@@ -246,8 +246,12 @@ public sealed class StorySimulationService(
                 .Select(kvp => new StorySimFlagDto(kvp.Key, kvp.Value))
                 .ToList(),
             session.Simulator.GetLifecycles(snapshot)
-                .Select(kvp => new StorySimNodeStateDto(kvp.Key, kvp.Value.ToString(),
-                    fireCounts.GetValueOrDefault(kvp.Key)))
+                .Select(kvp =>
+                {
+                    var gate = session.Simulator.GetGate(snapshot, kvp.Key);
+                    return new StorySimNodeStateDto(kvp.Key, kvp.Value.ToString(),
+                        fireCounts.GetValueOrDefault(kvp.Key), gate?.Label, gate?.Progress);
+                })
                 .ToList(),
             session.Simulator.GetInterventions(snapshot)
                 .Select(i => new StorySimInterventionDto(i.Kind, i.NodeId, i.EventName, i.EventType, i.Options,

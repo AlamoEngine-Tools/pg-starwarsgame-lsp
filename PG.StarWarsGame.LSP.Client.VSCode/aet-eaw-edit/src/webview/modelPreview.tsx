@@ -21,13 +21,13 @@
 import {
     Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from 'react';
-import { createRoot } from 'react-dom/client';
+import {createRoot} from 'react-dom/client';
 import styled from 'styled-components';
 import * as THREE from 'three';
 // Static, not dynamic: the webview is bundled as an IIFE, which cannot be code-split, so an
 // `await import()` here would not build.
-import { DDSLoader } from 'three/examples/jsm/loaders/DDSLoader.js';
-import { TGALoader } from 'three/examples/jsm/loaders/TGALoader.js';
+import {DDSLoader} from 'three/examples/jsm/loaders/DDSLoader.js';
+import {TGALoader} from 'three/examples/jsm/loaders/TGALoader.js';
 
 import {
     AlamoParticleContent, GetModelDetailResult, GetModelGlbResult, GetModelTextureResult,
@@ -37,18 +37,18 @@ import {
     ModelDetail, PREVIEW_SCENE_KIND, PreviewParticle,
     PreviewProblem, PreviewRgba, PreviewScene,
 } from '../protocol/modelPreview';
-import { worstSeverity } from './loc/validateState';
-import { collectTextureNames } from './preview/materials';
-import { type InspectorSubject } from './preview/inspectorSubject';
-import { AssetLedger, loadState, type LoadTally } from './preview/loadProgress';
-import { anchorFlyout } from './preview/flyoutAnchor';
-import { groundRange, snapToZero } from './preview/groundRange';
-import { InfoBadge } from './shared/InfoBadge';
-import { Button, IconButton } from './shared/Button';
-import { DockSection } from './shared/DockSection';
-import { Field } from './shared/Field';
-import { Icon, type IconName } from './shared/Icon';
-import { addressingFor } from './preview/textures';
+import {worstSeverity} from './loc/validateState';
+import {collectTextureNames} from './preview/materials';
+import {type InspectorSubject} from './preview/inspectorSubject';
+import {AssetLedger, loadState, type LoadTally} from './preview/loadProgress';
+import {anchorFlyout} from './preview/flyoutAnchor';
+import {groundRange, snapToZero} from './preview/groundRange';
+import {InfoBadge} from './shared/InfoBadge';
+import {Button, IconButton} from './shared/Button';
+import {DockSection} from './shared/DockSection';
+import {Field} from './shared/Field';
+import {Icon, type IconName} from './shared/Icon';
+import {addressingFor} from './preview/textures';
 import {
     DEFAULT_LIGHT_AZIMUTH_DEGREES, DEFAULT_LIGHT_ELEVATION_DEGREES,
 } from './preview/lighting';
@@ -61,44 +61,45 @@ import {
     visibleTreeRows, withDescendants,
     type TreeItem, type TreeKind,
 } from './preview/previewTree';
-import { PreviewViewport, type PresetView, type ViewportStats } from './preview/viewport';
+import {PreviewViewport, type PresetView, type ViewportStats} from './preview/viewport';
 import {
-    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
+    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, playerCss, problemsPanelCss, rightDockCss,
     rotarySwitchCss, stageChromeCss, stageFlyoutCss,
 } from './shared/dockChrome';
-import { ProblemsPanel } from './shared/ProblemsPanel';
-import { affiliationColour, colorizationFor, parseHex, toHex } from './preview/colour';
-import { reviewFactionColour, type ColourFinding } from './preview/colourUsability';
-import { translateEffect } from './preview/fx/effect';
-import { lightBearing } from './preview/lightBearing';
-import { cameraPose, cameraViewOptions, modelCameraEntries } from './preview/modelCameras';
-import { becauseText, setRow } from './preview/visibility';
-import { rowEye, type EyeState } from './preview/rowEye';
+import {ProblemsPanel} from './shared/ProblemsPanel';
+import {affiliationColour, colorizationFor, parseHex, toHex} from './preview/colour';
+import {reviewFactionColour, type ColourFinding} from './preview/colourUsability';
+import {translateEffect} from './preview/fx/effect';
+import {lightBearing} from './preview/lightBearing';
+import {cameraPose, cameraViewOptions, modelCameraEntries} from './preview/modelCameras';
+import {becauseText, setRow} from './preview/visibility';
+import {rowEye, type EyeState} from './preview/rowEye';
 import {
     luaFor, poseFromPreset, presetFromPose, type CameraPreset,
 } from './preview/cameraPresets';
-import { bindingFor, type CameraBinding, type PreviewSubject } from './preview/cameraBindings';
-import { CAPTURE_SIZES, captureFileName, captureSize } from './preview/capture';
-import { BREAKOFF_ATTACHMENT, VIEWPORT_BACKGROUND } from './preview/viewport';
-import { parseFxManifest, selectTechnique } from './preview/fx/fxParser';
-import { materialStateFrom } from './preview/fx/renderState';
+import {bindingFor, type CameraBinding, type PreviewSubject} from './preview/cameraBindings';
+import {CAPTURE_SIZES, captureFileName, captureSize} from './preview/capture';
+import {BREAKOFF_ATTACHMENT, VIEWPORT_BACKGROUND} from './preview/viewport';
+import {parseFxManifest, selectTechnique} from './preview/fx/fxParser';
+import {materialStateFrom} from './preview/fx/renderState';
 import {
     collisionMeshNames, decalNames, effectPlaysNow,
     hardpointGateAllows, partHidden,
 } from './preview/damage';
-import { passiveEffectPlaysNow, passiveEffects } from './preview/passiveSubject';
-import { stageForHull,
+import {passiveEffectPlaysNow, passiveEffects} from './preview/passiveSubject';
+import {
+    stageForHull,
     levelLabel, levelSteps, withDeclaredStages, type DefinedLevels, type LevelCost,
 } from './preview/levels';
 import {
     hardpointCards, hardpointFacts, healthBar, muzzleLabel, unitWeaponFacts, unitWeapons,
     weaponFacts,
 } from './preview/hardpointCards';
-import { groupHardpoints, groupOf } from './preview/hardpointGroups';
+import {groupHardpoints, groupOf} from './preview/hardpointGroups';
 import {
     countTreeNodes, searchIsOpen, treeFilterSummary, treeMinHeight,
 } from './preview/treeSearch';
-import type { PreviewBreakoffProp } from '../protocol/modelPreview';
+import type {PreviewBreakoffProp} from '../protocol/modelPreview';
 
 /**
  * Marks a GLB request as WRECKAGE rather than a scene part.
@@ -144,46 +145,47 @@ import {
     abilityRows, clipFor,
     gotoDefinitionTitle, shieldRevealed, stealthed, unboundEffectIds,
 } from './preview/abilityRows';
-import { problemLook, problemTag, problemWhere } from './shared/problemLook';
-import { cloneForDamage, deathCloneRows, turretSweeps } from './preview/deathClone';
+import {problemLook, problemTag, problemWhere} from './shared/problemLook';
+import {cloneForDamage, deathCloneRows, turretSweeps} from './preview/deathClone';
 import {
     TURRET_AT_REST, aimText, handlesForShownArcs, type TurretAim,
 } from './preview/turretHandles';
-import { spinAwayEnd, spinAwaySummary } from './preview/spinAway';
-import { BY_HAND, appendShot, damageLine, type DamageLogEntry } from './preview/damageLog';
-import { breakoffAnchor, breakoffFor, type BreakoffAnchor } from './preview/breakoff';
+import {spinAwayEnd, spinAwaySummary} from './preview/spinAway';
+import {BY_HAND, appendShot, damageLine, type DamageLogEntry} from './preview/damageLog';
+import {breakoffAnchor, breakoffFor, type BreakoffAnchor} from './preview/breakoff';
 import {
     hardpointPool, hullAfterHardpointDeath, hullPool, shieldGeneratorsDown, unitDestroyed,
     unitTargetable,
 } from './preview/unitPool';
-import { DEFAULT_HULL_CONSTRAINT, leashed } from './preview/healthPools';
-import { blastVictims, candidatesFrom } from './preview/blast';
-import { useEdgeResize } from './useEdgeResize';
-import { readPanelSize, writePanelSize } from './shared/panelLayout';
-import { poolSummary } from './preview/attacker';
+import {DEFAULT_HULL_CONSTRAINT, leashed} from './preview/healthPools';
+import {blastVictims, candidatesFrom} from './preview/blast';
+import {useEdgeResize} from './useEdgeResize';
+import {readPanelSize, writePanelSize} from './shared/panelLayout';
+import {poolSummary} from './preview/attacker';
 import {
     clipNamingModel, groupAnimations, playheadLabel, readClip, type AnimationAction,
 } from './preview/animationNames';
-import { isDeployedClip, weaponsInState } from './preview/deployedState';
-import { pickTake } from './preview/takeRoulette';
-import { AnimationTile } from './preview/AnimationTile';
-import { type ChoiceOption } from './shared/choice';
-import { ModeSelector } from './shared/ModeSelector';
-import { RotaryModeSwitch } from './shared/RotaryModeSwitch';
-import { subjectStateFrom, type SubjectState } from './preview/subjectState';
+import {isDeployedClip, weaponsInState} from './preview/deployedState';
+import {pickTake} from './preview/takeRoulette';
+import {AnimationTile} from './preview/AnimationTile';
+import {type ChoiceOption} from './shared/choice';
+import {ModeSelector} from './shared/ModeSelector';
+import {RotaryModeSwitch} from './shared/RotaryModeSwitch';
+import {subjectStateFrom, type SubjectState} from './preview/subjectState';
 import {
     colourFromHex, hexFromColour, viewerSettingsFrom, DEFAULT_LIGHTS, DEFAULT_VIEWER_SETTINGS,
     LIGHT_LABELS, LIGHT_NAMES, type DirectionalName, type DirectionalSetting, type LightRig,
     type BackgroundKind, type Wind,
 } from './preview/viewerSettings';
-import { projectSettingsFrom, type AttackerPreset } from './preview/projectSettings';
-import { shadowTintReach, type ShadowTintReach } from './preview/shadowVolumePass';
-import { RightDock } from './shared/RightDock';
+import {projectSettingsFrom, type AttackerPreset} from './preview/projectSettings';
+import {shadowTintReach, type ShadowTintReach} from './preview/shadowVolumePass';
+import {RightDock} from './shared/RightDock';
 
-import { initPanelLayout } from './shared/panelLayoutBridge';
-import { SeverityTag } from './shared/SeverityTag';
+import {initPanelLayout} from './shared/panelLayoutBridge';
+import {SeverityTag} from './shared/SeverityTag';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
+
 const vscode = acquireVsCodeApi();
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
@@ -192,14 +194,14 @@ initPanelLayout(vscode);
 
 /** Messages the panel host sends in. */
 type HostMessage =
-    // `refresh` marks a re-read of the same subject after the tree behind it changed, as
-    // opposed to a subject being opened. The difference is what the reader already has on
-    // screen and must keep - the camera above all.
+// `refresh` marks a re-read of the same subject after the tree behind it changed, as
+// opposed to a subject being opened. The difference is what the reader already has on
+// screen and must keep - the camera above all.
     | { type: 'scene'; scene: PreviewScene; refresh?: boolean }
     | {
-        type: 'glb'; partId: string; attachToPartId?: string | null; attachBone?: string | null;
-        result: GetModelGlbResult;
-    }
+    type: 'glb'; partId: string; attachToPartId?: string | null; attachBone?: string | null;
+    result: GetModelGlbResult;
+}
     | { type: 'texture'; name: string; result: GetModelTextureResult }
     | { type: 'modelDetail'; modelReference: string; result: GetModelDetailResult }
     | { type: 'inspectorClosed' }
@@ -302,25 +304,39 @@ const Shell = styled.div`
     flex-direction: column;
     min-height: 0;
 
-/* The header keeps its full height from the first frame, before the dial that fills it has
-       anything to show.
+    /* The header keeps its full height from the first frame, before the dial that fills it has
+           anything to show.
+    
+           Without this it opened at the default height with only the two anchored buttons in it, then
+           grew when the scene arrived and the dial appeared - so the top of the dock visibly drew
+           itself in two steps. The story graph never did that because its dial is there from the start;
+           78px is its measurement, and the same dial goes here. */
 
-       Without this it opened at the default height with only the two anchored buttons in it, then
-       grew when the scene arrived and the dial appeared - so the top of the dock visibly drew
-       itself in two steps. The story graph never did that because its dial is there from the start;
-       78px is its measurement, and the same dial goes here. */
-    .dock-header { min-height: 78px; }
+    .dock-header {
+        min-height: 78px;
+    }
 
     /* The header's centre slot holds the dial ALONE, so it reads as centred rather than as one item
        in a row - the graph's own layout, one anchored button either side. */
     /* The dial and the two hand-off buttons are one centred column, so the buttons sit under the
        thing they belong to rather than in a corner of the header. */
-    .header-modes { display: inline-flex; flex-direction: column; align-items: center; gap: var(--space-2); }
-    .header-handoff { display: inline-flex; gap: var(--space-6); }
+
+    .header-modes {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .header-handoff {
+        display: inline-flex;
+        gap: var(--space-6);
+    }
 
     /* The model's identity, floating under the button that opens it. Anchored to the header, which
        is position: relative and clips nothing - inside the content it would be trapped by that
        panel's own scroll box. */
+
     .model-info {
         position: absolute;
         top: calc(100% + 8px);
@@ -338,19 +354,23 @@ const Shell = styled.div`
 
     /* The caret, which is what makes it read as coming FROM the button rather than as a panel that
        happens to be nearby. Two squares: the border first, then the fill a pixel over it. */
+
     .model-info::before,
     .model-info::after {
         content: '';
         position: absolute;
         left: 12px;
-        width: 8px; height: 8px;
+        width: 8px;
+        height: 8px;
         transform: rotate(45deg);
     }
+
     .model-info::before {
         top: -5px;
         border: var(--space-1) solid var(--vscode-panel-border, #444);
         background: var(--vscode-panel-border, #444);
     }
+
     .model-info::after {
         top: -4px;
         background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
@@ -364,11 +384,15 @@ const Shell = styled.div`
 
     /* With the tree, not in the foot: the text box and the kind chips narrow the same list, and
        splitting them across two levels of the dock left the box acting on something out of sight. */
-/* Room to breathe. Every control in this section had been tuned down to 1-2px of padding to
-       win back vertical space for the tree - which stopped being the trade the moment the tree got
-       the top of the panel to itself. Squeezed rows are harder to hit and harder to scan, and the
-       saving was a dozen pixels. */
-    .dock-section { gap: var(--space-8); }
+    /* Room to breathe. Every control in this section had been tuned down to 1-2px of padding to
+           win back vertical space for the tree - which stopped being the trade the moment the tree got
+           the top of the panel to itself. Squeezed rows are harder to hit and harder to scan, and the
+           saving was a dozen pixels. */
+
+    .dock-section {
+        gap: var(--space-8);
+    }
+
     /* The tree's search: a magnifier and, next to it, either the kind filters or the box.
 
        One element rather than two blocks with a gap. border-box on the input because the loose one
@@ -377,10 +401,17 @@ const Shell = styled.div`
     /* A hardpoint card. A bordered block rather than a list row, because it carries four kinds of
        thing - a name, the game's own words, its measurements and its switches - and a flat row put
        them all on one line where none of them read. */
-    .hardpoint-cards { display: flex; flex-direction: column; gap: var(--space-6); margin: 0 0 var(--space-8); }
+
+    .hardpoint-cards {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6);
+        margin: 0 0 var(--space-8);
+    }
 
     /* A type heading over the cards it gathers. Quieter than the section's own title - this is a
        division INSIDE the list, not another list. */
+
     .card-group-title {
         display: flex;
         align-items: center;
@@ -399,17 +430,31 @@ const Shell = styled.div`
         opacity: 0.6;
         color: var(--vscode-descriptionForeground, #999);
     }
-    .card-group-title .section-count { margin-left: auto; }
-    .card-group-title:hover { background: var(--vscode-list-hoverBackground); opacity: 0.9; }
+
+    .card-group-title .section-count {
+        margin-left: auto;
+    }
+
+    .card-group-title:hover {
+        background: var(--vscode-list-hoverBackground);
+        opacity: 0.9;
+    }
 
     /* The hardpoint list's search sits in the flow above the cards rather than floating on them:
        there is no list box here for it to float over, and the section already scrolls as one. */
-    .hardpoint-search { position: static; margin: var(--space-2) 0 var(--space-6); padding: 0; background: none;
-        border: none; }
+
+    .hardpoint-search {
+        position: static;
+        margin: var(--space-2) 0 var(--space-6);
+        padding: 0;
+        background: none;
+        border: none;
+    }
 
     /* What the attacker is aimed at, said rather than chosen. */
     /* Pressed. The one control on the stage that FIRES rather than latching, so it says so for a
        moment and then goes quiet - red because that is what it just did to the model. */
+
     .icon-btn.as-action.fired {
         background: var(--vscode-charts-red, #f14c4c);
         border-color: var(--vscode-charts-red, #f14c4c);
@@ -419,6 +464,7 @@ const Shell = styled.div`
     /* The log. Monospace, because the numbers are the point and a proportional font makes a
        column of them impossible to compare down. Newest first, so the shot you just fired is the
        line under your eye rather than the one you have to scroll to. */
+
     .damage-log {
         list-style: none;
         margin: 0 0 var(--space-8);
@@ -428,6 +474,7 @@ const Shell = styled.div`
         font-family: var(--vscode-editor-font-family, monospace);
         font-size: var(--font-size-smaller);
     }
+
     .damage-log li {
         padding: var(--space-2) var(--space-2);
         border-bottom: var(--space-1) solid var(--vscode-panel-border, #333);
@@ -435,10 +482,15 @@ const Shell = styled.div`
            a horizontal scrollbar under the whole flyout. */
         overflow-wrap: anywhere;
     }
-    .damage-log li:last-child { border-bottom: none; }
+
+    .damage-log li:last-child {
+        border-bottom: none;
+    }
+
     /* The pools, above the shots that moved them. A definition list because that is what it is:
        each pool named, then said in full. */
     /* The pools, in one line above the shots that moved them. */
+
     .pool-summary {
         margin: 0 0 var(--space-4) 0;
         padding: 0 0 var(--space-4) 0;
@@ -453,9 +505,16 @@ const Shell = styled.div`
     /* Given a height by the grip, the LIST is what should grow - not the empty space under it.
        Its own max-height was fixed at 220px, so dragging the flyout taller moved the Clear button
        down and nothing else. */
-    .stage-flyout.sizeable .damage-log { flex: 1 1 auto; max-height: none; min-height: 0; }
+
+    .stage-flyout.sizeable .damage-log {
+        flex: 1 1 auto;
+        max-height: none;
+        min-height: 0;
+    }
+
     /* The workings, subordinate to the sentence they explain. Monospace because they are numbers
        lining up, and dimmed because the sentence is what a reader scans first. */
+
     .damage-log .log-workings {
         list-style: none;
         margin: var(--space-1) 0 0 0;
@@ -465,13 +524,28 @@ const Shell = styled.div`
         opacity: 0.7;
         font-variant-numeric: tabular-nums;
     }
-    .damage-log .log-workings li { padding: 0; border-bottom: none; }
+
+    .damage-log .log-workings li {
+        padding: 0;
+        border-bottom: none;
+    }
+
     /* The shot that finished something, and the shot that did nothing: the two lines a reader is
        scanning for. Everything between them is ordinary and stays quiet. */
-    .damage-log .log-kill { color: var(--vscode-charts-red, #f14c4c); }
-    .damage-log .log-nothing { opacity: 0.55; }
 
-    .fire-target { font-family: var(--vscode-editor-font-family, monospace); opacity: 0.85; }
+    .damage-log .log-kill {
+        color: var(--vscode-charts-red, #f14c4c);
+    }
+
+    .damage-log .log-nothing {
+        opacity: 0.55;
+    }
+
+    .fire-target {
+        font-family: var(--vscode-editor-font-family, monospace);
+        opacity: 0.85;
+    }
+
     /* Written as part-list li and not just hardpoint-card.
 
        A card IS an li of a part list, and that selector - one class plus an element - OUTWEIGHS a
@@ -479,6 +553,7 @@ const Shell = styled.div`
        has been rendering at the list's 3px by 6px with a 1px gap, which is what "the health bar and
        muzzle selectors are smashed together" was. The numbers below are the roomier ones the user
        asked to carry over from the story graph's tiles. */
+
     .part-list li.hardpoint-card {
         display: flex;
         flex-direction: column;
@@ -491,16 +566,26 @@ const Shell = styled.div`
         border-radius: var(--radius-6);
         cursor: pointer;
     }
-    .hardpoint-card:hover { background: var(--vscode-list-hoverBackground); }
+
+    .hardpoint-card:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
     /* The selected card is the one the attacker is aimed at, which is the same state the Fire at
        list and the targeting marks show. One fact, three places, one highlight. */
+
     .hardpoint-card.selected {
         background: var(--vscode-list-activeSelectionBackground);
         border-color: var(--vscode-focusBorder);
     }
+
     /* Shot away. Dimmed rather than struck through or removed: it is still a card you can press to
        put back, and a row that vanishes when destroyed takes the way back with it. */
-    .hardpoint-card.gone .part-name { opacity: 0.5; text-decoration: line-through; }
+
+    .hardpoint-card.gone .part-name {
+        opacity: 0.5;
+        text-decoration: line-through;
+    }
 
     /* A death clone card is a READING, not a control: the card itself does nothing and only the
        jump in its corner does. So it drops the hardpoint card's pointer and its hover, both of
@@ -510,24 +595,50 @@ const Shell = styled.div`
        A unit weapon card is the same: pressing a hardpoint card aims the attacker at it, and a unit
        weapon is not a target, so there is nothing for the card body itself to do. Its buttons are
        still buttons. */
-    .clone-card, .weapon-card { cursor: default; }
-    .clone-card:not(.selected):hover, .weapon-card:hover { background: none; }
+
+    .clone-card, .weapon-card {
+        cursor: default;
+    }
+
+    .clone-card:not(.selected):hover, .weapon-card:hover {
+        background: none;
+    }
 
     /* No wreck at all: the object is not defined anywhere, or it declares no tactical model. The
        one thing worth saying on a clone card beyond the mapping itself. */
-    .card-unresolved { color: var(--vscode-editorWarning-foreground, #cca700); }
+
+    .card-unresolved {
+        color: var(--vscode-editorWarning-foreground, #cca700);
+    }
 
     /* Title line: the name, and the jump pushed to the far corner. */
-    .card-head { display: flex; align-items: center; gap: var(--space-6); }
-    .card-head .part-name { font-weight: 600; }
-    .card-head .goto-definition, .card-head .icon-btn { margin-left: auto; flex-shrink: 0; }
+
+    .card-head {
+        display: flex;
+        align-items: center;
+        gap: var(--space-6);
+    }
+
+    .card-head .part-name {
+        font-weight: 600;
+    }
+
+    .card-head .goto-definition, .card-head .icon-btn {
+        margin-left: auto;
+        flex-shrink: 0;
+    }
 
     /* The Type, which is game data rather than prose - it picks the reticle and it is what a reader
        greps their own files for. */
-    .card-type { font-family: var(--vscode-editor-font-family, monospace); opacity: 0.75; }
+
+    .card-type {
+        font-family: var(--vscode-editor-font-family, monospace);
+        opacity: 0.75;
+    }
 
     /* Small, and dimmed when the game would not draw it. The card says Is_Targetable in words as
        well; this is the picture of the same fact. */
+
     .card-reticle {
         width: 16px;
         height: 16px;
@@ -537,6 +648,7 @@ const Shell = styled.div`
 
     /* The pool, as a bar with its own numbers on it. A bar alone cannot be checked against a file
        and a number alone cannot be read at a glance, so it carries both. */
+
     .card-health {
         position: relative;
         display: block;
@@ -545,7 +657,13 @@ const Shell = styled.div`
         overflow: hidden;
         background: var(--vscode-input-background, rgba(128, 128, 128, 0.18));
     }
-    .card-health-fill { display: block; height: 100%; transition: width 0.15s linear; }
+
+    .card-health-fill {
+        display: block;
+        height: 100%;
+        transition: width 0.15s linear;
+    }
+
     .card-health-label {
         position: absolute;
         inset: 0;
@@ -564,17 +682,28 @@ const Shell = styled.div`
     /* One row per fire bone, full width: the slot on the left and the bone it names beside it. They
        were inline pills showing the bone alone, which says where a shot leaves from but not which
        of Fire_Bone_A and _B declared it. */
-    .bone-picks { display: flex; flex-direction: column; gap: var(--space-4); }
+
+    .bone-picks {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
 
     /* Where the turret is pointed, with the way back to rest beside it. A readout rather than a
        control, so the numbers lead and the button sits at the end of the row. */
+
     .turret-aim {
         display: flex;
         align-items: center;
         gap: var(--space-6);
         margin-top: var(--space-4);
     }
-    .turret-aim .detail { flex: 1; font-variant-numeric: tabular-nums; }
+
+    .turret-aim .detail {
+        flex: 1;
+        font-variant-numeric: tabular-nums;
+    }
+
     .muzzle-row {
         display: flex;
         align-items: center;
@@ -589,13 +718,26 @@ const Shell = styled.div`
         cursor: pointer;
         text-align: left;
     }
-    .muzzle-row:hover:not(:disabled) { background: var(--vscode-list-hoverBackground); }
+
+    .muzzle-row:hover:not(:disabled) {
+        background: var(--vscode-list-hoverBackground);
+    }
+
     .muzzle-row.selected {
         border-color: var(--vscode-focusBorder);
         background: var(--vscode-list-activeSelectionBackground);
     }
-    .muzzle-row:disabled { opacity: 0.45; cursor: default; }
-    .muzzle-slot { flex: 0 0 auto; opacity: 0.75; }
+
+    .muzzle-row:disabled {
+        opacity: 0.45;
+        cursor: default;
+    }
+
+    .muzzle-slot {
+        flex: 0 0 auto;
+        opacity: 0.75;
+    }
+
     .muzzle-bone {
         font-family: var(--vscode-editor-font-family, monospace);
         overflow: hidden;
@@ -604,6 +746,7 @@ const Shell = styled.div`
 
     /* The measurements, behind the info button. A definition list because that is what it is - a
        label and a value - and it lines the values up in a column the eye can run down. */
+
     .card-info {
         display: grid;
         grid-template-columns: auto 1fr;
@@ -612,20 +755,45 @@ const Shell = styled.div`
         padding: var(--space-8) var(--space-8);
         font-size: var(--font-size-smaller);
     }
-    .card-info dt { opacity: 0.65; }
-    .card-info dd { margin: 0; font-variant-numeric: tabular-nums; }
-    .card-info dd:only-child, .card-info dd:not(dt + dd) { grid-column: 1 / -1; opacity: 0.8; }
+
+    .card-info dt {
+        opacity: 0.65;
+    }
+
+    .card-info dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .card-info dd:only-child, .card-info dd:not(dt + dd) {
+        grid-column: 1 / -1;
+        opacity: 0.8;
+    }
 
     /* Pushed to the far end: the three on its left DO something to the model, and this one only
        says what the file holds. */
-    .card-actions .card-info-btn { margin-left: auto; }
+
+    .card-actions .card-info-btn {
+        margin-left: auto;
+    }
 
     /* The gaps that group the card. Each of these starts a new group, so the space goes above it. */
-    .hardpoint-card .card-health { margin-top: var(--space-8); }
-    .hardpoint-card .bone-picks { margin-top: var(--space-8); }
-    .card-actions { margin-top: var(--space-8); }
 
-    .tree-pane { position: relative; }
+    .hardpoint-card .card-health {
+        margin-top: var(--space-8);
+    }
+
+    .hardpoint-card .bone-picks {
+        margin-top: var(--space-8);
+    }
+
+    .card-actions {
+        margin-top: var(--space-8);
+    }
+
+    .tree-pane {
+        position: relative;
+    }
 
     /* Drawn ON the list, hard against its bottom-right corner.
 
@@ -633,6 +801,7 @@ const Shell = styled.div`
        which is the whole reason for floating it: sharing a row with the icons, the field measured
        58px of the 214 a docked panel has, and a bone name does not fit in 58px. Nothing moves when
        it opens, because the icons are anchored to the right edge either way. */
+
     .tree-search {
         position: absolute;
         right: 6px;
@@ -654,10 +823,14 @@ const Shell = styled.div`
         /* Its own plate. Rows run underneath it, and a transparent strip over a list of names is
            unreadable in both directions. */
         background: color-mix(in srgb,
-            var(--vscode-sideBar-background, #181818) 88%, transparent);
+        var(--vscode-sideBar-background, #181818) 88%, transparent);
         border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.3));
     }
-    .tree-search.open { left: 6px; }
+
+    .tree-search.open {
+        left: 6px;
+    }
+
     /* The basis is what decides where it wraps: below this it is not worth having on the row, and
        the whole line goes above the icons instead.
 
@@ -665,6 +838,7 @@ const Shell = styled.div`
        extension picks these up from the rule VS Code injects into a webview, but this one sits on
        a plate of its own over a list, where an input that merely happens to look right is one host
        stylesheet change away from looking wrong. Rounded to match the plate it stands in. */
+
     .tree-search .tree-filter {
         flex: 1 1 130px;
         min-width: 0;
@@ -683,44 +857,62 @@ const Shell = styled.div`
         font-family: inherit;
         font-size: inherit;
     }
+
     /* Inset, so the ring is drawn ON the field rather than growing it - an outline that adds a
        pixel each side would nudge the icons every time the box took focus. */
+
     .tree-search .tree-filter:focus {
         outline: var(--space-1) solid var(--vscode-focusBorder);
         outline-offset: -1px;
     }
+
     .tree-search .tree-filter::placeholder {
         color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
     }
+
     /* The one button that never moves. Everything else in this row is what it opens onto, so it
        keeps its width whichever of the two is showing. */
-    .tree-search .tree-search-toggle { flex: 0 0 auto; }
-    .tree-search-icons { display: flex; align-items: center; gap: var(--space-4); flex: 0 0 auto; }
+
+    .tree-search .tree-search-toggle {
+        flex: 0 0 auto;
+    }
+
+    .tree-search-icons {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        flex: 0 0 auto;
+    }
+
     /* The empty message keeps the list's own shape rather than the row's - no hover, no pointer,
        and it must not look like something you can click. */
-    .bone-tree .tree-empty { list-style: none; cursor: default; }
+
+    .bone-tree .tree-empty {
+        list-style: none;
+        cursor: default;
+    }
 
 
-/* Controls that describe the VIEW rather than the subject, docked to the stage's own corners.
+    /* Controls that describe the VIEW rather than the subject, docked to the stage's own corners.
+    
+           They belonged to nothing in the right-hand dock, which describes the MODEL, and between them
+           they filled it: the camera, five overlay pills, a faction dropdown with a colour well under
+           it and a renderer switch left no room for the one thing the foot is for, which is the
+           playback bar. On the stage each cluster sits next to what it acts on, and the dock is free.
+    
+           The plate itself is shared - see stageChromeCss. */
 
-       They belonged to nothing in the right-hand dock, which describes the MODEL, and between them
-       they filled it: the camera, five overlay pills, a faction dropdown with a colour well under
-       it and a renderer switch left no room for the one thing the foot is for, which is the
-       playback bar. On the stage each cluster sits next to what it acts on, and the dock is free.
-
-       The plate itself is shared - see stageChromeCss. */
     ${stageChromeCss}
-
-/* Each EDGE is one row rather than two independently placed corners.
-
-       Absolutely positioning a left cluster and a right cluster works until the stage is narrow -
-       and this panel is routinely docked beside code. A Star Destroyer offers twelve factions, so
-       its palette is fourteen swatches wide and would have run straight under the renderer switch.
-       As a row they meet in the middle and each plate wraps inside itself instead.
-
-       pointer-events is load-bearing: the row spans the whole stage, so left as it is it would
-       swallow every camera drag that started anywhere near the top or bottom of the viewport. The
-       row is transparent to the mouse and only the plates on it are not. */
+        /* Each EDGE is one row rather than two independently placed corners.
+        
+               Absolutely positioning a left cluster and a right cluster works until the stage is narrow -
+               and this panel is routinely docked beside code. A Star Destroyer offers twelve factions, so
+               its palette is fourteen swatches wide and would have run straight under the renderer switch.
+               As a row they meet in the middle and each plate wraps inside itself instead.
+        
+               pointer-events is load-bearing: the row spans the whole stage, so left as it is it would
+               swallow every camera drag that started anywhere near the top or bottom of the viewport. The
+               row is transparent to the mouse and only the plates on it are not. */
     .stage-row {
         position: absolute;
         left: 8px;
@@ -730,30 +922,44 @@ const Shell = styled.div`
         gap: var(--space-8);
         pointer-events: none;
     }
-    .stage-row > * { pointer-events: auto; }
-    .stage-row .stage-chrome { position: static; }
 
-    .stage-top { top: 8px; align-items: flex-start; }
-    .stage-bottom { bottom: 8px; align-items: flex-end; }
+    .stage-row > * {
+        pointer-events: auto;
+    }
 
-/* BOTH edges are three-slot rows now, and the middle slot is what the row is about: the colour
-       above, the ability command bar below.
+    .stage-row .stage-chrome {
+        position: static;
+    }
 
-       The bottom edge used to position two plates absolutely - a centred palette and a corner
-       switch - because as a flex row or a grid each squeezed the other, and below about 600px there
-       is genuinely not enough space for a centred strip AND a corner plate. That reasoning still
-       holds and is why the narrow case below still STACKS rather than compressing anything. What
-       changed is the count: the edge carries four groups now, and four absolutely-positioned plates
-       cannot be made to meet in the middle at all.
+    .stage-top {
+        top: 8px;
+        align-items: flex-start;
+    }
 
-       The container query measures the STAGE rather than the window, which is the thing that
-       actually varies - this panel is usually docked beside code. */
+    .stage-bottom {
+        bottom: 8px;
+        align-items: flex-end;
+    }
+
+    /* BOTH edges are three-slot rows now, and the middle slot is what the row is about: the colour
+           above, the ability command bar below.
+    
+           The bottom edge used to position two plates absolutely - a centred palette and a corner
+           switch - because as a flex row or a grid each squeezed the other, and below about 600px there
+           is genuinely not enough space for a centred strip AND a corner plate. That reasoning still
+           holds and is why the narrow case below still STACKS rather than compressing anything. What
+           changed is the count: the edge carries four groups now, and four absolutely-positioned plates
+           cannot be made to meet in the middle at all.
+    
+           The container query measures the STAGE rather than the window, which is the thing that
+           actually varies - this panel is usually docked beside code. */
     @container (max-width: 700px) {
         .stage-row {
             flex-direction: column;
             align-items: center;
             gap: var(--space-6);
         }
+
         /* Stacked, a slot is one centred line rather than a third of a row. */
         .stage-slot,
         .stage-slot-end,
@@ -763,27 +969,31 @@ const Shell = styled.div`
             max-width: 100%;
             justify-content: center;
         }
+
         /* Read outwards from the model in both directions: the actions nearest the edge, the
            standing choices furthest from it. Reversing the bottom keeps the attack tool closest to
            the bottom of the stage, where it was before the stack. */
-        .stage-bottom { flex-direction: column-reverse; }
+        .stage-bottom {
+            flex-direction: column-reverse;
+        }
     }
 
-/* A COLUMN, which is the one arrangement that cannot squash.
-
-       A wrapping flex row's intrinsic width is its largest item, not the sum - measured every way
-       round, this box reported 201px around 276px of children, unchanged by width: max-content,
-       min-width: max-content or an inline style, while a hard-coded width took effect. So as a row
-       it either clipped "Default | Game" into "Dif..|Ga..." or rendered the button outside its own
-       background, depending on how the wrapping was forced.
-
-       Stacked, the intrinsic width IS the widest row and there is nothing left to get wrong.
-
-       NOTE: the plate itself is gone - the switch lives in Scene > Effects now, where .field
-       already stacks. Kept as the record of why a segmented control cannot be laid out in a row
-       inside a max-width plate, in case anything else is ever put on that edge. */
+    /* A COLUMN, which is the one arrangement that cannot squash.
+    
+           A wrapping flex row's intrinsic width is its largest item, not the sum - measured every way
+           round, this box reported 201px around 276px of children, unchanged by width: max-content,
+           min-width: max-content or an inline style, while a hard-coded width took effect. So as a row
+           it either clipped "Default | Game" into "Dif..|Ga..." or rendered the button outside its own
+           background, depending on how the wrapping was forced.
+    
+           Stacked, the intrinsic width IS the widest row and there is nothing left to get wrong.
+    
+           NOTE: the plate itself is gone - the switch lives in Scene > Effects now, where .field
+           already stacks. Kept as the record of why a segmented control cannot be laid out in a row
+           inside a max-width plate, in case anything else is ever put on that edge. */
 
     /* A readout, not a control - so no hover, no pointer, and quieter than the switch above it. */
+
     .shader-state {
         display: flex;
         align-items: center;
@@ -794,12 +1004,13 @@ const Shell = styled.div`
         color: var(--vscode-descriptionForeground, #999);
     }
 
-/* The two side slots are EQUAL, which is the whole of what centres the middle one.
+    /* The two side slots are EQUAL, which is the whole of what centres the middle one.
+    
+           They were not: the leading spacer was flex 1 1 0 while the end slot took its natural
+           width, so the spacer grew to fill everything left over and shoved the palette rightwards into
+           the renderer switch instead of balancing it. A centred element needs the same amount of
+           nothing on both sides. */
 
-       They were not: the leading spacer was flex 1 1 0 while the end slot took its natural
-       width, so the spacer grew to fill everything left over and shoved the palette rightwards into
-       the renderer switch instead of balancing it. A centred element needs the same amount of
-       nothing on both sides. */
     .stage-slot {
         flex: 1 1 0;
         min-width: 0;
@@ -808,16 +1019,30 @@ const Shell = styled.div`
         gap: var(--space-8);
         flex-wrap: wrap;
     }
-    .stage-slot-end { justify-content: flex-end; }
+
+    .stage-slot-end {
+        justify-content: flex-end;
+    }
+
     /* The middle slot centres its contents; the two side slots being EQUAL is what centres the
        slot itself. */
-    .stage-slot-mid { justify-content: center; }
-    .stage-bottom .stage-slot { align-items: flex-end; }
+
+    .stage-slot-mid {
+        justify-content: center;
+    }
+
+    .stage-bottom .stage-slot {
+        align-items: flex-end;
+    }
 
     /* Nothing in a side slot shrinks. Letting the renderer switch compress turned "Default | Game"
        into "Dif..|Ga..." - a control you can neither read nor aim at - while the palette in the
        middle wraps to another row perfectly well and stays centred doing it. */
-    .stage-slot .stage-chrome { flex: 0 0 auto; }
+
+    .stage-slot .stage-chrome {
+        flex: 0 0 auto;
+    }
+
     /* A mode selector sizes to its CONTENT on the stage, not to its container.
 
        NOTE: no backticks anywhere in this comment - the whole block is a template literal, and one
@@ -832,7 +1057,12 @@ const Shell = styled.div`
        The same trap the shader switch hit from the other side - see the .shader-corner note above,
        which is all that is left of it. A segmented control on this stage needs its own width, or it
        gets cut in half. */
-    .stage-chrome .mode-selector { flex-shrink: 0; width: auto; }
+
+    .stage-chrome .mode-selector {
+        flex-shrink: 0;
+        width: auto;
+    }
+
     .stage-chrome .mode-selector button {
         flex: 0 0 auto;
         min-width: max-content;
@@ -840,11 +1070,16 @@ const Shell = styled.div`
         text-overflow: clip;
         white-space: nowrap;
     }
-    .faction-palette { min-width: 0; justify-content: center; }
+
+    .faction-palette {
+        min-width: 0;
+        justify-content: center;
+    }
 
     /* A labelled control on a stage plate: the label INLINE and small, not above a full-width
        input the way the dock writes one. ALT and LOD are three letters and the number beside them
        is the whole answer, so the pair fits in the 22px box everything else on the stage uses. */
+
     .stage-field {
         display: flex;
         align-items: center;
@@ -852,7 +1087,11 @@ const Shell = styled.div`
         font-size: var(--font-size-smaller);
         white-space: nowrap;
     }
-    .stage-field > span { opacity: 0.7; }
+
+    .stage-field > span {
+        opacity: 0.7;
+    }
+
     /* A slider says WHERE you are on the axis but never WHAT that is, so the value beside it says
        so - in the health band the stage covers on the damage axis, in meshes and triangles on the
        detail one, and in words (undamaged, distant, close-up) wherever neither number is known.
@@ -861,17 +1100,29 @@ const Shell = styled.div`
        bar sideways mid-drag, and sized per axis rather than shared: 92px holds the damage axis's
        longest, "0 (undamaged)" at 88px, and the detail axis needs 165 for a model with four figures
        of meshes. Measured in this font by the harness probe measure-plate.js; do not guess. */
+
     .stage-field .stage-value {
         min-width: 92px;
         opacity: 0.85;
         font-variant-numeric: tabular-nums;
     }
-    .stage-field.detail .stage-value { min-width: 165px; }
+
+    .stage-field.detail .stage-value {
+        min-width: 165px;
+    }
+
     /* Short enough that two of them plus the renderer fit the left slot on a docked panel. */
-    .stage-field input[type=range] { width: 84px; }
+
+    .stage-field input[type=range] {
+        width: 84px;
+    }
+
     /* The tier count sits inline after its word, so it is sized to the two digits it holds rather
        than stretching like the fields above it. */
-    .stage-flyout .tier-count { width: 52px; }
+
+    .stage-flyout .tier-count {
+        width: 52px;
+    }
 
     .stage-chrome select {
         height: 22px;
@@ -886,6 +1137,7 @@ const Shell = styled.div`
 
     /* The command bar and the unit's pools, stacked. Two plates rather than one, so a subject with
        no abilities still gets its bars and a bare model gets neither. */
+
     .command-stack {
         display: flex;
         flex-direction: column;
@@ -900,6 +1152,7 @@ const Shell = styled.div`
        The min-width is the user's: room for a SECOND key whether or not the unit has one, so the
        bar does not resize as you move between units - and so the bars beneath it have a width worth
        drawing. Two 30px keys, the details button, and the gaps between them. */
+
     .ability-bar {
         flex-wrap: wrap;
         /* The keys pack from the LEFT, so ability one is leftmost whatever the unit has and a
@@ -910,13 +1163,18 @@ const Shell = styled.div`
         min-width: 148px;
         box-sizing: border-box;
     }
+
     /* The reading matter, pinned to the far end. It is the one thing in the bar that is not an
        ability, so it holds still while the keys grow towards it. */
-    .ability-bar > .icon-btn { margin-left: auto; }
+
+    .ability-bar > .icon-btn {
+        margin-left: auto;
+    }
 
     /* What the unit has left. Bars only - the numbers are on the hover and in the attacker's own
        readout, and three labelled rows under the command bar would be a panel rather than a
        glance. */
+
     .status-bars {
         display: flex;
         flex-direction: column;
@@ -925,7 +1183,12 @@ const Shell = styled.div`
         min-width: 148px;
         box-sizing: border-box;
     }
-    .status-bar { display: block; width: 100%; }
+
+    .status-bar {
+        display: block;
+        width: 100%;
+    }
+
     .status-bar-track {
         display: block;
         width: 100%;
@@ -934,12 +1197,18 @@ const Shell = styled.div`
         overflow: hidden;
         background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.25));
     }
+
     /* No transition on the width. A shot empties a pool in one step and the engine's own bars do
        not slide; animating it would show a number the simulation never held. */
-    .status-bar-fill { display: block; height: 100%; }
+
+    .status-bar-fill {
+        display: block;
+        height: 100%;
+    }
 
     /* A KEY, sized to the art rather than to a word. The atlas slot is 26x26 and the game draws it
        at that size; blown up, hand-drawn 26px art looks broken rather than large. */
+
     .stage-chrome .ability-key {
         width: 30px;
         height: 30px;
@@ -954,22 +1223,31 @@ const Shell = styled.div`
         cursor: pointer;
         overflow: hidden;
     }
+
     .stage-chrome .ability-key:hover:not(:disabled) {
         border-color: var(--vscode-focusBorder, #007fd4);
     }
+
     /* Active reads as PRESSED IN, not merely highlighted - it is a state you leave running while
        you look at what it did, so it has to survive the pointer moving away. */
+
     .stage-chrome .ability-key.active {
         background: var(--vscode-button-background, #0e639c);
         color: var(--vscode-button-foreground, #fff);
         border-color: var(--vscode-focusBorder, #007fd4);
     }
+
     /* An order - it drives nothing on this model. Dimmed rather than absent, and its tooltip says
        why: what a unit CAN do is worth reading even where the answer is "nothing you can see". */
-    .stage-chrome .ability-key:disabled { opacity: 0.4; cursor: default; }
+
+    .stage-chrome .ability-key:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
 
     /* The stand-in where no icon resolved: the first characters of the name, which at 30px is
        enough to tell two keys apart when the tooltip carries the rest. */
+
     .ability-key-text {
         font-size: var(--font-size-smallest);
         line-height: 1;
@@ -983,6 +1261,7 @@ const Shell = styled.div`
 
     /* Icon-only buttons are square rather than pill-shaped; the padding that makes room for a word
        beside the glyph just makes them lopsided without one. */
+
     .stage-chrome.icon-only .icon-btn {
         width: 22px;
         padding: 0;
@@ -993,6 +1272,7 @@ const Shell = styled.div`
        contents. A glyph and a word are different heights, and the plates ended up stepped: the
        scene globe stood taller than the preset words beside it and the camera button taller again.
        The box is the same and what sits in it is centred. */
+
     .stage-chrome .icon-btn, .stage-chrome .swatch, .stage-chrome .mode-selector button {
         height: 22px;
         font-size: var(--font-size-smaller);
@@ -1012,19 +1292,36 @@ const Shell = styled.div`
 
        The end radii come from the shared rule, which is interpolated above this one; all this has
        to do is stop overriding them. */
-    .stage-chrome .icon-btn, .stage-chrome .swatch { border-radius: var(--radius-6); }
-    .stage-chrome .mode-selector button { border-radius: 0; }
-    .stage-chrome .mode-selector button:first-child { border-radius: var(--radius-3) 0 0 var(--radius-3); }
-    .stage-chrome .mode-selector button:last-child { border-radius: 0 var(--radius-3) var(--radius-3) 0; }
+
+    .stage-chrome .icon-btn, .stage-chrome .swatch {
+        border-radius: var(--radius-6);
+    }
+
+    .stage-chrome .mode-selector button {
+        border-radius: 0;
+    }
+
+    .stage-chrome .mode-selector button:first-child {
+        border-radius: var(--radius-3) 0 0 var(--radius-3);
+    }
+
+    .stage-chrome .mode-selector button:last-child {
+        border-radius: 0 var(--radius-3) var(--radius-3) 0;
+    }
+
     /* Sized to the box above rather than to the glyph, which is what made the globe the odd one
        out - a 16px icon in a row of 0.9em words. */
     /* An icon is an SVG here, sized by the component. The stage's own buttons carry nothing else,
        so this only has to stop a glyph stretching the 22px box it sits in. */
-    .stage-chrome .icon-btn svg { flex-shrink: 0; }
+
+    .stage-chrome .icon-btn svg {
+        flex-shrink: 0;
+    }
 
     /* The colour IS the control, so the swatch carries no label - the faction's name is the title
        and reaches both a hover and a screen reader. Square and generous enough to judge a colour
        by, which a thin strip is not. */
+
     .faction-palette .swatch {
         width: 22px;
         height: 22px;
@@ -1034,12 +1331,15 @@ const Shell = styled.div`
         cursor: pointer;
         background-clip: padding-box;
     }
+
     /* The ring goes OUTSIDE the swatch. A border would eat into the colour being judged, and on a
        dark faction it is the only thing that says which one is applied. */
+
     .faction-palette .swatch.active {
         outline: 2px solid var(--vscode-focusBorder);
         outline-offset: 1px;
     }
+
     .faction-palette .swatch-plain {
         display: flex;
         align-items: center;
@@ -1047,7 +1347,9 @@ const Shell = styled.div`
         color: var(--vscode-descriptionForeground, #999);
         background: transparent;
     }
+
     /* Always last, whatever the roster does - see the markup. A divider says it is not a faction. */
+
     .faction-palette .swatch-custom {
         margin-left: var(--space-4);
         border-left: var(--space-1) solid var(--vscode-panel-border, #444);
@@ -1058,30 +1360,43 @@ const Shell = styled.div`
 
     /* The scene sits at the left of the stage and the camera at the right, mirroring the buttons
        that open them. The flyout itself is shared - see stageFlyoutCss. */
+
     ${stageFlyoutCss}
+        /* Everything below is the flyout being LESS CRAMPED, and every rule is scoped to it on purpose.
+           The .field and .dock-section rules come from shared/dockChrome.ts, which the story
+           graph, the localisation grid and the encyclopedia also wear - loosening them there is a
+           different decision from loosening this dialog, and not one this asked for.
+    
+           What was measured on the weapon flyout before this: sections 8px apart, a label 5px from its
+           control, checkbox rows 4px apart, and inputs on the browser's own padding - so the fields ran
+           together into one dense stack, and the projectile list drew its rows with no padding at all. */
+        /* A section is a GROUP. At 8px its fields butted into each other and the heading read as one
+           more row. */
+    .stage-flyout .dock-section {
+        gap: var(--space-12);
+    }
 
-    /* Everything below is the flyout being LESS CRAMPED, and every rule is scoped to it on purpose.
-       The .field and .dock-section rules come from shared/dockChrome.ts, which the story
-       graph, the localisation grid and the encyclopedia also wear - loosening them there is a
-       different decision from loosening this dialog, and not one this asked for.
+    .stage-flyout .field {
+        gap: var(--space-6);
+    }
 
-       What was measured on the weapon flyout before this: sections 8px apart, a label 5px from its
-       control, checkbox rows 4px apart, and inputs on the browser's own padding - so the fields ran
-       together into one dense stack, and the projectile list drew its rows with no padding at all. */
-
-    /* A section is a GROUP. At 8px its fields butted into each other and the heading read as one
-       more row. */
-    .stage-flyout .dock-section { gap: var(--space-12); }
-    .stage-flyout .field { gap: var(--space-6); }
     /* A row of switches needs more between them than a flex gap of 4, which put "Shield" and "Hull"
        close enough to read as one control with two boxes. */
-    .stage-flyout .view-row { gap: var(--space-8); }
+
+    .stage-flyout .view-row {
+        gap: var(--space-8);
+    }
+
     /* A note is prose and is the one thing here that wraps, so it gets the leading to match. */
-    .stage-flyout .field-note { line-height: 1.45; }
+
+    .stage-flyout .field-note {
+        line-height: 1.45;
+    }
 
     /* The controls themselves. Nothing gave these any padding, so a number sat hard against the
        left edge of its box. Not applied to the stage plates - the stage-chrome select is a 22px
        control on the stage edge and sets its own. */
+
     .stage-flyout input[type=text],
     .stage-flyout input[type=number],
     .stage-flyout select {
@@ -1091,18 +1406,37 @@ const Shell = styled.div`
     /* A list box, where the padding has to go on the ROWS - padding on the select itself indents
        the frame and leaves the rows as tight as they were. This is the control the report was
        most obviously about. */
-    .stage-flyout select[size] { padding: var(--space-2); }
-    .stage-flyout select[size] option { padding: var(--space-4) var(--space-6); border-radius: var(--radius-3); }
 
-    .body { flex: 1; display: flex; min-height: 0; }
+    .stage-flyout select[size] {
+        padding: var(--space-2);
+    }
+
+    .stage-flyout select[size] option {
+        padding: var(--space-4) var(--space-6);
+        border-radius: var(--radius-3);
+    }
+
+    .body {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+    }
 
     /* min-height: 0 is load-bearing - without it the canvas refuses to shrink below its content and
        shoves the problems bar off the bottom of the panel. */
-    .stage-column { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+    .stage-column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+    }
 
     /* The canvas needs a positioned parent so the bone labels can sit over it - and the stage
        chrome asks this element how wide it is, which is not the same question as how wide the
        window is. */
+
     .viewport {
         position: relative;
         flex: 1;
@@ -1117,6 +1451,7 @@ const Shell = styled.div`
        not worth looking at, and a scrim shows exactly the black untextured hull the reader
        complained about, only dimmer. It sits under the stage chrome's z-index so the view controls
        stay reachable - they act on the room, which is ready whether or not the model is. */
+
     .load-cover {
         position: absolute;
         inset: 0;
@@ -1143,21 +1478,32 @@ const Shell = styled.div`
     /* A reader who has asked for no motion gets none: the ring holds still and the counts
        underneath are what says the load is moving. */
     @media (prefers-reduced-motion: reduce) {
-        .load-spinner { animation: none; }
+        .load-spinner {
+            animation: none;
+        }
     }
 
     @keyframes load-spin {
-        to { transform: rotate(360deg); }
+        to {
+            transform: rotate(360deg);
+        }
     }
 
-    .load-label { letter-spacing: 0.02em; }
-    .load-detail { font-variant-numeric: tabular-nums; opacity: 0.7; }
+    .load-label {
+        letter-spacing: 0.02em;
+    }
+
+    .load-detail {
+        font-variant-numeric: tabular-nums;
+        opacity: 0.7;
+    }
 
     /* Absolutely positioned, NOT a flex child. The renderer sets the canvas width ATTRIBUTE, which
        becomes a flex item's min-content width, so the canvas could never shrink below its last size -
        and since it then measured wider than its parent, every resize made it bigger again. It reached
        1400px inside an 839px column. Taking it out of flow breaks the loop: it can only ever be the
        size of .viewport. */
+
     canvas {
         position: absolute;
         inset: 0;
@@ -1172,7 +1518,14 @@ const Shell = styled.div`
 
     /* Labels are DOM, not sprites: they stay crisp at any zoom, theme themselves, and can be read by
        a screen reader. pointer-events off, or they would swallow the drags that orbit the camera. */
-    .bone-labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+    .bone-labels {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+
     .bone-label {
         position: absolute;
         top: 0;
@@ -1185,6 +1538,7 @@ const Shell = styled.div`
         background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
         border-radius: var(--radius-3);
     }
+
     .bone-label.selected {
         color: var(--vscode-editor-background);
         background: var(--vscode-focusBorder);
@@ -1193,6 +1547,7 @@ const Shell = styled.div`
     /* The targeting marks. Shares the label layer, so it inherits pointer-events: none and the
        clipping - a reticle must never swallow the drag that orbits the camera. Sized in JS, from
        the fraction of the screen the game declares, so nothing here sets a width. */
+
     .reticle-mark {
         position: absolute;
         top: 0;
@@ -1210,8 +1565,14 @@ const Shell = styled.div`
        min-content width won over its set width, .body grew past the window, and the canvas stretched
        to 1400px inside an 1100px viewport. min-width: 0 lets the dock hold its size; the tree scrolls
        inside it instead. */
-    .right-dock { min-width: 0; }
-    .dock-content { min-width: 0; }
+
+    .right-dock {
+        min-width: 0;
+    }
+
+    .dock-content {
+        min-width: 0;
+    }
 
     /* Toggle buttons in the icon-btn / .active language the localisation search and the story
        graph's lane switches already use, rather than a checkbox row of their own invention.
@@ -1219,7 +1580,13 @@ const Shell = styled.div`
 
        .kind-filter and .selection-actions were the two blocks this pass folded away - the kinds
        into the search element, Reset into the section title - so only the overlay strip is left. */
-    .view-toggles { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+
+    .view-toggles {
+        display: flex;
+        gap: var(--space-4);
+        flex-wrap: wrap;
+    }
+
     .tree-search .icon-btn, .view-toggles .icon-btn {
         font-size: var(--font-size-smaller);
         padding: var(--space-2) var(--space-8);
@@ -1229,6 +1596,7 @@ const Shell = styled.div`
     /* A small picture, so a row's kind reads at a glance without widening every line in a deep
        tree. Sized as a BOX rather than by its contents - an icon that fails to load must still
        leave the row's columns lined up. */
+
     .row-kind {
         display: inline-flex;
         align-items: center;
@@ -1238,24 +1606,35 @@ const Shell = styled.div`
         height: 15px;
         opacity: 0.85;
     }
-    .row-kind.kind-bone { color: var(--vscode-charts-blue); }
-    .row-kind.kind-mesh { color: var(--vscode-charts-green); }
+
+    .row-kind.kind-bone {
+        color: var(--vscode-charts-blue);
+    }
+
+    .row-kind.kind-mesh {
+        color: var(--vscode-charts-green);
+    }
+
     /* kind-particle, which is what TreeKind calls it and what the row actually writes. This rule
        said kind-emitter and so had never matched anything: every effect row drew its icon in the
        body colour while the bones around it were blue, which is part of why a filtered tree read as
        bones with some grey text among them. */
-    .row-kind.kind-particle { color: var(--vscode-charts-orange); }
+
+    .row-kind.kind-particle {
+        color: var(--vscode-charts-orange);
+    }
 
 
-/* Scrolls inside itself rather than growing without limit.
-
-       The controls belong under the list, and a Star Destroyer's fifty rows would otherwise put the
-       filter fifty rows down the panel - "below" has to still mean "reachable". The list keeps the
-       top of the section, takes as much room as it needs up to this, and hands the rest back. */
+    /* Scrolls inside itself rather than growing without limit.
+    
+           The controls belong under the list, and a Star Destroyer's fifty rows would otherwise put the
+           filter fifty rows down the panel - "below" has to still mean "reachable". The list keeps the
+           top of the section, takes as much room as it needs up to this, and hands the rest back. */
     /* Scrolls DOWN only. Rows are nowrap so a name never breaks in half, which used to mean a
        deep tree with long hardpoint ids pushed the list sideways and put a horizontal scrollbar
        under it - and a tree you have to scroll sideways to read is a tree you cannot scan. The
        name gives up its tail instead; the whole of it is on the row's tooltip and in its details. */
+
     .bone-tree {
         list-style: none;
         margin: 0 0 var(--space-2);
@@ -1267,6 +1646,7 @@ const Shell = styled.div`
         overflow-x: hidden;
         max-height: 48vh;
     }
+
     .bone-row {
         display: flex;
         align-items: center;
@@ -1278,14 +1658,25 @@ const Shell = styled.div`
            stays as wide as its longest name and the list scrolls sideways anyway. */
         min-width: 0;
     }
+
     .bone-row .bone-name {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .bone-row:hover { background: var(--vscode-list-hoverBackground); }
-    .bone-row.selected { background: var(--vscode-list-activeSelectionBackground); }
-    .bone-row.hidden-bone .bone-name { opacity: 0.55; font-style: italic; }
+
+    .bone-row:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
+    .bone-row.selected {
+        background: var(--vscode-list-activeSelectionBackground);
+    }
+
+    .bone-row.hidden-bone .bone-name {
+        opacity: 0.55;
+        font-style: italic;
+    }
 
     /* A row the filter kept only to reach a match below it. The WHOLE row recedes - name, kind
        icon and controls together - because the complaint was about weight, not about text: an
@@ -1295,13 +1686,21 @@ const Shell = styled.div`
        Recessive, never removed. These rows are the only thing holding the hierarchy together, and
        they are still real rows worth hiding or inspecting - they just are not the answer. Hover
        brings the row back to full weight, so acting on one is never a fight. */
-    .bone-row.scaffold { opacity: 0.42; }
+
+    .bone-row.scaffold {
+        opacity: 0.42;
+    }
+
     .bone-row.scaffold:hover,
     .bone-row.scaffold.selected,
-    .bone-row.scaffold:focus-within { opacity: 1; }
+    .bone-row.scaffold:focus-within {
+        opacity: 1;
+    }
+
     /* A real box, not one the glyph gives it. Sized by its icon alone it is 12px wide and NO
        pixels tall, so the one control that folds a subtree is a hairline to aim at - and nothing
        at all if the icon font has not loaded. Same fault as the row's details button had. */
+
     .bone-row .twisty {
         display: inline-flex;
         align-items: center;
@@ -1311,9 +1710,19 @@ const Shell = styled.div`
         flex-shrink: 0;
         opacity: 0.7;
     }
-    .bone-row .twisty:hover { opacity: 1; }
-    .bone-row .twisty.leaf { visibility: hidden; }
-    .bone-row .bone-attach { color: var(--vscode-descriptionForeground); font-size: var(--font-size-smaller); }
+
+    .bone-row .twisty:hover {
+        opacity: 1;
+    }
+
+    .bone-row .twisty.leaf {
+        visibility: hidden;
+    }
+
+    .bone-row .bone-attach {
+        color: var(--vscode-descriptionForeground);
+        font-size: var(--font-size-smaller);
+    }
 
     /* The eye, and the pair of buttons it heads. Pushed to the far edge so they line up in a
        column whatever the names do - the eye first, then the row's details, which is the order the
@@ -1322,6 +1731,7 @@ const Shell = styled.div`
        The eye does NOT dim with its neighbour. It is the row's state as well as its control, so a
        tree of dimmed eyes would be a tree that will not say what it is showing; the details button
        beside it only ever offers an action. */
+
     .bone-row .row-eye {
         margin-left: auto;
         flex-shrink: 0;
@@ -1330,24 +1740,40 @@ const Shell = styled.div`
         padding: 0 var(--space-2);
         opacity: 0.85;
     }
-    .bone-row .row-eye:hover { opacity: 1; }
+
+    .bone-row .row-eye:hover {
+        opacity: 1;
+    }
 
     /* An open eye is the ordinary state and stays quiet. A CLOSED one is the reader's own doing
        nine times in ten, so it keeps full weight - a hidden row you cannot find the eye on is the
        tick that "did nothing" all over again. */
-    .bone-row .row-eye.eye-shown { opacity: 0.7; }
-    .bone-row:hover .row-eye.eye-shown { opacity: 1; }
+
+    .bone-row .row-eye.eye-shown {
+        opacity: 0.7;
+    }
+
+    .bone-row:hover .row-eye.eye-shown {
+        opacity: 1;
+    }
 
     /* Inherited: dimmed and inert, the way Blender greys an eye whose collection is hidden. The
        title says which ancestor, because a dead control that cannot explain itself is worse than
        no control. */
-    .bone-row .row-eye.eye-inherited { opacity: 0.4; }
-    .bone-row .row-eye.eye-inherited:disabled { cursor: default; }
+
+    .bone-row .row-eye.eye-inherited {
+        opacity: 0.4;
+    }
+
+    .bone-row .row-eye.eye-inherited:disabled {
+        cursor: default;
+    }
 
     /* Dim until the row is under the pointer - a deep tree has to read as a list of names, not a
        column of controls. Never hidden outright: a button that only exists on hover is one nobody
        finds, which is what the reader reported about this one. Raised from 0.25, where it was
        invisible against the default dark theme until hovered. */
+
     .bone-row .row-details {
         flex-shrink: 0;
         opacity: 0.45;
@@ -1358,12 +1784,16 @@ const Shell = styled.div`
         height: 18px;
         padding: 0 var(--space-2);
     }
+
     .bone-row:hover .row-details,
     .bone-row .row-details:focus-visible,
-    .bone-row .row-details.active { opacity: 1; }
+    .bone-row .row-details.active {
+        opacity: 1;
+    }
 
     /* Pinned against the WINDOW, because the row it belongs to lives inside a scroller that would
        clip it. placeInfo and placeCardInfo supply the corner; everything here is the box itself. */
+
     .details-flyout {
         position: fixed;
         z-index: 6;
@@ -1376,6 +1806,7 @@ const Shell = styled.div`
         background: var(--vscode-editorWidget-background, #202020);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
+
     .details-head {
         display: flex;
         align-items: baseline;
@@ -1384,6 +1815,7 @@ const Shell = styled.div`
         border-bottom: var(--space-1) solid var(--vscode-panel-border);
         font-size: var(--font-size-11);
     }
+
     .details-title {
         font-weight: 600;
         letter-spacing: 0.04em;
@@ -1392,8 +1824,10 @@ const Shell = styled.div`
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
     /* Takes what is left and gives it back: the title is what identifies the row, so it is the
        half that survives a narrow box. */
+
     .details-subtitle {
         flex: 1;
         min-width: 0;
@@ -1402,7 +1836,12 @@ const Shell = styled.div`
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .details-head .icon-btn { margin-left: auto; align-self: center; }
+
+    .details-head .icon-btn {
+        margin-left: auto;
+        align-self: center;
+    }
+
     .details-body {
         display: flex;
         flex-direction: column;
@@ -1415,6 +1854,7 @@ const Shell = styled.div`
        same bar in the same place. The relative position is the one that matters most: the shared
        panel renders its drag handle absolutely positioned, so without it the handle anchors to
        some ancestor and the panel cannot be resized at all. */
+
     .preview-problems {
         position: relative;
         flex-shrink: 0;
@@ -1429,7 +1869,12 @@ const Shell = styled.div`
     /* This editor's findings are PROSE, not the short entry labels the loc grids report, so they
        wrap instead of being clamped to one line - the shared rule's ellipsis would hide most of
        every message. The same override the encyclopedia already makes, for the same reason. */
-    .preview-problems .problem-row { align-items: flex-start; padding: var(--space-2) var(--space-6); }
+
+    .preview-problems .problem-row {
+        align-items: flex-start;
+        padding: var(--space-2) var(--space-6);
+    }
+
     .preview-problems .problem-msg {
         white-space: normal;
         overflow: visible;
@@ -1437,11 +1882,15 @@ const Shell = styled.div`
         /* A bone or file name has no break opportunity in it, so without this it runs off. */
         overflow-wrap: anywhere;
     }
-    .preview-problems .problem-row .codicon { margin-top: var(--space-2); }
+
+    .preview-problems .problem-row .codicon {
+        margin-top: var(--space-2);
+    }
 
     /* At the end of the row and out of the way: an id is what you look up AFTER reading the
        finding, so it must not compete with the sentence for the reader's eye. Monospaced because
        it is a literal string to be copied, and tabular so a column of them lines up. */
+
     .preview-problems .problem-id {
         flex: 0 0 auto;
         margin-left: auto;
@@ -1455,6 +1904,7 @@ const Shell = styled.div`
 
     /* Dimmer still, and italic: not an identifier, so it must not look like one that could be
        copied into a suppression comment. */
+
     .preview-problems .problem-id.render-time {
         font-family: inherit;
         font-style: italic;
@@ -1462,6 +1912,7 @@ const Shell = styled.div`
     }
 
     /* Which hardpoint, when the sentence does not already say so - see problemWhere. */
+
     .problem-where {
         flex-shrink: 0;
         padding: 0 var(--space-4);
@@ -1475,7 +1926,13 @@ const Shell = styled.div`
 
     /* A readout, not a menu: no hover state and no pointer, because nothing here is clickable yet.
        A row that looks pressable is a promise of interaction. */
-    .part-list { list-style: none; margin: 0; padding: 0; }
+
+    .part-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
     .part-list li {
         display: flex;
         flex-direction: column;
@@ -1484,12 +1941,22 @@ const Shell = styled.div`
         min-width: 0;
         cursor: default;
     }
-    .part-list li .field-label { min-width: 0; align-items: flex-start; }
-    .part-list li .field-label input[type=checkbox] { margin-top: var(--space-2); flex-shrink: 0; }
+
+    .part-list li .field-label {
+        min-width: 0;
+        align-items: flex-start;
+    }
+
+    .part-list li .field-label input[type=checkbox] {
+        margin-top: var(--space-2);
+        flex-shrink: 0;
+    }
+
     /* The name WRAPS; only the detail under it is clipped. Alamo hardpoint ids share a long prefix
        and differ in their last two characters, so one clipped line gave ten rows all reading
        "HP_Star_Destroyer_Weapon_..." - which is worse than a taller row, because it is the same
        row ten times. Two lines hold every id the shipped models use. */
+
     .part-list .part-name {
         overflow-wrap: anywhere;
         line-height: 1.25;
@@ -1498,8 +1965,10 @@ const Shell = styled.div`
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
+
     /* Indented to sit under the name rather than under its checkbox, and clipped to one line: a
        hardpoint's detail is a bone and a hitpoint count, which fits. */
+
     .part-list li .detail {
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1508,17 +1977,30 @@ const Shell = styled.div`
         font-size: var(--font-size-smaller);
         color: var(--vscode-descriptionForeground);
     }
+
     /* A weapon's is four separate facts - reach, cone, cadence, damage - and clipping them at the
        dock's width ended the row on "3 sho...", which says nothing about the cadence it is there
        to state. Wrapping costs a line; clipping costs the answer. */
+
     .part-list li .detail.wraps {
         white-space: normal;
         overflow: visible;
     }
+
     /* The command bar's own icon, at the size the atlas holds it. Blowing a 26x26 slot up makes
        hand-drawn art look broken; the game draws it at native size and so does this. */
-    .ability-row-head { display: flex; align-items: flex-start; gap: var(--space-6); min-width: 0; }
-    .ability-row-head .field-label, .ability-row-head .part-name { flex: 1; }
+
+    .ability-row-head {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-6);
+        min-width: 0;
+    }
+
+    .ability-row-head .field-label, .ability-row-head .part-name {
+        flex: 1;
+    }
+
     .ability-icon {
         width: 26px;
         height: 26px;
@@ -1526,9 +2008,13 @@ const Shell = styled.div`
         image-rendering: pixelated;
         display: block;
     }
+
     /* The tooltip text the game shows. Wraps - it is a sentence, and clipping it to the dock's
        width would end most of them mid-word. */
-    .part-list li .ability-description { font-style: italic; }
+
+    .part-list li .ability-description {
+        font-style: italic;
+    }
 
     /* An ability row carries four things now - art, name, what it drives, what the game calls it -
        where the list this styling comes from carries two. At the 1px gap and 3px padding the rest
@@ -1538,13 +2024,16 @@ const Shell = styled.div`
 
        NOTE: no backticks in this block - it lives inside a styled.div template literal, and one
        terminates it. That mistake reports itself as "Shell cannot be used as a JSX component". */
+
     .ability-list li {
         gap: var(--space-4);
         padding: var(--space-8) var(--space-6);
     }
+
     .ability-list li + li {
         border-top: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
     }
+
     /* How a jump LOOKS. Where it goes is the card head's business, and this used to decide that
        too: align-self flex-start and a 21px left margin put it under the text, indented past the
        icon, which is where it sat before the rows became cards.
@@ -1553,6 +2042,7 @@ const Shell = styled.div`
        Those two lines outlived the layout they were written for, and being the more specific rule
        they beat the head's own auto margin - so the jump on BOTH cards sat 21px after the name
        instead of at the right edge. Position removed; appearance kept. */
+
     .part-list li .goto-definition {
         padding: 0;
         border: none;
@@ -1562,20 +2052,30 @@ const Shell = styled.div`
         color: var(--vscode-textLink-foreground);
         cursor: pointer;
     }
-    .part-list li .goto-definition:hover:not(:disabled) { text-decoration: underline; }
+
+    .part-list li .goto-definition:hover:not(:disabled) {
+        text-decoration: underline;
+    }
+
     .part-list li .goto-definition:disabled {
         color: var(--vscode-disabledForeground);
         cursor: default;
     }
+
     /* Full width now, one row per fire bone - the 21px indent it carried lined it up with a jump
        that no longer sits under the name. */
-    .part-list li .bone-picks { margin-top: var(--space-2); }
+
+    .part-list li .bone-picks {
+        margin-top: var(--space-2);
+    }
+
     /* A count that can be pressed. Same type as the count beside it so the header does not jump
        when a selection appears, but with an affordance so it reads as the way out. */
     /* Pushed to the far end of the title, past the count. The class is the dock's own name for
        this position - the problems button uses it - so the two corners agree.
        NOTE: no backticks in this comment; one would end the template literal the whole stylesheet
        lives in, and the error surfaces far away as a TS1005. */
+
     .dock-section-title .header-right {
         margin-left: var(--space-6);
         flex: 0 0 auto;
@@ -1583,7 +2083,10 @@ const Shell = styled.div`
         height: 18px;
         padding: 0 var(--space-2);
     }
-    .dock-section-title .header-right:disabled { opacity: 0.35; }
+
+    .dock-section-title .header-right:disabled {
+        opacity: 0.35;
+    }
 
     .section-count.as-button {
         display: inline-flex;
@@ -1597,9 +2100,14 @@ const Shell = styled.div`
         font: inherit;
         cursor: pointer;
     }
-    .section-count.as-button:hover { background: var(--vscode-list-hoverBackground); }
+
+    .section-count.as-button:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
     /* A picked bone is boxed on the model, so its button carries the same weight as the active
        segment of a mode selector - it is a current state, not an action waiting to be taken. */
+
     .btn.selected {
         background: var(--vscode-button-background);
         color: var(--vscode-button-foreground);
@@ -1613,43 +2121,56 @@ const Shell = styled.div`
         padding: var(--space-1) var(--space-6);
         font-variant-numeric: tabular-nums;
     }
-    .stat-row .value { color: var(--vscode-descriptionForeground); }
 
-    .view-row { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
-
-    /* The clip library. Wide rows that look pressable, because they ARE the play control - there is
-       no separate play button and no dropdown to open first. */
-    .player { display: flex; flex-direction: column; gap: var(--space-6); }
-    .player-row { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
-    /* Six controls and a clock have to share one dock-wide row. The toolbar default leaves them
-       ~30px too wide at the dock's opening size, which wrapped the clock onto a line of its own. */
-    .player-row .icon-btn { min-width: 20px; padding: var(--space-4) var(--space-4); }
-    .player-row .player-time {
-        margin-left: auto;
-        padding-right: var(--space-4);
-        font-variant-numeric: tabular-nums;
-        font-size: var(--font-size-smaller);
+    .stat-row .value {
         color: var(--vscode-descriptionForeground);
     }
-    /* The travel direction is explicit on every slider in this panel. A range input takes it from
-       the inherited writing direction, so anything upstream that flips that - a host laying the
-       webview out right-to-left, a stray rule - silently runs the playhead backwards. These read a
-       timeline and a magnitude; both only make sense left to right.
+
+    .view-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        flex-wrap: wrap;
+    }
+
+    /* The transport itself is shared chrome (playerCss); the story graph's tick transport is the
+       same row. Only the preview's own field sliders are pinned here.
        (No backticks in here: this is a styled-components template literal.) */
-    .player-scrub, .player input[type=range], .field input[type=range] { direction: ltr; }
-    .player-scrub { width: 100%; }
-    .player-section { margin-bottom: var(--space-8); }
+
+    ${playerCss}
+    .field input[type=range] {
+        direction: ltr;
+    }
 
     /* No padding of its own now that it lives in the foot - the foot lays its children out with a
        gap. The old top padding was there to hold it off the tree it used to sit under. */
 
-    .anim-list { display: flex; flex-direction: column; gap: var(--space-2); }
+    .anim-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+
     /* A family, folded or open. The heading is the whole hit area, not just the chevron - a 13px
        target beside a word that obviously names the thing being folded is a target people miss. */
-    .anim-family { gap: var(--space-4); margin-bottom: var(--space-8); }
-    .anim-family:last-child { margin-bottom: 0; }
-    .dock-section-title.as-fold { cursor: pointer; user-select: none; }
-    .dock-section-title.as-fold:hover { color: var(--vscode-foreground, #ccc); }
+
+    .anim-family {
+        gap: var(--space-4);
+        margin-bottom: var(--space-8);
+    }
+
+    .anim-family:last-child {
+        margin-bottom: 0;
+    }
+
+    .dock-section-title.as-fold {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .dock-section-title.as-fold:hover {
+        color: var(--vscode-foreground, #ccc);
+    }
 
     /* An ACTION, as a full-width card down a list.
 
@@ -1661,7 +2182,12 @@ const Shell = styled.div`
 
        The shape is the user's: play state left and vertically centred, name on the top row left
        aligned, takes on the bottom row left aligned and filling right. */
-    .anim-list { display: flex; flex-direction: column; gap: var(--space-4); }
+
+    .anim-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
 
     .anim-card {
         display: flex;
@@ -1672,13 +2198,18 @@ const Shell = styled.div`
         border-radius: var(--radius-6);
         background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
     }
-    .anim-card:hover { background: var(--vscode-list-hoverBackground); }
+
+    .anim-card:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
     .anim-card.active {
         border-color: var(--vscode-button-background);
         background: color-mix(in srgb, var(--vscode-button-background) 22%, transparent);
     }
 
     /* Its own column, so it is centred across BOTH rows rather than sitting beside the name. */
+
     .anim-play {
         flex: 0 0 auto;
         display: flex;
@@ -1693,10 +2224,18 @@ const Shell = styled.div`
         color: inherit;
         cursor: pointer;
     }
-    .anim-play:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2)); }
-    .anim-play svg { flex-shrink: 0; opacity: 0.85; }
+
+    .anim-play:hover {
+        background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+    }
+
+    .anim-play svg {
+        flex-shrink: 0;
+        opacity: 0.85;
+    }
 
     /* min-width 0, or a long action name refuses to wrap and pushes the card wider than the dock. */
+
     .anim-card-body {
         display: flex;
         flex: 1 1 auto;
@@ -1704,10 +2243,15 @@ const Shell = styled.div`
         gap: var(--space-2);
         min-width: 0;
     }
-    .anim-name { text-align: left; overflow-wrap: anywhere; }
+
+    .anim-name {
+        text-align: left;
+        overflow-wrap: anywhere;
+    }
 
     /* WRAPS, where the tile scrolled. Nine idle takes fit on one line at full width and a model
        with thirty gets a second - which is readable, and a scrollbar over thirty was not. */
+
     .anim-takes {
         display: flex;
         flex-wrap: wrap;
@@ -1715,6 +2259,7 @@ const Shell = styled.div`
         gap: var(--space-2);
         width: 100%;
     }
+
     .anim-take {
         flex: 0 0 auto;
         min-width: 20px;
@@ -1727,11 +2272,16 @@ const Shell = styled.div`
         font-size: var(--font-size-smallest);
         cursor: pointer;
     }
-    .anim-take:hover { background: var(--vscode-list-hoverBackground); }
+
+    .anim-take:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
     .anim-take.active {
         background: var(--vscode-button-background);
         color: var(--vscode-button-foreground);
     }
+
     .anim-row {
         display: flex;
         align-items: center;
@@ -1747,26 +2297,37 @@ const Shell = styled.div`
         text-align: left;
         cursor: pointer;
     }
+
     .anim-row:hover {
         background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
         border-color: var(--vscode-focusBorder);
     }
+
     .anim-row.active {
         background: var(--vscode-button-background);
         color: var(--vscode-button-foreground);
     }
-    .anim-row svg { flex-shrink: 0; opacity: 0.8; }
-    .anim-row .anim-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .anim-row svg {
+        flex-shrink: 0;
+        opacity: 0.8;
+    }
+
+    .anim-row .anim-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 `;
 
 /** What a faction with no colour of its own is drawn as, and the custom well's starting point. */
-const NEUTRAL_COLOUR: PreviewRgba = { r: 184, g: 184, b: 184, a: 255 };
+const NEUTRAL_COLOUR: PreviewRgba = {r: 184, g: 184, b: 184, a: 255};
 
 const PRESETS: { view: PresetView; label: string; title: string }[] = [
-    { view: 'threeQuarter', label: '3/4', title: 'Look from three-quarters on' },
-    { view: 'front', label: 'Front', title: 'Look from the front' },
-    { view: 'side', label: 'Side', title: 'Look from the side' },
-    { view: 'top', label: 'Top', title: 'Look from above' },
+    {view: 'threeQuarter', label: '3/4', title: 'Look from three-quarters on'},
+    {view: 'front', label: 'Front', title: 'Look from the front'},
+    {view: 'side', label: 'Side', title: 'Look from the side'},
+    {view: 'top', label: 'Top', title: 'Look from above'},
 ];
 
 
@@ -1987,7 +2548,7 @@ function ModelPreview(): React.JSX.Element {
 
     /** Changes one directional, leaving the other two and the global terms alone. */
     const setLight = (name: DirectionalName, change: Partial<DirectionalSetting>): void =>
-        setLights(current => ({ ...current, [name]: { ...current[name], ...change } }));
+        setLights(current => ({...current, [name]: {...current[name], ...change}}));
 
     // How much further than the subject the camera can see. Fitted to the model AND its effects, so
     // 1 already clears a flamethrower's throw; the multiplier is for the trails no fit anticipates.
@@ -2033,7 +2594,7 @@ function ModelPreview(): React.JSX.Element {
     const [animationLoop, setAnimationLoop] = useState(true);
 
     /** Where the playhead is. Polled from the mixer, which is the only thing that knows. */
-    const [playhead, setPlayhead] = useState({ time: 0, duration: 0, running: false });
+    const [playhead, setPlayhead] = useState({time: 0, duration: 0, running: false});
 
     /**
      * True while the scrubber is held.
@@ -2117,15 +2678,19 @@ function ModelPreview(): React.JSX.Element {
      * no longer the height a reader wants. Same hook and same store as the problems panels, so the
      * grip behaves identically wherever it appears.
      */
-    const { size: logHeight, handleProps: logResizeN } = useEdgeResize(
+    const {size: logHeight, handleProps: logResizeN} = useEdgeResize(
         readPanelSize('preview.damageLog', 260), 120, 620, 'n',
-        value => { writePanelSize('preview.damageLog', value); });
+        value => {
+            writePanelSize('preview.damageLog', value);
+        });
 
     // Width as well as height. The lines are long - a factor, both operands and the pool either
     // side of the shot - and a fixed 304px column wrapped nearly every one of them.
-    const { size: logWidth, handleProps: logResizeW } = useEdgeResize(
+    const {size: logWidth, handleProps: logResizeW} = useEdgeResize(
         readPanelSize('preview.damageLog.width', 340), 280, 720, 'w',
-        value => { writePanelSize('preview.damageLog.width', value); });
+        value => {
+            writePanelSize('preview.damageLog.width', value);
+        });
     const [logOpen, setLogOpen] = useState(false);
 
     /**
@@ -2427,7 +2992,7 @@ function ModelPreview(): React.JSX.Element {
     const [translatedOn, setTranslatedOn] = useState(true);
 
     /** How many sub-meshes that actually reaches, out of how many are loaded. */
-    const [translatedCount, setTranslatedCount] = useState({ translated: 0, total: 0 });
+    const [translatedCount, setTranslatedCount] = useState({translated: 0, total: 0});
 
     /** Everything the model is made of, for the one tree. */
     const [treeItems, setTreeItems] = useState<TreeItem[]>([]);
@@ -2537,7 +3102,7 @@ function ModelPreview(): React.JSX.Element {
 
     /** What the pool readout and the status bars both read. */
     const poolOptions = useMemo(
-        () => ({ energy: energyPool, shieldsDown }), [energyPool, shieldsDown]);
+        () => ({energy: energyPool, shieldsDown}), [energyPool, shieldsDown]);
     const [hardpointHealth, setHardpointHealth] = useState<Record<string, number | null>>({});
     const [fireTarget, setFireTarget] = useState('hull');
 
@@ -2548,9 +3113,9 @@ function ModelPreview(): React.JSX.Element {
      * case a modder is checking. Tier 2 at most - it describes what you are inspecting right now,
      * not a habit - so it resets with the subject rather than being stored.
      */
-    // Fixed. The tracked twin comes from HOVERING a mark, which is what the game does, so there is
-    // no state to choose - see the note in the Hardpoints section. The other four states
-    // (friendly, repairing, disabled and its tracked form) have no way in at present.
+        // Fixed. The tracked twin comes from HOVERING a mark, which is what the game does, so there is
+        // no state to choose - see the note in the Hardpoints section. The other four states
+        // (friendly, repairing, disabled and its tracked form) have no way in at present.
     const reticleState: ReticleState = 'enemy';
 
     /**
@@ -2585,7 +3150,7 @@ function ModelPreview(): React.JSX.Element {
      * lowest-detail mesh - so defaulting to zero opened every model on its crudest version.
      */
     const lodChosenRef = useRef(false);
-    const [levels, setLevels] = useState<DefinedLevels>({ alt: [0], lod: [0] });
+    const [levels, setLevels] = useState<DefinedLevels>({alt: [0], lod: [0]});
 
     /* Slider positions over the levels this model DEFINES. Rebuilt only when the level list
        changes, which is once per subject. */
@@ -2724,7 +3289,7 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
-        vscode.postMessage({ type: 'updateInspector', subject: inspectorSubject });
+        vscode.postMessage({type: 'updateInspector', subject: inspectorSubject});
     }, [inspectorSubject]);
 
     /**
@@ -2836,7 +3401,7 @@ function ModelPreview(): React.JSX.Element {
         }
 
         const timer = setTimeout(
-            () => setTally(current => ({ ...current, timedOut: true })), LOAD_IDLE_LIMIT);
+            () => setTally(current => ({...current, timedOut: true})), LOAD_IDLE_LIMIT);
 
         return () => clearTimeout(timer);
     }, [loading.covered, tally.arrivedParts, tally.settledAssets, tally.expectedParts]);
@@ -2862,7 +3427,7 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
-        vscode.postMessage({ type: 'requestTexture', name });
+        vscode.postMessage({type: 'requestTexture', name});
         syncTally();
     }, [syncTally]);
 
@@ -2872,7 +3437,7 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
-        vscode.postMessage({ type: 'requestShader', name });
+        vscode.postMessage({type: 'requestShader', name});
         syncTally();
     }, [syncTally]);
 
@@ -2885,7 +3450,7 @@ function ModelPreview(): React.JSX.Element {
         // The geometry's own tags, WIDENED by what the object declares. A damage stage may touch
         // no geometry at all - see `withDeclaredStages` - so the model alone under-reports it.
         const defined = withDeclaredStages(
-            viewport?.definedLevels() ?? { alt: [0], lod: [0] },
+            viewport?.definedLevels() ?? {alt: [0], lod: [0]},
             sceneRef.current?.damageStages ?? []);
         setLevels(defined);
 
@@ -2897,7 +3462,7 @@ function ModelPreview(): React.JSX.Element {
         if (current !== null && current.parts > 0 && current.meshes === 0) {
             setProblems(existing => existing.some(p => p.message === NOTHING_DRAWN)
                 ? existing
-                : [...existing, { severity: 'warning', message: NOTHING_DRAWN }]);
+                : [...existing, {severity: 'warning', message: NOTHING_DRAWN}]);
         }
 
         // Not until geometry has actually ARRIVED. `definedLevels` seeds its sets with 0, so an
@@ -2991,7 +3556,7 @@ function ModelPreview(): React.JSX.Element {
                 for (const problem of viewport.shaderTextureProblems()) {
                     setProblems(current => current.some(p => p.message === problem)
                         ? current
-                        : [...current, { severity: 'info', message: problem }]);
+                        : [...current, {severity: 'info', message: problem}]);
                 }
             } else if (result.missingIncludes.length === 0) {
                 // Nothing more is coming for this one; the archetype is what it draws with.
@@ -3089,7 +3654,7 @@ function ModelPreview(): React.JSX.Element {
                 }
 
                 requestedSystemsRef.current.add(name.toLowerCase());
-                vscode.postMessage({ type: 'requestParticleSystem', name });
+                vscode.postMessage({type: 'requestParticleSystem', name});
             }
         }, []);
 
@@ -3304,8 +3869,8 @@ function ModelPreview(): React.JSX.Element {
         if (system === undefined) {
             // Fetched now and played on arrival; an effect nothing referenced until this moment is
             // not worth loading up front for every hardpoint on a capital ship.
-            explosionsRef.current.push({ id, system: name, partId, bone, once, at });
-            vscode.postMessage({ type: 'requestParticleSystem', name });
+            explosionsRef.current.push({id, system: name, partId, bone, once, at});
+            vscode.postMessage({type: 'requestParticleSystem', name});
             return;
         }
 
@@ -3399,7 +3964,7 @@ function ModelPreview(): React.JSX.Element {
                     }])));
                 }
 
-                return { ...current, [id]: full };
+                return {...current, [id]: full};
             });
 
             viewportRef.current?.clearBreakoff(id);
@@ -3490,7 +4055,7 @@ function ModelPreview(): React.JSX.Element {
                 chosen, customColour !== null ? '' : faction, scene?.factions ?? []);
     }, [customColour, faction, scene]);
 
-/**
+    /**
      * Switches every system in a group at once.
      *
      * Writes straight through to the systems and keeps nothing: the group's own switch reads back
@@ -3604,7 +4169,7 @@ function ModelPreview(): React.JSX.Element {
                 // One request per distinct system, however many proxies call for it.
                 for (const name of new Set(particles.map(particle => particle.systemRef))) {
                     requestedSystemsRef.current.add(name.toLowerCase());
-                    vscode.postMessage({ type: 'requestParticleSystem', name });
+                    vscode.postMessage({type: 'requestParticleSystem', name});
                 }
 
                 // A particle system is not geometry, so it takes getParticleSystem rather than
@@ -3656,7 +4221,7 @@ function ModelPreview(): React.JSX.Element {
                 if (glb === null) {
                     const error = message.result.error ?? null;
                     if (error !== null) {
-                        setProblems(current => [...current, { severity: 'error', message: error }]);
+                        setProblems(current => [...current, {severity: 'error', message: error}]);
                     }
 
                     // A part that failed is a part that is not coming. It still has to be counted
@@ -3666,7 +4231,7 @@ function ModelPreview(): React.JSX.Element {
                     if (!message.partId.startsWith(BREAKOFF_PART)
                         && !message.partId.startsWith(DEATH_CLONE_PART)) {
                         setTally(current =>
-                            ({ ...current, arrivedParts: current.arrivedParts + 1 }));
+                            ({...current, arrivedParts: current.arrivedParts + 1}));
                     }
 
                     return;
@@ -3757,7 +4322,7 @@ function ModelPreview(): React.JSX.Element {
                 // Counted here rather than at every `glb`: a wreck, a death clone and a breakoff
                 // prop all arrive down this same message and have already returned above. Only a
                 // scene part is one of the parts the cover is waiting for.
-                setTally(current => ({ ...current, arrivedParts: current.arrivedParts + 1 }));
+                setTally(current => ({...current, arrivedParts: current.arrivedParts + 1}));
 
                 // The bound shot, if this subject has one, INSTEAD of the default framing - not
                 // after it, so the model does not visibly jump from one to the other on open.
@@ -3824,7 +4389,7 @@ function ModelPreview(): React.JSX.Element {
                 if (system === null) {
                     const error = message.result.error ?? null;
                     if (error !== null) {
-                        setProblems(current => [...current, { severity: 'error', message: error }]);
+                        setProblems(current => [...current, {severity: 'error', message: error}]);
                     }
                     return;
                 }
@@ -3843,7 +4408,7 @@ function ModelPreview(): React.JSX.Element {
                     message.name.toLowerCase())) {
                     // A particle FILE opened on its own IS the subject, so it is model-owned - and
                     // it has no hull, so it reaches no model tree either way.
-                    viewport.addParticleSystem(message.name, system, { origin: 'model' });
+                    viewport.addParticleSystem(message.name, system, {origin: 'model'});
                     viewport.frameAll();
 
                     // Heat emitters are labelled rather than hidden: they draw as a distortion of
@@ -4057,7 +4622,7 @@ function ModelPreview(): React.JSX.Element {
 
                     setProblems(current => current.some(p => p.message === missing)
                         ? current
-                        : [...current, { severity: 'warning', message: missing }]);
+                        : [...current, {severity: 'warning', message: missing}]);
                 }
             }
         };
@@ -4069,7 +4634,7 @@ function ModelPreview(): React.JSX.Element {
         };
 
         globalThis.addEventListener('message', listener);
-        vscode.postMessage({ type: 'ready' });
+        vscode.postMessage({type: 'ready'});
 
         return () => globalThis.removeEventListener('message', listener);
         // Deliberately NOT depending on `scene`: this effect posts 'ready', so re-running it asks
@@ -4601,7 +5166,7 @@ function ModelPreview(): React.JSX.Element {
     const liveDefence = useMemo(
         () => scene?.defence === null || scene?.defence === undefined
             ? scene?.defence
-            : shieldsDown ? { ...scene.defence, isShielded: false } : scene.defence,
+            : shieldsDown ? {...scene.defence, isShielded: false} : scene.defence,
         [scene, shieldsDown]);
 
     /**
@@ -4631,7 +5196,7 @@ function ModelPreview(): React.JSX.Element {
             .find(p => p.id === attackerProjectile)?.id ?? attacker.damageType;
 
         if (fireTarget === 'hull') {
-            const { pools: after, workings } = resolveHitWithWorkings(attacker, defence, current);
+            const {pools: after, workings} = resolveHitWithWorkings(attacker, defence, current);
 
             setPools(after);
 
@@ -4639,9 +5204,9 @@ function ModelPreview(): React.JSX.Element {
             // happened; working the numbers out a second time here would be a second copy of the
             // damage rules, free to disagree with the one that did the work.
             setDamageLog(log => appendShot(log, [
-                { pool: 'shield' as const, took: current.shield - after.shield },
-                { pool: 'energy' as const, took: current.energy - after.energy },
-                { pool: 'hull' as const, took: current.hull - after.hull },
+                {pool: 'shield' as const, took: current.shield - after.shield},
+                {pool: 'energy' as const, took: current.energy - after.energy},
+                {pool: 'hull' as const, took: current.hull - after.hull},
             ]
                 .filter(hit => hit.took > 0 || hit.pool === 'hull')
                 .map(hit => ({
@@ -4798,7 +5363,7 @@ function ModelPreview(): React.JSX.Element {
      */
     const weapons = useMemo(
         () => weaponRows(
-            { weapons: stateWeapons, hardpoints: scene?.hardpoints ?? [] }, destroyed),
+            {weapons: stateWeapons, hardpoints: scene?.hardpoints ?? []}, destroyed),
         [stateWeapons, scene?.hardpoints, destroyed]);
 
     /**
@@ -4812,7 +5377,7 @@ function ModelPreview(): React.JSX.Element {
             (scene?.hardpoints ?? []).map(h => ({
                 id: h.id, partId: h.partId ?? 'hull', turret: h.turret,
             })),
-            weapons.map(w => ({ id: w.id, partId: w.partId, turret: w.turret }))),
+            weapons.map(w => ({id: w.id, partId: w.partId, turret: w.turret}))),
         [scene, weapons]);
 
     /**
@@ -4824,24 +5389,23 @@ function ModelPreview(): React.JSX.Element {
      * lives in the dock, so the pointer has to travel between them and any hover that gated the
      * handles would be gone before it arrived.
      */
-    // From the WEAPONS, in the arc toggle's own ids - not from `sweepable`, whose hardpoint turrets
-    // are keyed by the bare hardpoint id and so never matched. See `handlesForShownArcs`.
+        // From the WEAPONS, in the arc toggle's own ids - not from `sweepable`, whose hardpoint turrets
+        // are keyed by the bare hardpoint id and so never matched. See `handlesForShownArcs`.
     const draggableTurrets = useMemo(
-        () => handlesForShownArcs(
-            weapons,
-            new Set(visibleArcs(weapons, fireArcs, hiddenWeapons).map(arc => arc.weaponId))),
-        [weapons, fireArcs, hiddenWeapons]);
+            () => handlesForShownArcs(
+                weapons,
+                new Set(visibleArcs(weapons, fireArcs, hiddenWeapons).map(arc => arc.weaponId))),
+            [weapons, fireArcs, hiddenWeapons]);
 
     /* One card per hardpoint, each carrying the weapon on it, and whatever weapons are left over. */
     const cards = useMemo(
         () => hardpointCards(
-            { weapons: stateWeapons, hardpoints: scene?.hardpoints ?? [] }, destroyed),
+            {weapons: stateWeapons, hardpoints: scene?.hardpoints ?? []}, destroyed),
         [stateWeapons, scene?.hardpoints, destroyed]);
 
     const looseWeapons = useMemo(() => unitWeapons(weapons), [weapons]);
 
     const hardpointSearchOpen = searchIsOpen(hardpointSearchPressed, hardpointFilter);
-
 
 
     /* Gathered by type, and narrowed by the filter. A Star Destroyer's eight laser hardpoints are
@@ -4901,7 +5465,7 @@ function ModelPreview(): React.JSX.Element {
         // After the fold has been taken off, or the card is still not laid out.
         const at = requestAnimationFrame(() => {
             document.querySelector(`[data-card="${CSS.escape(fireTarget)}"]`)
-                ?.scrollIntoView({ block: 'nearest' });
+                ?.scrollIntoView({block: 'nearest'});
         });
 
         return () => cancelAnimationFrame(at);
@@ -5018,7 +5582,7 @@ function ModelPreview(): React.JSX.Element {
                             selectBoneRow(rowId);
                         }}
                     >
-                        <Icon name="skeleton" size={13} />
+                        <Icon name="skeleton" size={13}/>
                         <span className="muzzle-slot">{muzzleLabel(index)}</span>
                         <span className="muzzle-bone">{bone}</span>
                     </button>
@@ -5026,7 +5590,6 @@ function ModelPreview(): React.JSX.Element {
             })}
         </span>
     );
-
 
 
     useEffect(() => {
@@ -5078,7 +5641,7 @@ function ModelPreview(): React.JSX.Element {
             const bone = turret?.turretBone ?? '';
 
             return turret === null || turret === undefined || bone === ''
-                || turret.restAngle === null || turret.restAngle === undefined
+            || turret.restAngle === null || turret.restAngle === undefined
                 ? []
                 : [{
                     partId: hardpoint.partId ?? 'hull',
@@ -5170,7 +5733,7 @@ function ModelPreview(): React.JSX.Element {
         const tick = setInterval(() => {
             if (!scrubbingRef.current) {
                 setPlayhead(viewportRef.current?.animationProgress()
-                    ?? { time: 0, duration: 0, running: false });
+                    ?? {time: 0, duration: 0, running: false});
             }
         }, 50);
 
@@ -5371,10 +5934,10 @@ function ModelPreview(): React.JSX.Element {
             aimedBone === null
                 ? null
                 : boneRowIndex(viewportRef.current?.treeItems() ?? [])
-                    .get(aimedBone.toLowerCase()) ?? null);
-    // fireTarget is in the list because the effect READS it. Left out, the effect closed over
-    // whichever hardpoint was aimed at last render - so picking one drew the box for the previous
-    // one, or for none at all on the first pick.
+                .get(aimedBone.toLowerCase()) ?? null);
+        // fireTarget is in the list because the effect READS it. Left out, the effect closed over
+        // whichever hardpoint was aimed at last render - so picking one drew the box for the previous
+        // one, or for none at all on the first pick.
     }, [selected, treeItems, fireTarget]);
 
     /**
@@ -5429,10 +5992,10 @@ function ModelPreview(): React.JSX.Element {
         const row = button.getBoundingClientRect();
 
         return anchorFlyout({
-            row: { top: row.top, bottom: row.bottom },
+            row: {top: row.top, bottom: row.bottom},
             dockLeft: dock.getBoundingClientRect().left,
-            window: { width: window.innerWidth, height: window.innerHeight },
-            size: { width: box.offsetWidth, height: box.offsetHeight },
+            window: {width: window.innerWidth, height: window.innerHeight},
+            size: {width: box.offsetWidth, height: box.offsetHeight},
         });
     }, []);
 
@@ -5462,7 +6025,9 @@ function ModelPreview(): React.JSX.Element {
         }
     }, [infoAbility, placeBesideRow]);
 
-    useLayoutEffect(() => { placeAbilityInfo(); }, [placeAbilityInfo]);
+    useLayoutEffect(() => {
+        placeAbilityInfo();
+    }, [placeAbilityInfo]);
 
     // The abilities flyout is closed by Escape and by its own button; when it goes, so does this.
     useEffect(() => {
@@ -5472,7 +6037,9 @@ function ModelPreview(): React.JSX.Element {
     }, [abilitiesOpen]);
 
     // Same terms as the details flyout: before paint, and again while the dock scrolls under it.
-    useLayoutEffect(() => { placeInfo(); }, [placeInfo]);
+    useLayoutEffect(() => {
+        placeInfo();
+    }, [placeInfo]);
 
     useEffect(() => {
         if (infoCard === null) {
@@ -5551,7 +6118,7 @@ function ModelPreview(): React.JSX.Element {
             : [{
                 severity: 'warning',
                 message: `${shieldOffShader.join(', ')} ${shieldOffShader.length === 1
-                    ? 'is' : 'are'} named as a shield mesh but not drawn with a shield shader `
+                        ? 'is' : 'are'} named as a shield mesh but not drawn with a shield shader `
                     + '- draws as solid geometry, not a field.',
                 hardpointId: null,
             }];
@@ -5783,7 +6350,7 @@ function ModelPreview(): React.JSX.Element {
         // again the same instant, which reads as a dead button.
         if (atEnd && !animationLoop) {
             viewportRef.current?.seekAnimation(0);
-            setPlayhead(current => ({ ...current, time: 0 }));
+            setPlayhead(current => ({...current, time: 0}));
         }
 
         // Straight at the viewport, not only through the state. A clip that ran off its end was
@@ -5806,7 +6373,7 @@ function ModelPreview(): React.JSX.Element {
 
     const seek = (seconds: number): void => {
         viewportRef.current?.seekAnimation(seconds);
-        setPlayhead(current => ({ ...current, time: seconds }));
+        setPlayhead(current => ({...current, time: seconds}));
     };
 
 
@@ -5821,7 +6388,7 @@ function ModelPreview(): React.JSX.Element {
         .map(item => item.systemId!)), [treeItems]);
 
     const wholeTree = buildTree(treeItems);
-    const filteredTree = filterTree(wholeTree, { text: boneFilter, kinds });
+    const filteredTree = filterTree(wholeTree, {text: boneFilter, kinds});
     const treeRows = visibleTreeRows(filteredTree, collapsed);
 
     /* What the tree would show with no filter at all, which is the height it is held at. Folding a
@@ -5933,8 +6500,8 @@ function ModelPreview(): React.JSX.Element {
             <div className="body">
                 <div className="stage-column">
                     <div className="viewport">
-                        <canvas ref={canvasRef} />
-                        <div className="bone-labels" ref={labelsRef} />
+                        <canvas ref={canvasRef}/>
+                        <div className="bone-labels" ref={labelsRef}/>
 
                         {/* Over the canvas while the subject assembles itself.
 
@@ -5945,7 +6512,7 @@ function ModelPreview(): React.JSX.Element {
                             here because a cover that says nothing turns a slow load into a hang. */}
                         {loading.covered && (
                             <div className="load-cover" role="status" aria-live="polite">
-                                <div className="load-spinner" />
+                                <div className="load-spinner"/>
                                 <span className="load-label">{loading.label}</span>
                                 {loading.detail !== null && (
                                     <span className="load-detail">{loading.detail}</span>
@@ -5964,7 +6531,7 @@ function ModelPreview(): React.JSX.Element {
                         {/* Its own plate. The scene settings OPEN something, while the toggles beside
                             them switch something - putting all of it on one bar said they were one
                             group of related switches, which the flyout button is not. */}
-                        <div className="stage-chrome">
+                            <div className="stage-chrome">
                             <IconButton
                                 icon="scene"
                                 className={'world-globe' + (worldOpen ? ' active' : '')}
@@ -5974,7 +6541,7 @@ function ModelPreview(): React.JSX.Element {
                             />
                         </div>
 
-                        {/* The grid, the ground and the effects master describe the ROOM the model
+                            {/* The grid, the ground and the effects master describe the ROOM the model
                             is standing in - so they belong on the stage rather than in a dock that
                             describes the subject. Their persistence is unchanged: every one was
                             already a Tier 1 viewer setting, and moving a control does not move
@@ -5983,7 +6550,7 @@ function ModelPreview(): React.JSX.Element {
                             Icon only. These are the same switch repeated, so the icon is what tells
                             them apart and the words only made the bar long enough to reach the
                             camera. The name leads the tooltip. */}
-                        <div className="stage-chrome icon-only">
+                            <div className="stage-chrome icon-only">
                             {overlays.map(overlay => (
                                 <IconButton
                                     key={overlay.id}
@@ -6002,7 +6569,7 @@ function ModelPreview(): React.JSX.Element {
                         </div>
                         </span>
 
-                        {/* The faction palette, centred over the model.
+                            {/* The faction palette, centred over the model.
 
                             It sits with the room and the camera because all three answer HOW YOU
                             ARE LOOKING at the subject rather than what the subject is - a tint is
@@ -6016,7 +6583,7 @@ function ModelPreview(): React.JSX.Element {
 
                             Not gated on the lens. It is stage chrome, and a corner that empties
                             when you change lens makes the stage feel like it is coming apart. */}
-                        <span className="stage-slot stage-slot-mid">
+                            <span className="stage-slot stage-slot-mid">
                         {(scene?.factions.length ?? 0) > 0 && (
                             <div
                                 className="stage-chrome faction-palette"
@@ -6030,7 +6597,7 @@ function ModelPreview(): React.JSX.Element {
                                     title="No team colour"
                                     onClick={() => chooseTint('', null)}
                                 >
-                                    <Icon name="none" />
+                                    <Icon name="none"/>
                                 </button>
 
                                 {scene?.factions.map(entry => (
@@ -6066,7 +6633,7 @@ function ModelPreview(): React.JSX.Element {
                         </span>
 
 
-                        {/* Where you are looking FROM is a property of the view, not of the model,
+                            {/* Where you are looking FROM is a property of the view, not of the model,
                             so it sits on the stage like the scene controls opposite.
 
                             The presets read as words rather than pictograms, because no icon says
@@ -6080,7 +6647,7 @@ function ModelPreview(): React.JSX.Element {
                             camera is in one place at a time. Choosing any of them releases
                             whichever was chosen before, which is what a radiogroup says and a row
                             of toggles denies. */}
-                        <span className="stage-slot stage-slot-end">
+                            <span className="stage-slot stage-slot-end">
                         <div className="stage-chrome">
                             <ModeSelector
                                 label="Where the camera looks from"
@@ -6121,11 +6688,11 @@ function ModelPreview(): React.JSX.Element {
                             />
                         </div>
 
-                        {/* The mirror of the scene button opposite: the presets are the switches,
+                                {/* The mirror of the scene button opposite: the presets are the switches,
                             this OPENS something, and the two are not the same kind of control. Last
                             on the right as the scene is first on the left, so the stage reads
                             outwards from the model in both directions. */}
-                        <div className="stage-chrome">
+                                <div className="stage-chrome">
                             <IconButton
                                 icon="camera"
                                 className={cameraOpen ? 'active' : undefined}
@@ -6160,44 +6727,47 @@ function ModelPreview(): React.JSX.Element {
                                 </div>
                                 <div className="stage-flyout-body">
 
-        <DockSection
-            id="scene.room"
-            title="Room"
-            collapsed={folded.has('scene.room')}
-            onToggle={toggleSection}
-        >
-        <Field
-            label="Backdrop"
-            info={<>
-                Never lit and never in the depth buffer, so a backdrop cannot be
-                mistaken for part of the model.
-            </>}
-        >
-            <ModeSelector
-                label="Backdrop"
-                value={background}
-                options={[
-                    { id: 'flat', label: 'Flat', title: 'A plain, neutral field' },
-                    { id: 'starfield', label: 'Stars', title: 'A starfield' },
-                    { id: 'sky', label: 'Sky', title: 'A sky with a horizon' },
-                ] satisfies ChoiceOption<BackgroundKind>[]}
-                onSelect={setBackground}
-            />
-        </Field>
+                                    <DockSection
+                                        id="scene.room"
+                                        title="Room"
+                                        collapsed={folded.has('scene.room')}
+                                        onToggle={toggleSection}
+                                    >
+                                        <Field
+                                            label="Backdrop"
+                                            info={<>
+                                                Never lit and never in the depth buffer, so a backdrop cannot be
+                                                mistaken for part of the model.
+                                            </>}
+                                        >
+                                            <ModeSelector
+                                                label="Backdrop"
+                                                value={background}
+                                                options={[
+                                                    {id: 'flat', label: 'Flat', title: 'A plain, neutral field'},
+                                                    {id: 'starfield', label: 'Stars', title: 'A starfield'},
+                                                    {id: 'sky', label: 'Sky', title: 'A sky with a horizon'},
+                                                ] satisfies ChoiceOption<BackgroundKind>[]}
+                                                onSelect={setBackground}
+                                            />
+                                        </Field>
 
-        <Field
-            label="Ground height"
-            value={floorLevel}
-            info={<>
-                Zero is the middle of the track - the plane the model itself stands on. The ends are
-                one model radius either way, so the control means the same thing on a trooper and
-                on a Star Destroyer. The grid moves with it: it is the ruler for the ground, not for
-                the origin.
-            </>}
-        >
-            {/* The tick marks where the model stands. Zero is always the exact middle, because
+                                        <Field
+                                            label="Ground height"
+                                            value={floorLevel}
+                                            info={<>
+                                                Zero is the middle of the track - the plane the model itself stands on.
+                                                The ends are
+                                                one model radius either way, so the control means the same thing on a
+                                                trooper and
+                                                on a Star Destroyer. The grid moves with it: it is the ruler for the
+                                                ground, not for
+                                                the origin.
+                                            </>}
+                                        >
+                                            {/* The tick marks where the model stands. Zero is always the exact middle, because
                 the track is symmetrical by construction - see `groundRange`. */}
-            <span className="detent-track">
+                                            <span className="detent-track">
                 <input
                     type="range"
                     min={-ground.limit}
@@ -6207,98 +6777,109 @@ function ModelPreview(): React.JSX.Element {
                     disabled={!floor}
                     title={floor
                         ? `Where the ground and its grid sit, in model units. The track runs `
-                            + `${ground.limit} either side of the origin, which is the middle, `
-                            + `and catches there when dragged.`
+                        + `${ground.limit} either side of the origin, which is the middle, `
+                        + `and catches there when dragged.`
                         : 'Switch the ground on to place it'}
-                    onPointerDown={() => { groundDragging.current = true; }}
-                    onPointerUp={() => { groundDragging.current = false; }}
-                    onPointerCancel={() => { groundDragging.current = false; }}
-                    onKeyDown={() => { groundDragging.current = false; }}
+                    onPointerDown={() => {
+                        groundDragging.current = true;
+                    }}
+                    onPointerUp={() => {
+                        groundDragging.current = false;
+                    }}
+                    onPointerCancel={() => {
+                        groundDragging.current = false;
+                    }}
+                    onKeyDown={() => {
+                        groundDragging.current = false;
+                    }}
                     onChange={e => setFloorLevel(snapToZero(
                         Number(e.target.value),
                         ground.step,
                         groundDragging.current ? 1 : 0))}
                 />
             </span>
-        </Field>
-        </DockSection>
+                                        </Field>
+                                    </DockSection>
 
-        <DockSection
-            id="scene.light"
-            title="Light"
-            collapsed={folded.has('scene.light')}
-            onToggle={toggleSection}
-        >
-        <Field
-            label="Light"
-            info={<>
-                The engine's own rig: a sun that casts the shadow and two fills that
-                do not. All three reach the translated shaders.
-            </>}
-        >
-            <ModeSelector
-                label="Light being edited"
-                value={editing}
-                options={LIGHT_NAMES.map(name => ({
-                    id: name,
-                    label: LIGHT_LABELS[name],
-                    title: `Edit the ${LIGHT_LABELS[name].toLowerCase()}`,
-                }))}
-                onSelect={setEditing}
-            />
-        </Field>
+                                    <DockSection
+                                        id="scene.light"
+                                        title="Light"
+                                        collapsed={folded.has('scene.light')}
+                                        onToggle={toggleSection}
+                                    >
+                                        <Field
+                                            label="Light"
+                                            info={<>
+                                                The engine's own rig: a sun that casts the shadow and two fills that
+                                                do not. All three reach the translated shaders.
+                                            </>}
+                                        >
+                                            <ModeSelector
+                                                label="Light being edited"
+                                                value={editing}
+                                                options={LIGHT_NAMES.map(name => ({
+                                                    id: name,
+                                                    label: LIGHT_LABELS[name],
+                                                    title: `Edit the ${LIGHT_LABELS[name].toLowerCase()}`,
+                                                }))}
+                                                onSelect={setEditing}
+                                            />
+                                        </Field>
 
-        <Field
-            label="Light around"
-            value={<>{lights[editing].azimuth} deg, from {bearing.from}</>}
-            info={<>
-                Turns round the model the way the stage does, from the same zero: at 0 the light
-                stands where you stand in the Front view, and it moves clockwise seen from above.
-            </>}
-        >
-            <input
-                type="range"
-                min={0}
-                max={360}
-                step={5}
-                value={lights[editing].azimuth}
-                onChange={e => setLight(editing, { azimuth: Number(e.target.value) })}
-            />
-        </Field>
+                                        <Field
+                                            label="Light around"
+                                            value={<>{lights[editing].azimuth} deg, from {bearing.from}</>}
+                                            info={<>
+                                                Turns round the model the way the stage does, from the same zero: at 0
+                                                the light
+                                                stands where you stand in the Front view, and it moves clockwise seen
+                                                from above.
+                                            </>}
+                                        >
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={360}
+                                                step={5}
+                                                value={lights[editing].azimuth}
+                                                onChange={e => setLight(editing, {azimuth: Number(e.target.value)})}
+                                            />
+                                        </Field>
 
-        <Field
-            label="Light height"
-            infoSeverity={bearing.belowGround ? 'warning' : 'info'}
-            info={<>
-                {bearing.belowGround
-                    ? (editing === 'sun'
-                        ? 'Under the ground plane. The floor is between the sun and the model, so '
-                          + 'it lights the hull from beneath and casts nothing onto the ground.'
-                        : 'Under the ground plane, which is where the engine puts both of its own '
-                          + 'fills. They cast no shadow, so nothing is hidden by it.')
-                    : 'The sun drives the shadow. Straight overhead flattens the hull and hides '
-                      + 'the shadow under it; raking is what makes panel lines read.'}
-            </>}
-            value={<>{lights[editing].elevation} deg, {bearing.height}</>}
-        >
-            <input
-                type="range"
-                min={-90}
-                max={90}
-                step={5}
-                value={lights[editing].elevation}
-                onChange={e =>
-                    setLight(editing, { elevation: Number(e.target.value) })}
-            />
-        </Field>
+                                        <Field
+                                            label="Light height"
+                                            infoSeverity={bearing.belowGround ? 'warning' : 'info'}
+                                            info={<>
+                                                {bearing.belowGround
+                                                    ? (editing === 'sun'
+                                                        ? 'Under the ground plane. The floor is between the sun and the model, so '
+                                                        + 'it lights the hull from beneath and casts nothing onto the ground.'
+                                                        : 'Under the ground plane, which is where the engine puts both of its own '
+                                                        + 'fills. They cast no shadow, so nothing is hidden by it.')
+                                                    : 'The sun drives the shadow. Straight overhead flattens the hull and hides '
+                                                    + 'the shadow under it; raking is what makes panel lines read.'}
+                                            </>}
+                                            value={<>{lights[editing].elevation} deg, {bearing.height}</>}
+                                        >
+                                            <input
+                                                type="range"
+                                                min={-90}
+                                                max={90}
+                                                step={5}
+                                                value={lights[editing].elevation}
+                                                onChange={e =>
+                                                    setLight(editing, {elevation: Number(e.target.value)})}
+                                            />
+                                        </Field>
 
-        <Field label="Light colour" value={<>{lights[editing].intensity.toFixed(2)}x</>}>
+                                        <Field label="Light colour"
+                                               value={<>{lights[editing].intensity.toFixed(2)}x</>}>
             <span className="view-row">
                 <input
                     type="color"
                     value={hexFromColour(lights[editing].colour)}
                     onChange={e =>
-                        setLight(editing, { colour: colourFromHex(e.target.value) })}
+                        setLight(editing, {colour: colourFromHex(e.target.value)})}
                 />
                 <input
                     type="range"
@@ -6307,19 +6888,19 @@ function ModelPreview(): React.JSX.Element {
                     step={0.05}
                     value={lights[editing].intensity}
                     onChange={e =>
-                        setLight(editing, { intensity: Number(e.target.value) })}
+                        setLight(editing, {intensity: Number(e.target.value)})}
                 />
             </span>
-        </Field>
+                                        </Field>
 
-        <Field
-            label="Ambient"
-            value={<>{lights.ambient.intensity.toFixed(2)}x</>}
-            info={<>
-                What reaches the parts no light does. Too much and the model reads
-                flat; none at all and its shadowed side is black.
-            </>}
-        >
+                                        <Field
+                                            label="Ambient"
+                                            value={<>{lights.ambient.intensity.toFixed(2)}x</>}
+                                            info={<>
+                                                What reaches the parts no light does. Too much and the model reads
+                                                flat; none at all and its shadowed side is black.
+                                            </>}
+                                        >
             <span className="view-row">
                 <input
                     type="color"
@@ -6347,9 +6928,9 @@ function ModelPreview(): React.JSX.Element {
                     }))}
                 />
             </span>
-        </Field>
+                                        </Field>
 
-        {/* The swatch rides IN the label, not under it.
+                                        {/* The swatch rides IN the label, not under it.
 
             A colour input carries `margin-left: auto` so it sits at the far edge of its row - which
             is what the swatch beside a slider wants. Under a `.field`, though, the row is a COLUMN,
@@ -6361,181 +6942,190 @@ function ModelPreview(): React.JSX.Element {
             composites its whole subtree as a group, so a swatch in there renders a colour that is
             not the one stored - measured, a stored #ffffff drew as #bdbdbd. A sibling keeps its
             own colour and still reaches the far edge, because the well carries the auto margin. */}
-        <Field
-            label="Shadow colour"
-            inline
-            info={<>
-                Alamo`s one shadow colour, and it MULTIPLIES: 0.5 grey means half as bright.
-                In Game mode it tints the stencil volume, so it reaches the hull`s own
-                self-shadowing as well as the ground. In Default mode only the ground can
-                catch it.
-            </>}
-        >
-            <input
-                type="color"
-                value={hexFromColour(lights.shadow)}
-                /* Dead ONLY when nothing can show it. It was gated on the floor alone, which
-                   disabled a working control: in Game mode the stencil darken tints the hull's
-                   own self-shadowing with no ground under it at all. */
-                disabled={shadowReach === 'none'}
-                title={SHADOW_TINT_TITLE[shadowReach]}
-                onChange={e => setLights(current => ({
-                    ...current, shadow: colourFromHex(e.target.value),
-                }))}
-            />
-        </Field>
+                                        <Field
+                                            label="Shadow colour"
+                                            inline
+                                            info={<>
+                                                Alamo`s one shadow colour, and it MULTIPLIES: 0.5 grey means half as
+                                                bright.
+                                                In Game mode it tints the stencil volume, so it reaches the hull`s own
+                                                self-shadowing as well as the ground. In Default mode only the ground
+                                                can
+                                                catch it.
+                                            </>}
+                                        >
+                                            <input
+                                                type="color"
+                                                value={hexFromColour(lights.shadow)}
+                                                /* Dead ONLY when nothing can show it. It was gated on the floor alone, which
+                                                   disabled a working control: in Game mode the stencil darken tints the hull's
+                                                   own self-shadowing with no ground under it at all. */
+                                                disabled={shadowReach === 'none'}
+                                                title={SHADOW_TINT_TITLE[shadowReach]}
+                                                onChange={e => setLights(current => ({
+                                                    ...current, shadow: colourFromHex(e.target.value),
+                                                }))}
+                                            />
+                                        </Field>
 
-        <Field
-            label="Highlight colour"
-            inline
-            info={<>
-                One global specular for all three lights, as the engine keeps it.
-                Only the translated effect shaders read it.
-            </>}
-        >
-            <input
-                type="color"
-                value={hexFromColour(lights.specular)}
-                onChange={e => setLights(current => ({
-                    ...current, specular: colourFromHex(e.target.value),
-                }))}
-            />
-        </Field>
-        </DockSection>
+                                        <Field
+                                            label="Highlight colour"
+                                            inline
+                                            info={<>
+                                                One global specular for all three lights, as the engine keeps it.
+                                                Only the translated effect shaders read it.
+                                            </>}
+                                        >
+                                            <input
+                                                type="color"
+                                                value={hexFromColour(lights.specular)}
+                                                onChange={e => setLights(current => ({
+                                                    ...current, specular: colourFromHex(e.target.value),
+                                                }))}
+                                            />
+                                        </Field>
+                                    </DockSection>
 
-        <DockSection
-            id="scene.weather"
-            title="Weather"
-            collapsed={folded.has('scene.weather')}
-            onToggle={toggleSection}
-        >
-        <Field label="Wind from" value={<>{wind.heading} deg</>}>
-            <input
-                type="range"
-                min={0}
-                max={360}
-                step={5}
-                value={wind.heading}
-                onChange={e =>
-                    setWind(current => ({ ...current, heading: Number(e.target.value) }))}
-            />
-        </Field>
+                                    <DockSection
+                                        id="scene.weather"
+                                        title="Weather"
+                                        collapsed={folded.has('scene.weather')}
+                                        onToggle={toggleSection}
+                                    >
+                                        <Field label="Wind from" value={<>{wind.heading} deg</>}>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={360}
+                                                step={5}
+                                                value={wind.heading}
+                                                onChange={e =>
+                                                    setWind(current => ({...current, heading: Number(e.target.value)}))}
+                                            />
+                                        </Field>
 
-        <Field
-            label="Wind speed"
-            value={wind.speed.toFixed(1)}
-            info={<>
-                Bends the trees, leans the grass, and carries the 484 emitters that
-                declare themselves affected by it.
-            </>}
-        >
-            <input
-                type="range"
-                min={0}
-                max={20}
-                step={0.5}
-                value={wind.speed}
-                onChange={e =>
-                    setWind(current => ({ ...current, speed: Number(e.target.value) }))}
-            />
-        </Field>
-        </DockSection>
+                                        <Field
+                                            label="Wind speed"
+                                            value={wind.speed.toFixed(1)}
+                                            info={<>
+                                                Bends the trees, leans the grass, and carries the 484 emitters that
+                                                declare themselves affected by it.
+                                            </>}
+                                        >
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={20}
+                                                step={0.5}
+                                                value={wind.speed}
+                                                onChange={e =>
+                                                    setWind(current => ({...current, speed: Number(e.target.value)}))}
+                                            />
+                                        </Field>
+                                    </DockSection>
 
-        <DockSection
-            id="scene.effects"
-            title="Effects"
-            collapsed={folded.has('scene.effects')}
-            onToggle={toggleSection}
-        >
-        {/* Which renderer draws the model - one or the other, never both, so a segmented
+                                    <DockSection
+                                        id="scene.effects"
+                                        title="Effects"
+                                        collapsed={folded.has('scene.effects')}
+                                        onToggle={toggleSection}
+                                    >
+                                        {/* Which renderer draws the model - one or the other, never both, so a segmented
             control rather than a tick box.
 
             First in the section because it decides how every SURFACE is drawn, and the two below
             it are passes over the finished frame. All three are Tier 1: they describe the picture,
             not the model, so they follow the reader from one file to the next. */}
-        {scene !== null && scene.kind !== 'Particle' && (
-            <Field
-                label="Renderer"
-                info={<>
-                    Default reads each sub-mesh`s shader NAME and draws the archetype it names -
-                    never wrong about geometry, only about how a surface is lit. Game draws the
-                    model the way the engine does: its own effect shaders, translated, and
-                    stencil shadow volumes cast by its authored shadow mesh. Only the shaders
-                    need the .fx sources; the shadows work without them.
-                </>}
-            >
-                <ModeSelector
-                    label="Which renderer draws the model"
-                    /* What is actually RUNNING, not what could be fully delivered. The stencil
-                       shadow pass follows this switch alone and needs no .fx sources, so a reader
-                       with none was shown Default while the engine's own shadows were being cast -
-                       and told by the problems list, in the same breath, that they were in Game
-                       mode with nothing to translate. */
-                    value={translatedOn ? 'game' : 'default'}
-                    options={[
-                        {
-                            id: 'default',
-                            label: 'Default',
-                            title: 'Every sub-mesh drawn with the archetype reading '
-                                + 'of its shader name. Never wrong about geometry - '
-                                + 'only about how a surface is lit.',
-                        },
-                        {
-                            id: 'game',
-                            label: 'Game',
-                            // Selectable with no sources, because the mode still
-                            // DOES something without them: the stencil shadows
-                            // follow this switch and need no .fx at all. It was
-                            // disabled here, which - once the value above began
-                            // reporting the real mode - would have left a reader
-                            // who stepped to Default unable to return to the mode
-                            // the panel opens in.
-                            title: anyShaderSource
-                                ? 'The model`s own effect shaders, translated, and '
-                                    + 'the engine`s stencil shadows. '
-                                    + translatedCount.translated + ' of '
-                                    + translatedCount.total + ' sub-meshes are '
-                                    + 'drawn this way.'
-                                : 'The engine`s stencil shadows, which need no '
-                                    + 'sources. For its effect shaders as well, '
-                                    + 'set the .fx sources up.',
-                        },
-                    ]}
-                    onSelect={id => setTranslatedOn(id === 'game')}
-                />
+                                        {scene !== null && scene.kind !== 'Particle' && (
+                                            <Field
+                                                label="Renderer"
+                                                info={<>
+                                                    Default reads each sub-mesh`s shader NAME and draws the archetype it
+                                                    names -
+                                                    never wrong about geometry, only about how a surface is lit. Game
+                                                    draws the
+                                                    model the way the engine does: its own effect shaders, translated,
+                                                    and
+                                                    stencil shadow volumes cast by its authored shadow mesh. Only the
+                                                    shaders
+                                                    need the .fx sources; the shadows work without them.
+                                                </>}
+                                            >
+                                                <ModeSelector
+                                                    label="Which renderer draws the model"
+                                                    /* What is actually RUNNING, not what could be fully delivered. The stencil
+                                                       shadow pass follows this switch alone and needs no .fx sources, so a reader
+                                                       with none was shown Default while the engine's own shadows were being cast -
+                                                       and told by the problems list, in the same breath, that they were in Game
+                                                       mode with nothing to translate. */
+                                                    value={translatedOn ? 'game' : 'default'}
+                                                    options={[
+                                                        {
+                                                            id: 'default',
+                                                            label: 'Default',
+                                                            title: 'Every sub-mesh drawn with the archetype reading '
+                                                                + 'of its shader name. Never wrong about geometry - '
+                                                                + 'only about how a surface is lit.',
+                                                        },
+                                                        {
+                                                            id: 'game',
+                                                            label: 'Game',
+                                                            // Selectable with no sources, because the mode still
+                                                            // DOES something without them: the stencil shadows
+                                                            // follow this switch and need no .fx at all. It was
+                                                            // disabled here, which - once the value above began
+                                                            // reporting the real mode - would have left a reader
+                                                            // who stepped to Default unable to return to the mode
+                                                            // the panel opens in.
+                                                            title: anyShaderSource
+                                                                ? 'The model`s own effect shaders, translated, and '
+                                                                + 'the engine`s stencil shadows. '
+                                                                + translatedCount.translated + ' of '
+                                                                + translatedCount.total + ' sub-meshes are '
+                                                                + 'drawn this way.'
+                                                                : 'The engine`s stencil shadows, which need no '
+                                                                + 'sources. For its effect shaders as well, '
+                                                                + 'set the .fx sources up.',
+                                                        },
+                                                    ]}
+                                                    onSelect={id => setTranslatedOn(id === 'game')}
+                                                />
 
-                {/* Always here, in one of two states - never absent.
+                                                {/* Always here, in one of two states - never absent.
 
                     The setup flow is a command, and a command nobody can find is not a path out of
                     "nothing translated"; but a button that appears only while something is wrong is
                     a control the reader never sees working. So the row always says where the
                     sources stand, and only the wording changes. */}
-                {anyShaderSource ? (
-                    <span className="shader-state">
-                        <Icon name="check" />
+                                                {anyShaderSource ? (
+                                                    <span className="shader-state">
+                        <Icon name="check"/>
                         Shader sources ready
                     </span>
-                ) : (
-                    <Button
-                        title="Fetch the .fx shader sources"
-                        onClick={() => vscode.postMessage({ type: 'obtainShaders' })}
-                    >
-                        <Icon name="download" />
-                        Set up shader sources
-                    </Button>
-                )}
-            </Field>
-        )}
+                                                ) : (
+                                                    <Button
+                                                        title="Fetch the .fx shader sources"
+                                                        onClick={() => vscode.postMessage({type: 'obtainShaders'})}
+                                                    >
+                                                        <Icon name="download"/>
+                                                        Set up shader sources
+                                                    </Button>
+                                                )}
+                                            </Field>
+                                        )}
 
-        <Field
-            label="Heat distortion"
-            info={<>
-                Debug draws the heat BUFFER instead of the bent picture - the only way to see which
-                pixels a distortion covers, since its whole effect is a displacement. Red and green
-                carry the direction, blue the strength, and ALL BLACK means nothing on this model is
-                distorting anything. It keeps the buffers alive while it is on.
-            </>}
-        >
+                                        <Field
+                                            label="Heat distortion"
+                                            info={<>
+                                                Debug draws the heat BUFFER instead of the bent picture - the only way
+                                                to see which
+                                                pixels a distortion covers, since its whole effect is a displacement.
+                                                Red and green
+                                                carry the direction, blue the strength, and ALL BLACK means nothing on
+                                                this model is
+                                                distorting anything. It keeps the buffers alive while it is on.
+                                            </>}
+                                        >
             <span className="view-row">
                 <label className="field-label">
                     <input
@@ -6555,27 +7145,28 @@ function ModelPreview(): React.JSX.Element {
                     Debug
                 </label>
             </span>
-        </Field>
+                                        </Field>
 
-        <Field
-            // The checkbox and its word are one <label>, so pressing the word toggles it -
-            // and the mark stays OUTSIDE that label, or pressing the mark would toggle it too.
-            label={
-                <label className="field-label">
-                    <input
-                        type="checkbox"
-                        checked={bloom}
-                        onChange={e => setBloom(e.target.checked)}
-                    />
-                    Bloom
-                </label>
-            }
-            info={<>
-                Off by default, as it is in the game. It runs after the heat pass, so the two
-                compose in that order rather than fighting over the frame.
-            </>}
-        />
-        </DockSection>
+                                        <Field
+                                            // The checkbox and its word are one <label>, so pressing the word toggles it -
+                                            // and the mark stays OUTSIDE that label, or pressing the mark would toggle it too.
+                                            label={
+                                                <label className="field-label">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={bloom}
+                                                        onChange={e => setBloom(e.target.checked)}
+                                                    />
+                                                    Bloom
+                                                </label>
+                                            }
+                                            info={<>
+                                                Off by default, as it is in the game. It runs after the heat pass, so
+                                                the two
+                                                compose in that order rather than fighting over the frame.
+                                            </>}
+                                        />
+                                    </DockSection>
 
                                 </div>
                             </div>
@@ -6600,24 +7191,26 @@ function ModelPreview(): React.JSX.Element {
                                 </div>
                                 <div className="stage-flyout-body">
 
-        <DockSection
-            id="camera.shots"
-            title="Saved shots" count={cameraPresets.length}
-            collapsed={folded.has('camera.shots')}
-            onToggle={toggleSection}
-        >
-        <Field
-            label="Camera presets"
-            value={cameraPresets.length}
-            info={<>
-                Saved shots are kept in RADII rather than in game units, so one preset frames a
-                trooper and a Star Destroyer the same way. Copy as Lua works the distance back out
-                for whatever is on screen.
-            </>}
-        >
+                                    <DockSection
+                                        id="camera.shots"
+                                        title="Saved shots" count={cameraPresets.length}
+                                        collapsed={folded.has('camera.shots')}
+                                        onToggle={toggleSection}
+                                    >
+                                        <Field
+                                            label="Camera presets"
+                                            value={cameraPresets.length}
+                                            info={<>
+                                                Saved shots are kept in RADII rather than in game units, so one preset
+                                                frames a
+                                                trooper and a Star Destroyer the same way. Copy as Lua works the
+                                                distance back out
+                                                for whatever is on screen.
+                                            </>}
+                                        >
 
-            {cameraPresets.map(saved => (
-                <span className="view-row" key={saved.id}>
+                                            {cameraPresets.map(saved => (
+                                                <span className="view-row" key={saved.id}>
                     <Button
                         title={`Frame this model the way ${saved.name} does: `
                             + `${saved.distance.toFixed(1)} radii out, pitch `
@@ -6660,202 +7253,205 @@ function ModelPreview(): React.JSX.Element {
                             current => current.filter(p => p.id !== saved.id))}
                     />
                 </span>
-            ))}
+                                            ))}
 
-            <Button
-                onClick={() => {
-                    const viewport = viewportRef.current;
-                    if (viewport === null) {
-                        return;
-                    }
+                                            <Button
+                                                onClick={() => {
+                                                    const viewport = viewportRef.current;
+                                                    if (viewport === null) {
+                                                        return;
+                                                    }
 
-                    // Named for where it is in the list rather than prompting: a webview has no
-                    // modal worth the name, and a preset is renamed by editing its name field.
-                    const saved = presetFromPose(
-                        `Shot ${cameraPresets.length + 1}`,
-                        viewport.cameraPosition, viewport.subjectSphere);
+                                                    // Named for where it is in the list rather than prompting: a webview has no
+                                                    // modal worth the name, and a preset is renamed by editing its name field.
+                                                    const saved = presetFromPose(
+                                                        `Shot ${cameraPresets.length + 1}`,
+                                                        viewport.cameraPosition, viewport.subjectSphere);
 
-                    setCameraPresets(current => [...current, saved]);
-                }}
-            >
-                <Icon name="add" />
-                Save this shot
-            </Button>
+                                                    setCameraPresets(current => [...current, saved]);
+                                                }}
+                                            >
+                                                <Icon name="add"/>
+                                                Save this shot
+                                            </Button>
 
-        </Field>
+                                        </Field>
 
-        <Field
-            label="Opens with"
-            infoSeverity={bindTargets.length === 0 ? 'warning' : 'info'}
-            info={<>
-                {bindTargets.length === 0
-                    ? 'A model opened on its own has no object, type or category to bind to. Open '
-                      + 'it through a game object to bind a shot to a whole roster.'
-                    : 'A bound shot is applied when the model opens, most specific rule first: '
-                      + 'this object beats its type, and its type beats a category. Moving the '
-                      + 'camera afterwards is always allowed.'}
-            </>}
-            value={boundRule === null
-                ? 'nothing'
-                : cameraPresets.find(p => p.id === boundRule.presetId)?.name ?? 'a lost shot'}
-        >
+                                        <Field
+                                            label="Opens with"
+                                            infoSeverity={bindTargets.length === 0 ? 'warning' : 'info'}
+                                            info={<>
+                                                {bindTargets.length === 0
+                                                    ? 'A model opened on its own has no object, type or category to bind to. Open '
+                                                    + 'it through a game object to bind a shot to a whole roster.'
+                                                    : 'A bound shot is applied when the model opens, most specific rule first: '
+                                                    + 'this object beats its type, and its type beats a category. Moving the '
+                                                    + 'camera afterwards is always allowed.'}
+                                            </>}
+                                            value={boundRule === null
+                                                ? 'nothing'
+                                                : cameraPresets.find(p => p.id === boundRule.presetId)?.name ?? 'a lost shot'}
+                                        >
 
-            {/* Bind the LAST saved shot: with no preset there is nothing to bind, and picking
+                                            {/* Bind the LAST saved shot: with no preset there is nothing to bind, and picking
                 which one belongs in a list rather than in three buttons. */}
-            {bindTargets.map(target => (
-                <Button
-                    key={target.kind}
-                    title={`Open every ${target.what} with ${
-                        cameraPresets.length === 0
-                            ? 'a saved shot'
-                            : cameraPresets[cameraPresets.length - 1].name}`}
-                    disabled={cameraPresets.length === 0}
-                    disabledReason="Save a shot first - there is nothing to bind yet"
-                    onClick={() => {
-                        const preset = cameraPresets[cameraPresets.length - 1];
-                        setCameraBindings(current => [
-                            // Replacing rather than appending: two rules of one kind on the same
-                            // value would leave the second permanently unreachable, since the first
-                            // match wins.
-                            ...current.filter(b => !(b.kind === target.kind
-                                && b.value.toLowerCase() === target.value.toLowerCase())),
-                            {
-                                id: `bind-${Date.now().toString(36)}-${target.kind}`,
-                                kind: target.kind,
-                                value: target.value,
-                                presetId: preset.id,
-                            },
-                        ]);
-                    }}
-                >
-                    {target.label}
-                </Button>
-            ))}
+                                            {bindTargets.map(target => (
+                                                <Button
+                                                    key={target.kind}
+                                                    title={`Open every ${target.what} with ${
+                                                        cameraPresets.length === 0
+                                                            ? 'a saved shot'
+                                                            : cameraPresets[cameraPresets.length - 1].name}`}
+                                                    disabled={cameraPresets.length === 0}
+                                                    disabledReason="Save a shot first - there is nothing to bind yet"
+                                                    onClick={() => {
+                                                        const preset = cameraPresets[cameraPresets.length - 1];
+                                                        setCameraBindings(current => [
+                                                            // Replacing rather than appending: two rules of one kind on the same
+                                                            // value would leave the second permanently unreachable, since the first
+                                                            // match wins.
+                                                            ...current.filter(b => !(b.kind === target.kind
+                                                                && b.value.toLowerCase() === target.value.toLowerCase())),
+                                                            {
+                                                                id: `bind-${Date.now().toString(36)}-${target.kind}`,
+                                                                kind: target.kind,
+                                                                value: target.value,
+                                                                presetId: preset.id,
+                                                            },
+                                                        ]);
+                                                    }}
+                                                >
+                                                    {target.label}
+                                                </Button>
+                                            ))}
 
-            {boundRule !== null && (
-                <Button
-                    title={`Stop opening ${boundRule.kind === 'object' ? 'this object' : `every ${
-                        boundRule.value}`} with a saved shot`}
-                    onClick={() => setCameraBindings(
-                        current => current.filter(b => b.id !== boundRule.id))}
-                >
-                    <Icon name="remove" />
-                    Unbind
-                </Button>
-            )}
+                                            {boundRule !== null && (
+                                                <Button
+                                                    title={`Stop opening ${boundRule.kind === 'object' ? 'this object' : `every ${
+                                                        boundRule.value}`} with a saved shot`}
+                                                    onClick={() => setCameraBindings(
+                                                        current => current.filter(b => b.id !== boundRule.id))}
+                                                >
+                                                    <Icon name="remove"/>
+                                                    Unbind
+                                                </Button>
+                                            )}
 
-        </Field>
-        </DockSection>
+                                        </Field>
+                                    </DockSection>
 
-        <DockSection
-            id="camera.view"
-            title="View"
-            collapsed={folded.has('camera.view')}
-            onToggle={toggleSection}
-        >
-        <Field
-            label="Draw distance"
-            info={<>
-                The fit already reaches the end of the effects, not just the hull.
-                Reach further for a long trail; a huge model may z-fight if you do.
-            </>}
-        >
-            <ModeSelector
-                label="Draw distance"
-                value={String(drawDistance)}
-                options={[
-                    { id: '1', label: 'Fit', title: 'Fit the model and its effects' },
-                    { id: '2', label: '2x', title: 'Twice the fitted distance' },
-                    { id: '4', label: '4x', title: 'Four times' },
-                    { id: '8', label: '8x', title: 'Eight times' },
-                ]}
-                onSelect={value => setDrawDistance(Number(value))}
-            />
-        </Field>
-        </DockSection>
+                                    <DockSection
+                                        id="camera.view"
+                                        title="View"
+                                        collapsed={folded.has('camera.view')}
+                                        onToggle={toggleSection}
+                                    >
+                                        <Field
+                                            label="Draw distance"
+                                            info={<>
+                                                The fit already reaches the end of the effects, not just the hull.
+                                                Reach further for a long trail; a huge model may z-fight if you do.
+                                            </>}
+                                        >
+                                            <ModeSelector
+                                                label="Draw distance"
+                                                value={String(drawDistance)}
+                                                options={[
+                                                    {id: '1', label: 'Fit', title: 'Fit the model and its effects'},
+                                                    {id: '2', label: '2x', title: 'Twice the fitted distance'},
+                                                    {id: '4', label: '4x', title: 'Four times'},
+                                                    {id: '8', label: '8x', title: 'Eight times'},
+                                                ]}
+                                                onSelect={value => setDrawDistance(Number(value))}
+                                            />
+                                        </Field>
+                                    </DockSection>
 
-        <DockSection
-            id="camera.capture"
-            title="Capture"
-            collapsed={folded.has('camera.capture')}
-            onToggle={toggleSection}
-        >
-        <Field
-            label="Capture"
-            value={<>{captureSizePx}px</>}
-            info={<>
-                Renders the shot on screen at the chosen size and asks where to put it. Off by
-                default the grid, the floor, the effects and every annotation stay out of it, which
-                is what an icon wants - tick the box to capture the room exactly as you see it.
-            </>}
-        >
+                                    <DockSection
+                                        id="camera.capture"
+                                        title="Capture"
+                                        collapsed={folded.has('camera.capture')}
+                                        onToggle={toggleSection}
+                                    >
+                                        <Field
+                                            label="Capture"
+                                            value={<>{captureSizePx}px</>}
+                                            info={<>
+                                                Renders the shot on screen at the chosen size and asks where to put it.
+                                                Off by
+                                                default the grid, the floor, the effects and every annotation stay out
+                                                of it, which
+                                                is what an icon wants - tick the box to capture the room exactly as you
+                                                see it.
+                                            </>}
+                                        >
 
-            <ModeSelector
-                label="Capture size"
-                value={String(captureSizePx)}
-                options={CAPTURE_SIZES.map(size => ({
-                    id: String(size),
-                    label: String(size),
-                    title: `Write a ${size} by ${size} image`,
-                }))}
-                onSelect={id => setCaptureSizePx(Number(id))}
-            />
+                                            <ModeSelector
+                                                label="Capture size"
+                                                value={String(captureSizePx)}
+                                                options={CAPTURE_SIZES.map(size => ({
+                                                    id: String(size),
+                                                    label: String(size),
+                                                    title: `Write a ${size} by ${size} image`,
+                                                }))}
+                                                onSelect={id => setCaptureSizePx(Number(id))}
+                                            />
 
-            <label className="check-row">
-                <input
-                    type="checkbox"
-                    checked={captureTransparent}
-                    onChange={e => setCaptureTransparent(e.target.checked)}
-                />
-                Transparent background
-            </label>
+                                            <label className="check-row">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={captureTransparent}
+                                                    onChange={e => setCaptureTransparent(e.target.checked)}
+                                                />
+                                                Transparent background
+                                            </label>
 
-            <label className="check-row">
-                <input
-                    type="checkbox"
-                    checked={captureScenery}
-                    onChange={e => setCaptureScenery(e.target.checked)}
-                />
-                Keep the grid, floor, effects and markers
-            </label>
+                                            <label className="check-row">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={captureScenery}
+                                                    onChange={e => setCaptureScenery(e.target.checked)}
+                                                />
+                                                Keep the grid, floor, effects and markers
+                                            </label>
 
-            <Button
-                onClick={() => {
-                    const viewport = viewportRef.current;
-                    if (viewport === null) {
-                        return;
-                    }
+                                            <Button
+                                                onClick={() => {
+                                                    const viewport = viewportRef.current;
+                                                    if (viewport === null) {
+                                                        return;
+                                                    }
 
-                    const size = captureSize(captureSizePx, captureSizePx);
-                    const dataUrl = viewport.capture({
-                        ...size,
-                        // The reader's own backdrop when they asked to keep the room, so what they
-                        // see is what they get; otherwise nothing at all, which is what an icon
-                        // going onto a mega texture wants.
-                        // The viewport's own backdrop when a flat one is wanted, so an opaque
-                        // capture matches what is on screen rather than inventing a colour.
-                        background: captureTransparent
-                            ? null
-                            : `#${VIEWPORT_BACKGROUND.toString(16).padStart(6, '0')}`,
-                        grid: captureScenery && grid,
-                        floor: captureScenery && floor,
-                        particles: captureScenery && particlesOn,
-                        annotations: captureScenery,
-                    });
+                                                    const size = captureSize(captureSizePx, captureSizePx);
+                                                    const dataUrl = viewport.capture({
+                                                        ...size,
+                                                        // The reader's own backdrop when they asked to keep the room, so what they
+                                                        // see is what they get; otherwise nothing at all, which is what an icon
+                                                        // going onto a mega texture wants.
+                                                        // The viewport's own backdrop when a flat one is wanted, so an opaque
+                                                        // capture matches what is on screen rather than inventing a colour.
+                                                        background: captureTransparent
+                                                            ? null
+                                                            : `#${VIEWPORT_BACKGROUND.toString(16).padStart(6, '0')}`,
+                                                        grid: captureScenery && grid,
+                                                        floor: captureScenery && floor,
+                                                        particles: captureScenery && particlesOn,
+                                                        annotations: captureScenery,
+                                                    });
 
-                    vscode.postMessage({
-                        type: 'saveCapture',
-                        dataUrl,
-                        fileName: captureFileName(scene?.subject ?? 'capture', size.width),
-                    });
-                }}
-            >
-                <Icon name="capture" />
-                Save a picture
-            </Button>
+                                                    vscode.postMessage({
+                                                        type: 'saveCapture',
+                                                        dataUrl,
+                                                        fileName: captureFileName(scene?.subject ?? 'capture', size.width),
+                                                    });
+                                                }}
+                                            >
+                                                <Icon name="capture"/>
+                                                Save a picture
+                                            </Button>
 
-        </Field>
-        </DockSection>
+                                        </Field>
+                                    </DockSection>
 
                                 </div>
                             </div>
@@ -6889,66 +7485,66 @@ function ModelPreview(): React.JSX.Element {
                             Re-authored compactly rather than moved as it stood - the dock's
                             `.field` is a label above a full-width control, which is a shape a 22px
                             stage plate does not have. */}
-                        {(levels.alt.length > 1 || levels.lod.length > 1) && (
-                            <div
-                                className="stage-chrome subject-state"
-                                role="group"
-                                aria-label="Model state"
-                            >
-                                {levels.alt.length > 1 && (
-                                    <label
-                                        className="stage-field"
-                                        title={altDrivenByHull
-                                            ? 'Damage state follows the hull in Gameplay'
-                                            : 'Set damage state - 0 is undamaged'}
-                                    >
-                                        <Icon name="damage" />
-                                        <input
-                                            type="range"
-                                            min={0}
-                                            max={altSteps.count - 1}
-                                            step={1}
-                                            value={altSteps.positionOf(alt)}
-                                            disabled={altDrivenByHull}
-                                            onChange={e => setAlt(
-                                                altSteps.levelAt(Number(e.target.value)))}
-                                        />
-                                        <span className="stage-value">
+                            {(levels.alt.length > 1 || levels.lod.length > 1) && (
+                                <div
+                                    className="stage-chrome subject-state"
+                                    role="group"
+                                    aria-label="Model state"
+                                >
+                                    {levels.alt.length > 1 && (
+                                        <label
+                                            className="stage-field"
+                                            title={altDrivenByHull
+                                                ? 'Damage state follows the hull in Gameplay'
+                                                : 'Set damage state - 0 is undamaged'}
+                                        >
+                                            <Icon name="damage"/>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={altSteps.count - 1}
+                                                step={1}
+                                                value={altSteps.positionOf(alt)}
+                                                disabled={altDrivenByHull}
+                                                onChange={e => setAlt(
+                                                    altSteps.levelAt(Number(e.target.value)))}
+                                            />
+                                            <span className="stage-value">
                                             {levelLabel('alt', alt, levels.alt,
-                                                { table: scene?.damageTable ?? [] })}
+                                                {table: scene?.damageTable ?? []})}
                                         </span>
-                                    </label>
-                                )}
+                                        </label>
+                                    )}
 
-                                {levels.lod.length > 1 && (
-                                    <label
-                                        className="stage-field detail"
-                                        title="Set LOD - 0 is lowest detail in EaW"
-                                    >
-                                        <Icon name="detail" />
-                                        <input
-                                            type="range"
-                                            min={0}
-                                            max={lodSteps.count - 1}
-                                            step={1}
-                                            value={lodSteps.positionOf(lod)}
-                                            onChange={e => {
-                                                lodChosenRef.current = true;
-                                                setLod(lodSteps.levelAt(Number(e.target.value)));
-                                            }}
-                                        />
-                                        <span className="stage-value">
+                                    {levels.lod.length > 1 && (
+                                        <label
+                                            className="stage-field detail"
+                                            title="Set LOD - 0 is lowest detail in EaW"
+                                        >
+                                            <Icon name="detail"/>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={lodSteps.count - 1}
+                                                step={1}
+                                                value={lodSteps.positionOf(lod)}
+                                                onChange={e => {
+                                                    lodChosenRef.current = true;
+                                                    setLod(lodSteps.levelAt(Number(e.target.value)));
+                                                }}
+                                            />
+                                            <span className="stage-value">
                                             {levelLabel('lod', lod, levels.lod,
-                                                { cost: lodCost.get(lod) })}
+                                                {cost: lodCost.get(lod)})}
                                         </span>
-                                    </label>
-                                )}
-                            </div>
-                        )}
+                                        </label>
+                                    )}
+                                </div>
+                            )}
 
                         </span>
 
-                        {/* The ability command bar - the game's own arrangement, and the reason
+                            {/* The ability command bar - the game's own arrangement, and the reason
                             the icons were worth resolving at all. One key per ability, pressed to
                             activate, centred under the model it acts on.
 
@@ -6960,7 +7556,7 @@ function ModelPreview(): React.JSX.Element {
                             of the shipped types are ORDERS, and a unit's repertoire is worth
                             reading whole. Those keys are DISABLED and say why in their tooltip
                             rather than being left out. */}
-                        <span className="stage-slot stage-slot-mid">
+                            <span className="stage-slot stage-slot-mid">
                         <span className="command-stack">
                         {mode === 'gameplay' && abilities.length > 0 && (
                             <div
@@ -7014,26 +7610,26 @@ function ModelPreview(): React.JSX.Element {
                             </div>
                         )}
 
-                        {/* What the unit has LEFT, under the keys that act on it - the user's own
+                            {/* What the unit has LEFT, under the keys that act on it - the user's own
                             arrangement. The same three pools the attacker's readout lists, said as
                             bars: shields blue, the hull on the hardpoints' own ramp so a bar and a
                             targeting mark agree, and energy a hue neither of them uses.
 
                             Energy is absent unless its setting is on - see `poolOptions`. */}
-                        {mode === 'gameplay'
-                            && poolRows(scene?.defence, livePools, hull, poolOptions, hardpointHealthPool).length > 0 && (
-                            <div
-                                className="stage-chrome status-bars"
-                                role="group"
-                                aria-label="What the unit has left"
-                            >
-                                {poolRows(scene?.defence, livePools, hull, poolOptions, hardpointHealthPool)
-                                    .map(row => (
-                                    <span
-                                        key={row.id}
-                                        className="status-bar"
-                                        title={`${row.label}: ${row.detail}`}
+                            {mode === 'gameplay'
+                                && poolRows(scene?.defence, livePools, hull, poolOptions, hardpointHealthPool).length > 0 && (
+                                    <div
+                                        className="stage-chrome status-bars"
+                                        role="group"
+                                        aria-label="What the unit has left"
                                     >
+                                        {poolRows(scene?.defence, livePools, hull, poolOptions, hardpointHealthPool)
+                                            .map(row => (
+                                                <span
+                                                    key={row.id}
+                                                    className="status-bar"
+                                                    title={`${row.label}: ${row.detail}`}
+                                                >
                                         <span className="status-bar-track">
                                             <span
                                                 className="status-bar-fill"
@@ -7044,24 +7640,24 @@ function ModelPreview(): React.JSX.Element {
                                             />
                                         </span>
                                     </span>
-                                ))}
-                            </div>
-                        )}
+                                            ))}
+                                    </div>
+                                )}
                         </span>
                         </span>
 
-                        {/* The attack tool. A LENS, like the command bar beside it: absent
+                            {/* The attack tool. A LENS, like the command bar beside it: absent
                             outside Gameplay rather than disabled, because its absence says which
                             lens you are in and not something about this model.
 
                             A button rather than the form itself - ten fields laid along the bottom
                             edge would take a third of the viewport permanently, to show a tool that
                             is used in bursts. */}
-                        <span className="stage-slot stage-slot-end">
+                            <span className="stage-slot stage-slot-end">
                         {mode === 'gameplay' && scene?.defence !== null
                             && scene?.defence !== undefined && (
-                            <div className="stage-chrome">
-                                {/* The two ACTIONS, on the edge rather than inside the flyout -
+                                <div className="stage-chrome">
+                                    {/* The two ACTIONS, on the edge rather than inside the flyout -
                                     the same arrangement the scene controls and the camera presets
                                     use. `as-action`, not the plain toolbar glyph: neither ever
                                     latches, and a bare icon beside controls that do reads as a
@@ -7075,57 +7671,60 @@ function ModelPreview(): React.JSX.Element {
                                     the reason, rather than firing into nothing. The title also
                                     names the target, which the flyout's own readout used to be
                                     the only place to see. */}
-                                <IconButton
-                                    icon="fire"
-                                    className={'as-action' + (justFired ? ' fired' : '')}
-                                    title={`Fire at ${fireTarget === 'hull'
-                                        ? 'the whole unit' : fireTarget}`}
-                                    disabled={fireTarget === 'hull' && !shipTargetable}
-                                    disabledReason="Fire - pick a hardpoint to fire at"
-                                    onClick={fire}
-                                />
-                                <IconButton
-                                    icon="repair"
-                                    className="as-action"
-                                    title="Repair the target"
-                                    onClick={() => { repairTarget(); destroyAll(false, false); }}
-                                />
-                            </div>
-                        )}
+                                    <IconButton
+                                        icon="fire"
+                                        className={'as-action' + (justFired ? ' fired' : '')}
+                                        title={`Fire at ${fireTarget === 'hull'
+                                            ? 'the whole unit' : fireTarget}`}
+                                        disabled={fireTarget === 'hull' && !shipTargetable}
+                                        disabledReason="Fire - pick a hardpoint to fire at"
+                                        onClick={fire}
+                                    />
+                                    <IconButton
+                                        icon="repair"
+                                        className="as-action"
+                                        title="Repair the target"
+                                        onClick={() => {
+                                            repairTarget();
+                                            destroyAll(false, false);
+                                        }}
+                                    />
+                                </div>
+                            )}
 
-                        {/* Its own band, the way the camera corner does it: Fire and Repair ACT on
+                                {/* Its own band, the way the camera corner does it: Fire and Repair ACT on
                             the model, this OPENS something, and the two are not the same kind of
                             control. Last on the right, so the stage reads outwards from the model
                             in both directions. */}
-                        {mode === 'gameplay' && scene?.defence !== null
-                            && scene?.defence !== undefined && (
-                            <div className="stage-chrome">
-                                <IconButton
-                                    icon="settings"
-                                    className={attackOpen ? 'active' : undefined}
-                                    expanded={attackOpen}
-                                    title="Weapon settings"
-                                    onClick={() => setAttackOpen(open => !open)}
-                                />
+                                {mode === 'gameplay' && scene?.defence !== null
+                                    && scene?.defence !== undefined && (
+                                        <div className="stage-chrome">
+                                            <IconButton
+                                                icon="settings"
+                                                className={attackOpen ? 'active' : undefined}
+                                                expanded={attackOpen}
+                                                title="Weapon settings"
+                                                onClick={() => setAttackOpen(open => !open)}
+                                            />
 
-                                {/* Beside the settings, because it is the same kind of control -
+                                            {/* Beside the settings, because it is the same kind of control -
                                     it OPENS something. What each shot actually did, so a reader
                                     can see WHY a number came out the way it did rather than
                                     watching a bar move and guessing. */}
-                                <IconButton
-                                    icon="log"
-                                    className={logOpen ? 'active' : undefined}
-                                    expanded={logOpen}
-                                    title="Damage log"
-                                    disabled={damageLog.length === 0}
-                                    // Names the control even when it is disabled: a tooltip that
-                                    // gives only the reason leaves a reader who has never opened it
-                                    // no idea what it is.
-                                    disabledReason="Damage log - nothing fired yet"
-                                    onClick={() => setLogOpen(open => !open)}
-                                />
-                            </div>
-                        )}
+                                            <IconButton
+                                                icon="log"
+                                                className={logOpen ? 'active' : undefined}
+                                                expanded={logOpen}
+                                                title="Damage log"
+                                                disabled={damageLog.length === 0}
+                                                // Names the control even when it is disabled: a tooltip that
+                                                // gives only the reason leaves a reader who has never opened it
+                                                // no idea what it is.
+                                                disabledReason="Damage log - nothing fired yet"
+                                                onClick={() => setLogOpen(open => !open)}
+                                            />
+                                        </div>
+                                    )}
                         </span>
                         </div>
                         {/* What the command bar cannot say in an icon.
@@ -7192,7 +7791,7 @@ function ModelPreview(): React.JSX.Element {
                                                             referenceType: 'SpecialAbility',
                                                         })}
                                                     >
-                                                        <Icon name="definition" />
+                                                        <Icon name="definition"/>
                                                     </button>
                                                 </div>
 
@@ -7252,7 +7851,7 @@ function ModelPreview(): React.JSX.Element {
                                 className="stage-flyout from-bottom on-right sizeable"
                                 role="dialog"
                                 ref={logRef}
-                                style={{ height: logHeight, width: logWidth }}
+                                style={{height: logHeight, width: logWidth}}
                             >
                                 <div
                                     className="resize-handle-n"
@@ -7320,7 +7919,7 @@ function ModelPreview(): React.JSX.Element {
                                             title="Empty the log"
                                             onClick={() => setDamageLog([])}
                                         >
-                                            <Icon name="remove" />
+                                            <Icon name="remove"/>
                                             Clear
                                         </Button>
                                     </span>
@@ -7343,90 +7942,90 @@ function ModelPreview(): React.JSX.Element {
                                     />
                                 </div>
                                 <div className="stage-flyout-body">
-                        {mode === 'gameplay' && scene?.defence !== null
-                            && scene?.defence !== undefined && (
-                            <DockSection
-                                title="Attacker"
-                                count={scene.defence.isShielded ? 'shielded' : 'unshielded'}
-                            >
+                                    {mode === 'gameplay' && scene?.defence !== null
+                                        && scene?.defence !== undefined && (
+                                            <DockSection
+                                                title="Attacker"
+                                                count={scene.defence.isShielded ? 'shielded' : 'unshielded'}
+                                            >
 
-                                <div className="field-note">
-                                    The model on stage is the TARGET. Build a weapon here and fire
-                                    it at the unit or at one hardpoint.
-                                </div>
+                                                <div className="field-note">
+                                                    The model on stage is the TARGET. Build a weapon here and fire
+                                                    it at the unit or at one hardpoint.
+                                                </div>
 
-                                <Field label="Damage">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={attacker.damage}
-                                        onChange={e => setAttacker(current => ({
-                                            ...current,
-                                            damage: Number(e.target.value),
-                                        }))}
-                                    />
-                                </Field>
+                                                <Field label="Damage">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        value={attacker.damage}
+                                                        onChange={e => setAttacker(current => ({
+                                                            ...current,
+                                                            damage: Number(e.target.value),
+                                                        }))}
+                                                    />
+                                                </Field>
 
-                                <Field
-                                    label="Damage type"
-                                    valueTitle={'What the damage table says against this '
-                                        + 'target`s armor. A pair the table does not name is '
-                                        + '1.0, which is over half of them.'}
-                                    value={<>
-                                        {/* Off the LIVE defence: a ship whose generators are
+                                                <Field
+                                                    label="Damage type"
+                                                    valueTitle={'What the damage table says against this '
+                                                        + 'target`s armor. A pair the table does not name is '
+                                                        + '1.0, which is over half of them.'}
+                                                    value={<>
+                                                        {/* Off the LIVE defence: a ship whose generators are
                                             gone is unshielded, so the factor a shot would
                                             actually take is the hull's. Reading the scene's
                                             own copy showed the shield column beside a bar
                                             that had just gone flat. */}
-                                        x{armorFactor(
-                                            attacker.shield
-                                                && liveDefence?.isShielded === true
-                                                ? scene.defence.shieldFactors
-                                                : scene.defence.hullFactors,
-                                            attacker.damageType)}
-                                    </>}
-                                >
-                                    <select
-                                        value={attacker.damageType}
-                                        onChange={e => setAttacker(current => ({
-                                            ...current, damageType: e.target.value,
-                                        }))}
-                                        title="Which damage type the shot does"
-                                    >
-                                        {/* The reader's own value first when the tree does not
+                                                        x{armorFactor(
+                                                        attacker.shield
+                                                        && liveDefence?.isShielded === true
+                                                            ? scene.defence.shieldFactors
+                                                            : scene.defence.hullFactors,
+                                                        attacker.damageType)}
+                                                    </>}
+                                                >
+                                                    <select
+                                                        value={attacker.damageType}
+                                                        onChange={e => setAttacker(current => ({
+                                                            ...current, damageType: e.target.value,
+                                                        }))}
+                                                        title="Which damage type the shot does"
+                                                    >
+                                                        {/* The reader's own value first when the tree does not
                                             declare it - a preset saved against another mod must not
                                             silently become whatever happens to sort first. */}
-                                        {!scene.defence.damageTypes.includes(attacker.damageType)
-                                            && (
-                                            <option value={attacker.damageType}>
-                                                {attacker.damageType} (not in this tree)
-                                            </option>
-                                        )}
-                                        {scene.defence.damageTypes.map(type => (
-                                            <option key={type} value={type}>{type}</option>
-                                        ))}
-                                    </select>
-                                </Field>
+                                                        {!scene.defence.damageTypes.includes(attacker.damageType)
+                                                            && (
+                                                                <option value={attacker.damageType}>
+                                                                    {attacker.damageType} (not in this tree)
+                                                                </option>
+                                                            )}
+                                                        {scene.defence.damageTypes.map(type => (
+                                                            <option key={type} value={type}>{type}</option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
 
-                                {/* The three switches a projectile carries. They decide entirely
+                                                {/* The three switches a projectile carries. They decide entirely
                                     what a hit touches - see `attacker.ts` for the four rules. */}
-                                <div className="view-row">
-                                    {damageSwitches(poolOptions)
-                                        .map(({ id, label, title }) => (
-                                        <label key={id} className="field-label" title={title}>
-                                            <input
-                                                type="checkbox"
-                                                checked={attacker[id]}
-                                                onChange={e => setAttacker(current => ({
-                                                    ...current, [id]: e.target.checked,
-                                                }))}
-                                            />
-                                            {label}
-                                        </label>
-                                    ))}
-                                </div>
+                                                <div className="view-row">
+                                                    {damageSwitches(poolOptions)
+                                                        .map(({id, label, title}) => (
+                                                            <label key={id} className="field-label" title={title}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={attacker[id]}
+                                                                    onChange={e => setAttacker(current => ({
+                                                                        ...current, [id]: e.target.checked,
+                                                                    }))}
+                                                                />
+                                                                {label}
+                                                            </label>
+                                                        ))}
+                                                </div>
 
-                                {/* AREA DAMAGE. A blast reaches everything within its range as
+                                                {/* AREA DAMAGE. A blast reaches everything within its range as
                                     well as the thing it hit, and the two numbers are independent -
                                     `Proj_Veers_AT_AT_Max_Power_Laser_Red` declares a direct damage
                                     of 0.0 alongside a blast of 40, so a weapon can do all of its
@@ -7436,160 +8035,160 @@ function ModelPreview(): React.JSX.Element {
                                     range reaches nobody and the fields below it are moot - they
                                     disable rather than vanish, since a reader who has typed a
                                     damage and seen nothing happen needs to see the reason. */}
-                                <Field label="Blast damage">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={attacker.blastDamage}
-                                        title="Projectile_Blast_Area_Damage - applied to the target
+                                                <Field label="Blast damage">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        value={attacker.blastDamage}
+                                                        title="Projectile_Blast_Area_Damage - applied to the target
                                             AND to everything inside the range below"
-                                        onChange={e => setAttacker(current => ({
-                                            ...current,
-                                            blastDamage: Number(e.target.value),
-                                        }))}
-                                    />
-                                </Field>
+                                                        onChange={e => setAttacker(current => ({
+                                                            ...current,
+                                                            blastDamage: Number(e.target.value),
+                                                        }))}
+                                                    />
+                                                </Field>
 
-                                <Field label="Blast range">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={attacker.blastRange}
-                                        title="Projectile_Blast_Area_Range, in engine units.
+                                                <Field label="Blast range">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        value={attacker.blastRange}
+                                                        title="Projectile_Blast_Area_Range, in engine units.
                                             The target itself is always hit."
-                                        onChange={e => setAttacker(current => ({
-                                            ...current,
-                                            blastRange: Number(e.target.value),
-                                        }))}
-                                    />
-                                </Field>
+                                                        onChange={e => setAttacker(current => ({
+                                                            ...current,
+                                                            blastRange: Number(e.target.value),
+                                                        }))}
+                                                    />
+                                                </Field>
 
-                                <div className="view-row">
-                                    <label
-                                        className="field-label"
-                                        title="Projectile_Blast_Area_Dropoff - the blast weakens
+                                                <div className="view-row">
+                                                    <label
+                                                        className="field-label"
+                                                        title="Projectile_Blast_Area_Dropoff - the blast weakens
                                             with distance instead of being flat"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={attacker.blastDropoff}
-                                            disabled={attacker.blastRange <= 0}
-                                            onChange={e => setAttacker(current => ({
-                                                ...current,
-                                                blastDropoff: e.target.checked,
-                                            }))}
-                                        />
-                                        Falls off
-                                    </label>
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={attacker.blastDropoff}
+                                                            disabled={attacker.blastRange <= 0}
+                                                            onChange={e => setAttacker(current => ({
+                                                                ...current,
+                                                                blastDropoff: e.target.checked,
+                                                            }))}
+                                                        />
+                                                        Falls off
+                                                    </label>
 
-                                    <label
-                                        className="field-label"
-                                        title="Projectile_Blast_Area_Dropoff_Tiers - how many bands
+                                                    <label
+                                                        className="field-label"
+                                                        title="Projectile_Blast_Area_Dropoff_Tiers - how many bands
                                             it falls off in. Shipped values are 3, 4 or 5."
-                                    >
-                                        Tiers
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            max={16}
-                                            className="tier-count"
-                                            value={attacker.blastDropoffTiers}
-                                            disabled={!attacker.blastDropoff
-                                                || attacker.blastRange <= 0}
-                                            onChange={e => setAttacker(current => ({
-                                                ...current,
-                                                blastDropoffTiers: Number(e.target.value),
-                                            }))}
-                                        />
-                                    </label>
-                                </div>
+                                                    >
+                                                        Tiers
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            max={16}
+                                                            className="tier-count"
+                                                            value={attacker.blastDropoffTiers}
+                                                            disabled={!attacker.blastDropoff
+                                                                || attacker.blastRange <= 0}
+                                                            onChange={e => setAttacker(current => ({
+                                                                ...current,
+                                                                blastDropoffTiers: Number(e.target.value),
+                                                            }))}
+                                                        />
+                                                    </label>
+                                                </div>
 
-                                {/* Disabled rather than absent when the subject fires nothing: a
+                                                {/* Disabled rather than absent when the subject fires nothing: a
                                     control that comes and goes reads as a feature that does. */}
-                                {/* EVERY projectile in the tree, not the handful this subject
+                                                {/* EVERY projectile in the tree, not the handful this subject
                                     fires - you are building a weapon to shoot AT it, so its own
                                     armament is the wrong list. 105 of them, so the search is the
                                     way through rather than an optional extra. */}
-                                <Field
-                                    label="Fill from a projectile"
-                                    value={<>{scene.projectileCatalog?.length ?? 0}</>}
-                                >
-                                    <input
-                                        type="text"
-                                        placeholder="Search projectiles"
-                                        value={projectileSearch}
-                                        onChange={e => setProjectileSearch(e.target.value)}
-                                    />
-                                    <select
-                                        value=""
-                                        size={6}
-                                        disabled={(scene.projectileCatalog?.length ?? 0) === 0}
-                                        onChange={e => {
-                                            const picked = e.target.value;
-                                            const bolt = scene.projectiles
-                                                ?.find(p => p.id === picked);
+                                                <Field
+                                                    label="Fill from a projectile"
+                                                    value={<>{scene.projectileCatalog?.length ?? 0}</>}
+                                                >
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search projectiles"
+                                                        value={projectileSearch}
+                                                        onChange={e => setProjectileSearch(e.target.value)}
+                                                    />
+                                                    <select
+                                                        value=""
+                                                        size={6}
+                                                        disabled={(scene.projectileCatalog?.length ?? 0) === 0}
+                                                        onChange={e => {
+                                                            const picked = e.target.value;
+                                                            const bolt = scene.projectiles
+                                                                ?.find(p => p.id === picked);
 
-                                            if (bolt !== undefined) {
-                                                // A COPY. Edits afterwards stick.
-                                                setAttacker(attackerFromProjectile(bolt, attacker));
-                                                // Except the blast area, which has no field to edit
-                                                // and is read off the bolt when the shot resolves.
-                                                setAttackerProjectile(bolt.id);
-                                                setProjectileNote(null);
-                                            } else if (picked !== '') {
-                                                // Everything the subject does not fire is a NAME
-                                                // until it is fetched. It used to stop here and say
-                                                // so, which made the catalogue read as broken - and
-                                                // as incomplete, since 104 of its 105 entries do
-                                                // nothing on any given subject. Now it asks.
-                                                setProjectileNote(`Loading ${picked}...`);
-                                                vscode.postMessage({
-                                                    type: 'requestProjectile', name: picked,
-                                                });
-                                            }
-                                        }}
-                                    >
-                                        {projectileChoices(
-                                            scene.projectileCatalog ?? [], projectileSearch)
-                                            .map(name => (
-                                                <option key={name} value={name}>{name}</option>
-                                            ))}
-                                    </select>
-                                    {projectileNote !== null && (
-                                        <span className="field-note">{projectileNote}</span>
-                                    )}
-                                </Field>
+                                                            if (bolt !== undefined) {
+                                                                // A COPY. Edits afterwards stick.
+                                                                setAttacker(attackerFromProjectile(bolt, attacker));
+                                                                // Except the blast area, which has no field to edit
+                                                                // and is read off the bolt when the shot resolves.
+                                                                setAttackerProjectile(bolt.id);
+                                                                setProjectileNote(null);
+                                                            } else if (picked !== '') {
+                                                                // Everything the subject does not fire is a NAME
+                                                                // until it is fetched. It used to stop here and say
+                                                                // so, which made the catalogue read as broken - and
+                                                                // as incomplete, since 104 of its 105 entries do
+                                                                // nothing on any given subject. Now it asks.
+                                                                setProjectileNote(`Loading ${picked}...`);
+                                                                vscode.postMessage({
+                                                                    type: 'requestProjectile', name: picked,
+                                                                });
+                                                            }
+                                                        }}
+                                                    >
+                                                        {projectileChoices(
+                                                            scene.projectileCatalog ?? [], projectileSearch)
+                                                            .map(name => (
+                                                                <option key={name} value={name}>{name}</option>
+                                                            ))}
+                                                    </select>
+                                                    {projectileNote !== null && (
+                                                        <span className="field-note">{projectileNote}</span>
+                                                    )}
+                                                </Field>
 
-                                {/* Presets are TIER 1: they describe the reader's testing habits,
+                                                {/* Presets are TIER 1: they describe the reader's testing habits,
                                     not this model, so they live in globalState beside the camera
                                     presets and survive opening a different ship. */}
-                                <Field label="Saved weapons" value={<>{attackerPresets.length}</>}>
-                                    <select
-                                        value=""
-                                        disabled={attackerPresets.length === 0}
-                                        onChange={e => {
-                                            const saved = attackerPresets
-                                                .find(p => p.id === e.target.value);
+                                                <Field label="Saved weapons" value={<>{attackerPresets.length}</>}>
+                                                    <select
+                                                        value=""
+                                                        disabled={attackerPresets.length === 0}
+                                                        onChange={e => {
+                                                            const saved = attackerPresets
+                                                                .find(p => p.id === e.target.value);
 
-                                            if (saved !== undefined) {
-                                                const { id, name, ...weapon } = saved;
-                                                setAttacker(weapon);
-                                            }
-                                        }}
-                                        title={attackerPresets.length === 0
-                                            ? 'Name a configuration below to save it here.'
-                                            : 'Loads a saved weapon into the fields above.'}
-                                    >
-                                        <option value="">Recall a weapon...</option>
-                                        {attackerPresets.map(saved => (
-                                            <option key={saved.id} value={saved.id}>
-                                                {saved.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
+                                                            if (saved !== undefined) {
+                                                                const {id, name, ...weapon} = saved;
+                                                                setAttacker(weapon);
+                                                            }
+                                                        }}
+                                                        title={attackerPresets.length === 0
+                                                            ? 'Name a configuration below to save it here.'
+                                                            : 'Loads a saved weapon into the fields above.'}
+                                                    >
+                                                        <option value="">Recall a weapon...</option>
+                                                        {attackerPresets.map(saved => (
+                                                            <option key={saved.id} value={saved.id}>
+                                                                {saved.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
 
-                                <span className="view-row">
+                                                <span className="view-row">
                                     <input
                                         type="text"
                                         placeholder="Name this weapon"
@@ -7609,12 +8208,12 @@ function ModelPreview(): React.JSX.Element {
                                                 // the same thing is worse than losing the old one,
                                                 // which is what the reader just asked for anyway.
                                                 ...current.filter(p => p.name !== name),
-                                                { ...attacker, id: `atk-${Date.now()}`, name },
+                                                {...attacker, id: `atk-${Date.now()}`, name},
                                             ]);
                                             setPresetName('');
                                         }}
                                     >
-                                        <Icon name="save" />
+                                        <Icon name="save"/>
                                         Save
                                     </Button>
                                     <Button
@@ -7624,13 +8223,13 @@ function ModelPreview(): React.JSX.Element {
                                         disabledReason="No saved weapons to remove"
                                         onClick={() => setAttackerPresets([])}
                                     >
-                                        <Icon name="remove" />
+                                        <Icon name="remove"/>
                                         Clear
                                     </Button>
                                 </span>
 
-                            </DockSection>
-                        )}
+                                            </DockSection>
+                                        )}
                                 </div>
                             </div>
                         )}
@@ -7793,13 +8392,13 @@ function ModelPreview(): React.JSX.Element {
                                             icon="open"
                                             title="Open this model in AloViewer"
                                             onClick={() => vscode.postMessage(
-                                                { type: 'openExternal', tool: 'model' })}
+                                                {type: 'openExternal', tool: 'model'})}
                                         />
                                         <IconButton
                                             icon="bloom"
                                             title="Open this file in the Particle Editor"
                                             onClick={() => vscode.postMessage(
-                                                { type: 'openExternal', tool: 'particles' })}
+                                                {type: 'openExternal', tool: 'particles'})}
                                         />
                                     </span>
                                 )}
@@ -7840,7 +8439,7 @@ function ModelPreview(): React.JSX.Element {
                                             onClick={clearSelection}
                                         >
                                             {selected.size} selected
-                                            <Icon name="close" size={11} />
+                                            <Icon name="close" size={11}/>
                                         </button>
                                     )}
 
@@ -7880,51 +8479,51 @@ function ModelPreview(): React.JSX.Element {
                                     against the section, so the strip lands inside the tree's own
                                     bounds and not over the skeleton control below it. */}
                                 <div className="tree-pane">
-                                <ul
-                                    className="bone-tree"
-                                    style={{ minHeight: treeMinHeight(unfilteredRowCount) }}
-                                >
-                                    {treeRows.map(({ node, expandable, expanded }) => (
-                                        <li
-                                            key={node.id}
-                                            data-row={node.id}
-                                            className={
-                                                'bone-row'
-                                                + (selected.has(node.id) ? ' selected' : '')
-                                                + (node.gatedOff ? ' hidden-bone' : '')
-                                                + (node.scaffold === true ? ' scaffold' : '')
-                                            }
-                                            style={{ paddingLeft: 6 + node.depth * 10 }}
-                                            title={node.because === undefined
-                                                ? node.name
-                                                : `${node.name}
+                                    <ul
+                                        className="bone-tree"
+                                        style={{minHeight: treeMinHeight(unfilteredRowCount)}}
+                                    >
+                                        {treeRows.map(({node, expandable, expanded}) => (
+                                            <li
+                                                key={node.id}
+                                                data-row={node.id}
+                                                className={
+                                                    'bone-row'
+                                                    + (selected.has(node.id) ? ' selected' : '')
+                                                    + (node.gatedOff ? ' hidden-bone' : '')
+                                                    + (node.scaffold === true ? ' scaffold' : '')
+                                                }
+                                                style={{paddingLeft: 6 + node.depth * 10}}
+                                                title={node.because === undefined
+                                                    ? node.name
+                                                    : `${node.name}
 ${becauseText(node.because)}`}
-                                            onClick={event => {
-                                                // Clicking the row that is ALREADY the whole
-                                                // selection clears it. There was no other way out
-                                                // of a selection at all - the box and the axes
-                                                // stayed until you picked something else.
-                                                const plain = !(event.ctrlKey || event.metaKey)
-                                                    && !event.shiftKey;
+                                                onClick={event => {
+                                                    // Clicking the row that is ALREADY the whole
+                                                    // selection clears it. There was no other way out
+                                                    // of a selection at all - the box and the axes
+                                                    // stayed until you picked something else.
+                                                    const plain = !(event.ctrlKey || event.metaKey)
+                                                        && !event.shiftKey;
 
-                                                if (plain && selected.size === 1
-                                                    && selected.has(node.id)) {
-                                                    clearSelection();
-                                                    return;
-                                                }
+                                                    if (plain && selected.size === 1
+                                                        && selected.has(node.id)) {
+                                                        clearSelection();
+                                                        return;
+                                                    }
 
-                                                const after = selectionAfterClick(
-                                                    treeRows, selected, anchor, node.id, {
-                                                        ctrl: event.ctrlKey || event.metaKey,
-                                                        shift: event.shiftKey,
-                                                    });
-                                                setSelected(after.selected);
-                                                setAnchor(after.anchor);
+                                                    const after = selectionAfterClick(
+                                                        treeRows, selected, anchor, node.id, {
+                                                            ctrl: event.ctrlKey || event.metaKey,
+                                                            shift: event.shiftKey,
+                                                        });
+                                                    setSelected(after.selected);
+                                                    setAnchor(after.anchor);
 
-                                                if (node.kind === 'bone') {
-                                                }
-                                            }}
-                                        >
+                                                    if (node.kind === 'bone') {
+                                                    }
+                                                }}
+                                            >
                                             <span
                                                 className={`twisty${expandable ? '' : ' leaf'}`}
                                                 onClick={event => {
@@ -7937,18 +8536,18 @@ ${becauseText(node.because)}`}
                                                     size={13}
                                                 />
                                             </span>
-                                            {/* The kind reads as a PICTURE now. A letter needed
+                                                {/* The kind reads as a PICTURE now. A letter needed
                                                 the legend in the filter strip to decode, on every
                                                 row of a hundred-row tree. */}
-                                            <span
-                                                className={`row-kind kind-${node.kind}`}
-                                                title={KIND_LABELS[node.kind]}
-                                            >
-                                                <Icon name={KIND_ICONS[node.kind]} size={13} />
+                                                <span
+                                                    className={`row-kind kind-${node.kind}`}
+                                                    title={KIND_LABELS[node.kind]}
+                                                >
+                                                <Icon name={KIND_ICONS[node.kind]} size={13}/>
                                             </span>
-                                            <span className="bone-name">{node.name}</span>
+                                                <span className="bone-name">{node.name}</span>
 
-                                            {/* Blender's arrangement, and the reader asked for it
+                                                {/* Blender's arrangement, and the reader asked for it
                                                 by name: an open eye, a half-shut one for a row
                                                 whose visibility is inherited from above, and a
                                                 closed one for a row that is off. A tick could only
@@ -7957,66 +8556,66 @@ ${becauseText(node.because)}`}
                                                 it" from "a bone above it is hidden, pressing does
                                                 nothing", and the second one made the control look
                                                 broken. See `rowEye.ts`. */}
-                                            {(() => {
-                                                const eye = rowEye({
-                                                    visible: node.visible,
-                                                    decidedBy: node.decidedBy ?? 'file',
-                                                    authored: !node.gatedOff,
-                                                });
+                                                {(() => {
+                                                    const eye = rowEye({
+                                                        visible: node.visible,
+                                                        decidedBy: node.decidedBy ?? 'file',
+                                                        authored: !node.gatedOff,
+                                                    });
 
-                                                return (
-                                                    <IconButton
-                                                        icon={EYE_ICONS[eye.state]}
-                                                        className={`row-eye eye-${eye.state}`}
-                                                        size={13}
-                                                        pressed={eye.state === 'shown'}
-                                                        title={eye.title}
-                                                        disabled={!eye.canAct}
-                                                        // Already the reason when it cannot act:
-                                                        // rowEye phrases the title from the state,
-                                                        // and a row that cannot be hidden says so.
-                                                        disabledReason={eye.title}
-                                                        onClick={event => {
-                                                            event.stopPropagation();
-                                                            setRowsVisible(node.id, !node.visible);
-                                                        }}
-                                                    />
-                                                );
-                                            })()}
+                                                    return (
+                                                        <IconButton
+                                                            icon={EYE_ICONS[eye.state]}
+                                                            className={`row-eye eye-${eye.state}`}
+                                                            size={13}
+                                                            pressed={eye.state === 'shown'}
+                                                            title={eye.title}
+                                                            disabled={!eye.canAct}
+                                                            // Already the reason when it cannot act:
+                                                            // rowEye phrases the title from the state,
+                                                            // and a row that cannot be hidden says so.
+                                                            disabledReason={eye.title}
+                                                            onClick={event => {
+                                                                event.stopPropagation();
+                                                                setRowsVisible(node.id, !node.visible);
+                                                            }}
+                                                        />
+                                                    );
+                                                })()}
 
-                                            {/* Dim until the row is under the pointer or already
+                                                {/* Dim until the row is under the pointer or already
                                                 open, so a deep tree stays a list of names rather
                                                 than a column of buttons - but always THERE, since
                                                 a control that only exists on hover is one nobody
                                                 finds. */}
-                                            <IconButton
-                                                icon="details"
-                                                className={'row-details'
-                                                    + (detailsRow === node.id ? ' active' : '')}
-                                                size={13}
-                                                // pressed, not expanded: it opens an editor tab
-                                                // beside this one, which is not this control
-                                                // disclosing something underneath it.
-                                                pressed={detailsRow === node.id}
-                                                title={`Inspect ${node.name}`}
-                                                onClick={event => {
-                                                    event.stopPropagation();
-                                                    openInspector(node.id);
-                                                }}
-                                            />
-                                        </li>
-                                    ))}
-                                    {/* Inside the list, not after it. Below the box it was one
+                                                <IconButton
+                                                    icon="details"
+                                                    className={'row-details'
+                                                        + (detailsRow === node.id ? ' active' : '')}
+                                                    size={13}
+                                                    // pressed, not expanded: it opens an editor tab
+                                                    // beside this one, which is not this control
+                                                    // disclosing something underneath it.
+                                                    pressed={detailsRow === node.id}
+                                                    title={`Inspect ${node.name}`}
+                                                    onClick={event => {
+                                                        event.stopPropagation();
+                                                        openInspector(node.id);
+                                                    }}
+                                                />
+                                            </li>
+                                        ))}
+                                        {/* Inside the list, not after it. Below the box it was one
                                         more thing appearing where rows used to be, so the panel
                                         still moved - just by the height of the message instead of
                                         the height of the tree. */}
-                                    {treeRows.length === 0 && (
-                                        <li className="dock-hint tree-empty">
-                                            Nothing matches that filter.
-                                        </li>
-                                    )}
-                                </ul>
-                                {/* Show and Hide used to sit here, doing what the row's own tick
+                                        {treeRows.length === 0 && (
+                                            <li className="dock-hint tree-empty">
+                                                Nothing matches that filter.
+                                            </li>
+                                        )}
+                                    </ul>
+                                    {/* Show and Hide used to sit here, doing what the row's own tick
                                     does - and doing it to whatever happened to be selected, which
                                     is a second way to say the same thing and a second thing to get
                                     wrong. What the panel actually lacked was a way BACK: after
@@ -8024,7 +8623,7 @@ ${becauseText(node.because)}`}
                                     what the model looked like when it was opened. */}
 
 
-                                {/* ONE element, floating on the tree's bottom edge.
+                                    {/* ONE element, floating on the tree's bottom edge.
 
                                     The pattern and the kinds are the same question - which rows do
                                     I want - and they stood as two unrelated blocks with a gap
@@ -8036,80 +8635,80 @@ ${becauseText(node.because)}`}
                                     ON the tree rather than under it, so it costs the list no
                                     height at all. The list carries a matching pad at its foot, so
                                     the last row can still be scrolled clear of the strip. */}
-                                <div
-                                    className={'tree-search' + (searchOpen ? ' open' : '')}
-                                    ref={searchRef}
-                                >
-                                    {/* The box grows into the space to the LEFT of the icons,
+                                    <div
+                                        className={'tree-search' + (searchOpen ? ' open' : '')}
+                                        ref={searchRef}
+                                    >
+                                        {/* The box grows into the space to the LEFT of the icons,
                                         which never move. That is what makes the strip a fixed
                                         anchor rather than a row that rearranges itself: press the
                                         magnifier and the field appears beside it, press again and
                                         it is gone, and nothing you were pointing at has shifted. */}
-                                    {searchOpen && (
-                                        <input
-                                            className="tree-filter"
-                                            type="text"
-                                            autoFocus
-                                            value={boneFilter}
-                                            placeholder="Filter the tree, e.g. HP_"
-                                            onChange={e => setBoneFilter(e.target.value)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Escape') {
-                                                    e.stopPropagation();
-                                                    setBoneFilter('');
-                                                    setSearchPressed(false);
-                                                }
-                                            }}
-                                        />
-                                    )}
+                                        {searchOpen && (
+                                            <input
+                                                className="tree-filter"
+                                                type="text"
+                                                autoFocus
+                                                value={boneFilter}
+                                                placeholder="Filter the tree, e.g. HP_"
+                                                onChange={e => setBoneFilter(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Escape') {
+                                                        e.stopPropagation();
+                                                        setBoneFilter('');
+                                                        setSearchPressed(false);
+                                                    }
+                                                }}
+                                            />
+                                        )}
 
-                                    {/* The four icons are ONE flex item, so the plate can only
+                                        {/* The four icons are ONE flex item, so the plate can only
                                         wrap between the field and the strip - never in the middle
                                         of the strip. Left loose, the magnifier stayed up on the
                                         field's line and the three kinds dropped below it, which is
                                         neither of the two layouts this is meant to have. */}
-                                    <div className="tree-search-icons">
-                                    <IconButton
-                                        icon="search"
-                                        className={'tree-search-toggle'
-                                            + (searchOpen ? ' active' : '')}
-                                        expanded={searchOpen}
-                                        title={searchOpen
-                                            ? 'Close the filter'
-                                            : 'Filter the tree by name'}
-                                        onClick={() => {
-                                            // Closing clears. A pattern kept behind a closed box
-                                            // would reopen it immediately - see searchIsOpen - so
-                                            // the press would appear to do nothing at all.
-                                            if (searchOpen) {
-                                                setBoneFilter('');
-                                            }
-                                            setSearchPressed(open => !open);
-                                        }}
-                                    />
+                                        <div className="tree-search-icons">
+                                            <IconButton
+                                                icon="search"
+                                                className={'tree-search-toggle'
+                                                    + (searchOpen ? ' active' : '')}
+                                                expanded={searchOpen}
+                                                title={searchOpen
+                                                    ? 'Close the filter'
+                                                    : 'Filter the tree by name'}
+                                                onClick={() => {
+                                                    // Closing clears. A pattern kept behind a closed box
+                                                    // would reopen it immediately - see searchIsOpen - so
+                                                    // the press would appear to do nothing at all.
+                                                    if (searchOpen) {
+                                                        setBoneFilter('');
+                                                    }
+                                                    setSearchPressed(open => !open);
+                                                }}
+                                            />
 
-                                    {/* Always here, open or closed. A pattern and a kind are two
+                                            {/* Always here, open or closed. A pattern and a kind are two
                                         halves of the same question, and hiding one of them the
                                         moment you start typing makes narrowing by kind a round
                                         trip out of the box you are typing in. */}
-                                    {TREE_KINDS.map(kind => (
-                                        <IconButton
-                                            key={kind}
-                                            icon={KIND_ICONS[kind]}
-                                            className={kinds.has(kind) ? 'active' : undefined}
-                                            pressed={kinds.has(kind)}
-                                            title={`Show ${KIND_LABELS[kind].toLowerCase()}`}
-                                            onClick={() => setKinds(current => {
-                                                const next = new Set(current);
-                                                if (!next.delete(kind)) {
-                                                    next.add(kind);
-                                                }
-                                                return next;
-                                            })}
-                                        />
-                                    ))}
+                                            {TREE_KINDS.map(kind => (
+                                                <IconButton
+                                                    key={kind}
+                                                    icon={KIND_ICONS[kind]}
+                                                    className={kinds.has(kind) ? 'active' : undefined}
+                                                    pressed={kinds.has(kind)}
+                                                    title={`Show ${KIND_LABELS[kind].toLowerCase()}`}
+                                                    onClick={() => setKinds(current => {
+                                                        const next = new Set(current);
+                                                        if (!next.delete(kind)) {
+                                                            next.add(kind);
+                                                        }
+                                                        return next;
+                                                    })}
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
                                 </div>
                             </DockSection>
                         )}
@@ -8202,7 +8801,7 @@ ${becauseText(node.because)}`}
                                             title="Stop - show the rest pose"
                                             onClick={() => setAnimation(null)}
                                         >
-                                            <Icon name="stop" />
+                                            <Icon name="stop"/>
                                             <span className="anim-name">Rest pose</span>
                                         </button>
 
@@ -8222,51 +8821,51 @@ ${becauseText(node.because)}`}
                                             const folded = foldedFamilies.has(group.family);
 
                                             return (
-                                            <div className="dock-section anim-family"
-                                                key={group.family}>
-                                                <div
-                                                    className="dock-section-title as-fold"
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    aria-expanded={!folded}
-                                                    title={folded
-                                                        ? `Open ${group.label.toLowerCase()}`
-                                                        : `Fold ${group.label.toLowerCase()} away`}
-                                                    onClick={() => toggleFamily(group.family)}
-                                                    onKeyDown={event => {
-                                                        if (event.key === 'Enter'
-                                                            || event.key === ' ') {
-                                                            event.preventDefault();
-                                                            toggleFamily(group.family);
-                                                        }
-                                                    }}
-                                                >
-                                                    <Icon
-                                                        name={folded ? 'collapsed' : 'expanded'}
-                                                        size={13}
-                                                    />
-                                                    {group.label}
-                                                    <span className="title-end">
+                                                <div className="dock-section anim-family"
+                                                     key={group.family}>
+                                                    <div
+                                                        className="dock-section-title as-fold"
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        aria-expanded={!folded}
+                                                        title={folded
+                                                            ? `Open ${group.label.toLowerCase()}`
+                                                            : `Fold ${group.label.toLowerCase()} away`}
+                                                        onClick={() => toggleFamily(group.family)}
+                                                        onKeyDown={event => {
+                                                            if (event.key === 'Enter'
+                                                                || event.key === ' ') {
+                                                                event.preventDefault();
+                                                                toggleFamily(group.family);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Icon
+                                                            name={folded ? 'collapsed' : 'expanded'}
+                                                            size={13}
+                                                        />
+                                                        {group.label}
+                                                        <span className="title-end">
                                                         <span className="section-count">
                                                             {group.actions.length}
                                                         </span>
                                                     </span>
-                                                </div>
-
-                                                {!folded && (
-                                                    <div className="anim-list">
-                                                        {group.actions.map(action => (
-                                                            <AnimationTile
-                                                                key={action.id}
-                                                                action={action}
-                                                                playing={animation}
-                                                                onPlay={playAction}
-                                                                onPick={pickClip}
-                                                            />
-                                                        ))}
                                                     </div>
-                                                )}
-                                            </div>
+
+                                                    {!folded && (
+                                                        <div className="anim-list">
+                                                            {group.actions.map(action => (
+                                                                <AnimationTile
+                                                                    key={action.id}
+                                                                    action={action}
+                                                                    playing={animation}
+                                                                    onPlay={playAction}
+                                                                    onPick={pickClip}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             );
                                         })}
                                     </div>
@@ -8279,14 +8878,14 @@ ${becauseText(node.because)}`}
                             at all, and telling it there is nothing here would be wrong twice. */}
                         {mode === 'gameplay' && (scene?.hardpoints.length ?? 0) === 0
                             && weapons.length === 0 && abilities.length === 0 && (
-                            <DockSection title="Gameplay">
-                                <div className="field-note">
-                                    This unit declares no weapons, no hardpoints and no
-                                    abilities, so there is nothing to destroy and no damage effects
-                                    to drive.
-                                </div>
-                            </DockSection>
-                        )}
+                                <DockSection title="Gameplay">
+                                    <div className="field-note">
+                                        This unit declares no weapons, no hardpoints and no
+                                        abilities, so there is nothing to destroy and no damage effects
+                                        to drive.
+                                    </div>
+                                </DockSection>
+                            )}
 
                         {/* What is LEFT after the cards: the weapons without
                             hardpoint. A fighter carries its guns on the unit itself and declares no
@@ -8374,24 +8973,24 @@ ${becauseText(node.because)}`}
                                 title="Hardpoints"
                                 count={cards.length}
                                 end={<>
-                                <IconButton
-                                    icon="effects"
-                                    className="header-right"
-                                    size={13}
-                                    title="Destroy all hardpoints"
-                                    disabled={!cards.some(c => c.isDestroyable)}
-                                    disabledReason="No hardpoint on this model can be destroyed"
-                                    onClick={() => destroyAll(true)}
-                                />
-                                <IconButton
-                                    icon="reset"
-                                    className="header-right"
-                                    size={13}
-                                    title="Repair all hardpoints"
-                                    disabled={destroyed.size === 0}
-                                    disabledReason="Nothing is destroyed"
-                                    onClick={() => destroyAll(false)}
-                                />
+                                    <IconButton
+                                        icon="effects"
+                                        className="header-right"
+                                        size={13}
+                                        title="Destroy all hardpoints"
+                                        disabled={!cards.some(c => c.isDestroyable)}
+                                        disabledReason="No hardpoint on this model can be destroyed"
+                                        onClick={() => destroyAll(true)}
+                                    />
+                                    <IconButton
+                                        icon="reset"
+                                        className="header-right"
+                                        size={13}
+                                        title="Repair all hardpoints"
+                                        disabled={destroyed.size === 0}
+                                        disabledReason="Nothing is destroyed"
+                                        onClick={() => destroyAll(false)}
+                                    />
                                 </>}
                             >
 
@@ -8451,120 +9050,120 @@ ${becauseText(node.because)}`}
                                 )}
 
                                 {hardpointGroups.map(group => (
-                                <Fragment key={group.type}>
-                                <button
-                                    type="button"
-                                    className="card-group-title"
-                                    aria-expanded={!foldedGroups.has(group.type)}
-                                    title={foldedGroups.has(group.type)
-                                        ? `Show the ${group.label.toLowerCase()} hardpoints`
-                                        : `Hide the ${group.label.toLowerCase()} hardpoints`}
-                                    onClick={() => setFoldedGroups(
-                                        current => toggleSelected(current, group.type))}
-                                >
-                                    <Icon
-                                        name={foldedGroups.has(group.type)
-                                            ? 'collapsed'
-                                            : 'expanded'}
-                                        size={13}
-                                    />
-                                    {group.label}
-                                    <span className="section-count">{group.cards.length}</span>
-                                </button>
-                                {!foldedGroups.has(group.type) && (
-                                <ul className="part-list hardpoint-cards">
-                                    {group.cards.map(card => (
-                                        <li
-                                            key={card.id}
-                                            data-card={card.id}
-                                            className={'hardpoint-card'
-                                                + (fireTarget === card.id ? ' selected' : '')
-                                                + (card.destroyed ? ' gone' : '')}
-                                            /* Picking the card aims at it, which is the same act
-                                               as picking it in the attacker's Fire at list and
-                                               the same act as clicking its targeting mark. One
-                                               meaning, three ways in. */
-                                            onClick={() => selectHardpoint(card.id)}
+                                    <Fragment key={group.type}>
+                                        <button
+                                            type="button"
+                                            className="card-group-title"
+                                            aria-expanded={!foldedGroups.has(group.type)}
+                                            title={foldedGroups.has(group.type)
+                                                ? `Show the ${group.label.toLowerCase()} hardpoints`
+                                                : `Hide the ${group.label.toLowerCase()} hardpoints`}
+                                            onClick={() => setFoldedGroups(
+                                                current => toggleSelected(current, group.type))}
                                         >
-                                            <div className="card-head">
-                                                {/* The art the GAME draws over this hardpoint,
+                                            <Icon
+                                                name={foldedGroups.has(group.type)
+                                                    ? 'collapsed'
+                                                    : 'expanded'}
+                                                size={13}
+                                            />
+                                            {group.label}
+                                            <span className="section-count">{group.cards.length}</span>
+                                        </button>
+                                        {!foldedGroups.has(group.type) && (
+                                            <ul className="part-list hardpoint-cards">
+                                                {group.cards.map(card => (
+                                                    <li
+                                                        key={card.id}
+                                                        data-card={card.id}
+                                                        className={'hardpoint-card'
+                                                            + (fireTarget === card.id ? ' selected' : '')
+                                                            + (card.destroyed ? ' gone' : '')}
+                                                        /* Picking the card aims at it, which is the same act
+                                                           as picking it in the attacker's Fire at list and
+                                                           the same act as clicking its targeting mark. One
+                                                           meaning, three ways in. */
+                                                        onClick={() => selectHardpoint(card.id)}
+                                                    >
+                                                        <div className="card-head">
+                                                            {/* The art the GAME draws over this hardpoint,
                                                     the same image the marks on the model use. It
                                                     is picked by Type, so seeing it here is how a
                                                     reader checks that the Type they wrote resolves
                                                     to the mark they expected. */}
-                                                {reticleFor(scene?.reticles, card.type) !== null
-                                                    && (
-                                                    <img
-                                                        className="card-reticle"
-                                                        src={reticleFor(
-                                                            scene?.reticles, card.type) ?? ''}
-                                                        alt=""
-                                                        title={card.isTargetable
-                                                            ? 'The mark the game draws over this'
-                                                            : 'Is_Targetable is off, so the game '
-                                                                + 'draws no mark over this'}
-                                                    />
-                                                )}
-                                                <span className="part-name">{card.id}</span>
+                                                            {reticleFor(scene?.reticles, card.type) !== null
+                                                                && (
+                                                                    <img
+                                                                        className="card-reticle"
+                                                                        src={reticleFor(
+                                                                            scene?.reticles, card.type) ?? ''}
+                                                                        alt=""
+                                                                        title={card.isTargetable
+                                                                            ? 'The mark the game draws over this'
+                                                                            : 'Is_Targetable is off, so the game '
+                                                                            + 'draws no mark over this'}
+                                                                    />
+                                                                )}
+                                                            <span className="part-name">{card.id}</span>
 
-                                                {/* Top right, away from the switches: this leaves
+                                                            {/* Top right, away from the switches: this leaves
                                                     the panel, and a jump standing in a row of
                                                     toggles reads as another toggle. */}
-                                                <button
-                                                    type="button"
-                                                    className="goto-definition"
-                                                    title={`Go to where ${card.id} is defined`}
-                                                    onClick={event => {
-                                                        event.stopPropagation();
-                                                        vscode.postMessage({
-                                                            type: 'revealDefinition',
-                                                            value: card.id,
-                                                            referenceType: 'HardPoint',
-                                                        });
-                                                    }}
-                                                >
-                                                    <Icon name="definition" />
-                                                </button>
-                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                className="goto-definition"
+                                                                title={`Go to where ${card.id} is defined`}
+                                                                onClick={event => {
+                                                                    event.stopPropagation();
+                                                                    vscode.postMessage({
+                                                                        type: 'revealDefinition',
+                                                                        value: card.id,
+                                                                        referenceType: 'HardPoint',
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <Icon name="definition"/>
+                                                            </button>
+                                                        </div>
 
-                                            {/* The game's own words for it. The Type is what picks
+                                                        {/* The game's own words for it. The Type is what picks
                                                 its reticle; the tooltip is what a player reads. */}
-                                            {card.type !== null && (
-                                                <span className="detail card-type">{card.type}</span>
-                                            )}
-                                            {/* What a PLAYER reads, with the key the author wrote
+                                                        {card.type !== null && (
+                                                            <span className="detail card-type">{card.type}</span>
+                                                        )}
+                                                        {/* What a PLAYER reads, with the key the author wrote
                                                 on the hover. The card showed the key itself before
                                                 the server resolved it, which is the one line on a
                                                 card that nobody outside the files ever sees. */}
-                                            {card.tooltip !== null && (
-                                                <span
-                                                    className="detail wraps"
-                                                    title={card.tooltipKey ?? undefined}
-                                                >
+                                                        {card.tooltip !== null && (
+                                                            <span
+                                                                className="detail wraps"
+                                                                title={card.tooltipKey ?? undefined}
+                                                            >
                                                     {card.tooltip}
                                                 </span>
-                                            )}
+                                                        )}
 
-                                            {/* The key alone, when it resolved to nothing. Said as
+                                                        {/* The key alone, when it resolved to nothing. Said as
                                                 a key rather than dressed up as text: a row with no
                                                 translation is the localisation editor's to fix, and
                                                 showing it as prose would hide that. */}
-                                            {card.tooltip === null && card.tooltipKey !== null && (
-                                                <span
-                                                    className="detail card-type"
-                                                    title="This key resolves to no text"
-                                                >
+                                                        {card.tooltip === null && card.tooltipKey !== null && (
+                                                            <span
+                                                                className="detail card-type"
+                                                                title="This key resolves to no text"
+                                                            >
                                                     {card.tooltipKey}
                                                 </span>
-                                            )}
+                                                        )}
 
-                                            {/* The pool, as a bar. The colour is the ramp the
+                                                        {/* The pool, as a bar. The colour is the ramp the
                                                 targeting marks on the model use, so a mark gone
                                                 orange out there and a bar gone orange in here are
                                                 saying the same thing. */}
-                                            {healthBar(card, hardpointHealth[card.id] ?? null)
-                                                !== null && (
-                                                <span className="card-health">
+                                                        {healthBar(card, hardpointHealth[card.id] ?? null)
+                                                            !== null && (
+                                                                <span className="card-health">
                                                     <span
                                                         className={'card-health-fill'
                                                             + (card.destroyed ? ' gone' : '')}
@@ -8586,92 +9185,92 @@ ${becauseText(node.because)}`}
                                                         )!.label}
                                                     </span>
                                                 </span>
-                                            )}
+                                                            )}
 
-                                            {card.weapon !== null && turretAimRow(card.weapon)}
+                                                        {card.weapon !== null && turretAimRow(card.weapon)}
 
-                                            {card.weapon !== null
-                                                && fireBoneButtons(card.weapon)}
+                                                        {card.weapon !== null
+                                                            && fireBoneButtons(card.weapon)}
 
-                                            <span className="view-row card-actions">
+                                                        <span className="view-row card-actions">
                                                 {/* The glyph follows the tooltip: a wrench once it
                                                     is destroyed, because that is what pressing it
                                                     does now. Alive, it is the same reticle the
                                                     stage's Fire wears - shooting a hardpoint off
                                                     and pressing this are one outcome, and two
                                                     glyphs for it said they were different things. */}
-                                                <IconButton
-                                                    icon={card.destroyed ? 'repair' : 'fire'}
-                                                    className={card.destroyed ? 'active' : undefined}
-                                                    pressed={card.destroyed}
-                                                    title={card.destroyed
-                                                        ? 'Repair hardpoint'
-                                                        : 'Destroy hardpoint'}
-                                                    disabled={!card.isDestroyable}
-                                                    disabledReason="Is_Destroyable is off"
-                                                    onClick={event => {
-                                                        event.stopPropagation();
-                                                        setHardpointDestroyed(
-                                                            card.id, !card.destroyed);
-                                                    }}
-                                                />
+                                                            <IconButton
+                                                                icon={card.destroyed ? 'repair' : 'fire'}
+                                                                className={card.destroyed ? 'active' : undefined}
+                                                                pressed={card.destroyed}
+                                                                title={card.destroyed
+                                                                    ? 'Repair hardpoint'
+                                                                    : 'Destroy hardpoint'}
+                                                                disabled={!card.isDestroyable}
+                                                                disabledReason="Is_Destroyable is off"
+                                                                onClick={event => {
+                                                                    event.stopPropagation();
+                                                                    setHardpointDestroyed(
+                                                                        card.id, !card.destroyed);
+                                                                }}
+                                                            />
 
-                                                {card.weapon !== null
-                                                    && weaponToggles(card.weapon)}
+                                                            {card.weapon !== null
+                                                                && weaponToggles(card.weapon)}
 
-                                                {/* The sweep belongs to the hardpoint that
+                                                            {/* The sweep belongs to the hardpoint that
                                                     declares the traverse. One button swinging
                                                     everything at once could not say what it would
                                                     do on a hull whose hardpoints differ. */}
-                                                <IconButton
-                                                    icon="loop"
-                                                    className={sweeping.has(card.id) ? 'active' : undefined}
-                                                    pressed={sweeping.has(card.id)}
-                                                    title="Move turret"
-                                                    disabled={!card.sweepable}
-                                                    disabledReason="No traverse declared"
-                                                    onClick={event => {
-                                                        event.stopPropagation();
-                                                        setSweeping(current =>
-                                                            toggleSelected(current, card.id));
-                                                    }}
-                                                />
+                                                            <IconButton
+                                                                icon="loop"
+                                                                className={sweeping.has(card.id) ? 'active' : undefined}
+                                                                pressed={sweeping.has(card.id)}
+                                                                title="Move turret"
+                                                                disabled={!card.sweepable}
+                                                                disabledReason="No traverse declared"
+                                                                onClick={event => {
+                                                                    event.stopPropagation();
+                                                                    setSweeping(current =>
+                                                                        toggleSelected(current, card.id));
+                                                                }}
+                                                            />
 
-                                                    {/* Pushed to the far end: the three on the
+                                                            {/* Pushed to the far end: the three on the
                                                         left DO something to the model, and this
                                                         one only says what the file holds. */}
-                                                    <IconButton
-                                                        icon="details"
-                                                        className={'card-info-btn'
-                                                            + (infoCard === card.id
-                                                                ? ' active' : '')}
-                                                        expanded={infoCard === card.id}
-                                                        title="Info"
-                                                        onClick={event => {
-                                                            event.stopPropagation();
-                                                            setInfoCard(open =>
-                                                                open === card.id ? null : card.id);
-                                                        }}
-                                                    />
+                                                            <IconButton
+                                                                icon="details"
+                                                                className={'card-info-btn'
+                                                                    + (infoCard === card.id
+                                                                        ? ' active' : '')}
+                                                                expanded={infoCard === card.id}
+                                                                title="Info"
+                                                                onClick={event => {
+                                                                    event.stopPropagation();
+                                                                    setInfoCard(open =>
+                                                                        open === card.id ? null : card.id);
+                                                                }}
+                                                            />
                                             </span>
 
 
-                                        </li>
-                                    ))}
-                                </ul>
-                                )}
-                                </Fragment>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </Fragment>
                                 ))}
                             </DockSection>
                         )}
                         {mode === 'gameplay'
                             && ((scene?.deathClones?.length ?? 0) > 0
                                 || (scene?.spinAway ?? null) !== null) && (
-                            <DockSection title="Death clone" count={(scene?.deathClones?.length ?? 0)
-                                            + (scene?.spinAway === null
-                                                || scene?.spinAway === undefined ? 0 : 1)}>
+                                <DockSection title="Death clone" count={(scene?.deathClones?.length ?? 0)
+                                    + (scene?.spinAway === null
+                                    || scene?.spinAway === undefined ? 0 : 1)}>
 
-                                {/* The automated one. Its own card, and marked the way a real clone
+                                    {/* The automated one. Its own card, and marked the way a real clone
                                     is when it is what would happen - which is whenever the object
                                     declares no clone at all, since the two never coexist: not one
                                     of the 34 objects declaring `Spin_Away_On_Death` also declares a
@@ -8680,33 +9279,33 @@ ${becauseText(node.because)}`}
                                     The chance is READ OUT, not rolled - shipped values are 20% and
                                     40%, and a preview that honoured them would look broken four
                                     presses out of five. */}
-                                {scene?.spinAway !== null && scene?.spinAway !== undefined && (
-                                    <ul className="part-list hardpoint-cards">
-                                        <li
-                                            className={'hardpoint-card clone-card'
-                                                + ((scene?.deathClones?.length ?? 0) === 0
-                                                    ? ' selected' : '')}
-                                            title="Spin_Away_On_Death"
-                                        >
-                                            <div className="card-head">
-                                                {(scene?.deathClones?.length ?? 0) === 0
-                                                    && <Icon name="check" />}
-                                                <span className="part-name">Spins away</span>
-                                            </div>
+                                    {scene?.spinAway !== null && scene?.spinAway !== undefined && (
+                                        <ul className="part-list hardpoint-cards">
+                                            <li
+                                                className={'hardpoint-card clone-card'
+                                                    + ((scene?.deathClones?.length ?? 0) === 0
+                                                        ? ' selected' : '')}
+                                                title="Spin_Away_On_Death"
+                                            >
+                                                <div className="card-head">
+                                                    {(scene?.deathClones?.length ?? 0) === 0
+                                                        && <Icon name="check"/>}
+                                                    <span className="part-name">Spins away</span>
+                                                </div>
 
-                                            <span className="detail card-type">
+                                                <span className="detail card-type">
                                                 {scene.spinAway.explosion
                                                     ?? scene.deathExplosions ?? 'no explosion named'}
                                             </span>
 
-                                            <span className="detail">
+                                                <span className="detail">
                                                 {spinAwaySummary(scene.spinAway)}
                                             </span>
-                                        </li>
-                                    </ul>
-                                )}
+                                            </li>
+                                        </ul>
+                                    )}
 
-                                {/* One card per mapping: this damage type leaves that object
+                                    {/* One card per mapping: this damage type leaves that object
                                     behind. The same card shape the hardpoints and the abilities
                                     use, because it is the same kind of thing - a named piece of
                                     game data with somewhere to jump to.
@@ -8716,51 +9315,51 @@ ${becauseText(node.because)}`}
                                     damage type set there rather than being a static list. The tick
                                     says which, and used to need a sentence under the heading to say
                                     so. */}
-                                <ul className="part-list hardpoint-cards">
-                                    {deathCloneRows(scene?.deathClones ?? [], attacker.damageType)
-                                        .map(row => (
-                                        <li
-                                            key={`${row.label}:${row.objectId}`}
-                                            className={'hardpoint-card clone-card'
-                                                + (row.selected ? ' selected' : '')}
-                                            title={row.objectId}
-                                        >
-                                            <div className="card-head">
-                                                {row.selected && <Icon name="check" />}
-                                                <span className="part-name">{row.label}</span>
-
-                                                <button
-                                                    type="button"
-                                                    className="goto-definition"
-                                                    title={`Go to where ${row.objectId} is defined`}
-                                                    onClick={() => vscode.postMessage({
-                                                        type: 'revealDefinition',
-                                                        value: row.objectId,
-                                                        referenceType: 'GameObject',
-                                                    })}
+                                    <ul className="part-list hardpoint-cards">
+                                        {deathCloneRows(scene?.deathClones ?? [], attacker.damageType)
+                                            .map(row => (
+                                                <li
+                                                    key={`${row.label}:${row.objectId}`}
+                                                    className={'hardpoint-card clone-card'
+                                                        + (row.selected ? ' selected' : '')}
+                                                    title={row.objectId}
                                                 >
-                                                    <Icon name="definition" />
-                                                </button>
-                                            </div>
+                                                    <div className="card-head">
+                                                        {row.selected && <Icon name="check"/>}
+                                                        <span className="part-name">{row.label}</span>
 
-                                            {/* The object it names, in the monospace a reader would
+                                                        <button
+                                                            type="button"
+                                                            className="goto-definition"
+                                                            title={`Go to where ${row.objectId} is defined`}
+                                                            onClick={() => vscode.postMessage({
+                                                                type: 'revealDefinition',
+                                                                value: row.objectId,
+                                                                referenceType: 'GameObject',
+                                                            })}
+                                                        >
+                                                            <Icon name="definition"/>
+                                                        </button>
+                                                    </div>
+
+                                                    {/* The object it names, in the monospace a reader would
                                                 grep their own files in. */}
-                                            <span className="detail card-type">{row.objectId}</span>
+                                                    <span className="detail card-type">{row.objectId}</span>
 
-                                            {/* The one thing worth saying beyond the mapping: there
+                                                    {/* The one thing worth saying beyond the mapping: there
                                                 is no wreck. Either the object is not defined at all
                                                 - a typo the game is silent about - or it declares
                                                 no tactical model. */}
-                                            {!row.resolved && (
-                                                <span className="detail wraps card-unresolved">
+                                                    {!row.resolved && (
+                                                        <span className="detail wraps card-unresolved">
                                                     Not defined, or declares no model
                                                 </span>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </DockSection>
-                        )}
+                                                    )}
+                                                </li>
+                                            ))}
+                                    </ul>
+                                </DockSection>
+                            )}
 
                     </>}
                     overview={<>
@@ -8800,7 +9399,7 @@ ${becauseText(node.because)}`}
                                     label="How the skeleton is drawn"
                                     value={skeletonMode}
                                     options={[
-                                        { id: 'off', label: 'Off', title: 'No skeleton' },
+                                        {id: 'off', label: 'Off', title: 'No skeleton'},
                                         {
                                             id: 'selected', label: 'Selected',
                                             title: 'Name the picked bone only',
@@ -8827,15 +9426,15 @@ ${becauseText(node.because)}`}
                             Animation mode ever moves this. Changing LENS is the one thing that
                             does, which is what a lens is for. */}
                         {mode === 'animation' && animations.length > 0 && (
-                        <div className="dock-section player-section">
-                            <div className="dock-section-title">
-                                Playback
-                                {/* The ACTION and the take, which is what the reader picked - the
+                            <div className="dock-section player-section">
+                                <div className="dock-section-title">
+                                    Playback
+                                    {/* The ACTION and the take, which is what the reader picked - the
                                     filename repeats the model's name back at them. A rouletting
                                     action says so, because the clip under the playhead is about to
                                     change on its own and a readout that did not mention it would
                                     look like a bug. */}
-                                <span className="section-count">
+                                    <span className="section-count">
                                     {animation === null
                                         ? 'no clip'
                                         : playheadLabel(
@@ -8843,117 +9442,121 @@ ${becauseText(node.because)}`}
                                             animation,
                                             roulette !== null)}
                                 </span>
-                            </div>
+                                </div>
 
-                            {/* The layout every media player has had for thirty years, because
+                                {/* The layout every media player has had for thirty years, because
                                 it needs no explaining: transport on the left, time on the right,
                                 the scrub bar across the bottom. */}
-                            <div className="player">
-                                {/* The order and the glyphs a CD player uses, which is the
+                                <div className="player">
+                                    {/* The order and the glyphs a CD player uses, which is the
                                     reader's own reference: |<< to the previous clip, |< to this
                                     clip's first frame, play, >| to its last frame, >>| to the next
                                     clip, then the repeat latch. Last frame used to draw a bare play
                                     triangle - the same glyph as Play, saying the opposite of what
                                     it did. */}
-                                <div className="player-row">
-                                    {/* Every one of these says why it cannot be pressed. Four of
+                                    <div className="player-row">
+                                        {/* Every one of these says why it cannot be pressed. Four of
                                         them used to go quiet instead - "Previous clip" on a control
                                         that could not step - and only Play had ever been given the
                                         sentence. Its wording is reused rather than reinvented: it
                                         is already this panel's way of saying the same state. */}
-                                    <IconButton
-                                        icon="previousClip"
-                                        title="Previous clip"
-                                        disabled={orderedClips.length < 2}
-                                        disabledReason="Only one clip"
-                                        onClick={() => step(-1)}
-                                    />
-                                    <IconButton
-                                        icon="firstFrame"
-                                        title="First frame"
-                                        disabled={animation === null}
-                                        disabledReason="Pick a clip below to play it"
-                                        onClick={() => seek(0)}
-                                    />
-                                    <IconButton
-                                        icon={playing ? 'pause' : 'play'}
-                                        title={playing
-                                            ? 'Pause'
-                                            : atEnd && !animationLoop
-                                                ? 'Play again from the first frame'
-                                                : 'Play'}
-                                        disabled={animation === null}
-                                        disabledReason="Pick a clip below to play it"
-                                        onClick={togglePlay}
-                                    />
-                                    <IconButton
-                                        icon="lastFrame"
-                                        title="Last frame"
-                                        disabled={animation === null}
-                                        disabledReason="Pick a clip below to play it"
-                                        onClick={() => seek(playhead.duration)}
-                                    />
-                                    <IconButton
-                                        icon="nextClip"
-                                        title="Next clip"
-                                        disabled={orderedClips.length < 2}
-                                        disabledReason="Only one clip"
-                                        onClick={() => step(1)}
-                                    />
-                                    <IconButton
-                                        icon="loop"
-                                        className={animationLoop ? 'active' : undefined}
-                                        pressed={animationLoop}
-                                        title={animationLoop
-                                            ? 'Looping. Press to play the clip once and hold '
+                                        <IconButton
+                                            icon="previousClip"
+                                            title="Previous clip"
+                                            disabled={orderedClips.length < 2}
+                                            disabledReason="Only one clip"
+                                            onClick={() => step(-1)}
+                                        />
+                                        <IconButton
+                                            icon="firstFrame"
+                                            title="First frame"
+                                            disabled={animation === null}
+                                            disabledReason="Pick a clip below to play it"
+                                            onClick={() => seek(0)}
+                                        />
+                                        <IconButton
+                                            icon={playing ? 'pause' : 'play'}
+                                            title={playing
+                                                ? 'Pause'
+                                                : atEnd && !animationLoop
+                                                    ? 'Play again from the first frame'
+                                                    : 'Play'}
+                                            disabled={animation === null}
+                                            disabledReason="Pick a clip below to play it"
+                                            onClick={togglePlay}
+                                        />
+                                        <IconButton
+                                            icon="lastFrame"
+                                            title="Last frame"
+                                            disabled={animation === null}
+                                            disabledReason="Pick a clip below to play it"
+                                            onClick={() => seek(playhead.duration)}
+                                        />
+                                        <IconButton
+                                            icon="nextClip"
+                                            title="Next clip"
+                                            disabled={orderedClips.length < 2}
+                                            disabledReason="Only one clip"
+                                            onClick={() => step(1)}
+                                        />
+                                        <IconButton
+                                            icon="loop"
+                                            className={animationLoop ? 'active' : undefined}
+                                            pressed={animationLoop}
+                                            title={animationLoop
+                                                ? 'Looping. Press to play the clip once and hold '
                                                 + 'its last frame.'
-                                            : 'Playing once and holding the last frame. Press '
+                                                : 'Playing once and holding the last frame. Press '
                                                 + 'to loop.'}
-                                        disabled={animation === null}
-                                        disabledReason="Pick a clip below to play it"
-                                        onClick={() => setAnimationLoop(current => !current)}
-                                    />
+                                            disabled={animation === null}
+                                            disabledReason="Pick a clip below to play it"
+                                            onClick={() => setAnimationLoop(current => !current)}
+                                        />
 
-                                    <span className="player-time">
+                                        <span className="player-time">
                                         {playhead.time.toFixed(2)}
-                                        {' / '}
-                                        {playhead.duration.toFixed(2)}s
+                                            {' / '}
+                                            {playhead.duration.toFixed(2)}s
                                     </span>
-                                </div>
+                                    </div>
 
-                                <input
-                                    className="player-scrub"
-                                    type="range"
-                                    disabled={animation === null}
-                                    min={0}
-                                    max={Math.max(playhead.duration, 0.001)}
-                                    step={0.001}
-                                    value={playhead.time}
-                                    title="Drag to a frame"
-                                    onPointerDown={() => { scrubbingRef.current = true; }}
-                                    onPointerUp={() => { scrubbingRef.current = false; }}
-                                    onChange={e => {
-                                        const time = Number(e.target.value);
-                                        viewportRef.current?.seekAnimation(time);
-                                        setPlayhead(current => ({ ...current, time }));
-                                    }}
-                                />
-
-                                <Field label="Speed" value={<>{animationSpeed.toFixed(2)}x</>}>
                                     <input
+                                        className="player-scrub"
                                         type="range"
                                         disabled={animation === null}
                                         min={0}
-                                        max={2}
-                                        step={0.05}
-                                        value={animationSpeed}
-                                        title="Playback speed"
-                                        onChange={e =>
-                                            setAnimationSpeed(Number(e.target.value))}
+                                        max={Math.max(playhead.duration, 0.001)}
+                                        step={0.001}
+                                        value={playhead.time}
+                                        title="Drag to a frame"
+                                        onPointerDown={() => {
+                                            scrubbingRef.current = true;
+                                        }}
+                                        onPointerUp={() => {
+                                            scrubbingRef.current = false;
+                                        }}
+                                        onChange={e => {
+                                            const time = Number(e.target.value);
+                                            viewportRef.current?.seekAnimation(time);
+                                            setPlayhead(current => ({...current, time}));
+                                        }}
                                     />
-                                </Field>
+
+                                    <Field label="Speed" value={<>{animationSpeed.toFixed(2)}x</>}>
+                                        <input
+                                            type="range"
+                                            disabled={animation === null}
+                                            min={0}
+                                            max={2}
+                                            step={0.05}
+                                            value={animationSpeed}
+                                            title="Playback speed"
+                                            onChange={e =>
+                                                setAnimationSpeed(Number(e.target.value))}
+                                        />
+                                    </Field>
+                                </div>
                             </div>
-                        </div>
                         )}
 
                     </>}
@@ -8973,8 +9576,8 @@ ${becauseText(node.because)}`}
                         role="dialog"
                         ref={abilityInfoRef}
                         style={abilityInfoAt === null
-                            ? { visibility: 'hidden' }
-                            : { left: abilityInfoAt.left, top: abilityInfoAt.top }}
+                            ? {visibility: 'hidden'}
+                            : {left: abilityInfoAt.left, top: abilityInfoAt.top}}
                     >
                         <div className="details-head">
                             <span className="details-title">
@@ -9011,8 +9614,8 @@ ${becauseText(node.because)}`}
                         role="dialog"
                         ref={cardInfoRef}
                         style={cardInfoAt === null
-                            ? { visibility: 'hidden' }
-                            : { left: cardInfoAt.left, top: cardInfoAt.top }}
+                            ? {visibility: 'hidden'}
+                            : {left: cardInfoAt.left, top: cardInfoAt.top}}
                     >
                         <div className="details-head">
                             <span className="details-title">{infoCard}</span>
@@ -9049,11 +9652,11 @@ ${becauseText(node.because)}`}
                                         ))}
                                         {weapon !== null
                                             && weaponFacts(weapon).map(([label, value]) => (
-                                            <Fragment key={label}>
-                                                <dt>{label}</dt>
-                                                <dd>{value}</dd>
-                                            </Fragment>
-                                        ))}
+                                                <Fragment key={label}>
+                                                    <dt>{label}</dt>
+                                                    <dd>{value}</dd>
+                                                </Fragment>
+                                            ))}
                                     </dl>
                                 );
                             })()}
@@ -9136,4 +9739,4 @@ function decodeTexture(result: GetModelTextureResult): THREE.Texture | null {
     return null;
 }
 
-createRoot(document.getElementById('root')!).render(<ModelPreview />);
+createRoot(document.getElementById('root')!).render(<ModelPreview/>);

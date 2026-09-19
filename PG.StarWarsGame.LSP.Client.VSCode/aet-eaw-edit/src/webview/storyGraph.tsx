@@ -19,7 +19,7 @@ import {
     useCallback, useEffect, useMemo, useReducer, useRef, useState,
 } from 'react';
 import {
-    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
+    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, playerCss, problemsPanelCss, rightDockCss,
     rotarySwitchCss, stageChromeCss, stageFlyoutCss,
 } from './shared/dockChrome';
 import {RotaryModeSwitch, type RotaryMode} from './shared/RotaryModeSwitch';
@@ -59,8 +59,13 @@ import styled, {createGlobalStyle} from 'styled-components';
 
 import {
     StoryDiagnosticDto, StoryGraphEdgeDto, StoryGraphNodeDto, StoryLayoutEntryDto,
-    StoryParamOptionDto, StoryParamSchemaDto, StorySimStateDto, StorySimStepDto, StorySimWorldChangeDto,
+    StoryParamOptionDto, StoryParamSchemaDto, StorySimNodeStateDto, StorySimStateDto, StorySimStepDto,
 } from '../protocol';
+import {DEFAULT_PACE, paceIntervalMs, parsePace, type SimPace} from './storyGraph/simModel';
+import {
+    type SimActions, SimFlyout, SimHeaderChip, SimInventory, type SimLenses, type SimSelection, SimTransport,
+    TracePanel,
+} from './storyGraph/SimDock';
 
 import {readPanelSize, writePanelSize} from './shared/panelLayout';
 import {initPanelLayout} from './shared/panelLayoutBridge';
@@ -118,88 +123,55 @@ function simRequest(method: string, args?: Record<string, unknown>): void {
     sendSim(method, {sinceSeq: simLastSeq, ...(args ?? {})});
 }
 
-/** How the author advances ticks: a 1 s pulse, one tick per press, or a custom rate. */
-interface SimPace {
-    mode: 'pulse' | 'step' | 'custom';
-    ticksPerSecond: number;
-}
-
+// The pace and the lenses are per-viewer conveniences, so they live in storage rather than in the
+// state document; a missing or broken store falls back to the defaults.
 const SIM_PACE_KEY = 'storyGraph.simPace';
+const SIM_LENS_KEY = 'storyGraph.simLenses';
+const DEFAULT_LENSES: SimLenses = {activeOnly: false, hideFlow: false, hideLua: false};
 
 function readPace(): SimPace {
     try {
-        const raw = localStorage.getItem(SIM_PACE_KEY);
-        if (raw) {
-            const parsed = JSON.parse(raw) as Partial<SimPace>;
-            if (parsed.mode === 'pulse' || parsed.mode === 'step' || parsed.mode === 'custom') {
-                const tps = Number(parsed.ticksPerSecond);
-                return {mode: parsed.mode, ticksPerSecond: tps > 0 ? Math.min(30, tps) : 4};
-            }
-        }
+        return parsePace(localStorage.getItem(SIM_PACE_KEY));
     } catch {
-        // Storage is a convenience; the default pace is fine without it.
+        return DEFAULT_PACE;
     }
-    return {mode: 'pulse', ticksPerSecond: 4};
 }
 
 function writePace(pace: SimPace): void {
     try {
         localStorage.setItem(SIM_PACE_KEY, JSON.stringify(pace));
     } catch {
-        // Same: nothing to do when storage is unavailable.
+        // Storage is a convenience; nothing to do without it.
     }
 }
 
-/** A world change as the author reads it - the button label for a suggested change. */
-function describeChange(change: StorySimWorldChangeDto): string {
-    const who = change.faction ?? '';
-    switch (change.kind) {
-        case 'capturePlanet':
-            return `${who} captures ${change.planet ?? '?'}`;
-        case 'buildUnit':
-            return `${who} builds ${change.unitType ?? '?'}`;
-        case 'destroyUnit':
-            return `${change.unitType ?? '?'} destroyed`;
-        case 'destroyAll':
-            return `All ${change.unitType ?? 'units'} of ${who} destroyed`;
-        case 'captureUnit':
-            return `${who} captures ${change.unitType ?? '?'}`;
-        case 'setTech':
-            return `${who} tech level ${change.amount ?? 1}`;
-        case 'addCredits':
-            return `${who} credits +${change.amount ?? 0}`;
-        case 'battleWon':
-            return `${who} wins${change.planet ? ' at ' + change.planet : ''}`;
-        case 'battleLost':
-            return `${who} loses${change.name ? ' ' + change.name : ''}`;
-        case 'battleStarted':
-            return `${change.mode ?? 'a'} battle at ${change.planet ?? '?'}`;
-        case 'enterPlanet':
-            return `${who} enters ${change.planet ?? '?'}`;
-        case 'bounced':
-            return `${who} bounced at ${change.planet ?? '?'}`;
-        case 'moveUnit':
-            return `${change.unitType ?? '?'} to ${change.planet ?? '?'}`;
-        case 'clickGui':
-            return `Click ${change.name ?? '?'}`;
-        case 'selectPlanet':
-            return `Select ${change.planet ?? '?'}`;
-        case 'corrupt':
-            return `Corrupt ${change.planet ?? '?'}`;
-        case 'beginEra':
-            return `Era ${change.amount ?? 1}`;
-        case 'planetDestroyed':
-            return `${change.planet ?? '?'} destroyed`;
-        case 'generic':
-            return `Trigger ${change.name ?? '?'}`;
-        default:
-            return change.kind;
+function readLenses(): SimLenses {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(SIM_LENS_KEY) ?? '{}') as Partial<SimLenses>;
+        return {
+            activeOnly: parsed.activeOnly === true,
+            hideFlow: parsed.hideFlow === true,
+            hideLua: parsed.hideLua === true,
+        };
+    } catch {
+        return DEFAULT_LENSES;
     }
 }
 
-function paceIntervalMs(pace: SimPace): number {
-    return pace.mode === 'custom' ? 1000 / Math.max(0.25, pace.ticksPerSecond) : 1000;
+function writeLenses(lenses: SimLenses): void {
+    try {
+        localStorage.setItem(SIM_LENS_KEY, JSON.stringify(lenses));
+    } catch {
+        // Same.
+    }
 }
+
+/**
+ * The app's hook for a node picked on the canvas while simulating. Node views render through
+ * rete's portal pipeline, where App state is out of reach, so the pipe reaches the app the way
+ * `currentMode` does.
+ */
+let onSimNodePicked: ((nodeId: string) => void) | null = null;
 
 function prefersReducedMotion(): boolean {
     return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -417,6 +389,10 @@ class StoryNode extends ClassicPreset.Node {
     branchGlow: string | null = null;
     /** Simulation overlay: how often this event fired since Start; 0 hides the badge. */
     simFireCount = 0;
+    /** Simulation overlay: an armed clock or flag gate's label and 0..1 progress; null hides the meter. */
+    simGate: { label: string; progress: number | null } | null = null;
+    /** Simulation overlay: the clock halts after this event fires. */
+    simBreakpoint = false;
 
     constructor(dto: StoryGraphNodeDto, hasInputs: boolean, hasOutputs: boolean) {
         super(dto.label);
@@ -493,6 +469,9 @@ interface EditorHandle {
 
     /** Paints the fire-count badges from the simulation state (null clears them). */
     applyFireCounts(byNodeId: ReadonlyMap<string, number> | null): void;
+
+    /** Paints the gate meters and breakpoint marks from the simulation state (null clears them). */
+    applySimMarks(byNodeId: ReadonlyMap<string, StorySimNodeStateDto> | null, breakpoints: ReadonlySet<string>): void;
 
     /**
      * Plays a trace delta tick by tick: the edge from a step's source to its node flows for
@@ -1156,6 +1135,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         }
         if (context.type === 'nodedragged' && currentMode === 'edit') {
             saveAllPositions();
+        }
+        // In Simulation a pick opens the event's detail beside the dock.
+        if (context.type === 'nodepicked' && currentMode === 'simulate') {
+            onSimNodePicked?.((context.data as { id: string }).id);
         }
         // Keep the dock minimap in sync with pan/zoom and node moves (rAF-throttled).
         if (context.type === 'translated' || context.type === 'zoomed'
@@ -1943,6 +1926,23 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 }
             }
         },
+        applySimMarks(byNodeId: ReadonlyMap<string, StorySimNodeStateDto> | null, breakpoints: ReadonlySet<string>): void {
+            for (const node of editor.getNodes()) {
+                if (node.dto.kind !== 'Event') {
+                    continue;
+                }
+                const state = byNodeId?.get(node.id);
+                const gate = state?.gateLabel ? {label: state.gateLabel, progress: state.gateProgress ?? null} : null;
+                const breakpoint = breakpoints.has(node.id);
+                const gateMoved = (gate?.label ?? null) !== (node.simGate?.label ?? null)
+                    || (gate?.progress ?? null) !== (node.simGate?.progress ?? null);
+                if (gateMoved || breakpoint !== node.simBreakpoint) {
+                    node.simGate = gate;
+                    node.simBreakpoint = breakpoint;
+                    void area.update('node', node.id);
+                }
+            }
+        },
         async playSimSteps(steps: readonly StorySimStepDto[], tickMs: number): Promise<void> {
             // Adjacency over the mounted connections; a windowed (LOD) graph simply has fewer
             // edges to animate and the final state paint catches up on everything else.
@@ -2005,10 +2005,12 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 void area.update('connection', conn.id);
             }
             for (const node of editor.getNodes()) {
-                if (node.simFireCount === 0) {
+                if (node.simFireCount === 0 && node.simGate === null && !node.simBreakpoint) {
                     continue;
                 }
                 node.simFireCount = 0;
+                node.simGate = null;
+                node.simBreakpoint = false;
                 void area.update('node', node.id);
             }
         },
@@ -2791,6 +2793,52 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         pointer-events: none;
     }
 
+    /* Simulation overlay: an armed clock or flag gate as a meter along the bottom edge, filling
+       as the gate closes. A flag gate with no measurable progress draws the label only. */
+
+    .gate-meter {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -1px;
+        height: 4px;
+        background: color-mix(in srgb, var(--lifecycle-armed, #e2b93d) 30%, transparent);
+        border-radius: 0 0 var(--radius-6) var(--radius-6);
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    .gate-meter > span {
+        display: block;
+        height: 100%;
+        background: var(--lifecycle-armed, #e2b93d);
+    }
+
+    .gate-label {
+        position: absolute;
+        right: var(--space-4);
+        bottom: var(--space-4);
+        font-size: var(--font-size-10, 10px);
+        color: var(--vscode-descriptionForeground);
+        pointer-events: none;
+    }
+
+    /* Simulation overlay: a breakpoint as the editor's own red dot, in the gutter position - the
+       top-left corner, outside the border like the fire badge opposite. */
+
+    .bp-mark {
+        position: absolute;
+        top: -7px;
+        left: -7px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--vscode-debugIcon-breakpointForeground, #e51400);
+        border: 2px solid var(--vscode-editorWidget-background, #202020);
+        box-sizing: border-box;
+        pointer-events: none;
+    }
+
     font-family: var(--vscode-font-family);
     cursor: default;
 
@@ -3398,6 +3446,19 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): R
                     {props.data.simFireCount}
                 </span>
             ) : null}
+            {props.data.simGate ? (
+                <>
+                    {props.data.simGate.progress !== null ? (
+                        <span className="gate-meter" title={props.data.simGate.label}>
+                            <span
+                                style={{width: `${Math.round(Math.min(1, Math.max(0, props.data.simGate.progress)) * 100)}%`}}/>
+                        </span>
+                    ) : null}
+                    <span className="gate-label">{props.data.simGate.label}</span>
+                </>
+            ) : null}
+            {props.data.simBreakpoint ?
+                <span className="bp-mark" title="Breakpoint - the clock halts after this fires"/> : null}
             {input ? (
                 <RefSocket
                     name="input-socket" side="input" socketKey="in"
@@ -3789,7 +3850,7 @@ const GlobalStyle = createGlobalStyle`
 
     /* Diagnostic messages and sim log lines are worth copying out, and neither panel has a drag
        gesture of its own, so a selection there can't strand one. */
-    .problem-msg, .sim-log-line {
+    .problem-msg {
         user-select: text;
         -webkit-user-select: text;
     }
@@ -4124,11 +4185,6 @@ const Shell = styled.div`
         font-size: var(--icon-size-14);
     }
 
-    .sim-head .codicon {
-        font-size: var(--icon-size-14);
-        vertical-align: -1px;
-    }
-
     .resize-handle-w {
         position: absolute;
         top: 0;
@@ -4224,17 +4280,424 @@ const Shell = styled.div`
         stroke-width: 1;
     }
 
-    /* ── Simulation controls (dock content, Simulation mode) ───────────── */
+    /* ── Simulation (storyGraph/SimDock) ───────────────────────────────── */
 
-    .sim-controls {
+    /* Header: one chip, the tick and the thing that stopped the clock. A button when there is
+       something to open, a plain span when there is only the tick to read. */
+
+    .sim-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
+        padding: var(--space-2) var(--space-6);
+        border-radius: var(--radius-pill);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        background: transparent;
+        color: var(--vscode-descriptionForeground);
+        font: inherit;
+        font-size: var(--font-size-11);
+        font-variant-numeric: tabular-nums;
+        max-width: 140px;
+    }
+
+    button.sim-chip {
+        cursor: pointer;
+    }
+
+    button.sim-chip:hover {
+        background: var(--vscode-toolbar-hoverBackground);
+    }
+
+    .sim-chip.owed {
+        border-color: var(--lifecycle-armed, #e2b93d);
+        color: var(--vscode-foreground);
+    }
+
+    .sim-chip.halted {
+        border-color: var(--vscode-debugIcon-breakpointForeground, #e51400);
+        color: var(--vscode-foreground);
+    }
+
+    .sim-chip-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sim-chip-sep {
+        width: 1px;
+        align-self: stretch;
+        background: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+    }
+
+    .sim-row.add {
+        color: var(--vscode-descriptionForeground);
+    }
+
+    /* Content: inventories. A row is a button - it opens its detail beside the dock - and reads
+       the name at the left and the value at the right, ellipsised, one line. */
+
+    .sim-inventory {
         display: flex;
         flex-direction: column;
-        gap: var(--space-8);
         font-size: var(--font-size-12);
     }
 
-    .sim-section {
+    .sim-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+    }
+
+    .sim-group-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        font-size: var(--font-size-smaller);
+        color: var(--vscode-descriptionForeground);
+        padding: var(--space-2) 0 0;
+    }
+
+    .sim-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
         min-width: 0;
+        width: 100%;
+        padding: var(--space-2) var(--space-4);
+        border: none;
+        border-radius: var(--radius-3);
+        background: transparent;
+        color: var(--vscode-foreground);
+        font: inherit;
+        text-align: left;
+        box-sizing: border-box;
+    }
+
+    button.sim-row {
+        cursor: pointer;
+    }
+
+    button.sim-row:hover, .sim-row.decision:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
+    .sim-row.selected {
+        background: var(--vscode-list-activeSelectionBackground);
+        color: var(--vscode-list-activeSelectionForeground);
+    }
+
+    .sim-row.gone {
+        text-decoration: line-through;
+        opacity: 0.6;
+    }
+
+    .sim-row-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sim-row-value {
+        flex: none;
+        max-width: 45%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--vscode-descriptionForeground);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sim-row.selected .sim-row-value {
+        color: inherit;
+    }
+
+    /* A decision row is two controls: the row opens the choices, the check applies the one the
+       event itself supplies. */
+
+    .sim-row.decision {
+        padding: 0;
+    }
+
+    .sim-row-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        padding: var(--space-2) var(--space-4);
+        border: none;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .sim-planet-list {
+        display: flex;
+        flex-direction: column;
+        max-height: 180px;
+        overflow-y: auto;
+    }
+
+    .sim-number {
+        width: 72px;
+    }
+
+    /* The flyout beside the dock. Sizeable rather than capped at the stage's top band: the
+       decision list can run long and the reader wants to see the whole of it. */
+
+    .sim-flyout {
+        top: 8px;
+        max-height: calc(100% - 16px);
+    }
+
+    .sim-detail-head {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-6);
+        min-width: 0;
+    }
+
+    .sim-detail-name, .sim-detail-head .link {
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    .sim-detail-type {
+        color: var(--vscode-descriptionForeground);
+        font-size: var(--font-size-smaller);
+        flex: none;
+    }
+
+    .link {
+        border: none;
+        background: transparent;
+        color: var(--vscode-textLink-foreground);
+        padding: 0;
+        font: inherit;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .link:hover {
+        text-decoration: underline;
+    }
+
+    .link.fired {
+        color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-answer {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .sim-answer.active {
+        border-color: var(--vscode-focusBorder);
+    }
+
+    .sim-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+    }
+
+    .sim-pick {
+        padding: var(--space-1) var(--space-6);
+        font-size: var(--font-size-smaller);
+    }
+
+    .sim-arm-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-4);
+        padding: var(--space-2) 0;
+    }
+
+    .sim-arm-line.satisfied {
+        color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-arm-member {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
+    }
+
+    .sim-arm-or, .sim-arm-and {
+        color: var(--vscode-descriptionForeground);
+        font-size: var(--font-size-smaller);
+        text-transform: uppercase;
+    }
+
+    .sim-row-value.lc-Fired {
+        color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-row-value.lc-Armed {
+        color: var(--lifecycle-armed, #e2b93d);
+    }
+
+    .sim-row-value.lc-Disabled {
+        color: var(--lifecycle-disabled, #f14c4c);
+    }
+
+    /* Foot: the transport is the shared player; the pace is a three-stop slider with the custom
+       rate beside it, dead until Custom is the stop. */
+
+    ${playerCss}
+    .sim-pace {
+        gap: var(--space-6);
+    }
+
+    .sim-pace-label {
+        flex: none;
+        min-width: 56px;
+        font-size: var(--font-size-smaller);
+        color: var(--vscode-descriptionForeground);
+    }
+
+    .sim-pace-slider {
+        width: 64px;
+        flex: none;
+    }
+
+    .sim-rate-slider {
+        flex: 1;
+        min-width: 40px;
+    }
+
+    .sim-lenses {
+        gap: var(--space-2);
+    }
+
+    /* Lenses. Each hides one thing; a node that is not an Event has no lifecycle class and is
+       left alone by the path lens. */
+
+    &.lens-active-only [data-testid="node"].lc-Waiting,
+    &.lens-active-only [data-testid="node"].lc-Inactive,
+    &.lens-active-only [data-testid="node"].lc-Disabled,
+    &.lens-active-only [data-testid="connection"].flow-idle {
+        opacity: 0.22;
+    }
+
+    &.lens-hide-flow [data-testid="connection"].flow-active path:not(.glow-underlay),
+    &.lens-hide-flow [data-testid="connection"].flow-spent path:not(.glow-underlay) {
+        stroke: revert-layer;
+        stroke-width: revert-layer;
+        stroke-dasharray: revert-layer;
+        animation: none;
+    }
+
+    &.lens-hide-lua [data-testid="node"].k-LuaState,
+    &.lens-hide-lua [data-testid="connection"].k-LuaLink {
+        display: none;
+    }
+
+    /* Trace: the problems bar's frame, with a filter row pinned under the title. */
+
+    .sim-trace {
+        position: relative;
+        overflow-y: auto;
+        border-top: var(--space-1) solid var(--vscode-panel-border);
+        background: var(--vscode-sideBar-background);
+        flex-shrink: 0;
+        font-size: var(--font-size-11);
+        padding: 0 var(--space-4) var(--space-2);
+    }
+
+    .sim-trace-tools {
+        position: sticky;
+        top: 22px;
+        z-index: 1;
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
+        padding: var(--space-2) 0;
+        background: var(--vscode-sideBar-background);
+    }
+
+    .sim-trace-tools input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sim-trace-row {
+        display: grid;
+        grid-template-columns: 36px minmax(80px, 1.2fr) 70px minmax(60px, 0.8fr) minmax(60px, 0.8fr) 2fr;
+        gap: var(--space-6);
+        align-items: center;
+        padding: var(--space-1) var(--space-4);
+        border-radius: var(--radius-3);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sim-trace-row > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    .sim-trace-row.clickable {
+        cursor: pointer;
+    }
+
+    .sim-trace-row.clickable:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
+    .sim-trace-row.muted {
+        display: block;
+        color: var(--vscode-descriptionForeground);
+        font-style: italic;
+    }
+
+    .sim-trace-tick {
+        color: var(--vscode-descriptionForeground);
+    }
+
+    .sim-trace-cause {
+        color: var(--vscode-descriptionForeground);
+    }
+
+    .sim-trace-row.cause-trigger .sim-trace-node, .sim-trace-row.cause-prereq .sim-trace-node,
+    .sim-trace-row.cause-poll .sim-trace-node, .sim-trace-row.cause-world .sim-trace-node,
+    .sim-trace-row.cause-lua .sim-trace-node, .sim-trace-row.cause-manual .sim-trace-node {
+        color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-trace-row.cause-breakpoint {
+        color: var(--vscode-debugIcon-breakpointForeground, #e51400);
+    }
+
+    .sim-trace-row.cause-ignored {
+        opacity: 0.6;
+    }
+
+    .sim-trace-detail {
+        color: var(--vscode-descriptionForeground);
+    }
+
+    @media (max-width: 700px) {
+        .sim-trace-row {
+            grid-template-columns: 36px 1fr 70px;
+        }
+
+        .sim-trace-change, .sim-trace-via, .sim-trace-detail {
+            display: none;
+        }
     }
 
     .sim-head {
@@ -4251,73 +4714,21 @@ const Shell = styled.div`
         flex-direction: column;
     }
 
-    /* The simulation log shares the problems bar's title row, so its bar stays sticky over a long
-       scrolling log. The paddings are this editor's own measured values, kept deliberately: the
+    /* The trace shares the problems bar's title row, so its bar stays sticky over a long
+       scrolling list. The paddings are this editor's own measured values, kept deliberately: the
        shared block carries the localisation grids' 2px/6px, and the two differ by a pixel or two
        from a calibration that was done here. */
 
     .panel-bar {
         position: sticky;
         top: 0;
+        z-index: 2;
         background: var(--vscode-sideBar-background);
         padding: var(--space-1) var(--space-4) var(--space-2);
     }
 
     .problem-row {
         padding: var(--space-1) var(--space-4);
-    }
-
-    .sim-log-panel {
-        position: relative;
-        overflow-y: auto;
-        padding: var(--space-4) var(--space-8);
-        background: var(--vscode-sideBar-background);
-        border-top: var(--space-1) solid var(--vscode-panel-border);
-        font-size: var(--font-size-11);
-        color: var(--vscode-descriptionForeground);
-    }
-
-    .sim-row {
-        display: flex;
-        gap: var(--space-4);
-        align-items: center;
-        margin: var(--space-2) 0;
-    }
-
-    .sim-transport button {
-        padding: var(--space-2) var(--space-6);
-    }
-
-    .sim-transport input[type=range] {
-        width: 90px;
-    }
-
-    .sim-row input[type=text] {
-        width: 90px;
-        flex: none;
-    }
-
-    .sim-name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 160px;
-    }
-
-    .sim-kind {
-        font-size: var(--font-size-10);
-        padding: 0 var(--space-4);
-        border-radius: var(--radius-3);
-        border: var(--space-1) solid var(--vscode-panel-border);
-        color: var(--vscode-descriptionForeground);
-    }
-
-    .sim-kind.k-lua {
-        border-color: var(--vscode-charts-blue, #3794ff);
-    }
-
-    .sim-kind.k-tactical {
-        border-color: var(--vscode-charts-yellow, #cca700);
     }
 
     .problems {
@@ -4528,7 +4939,21 @@ function App(): React.JSX.Element {
     /** The reader has asked to see the findings the view filter holds back. */
     const [showAllProblems, setShowAllProblems] = useState(false);
     const [showProblems, setShowProblems] = useState(false);
-    const [showSimLog, setShowSimLog] = useState(true);
+    const [showTrace, setShowTrace] = useState(true);
+    const [simSteps, setSimSteps] = useState<StorySimStepDto[]>([]);
+    // What the simulation flyout beside the dock shows, and which lenses the canvas wears.
+    const [simSelection, setSimSelection] = useState<SimSelection | null>(null);
+    const [simLenses, setSimLensesState] = useState<SimLenses>(() => readLenses());
+    const setSimLenses = useCallback((next: SimLenses) => {
+        setSimLensesState(next);
+        writeLenses(next);
+    }, []);
+    // The graph as the server sent it, for the flyout's arming lines and the trace's node names.
+    // Refs rather than state: the graph changes rarely and the canvas already re-renders on it.
+    const simGraphRef = useRef<{ nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[] }>({nodes: [], edges: []});
+    const [simGraphVersion, setSimGraphVersion] = useState(0);
+    const labelOf = useCallback((id: string): string | undefined =>
+        simGraphRef.current.nodes.find(n => n.id === id)?.label, []);
     // Whether the current (possibly staged) state has been validated since it last changed.
     const [validated, setValidated] = useState(false);
     // Swimlane overlays, toggled independently (persisted per-workspace via WorkspaceSettings).
@@ -4576,13 +5001,14 @@ function App(): React.JSX.Element {
     const doSwitchMode = useCallback((next: EditorMode) => {
         setMode(next);
         if (next === 'simulate') {
-            setShowSimLog(true); // re-show the log each time simulation is entered
+            setShowTrace(true); // re-show the trace each time simulation is entered
             if (!simRef.current?.running) {
                 simLastSeq = 0;
                 sendSim('start');
             }
         } else if (simRef.current?.running) {
             setPlayingBoth(false);
+            setSimSelection(null);
             sendSim('stop');
         }
         if (next !== 'edit') {
@@ -4715,6 +5141,8 @@ function App(): React.JSX.Element {
         if (!state?.running) {
             simLastSeq = 0;
             setPlayingBoth(false);
+            setSimSteps([]);
+            setSimSelection(null);
             handle?.resetSimVisuals();
             handle?.applyLifecycles(null);
             handle?.applyFireCounts(null);
@@ -4722,6 +5150,8 @@ function App(): React.JSX.Element {
         }
         const lifecycles = new Map(state.nodes.map(n => [n.nodeId, n.lifecycle]));
         const fireCounts = new Map(state.nodes.map(n => [n.nodeId, n.fireCount]));
+        const nodeStates = new Map(state.nodes.map(n => [n.nodeId, n]));
+        const breakpoints = new Set(state.breakpoints);
         if (state.haltedAt || state.interventions.length > 0) {
             setPlayingBoth(false);
         }
@@ -4732,6 +5162,7 @@ function App(): React.JSX.Element {
         if (!replay) {
             handle.applyLifecycles(lifecycles);
             handle.applyFireCounts(fireCounts);
+            handle.applySimMarks(nodeStates, breakpoints);
             return;
         }
         // A rewind (seek, restart) hands back the trace from the top: repaint from nothing.
@@ -4739,6 +5170,9 @@ function App(): React.JSX.Element {
         const fresh = simLastSeq === 0;
         const delta = rewind ? state.steps : state.steps.filter(s => s.seq >= simLastSeq);
         simLastSeq = state.totalSteps;
+        // The trace panel shows the whole record; each response carries only the steps after the
+        // last one played, so they accumulate here and a rewind starts the record over.
+        setSimSteps(prev => (rewind || fresh ? [...state.steps] : [...prev, ...delta]));
         const tickMs = fresh || rewind || prefersReducedMotion()
             ? 0
             : Math.min(600, paceIntervalMs(paceRef.current) * 0.6);
@@ -4753,6 +5187,7 @@ function App(): React.JSX.Element {
                 // The state is authoritative; playback only staged the way there.
                 handle.applyLifecycles(lifecycles);
                 handle.applyFireCounts(fireCounts);
+                handle.applySimMarks(nodeStates, breakpoints);
             })
             .catch(() => undefined);
     }, []);
@@ -4777,33 +5212,55 @@ function App(): React.JSX.Element {
         return () => clearInterval(id);
     }, [playing, pace]);
 
-    const transport: SimTransport = {
-        pace,
-        playing,
-        setPace,
-        onPlayPause: () => {
-            if (pace.mode === 'step') {
+    // Every request the dock can make. Built once: the callbacks read refs, so a re-render of the
+    // dock never has to wait for a new object.
+    const simActions = useMemo<SimActions>(() => ({
+        playPause: () => {
+            if (paceRef.current.mode === 'step') {
                 simRequest('tick', {count: 1});
                 return;
             }
             setPlayingBoth(!playingRef.current);
         },
-        onStep: () => {
+        tick: () => {
             setPlayingBoth(false);
             simRequest('tick', {count: 1});
         },
-        onBack: () => {
+        back: () => {
             setPlayingBoth(false);
             const tick = simRef.current?.tick ?? 0;
             if (tick > 0) {
                 sendSim('seek', {tick: tick - 1});
             }
         },
-        onRun: () => {
+        restart: () => {
+            setPlayingBoth(false);
+            sendSim('seek', {tick: 0});
+        },
+        runToDecision: () => {
             setPlayingBoth(false);
             simRequest('runToDecision');
         },
-    };
+        satisfy: nodeId => simRequest('satisfyTrigger', {nodeId}),
+        world: change => simRequest('world', {change}),
+        luaNotify: id => simRequest('luaNotify', {id}),
+        setFlag: (flag, value) => simRequest('setFlag', {flag, value}),
+        setBreakpoints: (nodeIds, onConditionalGates) => sendSim('breakpoints', {nodeIds, onConditionalGates}),
+        centerNode: nodeId => editorRef.current?.centerNode(nodeId),
+        copy: text => vscode.postMessage({type: 'copy', text}),
+    }), []);
+
+    // A node picked on the canvas while simulating opens its detail beside the dock.
+    useEffect(() => {
+        onSimNodePicked = nodeId => {
+            if (simGraphRef.current.nodes.find(n => n.id === nodeId)?.kind === 'Event') {
+                setSimSelection({kind: 'node', nodeId});
+            }
+        };
+        return () => {
+            onSimNodePicked = null;
+        };
+    }, []);
 
     const fetchGraph = useCallback((next: FilterState) => {
         filtersRef.current = next;
@@ -4924,6 +5381,11 @@ function App(): React.JSX.Element {
                         }
                     }
                     setGraphNodeIds(new Set(graphNodes.map(n => n.id)));
+                    simGraphRef.current = {
+                        nodes: graphNodes,
+                        edges: (msg.edges as StoryGraphEdgeDto[] | undefined) ?? []
+                    };
+                    setSimGraphVersion(v => v + 1);
                     // Colours follow the CAMPAIGN's branches, so a filter leaves them alone. Set
                     // before the graph is applied: the build reads the assignment as it goes.
                     const campaignBranches = facetList(
@@ -5127,7 +5589,11 @@ function App(): React.JSX.Element {
     const severity = !validated ? 'unvalidated' : worstSeverity(problemView.shown);
 
     return (
-        <Shell>
+        <Shell className={mode === 'simulate' ? [
+            simLenses.activeOnly ? 'lens-active-only' : '',
+            simLenses.hideFlow ? 'lens-hide-flow' : '',
+            simLenses.hideLua ? 'lens-hide-lua' : '',
+        ].filter(c => c).join(' ') : undefined}>
             <GlobalStyle/>
             <svg width="0" height="0" style={{position: 'absolute'}} aria-hidden="true">
                 <defs>
@@ -5180,6 +5646,19 @@ function App(): React.JSX.Element {
                         {colourKeyOpen ? (
                             <ColourKeyFlyout branches={branchEntries} onClose={() => setColourKeyOpen(false)}/>
                         ) : null}
+                        {/* A simulation row's detail, beside the dock rather than unfolded inside it. */}
+                        {mode === 'simulate' && simState?.running && simSelection ? (
+                            <SimFlyout
+                                key={simGraphVersion}
+                                state={simState}
+                                selection={simSelection}
+                                graph={simGraphRef.current}
+                                labelOf={labelOf}
+                                actions={simActions}
+                                onSelect={setSimSelection}
+                                onClose={() => setSimSelection(null)}
+                            />
+                        ) : null}
                     </div>
                     <div className="bottom-panels">
                         {showProblems && problems.length ? (
@@ -5206,8 +5685,14 @@ function App(): React.JSX.Element {
                                 onClose={() => setShowProblems(false)}
                             />
                         ) : null}
-                        {simState?.running && showSimLog ? (
-                            <SimLog state={simState} onClose={() => setShowSimLog(false)}/>
+                        {mode === 'simulate' && simState?.running && showTrace ? (
+                            <TracePanel
+                                state={simState}
+                                steps={simSteps}
+                                labelOf={labelOf}
+                                actions={simActions}
+                                onClose={() => setShowTrace(false)}
+                            />
                         ) : null}
                     </div>
                 </div>
@@ -5237,6 +5722,9 @@ function App(): React.JSX.Element {
                                     : m.id === 'simulate' ? availableModes.simulate : true))}
                             onSelect={switchMode}
                         />
+                        {mode === 'simulate' && simState?.running ? (
+                            <SimHeaderChip state={simState} labelOf={labelOf} onSelect={setSimSelection}/>
+                        ) : null}
                         <SeverityTag
                             severity={severity}
                             count={problems.length}
@@ -5249,9 +5737,15 @@ function App(): React.JSX.Element {
                     content={<>
                         {mode === 'edit'
                             ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes}/> : null}
-                        {mode === 'simulate' && simState?.running
-                            ? <SimControls state={simState} transport={transport}/>
-                            : null}
+                        {mode === 'simulate' && simState?.running ? (
+                            <SimInventory
+                                state={simState}
+                                selection={simSelection}
+                                labelOf={labelOf}
+                                actions={simActions}
+                                onSelect={setSimSelection}
+                            />
+                        ) : null}
                         {mode === 'simulate' && !simState?.running
                             ? <div className="dock-hint">Starting simulation...</div> : null}
                         {mode === 'view'
@@ -5259,6 +5753,21 @@ function App(): React.JSX.Element {
                                 or Simulation to run it forward.</div> : null}
                     </>}
                     overview={<>
+                        {/* In Simulation the foot is the tick transport - the preview's player with
+                            ticks for frames - above the view controls every mode has. */}
+                        {mode === 'simulate' && simState?.running ? (
+                            <SimTransport
+                                state={simState}
+                                pace={pace}
+                                playing={playing}
+                                lenses={simLenses}
+                                traceOpen={showTrace}
+                                setPace={setPace}
+                                setLenses={setSimLenses}
+                                setTraceOpen={setShowTrace}
+                                actions={simActions}
+                            />
+                        ) : null}
                         <div className="dock-search">
                             <div className="dock-section-title">Filter</div>
                             <div className="search-field">
@@ -5343,9 +5852,6 @@ function App(): React.JSX.Element {
     );
 }
 
-/** The sim log opens this tall until the reader drags it somewhere else. */
-const SIM_LOG_DEFAULT_HEIGHT = 140;
-
 /**
  * Pointer-capture drag resizing for one panel edge. `axis` maps pointer movement to growth:
  * 'e' = dragging right grows (a left panel's right edge), 'w' = dragging left grows (a right dock's
@@ -5403,181 +5909,6 @@ function ProblemsBar(props: {
                 </div>
             ))}
         </ProblemsPanel>
-    );
-}
-
-/** The running simulation: clock, flag inspector, intervention queue, and the step log. */
-
-/** The simulation driver controls - clock, flags, and pending interventions - stacked for the dock. */
-/** The tick transport the dock offers; chunk 5 moves it into the foot as the shared player. */
-interface SimTransport {
-    pace: SimPace;
-    playing: boolean;
-    setPace: (pace: SimPace) => void;
-    onPlayPause: () => void;
-    onStep: () => void;
-    onBack: () => void;
-    onRun: () => void;
-}
-
-function SimControls(props: { state: StorySimStateDto; transport: SimTransport }): React.JSX.Element {
-    const state = props.state;
-    const {pace, playing, setPace} = props.transport;
-    const [flagName, setFlagName] = useState('');
-    const haltedName = state.haltedAt
-        ? state.haltedAt.slice(state.haltedAt.lastIndexOf('#') + 1)
-        : null;
-
-    return (
-        <div className="sim-controls">
-            <div className="sim-section">
-                <div className="sim-head">
-                    <span className="codicon codicon-watch"/> Tick {state.tick} - {state.clock.toFixed(0)}s
-                </div>
-                <div className="sim-row sim-transport">
-                    <select
-                        value={pace.mode} title="Pace"
-                        onChange={e => setPace({...pace, mode: e.target.value as SimPace['mode']})}
-                    >
-                        <option value="pulse">Pulse (1 s)</option>
-                        <option value="step">Step</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                    {pace.mode === 'custom' ? (
-                        <input
-                            type="range" min={1} max={30} step={1} value={pace.ticksPerSecond}
-                            title={pace.ticksPerSecond + ' ticks per second'}
-                            onChange={e => setPace({...pace, ticksPerSecond: Number(e.target.value)})}
-                        />
-                    ) : null}
-                </div>
-                <div className="sim-row sim-transport">
-                    <button onClick={props.transport.onBack} disabled={state.tick === 0} title="Back one tick">
-                        <span className="codicon codicon-debug-step-back"/>
-                    </button>
-                    <button onClick={props.transport.onPlayPause}
-                            title={pace.mode === 'step' ? 'One tick' : playing ? 'Pause' : 'Play'}>
-                        <span className={'codicon ' + (playing ? 'codicon-debug-pause' : 'codicon-play')}/>
-                    </button>
-                    <button onClick={props.transport.onStep} title="One tick">
-                        <span className="codicon codicon-debug-step-over"/>
-                    </button>
-                    <button onClick={props.transport.onRun} title="Run to the next decision">
-                        <span className="codicon codicon-debug-continue"/>
-                    </button>
-                </div>
-                {haltedName ? <div className="sim-row">Halted at {haltedName}</div> : null}
-            </div>
-            <div className="sim-section">
-                <div className="sim-head">Flags</div>
-                {state.flags.map(f => (
-                    <div className="sim-row" key={f.name}>
-                        <span className="sim-name" title={f.name}>{f.name}</span>
-                        <button onClick={() => sendSim('setFlag', {flag: f.name, value: f.value !== 0 ? 0 : 1})}
-                                title={`Toggle ${f.name}`}>
-                            {f.value !== 0 ? '1 to 0' : '0 to 1'}
-                        </button>
-                    </div>
-                ))}
-                <div className="sim-row">
-                    <input
-                        type="text" placeholder="Set flag..." value={flagName}
-                        onChange={e => setFlagName(e.target.value)}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' && flagName.trim()) {
-                                sendSim('setFlag', {flag: flagName.trim(), value: 1});
-                                setFlagName('');
-                            }
-                        }}
-                    />
-                </div>
-            </div>
-            <div className="sim-section">
-                <div className="sim-head">Waiting on</div>
-                {state.interventions.length === 0 ? <div className="sim-row">nothing - story exhausted</div> : null}
-                {state.interventions.map(i => (
-                    <div className="sim-row" key={i.nodeId}>
-                        <span className={'sim-kind k-' + i.kind}>{i.kind}</span>
-                        <span className="sim-name" title={`${i.eventName} (${i.eventType ?? '?'})`}>{i.eventName}</span>
-                        {i.kind === 'lua' && i.options.length
-                            ? i.options.map(o => (
-                                <button key={o} title={`Story_Event("${o}")`}
-                                        onClick={() => simRequest('luaNotify', {id: o})}>{o}</button>
-                            ))
-                            : i.suggested
-                                ? <button title={describeChange(i.suggested)}
-                                          onClick={() => simRequest('world', {change: i.suggested})}>
-                                    {describeChange(i.suggested)}
-                                </button>
-                                : <button title="Assume this event's trigger condition met"
-                                          onClick={() => simRequest('satisfyTrigger', {nodeId: i.nodeId})}>Assume
-                                    met</button>}
-                    </div>
-                ))}
-            </div>
-            <div className="sim-section">
-                <div className="sim-head">World</div>
-                {state.world.planets.filter(p => p.owner).map(p => (
-                    <div className="sim-row" key={p.name}>
-                        <span className="sim-name" title={p.name}>{p.name}</span>
-                        <span className="sim-name" title={'Owner - ' + p.owner}>{p.owner}</span>
-                    </div>
-                ))}
-                {state.world.tech.map(t => (
-                    <div className="sim-row" key={'tech-' + t.name}>
-                        <span className="sim-name">Tech {t.name}</span>
-                        <span>{t.value}</span>
-                    </div>
-                ))}
-                {state.world.credits.map(c => (
-                    <div className="sim-row" key={'credits-' + c.name}>
-                        <span className="sim-name">Credits {c.name}</span>
-                        <span>{c.value}</span>
-                    </div>
-                ))}
-                <div className="sim-row">{state.world.units.reduce((n, u) => n + u.count, 0)} units
-                    on {state.world.planets.length} planets
-                </div>
-                {state.luaNotifications.length ? (
-                    <div className="sim-row">
-                        <select
-                            value=""
-                            title="Simulate a Lua Story_Event call"
-                            onChange={e => {
-                                if (e.target.value) {
-                                    sendSim('luaNotify', {id: e.target.value});
-                                }
-                            }}
-                        >
-                            <option value="">Lua Story_Event...</option>
-                            {state.luaNotifications.map(id => <option key={id} value={id}>{id}</option>)}
-                        </select>
-                    </div>
-                ) : null}
-            </div>
-        </div>
-    );
-}
-
-/** The simulation step log - full-width bottom panel (VS Code-style), resizable by its top edge. */
-function SimLog(props: { state: StorySimStateDto; onClose: () => void }): React.JSX.Element {
-    const {size: height, handleProps} = useEdgeResize(
-        readPanelSize('storyGraph.simLog', SIM_LOG_DEFAULT_HEIGHT), 60, 320, 'n',
-        v => {
-            writePanelSize('storyGraph.simLog', v);
-        });
-    return (
-        <div className="sim-log-panel" style={{height}}>
-            <div className="resize-handle-n" title="Drag to resize" {...handleProps} />
-            <div className="panel-bar">
-                <span className="panel-title">Simulation log</span>
-                <button className="panel-close" onClick={props.onClose} title="Close"><span
-                    className="codicon codicon-close"/></button>
-            </div>
-            {props.state.log.slice(-100).map((line, i) => (
-                <div className="sim-log-line" key={i}>{line}</div>
-            ))}
-        </div>
     );
 }
 

@@ -259,6 +259,9 @@ export interface StorySimNodeStateDto {
     lifecycle: string;
     /** How often the event fired since Start (a perpetual event counts every time). */
     fireCount: number;
+    /** An armed clock or flag gate: "4/10 s", "FLAG_X 2 of 3"; null when the event has none. */
+    gateLabel?: string | null;
+    gateProgress?: number | null;
 }
 
 /**

@@ -92,6 +92,9 @@ public static class StorySimCause
         new HashSet<string>(StringComparer.Ordinal) { Manual, Lua, Poll, Prereq, Trigger, Speech, Movie, World };
 }
 
+/// <summary>An armed event's clock or flag gate, for the meter on its node.</summary>
+public sealed record StorySimGate(string Label, double Progress);
+
 /// <summary>
 ///     Where a run pauses. <see cref="NodeIds" /> halt after the tick in which that event fires;
 ///     <see cref="OnConditionalGates" /> halts after any tick in which a clock or flag gated event

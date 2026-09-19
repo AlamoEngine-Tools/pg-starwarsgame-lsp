@@ -3,10 +3,10 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway } from './lsp/lspGateway';
-import { revealDefinition } from './revealDefinition';
-import { panelKey, panelTitle, type StoryGraphTarget } from './storyGraphTarget';
-import { PanelRegistry, WebviewMessage, WebviewPanelHost } from './webviewPanelHost';
+import {LspGateway} from './lsp/lspGateway';
+import {revealDefinition} from './revealDefinition';
+import {panelKey, panelTitle, type StoryGraphTarget} from './storyGraphTarget';
+import {PanelRegistry, WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
 import {
     ApplyStoryCommandBatchResult, ExecuteStoryCommandResult, GetStoryDiagnosticsResult,
     GetStoryGraphResult, GetStoryLayoutResult, GetStoryNodeDetailResult,
@@ -47,7 +47,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         const invalidated = new Set(campaigns.map(c => c.toLowerCase()));
         for (const panel of StoryGraphPanel._panels.all) {
             if (invalidated.has(panel._target.campaign.toLowerCase())) {
-                panel.post({ type: 'invalidate' });
+                panel.post({type: 'invalidate'});
             }
         }
     }
@@ -132,6 +132,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
             case 'sim':
                 await this._runSim(msg.method as string, msg.args as Record<string, unknown> | undefined);
                 break;
+            case 'copy':
+                // The webview cannot reach the clipboard on every host; the extension can.
+                await vscode.env.clipboard.writeText(String(msg.text ?? ''));
+                void vscode.window.setStatusBarMessage('EaWEdit: simulation log copied', 2000);
+                break;
             case 'paramOptions':
                 await this._sendParamOptions(msg.requestId as number, msg.side as string,
                     msg.typeName as string, msg.position as number, msg.prefix as string | undefined);
@@ -139,12 +144,12 @@ export class StoryGraphPanel extends WebviewPanelHost {
             case 'resolveRef':
                 await this._resolveRef(msg.value as string, msg.referenceType as string | undefined);
                 break;
-    }
+        }
     }
 
     /** Called on `aet/storySimChanged` - the panel's webview re-fetches the sim state. */
     static simChanged(target: StoryGraphTarget): void {
-        StoryGraphPanel._panels.get(panelKey(target))?.post({ type: 'simChanged' });
+        StoryGraphPanel._panels.get(panelKey(target))?.post({type: 'simChanged'});
     }
 
     /**
@@ -154,14 +159,19 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _runSim(method: string, args: Record<string, unknown> | undefined): Promise<void> {
         const requestName = 'aet/storySim' + method.charAt(0).toUpperCase() + method.slice(1);
         const result = await this._lsp.requestOrReport<StorySimStateResult>(
-            requestName, { campaign: this._target.campaign, faction: this._target.faction, ...(args ?? {}) }, 'simulation request failed');
-        if (result === undefined) { return; }
+            requestName, {
+                campaign: this._target.campaign,
+                faction: this._target.faction, ...(args ?? {})
+            }, 'simulation request failed');
+        if (result === undefined) {
+            return;
+        }
 
         if (result.error) {
             void vscode.window.showErrorMessage(`EaWEdit: ${result.error}`);
             return;
         }
-        this.post({ type: 'simState', state: result.state ?? null });
+        this.post({type: 'simState', state: result.state ?? null});
     }
 
     /**
@@ -172,30 +182,39 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _runCommand(
         payload: Record<string, unknown>, confirm: string | undefined, refreshDetail: string | undefined
     ): Promise<void> {
-        if (!this._lsp.requireRunning()) { return; }
+        if (!this._lsp.requireRunning()) {
+            return;
+        }
 
         if (confirm) {
-            const choice = await vscode.window.showWarningMessage(confirm, { modal: true }, 'Continue');
-            if (choice !== 'Continue') { return; }
+            const choice = await vscode.window.showWarningMessage(confirm, {modal: true}, 'Continue');
+            if (choice !== 'Continue') {
+                return;
+            }
         }
 
         const result = await this._lsp.requestOrReport<ExecuteStoryCommandResult>(
-            'aet/executeStoryCommand', { campaign: this._target.campaign, faction: this._target.faction, ...payload },
+            'aet/executeStoryCommand', {campaign: this._target.campaign, faction: this._target.faction, ...payload},
             'story command failed');
 
         // Either a failed request or a refused command: a gesture may have changed the view
         // optimistically (e.g. a picked-off connection), so have the webview re-fetch and match
         // reality again.
-        if (result === undefined) { this.post({ type: 'invalidate' }); return; }
+        if (result === undefined) {
+            this.post({type: 'invalidate'});
+            return;
+        }
 
         if (!result.success) {
             void vscode.window.showErrorMessage(
                 `EaWEdit: ${result.error ?? 'The story command failed.'}`);
-            this.post({ type: 'invalidate' });
+            this.post({type: 'invalidate'});
             return;
         }
 
-        if (refreshDetail) { await this._sendDetail(refreshDetail); }
+        if (refreshDetail) {
+            await this._sendDetail(refreshDetail);
+        }
     }
 
     /**
@@ -213,7 +232,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 campaign: this._target.campaign, faction: this._target.faction, side, typeName, position,
                 prefix: prefix || undefined, limit: 50,
             },
-            { options: [] });
+            {options: []});
 
         this.post({
             type: 'paramOptions', requestId,
@@ -236,11 +255,18 @@ export class StoryGraphPanel extends WebviewPanelHost {
      */
     private async _saveBatch(commands: Record<string, unknown>[]): Promise<void> {
         const result = await this._lsp.requestOrReport<ApplyStoryCommandBatchResult>(
-            'aet/applyStoryCommandBatch', { campaign: this._target.campaign, faction: this._target.faction, commands }, 'save failed');
+            'aet/applyStoryCommandBatch', {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                commands
+            }, 'save failed');
 
         // The webview needs an answer either way: without one the Save button stays spinning and
         // the queue is neither cleared nor released for another attempt.
-        if (result === undefined) { this.post({ type: 'saveResult', success: false }); return; }
+        if (result === undefined) {
+            this.post({type: 'saveResult', success: false});
+            return;
+        }
 
         if (!result.success) {
             const where = typeof result.failedIndex === 'number'
@@ -248,7 +274,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
             void vscode.window.showErrorMessage(
                 `EaWEdit: ${result.error ?? 'The save failed.'}${where}`);
         }
-        this.post({ type: 'saveResult', success: result.success });
+        this.post({type: 'saveResult', success: result.success});
     }
 
     /**
@@ -261,7 +287,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
             this._skipDeleteConfirm = await this._fetchSkipDeleteConfirm();
         }
         if (this._skipDeleteConfirm) {
-            this.post({ type: 'confirmStageResult', proceed: true, payload });
+            this.post({type: 'confirmStageResult', proceed: true, payload});
             return;
         }
 
@@ -277,14 +303,14 @@ export class StoryGraphPanel extends WebviewPanelHost {
             'Delete', dontAskAgain);
 
         if (choice === undefined) {
-            this.post({ type: 'confirmStageResult', proceed: false, payload });
+            this.post({type: 'confirmStageResult', proceed: false, payload});
             return;
         }
         if (choice === dontAskAgain) {
             this._skipDeleteConfirm = true;
             await this._persistSkipDeleteConfirm(true);
         }
-        this.post({ type: 'confirmStageResult', proceed: true, payload });
+        this.post({type: 'confirmStageResult', proceed: true, payload});
     }
 
     /**
@@ -308,7 +334,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _sendWorkspaceSettings(): Promise<void> {
         // Preferences are optional - the graph works without them, so a failure is not reported.
         const settings = await this._lsp.request<WorkspaceSettingsDto>('aet/getWorkspaceSettings');
-        if (!settings.ok) { return; }
+        if (!settings.ok) {
+            return;
+        }
 
         this._skipDeleteConfirm = settings.value.skipStoryDeleteConfirmation === true;
         this.post({
@@ -320,7 +348,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
     /** Persists the swimlane-lane toggles (best-effort). */
     private async _setLanePrefs(showThreadLanes: boolean, showChapterLanes: boolean): Promise<void> {
-        await this._lsp.notify('aet/setWorkspaceSettings', { showThreadLanes, showChapterLanes });
+        await this._lsp.notify('aet/setWorkspaceSettings', {showThreadLanes, showChapterLanes});
     }
 
     private async _fetchSkipDeleteConfirm(): Promise<boolean> {
@@ -328,12 +356,12 @@ export class StoryGraphPanel extends WebviewPanelHost {
         // confirmation the user never turned off.
         const settings = await this._lsp.requestOr<WorkspaceSettingsDto>(
             'aet/getWorkspaceSettings', {},
-            { skipStoryDeleteConfirmation: false, showThreadLanes: false, showChapterLanes: false });
+            {skipStoryDeleteConfirmation: false, showThreadLanes: false, showChapterLanes: false});
         return settings.skipStoryDeleteConfirmation === true;
     }
 
     private async _persistSkipDeleteConfirm(value: boolean): Promise<void> {
-        await this._lsp.notify('aet/setWorkspaceSettings', { skipStoryDeleteConfirmation: value });
+        await this._lsp.notify('aet/setWorkspaceSettings', {skipStoryDeleteConfirmation: value});
     }
 
     /**
@@ -341,12 +369,16 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * this can only offer to flush the mirrored queue after the fact - not cancel the close.
      */
     private async _promptSaveOnClose(): Promise<void> {
-        if (this._pendingCommands.length === 0) { return; }
+        if (this._pendingCommands.length === 0) {
+            return;
+        }
         const choice = await vscode.window.showWarningMessage(
             `The story graph for '${this._target.campaign}' was closed with ${this._pendingCommands.length} ` +
             'unsaved change(s). Save them?',
             'Save', 'Discard');
-        if (choice !== 'Save') { return; }
+        if (choice !== 'Save') {
+            return;
+        }
 
         if (!this._lsp.isRunning) {
             void vscode.window.showWarningMessage(
@@ -356,9 +388,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         const result = await this._lsp.requestOrReport<ApplyStoryCommandBatchResult>(
             'aet/applyStoryCommandBatch',
-            { campaign: this._target.campaign, faction: this._target.faction, commands: this._pendingCommands },
+            {campaign: this._target.campaign, faction: this._target.faction, commands: this._pendingCommands},
             'could not save the closed story graph');
-        if (result === undefined || result.success) { return; }
+        if (result === undefined || result.success) {
+            return;
+        }
 
         const where = typeof result.failedIndex === 'number' ? ` (change ${result.failedIndex + 1})` : '';
         void vscode.window.showErrorMessage(
@@ -373,9 +407,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _confirmDirtyExit(next: string): Promise<void> {
         const choice = await vscode.window.showWarningMessage(
             'You have unsaved story changes. Save them before leaving Edit mode?',
-            { modal: true }, 'Save', "Don't Save");
+            {modal: true}, 'Save', "Don't Save");
         const resolved = choice === 'Save' ? 'save' : choice === "Don't Save" ? 'discard' : 'cancel';
-        this.post({ type: 'dirtyExitChoice', choice: resolved, next });
+        this.post({type: 'dirtyExitChoice', choice: resolved, next});
     }
 
     /**
@@ -386,8 +420,14 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _sendPreview(commands: Record<string, unknown>[], filters: GraphFilters): Promise<void> {
         const result = await this._lsp.requestOrReport<GetStoryGraphResult>(
             'aet/previewStoryGraph',
-            { campaign: this._target.campaign, faction: this._target.faction, commands, ...filterFields(filters) }, 'preview failed');
-        if (result === undefined) { return; }
+            {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                commands, ...filterFields(filters)
+            }, 'preview failed');
+        if (result === undefined) {
+            return;
+        }
 
         if (result.error) {
             void vscode.window.showWarningMessage(`EaWEdit: ${result.error}`);
@@ -405,25 +445,37 @@ export class StoryGraphPanel extends WebviewPanelHost {
     /** Dry-runs the staged batch on the server and posts the resulting diagnostics for the pending state. */
     private async _validateBatch(commands: Record<string, unknown>[]): Promise<void> {
         const result = await this._lsp.requestOrReport<GetStoryDiagnosticsResult>(
-            'aet/validateStoryCommandBatch', { campaign: this._target.campaign, faction: this._target.faction, commands },
+            'aet/validateStoryCommandBatch', {campaign: this._target.campaign, faction: this._target.faction, commands},
             'validation failed');
-        if (result === undefined) { return; }
+        if (result === undefined) {
+            return;
+        }
 
-        if (result.error) { void vscode.window.showWarningMessage(`EaWEdit: ${result.error}`); }
+        if (result.error) {
+            void vscode.window.showWarningMessage(`EaWEdit: ${result.error}`);
+        }
         this.post({
             type: 'diagnostics', diagnostics: result.error ? [] : result.diagnostics ?? [],
         });
     }
 
     private async _saveLayout(entries: StoryLayoutEntryDto[]): Promise<void> {
-        if (!entries?.length) { return; }
-        await this._lsp.notify('aet/setStoryLayout', { campaign: this._target.campaign, faction: this._target.faction, entries });
+        if (!entries?.length) {
+            return;
+        }
+        await this._lsp.notify('aet/setStoryLayout', {
+            campaign: this._target.campaign,
+            faction: this._target.faction,
+            entries
+        });
     }
 
     private async _sendSchema(): Promise<void> {
         // Schema is styling sugar - the graph renders without it, so a failure stays quiet.
         const schema = await this._lsp.request<GetStorySchemaResult>('aet/getStorySchema');
-        if (!schema.ok) { return; }
+        if (!schema.ok) {
+            return;
+        }
 
         const events = schema.value.eventTypes ?? [];
         const rewards = schema.value.rewardTypes ?? [];
@@ -447,7 +499,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      */
     private async _layout(): Promise<StoryLayoutEntryDto[]> {
         const stored = await this._lsp.requestOr<GetStoryLayoutResult>(
-            'aet/getStoryLayout', { campaign: this._target.campaign, faction: this._target.faction }, { entries: [] });
+            'aet/getStoryLayout', {campaign: this._target.campaign, faction: this._target.faction}, {entries: []});
         return stored.entries ?? [];
     }
 
@@ -455,7 +507,10 @@ export class StoryGraphPanel extends WebviewPanelHost {
         // Reported into the webview rather than as a notification: this is the panel's whole
         // content, so the message belongs where the graph would have been.
         const outcome = await this._lsp.request<GetStoryGraphResult>(
-            'aet/getStoryGraph', { campaign: this._target.campaign, faction: this._target.faction, ...filterFields(filters) });
+            'aet/getStoryGraph', {
+                campaign: this._target.campaign,
+                faction: this._target.faction, ...filterFields(filters)
+            });
 
         if (!outcome.ok) {
             this.post({
@@ -468,7 +523,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         }
 
         if (outcome.value.error) {
-            this.post({ type: 'error', message: outcome.value.error });
+            this.post({type: 'error', message: outcome.value.error});
             return;
         }
 
@@ -488,17 +543,19 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
     private async _sendDetail(nodeId: string): Promise<void> {
         const outcome = await this._lsp.request<GetStoryNodeDetailResult>(
-            'aet/getStoryNodeDetail', { campaign: this._target.campaign, faction: this._target.faction, nodeId });
+            'aet/getStoryNodeDetail', {campaign: this._target.campaign, faction: this._target.faction, nodeId});
 
         // The property view shows the failure in place; a notification would be a modal over a
         // panel that is already able to say what is wrong.
         this.post(outcome.ok
-            ? { type: 'detail', node: outcome.value.node ?? null, error: outcome.value.error ?? null }
-            : { type: 'detail', node: null, error: outcome.message });
+            ? {type: 'detail', node: outcome.value.node ?? null, error: outcome.value.error ?? null}
+            : {type: 'detail', node: null, error: outcome.message});
     }
 
     private async _openXml(threadUri: string, line: number | undefined): Promise<void> {
-        if (!threadUri) { return; }
+        if (!threadUri) {
+            return;
+        }
         try {
             const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(threadUri));
             const position = new vscode.Position(Math.max(0, line ?? 0), 0);

@@ -61,7 +61,16 @@ public sealed record StorySimLuaPendingDto(string Id, string State, double DueCl
 
 public sealed record StorySimFlagDto(string Name, int Value);
 
-public sealed record StorySimNodeStateDto(string NodeId, string Lifecycle, int FireCount);
+/// <summary>
+///     <see cref="GateLabel" /> and <see cref="GateProgress" /> describe an armed event's clock
+///     or flag gate ("4/10 s", "FLAG_X 2 of 3", 0..1); null for events with no such gate.
+/// </summary>
+public sealed record StorySimNodeStateDto(
+    string NodeId,
+    string Lifecycle,
+    int FireCount,
+    string? GateLabel = null,
+    double? GateProgress = null);
 
 /// <summary>
 ///     <see cref="Facet" /> is the world change kind that fires this event when its type reads

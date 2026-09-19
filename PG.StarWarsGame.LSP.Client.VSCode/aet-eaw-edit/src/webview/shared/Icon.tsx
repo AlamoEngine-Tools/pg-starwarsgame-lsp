@@ -35,11 +35,13 @@ import {
     IconCrosshair, IconTargetArrow, IconTool, IconHistory,
     IconRuler, IconSearch, IconSettings, IconShadow, IconSparkles, IconStack2,
     IconSun, IconSunHigh, IconSunLow, IconTexture, IconTrash, IconWind, IconWorld, IconX,
+    IconCircleDot, IconCoins, IconFlag, IconHandClick, IconPlanet, IconRoute, IconScript,
+    IconStairsUp, IconSwords, IconTimeline, IconUsers,
     type IconProps,
 } from '@tabler/icons-react';
-import { type ComponentType } from 'react';
+import {type ComponentType} from 'react';
 
-import { codiconFor } from './iconSource';
+import {codiconFor} from './iconSource';
 
 /**
  * What the preview can draw, by meaning.
@@ -183,6 +185,31 @@ const ICONS = {
     searchLiteral: IconLetterCase,
     searchWildcard: IconAsterisk,
     searchRegex: IconRegex,
+
+    // ── the story simulation ──────────────────────────────────────────────────
+    // What the running story is waiting on the AUTHOR for: a hand on a control, because every
+    // decision here is the author standing in for the player.
+    decision: IconHandClick,
+    // The fact table the story reads - planets, units, tech, credits. The same globe as the
+    // preview's room, and never beside it: one is the world a model stands in, this is the world a
+    // story plays in.
+    world: IconWorld,
+    planet: IconPlanet,
+    unit: IconUsers,
+    tech: IconStairsUp,
+    credits: IconCoins,
+    flag: IconFlag,
+    // A battle's outcome, which the author decides rather than fights.
+    tactical: IconSwords,
+    // A campaign script's state machine, drawn as a script rather than as a file: the file is what
+    // `definition` opens; this is the thing running inside it.
+    script: IconScript,
+    // The record of what fired when. A timeline, not the preview's clock-faced `log`: the ticks
+    // are the point of it.
+    trace: IconTimeline,
+    breakpoint: IconCircleDot,
+    // The tint that shows which edges the story has run along.
+    flow: IconRoute,
 } satisfies Record<string, ComponentType<IconProps>>;
 
 export type IconName = keyof typeof ICONS;
@@ -197,7 +224,7 @@ export interface IconProps_ {
     size?: number;
 }
 
-export function Icon({ name, size = 16 }: IconProps_): React.JSX.Element {
+export function Icon({name, size = 16}: IconProps_): React.JSX.Element {
     // An EDITOR action keeps the editor's own glyph - see `iconSource`. Only the domain icons are
     // Tabler's, because those are the ones codicons has not got.
     const codicon = codiconFor(name);
@@ -206,7 +233,7 @@ export function Icon({ name, size = 16 }: IconProps_): React.JSX.Element {
         return (
             <span
                 className={`codicon codicon-${codicon}`}
-                style={{ fontSize: size }}
+                style={{fontSize: size}}
                 aria-hidden="true"
             />
         );
@@ -217,5 +244,5 @@ export function Icon({ name, size = 16 }: IconProps_): React.JSX.Element {
     // `currentColor` and aria-hidden are the two things that make an icon behave: it takes the
     // colour of whatever it sits in - including a disabled or a warning state - and it is invisible
     // to a screen reader, which reads the control's own label instead.
-    return <Glyph size={size} stroke={2} color="currentColor" aria-hidden="true" />;
+    return <Glyph size={size} stroke={2} color="currentColor" aria-hidden="true"/>;
 }

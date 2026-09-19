@@ -18,7 +18,7 @@
 // gets it to every one of them without touching a single call site. The tile properties that used
 // to be declared here in full now live in tokens.ts with the reasoning that fitted them.
 
-import { tokensCss } from './tokens';
+import {tokensCss} from './tokens';
 
 export const dockChromeCss = `
 ${tokensCss}
@@ -805,6 +805,35 @@ export const dockOverviewCss = `
         overflow-y: auto;
     }
     .dock-overview > input[type=text] { width: 100%; }
+`;
+
+/**
+ * The transport: a row of player buttons and a clock, in a dock foot.
+ *
+ * The preview's animation player had it first; the story graph's tick transport is the same
+ * control - a CD player's row, a readout at the far end, a scrub or a pace under it - so the two
+ * share one shape. A control that advances time looks the same whichever editor it is in.
+ */
+export const playerCss = `
+    .player { display: flex; flex-direction: column; gap: var(--space-6); }
+    .player-row { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+    /* Six controls and a clock have to share one dock-wide row. The toolbar default leaves them
+       ~30px too wide at the dock's opening size, which wrapped the clock onto a line of its own. */
+    .player-row .icon-btn { min-width: 20px; padding: var(--space-4) var(--space-4); }
+    .player-row .player-time {
+        margin-left: auto;
+        padding-right: var(--space-4);
+        font-variant-numeric: tabular-nums;
+        font-size: var(--font-size-smaller);
+        color: var(--vscode-descriptionForeground);
+    }
+    /* The travel direction is explicit on every slider in a player. A range input takes it from
+       the inherited writing direction, so anything upstream that flips that - a host laying the
+       webview out right-to-left, a stray rule - silently runs the playhead backwards. These read a
+       timeline and a magnitude; both only make sense left to right. */
+    .player-scrub, .player input[type=range] { direction: ltr; }
+    .player-scrub { width: 100%; }
+    .player-section { margin-bottom: var(--space-8); }
 `;
 
 /**

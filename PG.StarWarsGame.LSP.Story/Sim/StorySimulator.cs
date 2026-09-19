@@ -302,6 +302,40 @@ public sealed partial class StorySimulator
         return interventions;
     }
 
+    /// <summary>
+    ///     How far an armed clock or flag gate has come: "4/10 s" with 0.4, "FLAG_X 2 of 3" with
+    ///     0.67, "FLAG_X unset" with 0. Null for anything that is not armed or has no such gate.
+    /// </summary>
+    public StorySimGate? GetGate(StorySimSnapshot snapshot, string nodeId)
+    {
+        if (!_nodesById.TryGetValue(nodeId, out var node) || !IsActive(node, snapshot.Runtime)) return null;
+        var storyEvent = node.Event!;
+        switch (storyEvent.EventType?.ToUpperInvariant())
+        {
+            case "STORY_ELAPSED":
+            {
+                var raw = storyEvent.EventParams.FirstOrDefault(p => p.Position == 0)?.RawValue;
+                if (raw is null || !double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var at))
+                    return null;
+                var elapsed = Math.Max(0, snapshot.Clock - snapshot.Runtime.ArmedAt.GetValueOrDefault(node.Id));
+                return new StorySimGate($"{elapsed:0}/{at:0} s", at <= 0 ? 1 : Math.Min(1, elapsed / at));
+            }
+            case "STORY_FLAG":
+            {
+                var flag = FlagsReadBy(storyEvent).FirstOrDefault();
+                if (flag is null) return null;
+                var rawTarget = storyEvent.EventParams.FirstOrDefault(p => p.Position == 1)?.RawValue;
+                var target = int.TryParse(rawTarget, out var parsed) ? parsed : 0;
+                if (!snapshot.Runtime.Flags.TryGetValue(flag, out var value))
+                    return new StorySimGate($"{flag} unset", 0);
+                var progress = target <= 0 ? (value == target ? 1 : 0) : Math.Clamp((double)value / target, 0, 1);
+                return new StorySimGate($"{flag} {value} of {target}", progress);
+            }
+            default:
+                return null;
+        }
+    }
+
     // ── Tick ─────────────────────────────────────────────────────────────────
 
     private StorySimSnapshot TickOnce(StorySimSnapshot snapshot, StorySimBreakpoints breakpoints)

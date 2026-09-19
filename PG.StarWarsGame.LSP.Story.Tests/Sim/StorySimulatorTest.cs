@@ -253,6 +253,25 @@ public sealed class StorySimulatorTest
     }
 
     [Fact]
+    public void GetGate_ReportsClockAndFlagProgress_ForArmedEventsOnly()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Tick(sim.Start(), 4);
+
+        var later = sim.GetGate(snapshot, NodeId(model, "Later"))!;
+        Assert.Equal("4/10 s", later.Label);
+        Assert.Equal(0.4, later.Progress, 3);
+
+        var counter = sim.GetGate(snapshot, NodeId(model, "CounterWatcher"))!;
+        Assert.Equal("FLAG_C unset", counter.Label);
+        snapshot = sim.SetFlag(snapshot, "FLAG_C", 2);
+        Assert.Equal("FLAG_C 2 of 3", sim.GetGate(snapshot, NodeId(model, "CounterWatcher"))!.Label);
+
+        Assert.Null(sim.GetGate(snapshot, NodeId(model, "Follower")));
+        Assert.Null(sim.GetGate(snapshot, NodeId(model, "Setter")));
+    }
+
+    [Fact]
     public void Start_RecordsLoadArming_AsSteps()
     {
         var (sim, model) = Build();
