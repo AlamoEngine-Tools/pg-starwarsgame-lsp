@@ -33,8 +33,10 @@
 
     <ItemGroup>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Story\PG.StarWarsGame.LSP.Story.csproj"/>
-        <!-- The vanilla replay test loads the real schema/eaw enums through the file provider. -->
+        <!-- The vanilla replay test loads the real schema/eaw enums through the file provider and
+             reads the campaign scripts as state machines through the Lua extractor. -->
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Schema\PG.StarWarsGame.LSP.Schema.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua\PG.StarWarsGame.LSP.Lua.csproj"/>
     </ItemGroup>
 
 </Project>

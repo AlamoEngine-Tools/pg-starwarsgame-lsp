@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
@@ -36,6 +37,9 @@ public sealed record StoryCampaignModel(
 
     /// <summary>The campaign's starting world for the simulator; null when the chain carried none.</summary>
     public StoryCampaignSeed? Seed { get; init; }
+
+    /// <summary>The campaign scripts as state machines, one per script the manifests attach that the workspace holds.</summary>
+    public IReadOnlyList<LuaStoryMachine> LuaMachines { get; init; } = [];
 }
 
 /// <summary>
@@ -52,8 +56,13 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
     ///     no manifest for it - a caller asking for a faction that is not there is asking about
     ///     nothing, and answering with another faction's chain is how this went wrong before.
     /// </param>
+    /// <param name="luaMachineFor">
+    ///     Resolves an attached script name (extensionless, as the manifest writes it) to its
+    ///     machine; null skips the Lua overlay. Called once per distinct script.
+    /// </param>
     public StoryCampaignModel? Assemble(string campaignName, string faction,
-        StoryChainScanResult chain, Func<string, (string Uri, string Text)?> readThread)
+        StoryChainScanResult chain, Func<string, (string Uri, string Text)?> readThread,
+        Func<string, LuaStoryMachine?>? luaMachineFor = null)
     {
         var campaigns = chain.Campaigns
             .Where(c => c.Name.Equals(campaignName, StringComparison.OrdinalIgnoreCase))
@@ -131,10 +140,15 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
                 StringComparer.Ordinal),
             StringComparer.OrdinalIgnoreCase);
 
+        var luaMachines = luaMachineFor is null
+            ? []
+            : luaScripts.Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(luaMachineFor).Where(m => m is not null).Select(m => m!).ToList();
         return new StoryCampaignModel(campaignName, faction, threads, suspendedUris,
-            new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads))
+            new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads, luaMachines))
         {
             LuaScripts = luaScripts,
+            LuaMachines = luaMachines,
             TacticalManifestThreads = tacticalManifestThreads,
             // The first declaration's seed: a campaign declared across layers keeps one world.
             Seed = campaigns[0].Seed

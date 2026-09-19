@@ -349,6 +349,22 @@ export interface StorySimStateDto {
     /** The event whose breakpoint halted the last run, until the next command. */
     haltedAt?: string | null;
     world: StorySimWorldDto;
+    luaStates: StorySimLuaStateDto[];
+}
+
+/** A campaign script's state machine: where it is, where it goes next, what it still owes. */
+export interface StorySimLuaStateDto {
+    scriptUri: string;
+    scriptName: string;
+    current?: string | null;
+    next?: string | null;
+    pending: StorySimLuaPendingDto[];
+}
+
+export interface StorySimLuaPendingDto {
+    id: string;
+    state: string;
+    dueClock: number;
 }
 
 export interface StorySimStateResult {

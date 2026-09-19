@@ -53,7 +53,7 @@ public sealed partial class StorySimulator
     /// </summary>
     public StorySimSnapshot ApplyWorldChange(StorySimSnapshot snapshot, StoryWorldChange change)
     {
-        snapshot = snapshot with { HaltedAt = null };
+        snapshot = RunTransitions(snapshot with { HaltedAt = null });
         if (change.Kind == StoryWorldChangeKind.AssumeMet)
             return change.NodeId is null
                 ? Note(snapshot, "", null, StorySimCause.Ignored, "AssumeMet needs an event.")

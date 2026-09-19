@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -538,6 +539,159 @@ public sealed class StorySimulatorTest
         {
             return kind != StoryWorldSymbolKind.Planet || _planets.Contains(name);
         }
+    }
+
+    // ── Lua overlay (chunk 4) ────────────────────────────────────────────────
+
+    private const string LuaUri = "file:///ws/data/scripts/story/story_lua.lua";
+
+    private const string LuaThreadText =
+        "<Story>\n" +
+        "\t<Event Name=\"Act_Begin\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>TRIGGER_EVENT</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Second</Reward_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Line_Done\">\n" +
+        "\t\t<Event_Type>STORY_AI_NOTIFICATION</Event_Type>\n" +
+        "\t\t<Event_Param1>LINE_ONE</Event_Param1>\n" +
+        "\t\t<Prereq>Act_Begin</Prereq>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Second\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Third\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t</Event>\n" +
+        "</Story>\n";
+
+    private static readonly LuaStoryMachine Machine = new(LuaUri, "story_lua",
+    [
+        new LuaStoryState("Act_Begin", "State_Act_Begin",
+            new LuaStoryPhase([new LuaStoryEmission("LINE_ONE", 5)], [], [new LuaStorySpawn("X_Wing", "Hoth")],
+                ["Talk"]),
+            LuaStoryPhase.Empty,
+            new LuaStoryPhase([new LuaStoryEmission("BYE", 0)], [], [], [])),
+        new LuaStoryState("Second", "State_Second",
+            new LuaStoryPhase([new LuaStoryEmission("SECOND", 0)], [], [], []),
+            LuaStoryPhase.Empty, LuaStoryPhase.Empty),
+        new LuaStoryState("Third", "State_Third", LuaStoryPhase.Empty, LuaStoryPhase.Empty, LuaStoryPhase.Empty)
+    ]);
+
+    private static (StorySimulator Sim, StoryCampaignModel Model) BuildLua()
+    {
+        var schema = new SimSchemaProvider();
+        var thread = StoryThreadParser.Parse(LuaThreadText, ThreadAUri);
+        var model = new StoryCampaignModel("GC", "Rebel", [thread],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new StoryGraphBuilder(schema).Build([thread], null, [Machine])) { LuaMachines = [Machine] };
+        return (new StorySimulator(model, schema), model);
+    }
+
+    private static string StateId(string state)
+    {
+        return StoryGraphBuilder.LuaStateNodeId(LuaUri, state);
+    }
+
+    [Fact]
+    public void Fire_EventKeyedInStoryModeEvents_SetsTheScriptsNextState()
+    {
+        var (sim, model) = BuildLua();
+        var snapshot = sim.Start();
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Act_Begin"));
+
+        var script = snapshot.Runtime.Scripts[LuaUri];
+        Assert.Null(script.Current);
+        Assert.Equal("Act_Begin", script.Next);
+        var step = Assert.Single(snapshot.Steps, s => s.Cause == StorySimCause.LuaTrigger);
+        Assert.Equal(StateId("Act_Begin"), step.NodeId);
+        Assert.Equal(NodeId(model, "Act_Begin"), step.SourceNodeId);
+    }
+
+    [Fact]
+    public void Tick_EntersTheState_SpawnsAndOwesEmissions_ThenDispatchesThemWhenDue()
+    {
+        var (sim, model) = BuildLua();
+        var snapshot = sim.SatisfyTrigger(sim.Start(), NodeId(model, "Act_Begin"));
+
+        snapshot = sim.Tick(snapshot);
+        Assert.Equal("Act_Begin", snapshot.Runtime.Scripts[LuaUri].Current);
+        Assert.Contains(snapshot.Steps, s => s.Cause == StorySimCause.LuaEnter && s.NodeId == StateId("Act_Begin"));
+        Assert.Equal(1, snapshot.Runtime.World.UnitCount("X_Wing", "Rebel", "Hoth"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Line_Done"));
+
+        snapshot = sim.Tick(snapshot, 4);
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Line_Done"));
+
+        snapshot = sim.Tick(snapshot);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Line_Done"));
+        var fired = Assert.Single(snapshot.Steps,
+            s => s.NodeId == NodeId(model, "Line_Done") && s.To == StoryEventLifecycle.Fired);
+        Assert.Equal(StorySimCause.Lua, fired.Cause);
+        Assert.Equal(StateId("Act_Begin"), fired.SourceNodeId);
+    }
+
+    [Fact]
+    public void Trigger_InTheSameFrameAsAPendingTransition_IsDroppedWithAWarning()
+    {
+        // Measured: Story_Event_Trigger only sets the next state when current == next. Act_Begin's
+        // TRIGGER_EVENT fires Second inside the same cascade, one frame, so Second's trigger drops.
+        var (sim, model) = BuildLua();
+
+        var snapshot = sim.SatisfyTrigger(sim.Start(), NodeId(model, "Act_Begin"));
+
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Second"));
+        Assert.Equal("Act_Begin", snapshot.Runtime.Scripts[LuaUri].Next);
+        Assert.Contains(snapshot.Steps,
+            s => s.Cause == StorySimCause.Ignored && s.Detail!.Contains("'Second' dropped"));
+    }
+
+    [Fact]
+    public void Trigger_OnALaterCommand_FindsTheTransitionDone()
+    {
+        // A command is its own frame: the script serviced the pending transition before it.
+        var (sim, model) = BuildLua();
+        var snapshot = sim.SatisfyTrigger(sim.Start(), NodeId(model, "Act_Begin"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Third"));
+
+        var script = snapshot.Runtime.Scripts[LuaUri];
+        Assert.Equal("Act_Begin", script.Current);
+        Assert.Equal("Third", script.Next);
+    }
+
+    [Fact]
+    public void Transition_RunsOnExit_ThenOnEnter_InOrder()
+    {
+        var (sim, model) = BuildLua();
+        var snapshot = sim.Tick(sim.SatisfyTrigger(sim.Start(), NodeId(model, "Act_Begin")));
+        var before = snapshot.Steps.Count;
+
+        snapshot = sim.Tick(sim.SatisfyTrigger(snapshot, NodeId(model, "Third")));
+
+        var luaSteps = snapshot.Steps.Skip(before)
+            .Where(s => s.Cause is StorySimCause.LuaExit or StorySimCause.LuaEnter)
+            .Select(s => (s.Cause, s.NodeId)).ToList();
+        Assert.Equal([(StorySimCause.LuaExit, StateId("Act_Begin")), (StorySimCause.LuaEnter, StateId("Third"))],
+            luaSteps);
+        Assert.Equal("Third", snapshot.Runtime.Scripts[LuaUri].Current);
+    }
+
+    [Fact]
+    public void GraphBuilder_ProducesLuaStateNodes_AndLuaLinkEdges()
+    {
+        var (_, model) = BuildLua();
+        var graph = model.Graph;
+
+        var state = Assert.Single(graph.Nodes, n => n.Id == StateId("Act_Begin"));
+        Assert.Equal(StoryNodeKind.LuaState, state.Kind);
+        Assert.Equal(LuaUri, state.ThreadUri);
+        Assert.Contains(graph.Edges,
+            e => e.Kind == StoryEdgeKind.LuaLink && e.FromId == NodeId(model, "Act_Begin") && e.ToId == state.Id);
+        Assert.Contains(graph.Edges,
+            e => e.Kind == StoryEdgeKind.LuaLink && e.FromId == state.Id && e.ToId == NodeId(model, "Line_Done") &&
+                 e.Label == "LINE_ONE");
     }
 
     private const string TimerChainText =

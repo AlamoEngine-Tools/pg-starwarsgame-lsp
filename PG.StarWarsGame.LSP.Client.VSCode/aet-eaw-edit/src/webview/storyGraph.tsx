@@ -27,7 +27,7 @@ import {RightDock} from './shared/RightDock';
 import {ProblemsPanel, type ProblemFilterControl} from './shared/ProblemsPanel';
 import {filterProblems, resolveProblemJump} from './shared/problemFilter';
 import {ARRANGE_OPTIONS} from './storyGraph/arrangeOptions';
-import {type Adjacent, FIRE_CAUSES, groupByTick, isLifecycleStep, resolvePath} from './simPlayback';
+import {type Adjacent, FIRE_CAUSES, groupByTick, isFlowStep, isLifecycleStep, resolvePath} from './simPlayback';
 import {ClearFiltersButton} from './storyGraph/ClearFiltersButton';
 import {canvasEdgeStyle, MUTED_EDGE_TOKEN, type CanvasEdgeStyle} from './storyGraph/canvasEdgeStyle';
 import {branchKey, type BranchKeyEntry} from './storyGraph/colourKey';
@@ -1956,10 +1956,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             for (const group of groupByTick(steps)) {
                 const active: StoryConnection[] = [];
                 for (const step of group) {
-                    if (!step.sourceNodeId || !isLifecycleStep(step)) {
+                    if (!isFlowStep(step)) {
                         continue;
                     }
-                    for (const id of resolvePath(step.sourceNodeId, step.nodeId, adjacency, passThrough)) {
+                    for (const id of resolvePath(step.sourceNodeId!, step.nodeId, adjacency, passThrough)) {
                         const conn = editor.getConnection(id);
                         if (!conn || conn.flow === 'active') {
                             continue;

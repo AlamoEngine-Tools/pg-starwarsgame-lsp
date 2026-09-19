@@ -215,7 +215,7 @@ public sealed partial class StorySimulator
     /// <summary>Manually fires an active event (the user says its trigger condition happened).</summary>
     public StorySimSnapshot SatisfyTrigger(StorySimSnapshot snapshot, string nodeId)
     {
-        snapshot = snapshot with { HaltedAt = null };
+        snapshot = RunTransitions(snapshot with { HaltedAt = null });
         if (!_nodesById.TryGetValue(nodeId, out var node))
             return snapshot with { Log = snapshot.Log.Add($"Unknown event node '{nodeId}'.") };
         if (!IsActive(node, snapshot.Runtime))
@@ -238,10 +238,10 @@ public sealed partial class StorySimulator
     /// <summary>Simulates Lua calling <c>Story_Event("id")</c>: fires active AI-notification events with that id.</summary>
     public StorySimSnapshot LuaNotify(StorySimSnapshot snapshot, string notificationId)
     {
-        snapshot = snapshot with
+        snapshot = RunTransitions(snapshot with
         {
             HaltedAt = null, Log = snapshot.Log.Add($"Lua Story_Event(\"{notificationId}\").")
-        };
+        });
         var fired = false;
         foreach (var node in _eventNodes)
         {
@@ -314,6 +314,7 @@ public sealed partial class StorySimulator
             Log = snapshot.Log.Add($"Tick {snapshot.Tick + 1} ({snapshot.Clock + ClockStepSeconds:0.##}s).")
         };
         snapshot = DispatchCompletions(snapshot);
+        snapshot = ServiceScripts(snapshot);
         snapshot = Poll(snapshot);
 
         // A breakpoint halts AFTER the tick in which its event fired - a frame cannot stop halfway.
@@ -342,7 +343,8 @@ public sealed partial class StorySimulator
                 if (!IsActive(node, snapshot.Runtime)) continue;
                 if (!PolledTriggerSatisfied(node, snapshot)) continue;
 
-                snapshot = Fire(snapshot, node, StorySimCause.Poll, null, 0);
+                // Each polled fire is its own frame for the scripts.
+                snapshot = Fire(RunTransitions(snapshot), node, StorySimCause.Poll, null, 0);
                 firedThisPass.Add(node.Id);
                 changed = true;
             }
@@ -441,6 +443,10 @@ public sealed partial class StorySimulator
         if (snapshot.Runtime.DisabledEvents.Contains(node.Id))
             return Note(snapshot, node.Id, sourceId, StorySimCause.Ignored,
                 $"'{storyEvent.Name}' is disabled - fire swallowed.");
+
+        // Measured order: the plot's Lua script hears Story_Event_Trigger before the event's own
+        // Triggered flag and reward.
+        snapshot = LuaTrigger(snapshot, node);
 
         // The fire step always lands on Fired, even for a perpetual event whose lifecycle reads
         // Armed again the moment it re-arms: the engine sets Triggered here and clears it later.

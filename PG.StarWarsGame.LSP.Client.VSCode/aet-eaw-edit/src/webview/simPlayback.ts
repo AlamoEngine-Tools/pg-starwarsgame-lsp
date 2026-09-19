@@ -104,3 +104,11 @@ export function fireDelta(steps: readonly StorySimStepDto[]): Map<string, number
 export function isLifecycleStep(step: StorySimStepDto): boolean {
     return step.to !== null && step.to !== undefined;
 }
+
+/** The Lua overlay's steps land on state nodes, which have no lifecycle; they still travel an edge. */
+export const LUA_FLOW_CAUSES: ReadonlySet<string> = new Set(['luaTrigger', 'luaEnter', 'luaExit']);
+
+/** True when the step should flow along the edge from its source to its node. */
+export function isFlowStep(step: StorySimStepDto): boolean {
+    return !!step.sourceNodeId && (isLifecycleStep(step) || LUA_FLOW_CAUSES.has(step.cause));
+}

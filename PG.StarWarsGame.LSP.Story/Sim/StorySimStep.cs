@@ -51,6 +51,15 @@ public static class StorySimCause
     /// <summary>A fact written to the world (detail says which).</summary>
     public const string Fact = "fact";
 
+    /// <summary>A fired XML event selected a script state (Story_Event_Trigger set the next state).</summary>
+    public const string LuaTrigger = "luaTrigger";
+
+    /// <summary>A script left its state: OnExit ran.</summary>
+    public const string LuaExit = "luaExit";
+
+    /// <summary>A script entered its next state: OnEnter ran, threads started, emissions owed.</summary>
+    public const string LuaEnter = "luaEnter";
+
     /// <summary>Cleared by RESET_EVENT or RESET_BRANCH.</summary>
     public const string Reset = "reset";
 

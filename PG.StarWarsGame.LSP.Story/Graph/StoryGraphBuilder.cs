@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Story.Model;
 
@@ -30,7 +31,8 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
     ///     pass linking each tactical stub to its battle's own root events.
     /// </param>
     public StoryGraph Build(IReadOnlyList<StoryThread> threads,
-        IReadOnlyDictionary<string, IReadOnlySet<string>>? tacticalManifestThreads = null)
+        IReadOnlyDictionary<string, IReadOnlySet<string>>? tacticalManifestThreads = null,
+        IReadOnlyList<LuaStoryMachine>? luaMachines = null)
     {
         var state = new BuildState(
             StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryEventType")),
@@ -101,7 +103,61 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             }
         }
 
+        // Pass 5: the campaign scripts as state nodes. An XML event whose name is a StoryModeEvents
+        // key selects that state (Story_Event_Trigger); a state's phases emit Story_Event ids that
+        // STORY_AI_NOTIFICATION events listen for; a Set_Next_State is a state-to-state link.
+        foreach (var machine in luaMachines ?? [])
+        {
+            foreach (var luaState in machine.States)
+                state.Nodes.Add(new StoryNode(LuaStateNodeId(machine.ScriptUri, luaState.Name), StoryNodeKind.LuaState,
+                    luaState.Name, machine.ScriptUri));
+
+            foreach (var luaState in machine.States)
+            {
+                var stateId = LuaStateNodeId(machine.ScriptUri, luaState.Name);
+                if (state.EventsByName.TryGetValue(luaState.Name, out var triggers))
+                    foreach (var trigger in triggers)
+                        state.AddEdge(new StoryEdge(trigger.Id, stateId, StoryEdgeKind.LuaLink, "Story_Event_Trigger"));
+
+                var emitted = new[] { luaState.OnEnter, luaState.OnUpdate, luaState.OnExit }
+                    .SelectMany(p => p.Emissions.Select(e => e.Id))
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+                foreach (var id in emitted)
+                foreach (var (_, node) in eventNodes)
+                    if (ListensFor(state, node.Event!, id))
+                        state.AddEdge(new StoryEdge(stateId, node.Id, StoryEdgeKind.LuaLink, id));
+
+                foreach (var target in new[] { luaState.OnEnter, luaState.OnUpdate, luaState.OnExit }
+                             .SelectMany(p => p.Transitions).Distinct(StringComparer.OrdinalIgnoreCase))
+                    if (machine.States.Any(s => s.Name.Equals(target, StringComparison.OrdinalIgnoreCase)))
+                        state.AddEdge(new StoryEdge(stateId, LuaStateNodeId(machine.ScriptUri, target),
+                            StoryEdgeKind.LuaLink, "Set_Next_State"));
+            }
+        }
+
         return new StoryGraph(state.Nodes, state.Edges, state.Problems);
+    }
+
+    /// <summary>The node id of a script state: the script uri plus the state name, lower-cased like an event id.</summary>
+    public static string LuaStateNodeId(string scriptUri, string stateName)
+    {
+        return $"{scriptUri}#lua#{stateName.ToLowerInvariant()}";
+    }
+
+    private static bool ListensFor(BuildState state, StoryEvent storyEvent, string notificationId)
+    {
+        var type = storyEvent.EventType?.ToUpperInvariant();
+        if (type is null) return false;
+        foreach (var slot in storyEvent.EventParams)
+        {
+            if (state.EventParamRefTypes.GetValueOrDefault((type, slot.Position)) != StoryReferenceTypes.Notification)
+                continue;
+            if (StoryReferenceTypes.SplitList(slot.RawValue)
+                .Any(id => id.Equals(notificationId, StringComparison.OrdinalIgnoreCase)))
+                return true;
+        }
+
+        return false;
     }
 
     // ── Prereqs: OR of AND-lines, materialized as junctions ──────────────────

@@ -90,6 +90,19 @@ public sealed record StoryRuntimeState
         return this with { Hits = Hits.Remove(eventNodeId) };
     }
 
+    /// <summary>Each campaign script's PGStateMachine, keyed by script uri.</summary>
+    public ImmutableDictionary<string, Sim.LuaScriptState> Scripts { get; init; } =
+        ImmutableDictionary.Create<string, Sim.LuaScriptState>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Story_Event calls a script's threads will make once their sleeps are over.</summary>
+    public ImmutableList<Sim.LuaPendingEmission> PendingEmissions { get; init; } =
+        ImmutableList<Sim.LuaPendingEmission>.Empty;
+
+    public StoryRuntimeState WithScript(string scriptUri, Sim.LuaScriptState state)
+    {
+        return this with { Scripts = Scripts.SetItem(scriptUri, state) };
+    }
+
     public StoryRuntimeState WithFired(string eventNodeId)
     {
         return this with { FiredEvents = FiredEvents.Add(eventNodeId) };

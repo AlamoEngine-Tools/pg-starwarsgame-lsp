@@ -19,7 +19,10 @@ public enum StoryNodeKind
     Portal,
 
     /// <summary>A tactical plot manifest attached via STORY_*_TACTICAL / LINK_TACTICAL.</summary>
-    TacticalPlot
+    TacticalPlot,
+
+    /// <summary>A <c>StoryModeEvents</c> state of a campaign Lua script; its id is the script uri plus the state.</summary>
+    LuaState
 }
 
 public enum StoryEdgeKind

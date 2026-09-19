@@ -6,6 +6,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -148,7 +149,7 @@ public sealed class StoryModelService : IStoryModelService
 
         var reader = new RecordingReader(this);
         var model = new StoryCampaignAssembler(_schema)
-            .Assemble(campaignName, faction, chain.Result, reader.ReadThread);
+            .Assemble(campaignName, faction, chain.Result, reader.ReadThread, reader.ReadLuaMachine);
         if (model is null) return null;
 
         _logger.LogDebug("Story model for {Key} built: {Threads} thread(s)",
@@ -329,6 +330,23 @@ public sealed class StoryModelService : IStoryModelService
             if (read is null) return null;
             Versions[read.Value.Uri] = service.CurrentVersionOf(read.Value.Uri);
             return read;
+        }
+
+        /// <summary>
+        ///     The attached script (manifest name, extensionless) as a state machine: the indexed
+        ///     .lua document of that file name, read open-buffer-first and extracted statically.
+        ///     Recorded like a thread, so an edit to the script rebuilds the model.
+        /// </summary>
+        public LuaStoryMachine? ReadLuaMachine(string scriptName)
+        {
+            var suffix = "/" + scriptName.ToLowerInvariant() + ".lua";
+            var uri = service._indexService.Current.Documents.Keys
+                .FirstOrDefault(u => u.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+            if (uri is null) return null;
+            var text = service._textSource.GetText(uri);
+            if (text is null) return null;
+            Versions[uri] = service.CurrentVersionOf(uri);
+            return LuaStoryMachineExtractor.Extract(text.Text, uri);
         }
     }
 }

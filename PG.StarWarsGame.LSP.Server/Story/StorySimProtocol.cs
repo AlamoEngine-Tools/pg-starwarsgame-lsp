@@ -42,11 +42,22 @@ public sealed record StorySimStateDto(
     IReadOnlyList<string> Breakpoints,
     bool BreakOnGates,
     string? HaltedAt,
-    StorySimWorldDto World)
+    StorySimWorldDto World,
+    IReadOnlyList<StorySimLuaStateDto> LuaStates)
 {
     public static StorySimStateDto NotRunning { get; } =
-        new(false, 0, 0, 1, [], [], [], [], [], [], 0, [], false, null, StorySimWorldDto.Empty);
+        new(false, 0, 0, 1, [], [], [], [], [], [], 0, [], false, null, StorySimWorldDto.Empty, []);
 }
+
+/// <summary>A campaign script's state machine: where it is, where it goes next, and the Story_Event calls it still owes.</summary>
+public sealed record StorySimLuaStateDto(
+    string ScriptUri,
+    string ScriptName,
+    string? Current,
+    string? Next,
+    IReadOnlyList<StorySimLuaPendingDto> Pending);
+
+public sealed record StorySimLuaPendingDto(string Id, string State, double DueClock);
 
 public sealed record StorySimFlagDto(string Name, int Value);
 

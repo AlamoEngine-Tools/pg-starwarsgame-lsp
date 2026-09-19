@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
@@ -45,11 +46,20 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
             NullLogger<LocalFileSchemaProvider>.Instance);
         var resolver = new DiskResolver(Path.Combine(root, game, "Data", "XML"));
         var chain = new StoryChainScanner(resolver).Scan("CampaignFiles.xml");
+        // The campaign's scripts as machines, from the shipped Scripts/Story folder, so the replay
+        // measures how much of the Lua overlay the vanilla scripts light up.
+        var scriptsDir = Path.Combine(root, game, "Data", "Scripts", "Story");
+        var scriptFiles = Directory.Exists(scriptsDir)
+            ? Directory.EnumerateFiles(scriptsDir, "*.lua").ToDictionary(Path.GetFileNameWithoutExtension,
+                p => p, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var model = new StoryCampaignAssembler(schema).Assemble(campaign, faction, chain, rel =>
         {
             var file = resolver.ReadFile(rel);
             return file is null ? null : (file.DocumentUri!, file.Content);
-        });
+        }, name => scriptFiles.TryGetValue(name, out var path)
+            ? LuaStoryMachineExtractor.Extract(File.ReadAllText(path), new Uri(path).AbsoluteUri.ToLowerInvariant())
+            : null);
         Assert.True(model is not null,
             $"{campaign}/{faction} did not assemble. Campaigns found: " + string.Join("; ",
                 chain.Campaigns.Select(c =>
@@ -66,7 +76,12 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
         while (commands < MaxCommands)
         {
             commands++;
-            var next = sim.GetInterventions(snapshot).FirstOrDefault(i => answers.GetValueOrDefault(i.NodeId) < 8);
+            // A notification a script already owes is the script's to deliver: the policy leaves
+            // it alone and lets the clock bring it, so the overlay is measured, not pre-empted.
+            var owed = snapshot.Runtime.PendingEmissions.Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var next = sim.GetInterventions(snapshot).FirstOrDefault(i =>
+                answers.GetValueOrDefault(i.NodeId) < 8 &&
+                !(i.Kind == "lua" && i.Options.Any(owed.Contains)));
             if (next is not null)
             {
                 idleAdvances = 0;
@@ -112,6 +127,22 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
             .ToList();
         output.WriteLine($"  answered 8x without firing: {unanswered.Count}" +
                          (unanswered.Count > 0 ? " - " + string.Join(", ", unanswered.Take(12)) : ""));
+        var states = model.LuaMachines.Sum(m => m.States.Count);
+        var emissions = model.LuaMachines.Sum(m =>
+            m.States.Sum(s => s.OnEnter.Emissions.Count + s.OnUpdate.Emissions.Count + s.OnExit.Emissions.Count));
+        var luaLinks = model.Graph.Edges.Count(e => e.Kind == StoryEdgeKind.LuaLink);
+        var entered = snapshot.Steps.Count(s => s.Cause == StorySimCause.LuaEnter);
+        // Only fires whose source is a script state came from an owed emission; the policy's own
+        // Story_Event answers carry no source.
+        var luaFired = snapshot.Steps.Count(s => s.Cause == StorySimCause.Lua && s.To == StoryEventLifecycle.Fired &&
+                                                 s.SourceNodeId?.Contains("#lua#", StringComparison.Ordinal) == true);
+        var unheard = snapshot.Steps.Count(s =>
+            s.Cause == StorySimCause.Ignored && s.Detail!.Contains("no armed event listens"));
+        var dropped = snapshot.Steps.Count(s => s.Cause == StorySimCause.Ignored && s.Detail!.Contains("dropped"));
+        output.WriteLine($"  lua: {model.LuaMachines.Count} scripts, {states} states, {emissions} emissions, " +
+                         $"{luaLinks} links; entered {entered} states, {luaFired} notifications fired from scripts, " +
+                         $"{unheard} emitted with no armed listener, {snapshot.Runtime.PendingEmissions.Count} still owed, " +
+                         $"{dropped} triggers dropped while a transition was pending");
 
         Assert.True(commands < MaxCommands, "The replay did not settle within the command budget.");
         Assert.Empty(stuck);

@@ -54,7 +54,7 @@ public sealed class StorySimulationService(
 
         var simulator = new StorySimulator(model, schema, symbols);
         var session = new Session(simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts),
-            ImmutableList<SimCommand>.Empty, StorySimBreakpoints.None);
+            ImmutableList<SimCommand>.Empty, StorySimBreakpoints.None, model.LuaMachines);
         lock (_gate)
         {
             _sessions[key] = session;
@@ -264,7 +264,22 @@ public sealed class StorySimulationService(
             session.Breakpoints.NodeIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
             session.Breakpoints.OnConditionalGates,
             snapshot.HaltedAt,
-            ToWorldDto(snapshot.Runtime.World));
+            ToWorldDto(snapshot.Runtime.World),
+            ToLuaStates(session, snapshot));
+    }
+
+    private static List<StorySimLuaStateDto> ToLuaStates(Session session, StorySimSnapshot snapshot)
+    {
+        return session.Machines.Select(machine =>
+        {
+            var state = snapshot.Runtime.Scripts.GetValueOrDefault(machine.ScriptUri);
+            var pending = snapshot.Runtime.PendingEmissions
+                .Where(p => p.ScriptUri.Equals(machine.ScriptUri, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(p => p.DueClock)
+                .Select(p => new StorySimLuaPendingDto(p.Id, p.State, p.DueClock))
+                .ToList();
+            return new StorySimLuaStateDto(machine.ScriptUri, machine.ScriptName, state?.Current, state?.Next, pending);
+        }).ToList();
     }
 
     private static StorySimWorldDto ToWorldDto(StoryWorld world)
@@ -347,5 +362,6 @@ public sealed class StorySimulationService(
         StorySimSnapshot Snapshot,
         IReadOnlyList<string> LuaNotifications,
         ImmutableList<SimCommand> Commands,
-        StorySimBreakpoints Breakpoints);
+        StorySimBreakpoints Breakpoints,
+        IReadOnlyList<LuaStoryMachine> Machines);
 }

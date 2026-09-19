@@ -226,6 +226,28 @@ public sealed class StorySimulationServiceTest
     }
 
     [Fact]
+    public void State_CarriesEachScriptsMachine_WithItsOwedEmissions()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+        var manual = service.GetState(Key).State!.Interventions.Single(i => i.EventName == "Manual");
+
+        var fired = service.SatisfyTrigger(Key, manual.NodeId).State!;
+        var script = Assert.Single(fired.LuaStates);
+        Assert.Equal("story_lua", script.ScriptName);
+        Assert.Null(script.Current);
+        Assert.Equal("Manual", script.Next);
+        Assert.Contains(fired.Steps, s => s.Cause == "luaTrigger");
+
+        var entered = service.Tick(Key, 1).State!;
+        script = Assert.Single(entered.LuaStates);
+        Assert.Equal("Manual", script.Current);
+        var owed = Assert.Single(script.Pending);
+        Assert.Equal("Alert_From_Lua", owed.Id);
+        Assert.Equal(6.0, owed.DueClock);
+    }
+
+    [Fact]
     public void RunToDecision_StopsAtTheFirstIntervention()
     {
         var (service, _) = BuildService();
@@ -314,11 +336,19 @@ public sealed class StorySimulationServiceTest
         private static StoryCampaignModel BuildModel()
         {
             var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
+            // The script answers to the Manual event and, five seconds in, calls Story_Event.
+            var machine = new LuaStoryMachine(LuaUri, "story_lua",
+            [
+                new LuaStoryState("Manual", "State_Manual",
+                    new LuaStoryPhase([new LuaStoryEmission("Alert_From_Lua", 5)], [], [], ["Talk"]),
+                    LuaStoryPhase.Empty, LuaStoryPhase.Empty)
+            ]);
             return new StoryCampaignModel("GC", "Rebel", [thread],
                 new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new SimEnumSchema()).Build([thread]))
+                new StoryGraphBuilder(new SimEnumSchema()).Build([thread], null, [machine]))
             {
-                LuaScripts = ["Story_Lua"]
+                LuaScripts = ["Story_Lua"],
+                LuaMachines = [machine]
             };
         }
     }
