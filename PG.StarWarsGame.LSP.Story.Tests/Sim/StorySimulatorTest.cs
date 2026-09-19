@@ -50,6 +50,86 @@ public sealed class StorySimulatorTest
         "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
         "\t\t<Reward_Type>DISABLE_STORY_EVENT</Reward_Type>\n" +
         "\t\t<Reward_Param1>Victim</Reward_Param1>\n" +
+        "\t\t<Reward_Param2>1</Reward_Param2>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Enabler\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>DISABLE_STORY_EVENT</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Victim</Reward_Param1>\n" +
+        "\t\t<Reward_Param2>0</Reward_Param2>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Victim2\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"HalfDisabler\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>DISABLE_STORY_EVENT</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Victim2</Reward_Param1>\n" +
+        "\t</Event>\n" +
+        // Engine fidelity fixtures (chunk 1): a root, its STORY_TRIGGER follower, reset/retrigger
+        // controls, a branch, a forced event whose prereq never fires, a speech, and a timer
+        // that only starts counting once armed.
+        "\t<Event Name=\"Root\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Follower\">\n" +
+        "\t\t<Event_Type>STORY_TRIGGER</Event_Type>\n" +
+        "\t\t<Prereq>Root</Prereq>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Resetter\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>RESET_EVENT</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Follower</Reward_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Retrigger\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>TRIGGER_EVENT</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Root</Reward_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"M1\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Branch>B</Branch>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"M2\">\n" +
+        "\t\t<Event_Type>STORY_TRIGGER</Event_Type>\n" +
+        "\t\t<Prereq>M1</Prereq>\n" +
+        "\t\t<Branch>B</Branch>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Extra\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"BranchReset\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>RESET_BRANCH</Reward_Type>\n" +
+        "\t\t<Reward_Param1>B</Reward_Param1>\n" +
+        "\t\t<Reward_Param2>Extra</Reward_Param2>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"NeverFires\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Forced\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Prereq>NeverFires</Prereq>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Forcer\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>TRIGGER_EVENT</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Forced</Reward_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Talker\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>SPEECH</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Line_1</Reward_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"AfterTalk\">\n" +
+        "\t\t<Event_Type>STORY_SPEECH_DONE</Event_Type>\n" +
+        "\t\t<Event_Param1>Line_1</Event_Param1>\n" +
+        "\t\t<Prereq>Talker</Prereq>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"LateTimer\">\n" +
+        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
+        "\t\t<Event_Param1>5</Event_Param1>\n" +
+        "\t\t<Prereq>Root</Prereq>\n" +
         "\t</Event>\n" +
         "\t<Event Name=\"Activator\">\n" +
         "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
@@ -138,24 +218,142 @@ public sealed class StorySimulatorTest
     }
 
     [Fact]
-    public void SetFlag_FiresFlagWatchers()
+    public void StoryFlag_DefaultCompare_IsEqualToZero_AndUnsetNeverFires()
+    {
+        // Measured: StoryEventFlagClass defaults to EQUAL_TO with value 0, and Get_Flag's unset
+        // sentinel never satisfies any comparison - so a bare watcher waits for an explicit 0.
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
+
+        snapshot = sim.SetFlag(snapshot, "FLAG_X", 1);
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
+
+        snapshot = sim.SetFlag(snapshot, "FLAG_X", 0);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
+    }
+
+    [Fact]
+    public void StoryTrigger_FiresFromPrereqsAlone()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        Assert.Equal(StoryEventLifecycle.Waiting, LifecycleOf(sim, snapshot, model, "Follower"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Root"));
+
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Follower"));
+    }
+
+    [Fact]
+    public void ResetEvent_ClearsFired_AndRearmsOnlyWhenAParentFiresAgain()
+    {
+        // Measured: Clear_Triggered drops Triggered and Reset drops Active when the event has
+        // prereqs; nothing re-arms it until a prereq pushes Parent_Triggered again.
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Root"));
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Follower"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Resetter"));
+        Assert.Equal(StoryEventLifecycle.Waiting, LifecycleOf(sim, snapshot, model, "Follower"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Retrigger"));
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Follower"));
+    }
+
+    [Fact]
+    public void ResetBranch_ClearsMembers_RearmsFromFiredPrereqs_AndTriggersParam1()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "M1"));
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "M1"));
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "M2"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Extra"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "BranchReset"));
+
+        // A root member keeps its armed flag through a reset; the STORY_TRIGGER member is cleared
+        // and pass 2 finds its prereq no longer fired, so it waits.
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "M1"));
+        Assert.Equal(StoryEventLifecycle.Waiting, LifecycleOf(sim, snapshot, model, "M2"));
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Extra"));
+    }
+
+    [Fact]
+    public void DisableStoryEvent_ParamZero_Enables_AndMissingParamIsIgnored()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Disabler"));
+        Assert.Equal(StoryEventLifecycle.Disabled, LifecycleOf(sim, snapshot, model, "Victim"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Enabler"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Victim"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "HalfDisabler"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Victim2"));
+        Assert.Contains(snapshot.Log, l => l.Contains("ignored", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void TriggerEvent_FiresAWaitingEvent_IgnoringItsPrereqs()
+    {
+        // Measured: Reward_Trigger_Event calls Event_Triggered on the named event in every
+        // subplot with no Active, prereq or Triggered check.
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        Assert.Equal(StoryEventLifecycle.Waiting, LifecycleOf(sim, snapshot, model, "Forced"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Forcer"));
+
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Forced"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "NeverFires"));
+    }
+
+    [Fact]
+    public void SpeechDone_CompletesOnTheNextCommand_AfterItsSpeechReward()
     {
         var (sim, model) = Build();
         var snapshot = sim.Start();
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_X", 1);
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Talker"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "AfterTalk"));
+        Assert.DoesNotContain(sim.GetInterventions(snapshot), i => i.EventName == "AfterTalk");
 
-        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
+        snapshot = sim.AdvanceClock(snapshot, 1);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "AfterTalk"));
+    }
+
+    [Fact]
+    public void Elapsed_CountsFromArming_NotFromCampaignStart()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+
+        snapshot = sim.AdvanceClock(snapshot, 10);
+        Assert.Equal(StoryEventLifecycle.Waiting, LifecycleOf(sim, snapshot, model, "LateTimer"));
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Root"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "LateTimer"));
+
+        snapshot = sim.AdvanceClock(snapshot, 4);
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "LateTimer"));
+
+        snapshot = sim.AdvanceClock(snapshot, 1);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "LateTimer"));
     }
 
     [Fact]
     public void StoryFlag_FlagList_IsOrSemantics()
     {
-        // Schema: multiple values in param 0 = OR condition.
+        // Schema: multiple values in param 0 = OR condition. No comparison params, so the
+        // measured default applies: EQUAL_TO 0.
         var (sim, model) = Build();
         var snapshot = sim.Start();
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_B", 1);
+        snapshot = sim.SetFlag(snapshot, "FLAG_B", 0);
 
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "EitherWatcher"));
     }
@@ -255,7 +453,7 @@ public sealed class StorySimulatorTest
         var (sim, model) = Build();
         var snapshot = sim.Start();
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_P", 1);
+        snapshot = sim.SetFlag(snapshot, "FLAG_P", 0);
         var firstCount = snapshot.Log.Count(l => l.Contains("Fired 'PerpFlag'"));
 
         snapshot = sim.AdvanceClock(snapshot, 1);
@@ -342,7 +540,8 @@ public sealed class StorySimulatorTest
                         }
                     ]
                 },
-                new EnumValueDefinition { Name = "STORY_GENERIC" }
+                new EnumValueDefinition { Name = "STORY_GENERIC" },
+                new EnumValueDefinition { Name = "STORY_SPEECH_DONE" }
             ]
         };
 
@@ -399,7 +598,37 @@ public sealed class StorySimulatorTest
                         }
                     ]
                 },
-                new EnumValueDefinition { Name = "STORY_ELEMENT" }
+                new EnumValueDefinition { Name = "STORY_ELEMENT" },
+                new EnumValueDefinition { Name = "SPEECH" },
+                new EnumValueDefinition
+                {
+                    Name = "RESET_EVENT",
+                    Params =
+                    [
+                        new ParamDefinition
+                        {
+                            Position = 0, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.EventName
+                        }
+                    ]
+                },
+                new EnumValueDefinition
+                {
+                    Name = "RESET_BRANCH",
+                    Params =
+                    [
+                        new ParamDefinition
+                        {
+                            Position = 0, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.Branch
+                        },
+                        new ParamDefinition
+                        {
+                            Position = 1, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.EventName
+                        }
+                    ]
+                }
             ]
         };
 

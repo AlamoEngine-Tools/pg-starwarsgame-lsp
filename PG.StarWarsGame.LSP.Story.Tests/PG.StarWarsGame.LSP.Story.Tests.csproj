@@ -33,6 +33,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Story\PG.StarWarsGame.LSP.Story.csproj"/>
+        <!-- The vanilla replay test loads the real schema/eaw enums through the file provider. -->
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Schema\PG.StarWarsGame.LSP.Schema.csproj"/>
     </ItemGroup>
 
 </Project>
