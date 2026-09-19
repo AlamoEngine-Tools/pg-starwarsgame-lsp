@@ -1,5 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/AlamoEngine-Tools/pg-starwarsgame-lsp/refs/heads/master/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/resources/pgproj.schema.json",
+  "_type": "aetswg.ModProject",
+  "_typeVersion": "aetswg-1.0.0",
   "name": "E2E Test Mod",
   "directories": {
     "xml": [
@@ -25,7 +27,5 @@
     "type": "CSV",
     "directory": "data/text"
   },
-  "projectReferences": [],
-  "_type": "aetswg.ModProject",
-  "_typeVersion": "aetswg-1.0.0"
+  "projectReferences": []
 }

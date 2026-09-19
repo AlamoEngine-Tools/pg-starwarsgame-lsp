@@ -2,21 +2,21 @@
 
 Editor support for **Star Wars: Empire at War** and **Forces of Corruption** mod development.
 
-This extension gives VS Code a full understanding of the game's XML data format and Lua scripting layer: completions drawn from the live object graph, hover documentation for every tag and enum value, cross-file diagnostics, go-to-definition, find-all-references, rename, and more.
+- XML and Lua: completions, hover documentation, cross-file diagnostics, navigation, rename
+- Story tooling: campaign navigator, story graph, cross-language symbols
+- Localisation editor
+- Model preview
+- Lua debugger
 
-> **Preview release** - This is early-access software. Not all planned features are complete, and behavior may change between versions. Please report anything unexpected on the [issue tracker](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues).
+> **Preview release.** Not every feature is complete; behaviour may change between versions. Report problems on the [issue tracker](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues).
 
 ---
 
 ## Requirements
 
 - Visual Studio Code 1.107 or later
-- Windows 11 (x64)
-- The PG.StarWarsGame.LSP server binary (see Getting started below)
-
-No .NET runtime installation is required. The server ships as a self-contained Windows executable.
-
-> **Windows 10 is not supported.** Microsoft ended mainstream support for Windows 10 in October 2025. The extension may work on Windows 10 but no issues specific to it will be investigated or fixed.
+- Windows 11 (x64); Windows 10 is unsupported (end of mainstream support October 2025)
+- The PG.StarWarsGame.LSP server binary, self-contained; no .NET runtime needed
 
 ---
 
@@ -24,30 +24,28 @@ No .NET runtime installation is required. The server ships as a self-contained W
 
 ### 1. Download the server
 
-Go to the [Releases](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases) page and download both:
+From the [Releases](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases) page:
 
-- `aet-eaw-edit-x.x.x.vsix` - the VS Code extension (if installing manually instead of through the marketplace)
-- `PG.StarWarsGame.LSP.Server-x.x.x-win-x64.zip` - the language server
-
-Extract the server archive to a permanent folder, for example `C:\tools\aet-lsp\`.
+- `aet-eaw-edit-x.x.x.vsix` - the extension, for manual installs
+- `PG.StarWarsGame.LSP.Server-x.x.x-win-x64.zip` - the language server; extract to a permanent folder, e.g. `C:\tools\aet-lsp\`
 
 ### 2. Configure the extension
 
-Open VS Code settings (`Ctrl+,`) and set:
-
 | Setting | Value |
 |---|---|
-| `aet-eaw-edit.lsp.executable` | Full path to `PG.StarWarsGame.LSP.Server.exe` inside the extracted folder |
+| `aet-eaw-edit.lsp.executable` | Full path to `PG.StarWarsGame.LSP.Server.exe` |
 | `aet-eaw-edit.lsp.enabled` | `true` |
 
-The extension activates when you open an XML or Lua file, or when the workspace contains a `.pgproj` file. If the server binary is missing or its version does not match what this extension expects, a notification appears with a link to the correct release.
+Activation: an open XML or Lua file, or a `.pgproj` in the workspace. A missing or mismatched server binary is reported with a link to the matching release.
 
 ### 3. Create a mod project file
 
-Place a `.pgproj` file at the root of your mod workspace so the extension knows which directories to index:
+`.pgproj` at the root of the mod workspace:
 
 ```json
 {
+  "_type": "aetswg.ModProject",
+  "_typeVersion": "aetswg-1.0.0",
   "name": "My Mod",
   "directories": {
     "xml":     ["data/xml"],
@@ -63,13 +61,17 @@ Place a `.pgproj` file at the root of your mod workspace so the extension knows 
 }
 ```
 
-All paths are relative to the `.pgproj` file. The `projectReferences` field can list other `.pgproj` files whose symbols your mod inherits - for example, a base game `.pgproj` placed alongside your mod. `localisation.type` is one of `CSV`, `DAT`, `XML`, `NLS`.
+- `_type` and `_typeVersion` - the file's format, written and maintained by the extension. A file without them loads as format 1.0.0; a newer format than the extension understands is refused.
+- Paths are relative to the `.pgproj`.
+- `projectReferences` - other `.pgproj` files whose symbols the mod inherits, e.g. a base game project.
+- `localisation.type` - `CSV`, `DAT`, `XML` or `NLS`.
+- `icons` (optional) - `megaTexture` (atlas pair without extension, e.g. `data/art/textures/mt_commandbar`) and `sourceRoots` (loose icon folders). Omitted: engine convention.
 
 ---
 
 ## Upgrading from 0.1.x
 
-**`.pgproj` files must be migrated.** 0.2.0 moves localisation configuration out of `directories` into its own top-level node:
+**Required `.pgproj` change.** Localisation moved from `directories` to its own node:
 
 ```diff
    "directories": {
@@ -88,50 +90,67 @@ All paths are relative to the `.pgproj` file. The `projectReferences` field can 
    "projectReferences": []
 ```
 
-`type` is the uppercased resource type (`CSV`, `DAT`, `XML`, `NLS`). **This edit is required** - a `.pgproj` left in the old shape now fails to load, with an error notification pointing at exactly this fix, so the server refuses to start rather than silently indexing your mod without localisation.
+A `.pgproj` in the old shape fails to load with a notification naming this fix.
 
-**Only one `.pgproj` per workspace.** If your opened folder contains more than one `.pgproj` file (for example a leftover backup copy), the server now fails to start with a notification listing every one found, instead of silently picking one at random as it used to. Remove or relocate the extras, or open the specific subfolder that contains the one you want to use.
+**One `.pgproj` per workspace.** More than one fails to start with a notification listing them all; remove the extras or open the subfolder holding the one you want.
 
-**Then clear cached indexes.** This release bundles a large number of accumulated parser and schema fixes. To be sure you are not looking at stale cached data, delete:
-
-1. The `.aetswg` folder next to every `.pgproj` in your workspace (per-project index cache)
-2. `%USERPROFILE%\.aetswg\` (downloaded baseline and schema cache)
-
-Both are safe to delete - everything in them is rebuilt or re-downloaded automatically. After deleting, run **EaWEdit: Restart LSP Server** (or reload the window).
+**Clear cached indexes.** Delete `.aetswg` next to every `.pgproj` and `%USERPROFILE%\.aetswg\`, then run **EaWEdit: Restart LSP Server**. Both are rebuilt automatically.
 
 ---
 
 ## XML features
 
-The extension indexes the full EaW/FoC object graph across your workspace and uses it to drive every editor feature.
+Indexes the full EaW/FoC object graph across the workspace.
 
-- **Completions** - tag values auto-complete from enum definitions and named objects declared anywhere in the workspace
-- **Hover** - hover over any tag name, enum value, or object reference to see its type, description, and valid values
-- **Diagnostics** - errors and warnings for unknown references, type mismatches, duplicate declarations, malformed values, and deprecated fields
-- **Go to definition** - `F12` or `Ctrl+Click` on any object reference jumps to its declaration, even across files
-- **Find all references** - `Shift+F12` on a symbol lists every file and line where it is used
-- **Rename** - `F2` on a symbol renames it consistently across every XML file in the workspace
-- **Code actions** - quick-fix lightbulbs for common problems, including creating a missing localisation key from within the editor
-- **Code lens** - inline reference counts shown above every named object
-- **Auto-close tags** - typing the `>` that ends an opening tag inserts the matching `</Tag>` and puts the cursor between them (requires VS Code's `editor.formatOnType` to be enabled)
-- **Linked editing** - renaming an opening tag renames its closing tag at the same time (requires VS Code's `editor.linkedEditing` to be enabled)
-- **Variant inheritance** - the Show Effective Object command opens a read-only view of the fully merged XML for any `Variant_Of_Existing_Type` object
+- **Completions** - enum values and named objects from the whole workspace
+- **Hover** - type, description and valid values for tags, enum values and references
+- **Diagnostics**
+  - Unknown references
+  - Unknown or misspelled tags, with a suggestion
+  - Unnamed objects, missing required tags
+  - Type mismatches, malformed values, deprecated fields
+  - Duplicate declarations
+- **Engine rules** - about 150 checks taken from the game's parser and error messages
+  - Numeric ranges
+  - Tags required or forbidden together
+  - Comparisons between tags of one object
+  - Variant-inheritance rules
+- **Go to definition** - `F12` / `Ctrl+Click`, across files
+- **Find all references** - `Shift+F12`
+- **Rename** - `F2`, workspace-wide
+- **Code actions** - quick fixes, including creating a missing localisation key
+- **Code lens** - reference counts above every named object
+- **Auto-close tags** - on `>` (needs `editor.formatOnType`)
+- **Linked editing** - opening and closing tag renamed together (needs `editor.linkedEditing`)
+- **Variant inheritance** - **Show Effective Object** opens the merged XML of a `Variant_Of_Existing_Type` object
 
 ---
 
 ## Lua features
 
-Lua script files inside the declared `scripts` directories are indexed and checked for diagnostics.
+Scripts under the declared `scripts` directories are indexed and checked.
+
+- Completion
+- Go to definition
+- Rename, including XML objects referenced from Lua
+- Code lenses, inlay hints, quick fixes
+- Hover and diagnostics _(work in progress)_
 
 ---
 
 ## Lua debugger
 
-> **Work in progress - off by default.** Enable `aet-eaw-edit.features.lua.debugger` to get the **Empire at War Lua** debug type. It needs a debug build of the game with its Lua debug server running; a retail build has no debug server and cannot be attached to.
+> **Work in progress, off by default.** Flag: `aet-eaw-edit.features.lua.debugger`. Requires a debug build of the game with its Lua debug server running; retail builds have none.
 
-The debugger connects VS Code's Run and Debug view to the Lua debug server built into the game's debug build. Set breakpoints in any Lua file under your project's script directories, attach to a running game (or launch it with your mod chain), and the stop lands in the normal call stack view with the frame's locals in the Variables view. Plain variable names can be watched or hovered, and the Debug Console runs Lua in the script that is selected or stopped.
+Debug type **Empire at War Lua** in Run and Debug:
 
-Press `F5` in a Lua file with no `launch.json` to attach with the connection settings below, or add configurations:
+- Breakpoints in Lua files under the project's script directories
+- Attach to a running game, or launch it with the mod chain
+- Call stack, locals in the Variables view, watches and hovers on plain names
+- Debug Console running Lua in the selected or stopped script
+- **Lua Scripts** view: every running script instance with its coroutine threads; break in a script or a thread (the game cannot start a script on request)
+
+`F5` in a Lua file attaches with the settings below. `launch.json`:
 
 ```json
 {
@@ -154,50 +173,61 @@ Press `F5` in a Lua file with no `launch.json` to attach with the connection set
 
 | Attribute | Request | Default | Description |
 |---|---|---|---|
-| `host` | both | `aet-eaw-edit.game.luaDebugHost` | The machine running the game |
+| `host` | both | `aet-eaw-edit.game.luaDebugHost` | Machine running the game |
 | `port` | both | `aet-eaw-edit.game.luaDebugPort` | The game's Lua debug UDP port |
-| `sourceRoots` | both | every project layer's script directories | Directories the game's script paths are mapped onto, mod first |
-| `clientName` | both | `AetLuaDebugger:<pid>` | The client name the game logs for the session |
-| `unsafeTableExpansion` | both | `aet-eaw-edit.game.unsafeTableExpansion` | Allow expanding tables in the Variables view (see below) |
-| `dropDuplicateOutermostFrame` | both | `true` | Drop the outermost call-stack entry when the game reports it twice |
-| `program` | launch | `aet-eaw-edit.game.executable` | The debug game executable |
-| `args` | launch | `[]` | Extra command-line arguments, appended after the mod chain |
-| `cwd` | launch | the executable's directory | Working directory for the game |
-| `modPaths` | launch | built from the project layers | Mod directories passed as `MODPATH=` entries, leaf first, replacing the chain built from the `.pgproj` |
-| `attachTimeoutSeconds` | launch | `60` | How long to keep trying to attach after the game starts |
+| `sourceRoots` | both | every project layer's script directories | Directories the game's script paths map onto, mod first |
+| `clientName` | both | `AetLuaDebugger:<pid>` | Client name the game logs |
+| `unsafeTableExpansion` | both | `aet-eaw-edit.game.unsafeTableExpansion` | Expand tables in the Variables view |
+| `dropDuplicateOutermostFrame` | both | `true` | Drop a duplicated outermost call-stack entry |
+| `program` | launch | `aet-eaw-edit.game.executable` | Debug game executable |
+| `args` | launch | `[]` | Extra arguments, after the mod chain |
+| `cwd` | launch | executable's directory | Working directory |
+| `modPaths` | launch | built from the project layers | `MODPATH=` entries, leaf first; replaces the chain from the `.pgproj` |
+| `attachTimeoutSeconds` | launch | `60` | Attach retry window after launch |
 
-**Launching with your mod.** A launch passes the game one `MODPATH=` entry per project layer, your mod first and its dependencies after it, exactly as the game resolves them. The game reads a mod folder as-is, so every layer must already be laid out the way the game expects: all directories declared in its `.pgproj` under that project's `Data/` folder, and no space anywhere in the path. A layer that is not is refused with the reason, and `modPaths` lets you name the folders yourself instead. Assembling a runnable mod from a project that keeps its files elsewhere is planned as a separate build step ([#144](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/144)).
+**Launch and the mod chain**
 
-**The Lua Scripts view.** The game cannot start a script from the debugger; scripts run when the game runs them. The **Lua Scripts** view in Run and Debug therefore lists every script instance the game reports, with its named coroutine threads under it, and is the way in: break in a script, or in one of its threads, and the game stops at the next Lua line it runs there. Refresh reloads the list; expanding a script fetches its threads. While a script is stopped, or a break is already waiting for the next line, the break actions are greyed out and their tooltip says why - the game accepts neither until you continue.
+- One `MODPATH=` per project layer: mod first, dependencies after
+- The game reads a mod folder as-is, so each layer needs:
+  - Its declared directories under its `Data/` folder
+  - No space in its path
+- A layer that does not comply is refused with the reason
+- `modPaths` overrides the chain
+- A build step for other layouts is planned ([#144](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/144))
 
-**What the game does not do.** These are limits of the game's debug server, reproduced rather than papered over:
+**Lua Scripts view**
 
-- A breakpoint condition, hit count or log message is stored by the game but never evaluated, so such a breakpoint is reported as not set instead of silently stopping every time.
-- The whole game freezes while a script is stopped. There is no way to pause one script and let the rest run.
-- Pausing does not stop the game at once; it stops at the next Lua line the selected script (or, with nothing selected, any attached script) runs.
-- The game names no locals. The Variables view shows the names the extension finds in scope at the stopped line and asks the game for each; an upvalue resolves to the global of the same name, and numbers are reported as integers.
-- Tables show as `table: 0x...` with no children unless `aet-eaw-edit.game.unsafeTableExpansion` is on. The game is reported to crash on a table member whose text runs to 255 bytes or more, so leave it off unless losing the game session is acceptable.
+- Refresh reloads the list
+- Expanding a script fetches its threads
+- Break actions are greyed out, with the reason in the tooltip, while a script is stopped or a break is already waiting
+
+**Limits of the game's debug server**, reported rather than hidden:
+
+- Breakpoint conditions, hit counts and log messages are never evaluated; such breakpoints are reported as not set
+- The whole game freezes while a script is stopped
+- Pause takes effect at the next Lua line of the selected script, or of any attached script
+- Locals are the names found in scope at the stopped line
+  - Upvalues resolve to the global of the same name
+  - Numbers are reported as integers
+- Tables show as `table: 0x...` without children unless `aet-eaw-edit.game.unsafeTableExpansion` is on
+  - The game is reported to crash on member text of 255 bytes or more
 
 ---
 
 ## Suppressing diagnostics
 
-Every diagnostic the server reports carries an id of the form `aetswg-<group>-<number>`, for example `aetswg-004-0001`. The id is shown in the Code column of the Problems panel and is what you name when you want a diagnostic silenced. Ids are stable: they are never renumbered or reused, so a suppression you commit today keeps meaning the same thing.
+Every diagnostic carries a stable id `aetswg-<group>-<number>` (e.g. `aetswg-004-0001`), shown in the Problems panel's Code column.
 
 ### Quick fixes
 
-Put the cursor on a reported problem and open the lightbulb (`Ctrl+.`). Every diagnostic offers the same four scopes, narrowest first, and the fix writes the comment for you:
+`Ctrl+.` on a problem offers four scopes, narrowest first, none preselected:
 
 - **Suppress ... for this line**
-- **Suppress ... for this `<Unit>` / function / chapter** - only offered when there is one to attach it to
+- **Suppress ... for this `<Unit>` / function / chapter** - only with an enclosing declaration
 - **Suppress ... in this file**
 - **Suppress ... across the project**
 
-None of them is marked as the preferred fix, so `Ctrl+.` followed by `Enter` never silences a problem by accident.
-
 ### Writing directives by hand
-
-A directive is an ordinary comment in whichever language the file is:
 
 | Language | Comment form |
 |---|---|
@@ -205,29 +235,25 @@ A directive is an ordinary comment in whichever language the file is:
 | Lua | `-- aetswg:suppress aetswg-004-0001` |
 | Story dialog (`.txt`) | `# aetswg:suppress aetswg-004-0001` |
 
-Three keywords select the scope:
-
 | Keyword | Covers |
 |---|---|
 | `aetswg:suppress` | the next element (XML), statement (Lua), or command line (dialog) |
 | `aetswg:suppress-object` | the enclosing object element, function, or `[CHAPTER n]` section |
-| `aetswg:suppress-file` | the whole file, wherever in it the comment sits |
+| `aetswg:suppress-file` | the whole file |
 
-A directive may sit inside a longer comment, so a note to your future self can share the line. If the thing a scope points at does not exist - an `-object` directive outside any object, or a trailing directive with nothing after it - it covers only its own line rather than silently spreading to the rest of the file.
+A directive may share a longer comment. A scope with no target (an `-object` directive outside any object, a trailing directive) covers its own line only.
 
-Project-wide suppressions are not comments. They live in `.aetswg/suppressions.json` at the project root, written by the **across the project** quick fix. Commit that file: it is part of the project, like the `.pgproj` itself.
+Project-wide suppressions live in `.aetswg/suppressions.json`, written by the **across the project** quick fix. Commit that file.
 
 ### Lists, wildcards, and reasons
 
-One directive can name several ids, separated by commas, and can carry a reason after `reason::`:
+Several ids per directive, comma-separated; a note after `reason::`:
 
 ```xml
 <!-- aetswg:suppress aetswg-010-0002, aetswg-010-0003 reason:: deliberate shadow, cleared with the art team -->
 ```
 
-Everything after `reason::` is free text to the end of the comment, so commas in it are prose rather than more ids. The reason is for whoever reads the file next; the server does not act on it.
-
-A `*` in place of the number silences a whole group - `aetswg-004-*` turns off every asset-file check, which is the usual way to say "stop checking whether these files exist yet":
+`*` in place of the number silences a group, e.g. `aetswg-004-*` for every asset-file check:
 
 | Group | Covers |
 |---|---|
@@ -245,72 +271,143 @@ A `*` in place of the number silences a whole group - `aetswg-004-*` turns off e
 | `aetswg-012-*` | Syntax errors |
 | `aetswg-013-*` | Suppression comments themselves |
 
-Groups describe the kind of problem, not the language it was found in, so `aetswg-001-*` covers unresolved references in XML and in Lua alike.
+Groups classify the problem, not the language: `aetswg-001-*` covers XML and Lua alike.
 
 ### When a directive is wrong
 
-A directive that names something unreadable suppresses nothing, and the server says so rather than leaving you to wonder why the diagnostic is still there:
+- `aetswg-013-0001` - an entry that is not an id or wildcard (typo, or missing leading zeros: `aetswg-4-1` for `aetswg-004-0001`)
+- `aetswg-013-0002` - a directive naming no diagnostic
 
-- `aetswg-013-0001` - an entry that is not an id or a group wildcard (usually a typo, or an id written without its leading zeros: `aetswg-4-1` instead of `aetswg-004-0001`)
-- `aetswg-013-0002` - a directive that names no diagnostic at all
-
-Only the bad entry is rejected. In a list, the ids you got right still take effect. These warnings can themselves be silenced with `aetswg-013-*` if you would rather not see them.
+Only the bad entry is rejected; the rest of the list applies. Silence these with `aetswg-013-*`.
 
 ### `<Override>` is not a suppression
 
-The `<!-- <Override Name="..."/> -->` marker in XML is a different mechanism and is unaffected by any of the above. It declares that shadowing a lower layer is intended, in the spirit of Java's `@Override` - a claim the server checks, rather than a message it hides.
+`<!-- <Override Name="..."/> -->` declares intended shadowing of a lower layer, a claim the server checks. Unaffected by suppression.
 
-Dialog quick fixes are gated by `aet-eaw-edit.features.dialog.codeActions`; every other part of suppression is always on.
+Dialog quick fixes require `aet-eaw-edit.features.dialog.codeActions`; the rest of suppression is always on.
 
 ---
 
 ## Story mode
 
-Campaign story plots are followed from `CampaignFiles.xml` through the plot manifests to the individual `Story_*.xml` thread files, so the whole campaign is understood as one graph rather than a pile of unrelated files. Every part of this is opt-in and still in development - see the story flags in the [feature flags](#feature-flags) reference.
+Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `Story_*.xml` thread files and understood as one graph. Opt-in and in development; see the story flags under [feature flags](#feature-flags).
 
-- **Story navigator** - an *EaWEdit: Story* activity bar view lists every campaign, faction, plot thread, and attached Lua script; suspended threads are marked, and clicking one opens the file
-- **Story graph panel** - an auto-laid-out view of the campaign's event flow with AND/OR junctions, cross-file portals, and tactical plots. Node colours track lifecycle (inactive, waiting, armed, fired, disabled), unreachable events are dimmed, and schema-untested types get dashed borders. Filter by name, branch, lifecycle, or what is reachable from a given event
-- **Editing in the graph** - in Edit mode, drag a connection between two events to add a prerequisite, drop event and reward types onto a node from the palette, and edit names, params, branch, perpetual, and dialog in place. Changes are staged and applied together on save as a normal `workspace/applyEdit`, so undo and open-editor sync work as usual. Edits are minimal - comments and formatting outside the touched lines survive byte for byte - and inserted tags follow the engine's documented order
-- **Campaign diagnostics** - prerequisites that dangle or form a cycle, duplicate event names, ambiguous campaign-global targets, events that can never fire, and suspended plots nothing ever activates
-- **Cross-language symbols** - story event names, flags, and AI-notification ids are indexed across XML and Lua. Go to definition works from a `Prereq` token to the event block, and from a `STORY_AI_NOTIFICATION` id to the Lua `Story_Event("...")` call that fires it. `F2` renames a story symbol across every thread and script at once
-- **Dialog scripts** - `.txt` dialog scripts declared in the `.pgproj` get their own diagnostics, inlay hints showing the localisation text behind each `TEXT` and `TITLE` line, and go to definition on speech, movie, and sound arguments
+- **Campaign Editor view**
+  - Campaigns, factions, plot threads and attached Lua scripts
+  - Suspended threads marked
+  - Click opens the file
+- **Story graph**
+  - Auto-laid-out event flow with AND/OR junctions, cross-file portals and tactical plots
+  - Node colour by lifecycle: inactive, waiting, armed, fired, disabled
+  - Unreachable events dimmed; schema-untested types dashed
+  - Filters: name, branch, lifecycle, the incoming or outgoing chain of one event
+- **Colour key** - flyout keying node, border and edge styles, including per-branch hues on zoomed-out nodes
+- **Editing** (Edit mode)
+  - Drag a prerequisite between events
+  - Drop event and reward types from the palette
+  - Edit names, params, branch, perpetual and dialog in place
+  - Staged and applied on save as one `workspace/applyEdit`; minimal edits; inserted tags in the engine's order
+- **Large campaigns** - lightweight overview when zoomed out, real nodes only for the visible part; 1000+ events stay responsive
+- **Campaign diagnostics**
+  - Dangling or cyclic prerequisites
+  - Duplicate event names
+  - Ambiguous campaign-global targets
+  - Events that can never fire
+  - Suspended plots nothing activates
+  - Problems bar can follow the branch filter; jumping to a hidden problem lifts it
+- **Cross-language symbols**
+  - Event names, flags and AI-notification ids indexed across XML and Lua
+  - Go to definition from `Prereq` tokens and `STORY_AI_NOTIFICATION` ids to the Lua `Story_Event("...")` call
+  - `F2` renames across threads and scripts
+- **Dialog scripts** (`.txt` scripts declared in the `.pgproj`)
+  - Diagnostics
+  - Inlay hints with the localisation text of `TEXT` and `TITLE` lines
+  - Go to definition on speech, movie and sound arguments
 
-Files that come from a dependency or the base game are read-only; the editor tells you to copy them into your project first. Node positions you arrange by hand persist per campaign in `.aetswg/story-layout.json`.
+Dependency and base-game files are read-only. Hand-arranged node positions persist per campaign in `.aetswg/story-layout.json`.
+
+---
+
+## Model preview
+
+Flag: `aet-eaw-edit.features.tools.modelPreview` (on by default).
+
+- **Alamo Model Preview** editor for `.alo` models and `.ala` animations; the file only, no XML
+- **Preview Assembled Unit** (command and GameObject code lens) - the unit as the game builds it
+  - Hardpoints on their attachment bones
+  - Movable turrets
+  - Firing arcs
+  - Team colour
+- **Model lens**
+  - Model tree with per-part visibility
+  - LOD and ALT levels
+  - Skeleton, cameras, info inspector
+  - Scene and light settings
+- **Animation lens**
+  - Clip library by family, action and take
+  - The game's loop rule: idle repeats, death does not
+  - Transport, playback speed
+- **Gameplay lens**
+  - Attacker weapons and abilities against the unit
+  - Shields and hardpoint health
+  - Destroy and repair hardpoints, with damage smoke and death clone
+  - Damage log naming the armour type per hit
+- **Particles** - effects, groups and emitters of a particle system
+- **Saved shots** - captures kept in a set
+- **Handoff** - *Open in AloViewer* and *Open in Particle Editor* via `aet-eaw-edit.tools.aloViewerExecutable` and `aet-eaw-edit.tools.particleEditorExecutable`
+- **Shaders** - **Set Up Base Shader Sources** fetches Petroglyph's published shader sources into `aet-eaw-edit.shaders.directory`; never redistributed
+- **Game models** - require `aet-eaw-edit.lsp.source.baseGameDirectory` and, for Forces of Corruption, `expansionDirectory`
+- **Energy pool** - behind `aet-eaw-edit.features.preview.energyPool`, off on purpose: the engine implements it, the shipped game disables it
+- **Not covered** - sounds and animation SFX maps; AloViewer remains the tool for those
+
+---
+
+## Encyclopedia preview
+
+Flag: `aet-eaw-edit.features.tools.encyclopedia` (on by default). Read-only.
+
+- **Preview Encyclopedia Popup** (command and GameObject code lens) - the in-game tooltip card
+  - Icon, name, class line
+  - `Encyclopedia_Text` wrapped as the game wraps it
+  - Ship names from the game's tables
+  - Faction switch
+- **Language** - `aet-eaw-edit.lsp.localisation.language` (the game's language, not the extension's)
+- **Icons** - from the mega texture
+  - Game icons baked into the baseline
+  - A project's own `mt_commandbar` (`.pgproj` `icons`) replaces them wholesale
+  - Missing everywhere: error
+  - In sources but not in the mega texture: warning to rebuild
 
 ---
 
 ## Localisation editor
 
-Localisation files declared in the `.pgproj` are listed in the **EaWEdit: Localisation** activity
-bar view, grouped into **Text files** and **Credits files**. Opening one from the tree gives a Key
-by Language table in its own editor tab, so it can be split, moved to another column, or kept open
-beside the XML that references its keys. One tab per file; two files can sit side by side.
+Flag: `aet-eaw-edit.features.tools.localisation`. **Localisation Editor** activity bar view, files grouped into **Text files** and **Credits files**; one grid tab per file, splittable side by side.
 
-- **Editing** - edit any cell in the grid. Changes are staged, shown as a count on the **Save**
-  button, and written only when you save
-- **Validate** - checks the staged changes without writing. Duplicate and empty keys are errors in
-  a text file and expected in a credits file, so they are not reported there
-- **Rows** - add, delete and reorder rows; reordering is offered on credits files, where position
-  carries meaning
-- **Add Language** - adds a language column from the game's official language list
-- **Filter** - the box in the right-hand dock filters rows by plain text, wildcard (`*`, `?`) or
-  regular expression, scoped to keys, one language, or everything
-- **Export DAT** - from the file's context menu in the tree
-- **New project** - creates a localisation file pre-populated from the EaW + FoC baseline, or
-  imports existing files
+- **Editing** - staged edits, count on **Save**, one all-or-nothing write; refused if the file changed on disk
+- **Validate** - without writing; duplicate and empty keys are errors in text files, expected in credits files
+- **Rows** - right-click menu: add and delete; reorder on credits files
+- **Add language** - from the game's language list, for formats that hold more than one
+- **Fill language** - from another language or from the game's own translations
+- **Inherited rows** - hidden by default, **Inherited** toggle shows them; **Reset to inherited value** on overridden rows
+- **Filter** - plain text, wildcard (`*`, `?`) or regex; scoped to keys, one language or everything
+- **Columns** - language columns chosen from the header gear; empty languages hidden at first
+- **Export to DAT** and **Convert to another format** - from the file's context menu; conversion keeps the original
+- **New project** - initialise from the EaW + FoC baseline, or import existing files
 
-A save rewrites only the rows you changed - untouched rows keep their original quoting, comments and
-line endings - and is refused if the file changed on disk since the tab loaded it.
+Saves rewrite changed rows only; untouched rows keep quoting, comments and line endings.
 
 ### Credits files
 
-A credits file is ordered and may repeat a key: it is the running list the end-credits crawl reads,
-not a lookup table. Rows are addressed by position rather than by key, so duplicates, blank spacer
-rows and order all survive editing. Credits files also get a **Preview crawl** button, which plays
-the staged rows as scrolling end credits.
+Ordered lists that may repeat a key. Rows are addressed by position, so duplicates, spacer rows and order survive editing.
 
-Files are recognised by the engine's naming - anything beginning with `credits`. A project that
-names them differently can say so:
+- Line kinds, offered as tiles to drag into the table:
+  - `HEADER` - label
+  - `CENTER` - name
+  - `[TBL]` - blank spacer
+- **Open Credits Preview to the Side** and **Play Credits Crawl Full Screen** play the staged rows as the game does
+
+Detection: engine naming (`credits*`), or in the `.pgproj`:
 
 ```jsonc
 "localisation": {
@@ -324,31 +421,44 @@ names them differently can say so:
 }
 ```
 
-Use `none` when a project's ordinary text file happens to be named like a credits file. Each project
-reads one localisation format, so a CSV project's credits file is expected to be a `.csv`; compiled
-`.dat` files are an export target, not editable.
+One format per project: a CSV project's credits file is a `.csv`. `"type": "DAT"` projects edit compiled `.dat` files directly (language from the file name, sort order preserved). **Set Localisation Project Format** changes the format from the editor.
 
 ---
 
 ## Commands
 
-Available from the Command Palette (`Ctrl+Shift+P`):
+Command Palette (`Ctrl+Shift+P`). Commands of a flagged feature are greyed out until the flag is on.
 
-| Command | Description |
-|---|---|
-| EaWEdit: New Mod Project | Creates a new `.pgproj` and initial directory structure |
-| EaWEdit: Reload Mod Project | Re-reads the `.pgproj` and re-indexes the workspace |
-| EaWEdit: Re-validate Workspace | Re-runs all diagnostics across indexed files |
-| EaWEdit: Restart LSP Server | Stops and restarts the language server |
-| EaWEdit: Initialise Localisation Project from Baseline | Creates a starter localisation file from the game baseline. Requires `aet-eaw-edit.features.tools.localisation` |
-| EaWEdit: Import Existing Localisation Files | Adopts existing CSV, XML, Properties, or DAT translation files into the `.pgproj`. Requires `aet-eaw-edit.features.tools.localisation` |
-| EaWEdit: Show Effective Object (Variant Inheritance) | Opens a read-only view of the fully resolved XML for a variant object. Requires `aet-eaw-edit.features.tools.variants` |
-| EaWEdit: Open Story Graph | Opens the story graph panel for a campaign. Requires `aet-eaw-edit.features.tools.storyEditor` and `aet-eaw-edit.features.story.discovery` |
-| EaWEdit: Refresh Story Navigator | Re-reads the campaign story chain and rebuilds the navigator tree. Requires `aet-eaw-edit.features.tools.storyEditor` and `aet-eaw-edit.features.story.discovery` |
-| EaWEdit: Refresh Lua Scripts | Reloads the Lua Scripts view's list from the game. Requires `aet-eaw-edit.features.lua.debugger` and an active Lua debug session |
-| EaWEdit: Refresh Script Threads | Reloads one script's coroutine threads from the game. Inline on a script row of the Lua Scripts view |
-| EaWEdit: Break in Script | Stops the game at the next Lua line the script runs. Inline on a script row; greyed out while a script is stopped or a break is already waiting |
-| EaWEdit: Break in Thread | Stops the game at the next Lua line one coroutine thread of a script runs. Inline on a thread row; greyed out under the same conditions |
+| Command | Description | Flag |
+|---|---|---|
+| EaWEdit: New Mod Project | Creates a `.pgproj` and initial directories | - |
+| EaWEdit: Reload Mod Project | Re-reads the `.pgproj`, re-indexes | - |
+| EaWEdit: Re-validate Workspace | Re-runs diagnostics in every language | - |
+| EaWEdit: Restart LSP Server | Restarts the language server | - |
+| EaWEdit: Show Effective Object (Variant Inheritance) | Merged XML of a variant object | `tools.variants` |
+| EaWEdit: Preview Model | Opens a model by file name, without XML | `tools.modelPreview` |
+| EaWEdit: Preview Assembled Unit | Opens the GameObject under the cursor, assembled from the XML | `tools.modelPreview` |
+| EaWEdit: Set Up Base Shader Sources | Fetches the shader sources into `aet-eaw-edit.shaders.directory` | `tools.modelPreview` |
+| EaWEdit: Preview Encyclopedia Popup | The encyclopedia card of the GameObject under the cursor | `tools.encyclopedia` |
+| EaWEdit: Open Story Graph | A faction's story graph | `tools.storyEditor`, `story.discovery` |
+| EaWEdit: Refresh Story Navigator | Rebuilds the campaign tree | `tools.storyEditor`, `story.discovery` |
+| EaWEdit: New Localisation Project | Initialise from baseline, or import | `tools.localisation` |
+| EaWEdit: Initialise Localisation Project from Baseline | Starter file from the game baseline | `tools.localisation` |
+| EaWEdit: Import Existing Localisation Files | Adopts CSV, XML, Properties or DAT files | `tools.localisation` |
+| EaWEdit: Set Localisation Project Format | Writes `localisation.type` | `tools.localisation` |
+| EaWEdit: Open Localisation Editor | Grid tab for a file | `tools.localisation` |
+| EaWEdit: Open Localisation File as Text | Plain text editor for a file | `tools.localisation` |
+| EaWEdit: Refresh Localisation Files | Re-reads the project's files | `tools.localisation` |
+| EaWEdit: Convert Localisation File to Another Format | CSV, XML, Properties or DAT | `tools.localisation` |
+| EaWEdit: Export Localisation to DAT | Compiled `.dat` for a file | `tools.localisation` |
+| EaWEdit: Open Credits Preview to the Side | Credits crawl beside the editor | `tools.localisation` |
+| EaWEdit: Play Credits Crawl Full Screen | Credits crawl over the editor | `tools.localisation` |
+| EaWEdit: Refresh Lua Scripts | Reloads the Lua Scripts view from the game | `lua.debugger`, active session |
+| EaWEdit: Refresh Script Threads | Reloads one script's threads (inline) | `lua.debugger`, active session |
+| EaWEdit: Break in Script | Break at the script's next Lua line (inline) | `lua.debugger`, game running |
+| EaWEdit: Break in Thread | Break at the thread's next Lua line (inline) | `lua.debugger`, game running |
+
+Flag column: the feature-flag id without its common prefix.
 
 ---
 
@@ -360,25 +470,52 @@ Available from the Command Palette (`Ctrl+Shift+P`):
 |---|---|---|
 | `aet-eaw-edit.lsp.enabled` | `false` | Enable the language server |
 | `aet-eaw-edit.lsp.executable` | _(empty)_ | Path to `PG.StarWarsGame.LSP.Server.exe` |
-| `aet-eaw-edit.lsp.locale` | `en` | Language for hover text and diagnostics (`en`, `de`, `fr`, `es`, `it`, `pl`, `ru`) |
+| `aet-eaw-edit.lsp.locale` | `en` | Language of hover text and diagnostics (`en`, `de`, `fr`, `es`, `it`, `pl`, `ru`) |
+| `aet-eaw-edit.lsp.localisation.language` | `ENGLISH` | Game language for displayed localisation text (hovers, inlay hints, encyclopedia card) |
+| `aet-eaw-edit.lsp.debug.traceServer` | `off` | `messages` or `verbose`: LSP traffic in the EaWEdit output channel |
+
+### Game installation and external tools
+
+Never searched for; used only once set.
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.lsp.source.baseGameDirectory` | _(empty)_ | Empire at War install; models, textures and string table that ship with the game |
+| `aet-eaw-edit.lsp.source.expansionDirectory` | _(empty)_ | Forces of Corruption install, searched alongside the base game |
+| `aet-eaw-edit.tools.aloViewerExecutable` | _(empty)_ | `AloViewer.exe`, for *Open in AloViewer* |
+| `aet-eaw-edit.tools.particleEditorExecutable` | _(empty)_ | `ParticleEditor.exe`, for *Open in Particle Editor* |
+| `aet-eaw-edit.shaders.directory` | _(empty)_ | Base game shader sources (`.fx`) for the preview; filled by *Set Up Base Shader Sources* or your own copy |
+| `aet-eaw-edit.shaders.sourceUrl` | _(empty)_ | Download location for *Set Up Base Shader Sources*; empty = Petroglyph's published download |
+| `aet-eaw-edit.modVerify.enabled` | `false` | ModVerify integration |
+| `aet-eaw-edit.modVerify.executable` | _(empty)_ | [ModVerify](https://github.com/AlamoEngine-Tools/ModVerify/releases) executable |
 
 ### Schema
 
-The schema describes the complete EaW/FoC XML format. It is fetched from GitHub when the server starts and cached between restarts using HTTP ETags, so only changed files are re-downloaded. You can switch to a local copy via the settings below if you prefer to work offline or pin a specific version.
+The EaW/FoC XML schema, fetched from GitHub on server start and cached with ETags; a local copy for offline or pinned use.
 
 | Setting | Default | Description |
 |---|---|---|
-| `aet-eaw-edit.lsp.schema.source` | `http` | `http` to fetch from GitHub; `local` to use a local directory |
-| `aet-eaw-edit.lsp.schema.localPath` | _(empty)_ | Path to a local `schema/eaw/` directory (only when source is `local`) |
+| `aet-eaw-edit.lsp.schema.source` | `http` | `http` (GitHub) or `local` |
+| `aet-eaw-edit.lsp.schema.localPath` | _(empty)_ | Local `schema/eaw/` directory (source `local`) |
+| `aet-eaw-edit.lsp.schema.url` | _(empty)_ | Custom schema index URL (source `http`) |
 
 ### Baseline
 
-The baseline is a pre-built snapshot of all vanilla EaW and FoC game objects and localisation keys. It is downloaded once and stored in `%USERPROFILE%\.pg-swg-lsp\baselines\`. The cached file is only re-downloaded when a new version is available. The baseline powers cross-file reference validation and the Inherited toggle in the localisation editor.
+Snapshot of all vanilla EaW and FoC objects and localisation keys, downloaded once to `%USERPROFILE%\.pg-swg-lsp\baselines\` and refreshed on new versions. Powers reference validation and the Inherited toggle.
 
 | Setting | Default | Description |
 |---|---|---|
-| `aet-eaw-edit.lsp.source.baseline.type` | `http` | `http` to download automatically; `local` for a local file; `none` to disable entirely |
-| `aet-eaw-edit.lsp.source.baseline.localPath` | _(empty)_ | Path to a local baseline file (only when type is `local`) |
+| `aet-eaw-edit.lsp.source.baseline.type` | `http` | `http`, `local` or `none` |
+| `aet-eaw-edit.lsp.source.baseline.localPath` | _(empty)_ | Local baseline file (type `local`) |
+| `aet-eaw-edit.lsp.source.baseline.url` | _(empty)_ | Custom baseline URL (type `http`) |
+
+### Development
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.lsp.devMode.enabled` | `false` | Start the server from source with `dotnet run --project` |
+| `aet-eaw-edit.lsp.devMode.projectPath` | _(empty)_ | `PG.StarWarsGame.LSP.Server.csproj` for dev mode |
+| `aet-eaw-edit.lsp.debug.waitForDebugger` | `false` | Start the server with `--wait-for-debugger` |
 
 ### Localisation editor
 
@@ -388,19 +525,19 @@ The baseline is a pre-built snapshot of all vanilla EaW and FoC game objects and
 
 ### Lua debugger
 
-Only read when `aet-eaw-edit.features.lua.debugger` is enabled. A `launch.json` attribute of the same meaning overrides the setting for that configuration.
+Read only with `aet-eaw-edit.features.lua.debugger` on; a `launch.json` attribute overrides the setting of the same meaning.
 
 | Setting | Default | Description |
 |---|---|---|
-| `aet-eaw-edit.game.executable` | _(empty)_ | Path to the debug `StarWarsI.exe` the Lua debugger launches. A retail build has no Lua debug server |
-| `aet-eaw-edit.game.arguments` | `[]` | Extra command-line arguments for the game when the Lua debugger launches it, placed before the mod chain |
-| `aet-eaw-edit.game.luaDebugHost` | `127.0.0.1` | The machine running the game. The debugger talks to it over UDP |
-| `aet-eaw-edit.game.luaDebugPort` | `1234` | The game's Lua debug UDP port. The game takes the first free port from 1234 upward |
-| `aet-eaw-edit.game.unsafeTableExpansion` | `false` | Allows expanding table values in the Variables view. The game is reported to crash on a table member whose text is 255 bytes or longer |
+| `aet-eaw-edit.game.executable` | _(empty)_ | Debug `StarWarsI.exe` for launch; retail builds have no debug server |
+| `aet-eaw-edit.game.arguments` | `[]` | Extra game arguments, before the mod chain |
+| `aet-eaw-edit.game.luaDebugHost` | `127.0.0.1` | Machine running the game (UDP) |
+| `aet-eaw-edit.game.luaDebugPort` | `1234` | Lua debug UDP port; the game takes the first free port from 1234 upward |
+| `aet-eaw-edit.game.unsafeTableExpansion` | `false` | Expand tables in the Variables view; the game is reported to crash on member text of 255 bytes or more |
 
 ### Feature flags
 
-Every language feature can be independently enabled or disabled. Defaults are given per flag in the tables below; the still-in-development capabilities are marked. **Changing a feature-flag setting the language server reads automatically restarts it.** The editor-side flags say so in their own note and take effect at once.
+Every feature has a flag. Work-in-progress features default to off. A flag the language server reads restarts it on change; editor-side flags apply at once.
 
 XML:
 
@@ -408,15 +545,15 @@ XML:
 |---|---|---|
 | `aet-eaw-edit.features.xml.completion` | `true` | Code completion |
 | `aet-eaw-edit.features.xml.hover` | `true` | Hover tooltips |
-| `aet-eaw-edit.features.xml.diagnostics` | `true` | Diagnostics (error and warning squiggles) |
+| `aet-eaw-edit.features.xml.diagnostics` | `true` | Diagnostics |
 | `aet-eaw-edit.features.xml.goToDefinition` | `true` | Go to definition |
 | `aet-eaw-edit.features.xml.findReferences` | `true` | Find all references |
 | `aet-eaw-edit.features.xml.rename` | `true` | Symbol rename |
 | `aet-eaw-edit.features.xml.codeLens` | `true` | Code lenses (reference counts, variant links) |
 | `aet-eaw-edit.features.xml.inlayHints` | `true` | Inlay hints |
 | `aet-eaw-edit.features.xml.codeActions` | `true` | Code actions (quick fixes) |
-| `aet-eaw-edit.features.xml.linkedEditing` | `true` | Linked editing of matching tag pairs (needs `editor.linkedEditing`) |
-| `aet-eaw-edit.features.xml.autoCloseTag` | `true` | Auto-insert the closing tag when typing `>` (needs `editor.formatOnType`) |
+| `aet-eaw-edit.features.xml.linkedEditing` | `true` | Linked editing of tag pairs (needs `editor.linkedEditing`) |
+| `aet-eaw-edit.features.xml.autoCloseTag` | `true` | Auto-close tag on `>` (needs `editor.formatOnType`) |
 
 Lua:
 
@@ -426,112 +563,88 @@ Lua:
 | `aet-eaw-edit.features.lua.hover` | `false` | Hover tooltips _(work in progress)_ |
 | `aet-eaw-edit.features.lua.diagnostics` | `false` | Diagnostics _(work in progress)_ |
 | `aet-eaw-edit.features.lua.goToDefinition` | `true` | Go to definition |
-| `aet-eaw-edit.features.lua.rename` | `true` | Symbol rename, including global rename of XML objects referenced from Lua |
+| `aet-eaw-edit.features.lua.rename` | `true` | Symbol rename, including XML objects referenced from Lua |
 | `aet-eaw-edit.features.lua.codeLens` | `true` | Code lenses |
 | `aet-eaw-edit.features.lua.inlayHints` | `true` | Inlay hints |
 | `aet-eaw-edit.features.lua.codeActions` | `true` | Code actions (quick fixes) |
-| `aet-eaw-edit.features.lua.debugger` | `false` | The Lua debugger: the _Empire at War Lua_ debug type, the Lua Scripts view and the `aet-eaw-edit.game.*` settings _(work in progress)_ |
+| `aet-eaw-edit.features.lua.debugger` | `false` | Lua debugger: debug type, Lua Scripts view, `aet-eaw-edit.game.*` _(work in progress)_ |
 
 Story mode:
 
 | Setting | Default | Description |
 |---|---|---|
-| `aet-eaw-edit.features.story.discovery` | `false` | Follows the campaign story chain (campaigns to plot manifests to thread files) and types those files, activating story parameter validation and completion. Every other story flag builds on this one _(work in progress)_ |
-| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign story analysis: dangling and cyclic prerequisites, duplicate event names, ambiguous campaign-global targets, events that can never fire, suspended plots nothing activates, tag-order deviations, and over-long flag names _(work in progress)_ |
-| `aet-eaw-edit.features.story.symbols` | `false` | Indexes story event names, flags, and AI-notification ids across XML and Lua, enabling hover, go to definition, and find all references on them _(work in progress)_ |
-| `aet-eaw-edit.features.story.rename` | `false` | Cross-language rename of story events, flags, and notification ids in one workspace edit. Builds on story symbols _(work in progress)_ |
+| `aet-eaw-edit.features.story.discovery` | `false` | Follows the campaign story chain and types its files; base of every other story flag _(work in progress)_ |
+| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign analysis: dangling and cyclic prerequisites, duplicate event names, ambiguous targets, unreachable events, orphaned suspended plots, tag order, over-long flag names _(work in progress)_ |
+| `aet-eaw-edit.features.story.symbols` | `false` | Story event names, flags and AI-notification ids indexed across XML and Lua _(work in progress)_ |
+| `aet-eaw-edit.features.story.rename` | `false` | Cross-language rename of story symbols; builds on story symbols _(work in progress)_ |
 
-Story dialog:
-
-| Setting | Default | Description |
-|---|---|---|
-| `aet-eaw-edit.features.dialog.diagnostics` | `false` | Diagnostics for dialog `.txt` scripts: unknown commands, argument count and type errors, untested-command warnings, and reference checks for localisation keys, speech events, movies, and sound events _(work in progress)_ |
-| `aet-eaw-edit.features.dialog.inlayHints` | `false` | Shows the referenced localisation text at the end of `TEXT` and `TITLE` lines, or a MISSING marker for unknown keys _(work in progress)_ |
-| `aet-eaw-edit.features.dialog.goToDefinition` | `false` | Go to definition from `DIALOG`, `MOVIE`/`MOVIE_ONCE`, and `SFX` arguments to the defining XML object _(work in progress)_ |
-
-> Dialog flags apply only to `.txt` files under the folders declared in the `.pgproj` `directories.storyDialog` node - filename conventions play no part.
-
-Cross-language tools:
+Story dialog (`.txt` files under `directories.storyDialog` only):
 
 | Setting | Default | Description |
 |---|---|---|
-| `aet-eaw-edit.features.tools.localisation` | `false` | Localisation tooling: the localisation editor's data source, the initialise/import commands, and the create-key code action _(work in progress)_ |
-| `aet-eaw-edit.features.tools.storyEditor` | `false` | The story navigator and the story graph panel, in read-only View mode. Builds on `aet-eaw-edit.features.story.discovery` _(work in progress)_ |
-| `aet-eaw-edit.features.tools.storyEditing` | `false` | Edit mode in the story graph panel: staging, previewing, validating, and writing story changes. Without it the panel is read-only and Edit is not offered by the mode switch. Builds on `aet-eaw-edit.features.tools.storyEditor` _(work in progress)_ |
-| `aet-eaw-edit.features.tools.variants` | `true` | Variant-inheritance tooling: the Show Effective Object command and its code lens |
+| `aet-eaw-edit.features.dialog.diagnostics` | `false` | Unknown commands, argument errors, untested commands, reference checks _(work in progress)_ |
+| `aet-eaw-edit.features.dialog.inlayHints` | `false` | Localisation text after `TEXT` and `TITLE` lines _(work in progress)_ |
+| `aet-eaw-edit.features.dialog.goToDefinition` | `false` | From `DIALOG`, `MOVIE`/`MOVIE_ONCE` and `SFX` arguments to the XML object _(work in progress)_ |
+| `aet-eaw-edit.features.dialog.codeActions` | `false` | Suppression quick fixes in dialog scripts _(work in progress)_ |
 
-Preview and encyclopedia:
+Tools:
 
 | Setting | Default | Description |
 |---|---|---|
-| `aet-eaw-edit.features.tools.modelPreview` | `true` | The 3D model preview: opening an `.alo` shows the model, and a GameObject can be previewed with its hardpoints mounted. Models that ship with the game are only reachable once `aet-eaw-edit.lsp.source.baseGameDirectory` is set |
-| `aet-eaw-edit.features.tools.encyclopedia` | `true` | The encyclopedia popup preview: the _Preview Encyclopedia Popup_ command and its code lens |
-| `aet-eaw-edit.features.preview.energyPool` | `false` | The energy pool in the model preview: its bar under the ability bar, its row in the target readout, and the `Projectile_Does_Energy_Damage` switch on the attacker. **Off on purpose** - the energy mechanic is implemented in the engine and works, but the shipped game disables it and offers no interface for it, so nothing you author against it is visible to a player unless you have enabled it yourself |
+| `aet-eaw-edit.features.tools.localisation` | `false` | Localisation editor, initialise and import commands, create-key code action _(work in progress)_ |
+| `aet-eaw-edit.features.tools.storyEditor` | `false` | Campaign Editor view and story graph in View mode; builds on `story.discovery` _(work in progress)_ |
+| `aet-eaw-edit.features.tools.storyEditing` | `false` | Edit mode in the story graph; builds on `tools.storyEditor` _(work in progress)_ |
+| `aet-eaw-edit.features.tools.variants` | `true` | Show Effective Object and its code lens |
+| `aet-eaw-edit.features.tools.modelPreview` | `true` | Model preview; game models need `aet-eaw-edit.lsp.source.baseGameDirectory` |
+| `aet-eaw-edit.features.tools.encyclopedia` | `true` | Encyclopedia popup preview and its code lens |
+| `aet-eaw-edit.features.preview.energyPool` | `false` | Energy pool in the preview (editor-side, no restart). Off on purpose: the shipped game disables the mechanic |
 
-> `aet-eaw-edit.features.preview.energyPool` is read by the editor rather than the language server. It takes effect immediately in any preview already open, and needs no restart. `Energy_Capacity` and `Projectile_Does_Energy_Damage` are read from your files either way - the setting decides only whether the preview shows them.
-
-> The localisation views follow `aet-eaw-edit.features.tools.localisation` alone. Feature flags are read at startup, so restart the server after changing it.
-
-> The story graph panel's Simulation mode is still unfinished and is deliberately absent from this list and from the settings UI. It is reachable by adding `"aet-eaw-edit.features.tools.storySimulator": true` to `settings.json` by hand; the mode switch then offers it.
+> The story graph's Simulation mode is unfinished and absent from the settings UI; `"aet-eaw-edit.features.tools.storySimulator": true` in `settings.json` enables it.
 
 ---
 
 ## What this extension downloads
 
-This extension contacts external servers only for the two data sources described above. Nothing else is sent or received.
+Three data sources; nothing else is sent or received. No telemetry.
 
 | What | Where | When | How to disable |
 |---|---|---|---|
-| XML schema | GitHub (raw content) | On each server start; individual files only re-fetched when changed (ETag caching) | Set `aet-eaw-edit.lsp.schema.source` to `local` |
-| Game baseline | Configured URL (default: GitHub releases) | Once on first use; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\`; only refreshed when a new version is available | Set `aet-eaw-edit.lsp.source.baseline.type` to `local` or `none` |
-
-No usage data, telemetry, or crash reports are sent.
+| XML schema | GitHub (raw content) | On server start; changed files only (ETag caching) | `aet-eaw-edit.lsp.schema.source` = `local` |
+| Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\`; refreshed on new versions | `aet-eaw-edit.lsp.source.baseline.type` = `local` or `none` |
+| Shader sources | Petroglyph's published download, or `aet-eaw-edit.shaders.sourceUrl` | Only on **Set Up Base Shader Sources** | Do not run the command; set `aet-eaw-edit.shaders.directory` to your own copy |
 
 ---
 
 ## Troubleshooting
 
-**No diagnostics appear**
-Confirm `aet-eaw-edit.lsp.enabled` is `true` and `aet-eaw-edit.lsp.executable` points to `PG.StarWarsGame.LSP.Server.exe`. Run EaWEdit: Restart LSP Server after changing settings.
+**No diagnostics.** `aet-eaw-edit.lsp.enabled` must be `true` and `aet-eaw-edit.lsp.executable` must point to `PG.StarWarsGame.LSP.Server.exe`; then **EaWEdit: Restart LSP Server**.
 
-**"LSP server failed to start" or status bar shows an error**
-Windows may have blocked the server executable because it was downloaded from the internet. Right-click `PG.StarWarsGame.LSP.Server.exe` in Explorer, choose Properties, tick **Unblock** at the bottom of the General tab, then click OK. After unblocking, restart the server with EaWEdit: Restart LSP Server. If it still fails, click **Show Output** in the error notification to see the full error in the EaWEdit output channel.
+**"LSP server failed to start".** Windows may have blocked the downloaded executable: Properties > **Unblock** on `PG.StarWarsGame.LSP.Server.exe`, then restart the server. Otherwise **Show Output** in the notification.
 
-**Version mismatch warning**
-The server binary and extension must be the same version. Download the matching server from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases).
+**Version mismatch.** Server and extension must match; download the matching server from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases).
 
-**Features only work in some files**
-Only files inside directories listed in your `.pgproj` are indexed. Add the relevant paths to `directories.xml` or `directories.scripts`.
+**Features work in some files only.** Only directories listed in the `.pgproj` are indexed; add the paths to `directories.xml` or `directories.scripts`.
 
-**Notification: "Found multiple .pgproj files under ..."**
-Only one `.pgproj` is supported per opened workspace root. Remove or relocate the extra file(s) named in the notification, or open the specific subfolder that contains the one you want to use, then run EaWEdit: Restart LSP Server.
+**"Found multiple .pgproj files under ...".** One `.pgproj` per workspace root: remove the extras or open the subfolder, then restart the server.
 
-**Notification: "'directories.text'/'directories.textResourceType' were removed"**
-Your `.pgproj` still uses the pre-0.2.0 localisation format. See [Upgrading from 0.1.x](#upgrading-from-01x) for the exact fields to change.
+**"'directories.text'/'directories.textResourceType' were removed".** Pre-0.2.0 `.pgproj`; see [Upgrading from 0.1.x](#upgrading-from-01x).
 
-**The localisation views are not visible**
-Set `aet-eaw-edit.features.tools.localisation` to `true`, then restart the server (`Ctrl+Shift+P` > EaWEdit: Restart LSP Server) - feature flags are read at startup. The localisation tooling is disabled by default while still in development.
+**Localisation views missing.** `aet-eaw-edit.features.tools.localisation` = `true`; the server restarts on the change.
 
-**A command or code action doesn't appear ("Show Effective Object", "Initialise/Import Localisation Project", localisation quick-fixes)**
-These are gated behind feature flags. Confirm `aet-eaw-edit.features.tools.variants` (for variant inheritance) or `aet-eaw-edit.features.tools.localisation` (for localisation tooling) is `true`. Changing either setting restarts the language server automatically.
+**A command or code action is missing.** Its feature flag is off; see the Flag column of the [commands table](#commands).
 
-**"The Lua debugger is disabled" when starting a debug session**
-Set `aet-eaw-edit.features.lua.debugger` to `true`. The debug type is registered either way so that `launch.json` validates, but a session only starts with the flag on.
+**"The Lua debugger is disabled".** `aet-eaw-edit.features.lua.debugger` = `true`. The debug type is always registered so `launch.json` validates; sessions start only with the flag on.
 
-**"The game did not answer on 127.0.0.1:1234 within 60 s"**
-The debugger needs a debug build of the game with its Lua debug server up; a retail build never answers. Start the debug build, open its console and run `luadebug`, then attach. The game takes the first free UDP port from 1234 upward, so a second game instance listens on 1235 - set `aet-eaw-edit.game.luaDebugPort` or `port` in the configuration to match. When the game runs on another machine, allow UDP to that port through its firewall.
+**"The game did not answer on 127.0.0.1:1234 within 60 s".** Debug build with `luadebug` run in its console required; retail builds never answer. A second game instance listens on 1235: set `aet-eaw-edit.game.luaDebugPort` or `port`. Remote machine: allow UDP to that port.
 
-**A breakpoint says "The file is under none of the configured script roots"**
-Breakpoints are sent to the game by the file's path below a script root. The roots default to every project layer's script directories; a file outside them cannot be mapped. Move it under a declared `scripts` directory, or list its root in `sourceRoots` in the configuration.
+**Breakpoint: "The file is under none of the configured script roots".** The file is outside every project layer's script directories; move it, or add its root to `sourceRoots`.
 
-**A launch is refused because a layer is not runnable**
-The game reads a mod folder as-is, so the launch passes it on unchanged. Lay the layer out with its declared directories under `Data/` and no space in the path, or pass the folders you want with `modPaths`. See [Lua debugger](#lua-debugger).
+**Launch refused: layer not runnable.** Declared directories under `Data/` and no space in the path, or pass the folders via `modPaths`. See [Lua debugger](#lua-debugger).
 
-**Viewing raw server output**
-Set `aet-eaw-edit.lsp.debug.traceServer` to `messages` and open the **EaWEdit** output channel in the Output panel.
+**Raw server output.** `aet-eaw-edit.lsp.debug.traceServer` = `messages`; **EaWEdit** output channel.
 
 ---
 
 ## Issues
 
-Report bugs and feature requests at [AlamoEngine-Tools/pg-starwarsgame-lsp/issues](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues).
+[AlamoEngine-Tools/pg-starwarsgame-lsp/issues](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues)
