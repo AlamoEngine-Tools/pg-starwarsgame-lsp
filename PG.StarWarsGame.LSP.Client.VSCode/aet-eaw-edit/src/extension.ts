@@ -267,10 +267,9 @@ function gameDirectory(name: 'baseGameDirectory' | 'expansionDirectory'): string
  * Builds the complete resolved feature-flag object sent to the server via initializationOptions.
  * The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults everything to
  * true; the user-facing off-defaults (lua.hover, lua.diagnostics, tools.localisation,
- * story.discovery) live in package.json, so the fallbacks here must mirror package.json. The one
- * exception is tools.storySimulator, which is intentionally not contributed at all - its fallback
- * below is the only default it has. Flags are restart-based: the config listener in activate()
- * restarts the server when any `aet-eaw-edit.features` value changes.
+ * story.discovery, tools.storySimulator) live in package.json, so the fallbacks here must mirror
+ * package.json. Flags are restart-based: the config listener in activate() restarts the server when
+ * any `aet-eaw-edit.features` value changes.
  */
 function resolveFeatureFlags() {
     const features = cfg('features');
@@ -304,10 +303,6 @@ function resolveFeatureFlags() {
             localisation: flag('tools.localisation', false),
             storyEditor: flag('tools.storyEditor', false),
             storyEditing: flag('tools.storyEditing', false),
-            // Deliberately NOT contributed in package.json: Simulation mode is unfinished, so it is
-            // kept out of the settings UI. Writing the key into settings.json by hand still works
-            // (VS Code returns undeclared values, and the features-wide restart listener still
-            // fires) - that is the escape hatch for trying it out.
             storySimulator: flag('tools.storySimulator', false),
             variants: flag('tools.variants', true),
             encyclopedia: flag('tools.encyclopedia', true),

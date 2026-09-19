@@ -14,8 +14,17 @@ namespace PG.StarWarsGame.LSP.Story.Graph;
 ///     annotations on the <c>StoryEventType</c>/<c>StoryRewardType</c> enums
 ///     (<c>StoryEventName</c> → control, <c>StoryFlag</c> → flag, <c>StoryPlotFile</c> →
 ///     tactical, <c>StoryBranch</c> → control to every branch member) - no hardcoded per-type
-///     switch. Event names resolve campaign-wide (<c>TRIGGER_EVENT</c> is campaign-global);
-///     ambiguity is tracked, not guessed away.
+///     switch.
+///     <para>
+///         Names resolve the way the engine resolves them (measured): a prerequisite, a branch, a
+///         <c>RESET_*</c> target and a <c>DISABLE_*</c> target are looked up in the event's own
+///         subplot - one thread file - and a name the file does not hold is an assert in the game,
+///         so here it is a diagnostic and never an edge. <c>TRIGGER_EVENT</c>, and
+///         <c>DISABLE_STORY_EVENT</c> with a non-zero third parameter, act on the name in EVERY
+///         subplot, so several matches are several edges rather than an ambiguity. The one
+///         ambiguity left is two events of one name in one file, which the engine cannot tell
+///         apart either.
+///     </para>
 /// </summary>
 public sealed class StoryGraphBuilder(ISchemaProvider schema)
 {
@@ -38,9 +47,9 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryEventType")),
             StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryRewardType")));
 
-        // Pass 1: event nodes and the campaign-wide name index. Duplicate names within one file
-        // are a diagnostic elsewhere; here they get deterministic disambiguated ids so the graph
-        // stays well-formed.
+        // Pass 1: event nodes and the name indexes, one campaign-wide and one per thread.
+        // Duplicate names within one file are a diagnostic elsewhere; here they get deterministic
+        // disambiguated ids so the graph stays well-formed.
         var eventNodes = new List<(StoryThread Thread, StoryNode Node)>();
         var idCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var thread in threads)
@@ -57,15 +66,22 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             if (!state.EventsByName.TryGetValue(storyEvent.Name, out var list))
                 state.EventsByName[storyEvent.Name] = list = [];
             list.Add(node);
+            var threadKey = (thread.DocumentUri, storyEvent.Name.ToLowerInvariant());
+            if (!state.EventsByThreadAndName.TryGetValue(threadKey, out var inThread))
+                state.EventsByThreadAndName[threadKey] = inThread = [];
+            inThread.Add(node);
             if (storyEvent.Branch is not null)
             {
-                if (!state.EventsByBranch.TryGetValue(storyEvent.Branch, out var members))
-                    state.EventsByBranch[storyEvent.Branch] = members = [];
+                // Per thread, and case-sensitive: the engine compares branch names with a plain
+                // string equality and only ever walks its own subplot's events.
+                var branchKey = (thread.DocumentUri, storyEvent.Branch);
+                if (!state.EventsByBranch.TryGetValue(branchKey, out var members))
+                    state.EventsByBranch[branchKey] = members = [];
                 members.Add(node);
             }
         }
 
-        // Pass 2: edges (needs the complete name index for campaign-global resolution).
+        // Pass 2: edges (needs the complete name indexes).
         foreach (var (thread, node) in eventNodes)
         {
             var storyEvent = node.Event!;
@@ -191,8 +207,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
 
             foreach (var token in group.Tokens)
             foreach (var source in ResolveEventName(state, thread, token.Text, token.Range,
-                         StoryGraphProblemKind.DanglingPrereq,
-                         $"Prerequisite '{token.Text}' does not match any event in this campaign."))
+                         StoryGraphProblemKind.DanglingPrereq, "Prerequisite", campaignWide: false))
                 state.AddEdge(new StoryEdge(source.Id, groupSinkId, StoryEdgeKind.Prereq));
         }
     }
@@ -213,7 +228,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             switch (refType)
             {
                 case RefStoryEventName:
-                    AddControlEdges(state, thread, node, typeName, slot);
+                    AddControlEdges(state, thread, node, typeName, slot, ReachesEverySubplot(typeName, slots));
                     break;
                 case RefStoryFlag:
                     // Trigger-side flag params are reads, reward-side ones are writes.
@@ -229,7 +244,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
                     state.AddEdge(new StoryEdge(node.Id, tactical.Id, StoryEdgeKind.Tactical, typeName));
                     break;
                 case RefStoryBranch:
-                    if (state.EventsByBranch.TryGetValue(slot.RawValue, out var members))
+                    if (state.EventsByBranch.TryGetValue((thread.DocumentUri, slot.RawValue), out var members))
                         foreach (var member in members)
                             state.AddEdge(new StoryEdge(node.Id, member.Id, StoryEdgeKind.Control, typeName));
                     break;
@@ -237,12 +252,39 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         }
     }
 
+    /// <summary>
+    ///     Measured: <c>TRIGGER_EVENT</c> runs on the name in every subplot; <c>DISABLE_STORY_EVENT</c>
+    ///     does so only when its third parameter parses non-zero (atoi); every other control reward
+    ///     stays inside its own subplot.
+    /// </summary>
+    private static bool ReachesEverySubplot(string typeName, IReadOnlyList<StoryParamSlot> slots)
+    {
+        switch (typeName.ToUpperInvariant())
+        {
+            case "TRIGGER_EVENT":
+                return true;
+            case "DISABLE_STORY_EVENT":
+                var third = slots.FirstOrDefault(s => s.Position == 2)?.RawValue.Trim();
+                return third is not null && LeadingInt(third) != 0;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>atoi: the leading integer of the text, or 0.</summary>
+    private static int LeadingInt(string text)
+    {
+        var end = 0;
+        if (end < text.Length && (text[end] == '-' || text[end] == '+')) end++;
+        while (end < text.Length && char.IsAsciiDigit(text[end])) end++;
+        return int.TryParse(text[..end], out var value) ? value : 0;
+    }
+
     private static void AddControlEdges(BuildState state, StoryThread thread, StoryNode node,
-        string typeName, StoryParamSlot slot)
+        string typeName, StoryParamSlot slot, bool campaignWide)
     {
         foreach (var target in ResolveEventName(state, thread, slot.RawValue, slot.Range,
-                     StoryGraphProblemKind.UnresolvedControlTarget,
-                     $"'{slot.RawValue}' does not match any event in this campaign."))
+                     StoryGraphProblemKind.UnresolvedControlTarget, $"{typeName} target", campaignWide))
             if (target.ThreadUri is { } targetThread && DocumentUris.Same(targetThread, thread.DocumentUri))
             {
                 state.AddEdge(new StoryEdge(node.Id, target.Id, StoryEdgeKind.Control, typeName));
@@ -257,25 +299,50 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             }
     }
 
-    // Campaign-wide, case-insensitive event-name resolution. Zero matches records the given
-    // problem; multiple matches record an ambiguity AND yield every match - the graph shows all
-    // candidates instead of guessing.
+    // Case-insensitive event-name resolution, in the referencing event's own thread unless the
+    // reward reaches every subplot. Zero matches records the given problem - naming the file that
+    // does hold the name, when one does, because that is the fix the author is looking for. Two
+    // events of one name in one file record an ambiguity AND yield both: the graph shows every
+    // candidate instead of guessing, and the engine cannot tell them apart either.
     private static IReadOnlyList<StoryNode> ResolveEventName(BuildState state, StoryThread thread,
-        string name, StorySourceRange range, StoryGraphProblemKind unresolvedKind, string unresolvedMessage)
+        string name, StorySourceRange range, StoryGraphProblemKind unresolvedKind, string what, bool campaignWide)
     {
-        if (!state.EventsByName.TryGetValue(name, out var matches) || matches.Count == 0)
+        var everywhere = state.EventsByName.GetValueOrDefault(name) ?? [];
+        var matches = campaignWide
+            ? everywhere
+            : state.EventsByThreadAndName.GetValueOrDefault((thread.DocumentUri, name.ToLowerInvariant())) ?? [];
+
+        if (matches.Count == 0)
         {
-            state.Problems.Add(new StoryGraphProblem(unresolvedKind, thread.DocumentUri, range,
-                name, unresolvedMessage));
+            var elsewhere = everywhere
+                .Select(n => n.ThreadUri)
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .Select(FileNameOf)
+                .ToList();
+            var message = everywhere.Count == 0
+                ? $"{what} '{name}' does not match any event in this campaign."
+                : $"{what} '{name}' is not an event in this plot file - the engine only looks here and asserts. " +
+                  $"An event of that name is in {string.Join(", ", elsewhere)}.";
+            state.Problems.Add(new StoryGraphProblem(unresolvedKind, thread.DocumentUri, range, name, message));
             return [];
         }
 
-        if (matches.Count > 1)
+        var sameFileTwins = matches
+            .GroupBy(n => n.ThreadUri, StringComparer.Ordinal)
+            .Any(g => g.Count() > 1);
+        if (sameFileTwins)
             state.Problems.Add(new StoryGraphProblem(StoryGraphProblemKind.AmbiguousTarget,
                 thread.DocumentUri, range, name,
-                $"'{name}' matches {matches.Count} events in this campaign - the engine's pick is undefined."));
+                $"'{name}' names more than one event in the same plot file - the engine's pick is undefined."));
 
         return matches;
+    }
+
+    private static string FileNameOf(string documentUri)
+    {
+        var slash = documentUri.LastIndexOf('/');
+        return slash >= 0 ? documentUri[(slash + 1)..] : documentUri;
     }
 
     /// <summary>
@@ -308,11 +375,15 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         public List<StoryEdge> Edges { get; } = [];
         public List<StoryGraphProblem> Problems { get; } = [];
 
+        /// <summary>Every event of a name across the campaign - what a campaign-wide reward acts on.</summary>
         public Dictionary<string, List<StoryNode>> EventsByName { get; } =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public Dictionary<string, List<StoryNode>> EventsByBranch { get; } =
-            new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>The events of a name in one thread (thread uri, lower-cased name) - the engine's subplot lookup.</summary>
+        public Dictionary<(string ThreadUri, string LowerName), List<StoryNode>> EventsByThreadAndName { get; } = new();
+
+        /// <summary>Branch members per thread (thread uri, branch as written) - the engine's case-sensitive walk.</summary>
+        public Dictionary<(string ThreadUri, string Branch), List<StoryNode>> EventsByBranch { get; } = new();
 
         public List<(string Flag, string NodeId)> FlagReaders { get; } = [];
         public List<(string Flag, string NodeId, string Display)> FlagWriters { get; } = [];

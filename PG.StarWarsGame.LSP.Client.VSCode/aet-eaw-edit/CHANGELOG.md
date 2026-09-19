@@ -4,6 +4,14 @@
 
 ### Features
 
+- **Story simulator** - off by default, flag `aet-eaw-edit.features.tools.storySimulator`. See [#90](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/90).
+  - Simulation mode in the story graph runs a campaign forward in 1 s ticks by the engine's event rules, measured from the game binary: push arming, campaign-wide trigger rewards, resets, disables, timers from arming, flag defaults, owed speech and movie completions
+  - The world is a fact table seeded from the campaign XML; every trigger the game decides becomes a decision for the author - capture, build, destroy, battle outcome, script event, or assume met
+  - Campaign scripts run as their `PGStateMachine` from a static read of each state's `OnEnter`; state nodes and links join the graph
+  - Dock at three levels: state chip, decision, world, flag and script inventories with flyouts beside the dock, and the transport in the foot with a pulse, step or custom pace
+  - Flow along the edges, fire counts, gate meters, breakpoints on events and gates, lenses, and a filterable trace panel; rewind replays the same answers
+  - Not simulated: movement, production, combat and AI - nothing changes unless a reward or the author writes it
+
 - **Lua debugger** - off by default, flag `aet-eaw-edit.features.lua.debugger`. See [#142](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/142).
   - New debug type **Empire at War Lua** for the game's debug build
   - Breakpoints in project scripts; attach to a running game, or launch it with the mod chain

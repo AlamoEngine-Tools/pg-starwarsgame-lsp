@@ -31,6 +31,8 @@ public sealed class StoryGraphBuilderTest
             Values =
             [
                 Value("TRIGGER_EVENT", Param(0, "StoryEventName")),
+                Value("RESET_EVENT", Param(0, "StoryEventName")),
+                Value("DISABLE_STORY_EVENT", Param(0, "StoryEventName")),
                 Value("SET_FLAG", Param(0, "StoryFlag")),
                 Value("DISABLE_BRANCH", Param(0, "StoryBranch"))
             ]
@@ -168,8 +170,10 @@ public sealed class StoryGraphBuilderTest
             e => e.FromId == portal.Id && e.ToId == EventId(UriB, "Target") && e.Kind == StoryEdgeKind.Control);
     }
 
+    // Measured: Trigger_Event runs Event_Triggered on the name in EVERY subplot, so twins in two
+    // threads are both targets and that is the engine's behaviour, not an ambiguity.
     [Fact]
-    public void ControlEdge_AmbiguousCampaignGlobalTarget_EdgesToAllAndRecordsProblem()
+    public void ControlEdge_TriggerEvent_TwinsInTwoThreads_EdgesToBothWithoutAmbiguity()
     {
         var graph = Build(
             Thread(UriA,
@@ -178,11 +182,121 @@ public sealed class StoryGraphBuilderTest
                 "<Reward_Param1>Twin</Reward_Param1></Event>"),
             Thread(UriB, "<Event Name=\"Twin\"/>"));
 
-        Assert.Contains(graph.Problems, p => p.Kind == StoryGraphProblemKind.AmbiguousTarget
-                                             && p.Reference == "Twin");
+        Assert.Empty(graph.Problems);
         // Both twins receive an edge (one direct, one through the cross-file portal).
         Assert.Contains(graph.Edges, e => e.ToId == EventId(UriA, "Twin"));
         Assert.Contains(graph.Edges, e => e.ToId == EventId(UriB, "Twin"));
+    }
+
+    // Measured: Reset_Event looks the name up in its own subplot only.
+    [Fact]
+    public void ControlEdge_ResetEvent_ResolvesInOwnThreadOnly()
+    {
+        var graph = Build(
+            Thread(UriA,
+                "<Event Name=\"Twin\"/>" +
+                "<Event Name=\"Source\"><Reward_Type>RESET_EVENT</Reward_Type>" +
+                "<Reward_Param1>Twin</Reward_Param1></Event>"),
+            Thread(UriB, "<Event Name=\"Twin\"/>"));
+
+        Assert.Empty(graph.Problems);
+        var edge = Assert.Single(graph.Edges);
+        Assert.Equal(EventId(UriA, "Twin"), edge.ToId);
+        Assert.DoesNotContain(graph.Nodes, n => n.Kind == StoryNodeKind.Portal);
+    }
+
+    [Fact]
+    public void ControlEdge_ResetEvent_TargetOnlyInAnotherThread_IsUnresolvedAndNamesThatFile()
+    {
+        var graph = Build(
+            Thread(UriA,
+                "<Event Name=\"Source\"><Reward_Type>RESET_EVENT</Reward_Type>" +
+                "<Reward_Param1>Remote</Reward_Param1></Event>"),
+            Thread(UriB, "<Event Name=\"Remote\"/>"));
+
+        Assert.Empty(graph.Edges);
+        var problem = Assert.Single(graph.Problems);
+        Assert.Equal(StoryGraphProblemKind.UnresolvedControlTarget, problem.Kind);
+        Assert.Contains("story_b.xml", problem.Message);
+    }
+
+    // Measured: DISABLE_STORY_EVENT reaches every subplot only when its third parameter is non-zero.
+    [Fact]
+    public void ControlEdge_DisableStoryEvent_ThirdParamNonZero_ReachesEveryThread()
+    {
+        const string source =
+            "<Event Name=\"Source\"><Reward_Type>DISABLE_STORY_EVENT</Reward_Type>" +
+            "<Reward_Param1>Twin</Reward_Param1><Reward_Param2>1</Reward_Param2>";
+
+        var everywhere = Build(
+            Thread(UriA, source + "<Reward_Param3>1</Reward_Param3></Event>"),
+            Thread(UriB, "<Event Name=\"Twin\"/>"));
+        Assert.Empty(everywhere.Problems);
+        Assert.Contains(everywhere.Edges, e => e.ToId == EventId(UriB, "Twin"));
+
+        var local = Build(
+            Thread(UriA, source + "</Event>"),
+            Thread(UriB, "<Event Name=\"Twin\"/>"));
+        Assert.Empty(local.Edges);
+        Assert.Single(local.Problems, p => p.Kind == StoryGraphProblemKind.UnresolvedControlTarget);
+    }
+
+    // The engine cannot tell two same-named events in ONE subplot apart either; that is the one
+    // ambiguity left worth reporting.
+    [Fact]
+    public void Prereq_DuplicateNameInSameThread_EdgesFromBothAndRecordsAmbiguity()
+    {
+        var graph = Build(Thread(UriA,
+            "<Event Name=\"Twin\"/><Event Name=\"Twin\"/>" +
+            "<Event Name=\"C\"><Prereq>Twin</Prereq></Event>"));
+
+        Assert.Single(graph.Problems, p => p.Kind == StoryGraphProblemKind.AmbiguousTarget && p.Reference == "Twin");
+        Assert.Equal(2, graph.Edges.Count(e => e.Kind == StoryEdgeKind.Prereq && e.ToId == EventId(UriA, "C")));
+    }
+
+    // Measured: Compute_Dependants resolves prereq names inside the event's own subplot; a name
+    // held only by another file is an assert in the engine, never an edge.
+    [Fact]
+    public void Prereq_SameNameInAnotherThread_ResolvesInOwnThreadOnly()
+    {
+        var graph = Build(
+            Thread(UriA, "<Event Name=\"Twin\"/><Event Name=\"C\"><Prereq>Twin</Prereq></Event>"),
+            Thread(UriB, "<Event Name=\"Twin\"/>"));
+
+        Assert.Empty(graph.Problems);
+        var edge = Assert.Single(graph.Edges);
+        Assert.Equal(EventId(UriA, "Twin"), edge.FromId);
+        Assert.Equal(EventId(UriA, "C"), edge.ToId);
+    }
+
+    [Fact]
+    public void Prereq_OnlyInAnotherThread_IsDanglingAndNamesTheFileHoldingIt()
+    {
+        var graph = Build(
+            Thread(UriA, "<Event Name=\"C\"><Prereq>Remote</Prereq></Event>"),
+            Thread(UriB, "<Event Name=\"Remote\"/>"));
+
+        Assert.Empty(graph.Edges);
+        var problem = Assert.Single(graph.Problems);
+        Assert.Equal(StoryGraphProblemKind.DanglingPrereq, problem.Kind);
+        Assert.Contains("story_b.xml", problem.Message);
+    }
+
+    // Measured: a branch reward touches the members in its own subplot; the engine compares branch
+    // names with a plain string equality, so the case must match too.
+    [Fact]
+    public void BranchEdge_ReachesOwnThreadMembersOnly_CaseSensitively()
+    {
+        var graph = Build(
+            Thread(UriA,
+                "<Event Name=\"X\"><Branch>b1</Branch></Event>" +
+                "<Event Name=\"Y\"><Branch>B1</Branch></Event>" +
+                "<Event Name=\"Source\"><Reward_Type>DISABLE_BRANCH</Reward_Type>" +
+                "<Reward_Param1>b1</Reward_Param1></Event>"),
+            Thread(UriB, "<Event Name=\"Z\"><Branch>b1</Branch></Event>"));
+
+        var edge = Assert.Single(graph.Edges);
+        Assert.Equal(EventId(UriA, "X"), edge.ToId);
     }
 
     [Fact]

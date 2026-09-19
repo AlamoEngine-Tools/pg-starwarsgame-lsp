@@ -875,6 +875,12 @@
             "default": false,
             "markdownDescription": "Enables **Edit mode** in the story graph panel: staging changes, previewing and validating them, and writing them back to the story XML.\n\nWithout this the panel is read-only - the graph can still be browsed in View mode.\n\nBuilds on `#aet-eaw-edit.features.tools.storyEditor#` (the panel hosting it).\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.tools.storySimulator": {
+            "order": 1957,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables **Simulation mode** in the story graph panel: the campaign runs forward in 1 s ticks as the engine would, with every trigger the game decides answered by you - planets captured, units built, battles won or lost, script events - from a fact table seeded by the campaign XML. The panel shows the flow along the edges, the decisions the story waits on, the world, the flags, each script's state machine, and a trace of every transition.\n\nThe simulation reproduces the engine's event rules; it does not run the galactic layer, so nothing moves, builds or fights unless you say it did.\n\nBuilds on `#aet-eaw-edit.features.tools.storyEditor#` (the panel hosting it).\n\n*Disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.tools.variants": {
             "order": 2000,
             "type": "boolean",

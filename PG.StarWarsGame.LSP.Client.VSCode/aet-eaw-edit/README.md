@@ -307,11 +307,21 @@ Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `S
   - Drop event and reward types from the palette
   - Edit names, params, branch, perpetual and dialog in place
   - Staged and applied on save as one `workspace/applyEdit`; minimal edits; inserted tags in the engine's order
+- **Simulation** (Simulation mode, flag `tools.storySimulator`)
+  - The campaign runs forward in 1 s ticks by the engine's own event rules: push-based arming, campaign-wide trigger rewards, resets, disables, timers from arming, flag comparisons with the engine's defaults, speech and movie completions owed to the next tick
+  - The world is a fact table seeded from the campaign XML - planets and owners, units, tech, credits - written only by rewards and by you; nothing moves, builds or fights on its own
+  - Every trigger the game would decide is a **decision** for you: capture a planet, build or destroy a unit, win or lose a battle, send a script event, or assume the trigger met; pickers list what fits the facts first and accept any name
+  - Campaign scripts run as their `PGStateMachine`: a fired event enters the state, its `OnEnter` thread sleeps and sends `Story_Event` ids back into the graph, drawn as state nodes and links
+  - Dock header: the tick and what stopped the clock; content: decisions, world, flags, scripts, each row opening beside the dock; foot: the transport - restart, one tick back, play, one tick, run to the next decision - with a pace of pulse, step or a custom rate
+  - Canvas: the flow along the edges, fire counts, gate meters on armed timers and flag checks, breakpoint marks; lenses for the path taken, the flow tints and the script states
+  - Trace panel: every transition with its tick, node, cause and source; filter by text or `t12` for one tick; copy
+  - Breakpoints on any event and on every clock or flag gate; rewind to any tick replays the same answers
 - **Large campaigns** - lightweight overview when zoomed out, real nodes only for the visible part; 1000+ events stay responsive
 - **Campaign diagnostics**
   - Dangling or cyclic prerequisites
   - Duplicate event names
-  - Ambiguous campaign-global targets
+  - Prerequisites, reset and disable targets the engine cannot see because they live in another plot file
+  - Two events of one name in one plot file
   - Events that can never fire
   - Suspended plots nothing activates
   - Problems bar can follow the branch filter; jumping to a hidden problem lifts it
@@ -574,7 +584,7 @@ Story mode:
 | Setting | Default | Description |
 |---|---|---|
 | `aet-eaw-edit.features.story.discovery` | `false` | Follows the campaign story chain and types its files; base of every other story flag _(work in progress)_ |
-| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign analysis: dangling and cyclic prerequisites, duplicate event names, ambiguous targets, unreachable events, orphaned suspended plots, tag order, over-long flag names _(work in progress)_ |
+| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign analysis: dangling and cyclic prerequisites, duplicate event names, targets outside their plot file, unreachable events, orphaned suspended plots, tag order, over-long flag names _(work in progress)_ |
 | `aet-eaw-edit.features.story.symbols` | `false` | Story event names, flags and AI-notification ids indexed across XML and Lua _(work in progress)_ |
 | `aet-eaw-edit.features.story.rename` | `false` | Cross-language rename of story symbols; builds on story symbols _(work in progress)_ |
 
@@ -594,12 +604,11 @@ Tools:
 | `aet-eaw-edit.features.tools.localisation` | `false` | Localisation editor, initialise and import commands, create-key code action _(work in progress)_ |
 | `aet-eaw-edit.features.tools.storyEditor` | `false` | Campaign Editor view and story graph in View mode; builds on `story.discovery` _(work in progress)_ |
 | `aet-eaw-edit.features.tools.storyEditing` | `false` | Edit mode in the story graph; builds on `tools.storyEditor` _(work in progress)_ |
+| `aet-eaw-edit.features.tools.storySimulator` | `false` | Simulation mode in the story graph; builds on `tools.storyEditor` |
 | `aet-eaw-edit.features.tools.variants` | `true` | Show Effective Object and its code lens |
 | `aet-eaw-edit.features.tools.modelPreview` | `true` | Model preview; game models need `aet-eaw-edit.lsp.source.baseGameDirectory` |
 | `aet-eaw-edit.features.tools.encyclopedia` | `true` | Encyclopedia popup preview and its code lens |
 | `aet-eaw-edit.features.preview.energyPool` | `false` | Energy pool in the preview (editor-side, no restart). Off on purpose: the shipped game disables the mechanic |
-
-> The story graph's Simulation mode is unfinished and absent from the settings UI; `"aet-eaw-edit.features.tools.storySimulator": true` in `settings.json` enables it.
 
 ---
 

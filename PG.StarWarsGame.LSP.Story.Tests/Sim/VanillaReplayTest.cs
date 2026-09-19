@@ -154,7 +154,8 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
             .Select(kvp => kvp.Key + "=" + kvp.Value)) + "|" + snapshot.Runtime.Flags.Count;
     }
 
-    private static string? FindRepoRoot()
+    /// <summary>The repo root holding the gitignored eaw/ and foc/ corpora; null on a clean clone.</summary>
+    internal static string? FindRepoRoot()
     {
         var dir = new DirectoryInfo(Path.GetDirectoryName(typeof(VanillaReplayTest).Assembly.Location)!);
         while (dir is not null)
@@ -170,7 +171,7 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
     }
 
     /// <summary>Case-insensitive lookup over one game's Data/XML tree, the way the engine resolves names.</summary>
-    private sealed class DiskResolver : IStoryChainFileResolver
+    internal sealed class DiskResolver : IStoryChainFileResolver
     {
         private readonly Dictionary<string, string> _files;
 

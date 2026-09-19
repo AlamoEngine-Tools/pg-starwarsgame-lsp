@@ -72,6 +72,33 @@ public sealed class StoryThreadParserTest
         Assert.Equal(["D"], e.PrereqGroups[1].Tokens.Select(t => t.Text));
     }
 
+    // Measured: the engine reads Prereq with its list field type (code 0x1b), the same reader as
+    // Affiliation, whose vanilla values are comma-separated. Vanilla Story_campaign_underworld.xml
+    // writes seven prereq lines one name per line with a trailing comma.
+    [Fact]
+    public void Parse_PrereqTokens_SplitOnCommasAsWellAsWhitespace()
+    {
+        var thread = StoryThreadParser.Parse("""
+                                             <Story>
+                                               <Event Name="E">
+                                                 <Prereq>
+                                                   Lock_A,
+                                                   Lock_B,
+                                                   Lock_C
+                                                 </Prereq>
+                                                 <Prereq>D,E F</Prereq>
+                                               </Event>
+                                             </Story>
+                                             """, "file:///ws/story.xml");
+
+        var e = Assert.Single(thread.Events);
+        Assert.Equal(["Lock_A", "Lock_B", "Lock_C"], e.PrereqGroups[0].Tokens.Select(t => t.Text));
+        Assert.Equal(["D", "E", "F"], e.PrereqGroups[1].Tokens.Select(t => t.Text));
+        // The token's range covers the name only, never the comma after it.
+        var first = e.PrereqGroups[0].Tokens[0];
+        Assert.Equal("Lock_A".Length, first.Range.EndColumn - first.Range.StartColumn);
+    }
+
     [Fact]
     public void Parse_PrereqTokens_CarryColumnAccurateRanges()
     {
