@@ -42,7 +42,15 @@ public sealed record StorySimIntervention(
     string? EventType,
     IReadOnlyList<string> Options,
     string? Facet = null,
-    StoryWorldChange? Suggested = null);
+    StoryWorldChange? Suggested = null)
+{
+    /// <summary>
+    ///     For a tactical decision, the battle whose outcome it waits on: inside a battle the
+    ///     battle itself, on the galactic level the battle whose entry event this listener follows.
+    ///     Null when no battle can be named, and the answer is a plain world change.
+    /// </summary>
+    public string? BattleKey { get; init; }
+}
 
 /// <summary>
 ///     Semantic story simulation over <see cref="StoryEvaluator" /> - no game process, no DAP.
@@ -67,9 +75,33 @@ public sealed record StorySimIntervention(
 ///     LuaNotify for <c>STORY_AI_NOTIFICATION</c>, and tactical outcomes resolved by firing the
 ///     armed <c>STORY_VICTORY</c>/<c>STORY_MISSION_LOST</c>/<c>STORY_MISSION_FAILED</c> events.
 /// </summary>
+/// <summary>
+///     How a session treats what the game decides on its own. <see cref="AssumeMediaCompletes" />:
+///     a speech or movie a reward starts is owed its completion on the next tick; off, the listener
+///     waits for the author or the engine's timeout, for stepping through media by hand.
+/// </summary>
+public sealed record StorySimOptions(bool AssumeMediaCompletes = true)
+{
+    public static readonly StorySimOptions Default = new();
+}
+
 public sealed partial class StorySimulator
 {
     public const double ClockStepSeconds = 1;
+
+    /// <summary>
+    ///     The parser gives a STORY_SPEECH_DONE a 60 s timeout when the XML carries none, which is
+    ///     every listener in the shipped corpus (measured: no Timeout tag in eaw or foc). That the
+    ///     listener fires when the timeout elapses is inferred from the field's existence.
+    /// </summary>
+    private const double SpeechDoneTimeoutSeconds = 60;
+
+    /// <summary>The generic the battle summary dialog raises when it closes (inferred from the corpus; the engine's name still owed).</summary>
+    public const string BattleEndClosed = "battle_end_closed";
+
+    /// <summary>MULTIMEDIA's speech is its parameter 8 (position 7); the movie in parameter 9 has no listener in the corpus.</summary>
+    private const int MultimediaSpeechPosition = 7;
+
     private const int MaxFireDepth = 64;
     private const int MaxRunTicks = 3600;
     private const string SpeechDone = "STORY_SPEECH_DONE";
@@ -86,17 +118,35 @@ public sealed partial class StorySimulator
     private readonly Dictionary<(string Type, int Position), string> _rewardParamTypes;
     private readonly List<string> _startupNotes = [];
     private readonly IStoryWorldSymbols? _symbols;
+    private readonly Dictionary<string, string> _battleOfListener;
 
     /// <summary>
     ///     <paramref name="symbols" /> answers whether a planet, unit type or faction the author
     ///     names exists in the game; null skips the check (tests, static callers).
+    ///     <paramref name="scope" /> is the battle this simulator runs, or null for the galactic
+    ///     story: the game freezes the galaxy while a battle plays and a battle's plot files only
+    ///     ever run there, so a session arms one scope's events and never the other's.
     /// </summary>
-    public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols? symbols = null)
+    public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols? symbols = null,
+        string? scope = null, StorySimOptions? options = null)
     {
         _model = model;
         _symbols = symbols;
+        Options = options ?? StorySimOptions.Default;
+        Scope = StoryGraphScoper.IsGalactic(scope) ? null : StoryGraphScoper.BattleKey(scope!);
+        // Lifecycles come from the whole graph - a prereq never crosses a scope, so the answer is
+        // the same - while the events this session runs are the scope's alone.
         _evaluator = new StoryEvaluator(model.Graph);
-        _eventNodes = model.Graph.Nodes.Where(n => n.Kind == StoryNodeKind.Event).ToList();
+        _eventNodes = StoryGraphScoper.Scope(model, Scope).Nodes.Where(n => n.Kind == StoryNodeKind.Event).ToList();
+        // On the galactic level an outcome listener belongs to the battle whose entry event it
+        // follows; inside a battle every outcome listener is the battle's own.
+        _battleOfListener = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (Scope is null)
+            foreach (var battle in model.Battles)
+            foreach (var listener in model.Graph.Edges
+                         .Where(e => e.Kind == StoryEdgeKind.Prereq && battle.EntryEventIds.Contains(e.FromId))
+                         .Select(e => e.ToId))
+                _battleOfListener.TryAdd(listener, battle.Key);
         _nodesById = _eventNodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
         _eventsByName = new Dictionary<string, List<StoryNode>>(StringComparer.OrdinalIgnoreCase);
         foreach (var node in _eventNodes)
@@ -146,9 +196,47 @@ public sealed partial class StorySimulator
         }
     }
 
+    /// <summary>The battle this simulator runs, as the plots feed keys it, or null for the galactic story.</summary>
+    public string? Scope { get; }
+
+    public StorySimOptions Options { get; }
+
+    /// <summary>
+    ///     What a battle can write into the shared flag table: every flag its events' SET_FLAG and
+    ///     INCREMENT_FLAG rewards name, with the value the reward would set or add - the picks a
+    ///     portal offers when the battle is decided without being played. First reward per flag.
+    /// </summary>
+    public static IReadOnlyList<StoryFlagWrite> FlagWritesOf(StoryCampaignModel model, ISchemaProvider schema,
+        string scope)
+    {
+        var rewardParamTypes = StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryRewardType"));
+        var writes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var node in StoryGraphScoper.Scope(model, scope).Nodes.Where(n => n.Kind == StoryNodeKind.Event))
+        {
+            var storyEvent = node.Event!;
+            var reward = storyEvent.RewardType?.ToUpperInvariant();
+            if (reward is null) continue;
+            var rawAmount = storyEvent.RewardParams.FirstOrDefault(p => p.Position == 1)?.RawValue;
+            var amount = int.TryParse(rawAmount, out var parsed) ? parsed : 1;
+            foreach (var slot in storyEvent.RewardParams)
+            {
+                if (rewardParamTypes.GetValueOrDefault((reward, slot.Position)) != StoryReferenceTypes.Flag) continue;
+                writes.TryAdd(slot.RawValue.Trim(), amount);
+            }
+        }
+
+        return writes.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(kvp => new StoryFlagWrite(kvp.Key, kvp.Value)).ToList();
+    }
+
     // ── Commands ─────────────────────────────────────────────────────────────
 
-    public StorySimSnapshot Start()
+    /// <summary>
+    ///     The first frame. <paramref name="flags" /> and <paramref name="world" /> seed the run
+    ///     before anything polls - a battle starts with the galaxy's flag table and world as they
+    ///     stand when it is entered; without them the campaign's own seed applies.
+    /// </summary>
+    public StorySimSnapshot Start(ImmutableDictionary<string, int>? flags = null, StoryWorld? world = null)
     {
         var snapshot = new StorySimSnapshot
         {
@@ -156,9 +244,11 @@ public sealed partial class StorySimulator
             {
                 SuspendedThreads = StoryRuntimeState.Initial.SuspendedThreads.Union(_model.SuspendedThreadUris),
                 ArmedEvents = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
-                World = SeedWorld(_model.Seed)
+                World = world ?? SeedWorld(_model.Seed),
+                Flags = flags ?? StoryRuntimeState.Initial.Flags
             },
-            Log = ImmutableList.Create("Simulation started.").AddRange(_startupNotes)
+            Log = ImmutableList.Create(Scope is null ? "Simulation started." : $"Battle {Scope} started.")
+                .AddRange(_startupNotes)
         };
 
         // The parser arms every event that has no prereq line; everything else waits for a push.
@@ -312,9 +402,17 @@ public sealed partial class StorySimulator
                 continue;
             }
 
+            var battleKey = kind == "tactical" ? Scope ?? _battleOfListener.GetValueOrDefault(node.Id) : null;
+            // Once the galaxy has taken a battle's outcome the game never takes the other route:
+            // the listener for it stays armed but is nothing the author can still decide.
+            if (battleKey is not null
+                && snapshot.Runtime.World.BattleOutcomes.TryGetValue(battleKey, out var outcome)
+                && (type == "STORY_VICTORY") != (outcome == "won"))
+                continue;
+
             var (facet, options, suggested) = FacetOf(storyEvent);
             interventions.Add(new StorySimIntervention(kind, node.Id, storyEvent.Name,
-                storyEvent.EventType, options, facet, suggested));
+                storyEvent.EventType, options, facet, suggested) { BattleKey = battleKey });
         }
 
         return interventions;
@@ -348,6 +446,14 @@ public sealed partial class StorySimulator
                     return new StorySimGate($"{flag} unset", 0);
                 var progress = target <= 0 ? (value == target ? 1 : 0) : Math.Clamp((double)value / target, 0, 1);
                 return new StorySimGate($"{flag} {value} of {target}", progress);
+            }
+            case SpeechDone:
+            {
+                // Owed completions dispatch on their own; the gate is the engine's timeout on the rest.
+                if (HasPendingCompletion(node, snapshot.Runtime)) return null;
+                var elapsed = Math.Max(0, snapshot.Clock - snapshot.Runtime.ArmedAt.GetValueOrDefault(node.Id));
+                return new StorySimGate($"{elapsed:0}/{SpeechDoneTimeoutSeconds:0} s",
+                    Math.Min(1, elapsed / SpeechDoneTimeoutSeconds));
             }
             default:
                 return null;
@@ -395,8 +501,12 @@ public sealed partial class StorySimulator
                 if (!IsActive(node, snapshot.Runtime)) continue;
                 if (!PolledTriggerSatisfied(node, snapshot)) continue;
 
-                // Each polled fire is its own frame for the scripts.
-                snapshot = Fire(RunTransitions(snapshot), node, StorySimCause.Poll, null, 0);
+                // Each polled fire is its own frame for the scripts. A speech-done reached here
+                // only through its timeout, and the trace says so.
+                var cause = string.Equals(node.Event!.EventType, SpeechDone, StringComparison.OrdinalIgnoreCase)
+                    ? StorySimCause.Timeout
+                    : StorySimCause.Poll;
+                snapshot = Fire(RunTransitions(snapshot), node, cause, null, 0);
                 firedThisPass.Add(node.Id);
                 changed = true;
             }
@@ -451,6 +561,14 @@ public sealed partial class StorySimulator
                     return false;
                 var armedAt = snapshot.Runtime.ArmedAt.GetValueOrDefault(node.Id);
                 return snapshot.Clock - armedAt >= at;
+            }
+            case SpeechDone:
+            {
+                // An owed completion dispatches on its own; otherwise the engine's timeout ends the
+                // wait - a speech nobody started, or one left to the author who never answered.
+                if (HasPendingCompletion(node, snapshot.Runtime)) return false;
+                var armedAt = snapshot.Runtime.ArmedAt.GetValueOrDefault(node.Id);
+                return snapshot.Clock - armedAt >= SpeechDoneTimeoutSeconds;
             }
             case "STORY_FLAG":
             {
@@ -556,6 +674,8 @@ public sealed partial class StorySimulator
             "DISABLE_BRANCH" => RewardDisableBranch(snapshot, node),
             "SPEECH" => OweCompletion(snapshot, node, SpeechDone),
             "START_MOVIE" => OweCompletion(snapshot, node, MovieDone),
+            // The compound reward's speech; one without a speech has nothing to owe and is done at once.
+            "MULTIMEDIA" => OweCompletion(snapshot, node, SpeechDone, MultimediaSpeechPosition),
             _ => ApplyWorldReward(snapshot, node, upperReward, depth)
         };
     }
@@ -726,11 +846,15 @@ public sealed partial class StorySimulator
                 r => r.WithEnabled(target.Id));
     }
 
-    private static StorySimSnapshot OweCompletion(StorySimSnapshot snapshot, StoryNode node, string doneType)
+    private StorySimSnapshot OweCompletion(StorySimSnapshot snapshot, StoryNode node, string doneType,
+        int position = 0)
     {
-        var name = Param(node.Event!, 0);
+        var name = Param(node.Event!, position);
         if (name is null) return snapshot;
         var cause = doneType == SpeechDone ? StorySimCause.Speech : StorySimCause.Movie;
+        // Stepping through media by hand: the listener waits for the author, or for the timeout.
+        if (!Options.AssumeMediaCompletes)
+            return Note(snapshot, node.Id, null, cause, $"  -> {doneType} '{name}' left to the author.");
         return Note(
             snapshot with
             {

@@ -64,5 +64,39 @@ public sealed class VanillaGraphScopeTest(ITestOutputHelper output)
 
         Assert.Empty(crossFilePrereqs);
         Assert.DoesNotContain(graph.Problems, p => p.Kind == StoryGraphProblemKind.AmbiguousTarget);
+
+        // Battles as sub-graphs: the galactic scope plus every battle scope carries each event
+        // exactly once, the galactic scope shows one portal per battle and nothing of theirs, and
+        // every battle scope has its entry portal.
+        var galactic = StoryGraphScoper.Scope(model, null);
+        var battles = model.Battles;
+        var galacticEvents = galactic.Nodes.Count(n => n.Kind == StoryNodeKind.Event);
+        var battleEvents = battles.Sum(b =>
+            StoryGraphScoper.Scope(model, b.Key).Nodes.Count(n => n.Kind == StoryNodeKind.Event));
+        output.WriteLine(
+            $"  galactic events {galacticEvents} in {galactic.Nodes.Where(n => n.Kind == StoryNodeKind.Event).Select(n => n.ThreadUri).Distinct().Count()} threads, " +
+            $"battles {battles.Count} with {battleEvents} events: " +
+            string.Join(", ", battles.OrderBy(b => b.Rank).Select(b => $"{b.Rank}:{b.Label}")));
+        Assert.Equal(threadOf.Count, galacticEvents + battleEvents);
+
+        // The implicit edges, counted per rule over the whole campaign and the galactic scope:
+        // the corpus numbers the rule table carries.
+        var implicitByLabel = graph.Edges.Where(e => e.Kind == StoryEdgeKind.Implicit)
+            .GroupBy(e => e.Label ?? "").OrderBy(g => g.Key)
+            .Select(g => $"{g.Key}={g.Count()}");
+        var galacticImplicit = galactic.Edges.Where(e => e.Kind == StoryEdgeKind.Implicit)
+            .GroupBy(e => e.Label ?? "").OrderBy(g => g.Key)
+            .Select(g => $"{g.Key}={g.Count()}");
+        output.WriteLine($"  implicit edges: campaign {string.Join(", ", implicitByLabel)}; galactic scope " +
+                         string.Join(", ", galacticImplicit));
+        Assert.Equal(battles.Count, galactic.Nodes.Count(n => n.Kind == StoryNodeKind.TacticalPlot));
+        Assert.DoesNotContain(galactic.Nodes, n => n.ThreadUri is { } t && battles.Any(b => b.ThreadUris.Contains(t)));
+        foreach (var battle in battles)
+        {
+            var scoped = StoryGraphScoper.Scope(model, battle.Key);
+            Assert.Contains(scoped.Nodes,
+                n => n.Kind == StoryNodeKind.GalacticPortal && battle.EntryEventIds.Contains(n.PortalTarget!));
+            Assert.DoesNotContain(scoped.Nodes, n => n.Kind == StoryNodeKind.TacticalPlot);
+        }
     }
 }

@@ -3,13 +3,14 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway } from './lsp/lspGateway';
-import { LspTreeDataProvider } from './lspTreeDataProvider';
+import {LspGateway} from './lsp/lspGateway';
+import {LspTreeDataProvider} from './lspTreeDataProvider';
 import {
     GetStoryPlotsResult, StoryCampaignDto, StoryFactionDto, StoryLuaScriptDto, StoryPlotThreadDto,
 } from './protocol';
+import {type BattleBranch, factionTree} from './storyBattles';
 
-type StoryNodeKind = 'set' | 'campaign' | 'faction' | 'thread' | 'lua' | 'info';
+type StoryNodeKind = 'set' | 'campaign' | 'faction' | 'battle' | 'thread' | 'lua' | 'info';
 
 export class StoryTreeItem extends vscode.TreeItem {
     constructor(
@@ -18,6 +19,7 @@ export class StoryTreeItem extends vscode.TreeItem {
         public readonly kind: StoryNodeKind,
         public readonly campaignName?: string,
         public readonly factionName?: string,
+        // A thread's or script's file; on a 'battle' node, the battle's key as the server names it.
         public readonly fileName?: string,
         // The Campaign_Set value a 'set' node represents; undefined on the "Ungrouped" set node.
         public readonly setName?: string
@@ -27,8 +29,9 @@ export class StoryTreeItem extends vscode.TreeItem {
 }
 
 /**
- * Campaign navigator: set (Campaign_Set) → campaign → faction (plot manifest) → story threads +
- * attached Lua scripts, fed by `aet/getStoryPlots`. Campaigns are always grouped by their
+ * Campaign navigator: set (Campaign_Set) → campaign → faction (plot manifest) → galactic story
+ * threads + the battles the story links out to (each over its own plot threads, in the order the
+ * galactic story reaches them) + attached Lua scripts, fed by `aet/getStoryPlots`. Campaigns are always grouped by their
  * Campaign_Set; every set is shown (even a single-campaign set), and campaigns that declare no
  * Campaign_Set fall under an "Ungrouped" node. The tree re-fetches on every expand of the root, so
  * a plain `refresh()` after `aet/storyGraphChanged` is enough to stay current.
@@ -95,11 +98,28 @@ export class StoryNavigatorViewProvider
             const faction = this._campaigns
                 .find(c => c.name === element.campaignName)?.factions
                 .find(f => f.faction === element.factionName);
-            if (!faction) { return []; }
+            if (!faction) {
+                return [];
+            }
+            // The galactic threads first, then the battles in play order, each folding its own
+            // plot files away: the galactic story does not care about a battle's inner workings,
+            // and a thread listed twice would read as two files.
+            const tree = factionTree(faction);
             return [
-                ...faction.threads.map(t => this._threadItem(t)),
+                ...tree.galacticThreads.map(t => this._threadItem(t)),
+                ...tree.battles.map((branch, index) =>
+                    this._battleItem(faction.faction, element.campaignName!, branch, index, tree.battles.length)),
                 ...faction.luaScripts.map(s => this._luaItem(s)),
             ];
+        }
+        if (element.kind === 'battle') {
+            const faction = this._campaigns
+                .find(c => c.name === element.campaignName)?.factions
+                .find(f => f.faction === element.factionName);
+            const branch = faction
+                ? factionTree(faction).battles.find(b => b.battle.key === element.fileName)
+                : undefined;
+            return (branch?.threads ?? []).map(t => this._threadItem(t));
         }
         return [];
     }
@@ -110,9 +130,16 @@ export class StoryNavigatorViewProvider
         const ungrouped: StoryCampaignDto[] = [];
         const bySet = new Map<string, StoryCampaignDto[]>();
         for (const c of this._campaigns) {
-            if (!c.set) { ungrouped.push(c); continue; }
+            if (!c.set) {
+                ungrouped.push(c);
+                continue;
+            }
             const list = bySet.get(c.set);
-            if (list) { list.push(c); } else { bySet.set(c.set, [c]); }
+            if (list) {
+                list.push(c);
+            } else {
+                bySet.set(c.set, [c]);
+            }
         }
 
         const items = [...bySet.keys()]
@@ -165,6 +192,31 @@ export class StoryNavigatorViewProvider
         item.tooltip = `${campaignName} - ${faction.faction}`
             + `\nDeclared by ${faction.manifestFile}`
             + '\nClick the graph icon to open this faction\'s story graph';
+        return item;
+    }
+
+    /**
+     * A battle: a tactical plot manifest the galactic story links out to, and the level its own
+     * graph opens from. Ordered by where the galactic story reaches it, which is what "battle 3 of
+     * 9" says, since a file name says nothing about the order of play.
+     */
+    private _battleItem(
+        factionName: string, campaignName: string, branch: BattleBranch, index: number, count: number,
+    ): StoryTreeItem {
+        const item = new StoryTreeItem(
+            branch.battle.label, vscode.TreeItemCollapsibleState.Collapsed, 'battle',
+            campaignName, factionName, branch.battle.key);
+        item.iconPath = new vscode.ThemeIcon('target');
+        item.contextValue = 'aetStoryBattle';
+        item.description = `Battle ${index + 1} of ${count}`;
+        item.tooltip = `${campaignName} - ${factionName} - ${branch.battle.label}`
+            + `\nBattle ${index + 1} of ${count} in play order`
+            + `\nPlot files - ${branch.threads.length}`;
+        item.command = {
+            command: 'aet-eaw-edit.lsp.openStoryGraph',
+            title: 'Open Battle Graph',
+            arguments: [item],
+        };
         return item;
     }
 

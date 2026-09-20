@@ -46,6 +46,19 @@ public sealed record StoryWorld
 
     public string? Era { get; init; }
 
+    /// <summary>
+    ///     Each battle the galaxy has taken an outcome for, by battle key: "won" or "lost". The
+    ///     game never takes the other route once a battle has ended, so its listeners for the
+    ///     other outcome are moot from here on.
+    /// </summary>
+    public ImmutableDictionary<string, string> BattleOutcomes { get; init; } =
+        ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
+
+    public StoryWorld WithBattleOutcome(string battleKey, string outcome)
+    {
+        return this with { BattleOutcomes = BattleOutcomes.SetItem(battleKey, outcome) };
+    }
+
     /// <summary>Counters keyed "name|faction": battlesWon, battlesLost, conquered, built.</summary>
     public ImmutableDictionary<string, int> Counters { get; init; } =
         ImmutableDictionary.Create<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -129,6 +142,9 @@ public sealed record StoryWorld
 /// </summary>
 public sealed record StoryWorldChange(string Kind)
 {
+    /// <summary>On a battle outcome, the battle it resolves - recorded on the world so the other outcome's listeners go moot.</summary>
+    public string? BattleKey { get; init; }
+
     public string? Planet { get; init; }
     public string? UnitType { get; init; }
     public string? Faction { get; init; }

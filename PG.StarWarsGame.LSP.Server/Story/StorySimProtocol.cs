@@ -46,11 +46,35 @@ public sealed record StorySimStateDto(
     IReadOnlyList<StorySimLuaStateDto> LuaStates,
     // How many things the clock alone can still change (armed timers, owed completions, script
     // work). Zero: nothing more happens until the author answers a decision.
-    int ClockPending = 0)
+    int ClockPending = 0,
+    // The battle this session runs, as the plots feed keys it; null for the galactic story.
+    string? Scope = null,
+    // Galactic only: the label of the battle whose session is up, while which the galaxy takes
+    // no command - the game freezes the galaxy during a tactical battle.
+    string? PausedFor = null,
+    // Battle only: "won" or "lost" once resolved, after which the session takes no command.
+    string? Outcome = null,
+    // Galactic only: every battle of the faction in play order with its status - notStarted,
+    // running (with its own tick), won or lost.
+    IReadOnlyList<StorySimBattleDto>? Battles = null,
+    // Whether a speech or movie a reward starts is owed its completion on the next tick (the
+    // session's option at start); off, the listener waits for the author or the engine's timeout.
+    bool AssumeMediaCompletes = true)
 {
     public static StorySimStateDto NotRunning { get; } =
         new(false, 0, 0, 1, [], [], [], [], [], [], 0, [], false, null, StorySimWorldDto.Empty, []);
 }
+
+/// <param name="Writes">
+///     The flags the battle's own rewards can write, with the value each would set - offered on the
+///     portal as picks when the battle is decided without being played.
+/// </param>
+public sealed record StorySimBattleDto(
+    string Key,
+    string Label,
+    string Status,
+    int Tick,
+    IReadOnlyList<StorySimFlagDto>? Writes = null);
 
 /// <summary>A campaign script's state machine: where it is, where it goes next, and the Story_Event calls it still owes.</summary>
 public sealed record StorySimLuaStateDto(
@@ -86,7 +110,9 @@ public sealed record StorySimInterventionDto(
     string? EventType,
     IReadOnlyList<string> Options,
     string? Facet,
-    StorySimWorldChangeDto? Suggested);
+    StorySimWorldChangeDto? Suggested,
+    // A tactical decision's battle: the one it is inside, or the one whose entry it follows.
+    string? BattleKey = null);
 
 /// <summary>An author's change to the world; the fields a kind does not read stay null.</summary>
 public sealed record StorySimWorldChangeDto(string Kind)
@@ -131,51 +157,94 @@ public sealed record StorySimStepDto(
 
 public sealed record StorySimStateResult(StorySimStateDto? State, string? Error = null);
 
+// Every request names its session: the campaign faction and, for a battle panel, the battle's
+// scope (the plots feed's key; null or empty is the galactic level). The scope is the last field
+// on each record so a caller written before battles existed still lines up.
+
 [Method("aet/storySimStart", Direction.ClientToServer)]
-public sealed record StorySimStartParams(string Campaign, string Faction) : IRequest<StorySimStateResult>;
+public sealed record StorySimStartParams(
+    string Campaign,
+    string Faction,
+    string? Scope = null,
+    // See StorySimStateDto.AssumeMediaCompletes; the session keeps it from start to stop.
+    bool AssumeMediaCompletes = true)
+    : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimStop", Direction.ClientToServer)]
-public sealed record StorySimStopParams(string Campaign, string Faction) : IRequest<StorySimStateResult>;
+public sealed record StorySimStopParams(string Campaign, string Faction, string? Scope = null)
+    : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimGetState", Direction.ClientToServer)]
-public sealed record StorySimGetStateParams(string Campaign, string Faction, int SinceSeq = 0)
+public sealed record StorySimGetStateParams(string Campaign, string Faction, int SinceSeq = 0, string? Scope = null)
     : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimSatisfyTrigger", Direction.ClientToServer)]
-public sealed record StorySimSatisfyTriggerParams(string Campaign, string Faction, string NodeId, int SinceSeq = 0)
+public sealed record StorySimSatisfyTriggerParams(
+    string Campaign,
+    string Faction,
+    string NodeId,
+    int SinceSeq = 0,
+    string? Scope = null)
     : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimSetFlag", Direction.ClientToServer)]
-public sealed record StorySimSetFlagParams(string Campaign, string Faction, string Flag, int Value, int SinceSeq = 0)
+public sealed record StorySimSetFlagParams(
+    string Campaign,
+    string Faction,
+    string Flag,
+    int Value,
+    int SinceSeq = 0,
+    string? Scope = null)
     : IRequest<StorySimStateResult>;
 
 /// <summary>Kept for callers that think in seconds; one second is one tick.</summary>
 [Method("aet/storySimAdvanceClock", Direction.ClientToServer)]
-public sealed record StorySimAdvanceClockParams(string Campaign, string Faction, double Seconds, int SinceSeq = 0)
+public sealed record StorySimAdvanceClockParams(
+    string Campaign,
+    string Faction,
+    double Seconds,
+    int SinceSeq = 0,
+    string? Scope = null)
     : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimLuaNotify", Direction.ClientToServer)]
-public sealed record StorySimLuaNotifyParams(string Campaign, string Faction, string Id, int SinceSeq = 0)
+public sealed record StorySimLuaNotifyParams(
+    string Campaign,
+    string Faction,
+    string Id,
+    int SinceSeq = 0,
+    string? Scope = null)
     : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimTick", Direction.ClientToServer)]
-public sealed record StorySimTickParams(string Campaign, string Faction, int Count, int SinceSeq = 0)
+public sealed record StorySimTickParams(
+    string Campaign,
+    string Faction,
+    int Count,
+    int SinceSeq = 0,
+    string? Scope = null)
     : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimRunToDecision", Direction.ClientToServer)]
-public sealed record StorySimRunToDecisionParams(string Campaign, string Faction, int SinceSeq = 0)
+public sealed record StorySimRunToDecisionParams(
+    string Campaign,
+    string Faction,
+    int SinceSeq = 0,
+    string? Scope = null)
     : IRequest<StorySimStateResult>;
 
 /// <summary>Replays the session to the state just after the given tick and drops everything after it.</summary>
 [Method("aet/storySimSeek", Direction.ClientToServer)]
-public sealed record StorySimSeekParams(string Campaign, string Faction, int Tick) : IRequest<StorySimStateResult>;
+public sealed record StorySimSeekParams(string Campaign, string Faction, int Tick, string? Scope = null)
+    : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimWorld", Direction.ClientToServer)]
 public sealed record StorySimWorldParams(
     string Campaign,
     string Faction,
     StorySimWorldChangeDto Change,
-    int SinceSeq = 0)
+    int SinceSeq = 0,
+    string? Scope = null)
     : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimBreakpoints", Direction.ClientToServer)]
@@ -183,8 +252,28 @@ public sealed record StorySimBreakpointsParams(
     string Campaign,
     string Faction,
     IReadOnlyList<string> NodeIds,
-    bool OnConditionalGates) : IRequest<StorySimStateResult>;
+    bool OnConditionalGates,
+    string? Scope = null) : IRequest<StorySimStateResult>;
 
-/// <summary>Server -> client push after any simulation state change; clients re-fetch the state.</summary>
+/// <summary>
+///     Resolves a battle: won or lost. <c>Battle</c> is the battle's key; <c>Scope</c> is the
+///     asking panel's own scope, whose state comes back - the galactic panel deciding on a portal,
+///     or the battle panel deciding its own end.
+/// </summary>
+[Method("aet/storySimResolveBattle", Direction.ClientToServer)]
+public sealed record StorySimResolveBattleParams(
+    string Campaign,
+    string Faction,
+    string Battle,
+    bool Won,
+    int SinceSeq = 0,
+    string? Scope = null,
+    // The author's picks among the battle's possible flag writes; they cross with the outcome.
+    IReadOnlyList<StorySimFlagDto>? Flags = null) : IRequest<StorySimStateResult>;
+
+/// <summary>
+///     Server -> client push after any simulation state change; the client whose panel shows that
+///     campaign faction and scope re-fetches the state. A battle's resolution pushes both scopes.
+/// </summary>
 [Method("aet/storySimChanged", Direction.ServerToClient)]
-public sealed record StorySimChangedParams(string Campaign, string Faction) : IRequest;
+public sealed record StorySimChangedParams(string Campaign, string Faction, string? Scope = null) : IRequest;

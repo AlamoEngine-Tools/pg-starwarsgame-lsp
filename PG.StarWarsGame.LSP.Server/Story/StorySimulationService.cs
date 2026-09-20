@@ -5,77 +5,180 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Story.Graph;
+using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Story.Sim;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
+/// <summary>
+///     What a simulation session is OF: a campaign faction, at the galactic level (null scope) or
+///     inside one of its battles (the battle's key as the plots feed names it). The scope is
+///     normalised on construction so a request may spell the manifest any way the XML does.
+/// </summary>
+public sealed record StorySimKey(string Campaign, string Faction, string? Scope = null)
+{
+    public string? Scope { get; init; } =
+        StoryGraphScoper.IsGalactic(Scope) ? null : StoryGraphScoper.BattleKey(Scope!);
+
+    public StoryModelKey Model => new(Campaign, Faction);
+
+    public bool IsGalactic => Scope is null;
+
+    /// <summary>The galactic session this one belongs to - itself when it is galactic.</summary>
+    public StorySimKey Galactic => this with { Scope = null };
+
+    public override string ToString()
+    {
+        return IsGalactic ? Model.ToString() : $"{Model} / {Scope}";
+    }
+}
+
 public interface IStorySimulationService
 {
-    (StorySimStateDto? State, string? Error) Start(StoryModelKey key);
-    (StorySimStateDto? State, string? Error) Stop(StoryModelKey key);
-    (StorySimStateDto? State, string? Error) GetState(StoryModelKey key, int sinceSeq = 0);
-    (StorySimStateDto? State, string? Error) SatisfyTrigger(StoryModelKey key, string nodeId, int sinceSeq = 0);
-    (StorySimStateDto? State, string? Error) SetFlag(StoryModelKey key, string flag, int value, int sinceSeq = 0);
-    (StorySimStateDto? State, string? Error) AdvanceClock(StoryModelKey key, double seconds, int sinceSeq = 0);
-    (StorySimStateDto? State, string? Error) LuaNotify(StoryModelKey key, string id, int sinceSeq = 0);
-    (StorySimStateDto? State, string? Error) Tick(StoryModelKey key, int count, int sinceSeq = 0);
-    (StorySimStateDto? State, string? Error) RunToDecision(StoryModelKey key, int sinceSeq = 0);
-    (StorySimStateDto? State, string? Error) Seek(StoryModelKey key, int tick);
+    /// <summary><paramref name="options" /> apply to a galactic session and every battle entered from it; a battle started on its own takes them itself.</summary>
+    (StorySimStateDto? State, string? Error) Start(StorySimKey key, StorySimOptions? options = null);
 
-    (StorySimStateDto? State, string? Error) SetBreakpoints(StoryModelKey key, IReadOnlyList<string> nodeIds,
+    (StorySimStateDto? State, string? Error) Stop(StorySimKey key);
+    (StorySimStateDto? State, string? Error) GetState(StorySimKey key, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) SatisfyTrigger(StorySimKey key, string nodeId, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) SetFlag(StorySimKey key, string flag, int value, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) AdvanceClock(StorySimKey key, double seconds, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) LuaNotify(StorySimKey key, string id, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) Tick(StorySimKey key, int count, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) RunToDecision(StorySimKey key, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) Seek(StorySimKey key, int tick);
+
+    (StorySimStateDto? State, string? Error) SetBreakpoints(StorySimKey key, IReadOnlyList<string> nodeIds,
         bool onConditionalGates);
 
-    (StorySimStateDto? State, string? Error) ApplyWorldChange(StoryModelKey key, StorySimWorldChangeDto change,
+    (StorySimStateDto? State, string? Error) ApplyWorldChange(StorySimKey key, StorySimWorldChangeDto change,
         int sinceSeq = 0);
+
+    /// <summary>
+    ///     Resolves a battle of <paramref name="key" />'s campaign faction: its own outcome listeners
+    ///     fire (on an implicit session from the galaxy's state when the battle was never entered),
+    ///     its flag writes and the author's <paramref name="flags" /> merge into the galactic table,
+    ///     its session closes on the outcome, and the galaxy takes the outcome as one command.
+    ///     Answers with the state of <paramref name="key" />'s own scope, which is whichever panel asked.
+    /// </summary>
+    (StorySimStateDto? State, string? Error) ResolveBattle(StorySimKey key, string battleKey, bool won,
+        int sinceSeq = 0, IReadOnlyList<StorySimFlagDto>? flags = null);
 }
 
 /// <summary>
-///     One simulation session per campaign and faction, pinned to the model at Start. The session
-///     keeps the command log alongside the snapshot: the simulator is deterministic, so seeking to
-///     an earlier tick is a replay of the log up to that tick, which needs no per-tick snapshots
-///     and drops the future for free.
+///     One simulation session per campaign faction and scope, pinned to the model at Start. The
+///     session keeps the command log alongside the snapshot: the simulator is deterministic, so
+///     seeking to an earlier tick is a replay of the log up to that tick, which needs no per-tick
+///     snapshots and drops the future for free.
+///     <para>
+///         A battle is a session of its own with its own clock, as in the game, which freezes the
+///         galaxy while a battle plays: while a battle session is up and unresolved its galactic
+///         session refuses every command. The battle starts with the galaxy's flags and world;
+///         when it resolves, the flags it wrote and the outcome land in the galactic log as ONE
+///         command, so a galactic seek replays the outcome without replaying the battle.
+///     </para>
 /// </summary>
 public sealed class StorySimulationService(
     IStoryModelService modelService,
     IGameIndexService indexService,
     ISchemaProvider schema,
-    Action<StoryModelKey> notifyChanged,
+    Action<StorySimKey> notifyChanged,
     IStoryWorldSymbols? symbols = null) : IStorySimulationService
 {
     private const int LogTail = 200;
+    private const string Won = "won";
+    private const string Lost = "lost";
     private readonly object _gate = new();
-    private readonly Dictionary<StoryModelKey, Session> _sessions = new();
+    private readonly Dictionary<StorySimKey, Session> _sessions = new();
 
-    public (StorySimStateDto? State, string? Error) Start(StoryModelKey key)
+    public (StorySimStateDto? State, string? Error) Start(StorySimKey key, StorySimOptions? options = null)
     {
         var model = modelService.GetCampaignModel(key.Campaign, key.Faction);
         if (model is null)
-            return (null, $"{key} was not found.");
+            return (null, $"{key.Model} was not found.");
 
-        var simulator = new StorySimulator(model, schema, symbols);
-        var session = new Session(simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts),
-            ImmutableList<SimCommand>.Empty, StorySimBreakpoints.None, model.LuaMachines);
+        var toNotify = new List<StorySimKey> { key };
+        Session session;
         lock (_gate)
         {
+            if (key.IsGalactic)
+            {
+                // A fresh galaxy has no battles in progress: whatever was up belongs to the old run.
+                foreach (var battleKey in _sessions.Keys.Where(k => k.Model == key.Model && !k.IsGalactic).ToList())
+                {
+                    _sessions.Remove(battleKey);
+                    toNotify.Add(battleKey);
+                }
+
+                var simulator = new StorySimulator(model, schema, symbols, null, options);
+                session = new Session(key, simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts),
+                    ImmutableList<SimCommand>.Empty, StorySimBreakpoints.None, model.LuaMachines, model.Battles)
+                {
+                    // What each battle could write, for the portal's picks: read once, the model is pinned.
+                    BattleWrites = model.Battles.ToDictionary(b => b.Key,
+                        b => StorySimulator.FlagWritesOf(model, schema, b.Key)
+                            .Select(w => new StorySimFlagDto(w.Flag, w.Value)).ToList(),
+                        StringComparer.Ordinal)
+                };
+            }
+            else
+            {
+                var battle = model.Battles.FirstOrDefault(b => b.Key == key.Scope);
+                if (battle is null)
+                    return (null, $"'{key.Scope}' is not a battle of {key.Model}.");
+                if (RunningBattle(key.Model, key) is { } running)
+                    return (null, $"Battle '{running.Label}' is still running - resolve it first.");
+
+                // The battle starts where the galaxy stands: its flags and its world, as the game
+                // hands a tactical mission the campaign state, and under the galaxy's options.
+                // Without a galactic session it runs on its own from the campaign seed.
+                _sessions.TryGetValue(key.Galactic, out var galactic);
+                var simulator = new StorySimulator(model, schema, symbols, key.Scope,
+                    galactic?.Simulator.Options ?? options);
+                var seedFlags = galactic?.Snapshot.Runtime.Flags;
+                var seedWorld = galactic?.Snapshot.Runtime.World;
+                session = new Session(key, simulator,
+                    simulator.Start(seedFlags, seedWorld),
+                    CollectLuaNotifications(model.LuaScripts), ImmutableList<SimCommand>.Empty,
+                    StorySimBreakpoints.None, model.LuaMachines, model.Battles)
+                {
+                    Label = battle.Label,
+                    SeedFlags = seedFlags ?? StoryRuntimeState.Initial.Flags,
+                    SeedWorld = seedWorld
+                };
+                if (galactic is not null) toNotify.Add(key.Galactic);
+            }
+
             _sessions[key] = session;
         }
 
-        notifyChanged(key);
+        foreach (var changed in toNotify) notifyChanged(changed);
         return (ToDto(session, 0), null);
     }
 
-    public (StorySimStateDto? State, string? Error) Stop(StoryModelKey key)
+    public (StorySimStateDto? State, string? Error) Stop(StorySimKey key)
     {
+        var toNotify = new List<StorySimKey> { key };
         lock (_gate)
         {
             _sessions.Remove(key);
+            if (key.IsGalactic)
+                // The battles of a stopped galaxy have nothing to resolve into.
+                foreach (var battleKey in _sessions.Keys.Where(k => k.Model == key.Model && !k.IsGalactic).ToList())
+                {
+                    _sessions.Remove(battleKey);
+                    toNotify.Add(battleKey);
+                }
+            else if (_sessions.ContainsKey(key.Galactic))
+                // Abandoning a battle un-pauses the galaxy.
+                toNotify.Add(key.Galactic);
         }
 
-        notifyChanged(key);
+        foreach (var changed in toNotify) notifyChanged(changed);
         return (StorySimStateDto.NotRunning, null);
     }
 
-    public (StorySimStateDto? State, string? Error) GetState(StoryModelKey key, int sinceSeq = 0)
+    public (StorySimStateDto? State, string? Error) GetState(StorySimKey key, int sinceSeq = 0)
     {
         lock (_gate)
         {
@@ -86,61 +189,85 @@ public sealed class StorySimulationService(
         return (StorySimStateDto.NotRunning, null);
     }
 
-    public (StorySimStateDto? State, string? Error) SatisfyTrigger(StoryModelKey key, string nodeId, int sinceSeq = 0)
+    public (StorySimStateDto? State, string? Error) SatisfyTrigger(StorySimKey key, string nodeId, int sinceSeq = 0)
     {
         return Mutate(key, new SimCommand(SimCommandKind.Satisfy, nodeId), sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) SetFlag(StoryModelKey key, string flag, int value, int sinceSeq = 0)
+    public (StorySimStateDto? State, string? Error) SetFlag(StorySimKey key, string flag, int value, int sinceSeq = 0)
     {
         return Mutate(key, new SimCommand(SimCommandKind.Flag, flag, value), sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) AdvanceClock(StoryModelKey key, double seconds, int sinceSeq = 0)
+    public (StorySimStateDto? State, string? Error) AdvanceClock(StorySimKey key, double seconds, int sinceSeq = 0)
     {
         var ticks = (int)Math.Round(seconds / StorySimulator.ClockStepSeconds);
         return ticks <= 0 ? GetState(key, sinceSeq) : Tick(key, ticks, sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) LuaNotify(StoryModelKey key, string id, int sinceSeq = 0)
+    public (StorySimStateDto? State, string? Error) LuaNotify(StorySimKey key, string id, int sinceSeq = 0)
     {
         return Mutate(key, new SimCommand(SimCommandKind.Lua, id), sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) Tick(StoryModelKey key, int count, int sinceSeq = 0)
+    public (StorySimStateDto? State, string? Error) Tick(StorySimKey key, int count, int sinceSeq = 0)
     {
         return Mutate(key, new SimCommand(SimCommandKind.Tick, null, count), sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) RunToDecision(StoryModelKey key, int sinceSeq = 0)
+    public (StorySimStateDto? State, string? Error) RunToDecision(StorySimKey key, int sinceSeq = 0)
     {
         return Mutate(key, new SimCommand(SimCommandKind.Run), sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) ApplyWorldChange(StoryModelKey key, StorySimWorldChangeDto change,
+    public (StorySimStateDto? State, string? Error) ApplyWorldChange(StorySimKey key, StorySimWorldChangeDto change,
         int sinceSeq = 0)
     {
+        // Inside a battle, the battle's outcome IS its resolution: the in-battle listeners fire and
+        // the galaxy takes the result, rather than the battle running on past its own end.
+        if (!key.IsGalactic && change.Kind is StoryWorldChangeKind.BattleWon or StoryWorldChangeKind.BattleLost)
+            return ResolveBattle(key, key.Scope!, change.Kind == StoryWorldChangeKind.BattleWon, sinceSeq);
+
         return Mutate(key, new SimCommand(SimCommandKind.World) { Change = ToChange(change) }, sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) Seek(StoryModelKey key, int tick)
+    public (StorySimStateDto? State, string? Error) Seek(StorySimKey key, int tick)
     {
         Session next;
+        var toNotify = new List<StorySimKey> { key };
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
                 return (null, $"No simulation is running for {key}.");
+            if (Refusal(session) is { } refusal)
+                return (null, refusal);
             if (tick < 0 || tick > session.Snapshot.Tick)
                 return (null, $"Tick {tick} is outside the run (0 to {session.Snapshot.Tick}).");
             next = Replay(session, tick);
             _sessions[key] = next;
+
+            // A resolution the cut dropped never happened: its battle session goes with it, or
+            // the portal would say "won" over a galaxy that has not taken the outcome.
+            if (key.IsGalactic)
+            {
+                var kept = ResolvedBattles(next).Keys.ToHashSet(StringComparer.Ordinal);
+                foreach (var stale in _sessions
+                             .Where(kvp => kvp.Key.Model == key.Model && !kvp.Key.IsGalactic
+                                                                      && kvp.Value.Outcome is not null &&
+                                                                      !kept.Contains(kvp.Key.Scope!))
+                             .Select(kvp => kvp.Key).ToList())
+                {
+                    _sessions.Remove(stale);
+                    toNotify.Add(stale);
+                }
+            }
         }
 
-        notifyChanged(key);
+        foreach (var changed in toNotify) notifyChanged(changed);
         return (ToDto(next, 0), null);
     }
 
-    public (StorySimStateDto? State, string? Error) SetBreakpoints(StoryModelKey key, IReadOnlyList<string> nodeIds,
+    public (StorySimStateDto? State, string? Error) SetBreakpoints(StorySimKey key, IReadOnlyList<string> nodeIds,
         bool onConditionalGates)
     {
         Session next;
@@ -160,13 +287,99 @@ public sealed class StorySimulationService(
         return (ToDto(next, next.Snapshot.Steps.Count), null);
     }
 
-    private (StorySimStateDto? State, string? Error) Mutate(StoryModelKey key, SimCommand command, int sinceSeq)
+    public (StorySimStateDto? State, string? Error) ResolveBattle(StorySimKey key, string battleKey, bool won,
+        int sinceSeq = 0, IReadOnlyList<StorySimFlagDto>? flags = null)
+    {
+        var battleSession = new StorySimKey(key.Campaign, key.Faction, battleKey);
+        var toNotify = new List<StorySimKey>();
+        Session? answer;
+        lock (_gate)
+        {
+            _sessions.TryGetValue(key.Galactic, out var galactic);
+            _sessions.TryGetValue(battleSession, out var battle);
+            if (galactic is null && battle is null)
+                return (null, $"No simulation is running for {key.Model}.");
+            if (battle?.Outcome is not null)
+                return (null, $"Battle '{battle.Label}' is already {battle.Outcome}.");
+            var model = modelService.GetCampaignModel(key.Campaign, key.Faction);
+            var label = model?.Battles.FirstOrDefault(b => b.Key == battleSession.Scope)?.Label;
+            if (label is null)
+                return (null, $"'{battleKey}' is not a battle of {key.Model}.");
+
+            var kind = won ? StoryWorldChangeKind.BattleWon : StoryWorldChangeKind.BattleLost;
+            var faction = model!.Faction;
+            var outcome = new SimCommand(SimCommandKind.World)
+                { Change = new StoryWorldChange(kind) { Faction = faction } };
+            // The battle ends on its outcome: its own listeners fire, and what it wrote to the
+            // flag table since it started is what crosses back. A battle decided on the portal was
+            // never entered, so its listeners run on an implicit session from the galaxy's state -
+            // the tutorial's victory listener increments the flag the galaxy reads, played or not.
+            StorySimSnapshot ended;
+            ImmutableDictionary<string, int> seed;
+            if (battle is not null)
+            {
+                ended = Apply(battle.Simulator, battle.Snapshot, outcome, battle.Breakpoints);
+                seed = battle.SeedFlags;
+                battle = battle with
+                {
+                    Snapshot = ended, Commands = battle.Commands.Add(outcome), Outcome = won ? Won : Lost
+                };
+                _sessions[battleSession] = battle;
+                toNotify.Add(battleSession);
+            }
+            else
+            {
+                var implicitSim = new StorySimulator(model, schema, symbols, battleSession.Scope,
+                    galactic?.Simulator.Options);
+                seed = galactic?.Snapshot.Runtime.Flags ?? StoryRuntimeState.Initial.Flags;
+                ended = Apply(implicitSim, implicitSim.Start(seed, galactic?.Snapshot.Runtime.World), outcome,
+                    StorySimBreakpoints.None);
+            }
+
+            var writes = new List<StoryFlagWrite>();
+            foreach (var (flag, value) in ended.Runtime.Flags)
+                if (!seed.TryGetValue(flag, out var before) || before != value)
+                    writes.Add(new StoryFlagWrite(flag, value));
+            // The author's picks: what the battle could have set but nothing decided on its own.
+            foreach (var pick in flags ?? [])
+            {
+                writes.RemoveAll(w => w.Flag.Equals(pick.Name, StringComparison.OrdinalIgnoreCase));
+                writes.Add(new StoryFlagWrite(pick.Name, pick.Value));
+            }
+
+            if (galactic is not null)
+            {
+                // One command in the galactic log, whatever happened inside the battle.
+                var command = new SimCommand(SimCommandKind.Battle, battleSession.Scope, won ? 1 : 0)
+                {
+                    Change = new StoryWorldChange(kind)
+                        { Faction = faction, Flags = writes, BattleKey = battleSession.Scope }
+                };
+                galactic = galactic with
+                {
+                    Snapshot = Apply(galactic.Simulator, galactic.Snapshot, command, galactic.Breakpoints),
+                    Commands = galactic.Commands.Add(command)
+                };
+                _sessions[key.Galactic] = galactic;
+                toNotify.Add(key.Galactic);
+            }
+
+            answer = key.IsGalactic ? galactic : _sessions.GetValueOrDefault(key);
+        }
+
+        foreach (var changed in toNotify) notifyChanged(changed);
+        return answer is null ? (StorySimStateDto.NotRunning, null) : (ToDto(answer, sinceSeq), null);
+    }
+
+    private (StorySimStateDto? State, string? Error) Mutate(StorySimKey key, SimCommand command, int sinceSeq)
     {
         Session next;
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
                 return (null, $"No simulation is running for {key}.");
+            if (Refusal(session) is { } refusal)
+                return (null, refusal);
             next = session with
             {
                 Snapshot = Apply(session.Simulator, session.Snapshot, command, session.Breakpoints),
@@ -177,6 +390,23 @@ public sealed class StorySimulationService(
 
         notifyChanged(key);
         return (ToDto(next, sinceSeq), null);
+    }
+
+    /// <summary>Why a session takes no command right now, or null. Called under the gate.</summary>
+    private string? Refusal(Session session)
+    {
+        if (session.Outcome is not null)
+            return $"Battle '{session.Label}' is {session.Outcome} - start it again to run it once more.";
+        if (session.Key.IsGalactic && RunningBattle(session.Key.Model, null) is { } running)
+            return $"The galaxy is paused while battle '{running.Label}' runs.";
+        return null;
+    }
+
+    /// <summary>The unresolved battle session of a campaign faction other than <paramref name="except" />, if any. Called under the gate.</summary>
+    private Session? RunningBattle(StoryModelKey model, StorySimKey? except)
+    {
+        return _sessions.Values.FirstOrDefault(s =>
+            s.Key.Model == model && !s.Key.IsGalactic && s.Outcome is null && s.Key != except);
     }
 
     private static StorySimSnapshot Apply(StorySimulator sim, StorySimSnapshot snapshot, SimCommand command,
@@ -190,6 +420,7 @@ public sealed class StorySimulationService(
             SimCommandKind.Tick => sim.Tick(snapshot, command.Number, breakpoints),
             SimCommandKind.Run => sim.RunToDecision(snapshot, breakpoints),
             SimCommandKind.World when command.Change is { } change => sim.ApplyWorldChange(snapshot, change),
+            SimCommandKind.Battle when command.Change is { } change => sim.ResolveBattleOutcome(snapshot, change),
             _ => snapshot
         };
     }
@@ -202,7 +433,7 @@ public sealed class StorySimulationService(
     private static Session Replay(Session session, int tick)
     {
         var sim = session.Simulator;
-        var snapshot = sim.Start();
+        var snapshot = sim.Start(session.Key.IsGalactic ? null : session.SeedFlags, session.SeedWorld);
         var commands = ImmutableList<SimCommand>.Empty;
         foreach (var command in session.Commands)
         {
@@ -228,13 +459,41 @@ public sealed class StorySimulationService(
         return session with { Snapshot = snapshot, Commands = commands };
     }
 
-    private static StorySimStateDto ToDto(Session session, int sinceSeq)
+    /// <summary>The battles a galactic log has resolved, last word per battle. </summary>
+    private static Dictionary<string, string> ResolvedBattles(Session galactic)
+    {
+        var resolved = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var command in galactic.Commands)
+            if (command.Kind == SimCommandKind.Battle && command.Text is { } battleKey)
+                resolved[battleKey] = command.Number == 1 ? Won : Lost;
+        return resolved;
+    }
+
+    /// <summary>Builds the state document. Called under the gate: the battle list reads the other sessions.</summary>
+    private StorySimStateDto ToDto(Session session, int sinceSeq)
     {
         var snapshot = session.Snapshot;
         var fireCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var step in snapshot.Steps)
             if (StorySimCause.Fires.Contains(step.Cause) && step.To == StoryEventLifecycle.Fired)
                 fireCounts[step.NodeId] = fireCounts.GetValueOrDefault(step.NodeId) + 1;
+
+        string? pausedFor = null;
+        var battles = new List<StorySimBattleDto>();
+        if (session.Key.IsGalactic)
+            lock (_gate)
+            {
+                pausedFor = RunningBattle(session.Key.Model, null)?.Label;
+                var resolved = ResolvedBattles(session);
+                foreach (var battle in session.Battles)
+                {
+                    var running = _sessions.GetValueOrDefault(session.Key with { Scope = battle.Key });
+                    var status = resolved.GetValueOrDefault(battle.Key)
+                                 ?? (running is { Outcome: null } ? "running" : "notStarted");
+                    battles.Add(new StorySimBattleDto(battle.Key, battle.Label, status, running?.Snapshot.Tick ?? 0,
+                        session.BattleWrites.GetValueOrDefault(battle.Key) ?? []));
+                }
+            }
 
         return new StorySimStateDto(
             true,
@@ -255,7 +514,7 @@ public sealed class StorySimulationService(
                 .ToList(),
             session.Simulator.GetInterventions(snapshot)
                 .Select(i => new StorySimInterventionDto(i.Kind, i.NodeId, i.EventName, i.EventType, i.Options,
-                    i.Facet, i.Suggested is null ? null : ToChangeDto(i.Suggested)))
+                    i.Facet, i.Suggested is null ? null : ToChangeDto(i.Suggested), i.BattleKey))
                 .ToList(),
             session.LuaNotifications,
             snapshot.Log.Count > LogTail ? snapshot.Log.GetRange(snapshot.Log.Count - LogTail, LogTail) : snapshot.Log,
@@ -270,7 +529,12 @@ public sealed class StorySimulationService(
             snapshot.HaltedAt,
             ToWorldDto(snapshot.Runtime.World),
             ToLuaStates(session, snapshot),
-            session.Simulator.GetClockPending(snapshot));
+            session.Simulator.GetClockPending(snapshot),
+            session.Key.Scope,
+            pausedFor,
+            session.Outcome,
+            battles,
+            session.Simulator.Options.AssumeMediaCompletes);
     }
 
     private static List<StorySimLuaStateDto> ToLuaStates(Session session, StorySimSnapshot snapshot)
@@ -354,7 +618,10 @@ public sealed class StorySimulationService(
         Lua,
         Tick,
         Run,
-        World
+        World,
+
+        /// <summary>A battle's resolution in the galactic log: Text is the battle key, Number 1 for won.</summary>
+        Battle
     }
 
     private sealed record SimCommand(SimCommandKind Kind, string? Text = null, int Number = 0)
@@ -362,11 +629,29 @@ public sealed class StorySimulationService(
         public StoryWorldChange? Change { get; init; }
     }
 
+    /// <summary>
+    ///     <see cref="SeedFlags" /> and <see cref="SeedWorld" /> are what a battle started from, so
+    ///     a battle seek replays from the same footing and a resolution knows which flags the
+    ///     battle wrote; <see cref="Outcome" /> is set once it has resolved.
+    /// </summary>
     private sealed record Session(
+        StorySimKey Key,
         StorySimulator Simulator,
         StorySimSnapshot Snapshot,
         IReadOnlyList<string> LuaNotifications,
         ImmutableList<SimCommand> Commands,
         StorySimBreakpoints Breakpoints,
-        IReadOnlyList<LuaStoryMachine> Machines);
+        IReadOnlyList<LuaStoryMachine> Machines,
+        IReadOnlyList<StoryBattle> Battles)
+    {
+        public string? Label { get; init; }
+
+        /// <summary>Galactic only: per battle, the flags its rewards can write - the portal's picks.</summary>
+        public IReadOnlyDictionary<string, List<StorySimFlagDto>> BattleWrites { get; init; } =
+            new Dictionary<string, List<StorySimFlagDto>>(StringComparer.Ordinal);
+
+        public ImmutableDictionary<string, int> SeedFlags { get; init; } = StoryRuntimeState.Initial.Flags;
+        public StoryWorld? SeedWorld { get; init; }
+        public string? Outcome { get; init; }
+    }
 }

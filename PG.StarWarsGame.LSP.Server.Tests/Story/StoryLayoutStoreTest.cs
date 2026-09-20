@@ -137,6 +137,50 @@ public sealed class StoryLayoutStoreTest
         Assert.Equal(5, Assert.Single(NewStore(fs).Get(Rebel, [Node("story_main.xml", "Start")])).X);
     }
 
+    /// <summary>
+    ///     A junction, a portal, a tactical stub or a script state has no thread and event to be
+    ///     named by; its node id is the name, with the document URIs inside it made relative to the
+    ///     project so the key survives a clone like an event's does. A battle graph is a third such
+    ///     nodes, and without this every open re-placed them.
+    /// </summary>
+    [Fact]
+    public void RoundTrip_VirtualNode_ByItsIdWithTheUrisMadeRelative()
+    {
+        var (store, fs) = Build();
+        var junction = Thread("story_main.xml") + "#start#and#1";
+        var portal = "galactic#story_plots_m2.xml#" + Thread("story_main.xml") + "#e";
+        store.Set(Rebel,
+        [
+            new StoryLayoutEntry("", "", 11, 12, junction),
+            new StoryLayoutEntry("", "", 21, 22, portal),
+            new StoryLayoutEntry("", "", 31, 32, "tactical#story_plots_m2.xml")
+        ]);
+
+        var back = NewStore(fs).Get(Rebel,
+        [
+            new StoryLayoutNode("", "", junction),
+            new StoryLayoutNode("", "", portal),
+            new StoryLayoutNode("", "", "tactical#story_plots_m2.xml"),
+            new StoryLayoutNode("", "", "tactical#story_plots_m5.xml")
+        ]);
+
+        Assert.Equal([(junction, 11.0), (portal, 21.0), ("tactical#story_plots_m2.xml", 31.0)],
+            back.Select(e => (e.NodeId, e.X)).OrderBy(e => e.Item2));
+        // Nothing in the file names the thread in the clear: the id's URI was keyed, not written.
+        Assert.DoesNotContain("story_main", fs.File.ReadAllText(Sidecar(fs)));
+    }
+
+    [Fact]
+    public void VirtualNode_OutsideTheProject_HasNoKey_AndIsNotWritten()
+    {
+        var (store, fs) = Build();
+        store.Set(Rebel, [new StoryLayoutEntry("", "", 1, 2, "file:///elsewhere/story.xml#e#or")]);
+
+        Assert.Empty(store.Get(Rebel, [new StoryLayoutNode("", "", "file:///elsewhere/story.xml#e#or")]));
+        // The document is saved as ever, but holds no entry: nothing outside the project is keyed.
+        Assert.DoesNotContain("\"key\"", fs.File.ReadAllText(Sidecar(fs)));
+    }
+
     [Fact]
     public void NoProject_DegradesToInMemory()
     {

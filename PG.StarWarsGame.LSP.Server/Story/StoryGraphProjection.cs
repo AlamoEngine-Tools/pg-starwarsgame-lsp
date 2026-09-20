@@ -35,8 +35,13 @@ internal static class StoryGraphProjection
 
     public static GetStoryGraphResult Project(
         StoryCampaignModel model, string? nameFilter, string? branch, string? lifecycle,
-        string? reachableFrom, string? plotState = null, string? reachableDirection = null)
+        string? reachableFrom, string? plotState = null, string? reachableDirection = null,
+        string? scope = null)
     {
+        // The scope decides which nodes a panel can show at all; the filters below then choose
+        // among them. Lifecycles and reachability still come from the WHOLE graph, because a
+        // battle's event is armed by the same campaign whichever panel shows it.
+        var scoped = StoryGraphScoper.Scope(model, scope);
         // Null or empty is every plot the manifest registers, in either state - a suspended plot is
         // part of the chain, waiting for something to resume it.
         var wantSuspended = string.Equals(plotState, Suspended, StringComparison.OrdinalIgnoreCase);
@@ -53,7 +58,7 @@ internal static class StoryGraphProjection
 
         // Filters select EVENT nodes; virtual nodes and edges survive when both endpoints do.
         var keptEvents = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var node in model.Graph.Nodes.Where(n => n.Kind == StoryNodeKind.Event))
+        foreach (var node in scoped.Nodes.Where(n => n.Kind == StoryNodeKind.Event))
         {
             if (nameFilter is { Length: > 0 } name &&
                 !node.Label.Contains(name, StringComparison.OrdinalIgnoreCase)) continue;
@@ -75,18 +80,40 @@ internal static class StoryGraphProjection
             keptEvents.Add(node.Id);
         }
 
+        HashSet<string>? closure = null;
         if (reachableFrom is { Length: > 0 } fromId)
-            keptEvents.IntersectWith(Closure(model.Graph, fromId, reachableDirection));
+        {
+            closure = Closure(scoped, fromId, reachableDirection);
+            keptEvents.IntersectWith(closure);
+        }
+
+        // A virtual node survives when an edge joins it to a kept event. A battle's exit portal
+        // is the exception: it stands for the galactic listener that fires on the outcome, and
+        // its one edge is the "outcome" link from the entry portal - so it follows the portal it
+        // hangs off, or the battle would show its way in and never its way out.
+        var keptVirtual = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in scoped.Nodes.Where(n => n.Kind != StoryNodeKind.Event))
+            if (scoped.Edges.Any(e =>
+                    (e.FromId == node.Id && keptEvents.Contains(e.ToId)) ||
+                    (e.ToId == node.Id && keptEvents.Contains(e.FromId))))
+                keptVirtual.Add(node.Id);
+        var portals = scoped.Nodes.Where(n => n.Kind == StoryNodeKind.GalacticPortal).Select(n => n.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        // A chain asked for from a portal, or reaching one, keeps the portal: it is the end of the
+        // battle the walk arrived at, even when no event of the battle lies on the way.
+        if (closure is not null)
+            keptVirtual.UnionWith(portals.Where(closure.Contains));
+        foreach (var edge in scoped.Edges)
+            if (portals.Contains(edge.FromId) && portals.Contains(edge.ToId) && keptVirtual.Contains(edge.FromId))
+                keptVirtual.Add(edge.ToId);
 
         var keptNodes = new List<StoryGraphNodeDto>();
         var keptIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var node in model.Graph.Nodes)
+        foreach (var node in scoped.Nodes)
         {
             var keep = node.Kind == StoryNodeKind.Event
                 ? keptEvents.Contains(node.Id)
-                : model.Graph.Edges.Any(e =>
-                    (e.FromId == node.Id && keptEvents.Contains(e.ToId)) ||
-                    (e.ToId == node.Id && keptEvents.Contains(e.FromId)));
+                : keptVirtual.Contains(node.Id);
             if (!keep) continue;
 
             keptIds.Add(node.Id);
@@ -102,24 +129,28 @@ internal static class StoryGraphProjection
                 node.Event?.RewardParams.Select(p => new StoryParamValueDto(p.Position, p.RawValue)).ToList(),
                 node.Event?.Perpetual ?? false,
                 node.Event?.StoryDialog,
-                node.Event?.StoryChapter));
+                node.Event?.StoryChapter,
+                node.PortalTarget));
         }
 
-        var edges = model.Graph.Edges
+        var edges = scoped.Edges
             .Where(e => keptIds.Contains(e.FromId) && keptIds.Contains(e.ToId))
             .Select(e => new StoryGraphEdgeDto(e.FromId, e.ToId, e.Kind.ToString(), e.Label))
             .ToList();
 
-        // Facets describe the CAMPAIGN, so they are read off the whole model rather than off
-        // keptNodes - a list of what you could switch to is worthless once the filter has already
-        // removed everything you might switch to.
-        return new GetStoryGraphResult(keptNodes, edges, null, Facet(model, n => n.Event?.Branch),
-            Facet(model, n => n.ThreadUri));
+        // Facets describe the SCOPE, not the filtered result: what you could switch to is
+        // worthless once the filter has already removed everything you might switch to, but a
+        // battle's thread picker must not offer the galaxy's files either.
+        return new GetStoryGraphResult(keptNodes, edges, null, Facet(scoped, n => n.Event?.Branch),
+            Facet(scoped, n => n.ThreadUri));
     }
 
-    private static List<string> Facet(StoryCampaignModel model, Func<StoryNode, string?> of)
+    private static List<string> Facet(StoryGraph graph, Func<StoryNode, string?> of)
     {
-        return model.Graph.Nodes
+        // Events only: a script state's "thread" is its .lua uri and a portal has none, and the
+        // thread facet backs the picker for placing a NEW event, which no script file can host.
+        return graph.Nodes
+            .Where(n => n.Kind == StoryNodeKind.Event)
             .Select(of)
             .Where(v => !string.IsNullOrEmpty(v))
             .Select(v => v!)

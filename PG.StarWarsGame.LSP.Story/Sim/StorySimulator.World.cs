@@ -69,6 +69,27 @@ public sealed partial class StorySimulator
         return Dispatch(snapshot, change, 0);
     }
 
+    /// <summary>
+    ///     A battle's end as the galaxy takes it: the outcome dispatches to its listeners and is
+    ///     recorded on the world, then the summary dialog closes - which raises the
+    ///     <see cref="BattleEndClosed" /> generic and, measured, fires every active speech-done
+    ///     listener (Trigger_All_Speech_Done_Events is called from the battle-end dialog alone).
+    /// </summary>
+    public StorySimSnapshot ResolveBattleOutcome(StorySimSnapshot snapshot, StoryWorldChange outcome)
+    {
+        snapshot = ApplyWorldChange(snapshot, outcome);
+        snapshot = ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.Generic) { Name = BattleEndClosed });
+        foreach (var node in _eventNodes)
+        {
+            if (!IsActive(node, snapshot.Runtime)) continue;
+            if (!string.Equals(node.Event!.EventType, SpeechDone, StringComparison.OrdinalIgnoreCase)) continue;
+            snapshot = Fire(snapshot, node, StorySimCause.Speech, null, 0);
+        }
+
+        return snapshot;
+    }
+
     private string? UnknownName(StoryWorldChange change)
     {
         if (_symbols is null) return null;
@@ -177,6 +198,11 @@ public sealed partial class StorySimulator
                     });
                 break;
         }
+
+        if (change.BattleKey is { } battleKey &&
+            change.Kind is StoryWorldChangeKind.BattleWon or StoryWorldChangeKind.BattleLost)
+            world = world.WithBattleOutcome(battleKey,
+                change.Kind == StoryWorldChangeKind.BattleWon ? "won" : "lost");
 
         var runtime = snapshot.Runtime.WithWorld(world);
         foreach (var write in change.Flags ?? [])

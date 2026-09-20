@@ -5,7 +5,8 @@ import * as vscode from 'vscode';
 
 import {LspGateway} from './lsp/lspGateway';
 import {revealDefinition} from './revealDefinition';
-import {panelKey, panelTitle, type StoryGraphTarget} from './storyGraphTarget';
+import {battleLabelOf} from './storyBattles';
+import {galacticOf, panelKey, panelTitle, type StoryGraphTarget} from './storyGraphTarget';
 import {PanelRegistry, WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
 import {
     ApplyStoryCommandBatchResult, ExecuteStoryCommandResult, GetStoryDiagnosticsResult,
@@ -15,8 +16,10 @@ import {
 } from './protocol';
 
 /**
- * Read-only story graph webview, one panel per campaign FACTION - a campaign's factions are
- * separate story chains and never share a graph. The webview (a rete.js app bundled to
+ * Read-only story graph webview, one panel per campaign FACTION and SCOPE - a campaign's factions
+ * are separate story chains and never share a graph, and within a faction each tactical battle is
+ * a sub-graph of its own: the galactic panel shows a battle as one portal, the battle's panel shows
+ * the galactic events it touches as portals back. The webview (a rete.js app bundled to
  * out/webview/storyGraph.js) is a pure renderer: it holds the current filter state and asks the
  * extension to re-fetch (`fetch` message) whenever filters change or the server pushes
  * `aet/storyGraphChanged` for this campaign (`invalidate` → the webview replays its filters so
@@ -25,14 +28,29 @@ import {
 export class StoryGraphPanel extends WebviewPanelHost {
     private static readonly _panels = new PanelRegistry<StoryGraphPanel>();
 
-    static show(target: StoryGraphTarget, extensionUri: vscode.Uri, lsp: LspGateway): void {
+    /**
+     * Opens or reveals the panel for a target. `centerOn` is a node the revealed graph should
+     * centre on - how a portal lands the reader on the event it stands for rather than wherever
+     * the other panel was last left.
+     */
+    static show(
+        target: StoryGraphTarget, extensionUri: vscode.Uri, lsp: LspGateway, centerOn?: string, simulate = false,
+    ): void {
         const key = panelKey(target);
         const existing = StoryGraphPanel._panels.get(key);
         if (existing) {
             existing.reveal();
+            if (centerOn) {
+                existing.post({type: 'centerNode', nodeId: centerOn});
+            }
+            if (simulate) {
+                existing.post({type: 'enterMode', mode: 'simulate'});
+            }
             return;
         }
-        StoryGraphPanel._panels.track(key, new StoryGraphPanel(target, extensionUri, lsp));
+        const panel = StoryGraphPanel._panels.track(key, new StoryGraphPanel(target, extensionUri, lsp));
+        panel._pendingCenter = centerOn;
+        panel._pendingSimulate = simulate;
     }
 
     /**
@@ -61,15 +79,21 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private _pendingCommands: Record<string, unknown>[] = [];
     // Cached "skip the delete-event confirmation" preference (undefined = not fetched yet).
     private _skipDeleteConfirm: boolean | undefined;
+    // A node to centre on once the first graph has been posted - a portal's landing spot on a panel
+    // that did not exist yet.
+    private _pendingCenter: string | undefined;
+    // Whether to enter Simulation once the first graph is up - a battle entered from the galactic
+    // simulation opens straight into its own session.
+    private _pendingSimulate = false;
 
     private constructor(
         private readonly _target: StoryGraphTarget,
-        extensionUri: vscode.Uri,
+        private readonly _extensionUri: vscode.Uri,
         private readonly _lsp: LspGateway
     ) {
         // No bodyStyle: this webview resets the page from inside its own styled-components global,
         // which is where the rest of its canvas styling lives.
-        super(extensionUri, {
+        super(_extensionUri, {
             viewType: 'aetStoryGraph',
             title: panelTitle(_target),
             column: vscode.ViewColumn.Active,
@@ -144,24 +168,55 @@ export class StoryGraphPanel extends WebviewPanelHost {
             case 'resolveRef':
                 await this._resolveRef(msg.value as string, msg.referenceType as string | undefined);
                 break;
+            case 'openScope':
+                // A portal on the galactic graph: the battle's own panel. The stub's label is the
+                // reference as the XML wrote it; the title takes the server's form of the name so
+                // the navigator and the portal open one and the same tab.
+                StoryGraphPanel.show(
+                    {
+                        ...galacticOf(this._target),
+                        scope: msg.scope as string,
+                        scopeLabel: battleLabelOf(String(msg.label ?? msg.scope)),
+                    },
+                    this._extensionUri, this._lsp, undefined, msg.simulate === true);
+                break;
+            case 'revealScope':
+                // A portal on a battle graph: the galactic panel, centred on the event it stands for.
+                StoryGraphPanel.show(galacticOf(this._target), this._extensionUri, this._lsp, msg.nodeId as string);
+                break;
         }
     }
 
-    /** Called on `aet/storySimChanged` - the panel's webview re-fetches the sim state. */
+    /**
+     * Called on `aet/storySimChanged` - the panel showing that session re-fetches its state.
+     *
+     * A session is one scope: the galactic story, or one battle. The server names the scope a
+     * change happened in and pushes both when a battle's resolution reaches the galaxy, so the
+     * routing here is exact rather than fanned out over the faction.
+     */
     static simChanged(target: StoryGraphTarget): void {
         StoryGraphPanel._panels.get(panelKey(target))?.post({type: 'simChanged'});
     }
 
     /**
      * Forwards a simulation request (`start`, `stop`, `getState`, `satisfyTrigger`, `setFlag`,
-     * `advanceClock`, `luaNotify`) and posts the resulting state document back.
+     * `advanceClock`, `luaNotify`, `resolveBattle`, ...) for this panel's scope and posts the
+     * resulting state document back.
      */
     private async _runSim(method: string, args: Record<string, unknown> | undefined): Promise<void> {
         const requestName = 'aet/storySim' + method.charAt(0).toUpperCase() + method.slice(1);
+        // The session's options travel with its start and hold until it stops; only the
+        // extension host can read configuration.
+        const options = method === 'start'
+            ? {assumeMediaCompletes: this._simulatorSetting('assumeMediaCompletes')}
+            : {};
         const result = await this._lsp.requestOrReport<StorySimStateResult>(
             requestName, {
                 campaign: this._target.campaign,
-                faction: this._target.faction, ...(args ?? {})
+                faction: this._target.faction,
+                scope: this._target.scope,
+                ...options,
+                ...(args ?? {})
             }, 'simulation request failed');
         if (result === undefined) {
             return;
@@ -328,6 +383,13 @@ export class StoryGraphPanel extends WebviewPanelHost {
             // Not contributed in package.json (WIP): only ever true if hand-written into settings.
             simulate: features.get<boolean>('tools.storySimulator', false) === true,
         });
+        // The webview's own simulation preferences; the session's go with its start instead.
+        this.post({type: 'simSettings', autoResume: this._simulatorSetting('autoResume')});
+    }
+
+    /** A `aet-eaw-edit.storySimulator.*` setting; both default on, as the contribution says. */
+    private _simulatorSetting(name: 'assumeMediaCompletes' | 'autoResume'): boolean {
+        return vscode.workspace.getConfiguration('aet-eaw-edit.storySimulator').get<boolean>(name, true) !== false;
     }
 
     /** Fetches the workspace preferences and pushes the swimlane-lane toggles to the webview. */
@@ -423,6 +485,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
             {
                 campaign: this._target.campaign,
                 faction: this._target.faction,
+                scope: this._target.scope,
                 commands, ...filterFields(filters)
             }, 'preview failed');
         if (result === undefined) {
@@ -436,6 +499,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         this.post({
             type: 'graph', preview: true, campaign: this._target.campaign, faction: this._target.faction,
+            scope: this._target.scope ?? null,
             nodes: result.nodes ?? [], edges: result.edges ?? [],
             branches: result.branches ?? undefined, threads: result.threads ?? undefined,
             layout: await this._layout(),
@@ -499,7 +563,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
      */
     private async _layout(): Promise<StoryLayoutEntryDto[]> {
         const stored = await this._lsp.requestOr<GetStoryLayoutResult>(
-            'aet/getStoryLayout', {campaign: this._target.campaign, faction: this._target.faction}, {entries: []});
+            'aet/getStoryLayout',
+            {campaign: this._target.campaign, faction: this._target.faction, scope: this._target.scope},
+            {entries: []});
         return stored.entries ?? [];
     }
 
@@ -509,7 +575,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
         const outcome = await this._lsp.request<GetStoryGraphResult>(
             'aet/getStoryGraph', {
                 campaign: this._target.campaign,
-                faction: this._target.faction, ...filterFields(filters)
+                faction: this._target.faction,
+                scope: this._target.scope,
+                ...filterFields(filters)
             });
 
         if (!outcome.ok) {
@@ -530,12 +598,23 @@ export class StoryGraphPanel extends WebviewPanelHost {
         this.post({
             type: 'graph',
             campaign: this._target.campaign, faction: this._target.faction,
+            scope: this._target.scope ?? null,
             nodes: outcome.value.nodes ?? [],
             edges: outcome.value.edges ?? [],
             branches: outcome.value.branches ?? undefined,
             threads: outcome.value.threads ?? undefined,
             layout: await this._layout(),
         });
+        // The portal's landing spot, now that the graph holding it is on its way. The webview
+        // parks the jump until the nodes are mounted, so ordering behind the graph is enough.
+        if (this._pendingCenter) {
+            this.post({type: 'centerNode', nodeId: this._pendingCenter});
+            this._pendingCenter = undefined;
+        }
+        if (this._pendingSimulate) {
+            this.post({type: 'enterMode', mode: 'simulate'});
+            this._pendingSimulate = false;
+        }
         // Diagnostics are NO LONGER pushed on every graph refresh - they were the "live"
         // validation that made editing sluggish. They now come only from the explicit Validate
         // action (aet/validateStoryCommandBatch), which reflects the staged/pending state.

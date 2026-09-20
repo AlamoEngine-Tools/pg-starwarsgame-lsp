@@ -183,6 +183,7 @@ public static class ServerConfigurator
             .WithHandler<StorySimSeekHandler>()
             .WithHandler<StorySimBreakpointsHandler>()
             .WithHandler<StorySimWorldHandler>()
+            .WithHandler<StorySimResolveBattleHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
@@ -240,7 +241,7 @@ public static class ServerConfigurator
                     sp.GetRequiredService<ISchemaProvider>(),
                     key => sp.GetRequiredService<ILanguageServerFacade>()
                         .SendNotification("aet/storySimChanged",
-                            new StorySimChangedParams(key.Campaign, key.Faction)),
+                            new StorySimChangedParams(key.Campaign, key.Faction, key.Scope)),
                     new IndexWorldSymbols(sp.GetRequiredService<IGameIndexService>())));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.

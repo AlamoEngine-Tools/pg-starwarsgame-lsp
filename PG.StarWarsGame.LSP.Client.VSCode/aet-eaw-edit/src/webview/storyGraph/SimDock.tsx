@@ -16,6 +16,8 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import type {
     StoryGraphEdgeDto,
     StoryGraphNodeDto,
+    StorySimBattleDto,
+    StorySimFlagDto,
     StorySimInterventionDto,
     StorySimNodeStateDto,
     StorySimStateDto,
@@ -55,6 +57,13 @@ export interface SimActions {
     setBreakpoints: (nodeIds: string[], onGates: boolean) => void;
     centerNode: (nodeId: string) => void;
     copy: (text: string) => void;
+    /** The battle's own panel; `simulate` opens it straight into its session. */
+    openBattle: (battleKey: string, label: string, simulate: boolean) => void;
+    /**
+     * The battle's end: its own outcome listeners fire, its flag writes and the author's picks
+     * merge into the galaxy, and the outcome fires there.
+     */
+    resolveBattle: (battleKey: string, won: boolean, picks?: readonly StorySimFlagDto[]) => void;
 }
 
 /** What the flyout beside the dock is showing. */
@@ -63,7 +72,33 @@ export type SimSelection =
     | { kind: 'node'; nodeId: string }
     | { kind: 'planet'; name: string }
     | { kind: 'flag'; name: string }
-    | { kind: 'script'; scriptUri: string };
+    | { kind: 'script'; scriptUri: string }
+    | { kind: 'battle'; key: string };
+
+/** Why a session takes no command right now, or null: the reason every transport control shows. */
+export function frozenReason(state: StorySimStateDto): string | null {
+    if (state.pausedFor) {
+        return `Galaxy paused - battle ${state.pausedFor}`;
+    }
+    if (state.outcome) {
+        return `Battle ${state.outcome} - re-enter Simulation to replay`;
+    }
+    return null;
+}
+
+/** A battle's standing as the galactic session reports it, in the dock's words. */
+export function battleStatusLabel(battle: StorySimBattleDto): string {
+    switch (battle.status) {
+        case 'running':
+            return `Running - t${battle.tick}`;
+        case 'won':
+            return 'Won';
+        case 'lost':
+            return 'Lost';
+        default:
+            return 'Not started';
+    }
+}
 
 /** The three canvas lenses: each shows one slice of the running story. */
 export interface SimLenses {
@@ -117,6 +152,35 @@ export function SimHeaderChip(props: {
 }): React.JSX.Element {
     const {state} = props;
     const owed = waitingOnAuthor(state) ? state.interventions.length : 0;
+    if (state.pausedFor) {
+        // The game freezes the galaxy during a tactical battle; the chip names the battle and
+        // opens it, since that is where the story goes on.
+        const battle = state.battles?.find(b => b.label === state.pausedFor);
+        return (
+            <button
+                type="button"
+                className="sim-chip battle"
+                title={`Galaxy paused - battle ${state.pausedFor}`}
+                onClick={() => battle && props.onSelect({kind: 'battle', key: battle.key})}
+            >
+                <span className="sim-chip-tick">t{state.tick}</span>
+                <span className="sim-chip-sep"/>
+                <Icon name="tactical" size={13}/>
+                <span className="sim-chip-text">{state.pausedFor}</span>
+            </button>
+        );
+    }
+    if (state.outcome) {
+        return (
+            <span className={'sim-chip resolved ' + state.outcome}
+                  title={`Battle ${state.outcome} - tick ${state.tick}`}>
+                <span className="sim-chip-tick">t{state.tick}</span>
+                <span className="sim-chip-sep"/>
+                <Icon name="tactical" size={13}/>
+                <span className="sim-chip-text">{state.outcome === 'won' ? 'Won' : 'Lost'}</span>
+            </span>
+        );
+    }
     if (state.haltedAt) {
         const name = labelFor(state.haltedAt, props.labelOf);
         return (
@@ -261,6 +325,34 @@ export function SimInventory(props: {
                     </div>
                 ))}
             </DockSection>
+
+            {state.scope ? (
+                <DockSection title="Battle" id="sim-battle" collapsed={folded.has('sim-battle')} onToggle={toggle}>
+                    <BattleControls state={state} battleKey={state.scope} actions={actions}/>
+                </DockSection>
+            ) : null}
+            {!state.scope && state.battles?.length ? (
+                <DockSection
+                    title="Battles"
+                    count={state.battles.length}
+                    id="sim-battles" collapsed={folded.has('sim-battles')} onToggle={toggle}
+                >
+                    {state.battles.map(battle => (
+                        <button
+                            type="button"
+                            key={battle.key}
+                            className={'sim-row' + (isSelected({kind: 'battle', key: battle.key}) ? ' selected' : '')
+                                + (battle.status === 'running' ? ' running' : '')}
+                            title={`${battle.label} - ${battleStatusLabel(battle)}`}
+                            onClick={() => pick({kind: 'battle', key: battle.key})}
+                        >
+                            <Icon name="tactical" size={13}/>
+                            <span className="sim-row-name">{battle.label}</span>
+                            <span className="sim-row-value">{battleStatusLabel(battle)}</span>
+                        </button>
+                    ))}
+                </DockSection>
+            ) : null}
 
             <DockSection
                 title="World"
@@ -422,7 +514,8 @@ export function SimFlyout(props: {
     const title = selection.kind === 'decision' ? 'Decision'
         : selection.kind === 'node' ? 'Event'
             : selection.kind === 'planet' ? 'Planet'
-                : selection.kind === 'flag' ? 'Flag' : 'Script';
+                : selection.kind === 'flag' ? 'Flag'
+                    : selection.kind === 'battle' ? 'Battle' : 'Script';
     return (
         <div className="stage-flyout on-right sizeable sim-flyout" role="dialog" aria-label={title}>
             <div className="stage-flyout-head">
@@ -435,6 +528,7 @@ export function SimFlyout(props: {
                 {selection.kind === 'planet' ? <PlanetDetail {...props} name={selection.name}/> : null}
                 {selection.kind === 'flag' ? <FlagDetail {...props} name={selection.name}/> : null}
                 {selection.kind === 'script' ? <ScriptDetail {...props} scriptUri={selection.scriptUri}/> : null}
+                {selection.kind === 'battle' ? <BattleDetail {...props} battleKey={selection.key}/> : null}
             </div>
         </div>
     );
@@ -455,6 +549,88 @@ function factionOf(item: StorySimInterventionDto | undefined, state: StorySimSta
     }
     // The player's faction is the one with a credit line; a campaign seeds exactly one.
     return state.world.credits[0]?.name ?? null;
+}
+
+/**
+ * A battle's controls: enter it (its own panel and session), show it while it runs, or decide
+ * its outcome here without entering - the tactical decision the game leaves to play. Shared by
+ * the battle row, the tactical decision that waits on it, and the paused chip.
+ */
+function BattleControls(props: { state: StorySimStateDto; battleKey: string; actions: SimActions }): React.JSX.Element {
+    const {state, battleKey, actions} = props;
+    const inside = state.scope === battleKey;
+    const battle = state.battles?.find(b => b.key === battleKey);
+    const label = battle?.label ?? battleKey;
+    const status = inside
+        ? (state.outcome === 'won' ? 'Won' : state.outcome === 'lost' ? 'Lost' : `Running - t${state.tick}`)
+        : battle ? battleStatusLabel(battle) : 'Unknown';
+    const resolved = inside ? !!state.outcome : battle?.status === 'won' || battle?.status === 'lost';
+    const running = inside ? !state.outcome : battle?.status === 'running';
+    // Deciding on the portal skips the battle's own run, so the flags it could have written are
+    // offered here; a battle that is running or being played writes them itself.
+    const writes = !inside && !running ? battle?.writes ?? [] : [];
+    const [picked, setPicked] = useState<Set<string>>(() => new Set());
+    useEffect(() => setPicked(new Set()), [battleKey]);
+    const picks = writes.filter(w => picked.has(w.name));
+    const togglePick = (name: string): void => setPicked(prev => {
+        const next = new Set(prev);
+        if (next.has(name)) {
+            next.delete(name);
+        } else {
+            next.add(name);
+        }
+        return next;
+    });
+    return (
+        <>
+            <div className="sim-row static">
+                <Icon name="tactical" size={13}/>
+                <span className="sim-row-name">{label}</span>
+                <span className="sim-row-value">{status}</span>
+            </div>
+            {!inside ? (
+                <button type="button" className="btn sim-answer" disabled={resolved}
+                        title={resolved ? `Battle ${status.toLowerCase()} - restart the galaxy to play it again`
+                            : running ? 'Show the battle panel' : 'Open the battle in its own panel and run it'}
+                        onClick={() => actions.openBattle(battleKey, label, !running)}>
+                    <Icon name="tactical" size={13}/>{running ? 'Show the battle' : 'Enter the battle'}
+                </button>
+            ) : null}
+            {writes.length > 0 && !resolved ? (
+                <div className="sim-picks">
+                    <p className="field-note">Flags the battle can write - pick what it did</p>
+                    {writes.map(w => (
+                        <label className="sim-row static sim-pick-row" key={w.name} title={`${w.name} = ${w.value}`}>
+                            <input type="checkbox" checked={picked.has(w.name)} onChange={() => togglePick(w.name)}/>
+                            <Icon name="flag" size={13}/>
+                            <span className="sim-row-name">{w.name}</span>
+                            <span className="sim-row-value">{w.value}</span>
+                        </label>
+                    ))}
+                </div>
+            ) : null}
+            <div className="sim-chip-row">
+                <button type="button" className="btn sim-answer" disabled={resolved}
+                        title={resolved ? `Battle ${status.toLowerCase()}` : `${label} won - the galaxy takes the victory`}
+                        onClick={() => actions.resolveBattle(battleKey, true, picks)}>
+                    <Icon name="check" size={13}/>Won
+                </button>
+                <button type="button" className="btn sim-answer" disabled={resolved}
+                        title={resolved ? `Battle ${status.toLowerCase()}` : `${label} lost - the galaxy takes the defeat`}
+                        onClick={() => actions.resolveBattle(battleKey, false, picks)}>
+                    <Icon name="close" size={13}/>Lost
+                </button>
+            </div>
+        </>
+    );
+}
+
+function BattleDetail(props: DetailProps & { battleKey: string }): React.JSX.Element {
+    return (
+        <DockSection title="Battle">
+            <BattleControls state={props.state} battleKey={props.battleKey} actions={props.actions}/>
+        </DockSection>
+    );
 }
 
 function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Element {
@@ -503,7 +679,13 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
                     ))}
                 </DockSection>
             ) : null}
-            {item.suggested ? (
+            {item.battleKey ? (
+                // The outcome this listener waits on is a battle's: deciding it here resolves the
+                // battle, so the portal, the dock and the galaxy agree on what happened.
+                <DockSection title="Battle">
+                    <BattleControls state={state} battleKey={item.battleKey} actions={actions}/>
+                </DockSection>
+            ) : item.suggested ? (
                 <DockSection title="From the event">
                     <button type="button" className="btn sim-answer" title="Apply"
                             onClick={() => actions.world(item.suggested!)}>
@@ -845,6 +1027,10 @@ export function SimTransport(props: {
     // Never gated on decisions: the engine's clock runs whatever the story waits on, and a real
     // campaign waits on hundreds of things from tick 0. The title says when a tick is idle.
     const idle = waitingOnAuthor(state);
+    // Gated on a frozen session: the galaxy while a battle is up, a battle once it has resolved.
+    // A disabled control always carries its reason, so the gate is one object spread in.
+    const frozen = frozenReason(state);
+    const gate = frozen === null ? {} : {disabled: true as const, disabledReason: frozen};
     const stop = PACE_STOPS.indexOf(pace.mode);
     return (
         <div className="player sim-transport">
@@ -852,15 +1038,15 @@ export function SimTransport(props: {
                 <IconButton
                     icon="firstFrame"
                     title="Restart"
-                    disabled={state.tick === 0}
-                    disabledReason="Already at tick 0"
+                    disabled={state.tick === 0 || frozen !== null}
+                    disabledReason={frozen ?? 'Already at tick 0'}
                     onClick={actions.restart}
                 />
                 <IconButton
                     icon="previousClip"
                     title="Back one tick"
-                    disabled={state.tick === 0}
-                    disabledReason="Already at tick 0"
+                    disabled={state.tick === 0 || frozen !== null}
+                    disabledReason={frozen ?? 'Already at tick 0'}
                     onClick={actions.back}
                 />
                 <IconButton
@@ -869,16 +1055,19 @@ export function SimTransport(props: {
                         : playing ? 'Pause'
                             : halted ? 'Resume from the breakpoint'
                                 : idle ? 'Play - clock idle' : 'Play'}
+                    {...gate}
                     onClick={actions.playPause}
                 />
                 <IconButton
                     icon="nextClip"
                     title={idle ? 'One tick - clock idle' : 'One tick'}
+                    {...gate}
                     onClick={actions.tick}
                 />
                 <IconButton
                     icon="lastFrame"
                     title="Run to next decision or breakpoint"
+                    {...gate}
                     onClick={actions.runToDecision}
                 />
                 <span className="player-time" title={`Tick ${state.tick} - ${state.clock.toFixed(0)} s`}>

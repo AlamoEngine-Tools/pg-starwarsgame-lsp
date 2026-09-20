@@ -66,86 +66,98 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
                     c.Name + " [" +
                     string.Join(", ", c.FactionManifests.Select(f => f.Faction + "=" + f.ManifestFile)) + "]")));
 
-        var sim = new StorySimulator(model, schema);
-        var snapshot = sim.Start();
-        var commands = 0;
-        var idleAdvances = 0;
-        // A perpetual manual event re-arms after every answer; answering it forever would be the
-        // policy looping, not the story. Eight answers per node, then it counts as settled.
-        var answers = new Dictionary<string, int>(StringComparer.Ordinal);
-        while (commands < MaxCommands)
+        // One replay per scope, as the game runs them: the galactic story on its own clock, and
+        // each battle from its own tick 0. A battle's listeners never arm in the galaxy.
+        var scopes = new List<string?> { null };
+        scopes.AddRange(model.Battles.Select(b => b.Key));
+        foreach (var scope in scopes) ReplayScope(scope);
+        return;
+
+        void ReplayScope(string? scope)
         {
-            commands++;
-            // A notification a script already owes is the script's to deliver: the policy leaves
-            // it alone and lets the clock bring it, so the overlay is measured, not pre-empted.
-            var owed = snapshot.Runtime.PendingEmissions.Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var next = sim.GetInterventions(snapshot).FirstOrDefault(i =>
-                answers.GetValueOrDefault(i.NodeId) < 8 &&
-                !(i.Kind == "lua" && i.Options.Any(owed.Contains)));
-            if (next is not null)
+            var sim = new StorySimulator(model, schema, null, scope);
+            var snapshot = sim.Start();
+            var commands = 0;
+            var idleAdvances = 0;
+            // A perpetual manual event re-arms after every answer; answering it forever would be the
+            // policy looping, not the story. Eight answers per node, then it counts as settled.
+            var answers = new Dictionary<string, int>(StringComparer.Ordinal);
+            while (commands < MaxCommands)
             {
-                idleAdvances = 0;
-                answers[next.NodeId] = answers.GetValueOrDefault(next.NodeId) + 1;
-                // The policy answers the way an author would: change the world the event asks
-                // for when it names one, else the Lua notification, else assume the trigger met.
-                snapshot = next switch
+                commands++;
+                // A notification a script already owes is the script's to deliver: the policy leaves
+                // it alone and lets the clock bring it, so the overlay is measured, not pre-empted.
+                var owed = snapshot.Runtime.PendingEmissions.Select(p => p.Id)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var next = sim.GetInterventions(snapshot).FirstOrDefault(i =>
+                    answers.GetValueOrDefault(i.NodeId) < 8 &&
+                    !(i.Kind == "lua" && i.Options.Any(owed.Contains)));
+                if (next is not null)
                 {
-                    { Kind: "lua", Options.Count: > 0 } => sim.LuaNotify(snapshot, next.Options[0]),
-                    { Suggested: { } change } => sim.ApplyWorldChange(snapshot, change),
-                    _ => sim.SatisfyTrigger(snapshot, next.NodeId)
-                };
-                continue;
+                    idleAdvances = 0;
+                    answers[next.NodeId] = answers.GetValueOrDefault(next.NodeId) + 1;
+                    // The policy answers the way an author would: change the world the event asks
+                    // for when it names one, else the Lua notification, else assume the trigger met.
+                    snapshot = next switch
+                    {
+                        { Kind: "lua", Options.Count: > 0 } => sim.LuaNotify(snapshot, next.Options[0]),
+                        { Suggested: { } change } => sim.ApplyWorldChange(snapshot, change),
+                        _ => sim.SatisfyTrigger(snapshot, next.NodeId)
+                    };
+                    continue;
+                }
+
+                var before = Fingerprint(sim, snapshot);
+                snapshot = sim.AdvanceClock(snapshot, ClockStepSeconds);
+                idleAdvances = Fingerprint(sim, snapshot) == before ? idleAdvances + 1 : 0;
+                if (idleAdvances >= IdleAdvancesBeforeStop) break;
             }
 
-            var before = Fingerprint(sim, snapshot);
-            snapshot = sim.AdvanceClock(snapshot, ClockStepSeconds);
-            idleAdvances = Fingerprint(sim, snapshot) == before ? idleAdvances + 1 : 0;
-            if (idleAdvances >= IdleAdvancesBeforeStop) break;
+            var lifecycles = sim.GetLifecycles(snapshot);
+            var offered = sim.GetInterventions(snapshot).Select(i => i.NodeId).ToHashSet(StringComparer.Ordinal);
+            offered.UnionWith(answers.Where(kvp => kvp.Value >= 8).Select(kvp => kvp.Key));
+            var stuck = lifecycles
+                .Where(kvp => kvp.Value == StoryEventLifecycle.Armed && !offered.Contains(kvp.Key))
+                .Select(kvp => model.Graph.Nodes.First(n => n.Id == kvp.Key))
+                .Where(n => !SelfFiringTypes.Contains(n.Event!.EventType ?? ""))
+                .Select(n => $"{n.Event!.Name} ({n.Event.EventType})")
+                .ToList();
+
+            var fired = lifecycles.Values.Count(l => l == StoryEventLifecycle.Fired);
+            output.WriteLine($"{game}/{campaign}/{faction} [{scope ?? "galactic"}]: events {lifecycles.Count}, " +
+                             $"fired {fired}, commands {commands}, clock {snapshot.Clock:0}s, log lines {snapshot.Log.Count}");
+            // Events the policy answered three times without firing: a facet whose suggested change
+            // does not satisfy the event's own parameters. Not a dead end, but a modelling gap to read.
+            var everFired = snapshot.Steps.Where(s => s.To == StoryEventLifecycle.Fired).Select(s => s.NodeId)
+                .ToHashSet(StringComparer.Ordinal);
+            var unanswered = answers.Where(kvp => kvp.Value >= 8 && !everFired.Contains(kvp.Key))
+                .Select(kvp => model.Graph.Nodes.First(n => n.Id == kvp.Key).Event!)
+                .Select(e => $"{e.Name} ({e.EventType})")
+                .ToList();
+            output.WriteLine($"  answered 8x without firing: {unanswered.Count}" +
+                             (unanswered.Count > 0 ? " - " + string.Join(", ", unanswered.Take(12)) : ""));
+            var states = model.LuaMachines.Sum(m => m.States.Count);
+            var emissions = model.LuaMachines.Sum(m =>
+                m.States.Sum(s => s.OnEnter.Emissions.Count + s.OnUpdate.Emissions.Count + s.OnExit.Emissions.Count));
+            var luaLinks = model.Graph.Edges.Count(e => e.Kind == StoryEdgeKind.LuaLink);
+            var entered = snapshot.Steps.Count(s => s.Cause == StorySimCause.LuaEnter);
+            // Only fires whose source is a script state came from an owed emission; the policy's own
+            // Story_Event answers carry no source.
+            var luaFired = snapshot.Steps.Count(s =>
+                s.Cause == StorySimCause.Lua && s.To == StoryEventLifecycle.Fired &&
+                s.SourceNodeId?.Contains("#lua#", StringComparison.Ordinal) == true);
+            var unheard = snapshot.Steps.Count(s =>
+                s.Cause == StorySimCause.Ignored && s.Detail!.Contains("no armed event listens"));
+            var dropped = snapshot.Steps.Count(s => s.Cause == StorySimCause.Ignored && s.Detail!.Contains("dropped"));
+            output.WriteLine($"  lua: {model.LuaMachines.Count} scripts, {states} states, {emissions} emissions, " +
+                             $"{luaLinks} links; entered {entered} states, {luaFired} notifications fired from scripts, " +
+                             $"{unheard} emitted with no armed listener, {snapshot.Runtime.PendingEmissions.Count} still owed, " +
+                             $"{dropped} triggers dropped while a transition was pending");
+
+            Assert.True(commands < MaxCommands,
+                $"The {scope ?? "galactic"} replay did not settle within the command budget.");
+            Assert.Empty(stuck);
         }
-
-        var lifecycles = sim.GetLifecycles(snapshot);
-        var offered = sim.GetInterventions(snapshot).Select(i => i.NodeId).ToHashSet(StringComparer.Ordinal);
-        offered.UnionWith(answers.Where(kvp => kvp.Value >= 8).Select(kvp => kvp.Key));
-        var stuck = model.Graph.Nodes
-            .Where(n => n.Kind == StoryNodeKind.Event
-                        && lifecycles[n.Id] == StoryEventLifecycle.Armed
-                        && !SelfFiringTypes.Contains(n.Event!.EventType ?? "")
-                        && !offered.Contains(n.Id))
-            .Select(n => $"{n.Event!.Name} ({n.Event.EventType})")
-            .ToList();
-
-        var fired = lifecycles.Values.Count(l => l == StoryEventLifecycle.Fired);
-        output.WriteLine($"{game}/{campaign}/{faction}: events {lifecycles.Count}, fired {fired}, " +
-                         $"commands {commands}, clock {snapshot.Clock:0}s, log lines {snapshot.Log.Count}");
-        // Events the policy answered three times without firing: a facet whose suggested change
-        // does not satisfy the event's own parameters. Not a dead end, but a modelling gap to read.
-        var everFired = snapshot.Steps.Where(s => s.To == StoryEventLifecycle.Fired).Select(s => s.NodeId)
-            .ToHashSet(StringComparer.Ordinal);
-        var unanswered = answers.Where(kvp => kvp.Value >= 8 && !everFired.Contains(kvp.Key))
-            .Select(kvp => model.Graph.Nodes.First(n => n.Id == kvp.Key).Event!)
-            .Select(e => $"{e.Name} ({e.EventType})")
-            .ToList();
-        output.WriteLine($"  answered 8x without firing: {unanswered.Count}" +
-                         (unanswered.Count > 0 ? " - " + string.Join(", ", unanswered.Take(12)) : ""));
-        var states = model.LuaMachines.Sum(m => m.States.Count);
-        var emissions = model.LuaMachines.Sum(m =>
-            m.States.Sum(s => s.OnEnter.Emissions.Count + s.OnUpdate.Emissions.Count + s.OnExit.Emissions.Count));
-        var luaLinks = model.Graph.Edges.Count(e => e.Kind == StoryEdgeKind.LuaLink);
-        var entered = snapshot.Steps.Count(s => s.Cause == StorySimCause.LuaEnter);
-        // Only fires whose source is a script state came from an owed emission; the policy's own
-        // Story_Event answers carry no source.
-        var luaFired = snapshot.Steps.Count(s => s.Cause == StorySimCause.Lua && s.To == StoryEventLifecycle.Fired &&
-                                                 s.SourceNodeId?.Contains("#lua#", StringComparison.Ordinal) == true);
-        var unheard = snapshot.Steps.Count(s =>
-            s.Cause == StorySimCause.Ignored && s.Detail!.Contains("no armed event listens"));
-        var dropped = snapshot.Steps.Count(s => s.Cause == StorySimCause.Ignored && s.Detail!.Contains("dropped"));
-        output.WriteLine($"  lua: {model.LuaMachines.Count} scripts, {states} states, {emissions} emissions, " +
-                         $"{luaLinks} links; entered {entered} states, {luaFired} notifications fired from scripts, " +
-                         $"{unheard} emitted with no armed listener, {snapshot.Runtime.PendingEmissions.Count} still owed, " +
-                         $"{dropped} triggers dropped while a transition was pending");
-
-        Assert.True(commands < MaxCommands, "The replay did not settle within the command budget.");
-        Assert.Empty(stuck);
     }
 
     private static string Fingerprint(StorySimulator sim, StorySimSnapshot snapshot)

@@ -262,6 +262,23 @@ export function describeChange(change: StorySimWorldChangeDto): string {
 // ── Pace ─────────────────────────────────────────────────────────────────────
 
 /** How the author advances ticks: a 1 s pulse, one tick per press, or a custom rate. */
+/**
+ * Whether play should pick itself up again after the author answered something.
+ *
+ * Play pauses itself when the clock has nothing left but a decision. Once the author has answered,
+ * the reader who pressed play expects the story to move on without pressing it again - unless the
+ * setting is off, play was never on, a breakpoint holds the run, or the story is still waiting on
+ * another answer, in which case resuming would only pause again on the next state.
+ */
+export function shouldResumeAfterAnswer(args: {
+    autoResume: boolean;
+    pausedForWait: boolean;
+    stillWaiting: boolean;
+    halted: boolean;
+}): boolean {
+    return args.autoResume && args.pausedForWait && !args.stillWaiting && !args.halted;
+}
+
 export interface SimPace {
     mode: 'pulse' | 'step' | 'custom';
     ticksPerSecond: number;

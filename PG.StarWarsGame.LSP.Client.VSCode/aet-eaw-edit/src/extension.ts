@@ -628,7 +628,9 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     });
 
     lspClient.onNotification('aet/storySimChanged', (params: StorySimChangedParams) => {
-        StoryGraphPanel.simChanged({campaign: params.campaign, faction: params.faction});
+        StoryGraphPanel.simChanged({
+            campaign: params.campaign, faction: params.faction, scope: params.scope ?? undefined,
+        });
     });
 
     lspClient.onNotification('aet/previewSceneChanged', () => {
@@ -961,9 +963,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 return;
             }
 
+            // A battle node carries its key in fileName and its name in the label; it opens the
+            // battle's own graph, the sub-graph the galactic one shows as a portal.
             let target: StoryGraphTarget | undefined =
                 arg?.campaignName && arg?.factionName
-                    ? {campaign: arg.campaignName, faction: arg.factionName}
+                    ? {
+                        campaign: arg.campaignName, faction: arg.factionName,
+                        ...(arg.kind === 'battle' && arg.fileName
+                            ? {scope: arg.fileName, scopeLabel: String(arg.label ?? arg.fileName)}
+                            : {}),
+                    }
                     : undefined;
 
             if (!target) {
@@ -983,7 +992,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                     return;
                 }
                 const picked = await vscode.window.showQuickPick(items, {
-                    title: 'Open Story Graph', placeHolder: 'Select a campaign faction',
+                    title: 'Open Story Graph', placeHolder: 'Select a campaign faction or one of its battles',
                 });
                 target = picked?.target;
             }
@@ -991,31 +1000,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 StoryGraphPanel.show(target, context.extensionUri, lsp);
             }
         }),
-        // Prefer the server-resolved URI: manifest entries and on-disk names differ in casing
-        // throughout vanilla data (the engine is case-insensitive, findFiles is not), and the
-        // file may live outside the workspace (dependency / base game). The name-based search
-        // remains as a fallback for entries the server could not resolve (broken chain links).
+        // The server's resolution is the only one: the model resolved every manifest entry to its
+        // document when it was assembled, case-insensitively as the engine reads files. There is
+        // no name search here - a workspace glob is case-sensitive and would answer by a different
+        // rule than the one the model used, which is how a file that was right there read as missing.
         vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryFile', async (fileName: string, uri?: string) => {
-            if (uri) {
-                try {
-                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
-                    await vscode.window.showTextDocument(doc, {preview: true});
-                    return;
-                } catch {
-                    // e.g. stale URI after files changed on disk - fall through to the name search.
-                }
-            }
-            if (!fileName) {
-                return;
-            }
-            const matches = await vscode.workspace.findFiles(`**/${fileName}`, '**/node_modules/**', 2);
-            if (!matches.length) {
+            if (!uri) {
                 vscode.window.showWarningMessage(
-                    `EaWEdit: '${fileName}' was not found in the workspace (it may live in a dependency or the base game).`);
+                    `EaWEdit: '${fileName}' is named by a plot manifest but the story model could not read it - `
+                    + 'a broken chain link, or a file outside the project and its dependencies.');
                 return;
             }
-            const doc = await vscode.workspace.openTextDocument(matches[0]);
-            await vscode.window.showTextDocument(doc, {preview: true});
+            try {
+                const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
+                await vscode.window.showTextDocument(doc, {preview: true});
+            } catch (e) {
+                vscode.window.showWarningMessage(`EaWEdit: Cannot open '${fileName}' - ${e}`);
+            }
         }),
     );
 

@@ -2,6 +2,22 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
+import {shouldResumeAfterAnswer} from './simModel';
+
+describe('shouldResumeAfterAnswer', () => {
+    const base = {autoResume: true, pausedForWait: true, stillWaiting: false, halted: false};
+
+    it('resumes when play paused itself for a decision that is now answered', () => {
+        assert.equal(shouldResumeAfterAnswer(base), true);
+    });
+
+    it('stays paused when the setting is off, play was never on, a breakpoint holds, or another decision waits', () => {
+        assert.equal(shouldResumeAfterAnswer({...base, autoResume: false}), false);
+        assert.equal(shouldResumeAfterAnswer({...base, pausedForWait: false}), false);
+        assert.equal(shouldResumeAfterAnswer({...base, halted: true}), false);
+        assert.equal(shouldResumeAfterAnswer({...base, stillWaiting: true}), false);
+    });
+});
 import {describe, it} from 'node:test';
 
 import {

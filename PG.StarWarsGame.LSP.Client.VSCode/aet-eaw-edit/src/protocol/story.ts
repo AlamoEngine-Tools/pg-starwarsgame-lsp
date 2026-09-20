@@ -22,11 +22,29 @@ export interface StoryLuaScriptDto {
     uri?: string | null;
 }
 
+/**
+ * A tactical battle of the faction: its own graph, opened through `GetStoryGraph`'s `scope`.
+ * `rank` is the order in which the galactic story reaches it.
+ */
+export interface StoryBattleDto {
+    key: string;
+    label: string;
+    entryEventIds: string[];
+    rank: number;
+    /**
+     * The battle's plot files as its tactical manifest lists them, each with the document it
+     * resolved to. The faction's own thread list never carries these.
+     */
+    threads: StoryPlotThreadDto[];
+}
+
 export interface StoryFactionDto {
     faction: string;
     manifestFile: string;
     threads: StoryPlotThreadDto[];
     luaScripts: StoryLuaScriptDto[];
+    /** Absent from an older server; treat as none. */
+    battles?: StoryBattleDto[] | null;
 }
 
 /** `set` is the Campaign_Set this campaign belongs to; null when it declares none. */
@@ -64,6 +82,8 @@ export interface StoryGraphNodeDto {
     perpetual?: boolean;
     storyDialog?: string | null;
     storyChapter?: number | null;
+    /** For a GalacticPortal node: the galactic event it stands for. */
+    portalTarget?: string | null;
 }
 
 export interface StoryGraphEdgeDto {
@@ -223,6 +243,11 @@ export interface StoryLayoutEntryDto {
     eventName: string;
     x: number;
     y: number;
+    /**
+     * Set for a virtual node - a junction, a portal, a tactical stub, a script state - which the
+     * sidecar names by id; the thread and event are then empty. Absent for an event.
+     */
+    nodeId?: string | null;
 }
 
 export interface GetStoryLayoutResult {
@@ -291,6 +316,25 @@ export interface StorySimInterventionDto {
     facet?: string | null;
     /** A ready change built from the event's own parameters; null when the author must pick. */
     suggested?: StorySimWorldChangeDto | null;
+    /**
+     * A tactical decision's battle: the one the panel is inside, or the one whose entry this
+     * listener follows. Absent when no battle can be named and the answer is a plain world change.
+     */
+    battleKey?: string | null;
+}
+
+/** One battle of the faction as the galactic session sees it: notStarted, running, won or lost. */
+export interface StorySimBattleDto {
+    key: string;
+    label: string;
+    status: string;
+    /** The battle session's own tick while it runs. */
+    tick: number;
+    /**
+     * The flags the battle's own rewards can write, with the value each would set - offered on the
+     * portal as picks when the battle is decided without being played.
+     */
+    writes?: StorySimFlagDto[] | null;
 }
 
 /** An author's change to the world; fields a kind does not read stay undefined. */
@@ -359,6 +403,22 @@ export interface StorySimStateDto {
      * older server reads as "the clock may still run".
      */
     clockPending?: number;
+    /** The battle this session runs, as the plots feed keys it; absent or null at the galactic level. */
+    scope?: string | null;
+    /**
+     * Galactic only: the label of the battle whose session is up. The game freezes the galaxy
+     * during a tactical battle, so the galactic session takes no command while this is set.
+     */
+    pausedFor?: string | null;
+    /** Battle only: "won" or "lost" once resolved, after which the session takes no command. */
+    outcome?: string | null;
+    /** Galactic only: every battle of the faction in play order with its status. */
+    battles?: StorySimBattleDto[] | null;
+    /**
+     * Whether a speech or movie a reward starts is owed its completion on the next tick, the
+     * session's option at start. Off, the listener waits for the author or the engine's timeout.
+     */
+    assumeMediaCompletes?: boolean;
 }
 
 /** A campaign script's state machine: where it is, where it goes next, what it still owes. */
@@ -390,4 +450,6 @@ export interface StoryGraphChangedParams {
 export interface StorySimChangedParams {
     campaign: string;
     faction: string;
+    /** The session's scope: a battle key, or absent/null for the galactic session. */
+    scope?: string | null;
 }

@@ -151,7 +151,8 @@ public sealed class StoryProtocolHandlersTest
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Null(result.Error);
-        var start = Assert.Single(result.Nodes, n => n.Label == "Start");
+        // The script state answering to Start carries the same label, so match the EVENT.
+        var start = Assert.Single(result.Nodes, n => n.Label == "Start" && n.Kind == "Event");
         Assert.Equal("Armed", start.Lifecycle);
         Assert.True(start.Reachable);
         var next = Assert.Single(result.Nodes, n => n.Label == "Next");
@@ -159,6 +160,32 @@ public sealed class StoryProtocolHandlersTest
         Assert.Contains(result.Edges, e => e.Kind == "Prereq");
         // The suspended thread's event reports Inactive.
         Assert.Equal("Inactive", Assert.Single(result.Nodes, n => n.Label == "Later").Lifecycle);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_Scope_GalacticIsTheDefault_UnknownBattleIsEmpty()
+    {
+        var handler = new GetStoryGraphHandler(Models(), Config());
+        var galactic = await handler.Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
+        var explicitGalactic =
+            await handler.Handle(new GetStoryGraphParams("GC", "Rebel", Scope: ""), CancellationToken.None);
+        var unknown = await handler.Handle(new GetStoryGraphParams("GC", "Rebel", Scope: "story_plots_nowhere.xml"),
+            CancellationToken.None);
+
+        Assert.Equal(galactic.Nodes.Select(n => n.Id), explicitGalactic.Nodes.Select(n => n.Id));
+        Assert.Null(unknown.Error);
+        Assert.Empty(unknown.Nodes);
+    }
+
+    [Fact]
+    public async Task GetStoryPlots_ListsTheFactionsBattles_NoneWhenNothingLinksATacticalPlot()
+    {
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var faction = Assert.Single(Assert.Single(result.Campaigns).Factions);
+        Assert.NotNull(faction.Battles);
+        Assert.Empty(faction.Battles);
     }
 
     [Fact]
@@ -215,6 +242,18 @@ public sealed class StoryProtocolHandlersTest
         Assert.NotNull(result.Threads);
         Assert.Contains(ThreadUri, result.Threads!);
         Assert.Contains(SuspendedUri, result.Threads!);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_ThreadFacet_ListsPlotFilesOnly_NeverAScript()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
+
+        // The script state is in the graph, so its uri would leak in if the facet read every node -
+        // and the picker would then offer a .lua file as the place for a new event.
+        Assert.Contains(result.Nodes, n => n.Kind == "LuaState");
+        Assert.Equal([ThreadUri, SuspendedUri], result.Threads!.Order(StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -800,9 +839,26 @@ public sealed class StoryProtocolHandlersTest
             // span threads and survive both a branch filter and a plot-state filter to be right.
             var suspended = StoryThreadParser.Parse(
                 "<Story><Event Name=\"Later\"><Branch>Act2</Branch></Event></Story>", SuspendedUri);
+            // A script state answering to Start joins the graph as a LuaState node whose "thread"
+            // is the .lua uri - present so the thread facet can be shown to leave it out.
+            var machine = new LuaStoryMachine(LuaUri, "story_lua",
+            [
+                new LuaStoryState("Start", "State_Start", LuaStoryPhase.Empty, LuaStoryPhase.Empty, LuaStoryPhase.Empty)
+            ]);
             return new StoryCampaignModel("GC", "Rebel", [active, suspended],
                 new HashSet<string>(StringComparer.Ordinal) { SuspendedUri },
-                new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended]));
+                new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended], null, [machine]))
+            {
+                LuaScripts = ["Story_Lua"],
+                LuaMachines = [machine],
+                // What the assembler records: the manifest's entries, in its casing, to the
+                // documents they resolved to.
+                ThreadUriByFile = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Story_Act_I.xml"] = ThreadUri,
+                    ["Story_Act_II.xml"] = SuspendedUri
+                }
+            };
         }
     }
 

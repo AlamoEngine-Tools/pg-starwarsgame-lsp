@@ -59,6 +59,19 @@ public sealed class PreviewStoryGraphHandlerTest
     }
 
     [Fact]
+    public async Task Scope_IsHonoured_SoABattlePanelPreviewsItsOwnGraph()
+    {
+        // The fixture links no battle, so a battle scope is empty - and the galactic scope, which
+        // is what a null scope means, is the whole graph. What matters is that the field reaches the
+        // projection at all: without it a staged edit previewed in a battle panel painted the galaxy.
+        var scoped =
+            await Handler().Handle(Preview() with { Scope = "story_plots_nowhere.xml" }, CancellationToken.None);
+
+        Assert.Null(scoped.Error);
+        Assert.Empty(scoped.Nodes);
+    }
+
+    [Fact]
     public async Task StagedCreateEvent_AppearsInPreview()
     {
         // The new event exists only in the composed working copy (nothing was written) - its node

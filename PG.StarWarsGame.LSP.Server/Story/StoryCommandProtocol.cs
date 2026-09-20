@@ -139,7 +139,9 @@ public sealed record PreviewStoryGraphParams(
     string? PlotState = null,
     // Which way ReachableFrom reaches - see GetStoryGraphParams. Carried here as well so a staged
     // edit previewed while filtered upstream stays filtered the same way.
-    string? ReachableDirection = null) : IRequest<GetStoryGraphResult>;
+    string? ReachableDirection = null,
+    // The battle whose panel is previewing, or null for the galactic level - see GetStoryGraphParams.
+    string? Scope = null) : IRequest<GetStoryGraphResult>;
 
 /// <summary>
 ///     Sends <c>workspace/applyEdit</c> to the client. A seam so command handlers are testable

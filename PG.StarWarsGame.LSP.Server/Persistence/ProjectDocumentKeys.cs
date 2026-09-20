@@ -70,6 +70,26 @@ public sealed class ProjectDocumentKeys(IModProjectReloadService reloadService, 
     }
 
     /// <summary>
+    ///     A virtual node's key - a junction, a portal, a tactical stub, a script state. Such a node
+    ///     has no thread and event to be named by, so its id is the name: the graph builds ids from
+    ///     '#'-joined parts, and every part that is a document URI is made project-relative first,
+    ///     so the key survives a clone as an event's does and no absolute path is hashed. Null when
+    ///     a URI in the id lies outside the project.
+    /// </summary>
+    public Guid? VirtualNodeKey(string nodeId)
+    {
+        var parts = nodeId.Split('#');
+        for (var i = 0; i < parts.Length; i++)
+        {
+            if (!parts[i].StartsWith("file:", StringComparison.OrdinalIgnoreCase)) continue;
+            if (RelativePathFor(parts[i]) is not { } relative) return null;
+            parts[i] = relative;
+        }
+
+        return DocumentKey.Composite(["node", .. parts]);
+    }
+
+    /// <summary>
     ///     The same key for a thread named only by its file name, as the layout sidecar named them
     ///     before this existed. Null when the name matches no file or more than one.
     /// </summary>

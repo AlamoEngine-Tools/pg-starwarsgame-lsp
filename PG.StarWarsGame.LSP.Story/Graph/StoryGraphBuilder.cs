@@ -101,6 +101,42 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             state.AddEdge(new StoryEdge(writerId, readerId, StoryEdgeKind.Flag, display));
         }
 
+        // Pass 3b: media completion edges - a reward that starts a speech or a movie to the
+        // listeners that wait for it to end, campaign-wide, since the engine dispatches the
+        // completion by name to every active listener. Measured on the corpus: 1485 of 1522
+        // speech-done listeners name a MULTIMEDIA speech (parameter 8), 35 a SPEECH reward's.
+        // Drawn, not a prerequisite: the simulator owes the completion the same way.
+        var mediaListeners = new List<(string Kind, HashSet<string> Names, string NodeId)>();
+        foreach (var (_, node) in eventNodes)
+        {
+            var kind = node.Event!.EventType?.ToUpperInvariant() switch
+            {
+                "STORY_SPEECH_DONE" => "speech",
+                "STORY_MOVIE_DONE" => "movie",
+                _ => null
+            };
+            if (kind is null) continue;
+            var names = NameTokens(node.Event.EventParams.FirstOrDefault(p => p.Position == 0)?.RawValue);
+            if (names.Count > 0) mediaListeners.Add((kind, names, node.Id));
+        }
+
+        foreach (var (_, node) in eventNodes)
+        {
+            var (kind, position) = node.Event!.RewardType?.ToUpperInvariant() switch
+            {
+                "SPEECH" => ("speech", 0),
+                "MULTIMEDIA" => ("speech", 7),
+                "START_MOVIE" => ("movie", 0),
+                _ => (null, 0)
+            };
+            if (kind is null) continue;
+            var name = node.Event.RewardParams.FirstOrDefault(p => p.Position == position)?.RawValue.Trim();
+            if (string.IsNullOrEmpty(name)) continue;
+            foreach (var listener in mediaListeners)
+                if (listener.Kind == kind && listener.Names.Contains(name) && listener.NodeId != node.Id)
+                    state.AddEdge(new StoryEdge(node.Id, listener.NodeId, StoryEdgeKind.Implicit, kind));
+        }
+
         // Pass 4: tactical entry edges - root events (no incoming Prereq/Control) of a tactical
         // manifest's own threads get an edge from that manifest's stub node, so "reachable from
         // here" can jump straight into the battle's story.
@@ -155,6 +191,16 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
     }
 
     /// <summary>The node id of a script state: the script uri plus the state name, lower-cased like an event id.</summary>
+    /// <summary>A string-list parameter's names, split as the engine splits (whitespace and commas), compared case-insensitively.</summary>
+    public static HashSet<string> NameTokens(string? raw)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (raw is null) return set;
+        foreach (var token in raw.Split([' ', '\t', '\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries))
+            set.Add(token);
+        return set;
+    }
+
     public static string LuaStateNodeId(string scriptUri, string stateName)
     {
         return $"{scriptUri}#lua#{stateName.ToLowerInvariant()}";

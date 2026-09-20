@@ -12,6 +12,19 @@
   - Flow along the edges, fire counts, gate meters, breakpoints on events and gates, lenses, and a filterable trace panel; rewind replays the same answers
   - Not simulated: movement, production, combat and AI - nothing changes unless a reward or the author writes it
 
+- **Battles as sub-graphs** - a tactical mission is its own story graph behind a portal, as the game runs it. See [#81](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/81).
+  - The galactic graph shows each battle as one portal; the battle graph shows the galactic events that link it in and listen for its outcome as portals back. Either portal opens or reveals the other panel on the event concerned
+  - Campaign Editor view: the faction's battles in play order, their plot files beneath them; a battle opens its graph. The palette lists the battles after their faction
+  - Filters and the reachable-from chain run inside a panel's scope; thread lanes stay on the galactic graph and are disabled inside a battle
+  - Simulation: the galactic session arms the galactic listeners only - Underworld starts with 12 decisions instead of 543. A battle runs as its own session on its own clock, seeded with the galaxy's flags and world; the galaxy pauses while it runs and says so. Won or lost from either panel: the battle's listeners fire, its flag writes cross, the galactic outcome listeners fire, and a rewind replays the outcome as one step
+  - Protocol: `scope` on the story graph, preview and simulation requests and on `aet/storySimChanged`; `battles` on the plots result; `aet/storySimResolveBattle`
+  - A battle's plot files travel with the battle in the plots feed, resolved through the model's own manifest-to-document map; the navigator lists them under the battle and no longer searches the workspace for a file by name
+  - Deciding a battle on its portal runs the battle's own outcome listeners, offers the flags the battle could write as picks, raises the `battle_end_closed` generic and ends every speech still playing, as closing the summary does in the game; the listener for the other outcome leaves the decisions
+  - A speech a MULTIMEDIA reward starts is owed its `STORY_SPEECH_DONE` like a SPEECH reward's (1485 of the corpus's 1522 listeners); a speech-done listener nothing started fires at the engine's 60 s timeout, shown as its gate
+  - Settings `aet-eaw-edit.storySimulator.assumeMediaCompletes` and `aet-eaw-edit.storySimulator.autoResume`, both on: media completes on its own, and play resumes after an answer
+  - The saved layout now covers every node: junctions, portals, tactical stubs and script states are stored by node id with the documents inside it made project-relative, so a battle graph comes back arranged the way it was left. Older sidecars read unchanged; the nodes they never named are placed beside their neighbours once and saved from then on
+  - **Engine links**, a new edge kind in a dash-dot style of its own with a colour-key entry: a SPEECH or MULTIMEDIA speech to its `STORY_SPEECH_DONE`, a START_MOVIE to its `STORY_MOVIE_DONE`, a battle's stub to the galactic listeners for its outcome and for `battle_end_closed`. Never a prerequisite: lifecycle and reachability ignore them, and the simulator follows the same links through its world changes. On the shipped campaigns: Underworld 608 speech links, Rebel 364, Empire 263; on the galactic level 8, 10 and 9 outcome links
+
 - **Lua debugger** - off by default, flag `aet-eaw-edit.features.lua.debugger`. See [#142](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/142).
   - New debug type **Empire at War Lua** for the game's debug build
   - Breakpoints in project scripts; attach to a running game, or launch it with the mod chain

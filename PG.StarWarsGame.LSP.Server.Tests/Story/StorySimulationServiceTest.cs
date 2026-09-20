@@ -36,11 +36,11 @@ public sealed class StorySimulationServiceTest
         "</Story>\n";
 
     /// <summary>The campaign faction every fixture here runs as; a session is keyed by both.</summary>
-    private static readonly StoryModelKey Key = new("GC", "Rebel");
+    private static readonly StorySimKey Key = new("GC", "Rebel");
 
-    private static (StorySimulationService Service, List<StoryModelKey> Notified) BuildService()
+    private static (StorySimulationService Service, List<StorySimKey> Notified) BuildService()
     {
-        var notified = new List<StoryModelKey>();
+        var notified = new List<StorySimKey>();
         var service = new StorySimulationService(
             new StubModelService(), new StubIndexService(IndexWithLuaSymbol()),
             new SimEnumSchema(), notified.Add);
@@ -78,7 +78,7 @@ public sealed class StorySimulationServiceTest
     {
         var (service, _) = BuildService();
 
-        var (state, error) = service.Start(new StoryModelKey("Nope", "Rebel"));
+        var (state, error) = service.Start(new StorySimKey("Nope", "Rebel"));
 
         Assert.Null(state);
         Assert.Contains("Nope", error);

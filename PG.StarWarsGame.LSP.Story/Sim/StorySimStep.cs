@@ -72,6 +72,9 @@ public static class StorySimCause
     /// <summary>A STORY_SPEECH_DONE fired by the owed speech completion.</summary>
     public const string Speech = "speech";
 
+    /// <summary>A speech-done listener whose speech never ended, fired by the engine's timeout.</summary>
+    public const string Timeout = "timeout";
+
     /// <summary>A STORY_MOVIE_DONE fired by the owed movie completion.</summary>
     public const string Movie = "movie";
 

@@ -35,8 +35,23 @@ public sealed record StoryCampaignModel(
     public IReadOnlyDictionary<string, IReadOnlySet<string>> TacticalManifestThreads { get; init; } =
         new Dictionary<string, IReadOnlySet<string>>();
 
+    /// <summary>
+    ///     Every plot file the chain names, as its manifest writes it, to the document URI it
+    ///     resolved to - the faction manifest's plots and the tactical manifests' alike. Compared
+    ///     case-insensitively, since the engine reads files that way and the manifests' casing
+    ///     never matches the disk's. This is THE resolution; nothing downstream re-derives it.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ThreadUriByFile { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>The campaign's starting world for the simulator; null when the chain carried none.</summary>
     public StoryCampaignSeed? Seed { get; init; }
+
+    /// <summary>
+    ///     The faction's tactical battles in the order the galactic story reaches them - see
+    ///     <see cref="StoryGraphScoper.Battles" />. Each is a scope of <see cref="Graph" />.
+    /// </summary>
+    public IReadOnlyList<StoryBattle> Battles { get; init; } = [];
 
     /// <summary>The campaign scripts as state machines, one per script the manifests attach that the workspace holds.</summary>
     public IReadOnlyList<LuaStoryMachine> LuaMachines { get; init; } = [];
@@ -144,14 +159,18 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             ? []
             : luaScripts.Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(luaMachineFor).Where(m => m is not null).Select(m => m!).ToList();
-        return new StoryCampaignModel(campaignName, faction, threads, suspendedUris,
-            new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads, luaMachines))
+        var graph = new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads, luaMachines);
+        var tacticalManifestFileLists = tacticalManifestThreadFiles.ToDictionary(
+            kvp => kvp.Key, IReadOnlyList<string> (kvp) => kvp.Value, StringComparer.OrdinalIgnoreCase);
+        return new StoryCampaignModel(campaignName, faction, threads, suspendedUris, graph)
         {
             LuaScripts = luaScripts,
             LuaMachines = luaMachines,
             TacticalManifestThreads = tacticalManifestThreads,
+            ThreadUriByFile = uriByThreadFile,
             // The first declaration's seed: a campaign declared across layers keeps one world.
-            Seed = campaigns[0].Seed
+            Seed = campaigns[0].Seed,
+            Battles = StoryGraphScoper.Battles(graph, tacticalManifestThreads, tacticalManifestFileLists)
         };
 
         void AddThread(string threadFile)

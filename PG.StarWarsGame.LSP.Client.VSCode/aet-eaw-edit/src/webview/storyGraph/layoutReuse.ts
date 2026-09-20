@@ -23,3 +23,36 @@
 export function canReuseStoredLayout(eventKeys: readonly string[], stored: ReadonlySet<string>): boolean {
     return eventKeys.some(key => stored.has(key));
 }
+
+/** The shape of a node and of a stored entry this module keys by; both the DTOs satisfy it. */
+export interface LayoutNodeLike {
+    kind?: string;
+    id?: string;
+    threadUri?: string | null;
+    label?: string;
+}
+
+export interface LayoutEntryLike {
+    threadUri: string;
+    eventName: string;
+    nodeId?: string | null;
+}
+
+/**
+ * How a node is looked up in a saved layout.
+ *
+ * An event is named by its thread and event name, folded, since that is what survives a rename of
+ * nothing but casing and what the sidecar keys. A junction, portal, tactical stub or script state
+ * has neither, so its node id is the name - the server keys it by the same id with the URIs inside
+ * made relative. The two spaces cannot collide: an event key holds a space, a node id never does.
+ */
+export function nodeLayoutKey(node: LayoutNodeLike): string {
+    return node.kind === 'Event'
+        ? `${node.threadUri ?? ''} ${node.label ?? ''}`.toLowerCase()
+        : node.id ?? '';
+}
+
+/** The same key for a stored entry, so the two sides meet in one map. */
+export function layoutEntryKey(entry: LayoutEntryLike): string {
+    return entry.nodeId ? entry.nodeId : `${entry.threadUri} ${entry.eventName}`.toLowerCase();
+}

@@ -2,9 +2,36 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { canReuseStoredLayout } from './layoutReuse';
+import {canReuseStoredLayout, layoutEntryKey, nodeLayoutKey} from './layoutReuse';
+
+describe('layout keys', () => {
+    it('name an event by thread and event, folded, and a stored event entry the same way', () => {
+        const node = {
+            kind: 'Event',
+            id: 'file:///ws/Data/XML/Story.xml#start',
+            threadUri: 'file:///ws/Data/XML/Story.xml',
+            label: 'Start'
+        };
+        assert.equal(nodeLayoutKey(node), 'file:///ws/data/xml/story.xml start');
+        assert.equal(layoutEntryKey({
+            threadUri: 'file:///ws/Data/XML/Story.xml',
+            eventName: 'START'
+        }), nodeLayoutKey(node));
+    });
+
+    /**
+     * A battle graph is a third portals, junctions and script states. Named by id, they meet the
+     * entries the server hands back by the same id; before this they had no key at all and were
+     * re-placed on every open.
+     */
+    it('name any other node by its id, as the stored entry carries it', () => {
+        const portal = {kind: 'GalacticPortal', id: 'galactic#m2.xml#file:///ws/Data/XML/Story.xml#e'};
+        assert.equal(nodeLayoutKey(portal), portal.id);
+        assert.equal(layoutEntryKey({threadUri: '', eventName: '', nodeId: portal.id}), portal.id);
+    });
+});
 
 describe('canReuseStoredLayout', () => {
     it('reuses a layout that covers every event', () => {

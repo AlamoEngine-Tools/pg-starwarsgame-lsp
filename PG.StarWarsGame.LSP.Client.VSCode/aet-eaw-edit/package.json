@@ -281,6 +281,11 @@
           "group": "inline"
         },
         {
+          "command": "aet-eaw-edit.lsp.openStoryGraph",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryBattle",
+          "group": "inline"
+        },
+        {
           "command": "aet-eaw-edit.lsp.openLocalisationEditor",
           "when": "view == aet-eaw-edit.lsp.localisationNavigator && viewItem =~ /^aetLocFile/",
           "group": "inline"
@@ -879,7 +884,19 @@
             "order": 1957,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables **Simulation mode** in the story graph panel: the campaign runs forward in 1 s ticks as the engine would, with every trigger the game decides answered by you - planets captured, units built, battles won or lost, script events - from a fact table seeded by the campaign XML. The panel shows the flow along the edges, the decisions the story waits on, the world, the flags, each script's state machine, and a trace of every transition.\n\nThe simulation reproduces the engine's event rules; it does not run the galactic layer, so nothing moves, builds or fights unless you say it did.\n\nBuilds on `#aet-eaw-edit.features.tools.storyEditor#` (the panel hosting it).\n\n*Disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables **Simulation mode** in the story graph panel: the campaign runs forward in 1 s ticks as the engine would, with every trigger the game decides answered by you - planets captured, units built, battles won or lost, script events - from a fact table seeded by the campaign XML. The panel shows the flow along the edges, the decisions the story waits on, the world, the flags, each script's state machine, and a trace of every transition. A battle runs as its own session in its own panel while the galaxy stands still, as in the game.\n\nThe simulation reproduces the engine's event rules; it does not run the galactic layer, so nothing moves, builds or fights unless you say it did.\n\nBuilds on `#aet-eaw-edit.features.tools.storyEditor#` (the panel hosting it).\n\n*Disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.storySimulator.assumeMediaCompletes": {
+            "order": 1958,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Story simulation: a speech or movie a reward starts is taken to complete on the next tick, so the `STORY_SPEECH_DONE` and `STORY_MOVIE_DONE` listeners that wait on it fire on their own. Off, each such listener is a decision for you until you answer it or the engine's 60 s timeout ends it - for stepping through media by hand.\n\nA listener no reward starts is a decision either way; that is a structural problem in the story, not a media length.\n\nTakes effect when a simulation starts."
+          },
+          "aet-eaw-edit.storySimulator.autoResume": {
+            "order": 1959,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Story simulation: when play paused itself because the clock had nothing left but a decision, answering the decision resumes play. Off, play stays paused until you press it again."
           },
           "aet-eaw-edit.features.tools.variants": {
             "order": 2000,

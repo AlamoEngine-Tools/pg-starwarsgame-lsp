@@ -22,7 +22,13 @@ public enum StoryNodeKind
     TacticalPlot,
 
     /// <summary>A <c>StoryModeEvents</c> state of a campaign Lua script; its id is the script uri plus the state.</summary>
-    LuaState
+    LuaState,
+
+    /// <summary>
+    ///     A galactic event seen from inside a battle's graph: the event that links the battle in,
+    ///     or one that listens for its outcome. <see cref="StoryNode.PortalTarget" /> names it.
+    /// </summary>
+    GalacticPortal
 }
 
 public enum StoryEdgeKind
@@ -40,7 +46,16 @@ public enum StoryEdgeKind
     ///     threads its manifest includes - lets the editor jump from the stub into that
     ///     battle's own story via the existing reachable-from traversal.
     /// </summary>
-    TacticalEntry
+    TacticalEntry,
+
+    /// <summary>
+    ///     A link the engine makes between a reward and the listeners it will reach, drawn so a
+    ///     sequence the game plays in order reads in order: a speech or movie to the listener that
+    ///     waits for it to end, a battle's stub to the galactic listeners for its outcome and for
+    ///     the summary dialog closing. Never a prerequisite - the evaluator ignores it, the
+    ///     simulator follows the same link through its world changes. The label names the link.
+    /// </summary>
+    Implicit
 }
 
 /// <summary>
@@ -53,7 +68,15 @@ public sealed record StoryNode(
     StoryNodeKind Kind,
     string Label,
     string? ThreadUri,
-    StoryEvent? Event = null);
+    StoryEvent? Event = null)
+{
+    /// <summary>
+    ///     For a portal, the id of the node it stands for in the other scope: a
+    ///     <see cref="StoryNodeKind.GalacticPortal" /> names a galactic event, a
+    ///     <see cref="StoryNodeKind.TacticalPlot" /> names nothing here (its battle key is in its id).
+    /// </summary>
+    public string? PortalTarget { get; init; }
+}
 
 public sealed record StoryEdge(string FromId, string ToId, StoryEdgeKind Kind, string? Label = null);
 

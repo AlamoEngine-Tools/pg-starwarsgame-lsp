@@ -67,7 +67,26 @@ public sealed record StoryFactionDto(
     string Faction,
     string ManifestFile,
     IReadOnlyList<StoryPlotThreadDto> Threads,
-    IReadOnlyList<StoryLuaScriptDto> LuaScripts);
+    IReadOnlyList<StoryLuaScriptDto> LuaScripts,
+    // The faction's tactical battles in the order the galactic story reaches them; each opens as
+    // its own graph through getStoryGraph's Scope.
+    IReadOnlyList<StoryBattleDto>? Battles = null);
+
+/// <param name="Key">The scope key for getStoryGraph.</param>
+/// <param name="Label">The plot manifest's file name without extension.</param>
+/// <param name="EntryEventIds">The galactic event node ids whose reward links the battle in.</param>
+/// <param name="Rank">0-based order in which the galactic story reaches the battle.</param>
+/// <param name="Threads">The battle's thread document URIs.</param>
+/// <param name="Threads">
+///     The battle's plot files as its tactical manifest lists them, each with the document it
+///     resolved to. The faction's own thread list never carries these.
+/// </param>
+public sealed record StoryBattleDto(
+    string Key,
+    string Label,
+    IReadOnlyList<string> EntryEventIds,
+    int Rank,
+    IReadOnlyList<StoryPlotThreadDto> Threads);
 
 /// <param name="Name">Extensionless script name exactly as written in the plot manifest.</param>
 /// <param name="Uri">
@@ -101,7 +120,11 @@ public sealed record GetStoryGraphParams(
     // Which way <paramref name="ReachableFrom" /> reaches: "Downstream" (what the event leads to),
     // "Upstream" (what leads to it) or "Both". Null or unrecognised is Downstream, which is what the
     // filter did before the other two directions existed - so an older client keeps its behaviour.
-    string? ReachableDirection = null) : IRequest<GetStoryGraphResult>;
+    string? ReachableDirection = null,
+    // Which scope to show: null or empty is the galactic story with each battle as one portal;
+    // a battle key (from getStoryPlots' battles) is that battle's own graph with the galaxy as
+    // portals. An older client sends none and gets the galactic story.
+    string? Scope = null) : IRequest<GetStoryGraphResult>;
 
 /// <param name="Branches">
 ///     Every branch name in the campaign, INDEPENDENT of the filters that produced
@@ -136,7 +159,9 @@ public sealed record StoryGraphNodeDto(
     IReadOnlyList<StoryParamValueDto>? RewardParams = null,
     bool Perpetual = false,
     string? StoryDialog = null,
-    int? StoryChapter = null);
+    int? StoryChapter = null,
+    // For a GalacticPortal: the galactic event it stands for, so the client can jump to it.
+    string? PortalTarget = null);
 
 public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, string? Label);
 
@@ -254,7 +279,12 @@ public sealed record StoryDiagnosticDto(
 // ── aet/getStoryLayout / aet/setStoryLayout - node position sidecar ──────────
 
 [Method("aet/getStoryLayout", Direction.ClientToServer)]
-public sealed record GetStoryLayoutParams(string Campaign, string Faction) : IRequest<GetStoryLayoutResult>;
+/// <param name="Scope">
+///     The battle whose panel asks, or null for the galactic level: a battle graph's portals exist
+///     only in that scope, and the answer names the nodes the panel holds.
+/// </param>
+public sealed record GetStoryLayoutParams(string Campaign, string Faction, string? Scope = null)
+    : IRequest<GetStoryLayoutResult>;
 
 public sealed record GetStoryLayoutResult(IReadOnlyList<StoryLayoutEntryDto> Entries, string? Error = null);
 
@@ -264,7 +294,11 @@ public sealed record SetStoryLayoutParams(string Campaign, string Faction, IRead
 
 public sealed record SetStoryLayoutResult(bool Success, string? Error = null);
 
-public sealed record StoryLayoutEntryDto(string ThreadUri, string EventName, double X, double Y);
+/// <param name="NodeId">
+///     Set for a virtual node - a junction, a portal, a tactical stub, a script state - which the
+///     sidecar names by id; the thread and event are then empty. Absent for an event.
+/// </param>
+public sealed record StoryLayoutEntryDto(string ThreadUri, string EventName, double X, double Y, string? NodeId = null);
 
 // ── aet/storyGraphChanged - server push after model invalidation ─────────────
 

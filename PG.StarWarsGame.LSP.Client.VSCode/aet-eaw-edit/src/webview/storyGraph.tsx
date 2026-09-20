@@ -48,7 +48,7 @@ import {canvasEdgeStyle, type CanvasEdgeStyle, MUTED_EDGE_TOKEN} from './storyGr
 import {branchKey, type BranchKeyEntry} from './storyGraph/colourKey';
 import {ColourKeyFlyout} from './storyGraph/ColourKeyFlyout';
 import {FrameNotifier} from './storyGraph/frameNotifier';
-import {canReuseStoredLayout} from './storyGraph/layoutReuse';
+import {canReuseStoredLayout, layoutEntryKey, nodeLayoutKey} from './storyGraph/layoutReuse';
 import {createLabelSizer, LINE_RATIO, wrapLabel} from './storyGraph/lodLabel';
 import {facetList} from './storyGraph/facets';
 import {PathFilterMenu} from './storyGraph/PathFilterMenu';
@@ -78,11 +78,15 @@ import {
     StoryLayoutEntryDto,
     StoryParamOptionDto,
     StoryParamSchemaDto,
+    StorySimBattleDto,
     StorySimNodeStateDto,
     StorySimStateDto,
     StorySimStepDto,
 } from '../protocol';
-import {DEFAULT_PACE, paceIntervalMs, parsePace, type SimPace} from './storyGraph/simModel';
+import {battleKeyOfNode} from '../storyBattles';
+import {
+    DEFAULT_PACE, paceIntervalMs, parsePace, shouldResumeAfterAnswer, type SimPace,
+} from './storyGraph/simModel';
 import {
     type SimActions,
     SimFlyout,
@@ -425,6 +429,8 @@ class StoryNode extends ClassicPreset.Node {
     simGate: { label: string; progress: number | null } | null = null;
     /** Simulation overlay: the clock halts after this event fires. */
     simBreakpoint = false;
+    /** A tactical stub's battle as the galactic simulation sees it; null outside Simulation. */
+    simBattle: { status: string; tick: number } | null = null;
 
     constructor(dto: StoryGraphNodeDto, hasInputs: boolean, hasOutputs: boolean) {
         super(dto.label);
@@ -504,6 +510,9 @@ interface EditorHandle {
 
     /** Paints the gate meters and breakpoint marks from the simulation state (null clears them). */
     applySimMarks(byNodeId: ReadonlyMap<string, StorySimNodeStateDto> | null, breakpoints: ReadonlySet<string>): void;
+
+    /** The galactic session's battle statuses onto the tactical stubs; null takes them off. */
+    applyBattles(battles: readonly StorySimBattleDto[] | null): void;
 
     /** Recomputes the paths taken from the whole trace, without animating - for a graph rebuilt under a running simulation. */
     applyFlow(steps: readonly StorySimStepDto[]): void;
@@ -659,6 +668,17 @@ let onReachableFromRequested: (nodeId: string, direction: PathDirection) => void
 
 /** The event the graph is filtered to and which way, so a node's menu can mark its own direction. */
 let currentReachable: { from: string; direction: PathDirection } = {from: '', direction: 'Downstream'};
+
+/**
+ * A portal pressed. On the galactic graph a battle's stand-in opens the battle's own panel; on a
+ * battle graph a galactic event's stand-in reveals the galactic panel centred on that event. Both
+ * are the extension's to do - a webview cannot open another - so they go out as messages, through
+ * the same bridge pattern as the path filter because a node body cannot reach App.
+ */
+let onOpenBattleRequested: (battleKey: string, label: string) => void = () => { /* replaced by App */
+};
+let onRevealGalacticRequested: (galacticNodeId: string) => void = () => { /* replaced by App */
+};
 
 /** A gesture locally changed the graph without a server command - re-fetch to reconcile. */
 let onGraphDesynced: () => void = () => { /* replaced by App */
@@ -1157,17 +1177,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     };
 
     const saveAllPositions = (): void => {
+        // Every node the panel showed, not only the events: a battle graph is a third portals,
+        // junctions and script states, and a saved arrangement that left them out re-placed them
+        // on every open. An event is named by thread and event, anything else by its id.
         const entries: StoryLayoutEntryDto[] = [];
         for (const m of graphModel.values()) {
-            if (m.dto.kind !== 'Event') {
-                continue;
+            if (m.dto.kind === 'StagingAnd' || m.dto.kind === 'StagingOr') {
+                continue; // client-only, gone once its output reaches an event
             }
-            entries.push({
-                threadUri: m.dto.threadUri ?? '',
-                eventName: m.dto.label,
-                x: m.x,
-                y: m.y,
-            });
+            entries.push(m.dto.kind === 'Event'
+                ? {threadUri: m.dto.threadUri ?? '', eventName: m.dto.label, x: m.x, y: m.y}
+                : {threadUri: '', eventName: '', nodeId: m.dto.id, x: m.x, y: m.y});
         }
         if (entries.length) {
             vscode.postMessage({type: 'saveLayout', entries});
@@ -1185,6 +1205,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         // In Simulation a pick opens the event's detail beside the dock.
         if (context.type === 'nodepicked' && currentMode === 'simulate') {
             onSimNodePicked?.((context.data as { id: string }).id);
+        }
+        // A portal is a doorway: picking it goes through. Not in Edit, where a pick is the start
+        // of a drag and opening another panel under the pointer would steal the gesture.
+        if (context.type === 'nodepicked' && currentMode !== 'edit') {
+            const dto = editor.getNode((context.data as { id: string }).id)?.dto;
+            const battleKey = dto ? battleKeyOfNode(dto.id) : undefined;
+            if (dto?.kind === 'TacticalPlot' && battleKey) {
+                onOpenBattleRequested(battleKey, dto.label);
+            } else if (dto?.kind === 'GalacticPortal' && dto.portalTarget) {
+                onRevealGalacticRequested(dto.portalTarget);
+            }
         }
         // Keep the dock minimap in sync with pan/zoom and node moves (rAF-throttled).
         if (context.type === 'translated' || context.type === 'zoomed'
@@ -1305,14 +1336,22 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
      */
     const simFireCounts = new Map<string, number>();
     const simMarks = new Map<string, StorySimNodeStateDto>();
+    // The galactic session's word on each battle, keyed by battle key: what a tactical stub shows.
+    const simBattles = new Map<string, StorySimBattleDto>();
     let simBreakpoints: ReadonlySet<string> = new Set<string>();
     let simRunning = false;
     let lensActiveOnly = false;
+    const battleOf = (nodeId: string): { status: string; tick: number } | null => {
+        const key = battleKeyOfNode(nodeId);
+        const battle = key ? simBattles.get(key) : undefined;
+        return battle ? {status: battle.status, tick: battle.tick} : null;
+    };
     const decorateFromSim = (node: StoryNode): void => {
         node.simFireCount = simFireCounts.get(node.id) ?? 0;
         const mark = simMarks.get(node.id);
         node.simGate = mark?.gateLabel ? {label: mark.gateLabel, progress: mark.gateProgress ?? null} : null;
         node.simBreakpoint = simBreakpoints.has(node.id);
+        node.simBattle = node.dto.kind === 'TacticalPlot' ? battleOf(node.id) : null;
     };
     const reached = (dto: StoryGraphNodeDto): boolean => dto.lifecycle === 'Fired' || dto.lifecycle === 'Armed';
 
@@ -1368,7 +1407,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const buildModelFromLayout = (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): boolean => {
-        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [layoutEntryKey(e), e]));
         const events = nodes.filter(n => n.kind === 'Event');
         if (events.length === 0 || !canReuseStoredLayout(events.map(layoutKey), new Set(stored.keys()))) {
             return false;
@@ -1376,10 +1415,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         graphModel.clear();
         const branchByEvent = branchIndex(nodes);
         const colorFor = (dto: StoryGraphNodeDto): string => overviewToken(dto, branchOfNodeId(dto.id, branchByEvent));
-        for (const dto of events) {
-            // An event with no stored entry - newly added since the layout was written - is left
-            // for the placement pass below rather than discarding everyone else's positions.
-            const e = stored.get(layoutKey(dto));
+        for (const dto of nodes) {
+            // A node with no stored entry - added since the layout was written, or a junction from
+            // before junctions were saved - is left for the placement pass below rather than
+            // discarding everyone else's positions.
+            const e = stored.get(nodeLayoutKey(dto));
             if (e === undefined) {
                 continue;
             }
@@ -1679,7 +1719,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const rebuildModelFromGraph = (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): void => {
-        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [layoutEntryKey(e), e]));
         const oldPos = new Map<string, { x: number; y: number }>();
         for (const [id, m] of graphModel) {
             oldPos.set(id, {x: m.x, y: m.y});
@@ -1691,9 +1731,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         let placedFromDrop = false;
         for (const dto of nodes) {
             const old = oldPos.get(dto.id);
-            const key = dto.kind === 'Event' ? layoutKey(dto) : null;
-            const s = key ? stored.get(key) : undefined;
-            const drop = key ? pendingDropPositions.get(key) : undefined;
+            const key = nodeLayoutKey(dto);
+            const s = stored.get(key);
+            const drop = dto.kind === 'Event' ? pendingDropPositions.get(key) : undefined;
             // A junction born from a staging-node commit lands where the staging node stood.
             const owner = dto.kind === 'AndJunction' ? andJunctionId.exec(dto.id)?.[1]
                 : dto.kind === 'OrJunction' && dto.id.endsWith('#or') ? dto.id.slice(0, -'#or'.length)
@@ -1872,7 +1912,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
         // 3. Existing nodes update in place; nodes whose socket shape changed are rebuilt at
         //    their current position; genuinely new nodes appear beside a neighbour.
-        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [layoutEntryKey(e), e]));
         let placedPending = false;
         for (const dto of nodes) {
             const needsIn = hasIn.has(dto.id) || dto.kind === 'Event';
@@ -1896,9 +1936,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 node.branchGlow = branchOfNodeId(dto.id, branches);
                 decorateFromSim(node);
                 await editor.addNode(node);
-                const key = dto.kind === 'Event' ? layoutKey(dto) : null;
-                const pending = key ? pendingDropPositions.get(key) : undefined;
-                if (pending && key) {
+                const key = nodeLayoutKey(dto);
+                const pending = dto.kind === 'Event' ? pendingDropPositions.get(key) : undefined;
+                if (pending) {
                     pendingDropPositions.delete(key);
                     placedPending = true;
                 }
@@ -1913,7 +1953,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 if (junctionPending && owner) {
                     pendingJunctionPositions.delete(owner);
                 }
-                const entry = key ? stored.get(key) : undefined;
+                const entry = stored.get(key);
                 await area.translate(node.id, pending ?? junctionPending ?? (entry
                     ? {x: entry.x, y: entry.y}
                     : placeNewNode(dto, edges.filter(e => e.fromId === dto.id || e.toId === dto.id))));
@@ -2061,6 +2101,23 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 if (gateMoved || breakpoint !== node.simBreakpoint) {
                     node.simGate = gate;
                     node.simBreakpoint = breakpoint;
+                    void area.update('node', node.id);
+                }
+            }
+        },
+        applyBattles(battles: readonly StorySimBattleDto[] | null): void {
+            simBattles.clear();
+            for (const battle of battles ?? []) {
+                simBattles.set(battle.key, battle);
+            }
+            for (const node of editor.getNodes()) {
+                if (node.dto.kind !== 'TacticalPlot') {
+                    continue;
+                }
+                const next = battleOf(node.id);
+                if ((next?.status ?? null) !== (node.simBattle?.status ?? null)
+                    || (next?.tick ?? 0) !== (node.simBattle?.tick ?? 0)) {
+                    node.simBattle = next;
                     void area.update('node', node.id);
                 }
             }
@@ -2786,7 +2843,8 @@ const VIRTUAL_DESCRIPTIONS: Record<string, string> = {
     AndJunction: 'AND junction - every input on this prereq line must fire.',
     OrJunction: 'OR junction - any one prereq line arms the event.',
     Portal: 'Portal - stands in for a cross-file target event.',
-    TacticalPlot: 'Tactical plot manifest attached to this campaign.',
+    TacticalPlot: 'Battle - opens its own graph',
+    GalacticPortal: 'Galactic event - opens the campaign graph on it',
     StagingAnd: 'Not yet attached - wire event outputs into this, then drag its output onto the '
         + "event that should require all of them together. Nothing is saved until then.",
     StagingOr: 'Not yet attached - wire event outputs into this, then drag its output onto the '
@@ -2870,9 +2928,15 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         z-index: 1;
     }
 
-    &.k-Portal, &.k-TacticalPlot {
+    &.k-Portal, &.k-TacticalPlot, &.k-GalacticPortal {
         border-style: dashed;
         border-radius: var(--radius-6);
+    }
+
+    /* A portal to another panel is a doorway, so it takes the pointer that says so. */
+
+    &.k-TacticalPlot, &.k-GalacticPortal {
+        cursor: pointer;
     }
 
     /* Dashed = "not yet attached", same visual language as Portal/TacticalPlot's "not fully
@@ -2928,6 +2992,14 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         color: var(--vscode-focusBorder);
     }
 
+    /* The way back sits on the side the galaxy is on: a battle's portals point left, to the
+       galactic level, the way the tactical stub's arrow points right, into the battle. */
+
+    .jump.back {
+        right: auto;
+        left: -8px;
+    }
+
     /* top uses calc(50% - 7px), not transform: translateY(-50%) - rete positions connection
        endpoints from offsetTop/offsetLeft (rete-render-utils' getElementCenter), which does not
        reflect CSS transforms, so a translateY-centered socket draws edges anchored below it. */
@@ -2946,6 +3018,20 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
 `;
 
 const {RefSocket} = Presets.classic;
+
+/** What a tactical stub says about its battle while the galaxy simulates: not started, running with its own tick, won or lost. */
+function battleStatusText(battle: { status: string; tick: number }): string {
+    switch (battle.status) {
+        case 'running':
+            return `Running - t${battle.tick}`;
+        case 'won':
+            return 'Won';
+        case 'lost':
+            return 'Lost';
+        default:
+            return 'Not started';
+    }
+}
 
 function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     const dto = props.data.dto;
@@ -2984,12 +3070,26 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
                     ><span className="codicon codicon-close"/></button>
                 </Drag.NoDrag>
             ) : null}
-            {dto.kind === 'TacticalPlot' && output ? (
+            {dto.kind === 'TacticalPlot' && battleKeyOfNode(dto.id) ? (
                 <Drag.NoDrag>
                     <button
-                        className="jump" title="Jump to this battle's own story"
-                        onClick={() => onReachableFromRequested(dto.id, 'Downstream')}
+                        className="jump" title="Open this battle's graph"
+                        onClick={() => onOpenBattleRequested(battleKeyOfNode(dto.id)!, dto.label)}
                     ><span className="codicon codicon-arrow-right"/></button>
+                </Drag.NoDrag>
+            ) : null}
+            {dto.kind === 'TacticalPlot' && props.data.simBattle ? (
+                <span className={'sim-battle-status ' + props.data.simBattle.status}
+                      title={battleStatusText(props.data.simBattle)}>
+                    {battleStatusText(props.data.simBattle)}
+                </span>
+            ) : null}
+            {dto.kind === 'GalacticPortal' && dto.portalTarget ? (
+                <Drag.NoDrag>
+                    <button
+                        className="jump back" title="Open the campaign graph on this event"
+                        onClick={() => onRevealGalacticRequested(dto.portalTarget!)}
+                    ><span className="codicon codicon-arrow-left"/></button>
                 </Drag.NoDrag>
             ) : null}
             {input ? (
@@ -4594,6 +4694,35 @@ const Shell = styled.div`
         color: var(--vscode-foreground);
     }
 
+    /* The galaxy standing still for a battle, and a battle that has ended. */
+
+    .sim-chip.battle {
+        border-color: var(--vscode-focusBorder);
+        color: var(--vscode-foreground);
+    }
+
+    .sim-chip.resolved.won {
+        border-color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-chip.resolved.lost {
+        border-color: var(--vscode-errorForeground);
+    }
+
+    /* The portal's picks: the flags a battle could write, chosen before it is decided unplayed. */
+
+    .sim-picks {
+        margin: var(--space-1) 0;
+    }
+
+    .sim-pick-row {
+        cursor: pointer;
+    }
+
+    .sim-pick-row input[type="checkbox"] {
+        margin: 0 var(--space-1) 0 0;
+    }
+
     .sim-chip-dot {
         width: 8px;
         height: 8px;
@@ -5197,6 +5326,12 @@ function App(): React.JSX.Element {
     const paceRef = useRef(pace);
     const [playing, setPlaying] = useState(false);
     const playingRef = useRef(false);
+    // Auto-resume: whether the setting is on, whether the last pause was the clock waiting on the
+    // author rather than the reader pressing pause, and whether the state now arriving answers
+    // something - the three things that decide if play picks itself up again.
+    const autoResumeRef = useRef(true);
+    const pausedForWaitRef = useRef(false);
+    const answeredRef = useRef(false);
     const inFlightRef = useRef<number | null>(null);
     const setPace = useCallback((next: SimPace) => {
         paceRef.current = next;
@@ -5267,6 +5402,17 @@ function App(): React.JSX.Element {
     // Swimlane overlays, toggled independently (persisted per-workspace via WorkspaceSettings).
     const [showThreadLanes, setShowThreadLanes] = useState(false);
     const [showChapterLanes, setShowChapterLanes] = useState(false);
+    /**
+     * The battle this panel shows, or null at the galactic level. Told by the extension with every
+     * graph, since the panel is one scope for its whole life; it decides what a thread lane means.
+     */
+    const [scope, setScope] = useState<string | null>(null);
+    /**
+     * Whether the last graph has finished mounting. A centre request that arrives mid-build parks
+     * in {@link pendingJumpRef} for {@link runSetGraph} to spend; one that arrives after can go
+     * straight to the editor.
+     */
+    const graphSettledRef = useRef(true);
     // Count of unsaved staged edits - drives the Save button's enabled/dirty state.
     const [pendingCount, setPendingCount] = useState(0);
     const [saving, setSaving] = useState(false);
@@ -5455,6 +5601,7 @@ function App(): React.JSX.Element {
             handle?.resetSimVisuals();
             handle?.applyLifecycles(null);
             handle?.applyFireCounts(null);
+            handle?.applyBattles(null);
             return;
         }
         const lifecycles = new Map(state.nodes.map(n => [n.nodeId, n.lifecycle]));
@@ -5469,13 +5616,27 @@ function App(): React.JSX.Element {
         // the clock alone to change. Not on a new decision - on a real campaign one arms nearly
         // every tick (measured on Underworld: play stopped after each tick and read as broken),
         // and stopping there is what run-to-decision is for.
-        if (state.haltedAt || (state.interventions.length > 0 && (state.clockPending ?? 1) === 0)) {
+        const waiting = state.interventions.length > 0 && (state.clockPending ?? 1) === 0;
+        if (state.haltedAt || waiting) {
+            // Remember that it was the wait, not the reader, that stopped play: an answer resumes it.
+            if (playingRef.current && !state.haltedAt) {
+                pausedForWaitRef.current = true;
+            }
             setPlayingBoth(false);
+        } else if (answeredRef.current && shouldResumeAfterAnswer({
+            autoResume: autoResumeRef.current, pausedForWait: pausedForWaitRef.current,
+            stillWaiting: waiting, halted: !!state.haltedAt,
+        })) {
+            pausedForWaitRef.current = false;
+            setPlayingBoth(true);
         }
+        answeredRef.current = false;
         if (!handle) {
             simLastSeq = state.totalSteps;
             return;
         }
+        // The battles' standing is the galactic session's word, whole every time.
+        handle.applyBattles(state.battles ?? null);
         if (!replay) {
             // The graph was rebuilt under the simulation: paint everything the server's state says,
             // paths taken included, from the whole trace seen so far.
@@ -5567,10 +5728,32 @@ function App(): React.JSX.Element {
             setPlayingBoth(false);
             simRequest('runToDecision');
         },
-        satisfy: nodeId => simRequest('satisfyTrigger', {nodeId}),
-        world: change => simRequest('world', {change}),
-        luaNotify: id => simRequest('luaNotify', {id}),
-        setFlag: (flag, value) => simRequest('setFlag', {flag, value}),
+        satisfy: nodeId => {
+            answeredRef.current = true;
+            simRequest('satisfyTrigger', {nodeId});
+        },
+        world: change => {
+            answeredRef.current = true;
+            simRequest('world', {change});
+        },
+        // The battle's own panel, straight into Simulation when the reader is entering it; the
+        // resolution names the battle, and the answer is this panel's own scope.
+        openBattle: (battleKey, label, simulate) =>
+            vscode.postMessage({type: 'openScope', scope: battleKey, label, simulate}),
+        resolveBattle: (battleKey, won, picks) => {
+            answeredRef.current = true;
+            simRequest('resolveBattle', {
+                battle: battleKey, won, flags: picks?.length ? [...picks] : undefined,
+            });
+        },
+        luaNotify: id => {
+            answeredRef.current = true;
+            simRequest('luaNotify', {id});
+        },
+        setFlag: (flag, value) => {
+            answeredRef.current = true;
+            simRequest('setFlag', {flag, value});
+        },
         setBreakpoints: (nodeIds, onConditionalGates) => sendSim('breakpoints', {nodeIds, onConditionalGates}),
         centerNode: nodeId => editorRef.current?.centerNode(nodeId),
         copy: text => vscode.postMessage({type: 'copy', text}),
@@ -5605,6 +5788,7 @@ function App(): React.JSX.Element {
         if (g.full) {
             setLayouting(true);
         }
+        graphSettledRef.current = false;
         // Re-apply staged edits once the (re)built graph settles, so a reconcile never reverts them.
         const done = handle.setGraph(g.nodes, g.edges, g.layout, g.full)
             .then(() => reapplyStagedCommands())
@@ -5616,7 +5800,9 @@ function App(): React.JSX.Element {
                 }
             })
             .then(() => {
-                // A jump parked by a problem click, now that its node is mounted and centreable.
+                graphSettledRef.current = true;
+                // A jump parked by a problem click or a portal, now that its node is mounted and
+                // centreable.
                 const queued = pendingJumpRef.current;
                 if (queued === null) {
                     return;
@@ -5659,6 +5845,10 @@ function App(): React.JSX.Element {
         };
         onReachableFromRequested = (id, direction) =>
             setFilter({reachableFrom: id, reachableDirection: direction});
+        onOpenBattleRequested = (battleKey, label) =>
+            vscode.postMessage({type: 'openScope', scope: battleKey, label});
+        onRevealGalacticRequested = galacticNodeId =>
+            vscode.postMessage({type: 'revealScope', nodeId: galacticNodeId});
         requestPreview = () => vscode.postMessage({
             type: 'previewGraph', commands: [...pendingCommands], filters: filtersRef.current,
         });
@@ -5701,6 +5891,7 @@ function App(): React.JSX.Element {
                         fullRenderRef.current = false;
                     }
                     const graphNodes = (msg.nodes as StoryGraphNodeDto[] | undefined) ?? [];
+                    setScope(typeof msg.scope === 'string' && msg.scope ? msg.scope : null);
                     // Big campaigns render hundreds of full form nodes - collapse the Trigger and
                     // Reward sections by default past a threshold so first paint (and every later
                     // measure) touches far less DOM. Only seeds nodes with no explicit choice yet,
@@ -5756,6 +5947,32 @@ function App(): React.JSX.Element {
                 case 'simChanged':
                     simRequest('getState');
                     break;
+                case 'enterMode':
+                    // A battle entered from the galactic simulation opens into its own session.
+                    if (msg.mode === 'simulate' || msg.mode === 'edit' || msg.mode === 'view') {
+                        doSwitchMode(msg.mode);
+                    }
+                    break;
+                case 'centerNode': {
+                    // A portal's landing spot. Outside the current filter the node was never sent,
+                    // so the filter goes and the jump waits for the fuller graph; mid-build it waits
+                    // for the nodes to mount; otherwise it goes straight to the editor.
+                    const id = String(msg.nodeId ?? '');
+                    if (!id) {
+                        break;
+                    }
+                    const inView = new Set(simGraphRef.current.nodes.map(n => n.id));
+                    if (resolveProblemJump(id, inView) === 'unfilter') {
+                        pendingJumpRef.current = id;
+                        setNameDraft('');
+                        fetchGraph({...EMPTY_FILTERS});
+                    } else if (!graphSettledRef.current) {
+                        pendingJumpRef.current = id;
+                    } else {
+                        editorRef.current?.centerNode(id);
+                    }
+                    break;
+                }
                 case 'paramOptions': {
                     const resolve = pendingOptionRequests.get(msg.requestId as number);
                     if (resolve) {
@@ -5797,6 +6014,9 @@ function App(): React.JSX.Element {
                     break;
                 case 'availableModes':
                     setAvailableModes({edit: msg.edit === true, simulate: msg.simulate === true});
+                    break;
+                case 'simSettings':
+                    autoResumeRef.current = msg.autoResume !== false;
                     break;
                 case 'confirmStageResult':
                     if (msg.proceed) {
@@ -5957,7 +6177,7 @@ function App(): React.JSX.Element {
                         {/* Screen-space canvases behind the nodes (.canvas is z-index 1), redrawn on pan/zoom. */}
                         <SwimlaneCanvas
                             getHandle={() => editorRef.current}
-                            showThread={showThreadLanes} showChapter={showChapterLanes}
+                            showThread={showThreadLanes && scope === null} showChapter={showChapterLanes}
                         />
                         <LodOverview getHandle={() => editorRef.current}/>
                         <FlowOverlay getHandle={() => editorRef.current} hidden={simLenses.hideFlow}/>
@@ -6156,9 +6376,11 @@ function App(): React.JSX.Element {
                                 />
                                 <IconButton
                                     icon="threadLanes"
-                                    className={showThreadLanes ? 'active' : undefined}
-                                    pressed={showThreadLanes}
+                                    className={showThreadLanes && scope === null ? 'active' : undefined}
+                                    pressed={showThreadLanes && scope === null}
                                     title="Toggle thread lanes"
+                                    disabled={scope !== null}
+                                    disabledReason="Thread lanes - galactic graph only"
                                     onClick={() => toggleLane('thread')}
                                 />
                                 <IconButton

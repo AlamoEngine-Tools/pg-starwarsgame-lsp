@@ -13,10 +13,14 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     One saved node position. The node is named by its thread and event here, in memory - the
 ///     file on disk holds the two hashed together and nothing else.
 /// </summary>
-public sealed record StoryLayoutEntry(string ThreadUri, string EventName, double X, double Y);
+/// <param name="NodeId">
+///     Set for a virtual node - a junction, portal, tactical stub or script state - which has no
+///     thread and event to be named by; the thread and event are then empty.
+/// </param>
+public sealed record StoryLayoutEntry(string ThreadUri, string EventName, double X, double Y, string? NodeId = null);
 
 /// <summary>A node the caller is holding, and can therefore name a stored key with.</summary>
-public sealed record StoryLayoutNode(string ThreadUri, string EventName);
+public sealed record StoryLayoutNode(string ThreadUri, string EventName, string? NodeId = null);
 
 /// <summary>Per campaign-faction story graph layout persistence.</summary>
 public interface IStoryLayoutStore
@@ -70,7 +74,7 @@ public sealed class StoryLayoutStore : IStoryLayoutStore
             // whose event is not in the campaign any more simply does not come back.
             var byKey = new Dictionary<Guid, StoryLayoutNode>();
             foreach (var node in nodes)
-                if (_keys.NodeKey(node.ThreadUri, node.EventName) is { } nodeKey)
+                if (KeyOf(node.ThreadUri, node.EventName, node.NodeId) is { } nodeKey)
                     byKey[nodeKey] = node;
 
             var stored = graphs.TryGetValue(GraphKeyOf(key), out var scoped)
@@ -85,7 +89,7 @@ public sealed class StoryLayoutStore : IStoryLayoutStore
             return stored
                 .Where(e => byKey.ContainsKey(e.Key))
                 .Select(e => new StoryLayoutEntry(
-                    byKey[e.Key].ThreadUri, byKey[e.Key].EventName, e.X, e.Y))
+                    byKey[e.Key].ThreadUri, byKey[e.Key].EventName, e.X, e.Y, byKey[e.Key].NodeId))
                 .ToList();
         }
     }
@@ -102,7 +106,7 @@ public sealed class StoryLayoutStore : IStoryLayoutStore
             {
                 // A thread outside the project has no key that survives a clone, so there is
                 // nothing worth writing down for it.
-                if (_keys.NodeKey(entry.ThreadUri, entry.EventName) is not { } nodeKey) continue;
+                if (KeyOf(entry.ThreadUri, entry.EventName, entry.NodeId) is not { } nodeKey) continue;
 
                 var index = existing.FindIndex(e => e.Key == nodeKey);
                 var updated = new StoryLayoutDocument.Entry { Key = nodeKey, X = entry.X, Y = entry.Y };
@@ -130,5 +134,11 @@ public sealed class StoryLayoutStore : IStoryLayoutStore
     private static string GraphKeyOf(StoryModelKey key)
     {
         return ProjectDocumentKeys.GraphKey(key.Campaign, key.Faction).ToString();
+    }
+
+    /// <summary>An event is named by thread and event; anything else by its node id, URIs made relative.</summary>
+    private Guid? KeyOf(string threadUri, string eventName, string? nodeId)
+    {
+        return nodeId is { Length: > 0 } ? _keys.VirtualNodeKey(nodeId) : _keys.NodeKey(threadUri, eventName);
     }
 }

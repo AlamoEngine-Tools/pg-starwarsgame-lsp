@@ -5,6 +5,7 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Story.Discovery;
@@ -60,33 +61,42 @@ public sealed class GetStoryPlotsHandler(
                 // faction never runs.
                 var model = modelService.GetCampaignModel(campaign.Name, faction.Faction);
 
-                // Manifest entries use engine casing; canonical thread URIs are lowercase. Indexed
-                // by file name once, for the same reason as the Lua map above - a manifest with
-                // fifty threads used to walk the whole thread list fifty times.
-                var threadUrisByFileName = BuildThreadUriIndex(model);
-
+                // The model resolved every manifest entry to its document when it was assembled,
+                // case-insensitively as the engine reads files. That is the one resolution: a
+                // thread it holds no entry for was not readable at model time, and stays null.
                 string? ResolveUri(string thread)
                 {
-                    return threadUrisByFileName.GetValueOrDefault(thread.ToLowerInvariant());
+                    return model?.ThreadUriByFile.GetValueOrDefault(thread);
+                }
+
+                StoryPlotThreadDto Thread(string file, bool listedSuspended)
+                {
+                    var uri = ResolveUri(file);
+                    var suspended = listedSuspended && (uri is null || model!.SuspendedThreadUris.Contains(uri));
+                    return new StoryPlotThreadDto(file, suspended, uri);
                 }
 
                 manifestsByFile.TryGetValue(faction.ManifestFile, out var contents);
                 var threads = new List<StoryPlotThreadDto>();
                 foreach (var thread in contents?.ActiveThreads ?? [])
-                    threads.Add(new StoryPlotThreadDto(thread, false, ResolveUri(thread)));
+                    threads.Add(Thread(thread, false));
                 foreach (var thread in contents?.SuspendedThreads ?? [])
-                {
-                    var uri = ResolveUri(thread);
-                    threads.Add(new StoryPlotThreadDto(thread,
-                        uri is null || model!.SuspendedThreadUris.Contains(uri), uri));
-                }
+                    threads.Add(Thread(thread, true));
 
                 var luaScripts = new List<StoryLuaScriptDto>();
                 foreach (var script in contents?.LuaScripts ?? [])
                     luaScripts.Add(new StoryLuaScriptDto(
                         script, ResolveLuaUri(script, luaUrisByFileName)));
+                // A battle's plot files live in its tactical manifest, which the faction manifest
+                // never lists, so they travel with the battle - name and document alike.
+                var battles = (model?.Battles ?? [])
+                    .Select(b => new StoryBattleDto(b.Key, b.Label, b.EntryEventIds, b.Rank,
+                        b.ThreadFiles.Select(file => Thread(file, ResolveUri(file) is { } uri
+                                                                  && model!.SuspendedThreadUris.Contains(uri)))
+                            .ToList()))
+                    .ToList();
                 factions.Add(new StoryFactionDto(faction.Faction, faction.ManifestFile,
-                    threads, luaScripts));
+                    threads, luaScripts, battles));
             }
 
             campaigns.Add(new StoryCampaignDto(campaign.Name, factions, SetForCampaign(campaign.Name)));
@@ -119,24 +129,11 @@ public sealed class GetStoryPlotsHandler(
     /// </summary>
     private static Dictionary<string, string> BuildLuaUriIndex(GameIndex index)
     {
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Keyed by a document name, so compared through the identity fold like every such map.
+        var map = new Dictionary<string, string>(DocumentUris.Comparer);
         foreach (var uri in index.Documents.Keys)
         {
-            if (!uri.EndsWith(".lua", StringComparison.Ordinal)) continue;
-            var slash = uri.LastIndexOf('/');
-            map.TryAdd(slash < 0 ? uri : uri[(slash + 1)..], uri);
-        }
-
-        return map;
-    }
-
-    /// <summary>A campaign's thread documents by file name; see {@link BuildLuaUriIndex}.</summary>
-    private static Dictionary<string, string> BuildThreadUriIndex(StoryCampaignModel? model)
-    {
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var thread in model?.Threads ?? [])
-        {
-            var uri = thread.DocumentUri;
+            if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;
             var slash = uri.LastIndexOf('/');
             map.TryAdd(slash < 0 ? uri : uri[(slash + 1)..], uri);
         }
@@ -148,8 +145,8 @@ public sealed class GetStoryPlotsHandler(
     // are keyed by lowercase canonical URI.
     private static string? ResolveLuaUri(string script, Dictionary<string, string> byFileName)
     {
-        var fileName = script.ToLowerInvariant();
-        if (!fileName.EndsWith(".lua", StringComparison.Ordinal)) fileName += ".lua";
+        // The map folds case; the name goes in as the manifest wrote it.
+        var fileName = script.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) ? script : script + ".lua";
         return byFileName.GetValueOrDefault(fileName);
     }
 }
@@ -169,7 +166,7 @@ public sealed class GetStoryGraphHandler(IStoryModelService modelService, ILspCo
 
         return Task.FromResult(StoryGraphProjection.Project(
             model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
-            request.PlotState, request.ReachableDirection));
+            request.PlotState, request.ReachableDirection, request.Scope));
     }
 }
 
@@ -220,16 +217,23 @@ public sealed class GetStoryLayoutHandler(
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryLayoutResult([], rejection));
 
-        // The sidecar names a node by its thread and event hashed together, so the graph's own
-        // events are what turn those keys back into nodes. An event the campaign no longer has
+        // The sidecar names an event by its thread and event hashed together and anything else by
+        // its node id, so the graph's own nodes - the scope's, since a battle's portals exist only
+        // there - are what turn those keys back into nodes. A node the campaign no longer has
         // simply gets no entry back.
-        var nodes = models.GetCampaignModel(request.Campaign, request.Faction)?.Graph.Nodes
-            .Where(n => n.Kind == StoryNodeKind.Event && n.ThreadUri is not null)
-            .Select(n => new StoryLayoutNode(n.ThreadUri!, n.Label))
-            .ToList() ?? [];
+        var model = models.GetCampaignModel(request.Campaign, request.Faction);
+        var nodes = model is null
+            ? []
+            : StoryGraphScoper.Scope(model, request.Scope).Nodes
+                .Select(n => n.Kind == StoryNodeKind.Event
+                    ? n.ThreadUri is null ? null : new StoryLayoutNode(n.ThreadUri, n.Label)
+                    : new StoryLayoutNode("", "", n.Id))
+                .Where(n => n is not null)
+                .Select(n => n!)
+                .ToList();
 
         var entries = store.Get(new StoryModelKey(request.Campaign, request.Faction), nodes)
-            .Select(e => new StoryLayoutEntryDto(e.ThreadUri, e.EventName, e.X, e.Y))
+            .Select(e => new StoryLayoutEntryDto(e.ThreadUri, e.EventName, e.X, e.Y, e.NodeId))
             .ToList();
         return Task.FromResult(new GetStoryLayoutResult(entries));
     }
@@ -244,7 +248,7 @@ public sealed class SetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigura
             return Task.FromResult(new SetStoryLayoutResult(false, rejection));
 
         store.Set(new StoryModelKey(request.Campaign, request.Faction), request.Entries
-            .Select(e => new StoryLayoutEntry(e.ThreadUri, e.EventName, e.X, e.Y))
+            .Select(e => new StoryLayoutEntry(e.ThreadUri, e.EventName, e.X, e.Y, e.NodeId))
             .ToList());
         return Task.FromResult(new SetStoryLayoutResult(true));
     }

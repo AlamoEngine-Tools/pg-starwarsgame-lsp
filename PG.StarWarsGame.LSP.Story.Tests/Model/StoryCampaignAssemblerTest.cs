@@ -159,6 +159,30 @@ public sealed class StoryCampaignAssemblerTest
         });
     }
 
+    /// <summary>
+    ///     The model keeps the one resolution of manifest entry to document, for the faction's
+    ///     plots and a battle's alike, compared as the engine reads files: whatever the manifest's
+    ///     casing, the entry finds its document, and nothing downstream re-derives it.
+    /// </summary>
+    [Fact]
+    public void Assemble_KeepsTheManifestEntryToDocumentResolution_ForPlotsAndBattles()
+    {
+        var chain = Chain(
+            [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M.xml")])],
+            [
+                new StoryManifestContents("M.xml", ["Story_Act_I.XML"], [], []),
+                new StoryManifestContents("Plots_M02.xml", ["Story_M02_Land.xml"], [], [])
+            ],
+            [new StoryTacticalReference("Story_Act_I.XML", "Plots_M02.xml")]);
+
+        var model = Assemble(chain)!;
+
+        Assert.Equal("file:///xml/story_act_i.xml", model.ThreadUriByFile["story_act_i.xml"]);
+        Assert.Equal("file:///xml/story_m02_land.xml", model.ThreadUriByFile["STORY_M02_LAND.XML"]);
+        var battle = Assert.Single(model.Battles);
+        Assert.Equal(["Story_M02_Land.xml"], battle.ThreadFiles);
+    }
+
     [Fact]
     public void Assemble_ThreadOnlyEverSuspended_IsSuspended()
     {
