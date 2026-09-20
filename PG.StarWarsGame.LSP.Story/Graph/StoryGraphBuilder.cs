@@ -120,9 +120,28 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             if (names.Count > 0) mediaListeners.Add((kind, names, node.Id));
         }
 
+        // The tutorial dialog box (measured): its Continue button raises the generic
+        // "Continue_Tutorial"; its other button quits the game. So a TUTORIAL_DIALOG links to the
+        // listeners for that generic and to nothing else.
+        var continueListeners = eventNodes.Select(pair => pair.Node)
+            .Where(n => string.Equals(n.Event!.EventType, "STORY_GENERIC", StringComparison.OrdinalIgnoreCase)
+                        && NameTokens(n.Event.EventParams.FirstOrDefault(p => p.Position == 0)?.RawValue)
+                            .Contains(ContinueTutorialGeneric))
+            .Select(n => n.Id)
+            .ToList();
+
         foreach (var (_, node) in eventNodes)
         {
-            var (kind, position) = node.Event!.RewardType?.ToUpperInvariant() switch
+            var reward = node.Event!.RewardType?.ToUpperInvariant();
+            if (reward == "TUTORIAL_DIALOG")
+            {
+                foreach (var listenerId in continueListeners)
+                    if (listenerId != node.Id)
+                        state.AddEdge(new StoryEdge(node.Id, listenerId, StoryEdgeKind.Implicit, "continue"));
+                continue;
+            }
+
+            var (kind, position) = reward switch
             {
                 "SPEECH" => ("speech", 0),
                 "MULTIMEDIA" => ("speech", 7),
@@ -135,6 +154,31 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             foreach (var listener in mediaListeners)
                 if (listener.Kind == kind && listener.Names.Contains(name) && listener.NodeId != node.Id)
                     state.AddEdge(new StoryEdge(node.Id, listener.NodeId, StoryEdgeKind.Implicit, kind));
+        }
+
+        // Pass 3c: generic listeners the game never reaches. The engine raises a measured set of
+        // generic names (see StoryGenericNames); a listener naming none of them fires only when a
+        // TRIGGER_EVENT pushes it, and without one it is dead. Measured on the corpus: eaw 91 of
+        // 91 generic listeners name an engine name, foc 163 of 164 - the one left listens for
+        // "right_click", which the game never raises.
+        var pushedByTrigger = new HashSet<string>(
+            state.Edges.Where(e => e.Kind == StoryEdgeKind.Control
+                                   && string.Equals(e.Label, "TRIGGER_EVENT", StringComparison.OrdinalIgnoreCase))
+                .Select(e => e.ToId),
+            StringComparer.Ordinal);
+        foreach (var (thread, node) in eventNodes)
+        {
+            var storyEvent = node.Event!;
+            if (!string.Equals(storyEvent.EventType, "STORY_GENERIC", StringComparison.OrdinalIgnoreCase)) continue;
+            var slot = storyEvent.EventParams.FirstOrDefault(p => p.Position == 0);
+            var names = NameTokens(slot?.RawValue);
+            if (slot is null || names.Count == 0 || names.Any(StoryGenericNames.IsEngineRaised)) continue;
+            if (pushedByTrigger.Contains(node.Id)) continue;
+            var listed = string.Join(", ", names);
+            state.Problems.Add(new StoryGraphProblem(StoryGraphProblemKind.GenericNeverRaised, thread.DocumentUri,
+                slot.Range, listed,
+                $"The game never raises '{listed}' as a generic trigger and no TRIGGER_EVENT pushes '{storyEvent.Name}' - it never fires. " +
+                $"The game raises: {string.Join(", ", StoryGenericNames.EngineRaised)}."));
         }
 
         // Pass 4: tactical entry edges - root events (no incoming Prereq/Control) of a tactical
@@ -190,7 +234,9 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         return new StoryGraph(state.Nodes, state.Edges, state.Problems);
     }
 
-    /// <summary>The node id of a script state: the script uri plus the state name, lower-cased like an event id.</summary>
+    /// <summary>The generic the tutorial dialog's Continue button raises (measured); compared case-insensitively.</summary>
+    public const string ContinueTutorialGeneric = "Continue_Tutorial";
+
     /// <summary>A string-list parameter's names, split as the engine splits (whitespace and commas), compared case-insensitively.</summary>
     public static HashSet<string> NameTokens(string? raw)
     {

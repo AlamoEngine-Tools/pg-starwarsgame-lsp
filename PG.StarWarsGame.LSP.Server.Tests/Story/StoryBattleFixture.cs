@@ -33,12 +33,16 @@ internal static class StoryBattleFixture
     public const string M5 = "Story_Plots_M5_Space.xml";
     public const string M2Key = "story_plots_m2_land.xml";
     public const string M5Key = "story_plots_m5_space.xml";
+    public const string M2Script = "Story_M2_LAND";
 
     public const string GalaxyText =
         "<Story>" +
         "<Event Name=\"Begin\"><Event_Type>STORY_ELAPSED</Event_Type><Event_Param1>0</Event_Param1></Event>" +
         "<Event Name=\"E\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Begin</Prereq>" +
-        "<Reward_Type>LINK_TACTICAL</Reward_Type><Reward_Param1>" + M2 + "</Reward_Param1></Event>" +
+        "<Reward_Type>LINK_TACTICAL</Reward_Type><Reward_Param1>" + M2 + "</Reward_Param1><Branch>B</Branch></Event>" +
+        // The tutorial's way back after a loss: reset the branch, which re-arms and re-fires the link.
+        "<Event Name=\"Again\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>again</Event_Param1>" +
+        "<Reward_Type>RESET_BRANCH</Reward_Type><Reward_Param1>B</Reward_Param1></Event>" +
         "<Event Name=\"E2\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Begin</Prereq>" +
         "<Reward_Type>LINK_TACTICAL</Reward_Type><Reward_Param1>" + M5 + "</Reward_Param1></Event>" +
         "<Event Name=\"Win\"><Event_Type>STORY_VICTORY</Event_Type><Prereq>E</Prereq></Event>" +
@@ -93,7 +97,9 @@ internal static class StoryBattleFixture
                 [M2ManifestEntry] = Battle,
                 [M5ManifestEntry] = Battle2
             },
-            Battles = StoryGraphScoper.Battles(graph, manifests, manifestFiles)
+            Battles = StoryGraphScoper.Battles(graph, manifests, manifestFiles,
+                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+                    { [M2] = [M2Script] })
         };
     }
 
@@ -106,7 +112,7 @@ internal static class StoryBattleFixture
             Manifests =
             [
                 new StoryManifestContents(FactionManifest, [GalaxyManifestEntry], [], []),
-                new StoryManifestContents(M2, [M2ManifestEntry], [], []),
+                new StoryManifestContents(M2, [M2ManifestEntry], [], [M2Script]),
                 new StoryManifestContents(M5, [M5ManifestEntry], [], [])
             ]
         };

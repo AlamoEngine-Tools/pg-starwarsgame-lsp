@@ -293,16 +293,16 @@ Dialog quick fixes require `aet-eaw-edit.features.dialog.codeActions`; the rest 
 Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `Story_*.xml` thread files and understood as one graph. Opt-in and in development; see the story flags under [feature flags](#feature-flags).
 
 - **Campaign Editor view**
-  - Campaigns, factions, galactic plot threads, the faction's battles in play order with their own plot files beneath them, and attached Lua scripts
+  - Campaigns, factions, galactic plot threads, the faction's battles in play order with their own plot files and the script their manifest attaches beneath them, and the faction's attached Lua scripts
   - Suspended threads marked
   - Click opens the file; a battle opens its graph
 - **Story graph** - one panel per campaign faction at the galactic level, and one per battle
   - Auto-laid-out event flow with AND/OR junctions and cross-file portals
-  - **Battles as sub-graphs**: the galactic graph shows each tactical mission as one portal that opens the battle's own panel; the battle graph shows the galactic events that link it in and listen for its outcome as portals back, each opening the galactic panel on that event. The command palette lists the battles after their faction
+  - **Battles as sub-graphs**: the galactic graph shows each tactical mission as one portal that opens the battle's own panel; the battle graph shows the galactic events that link it in and listen for its outcome as portals back, each opening the galactic panel on that event. In Simulation a pick on the portal selects the battle's decision beside the dock instead - fight, auto-resolve, won or lost - and the portal's arrow opens the battle's graph into Simulation. The command palette lists the battles after their faction
   - Node colour by lifecycle: inactive, waiting, armed, fired, disabled
   - Unreachable events dimmed; schema-untested types dashed
   - Filters: name, branch, lifecycle, plot state, the incoming or outgoing chain of one event - inside the panel's scope; the chain runs through a battle's portal
-  - **Engine links** (dash-dot): the links the game makes that no prerequisite writes - a speech or movie to the listener that waits for it to end, a battle to the galactic listeners for its outcome and for the summary dialog closing. Drawn so a sequence the game plays in order reads in order; never a prerequisite
+  - **Engine links** (dash-dot): the links the game makes that no prerequisite writes - a speech or movie to the listener that waits for it to end, a tutorial dialog to the listener for its Continue button, a battle to the galactic listeners for its outcome and for the summary dialog closing. Drawn so a sequence the game plays in order reads in order; never a prerequisite
   - Thread lanes on the galactic graph (Empire at War's acts); disabled inside a battle, which is one plot
 - **Colour key** - flyout keying node, border and edge styles, including per-branch hues on zoomed-out nodes
 - **Editing** (Edit mode)
@@ -315,6 +315,7 @@ Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `S
   - The world is a fact table seeded from the campaign XML - planets and owners, units, tech, credits - written only by rewards and by you; nothing moves, builds or fights on its own
   - Every trigger the game would decide is a **decision** for you: capture a planet, build or destroy a unit, win or lose a battle, send a script event, or assume the trigger met; pickers list what fits the facts first and accept any name
   - **Battles run as their own session**, as the game plays them: the galactic simulation arms the galactic listeners only. Entering a battle - from its portal, its row in the dock, or the decision that waits on it - opens its panel into Simulation on its own clock, seeded with the galaxy's flags and world, and the galaxy stands still until it resolves. Won or lost, from either panel: the battle's own listeners fire, the flags it wrote cross into the galaxy, and the galactic outcome listeners fire. A rewind replays the outcome as one step without replaying the battle
+  - **A linked battle waits for its choice**, as the game's pending-battle panel does: a `LINK_TACTICAL` reward makes the battle pending and holds gameplay time - the story keeps running (pushes, flag polls, scripts, generic and GUI events), only `STORY_ELAPSED` timers stand still. The decision sits on the battle's portal: **Fight** opens the battle's panel straight into its session, **Auto-resolve** leaves won or lost and the flag picks to you. A `FORCE_CLICK_GUI` on the left choice button fights by itself, as the tutorial does, and on the right one auto-resolves. The `battle_end_closed` listener is the battle's to raise, not a decision, while one is pending or running; a loss that links the same mission again is a new attempt
   - Campaign scripts run as their `PGStateMachine`: a fired event enters the state, its `OnEnter` thread sleeps and sends `Story_Event` ids back into the graph, drawn as state nodes and links
   - Dock header: the tick and what stopped the clock; content: decisions, world, flags, scripts, each row opening beside the dock; foot: the transport - restart, one tick back, play, one tick, run until the story reaches a new decision, a breakpoint or nothing more can happen - with a pace of pulse, step or a custom rate. The clock is never held back by open decisions: a real campaign has hundreds of armed listeners from tick 0
   - Canvas: the flow along the edges, fire counts, gate meters on armed timers and flag checks, breakpoint marks; lenses for the path taken, the flow tints and the script states
@@ -553,7 +554,7 @@ Read only with `aet-eaw-edit.features.lua.debugger` on; a `launch.json` attribut
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `aet-eaw-edit.storySimulator.assumeMediaCompletes` | `true` | A speech or movie a reward starts completes on the next tick, so its `STORY_SPEECH_DONE` or `STORY_MOVIE_DONE` listener fires on its own. Off, each is a decision until answered or until the engine's 60 s timeout. Takes effect when a simulation starts |
+| `aet-eaw-edit.storySimulator.assumeMediaCompletes` | `true` | A speech or movie a reward starts completes on the next tick, so its `STORY_SPEECH_DONE` or `STORY_MOVIE_DONE` listener fires on its own. Off, each is a decision until answered; the game never ends one on a timer. Either way a new speech ends the one still playing and a battle's end ends every speech, as the game does. Takes effect when a simulation starts |
 | `aet-eaw-edit.storySimulator.autoResume` | `true` | When play paused itself for a decision, answering it resumes play |
 
 ### Feature flags
@@ -595,7 +596,7 @@ Story mode:
 | Setting | Default | Description |
 |---|---|---|
 | `aet-eaw-edit.features.story.discovery` | `false` | Follows the campaign story chain and types its files; base of every other story flag _(work in progress)_ |
-| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign analysis: dangling and cyclic prerequisites, duplicate event names, targets outside their plot file, unreachable events, orphaned suspended plots, tag order, over-long flag names _(work in progress)_ |
+| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign analysis: dangling and cyclic prerequisites, duplicate event names, targets outside their plot file, unreachable events, orphaned suspended plots, tag order, over-long flag names, `STORY_GENERIC` listeners for a name the game never raises _(work in progress)_ |
 | `aet-eaw-edit.features.story.symbols` | `false` | Story event names, flags and AI-notification ids indexed across XML and Lua _(work in progress)_ |
 | `aet-eaw-edit.features.story.rename` | `false` | Cross-language rename of story symbols; builds on story symbols _(work in progress)_ |
 

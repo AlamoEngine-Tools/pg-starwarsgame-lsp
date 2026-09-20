@@ -2,7 +2,38 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import {shouldResumeAfterAnswer} from './simModel';
+import {battlesToEnter, portalPickAction, shouldResumeAfterAnswer} from './simModel';
+
+// A pick on a battle's portal: in Simulation it selects the battle's decision beside the dock -
+// the picker, not the other panel; in View it goes through to the battle's graph; in Edit a pick
+// starts a drag and does nothing else. The jump arrow always opens the graph, into Simulation
+// while the galaxy simulates.
+describe('portalPickAction', () => {
+    it('selects in Simulation, opens in View, does nothing in Edit', () => {
+        assert.equal(portalPickAction('simulate'), 'select');
+        assert.equal(portalPickAction('view'), 'open');
+        assert.equal(portalPickAction('edit'), 'none');
+    });
+});
+
+// The galaxy chose to fight (the author on the picker, or a forced click on the fight button): the
+// battle's panel opens into its session once, when the status turns, never again on a re-fetch.
+describe('battlesToEnter', () => {
+    const battle = (key: string, status: string) => ({key, label: key, status, tick: 0});
+
+    it('names a battle whose status just turned to fight', () => {
+        assert.deepEqual(battlesToEnter([battle('m1', 'pending')], [battle('m1', 'fight')]), ['m1']);
+        assert.deepEqual(battlesToEnter(null, [battle('m1', 'fight')]), ['m1']);
+    });
+
+    it('names nothing for a battle already fighting, running, pending or resolved', () => {
+        assert.deepEqual(battlesToEnter([battle('m1', 'fight')], [battle('m1', 'fight')]), []);
+        assert.deepEqual(battlesToEnter([battle('m1', 'fight')], [battle('m1', 'running')]), []);
+        assert.deepEqual(battlesToEnter([battle('m1', 'notStarted')], [battle('m1', 'pending')]), []);
+        assert.deepEqual(battlesToEnter([battle('m1', 'running')], [battle('m1', 'won')]), []);
+        assert.deepEqual(battlesToEnter([battle('m1', 'fight')], null), []);
+    });
+});
 
 describe('shouldResumeAfterAnswer', () => {
     const base = {autoResume: true, pausedForWait: true, stillWaiting: false, halted: false};

@@ -268,6 +268,26 @@ public sealed class StoryCampaignAssemblerTest
         Assert.Equal("file:///xml/t_tactical.xml", uri);
     }
 
+    // A tactical manifest attaches the mission's script; the faction manifest never lists it, so
+    // the battle carries it the way it carries its plot files - for the navigator and the feed.
+    [Fact]
+    public void Assemble_BattlesCarryTheirManifestsScripts()
+    {
+        var chain = Chain(
+            [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M.xml")])],
+            [
+                new StoryManifestContents("M.xml", ["T_Galactic.xml"], [], ["Script_Galactic"]),
+                new StoryManifestContents("M_Tac.xml", ["T_Tactical.xml"], [], ["Script_Tac"])
+            ],
+            [new StoryTacticalReference("T_Galactic.xml", "M_Tac.xml")]);
+
+        var model = Assemble(chain)!;
+
+        var battle = Assert.Single(model.Battles);
+        Assert.Equal(["Script_Tac"], battle.LuaScripts);
+        Assert.Equal(["Script_Galactic", "Script_Tac"], model.LuaScripts);
+    }
+
     [Fact]
     public void Assemble_MainCampaignManifests_AreNotRecordedAsTactical()
     {

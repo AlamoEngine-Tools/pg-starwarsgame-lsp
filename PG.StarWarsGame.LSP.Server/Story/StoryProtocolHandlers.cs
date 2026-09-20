@@ -87,12 +87,16 @@ public sealed class GetStoryPlotsHandler(
                 foreach (var script in contents?.LuaScripts ?? [])
                     luaScripts.Add(new StoryLuaScriptDto(
                         script, ResolveLuaUri(script, luaUrisByFileName)));
-                // A battle's plot files live in its tactical manifest, which the faction manifest
-                // never lists, so they travel with the battle - name and document alike.
+                // A battle's plot files and script live in its tactical manifest, which the
+                // faction manifest never lists, so they travel with the battle - name and
+                // document alike.
                 var battles = (model?.Battles ?? [])
                     .Select(b => new StoryBattleDto(b.Key, b.Label, b.EntryEventIds, b.Rank,
                         b.ThreadFiles.Select(file => Thread(file, ResolveUri(file) is { } uri
                                                                   && model!.SuspendedThreadUris.Contains(uri)))
+                            .ToList(),
+                        b.LuaScripts.Select(script =>
+                                new StoryLuaScriptDto(script, ResolveLuaUri(script, luaUrisByFileName)))
                             .ToList()))
                     .ToList();
                 factions.Add(new StoryFactionDto(faction.Faction, faction.ManifestFile,

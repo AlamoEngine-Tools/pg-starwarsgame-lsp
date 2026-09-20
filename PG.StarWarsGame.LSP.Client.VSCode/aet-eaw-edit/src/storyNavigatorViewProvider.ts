@@ -119,7 +119,12 @@ export class StoryNavigatorViewProvider
             const branch = faction
                 ? factionTree(faction).battles.find(b => b.battle.key === element.fileName)
                 : undefined;
-            return (branch?.threads ?? []).map(t => this._threadItem(t));
+            // The battle's plot files, then the script its manifest attaches - the mission's own
+            // state machine, which the faction manifest never lists.
+            return [
+                ...(branch?.threads ?? []).map(t => this._threadItem(t)),
+                ...(branch?.battle.luaScripts ?? []).map(s => this._luaItem(s)),
+            ];
         }
         return [];
     }
@@ -211,7 +216,8 @@ export class StoryNavigatorViewProvider
         item.description = `Battle ${index + 1} of ${count}`;
         item.tooltip = `${campaignName} - ${factionName} - ${branch.battle.label}`
             + `\nBattle ${index + 1} of ${count} in play order`
-            + `\nPlot files - ${branch.threads.length}`;
+            + `\nPlot files - ${branch.threads.length}`
+            + `\nScripts - ${branch.battle.luaScripts?.length ?? 0}`;
         item.command = {
             command: 'aet-eaw-edit.lsp.openStoryGraph',
             title: 'Open Battle Graph',

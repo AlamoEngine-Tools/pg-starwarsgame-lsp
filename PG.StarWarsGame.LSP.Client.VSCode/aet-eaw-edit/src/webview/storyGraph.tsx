@@ -85,7 +85,7 @@ import {
 } from '../protocol';
 import {battleKeyOfNode} from '../storyBattles';
 import {
-    DEFAULT_PACE, paceIntervalMs, parsePace, shouldResumeAfterAnswer, type SimPace,
+    DEFAULT_PACE, battlesToEnter, paceIntervalMs, parsePace, portalPickAction, shouldResumeAfterAnswer, type SimPace,
 } from './storyGraph/simModel';
 import {
     type SimActions,
@@ -675,7 +675,7 @@ let currentReachable: { from: string; direction: PathDirection } = {from: '', di
  * are the extension's to do - a webview cannot open another - so they go out as messages, through
  * the same bridge pattern as the path filter because a node body cannot reach App.
  */
-let onOpenBattleRequested: (battleKey: string, label: string) => void = () => { /* replaced by App */
+let onOpenBattleRequested: (battleKey: string, label: string, simulate: boolean) => void = () => { /* replaced by App */
 };
 let onRevealGalacticRequested: (galacticNodeId: string) => void = () => { /* replaced by App */
 };
@@ -1202,17 +1202,18 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         if (context.type === 'nodedragged' && currentMode === 'edit') {
             saveAllPositions();
         }
-        // In Simulation a pick opens the event's detail beside the dock.
+        // In Simulation a pick opens the event's detail beside the dock - or, on a battle's
+        // portal, the battle's own decision: fight, auto-resolve, won or lost live there.
         if (context.type === 'nodepicked' && currentMode === 'simulate') {
             onSimNodePicked?.((context.data as { id: string }).id);
         }
-        // A portal is a doorway: picking it goes through. Not in Edit, where a pick is the start
-        // of a drag and opening another panel under the pointer would steal the gesture.
-        if (context.type === 'nodepicked' && currentMode !== 'edit') {
+        // In View a portal is a doorway: picking it goes through. Not in Edit, where a pick is the
+        // start of a drag and opening another panel under the pointer would steal the gesture.
+        if (context.type === 'nodepicked' && portalPickAction(currentMode) === 'open') {
             const dto = editor.getNode((context.data as { id: string }).id)?.dto;
             const battleKey = dto ? battleKeyOfNode(dto.id) : undefined;
             if (dto?.kind === 'TacticalPlot' && battleKey) {
-                onOpenBattleRequested(battleKey, dto.label);
+                onOpenBattleRequested(battleKey, dto.label, false);
             } else if (dto?.kind === 'GalacticPortal' && dto.portalTarget) {
                 onRevealGalacticRequested(dto.portalTarget);
             }
@@ -3073,8 +3074,9 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
             {dto.kind === 'TacticalPlot' && battleKeyOfNode(dto.id) ? (
                 <Drag.NoDrag>
                     <button
-                        className="jump" title="Open this battle's graph"
-                        onClick={() => onOpenBattleRequested(battleKeyOfNode(dto.id)!, dto.label)}
+                        className="jump"
+                        title={currentMode === 'simulate' ? "Open this battle's graph in Simulation" : "Open this battle's graph"}
+                        onClick={() => onOpenBattleRequested(battleKeyOfNode(dto.id)!, dto.label, currentMode === 'simulate')}
                     ><span className="codicon codicon-arrow-right"/></button>
                 </Drag.NoDrag>
             ) : null}
@@ -5331,6 +5333,8 @@ function App(): React.JSX.Element {
     // something - the three things that decide if play picks itself up again.
     const autoResumeRef = useRef(true);
     const pausedForWaitRef = useRef(false);
+    // The battles' standing as of the previous state, so a turn to "fight" opens the panel once.
+    const prevBattlesRef = useRef<StorySimBattleDto[] | null>(null);
     const answeredRef = useRef(false);
     const inFlightRef = useRef<number | null>(null);
     const setPace = useCallback((next: SimPace) => {
@@ -5631,6 +5635,16 @@ function App(): React.JSX.Element {
             setPlayingBoth(true);
         }
         answeredRef.current = false;
+        // The galaxy chose to fight - the author on the picker, or a forced click on the fight
+        // button, as the tutorial does: the battle's panel opens straight into its own session,
+        // seeded with the galactic state. Once per turn of the status, never on a re-fetch.
+        if (!state.scope) {
+            for (const key of battlesToEnter(prevBattlesRef.current, state.battles)) {
+                const label = state.battles?.find(b => b.key === key)?.label ?? key;
+                vscode.postMessage({type: 'openScope', scope: key, label, simulate: true});
+            }
+        }
+        prevBattlesRef.current = state.battles ?? null;
         if (!handle) {
             simLastSeq = state.totalSteps;
             return;
@@ -5762,8 +5776,12 @@ function App(): React.JSX.Element {
     // A node picked on the canvas while simulating opens its detail beside the dock.
     useEffect(() => {
         onSimNodePicked = nodeId => {
-            if (simGraphRef.current.nodes.find(n => n.id === nodeId)?.kind === 'Event') {
+            const kind = simGraphRef.current.nodes.find(n => n.id === nodeId)?.kind;
+            const battleKey = battleKeyOfNode(nodeId);
+            if (kind === 'Event') {
                 setSimSelection({kind: 'node', nodeId});
+            } else if (kind === 'TacticalPlot' && battleKey) {
+                setSimSelection({kind: 'battle', key: battleKey});
             }
         };
         return () => {
@@ -5845,8 +5863,8 @@ function App(): React.JSX.Element {
         };
         onReachableFromRequested = (id, direction) =>
             setFilter({reachableFrom: id, reachableDirection: direction});
-        onOpenBattleRequested = (battleKey, label) =>
-            vscode.postMessage({type: 'openScope', scope: battleKey, label});
+        onOpenBattleRequested = (battleKey, label, simulate) =>
+            vscode.postMessage({type: 'openScope', scope: battleKey, label, simulate});
         onRevealGalacticRequested = galacticNodeId =>
             vscode.postMessage({type: 'revealScope', nodeId: galacticNodeId});
         requestPreview = () => vscode.postMessage({

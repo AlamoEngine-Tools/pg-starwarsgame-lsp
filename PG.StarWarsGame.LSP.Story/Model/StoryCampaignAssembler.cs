@@ -110,6 +110,9 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
         // Manifest file (only those reached via a tactical reference) → the raw thread files it
         // lists, resolved to document URIs once threads are read below.
         var tacticalManifestThreadFiles = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        // Manifest file (tactical only) → the scripts it attaches; the faction manifest never lists
+        // a battle's script, so the battle carries it.
+        var tacticalManifestScripts = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
 
         while (manifestQueue.Count > 0)
         {
@@ -120,8 +123,11 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             luaScripts.AddRange(contents.LuaScripts);
 
             if (tacticalManifestFiles.Contains(manifestFile))
+            {
                 tacticalManifestThreadFiles[manifestFile] =
                     [.. contents.ActiveThreads, .. contents.SuspendedThreads];
+                tacticalManifestScripts[manifestFile] = contents.LuaScripts;
+            }
 
             foreach (var thread in contents.ActiveThreads)
             {
@@ -170,7 +176,8 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             ThreadUriByFile = uriByThreadFile,
             // The first declaration's seed: a campaign declared across layers keeps one world.
             Seed = campaigns[0].Seed,
-            Battles = StoryGraphScoper.Battles(graph, tacticalManifestThreads, tacticalManifestFileLists)
+            Battles = StoryGraphScoper.Battles(graph, tacticalManifestThreads, tacticalManifestFileLists,
+                tacticalManifestScripts)
         };
 
         void AddThread(string threadFile)

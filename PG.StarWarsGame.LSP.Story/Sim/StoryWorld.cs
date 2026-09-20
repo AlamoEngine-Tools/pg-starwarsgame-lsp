@@ -59,6 +59,30 @@ public sealed record StoryWorld
         return this with { BattleOutcomes = BattleOutcomes.SetItem(battleKey, outcome) };
     }
 
+    /// <summary>
+    ///     The battle a LINK_TACTICAL reward queued, while its pending-battle choice is up or the
+    ///     battle runs. Measured: the engine pauses gameplay for the choice but keeps servicing
+    ///     the galactic story; a second link while one is pending queues nothing.
+    /// </summary>
+    public string? PendingBattle { get; init; }
+
+    /// <summary>
+    ///     Null while the choice waits; <see cref="StoryBattleChoice.Fight" /> once the fight
+    ///     button was pressed (the battle starts), <see cref="StoryBattleChoice.AutoResolve" />
+    ///     once the auto-resolve button was.
+    /// </summary>
+    public string? PendingBattleChoice { get; init; }
+
+    public StoryWorld WithPendingBattle(string battleKey, string? choice = null)
+    {
+        return this with { PendingBattle = battleKey, PendingBattleChoice = choice };
+    }
+
+    public StoryWorld WithoutPendingBattle()
+    {
+        return this with { PendingBattle = null, PendingBattleChoice = null };
+    }
+
     /// <summary>Counters keyed "name|faction": battlesWon, battlesLost, conquered, built.</summary>
     public ImmutableDictionary<string, int> Counters { get; init; } =
         ImmutableDictionary.Create<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -132,6 +156,27 @@ public sealed record StoryWorld
     public int Counter(string name, string faction)
     {
         return Counters.GetValueOrDefault(name + "|" + faction);
+    }
+}
+
+/// <summary>
+///     The pending-battle choice, measured in the engine's command-bar scene: the left choice
+///     button resumes the galaxy into the fight, the right one auto-resolves. FORCE_CLICK_GUI
+///     presses either without raising the story's click event; a real click raises it.
+/// </summary>
+public static class StoryBattleChoice
+{
+    public const string Fight = "fight";
+    public const string AutoResolve = "autoResolve";
+    public const string FightButton = "choice_button_left";
+    public const string AutoResolveButton = "choice_button_right";
+
+    /// <summary>The choice a press on the named component takes, or null for any other component.</summary>
+    public static string? OfButton(string? component)
+    {
+        if (string.Equals(component, FightButton, StringComparison.OrdinalIgnoreCase)) return Fight;
+        if (string.Equals(component, AutoResolveButton, StringComparison.OrdinalIgnoreCase)) return AutoResolve;
+        return null;
     }
 }
 

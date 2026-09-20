@@ -85,6 +85,17 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
             while (commands < MaxCommands)
             {
                 commands++;
+                // The fight was chosen (Underworld forces the button itself): the galaxy is frozen
+                // until the battle is played to its end. The policy plays it won, as the author
+                // does in the battle's own panel; the battle's own story replays as its own scope.
+                if (snapshot.Runtime.World is
+                    { PendingBattle: { } fighting, PendingBattleChoice: StoryBattleChoice.Fight })
+                {
+                    snapshot = sim.ResolveBattleOutcome(snapshot,
+                        new StoryWorldChange(StoryWorldChangeKind.BattleWon) { BattleKey = fighting });
+                    continue;
+                }
+
                 // A notification a script already owes is the script's to deliver: the policy leaves
                 // it alone and lets the clock bring it, so the overlay is measured, not pre-empted.
                 var owed = snapshot.Runtime.PendingEmissions.Select(p => p.Id)
@@ -101,6 +112,15 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
                     snapshot = next switch
                     {
                         { Kind: "lua", Options.Count: > 0 } => sim.LuaNotify(snapshot, next.Options[0]),
+                        // The pending battle: the author decides it won on the portal, as the
+                        // service does when nothing inside the battle is played.
+                        { Kind: StorySimIntervention.BattleKind, BattleKey: { } pendingKey } =>
+                            sim.ResolveBattleOutcome(snapshot,
+                                new StoryWorldChange(StoryWorldChangeKind.BattleWon) { BattleKey = pendingKey }),
+                        // A battle's outcome is its resolution, as the service applies it: the
+                        // pending battle ends, the summary closes and the galaxy runs on.
+                        { Kind: "tactical", Suggested: { } outcome, BattleKey: { } battleKey } =>
+                            sim.ResolveBattleOutcome(snapshot, outcome with { BattleKey = battleKey }),
                         { Suggested: { } change } => sim.ApplyWorldChange(snapshot, change),
                         _ => sim.SatisfyTrigger(snapshot, next.NodeId)
                     };
@@ -116,10 +136,22 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
             var lifecycles = sim.GetLifecycles(snapshot);
             var offered = sim.GetInterventions(snapshot).Select(i => i.NodeId).ToHashSet(StringComparer.Ordinal);
             offered.UnionWith(answers.Where(kvp => kvp.Value >= 8).Select(kvp => kvp.Key));
+            // The listener for a battle's other outcome stays armed once the galaxy has taken the
+            // result - the game never takes that route, so it is moot, not stuck.
+            var outcomes = snapshot.Runtime.World.BattleOutcomes;
+            // A generic listener the game never raises is dead by measurement - the graph reports
+            // it - not stuck.
+            var neverRaised = model.Graph.Problems
+                .Where(p => p.Kind == StoryGraphProblemKind.GenericNeverRaised)
+                .Select(p => (p.DocumentUri, p.Range.StartLine))
+                .ToHashSet();
             var stuck = lifecycles
                 .Where(kvp => kvp.Value == StoryEventLifecycle.Armed && !offered.Contains(kvp.Key))
+                .Where(kvp => sim.BattleOf(kvp.Key) is not { } battle || !outcomes.ContainsKey(battle))
                 .Select(kvp => model.Graph.Nodes.First(n => n.Id == kvp.Key))
                 .Where(n => !SelfFiringTypes.Contains(n.Event!.EventType ?? ""))
+                .Where(n => !n.Event!.EventParams.Any(p =>
+                    n.ThreadUri is { } uri && neverRaised.Contains((uri, p.Range.StartLine))))
                 .Select(n => $"{n.Event!.Name} ({n.Event.EventType})")
                 .ToList();
 
@@ -156,6 +188,17 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
 
             Assert.True(commands < MaxCommands,
                 $"The {scope ?? "galactic"} replay did not settle within the command budget.");
+            if (stuck.Count > 0)
+            {
+                // The battle the galaxy is waiting on, if any, and how the log got there.
+                output.WriteLine($"  pending battle: {snapshot.Runtime.World.PendingBattle ?? "none"} " +
+                                 $"({snapshot.Runtime.World.PendingBattleChoice ?? "no choice"})");
+                foreach (var line in snapshot.Log.Where(l =>
+                             l.Contains("battle", StringComparison.OrdinalIgnoreCase) ||
+                             l.Contains("LINK_TACTICAL", StringComparison.Ordinal)).TakeLast(20))
+                    output.WriteLine("    " + line);
+            }
+
             Assert.Empty(stuck);
         }
     }

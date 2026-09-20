@@ -15,7 +15,7 @@ public sealed class StorySimStartHandler(IStorySimulationService sim, ILspConfig
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
         var (state, error) = sim.Start(new StorySimKey(request.Campaign, request.Faction, request.Scope),
-            new StorySimOptions(request.AssumeMediaCompletes));
+            new StorySimOptions(request.AssumeMediaCompletes ?? true));
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }

@@ -65,6 +65,11 @@ public sealed record StorySimStateDto(
         new(false, 0, 0, 1, [], [], [], [], [], [], 0, [], false, null, StorySimWorldDto.Empty, []);
 }
 
+/// <param name="Status">
+///     notStarted; pending (LINK_TACTICAL brought up the choice: fight or auto-resolve); fight (the
+///     fight was chosen, the battle's panel opens into its session); autoResolve (the outcome is the
+///     author's to decide, the galaxy keeps going meanwhile); running; won; lost.
+/// </param>
 /// <param name="Writes">
 ///     The flags the battle's own rewards can write, with the value each would set - offered on the
 ///     portal as picks when the battle is decided without being played.
@@ -166,8 +171,9 @@ public sealed record StorySimStartParams(
     string Campaign,
     string Faction,
     string? Scope = null,
-    // See StorySimStateDto.AssumeMediaCompletes; the session keeps it from start to stop.
-    bool AssumeMediaCompletes = true)
+    // See StorySimStateDto.AssumeMediaCompletes; the session keeps it from start to stop. Nullable
+    // because a missing field deserializes as false, never as the record's default; absent is on.
+    bool? AssumeMediaCompletes = null)
     : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimStop", Direction.ClientToServer)]

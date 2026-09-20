@@ -37,6 +37,10 @@ public sealed class StoryGraphImplicitEdgeTest
         "<Reward_Type>START_MOVIE</Reward_Type><Reward_Param1>Intro_Movie</Reward_Param1></Event>" +
         "<Event Name=\"IntroDone\"><Event_Type>STORY_MOVIE_DONE</Event_Type><Event_Param1>INTRO_MOVIE</Event_Param1></Event>" +
         "<Event Name=\"OtherDone\"><Event_Type>STORY_SPEECH_DONE</Event_Type><Event_Param1>Speech_Nobody</Event_Param1></Event>" +
+        // The tutorial's dialog box: its Continue button raises the Continue_Tutorial generic.
+        "<Event Name=\"Hint\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Begin</Prereq>" +
+        "<Reward_Type>TUTORIAL_DIALOG</Reward_Type><Reward_Param1>TEXT_HINT</Reward_Param1></Event>" +
+        "<Event Name=\"Continue\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>continue_tutorial</Event_Param1></Event>" +
         "<Event Name=\"E\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Begin</Prereq>" +
         "<Reward_Type>LINK_TACTICAL</Reward_Type><Reward_Param1>" + M2 + "</Reward_Param1></Event>" +
         "<Event Name=\"Returned\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>battle_end_closed</Event_Param1>" +
@@ -94,6 +98,17 @@ public sealed class StoryGraphImplicitEdgeTest
         Assert.DoesNotContain(edges, e => e.To == Id("OtherDone"));
     }
 
+    // Measured: the tutorial dialog's Continue button raises the generic "Continue_Tutorial"; its
+    // close button quits the game. eaw writes 9 such dialogs, foc 11.
+    [Fact]
+    public void TutorialDialog_LinksToTheContinueListener_AndToNoOtherGeneric()
+    {
+        var edges = Implicit(Model().Graph);
+
+        Assert.Contains((Id("Hint"), Id("Continue"), "continue"), edges);
+        Assert.DoesNotContain(edges, e => e.From == Id("Hint") && e.To != Id("Continue"));
+    }
+
     [Fact]
     public void GalacticScope_LinksTheBattleStub_ToItsOutcomeAndSummaryListeners()
     {
@@ -141,12 +156,20 @@ file sealed class ImplicitSchemaProvider : ISchemaProvider
             new EnumValueDefinition
             {
                 Name = "STORY_SPEECH_DONE",
-                Params = [new ParamDefinition { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "SpeechEvent" }]
+                Params =
+                [
+                    new ParamDefinition
+                        { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "SpeechEvent" }
+                ]
             },
             new EnumValueDefinition
             {
                 Name = "STORY_MOVIE_DONE",
-                Params = [new ParamDefinition { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "Movie" }]
+                Params =
+                [
+                    new ParamDefinition
+                        { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "Movie" }
+                ]
             }
         ]
     };
@@ -159,7 +182,11 @@ file sealed class ImplicitSchemaProvider : ISchemaProvider
             new EnumValueDefinition
             {
                 Name = "LINK_TACTICAL",
-                Params = [new ParamDefinition { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "StoryPlotFile" }]
+                Params =
+                [
+                    new ParamDefinition
+                        { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "StoryPlotFile" }
+                ]
             },
             new EnumValueDefinition
             {
@@ -167,18 +194,27 @@ file sealed class ImplicitSchemaProvider : ISchemaProvider
                 Params =
                 [
                     new ParamDefinition { Position = 0, ValueType = XmlValueType.NameReference },
-                    new ParamDefinition { Position = 7, ValueType = XmlValueType.NameReference, ReferenceTypeName = "SpeechEvent" }
+                    new ParamDefinition
+                        { Position = 7, ValueType = XmlValueType.NameReference, ReferenceTypeName = "SpeechEvent" }
                 ]
             },
             new EnumValueDefinition
             {
                 Name = "SPEECH",
-                Params = [new ParamDefinition { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "SpeechEvent" }]
+                Params =
+                [
+                    new ParamDefinition
+                        { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "SpeechEvent" }
+                ]
             },
             new EnumValueDefinition
             {
                 Name = "START_MOVIE",
-                Params = [new ParamDefinition { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "Movie" }]
+                Params =
+                [
+                    new ParamDefinition
+                        { Position = 0, ValueType = XmlValueType.NameReference, ReferenceTypeName = "Movie" }
+                ]
             }
         ]
     };

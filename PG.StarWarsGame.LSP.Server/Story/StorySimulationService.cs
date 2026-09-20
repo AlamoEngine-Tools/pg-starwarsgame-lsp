@@ -299,6 +299,15 @@ public sealed class StorySimulationService(
             _sessions.TryGetValue(battleSession, out var battle);
             if (galactic is null && battle is null)
                 return (null, $"No simulation is running for {key.Model}.");
+            // A resolved session of a mission the galaxy has since linked again is the old attempt.
+            if (battle?.Outcome is not null && galactic is not null
+                                            && !ResolvedBattles(galactic).ContainsKey(battleSession.Scope!))
+            {
+                _sessions.Remove(battleSession);
+                toNotify.Add(battleSession);
+                battle = null;
+            }
+
             if (battle?.Outcome is not null)
                 return (null, $"Battle '{battle.Label}' is already {battle.Outcome}.");
             var model = modelService.GetCampaignModel(key.Campaign, key.Faction);
@@ -399,6 +408,12 @@ public sealed class StorySimulationService(
             return $"Battle '{session.Label}' is {session.Outcome} - start it again to run it once more.";
         if (session.Key.IsGalactic && RunningBattle(session.Key.Model, null) is { } running)
             return $"The galaxy is paused while battle '{running.Label}' runs.";
+        // The fight was chosen but the battle's panel is not up yet: the tactical mode is loading
+        // and the galactic story is already frozen.
+        if (session.Key.IsGalactic && session.Snapshot.Runtime.World is
+                { PendingBattle: { } pending, PendingBattleChoice: StoryBattleChoice.Fight })
+            return $"The galaxy is paused while battle '{
+                session.Battles.FirstOrDefault(b => b.Key == pending)?.Label ?? pending}' runs.";
         return null;
     }
 
@@ -460,13 +475,13 @@ public sealed class StorySimulationService(
     }
 
     /// <summary>The battles a galactic log has resolved, last word per battle. </summary>
-    private static Dictionary<string, string> ResolvedBattles(Session galactic)
+    /// <summary>
+    ///     The battles the galaxy has an outcome on the books for, from its world: a resolution
+    ///     records it, a seek replays it, and a new link of the same mission clears it.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> ResolvedBattles(Session galactic)
     {
-        var resolved = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var command in galactic.Commands)
-            if (command.Kind == SimCommandKind.Battle && command.Text is { } battleKey)
-                resolved[battleKey] = command.Number == 1 ? Won : Lost;
-        return resolved;
+        return galactic.Snapshot.Runtime.World.BattleOutcomes;
     }
 
     /// <summary>Builds the state document. Called under the gate: the battle list reads the other sessions.</summary>
@@ -483,13 +498,21 @@ public sealed class StorySimulationService(
         if (session.Key.IsGalactic)
             lock (_gate)
             {
-                pausedFor = RunningBattle(session.Key.Model, null)?.Label;
+                // Frozen while a battle session runs, and from the moment the fight was chosen:
+                // measured, the galactic story is not serviced once the tactical mode is up.
+                var world = snapshot.Runtime.World;
+                pausedFor = RunningBattle(session.Key.Model, null)?.Label
+                            ?? (world.PendingBattleChoice == StoryBattleChoice.Fight
+                                ? session.Battles.FirstOrDefault(b => b.Key == world.PendingBattle)?.Label
+                                : null);
                 var resolved = ResolvedBattles(session);
                 foreach (var battle in session.Battles)
                 {
                     var running = _sessions.GetValueOrDefault(session.Key with { Scope = battle.Key });
                     var status = resolved.GetValueOrDefault(battle.Key)
-                                 ?? (running is { Outcome: null } ? "running" : "notStarted");
+                                 ?? (running is { Outcome: null } ? "running"
+                                     : world.PendingBattle == battle.Key ? world.PendingBattleChoice ?? "pending"
+                                     : "notStarted");
                     battles.Add(new StorySimBattleDto(battle.Key, battle.Label, status, running?.Snapshot.Tick ?? 0,
                         session.BattleWrites.GetValueOrDefault(battle.Key) ?? []));
                 }

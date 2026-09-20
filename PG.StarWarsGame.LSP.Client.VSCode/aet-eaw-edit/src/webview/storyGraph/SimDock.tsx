@@ -89,6 +89,12 @@ export function frozenReason(state: StorySimStateDto): string | null {
 /** A battle's standing as the galactic session reports it, in the dock's words. */
 export function battleStatusLabel(battle: StorySimBattleDto): string {
     switch (battle.status) {
+        case 'pending':
+            return 'Pending - fight or auto-resolve';
+        case 'fight':
+            return 'Starting';
+        case 'autoResolve':
+            return 'Auto-resolve - decide the outcome';
         case 'running':
             return `Running - t${battle.tick}`;
         case 'won':
@@ -566,9 +572,13 @@ function BattleControls(props: { state: StorySimStateDto; battleKey: string; act
         : battle ? battleStatusLabel(battle) : 'Unknown';
     const resolved = inside ? !!state.outcome : battle?.status === 'won' || battle?.status === 'lost';
     const running = inside ? !state.outcome : battle?.status === 'running';
+    // The game's pending-battle choice, as measured: the left button fights, the right one
+    // auto-resolves. The author's press is a real click, so the click event is raised with it.
+    const pending = !inside && battle?.status === 'pending';
+    const starting = !inside && battle?.status === 'fight';
     // Deciding on the portal skips the battle's own run, so the flags it could have written are
     // offered here; a battle that is running or being played writes them itself.
-    const writes = !inside && !running ? battle?.writes ?? [] : [];
+    const writes = !inside && !running && !pending && !starting ? battle?.writes ?? [] : [];
     const [picked, setPicked] = useState<Set<string>>(() => new Set());
     useEffect(() => setPicked(new Set()), [battleKey]);
     const picks = writes.filter(w => picked.has(w.name));
@@ -588,7 +598,21 @@ function BattleControls(props: { state: StorySimStateDto; battleKey: string; act
                 <span className="sim-row-name">{label}</span>
                 <span className="sim-row-value">{status}</span>
             </div>
-            {!inside ? (
+            {pending ? (
+                <div className="sim-chip-row">
+                    <button type="button" className="btn sim-answer"
+                            title="Press the fight button - the battle begins in its own panel"
+                            onClick={() => actions.world({kind: 'clickGui', name: 'choice_button_left'})}>
+                        <Icon name="tactical" size={13}/>Fight
+                    </button>
+                    <button type="button" className="btn sim-answer"
+                            title="Press the auto-resolve button - decide the outcome here"
+                            onClick={() => actions.world({kind: 'clickGui', name: 'choice_button_right'})}>
+                        <Icon name="decision" size={13}/>Auto-resolve
+                    </button>
+                </div>
+            ) : null}
+            {!inside && !pending ? (
                 <button type="button" className="btn sim-answer" disabled={resolved}
                         title={resolved ? `Battle ${status.toLowerCase()} - restart the galaxy to play it again`
                             : running ? 'Show the battle panel' : 'Open the battle in its own panel and run it'}
@@ -609,18 +633,20 @@ function BattleControls(props: { state: StorySimStateDto; battleKey: string; act
                     ))}
                 </div>
             ) : null}
-            <div className="sim-chip-row">
-                <button type="button" className="btn sim-answer" disabled={resolved}
-                        title={resolved ? `Battle ${status.toLowerCase()}` : `${label} won - the galaxy takes the victory`}
-                        onClick={() => actions.resolveBattle(battleKey, true, picks)}>
-                    <Icon name="check" size={13}/>Won
-                </button>
-                <button type="button" className="btn sim-answer" disabled={resolved}
-                        title={resolved ? `Battle ${status.toLowerCase()}` : `${label} lost - the galaxy takes the defeat`}
-                        onClick={() => actions.resolveBattle(battleKey, false, picks)}>
-                    <Icon name="close" size={13}/>Lost
-                </button>
-            </div>
+            {!pending ? (
+                <div className="sim-chip-row">
+                    <button type="button" className="btn sim-answer" disabled={resolved}
+                            title={resolved ? `Battle ${status.toLowerCase()}` : `${label} won - the galaxy takes the victory`}
+                            onClick={() => actions.resolveBattle(battleKey, true, picks)}>
+                        <Icon name="check" size={13}/>Won
+                    </button>
+                    <button type="button" className="btn sim-answer" disabled={resolved}
+                            title={resolved ? `Battle ${status.toLowerCase()}` : `${label} lost - the galaxy takes the defeat`}
+                            onClick={() => actions.resolveBattle(battleKey, false, picks)}>
+                        <Icon name="close" size={13}/>Lost
+                    </button>
+                </div>
+            ) : null}
         </>
     );
 }
@@ -737,12 +763,15 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
                     </button>
                 </DockSection>
             ) : null}
-            <DockSection title="Or">
-                <button type="button" className="btn sim-answer" title="Fire without a world change"
-                        onClick={() => actions.satisfy(item.nodeId)}>
-                    <Icon name="decision" size={13}/>Assume the trigger met
-                </button>
-            </DockSection>
+            {item.kind !== 'battle' ? (
+                // A battle is not a trigger: it ends through its outcome or nothing.
+                <DockSection title="Or">
+                    <button type="button" className="btn sim-answer" title="Fire without a world change"
+                            onClick={() => actions.satisfy(item.nodeId)}>
+                        <Icon name="decision" size={13}/>Assume the trigger met
+                    </button>
+                </DockSection>
+            ) : null}
         </>
     );
 }

@@ -69,11 +69,8 @@ public static class StorySimCause
     /// <summary>A perpetual event re-armed after firing.</summary>
     public const string Perpetual = "perpetual";
 
-    /// <summary>A STORY_SPEECH_DONE fired by the owed speech completion.</summary>
+    /// <summary>A STORY_SPEECH_DONE fired because its speech ended: completed, cut off by a newer speech, or ended by a battle's end.</summary>
     public const string Speech = "speech";
-
-    /// <summary>A speech-done listener whose speech never ended, fired by the engine's timeout.</summary>
-    public const string Timeout = "timeout";
 
     /// <summary>A STORY_MOVIE_DONE fired by the owed movie completion.</summary>
     public const string Movie = "movie";

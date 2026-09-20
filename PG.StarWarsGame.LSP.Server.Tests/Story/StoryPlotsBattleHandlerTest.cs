@@ -56,4 +56,17 @@ public sealed class StoryPlotsBattleHandlerTest
         // The faction's own list stays the galactic manifest's: a battle's files are not repeated there.
         Assert.DoesNotContain(faction.Threads, t => t.Uri == StoryBattleFixture.Battle);
     }
+
+    [Fact]
+    public async Task Battles_CarryTheirScripts_TheFactionsListDoesNot()
+    {
+        var faction = await Faction();
+
+        var m2 = Assert.Single(faction.Battles!, b => b.Key == StoryBattleFixture.M2Key);
+        var script = Assert.Single(m2.LuaScripts!);
+        Assert.Equal(StoryBattleFixture.M2Script, script.Name);
+        // Nothing indexes the script here: the name still travels, the document stays null.
+        Assert.Null(script.Uri);
+        Assert.Empty(faction.LuaScripts);
+    }
 }

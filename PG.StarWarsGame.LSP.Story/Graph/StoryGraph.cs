@@ -84,7 +84,14 @@ public enum StoryGraphProblemKind
 {
     DanglingPrereq,
     UnresolvedControlTarget,
-    AmbiguousTarget
+    AmbiguousTarget,
+
+    /// <summary>
+    ///     A STORY_GENERIC listener whose names the game never raises (measured: 36 names from
+    ///     the engine's call sites, see <see cref="StoryGenericNames" />) and which no
+    ///     TRIGGER_EVENT pushes: it never fires.
+    /// </summary>
+    GenericNeverRaised
 }
 
 /// <summary>A resolution defect found while building the graph, anchored to the referencing value.</summary>

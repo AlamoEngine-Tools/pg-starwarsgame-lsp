@@ -70,16 +70,25 @@ public sealed partial class StorySimulator
     }
 
     /// <summary>
-    ///     A battle's end as the galaxy takes it: the outcome dispatches to its listeners and is
-    ///     recorded on the world, then the summary dialog closes - which raises the
-    ///     <see cref="BattleEndClosed" /> generic and, measured, fires every active speech-done
-    ///     listener (Trigger_All_Speech_Done_Events is called from the battle-end dialog alone).
+    ///     A battle's end as the galaxy takes it, in the measured order: the outcome dispatches to
+    ///     its listeners and is recorded on the world; the summary dialog closes, which first fires
+    ///     every active speech-done listener in every running plot and then raises the
+    ///     <see cref="BattleEndClosed" /> generic. Speeches the galaxy was still playing were
+    ///     killed without callbacks when the battle began, so nothing stays owed for them.
     /// </summary>
     public StorySimSnapshot ResolveBattleOutcome(StorySimSnapshot snapshot, StoryWorldChange outcome)
     {
         snapshot = ApplyWorldChange(snapshot, outcome);
-        snapshot = ApplyWorldChange(snapshot,
-            new StoryWorldChange(StoryWorldChangeKind.Generic) { Name = BattleEndClosed });
+        // The battle is over: the choice is spent and gameplay time runs again.
+        if (snapshot.Runtime.World.PendingBattle is not null)
+            snapshot = snapshot with
+            {
+                Runtime = snapshot.Runtime.WithWorld(snapshot.Runtime.World.WithoutPendingBattle())
+            };
+        var owedSpeeches = snapshot.Runtime.PendingCompletions.Where(k => ParseCompletion(k).Type == SpeechDone)
+            .ToList();
+        if (owedSpeeches.Count > 0)
+            snapshot = snapshot with { Runtime = snapshot.Runtime.WithoutCompletions(owedSpeeches) };
         foreach (var node in _eventNodes)
         {
             if (!IsActive(node, snapshot.Runtime)) continue;
@@ -87,7 +96,8 @@ public sealed partial class StorySimulator
             snapshot = Fire(snapshot, node, StorySimCause.Speech, null, 0);
         }
 
-        return snapshot;
+        return ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.Generic) { Name = BattleEndClosed });
     }
 
     private string? UnknownName(StoryWorldChange change)
@@ -189,6 +199,13 @@ public sealed partial class StorySimulator
                 break;
             case StoryWorldChangeKind.BeginEra:
                 world = world with { Era = change.Amount.ToString() };
+                break;
+            // The author's own click on the pending-battle choice: takes the choice, and the
+            // click event is raised by the dispatch that follows, as a real click raises it.
+            case StoryWorldChangeKind.ClickGui
+                when world.PendingBattle is { } pendingBattle && world.PendingBattleChoice is null
+                                                              && StoryBattleChoice.OfButton(change.Name) is { } choice:
+                world = world.WithPendingBattle(pendingBattle, choice);
                 break;
             case StoryWorldChangeKind.PlanetDestroyed when change.Planet is { } planet:
                 world = world.WithPlanet(
@@ -564,6 +581,23 @@ public sealed partial class StorySimulator
         var own = _model.Faction;
         switch (upperReward)
         {
+            case "LINK_TACTICAL":
+                return LinkTactical(snapshot, node);
+            case "FORCE_CLICK_GUI" when Param(storyEvent, 0) is { } component:
+            {
+                // Measured: the reward presses the named command-bar component's release handler
+                // directly; the story's click event is raised by the command bar's own mouse
+                // handling alone, so no listener hears this press. The pending-battle buttons
+                // are the one press with a story-side effect.
+                var choice = StoryBattleChoice.OfButton(component);
+                if (choice is not null && world.PendingBattle is { } pending && world.PendingBattleChoice is null)
+                    return Fact(snapshot, node, world.WithPendingBattle(pending, choice),
+                        choice == StoryBattleChoice.Fight
+                            ? $"  -> {component} pressed: the battle {pending} begins."
+                            : $"  -> {component} pressed: {pending} is auto-resolved - decide its outcome.");
+                return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                    $"  -> FORCE_CLICK_GUI {component}: pressed in the game; no listener hears a forced click.");
+            }
             case "PLANET_FACTION" when Param(storyEvent, 0) is { } planet && Param(storyEvent, 1) is { } faction:
                 return Fact(snapshot, node, world.WithPlanetOwner(planet, faction),
                     $"  -> {planet} now belongs to {faction}.");
@@ -619,6 +653,43 @@ public sealed partial class StorySimulator
             default:
                 return snapshot;
         }
+    }
+
+    /// <summary>
+    ///     LINK_TACTICAL, measured: the reward queues the next tactical conflict and, from the
+    ///     galaxy, transitions to it at once - with the pending-battle choice up unless parameter
+    ///     13 turns it off, in which case the battle begins straight away. The engine refuses a
+    ///     second queue while one is pending, and queues nothing. From inside a battle the queue
+    ///     waits for the galaxy, which the sub-graph does not model.
+    /// </summary>
+    private StorySimSnapshot LinkTactical(StorySimSnapshot snapshot, StoryNode node)
+    {
+        var world = snapshot.Runtime.World;
+        var stub = _model.Graph.Edges
+            .FirstOrDefault(e => e.Kind == StoryEdgeKind.Tactical && e.FromId == node.Id)?.ToId;
+        var battleKey = stub is null
+            ? null
+            : _model.Battles.FirstOrDefault(b => StoryGraphScoper.TacticalNodeId(b.Key) == stub)?.Key;
+        if (battleKey is null)
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                "  -> LINK_TACTICAL names no battle the model knows.");
+        if (Scope is not null)
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                $"  -> LINK_TACTICAL {battleKey} from inside a battle: queued for the galaxy, not modelled here.");
+        if (world.PendingBattle is { } pending)
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                $"  -> LINK_TACTICAL {battleKey} while {pending} is pending: the game queues nothing.");
+        // Linked again after an outcome - the tutorial resets its branch on a loss and links the
+        // same mission once more: a new attempt, with no outcome on the books.
+        if (world.BattleOutcomes.ContainsKey(battleKey))
+            world = world with { BattleOutcomes = world.BattleOutcomes.Remove(battleKey) };
+
+        var showChoice = Param(node.Event!, 12) is not { } raw || ParseInt(raw) != 0;
+        return showChoice
+            ? Fact(snapshot, node, world.WithPendingBattle(battleKey),
+                $"  -> battle {battleKey} pending: fight or auto-resolve.")
+            : Fact(snapshot, node, world.WithPendingBattle(battleKey, StoryBattleChoice.Fight),
+                $"  -> battle {battleKey} begins.");
     }
 
     private static StorySimSnapshot Fact(StorySimSnapshot snapshot, StoryNode node, StoryWorld world, string detail)

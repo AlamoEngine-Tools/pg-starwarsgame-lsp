@@ -8,13 +8,40 @@
  */
 
 import {
-    StoryGraphEdgeDto, StoryGraphNodeDto, StorySimInterventionDto, StorySimStepDto, StorySimWorldChangeDto,
-    StorySimWorldDto,
+    StoryGraphEdgeDto, StoryGraphNodeDto, StorySimBattleDto, StorySimInterventionDto, StorySimStepDto,
+    StorySimWorldChangeDto, StorySimWorldDto,
 } from '../../protocol/story';
 
 // ── Decisions ────────────────────────────────────────────────────────────────
 
 /** What kind of answer a decision takes: a world change, a battle outcome, a Lua notification, or an assumption. */
+/**
+ * The battles whose status just turned to `fight`: the galaxy chose to fight (the author on the
+ * picker, or a forced click on the fight button), so each one's panel opens into its own session.
+ * Only the turn counts - a re-fetch of the same state names nothing, and a battle already running,
+ * pending or resolved is never opened by this.
+ */
+export function battlesToEnter(
+    previous: readonly StorySimBattleDto[] | null | undefined,
+    next: readonly StorySimBattleDto[] | null | undefined,
+): string[] {
+    const before = new Map((previous ?? []).map(b => [b.key, b.status]));
+    return (next ?? []).filter(b => b.status === 'fight' && before.get(b.key) !== 'fight').map(b => b.key);
+}
+
+export type PortalPickAction = 'select' | 'open' | 'none';
+
+/**
+ * What a pick on a battle's portal does. In Simulation the portal is the battle's decision, so a
+ * pick selects it beside the dock - fight, auto-resolve, won or lost live there - and never opens
+ * the other panel under the pointer; in View the portal is a doorway and the pick goes through;
+ * in Edit a pick is the start of a drag. The jump arrow on the portal opens the graph in every
+ * mode, into Simulation while the galaxy simulates.
+ */
+export function portalPickAction(mode: 'view' | 'edit' | 'simulate'): PortalPickAction {
+    return mode === 'simulate' ? 'select' : mode === 'view' ? 'open' : 'none';
+}
+
 export type DecisionKind = 'world' | 'tactical' | 'lua' | 'assume';
 
 export interface DecisionGroup {
@@ -26,7 +53,8 @@ export function decisionKind(intervention: StorySimInterventionDto): DecisionKin
     if (intervention.kind === 'lua') {
         return 'lua';
     }
-    if (intervention.kind === 'tactical') {
+    // The pending battle sits with the tactical decisions: it is decided on its portal like them.
+    if (intervention.kind === 'tactical' || intervention.kind === 'battle') {
         return 'tactical';
     }
     return intervention.facet ? 'world' : 'assume';

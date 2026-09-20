@@ -81,12 +81,17 @@ public sealed record StoryFactionDto(
 ///     The battle's plot files as its tactical manifest lists them, each with the document it
 ///     resolved to. The faction's own thread list never carries these.
 /// </param>
+/// <param name="LuaScripts">
+///     The scripts the battle's tactical manifest attaches, resolved like the faction's own; the
+///     faction's script list never carries these either.
+/// </param>
 public sealed record StoryBattleDto(
     string Key,
     string Label,
     IReadOnlyList<string> EntryEventIds,
     int Rank,
-    IReadOnlyList<StoryPlotThreadDto> Threads);
+    IReadOnlyList<StoryPlotThreadDto> Threads,
+    IReadOnlyList<StoryLuaScriptDto>? LuaScripts = null);
 
 /// <param name="Name">Extensionless script name exactly as written in the plot manifest.</param>
 /// <param name="Uri">

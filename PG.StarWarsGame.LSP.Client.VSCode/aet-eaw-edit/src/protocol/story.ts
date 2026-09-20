@@ -36,6 +36,8 @@ export interface StoryBattleDto {
      * resolved to. The faction's own thread list never carries these.
      */
     threads: StoryPlotThreadDto[];
+    /** The scripts the battle's tactical manifest attaches; the faction's own list never carries them. */
+    luaScripts?: StoryLuaScriptDto[] | null;
 }
 
 export interface StoryFactionDto {

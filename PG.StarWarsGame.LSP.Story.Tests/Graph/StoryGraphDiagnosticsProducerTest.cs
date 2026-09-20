@@ -33,6 +33,20 @@ public sealed class StoryGraphDiagnosticsProducerTest
         return new StoryGraphDiagnosticsProducer(Schema).Produce(model, uri);
     }
 
+    // A listener the game never reaches is a warning on its name: the file is valid, the event is dead.
+    [Fact]
+    public void GenericListener_TheGameNeverRaises_WarnsOnTheName()
+    {
+        var model = Model([
+            (UriA,
+                "<Event Name=\"Dead\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>right_click</Event_Param1></Event>")
+        ]);
+
+        var dead = Assert.Single(Produce(model), d => d.Message.Contains("never fires"));
+
+        Assert.Equal(XmlDiagnosticSeverity.Warning, dead.Severity);
+    }
+
     [Fact]
     public void DuplicateEventNames_ErrorOnEveryOccurrence()
     {

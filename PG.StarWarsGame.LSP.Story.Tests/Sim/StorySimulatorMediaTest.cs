@@ -12,9 +12,11 @@ namespace PG.StarWarsGame.LSP.Story.Tests.Sim;
 /// <summary>
 ///     What the story waits on when media plays, and what a battle's end does to the galaxy.
 ///     Measured on the shipped corpus: 1485 of 1522 STORY_SPEECH_DONE listeners name a speech a
-///     MULTIMEDIA reward starts (parameter 8), 35 one a SPEECH reward starts, 2 none. The engine
-///     gives a speech-done listener a 60 s timeout at parse when the XML carries none, and the
-///     battle-end dialog fires every active speech-done listener.
+///     MULTIMEDIA reward starts (parameter 8), 35 one a SPEECH reward starts, 2 none. Measured in
+///     the engine: the parser's 60 s speech-done timeout is never evaluated (the timeout list's
+///     add, remove and check are empty), a new speech ends the one playing and fires its listener
+///     before it starts, and the battle-end dialog fires every active speech-done listener before
+///     it raises <c>battle_end_closed</c>.
 /// </summary>
 public sealed class StorySimulatorMediaTest
 {
@@ -32,7 +34,7 @@ public sealed class StorySimulatorMediaTest
         "<Reward_Param8>SPEECH_WELCOME</Reward_Param8></Event>" +
         "<Event Name=\"WelcomeDone\"><Event_Type>STORY_SPEECH_DONE</Event_Type><Event_Param1>speech_welcome</Event_Param1>" +
         "<Prereq>Welcome</Prereq></Event>" +
-        // A listener nothing starts: only the engine's timeout ends its wait.
+        // A listener nothing starts: it waits until the author answers or a battle ends.
         "<Event Name=\"Orphan\"><Event_Type>STORY_SPEECH_DONE</Event_Type><Event_Param1>NEVER_SPOKEN</Event_Param1></Event>" +
         "<Event Name=\"E\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Begin</Prereq>" +
         "<Reward_Type>LINK_TACTICAL</Reward_Type><Reward_Param1>" + M2 + "</Reward_Param1></Event>" +
@@ -42,16 +44,32 @@ public sealed class StorySimulatorMediaTest
         "<Prereq>E</Prereq></Event>" +
         "</Story>";
 
+    // A second speech in the same push as the first: the engine kills the speech still playing
+    // before it queues the new one, and the killed speech's listener fires there and then. The
+    // listener sits before its killer in the file, so it is armed when the kill reaches it.
+    private const string TwoSpeechesText =
+        "<Story>" +
+        "<Event Name=\"Begin\"><Event_Type>STORY_ELAPSED</Event_Type><Event_Param1>0</Event_Param1></Event>" +
+        "<Event Name=\"Welcome\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Begin</Prereq>" +
+        "<Reward_Type>MULTIMEDIA</Reward_Type><Reward_Param8>SPEECH_WELCOME</Reward_Param8></Event>" +
+        "<Event Name=\"WelcomeDone\"><Event_Type>STORY_SPEECH_DONE</Event_Type><Event_Param1>speech_welcome</Event_Param1>" +
+        "<Prereq>Welcome</Prereq></Event>" +
+        "<Event Name=\"Second\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Welcome</Prereq>" +
+        "<Reward_Type>SPEECH</Reward_Type><Reward_Param1>Speech_Second</Reward_Param1></Event>" +
+        "<Event Name=\"SecondDone\"><Event_Type>STORY_SPEECH_DONE</Event_Type><Event_Param1>SPEECH_SECOND</Event_Param1>" +
+        "<Prereq>Second</Prereq></Event>" +
+        "</Story>";
+
     private const string BattleText =
         "<Story><Event Name=\"Ambush\"><Event_Type>STORY_GENERIC</Event_Type></Event></Story>";
 
     private static readonly ISchemaProvider Schema = new MediaSchemaProvider();
 
-    private static StoryCampaignModel Model()
+    private static StoryCampaignModel Model(string galaxyText = GalaxyText)
     {
         var threads = new List<StoryThread>
         {
-            StoryThreadParser.Parse(GalaxyText, Galaxy),
+            StoryThreadParser.Parse(galaxyText, Galaxy),
             StoryThreadParser.Parse(BattleText, Battle)
         };
         var manifests = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
@@ -94,44 +112,78 @@ public sealed class StorySimulatorMediaTest
     }
 
     [Fact]
-    public void MediaNotAssumedToComplete_LeavesTheSpeechDoneToTheAuthor_UntilTheTimeout()
+    public void MediaNotAssumedToComplete_LeavesTheSpeechDoneToTheAuthor_ForGood()
     {
         var sim = new StorySimulator(Model(), Schema, options: new StorySimOptions(AssumeMediaCompletes: false));
 
         var start = sim.Start();
         Assert.Contains(sim.GetInterventions(start), i => i.EventName == "WelcomeDone");
-        var later = sim.Tick(start, 59);
+        // Nothing the simulator owes counts as clock work when the author is stepping the media.
+        Assert.Equal(0, sim.GetClockPending(start));
+
+        // Measured: the engine never evaluates the parser's 60 s timeout, so no clock ends the wait.
+        var later = sim.Tick(start, 600);
+
         Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, later, "WelcomeDone"));
-
-        var timedOut = sim.Tick(later);
-
-        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, timedOut, "WelcomeDone"));
+        Assert.Contains(sim.GetInterventions(later), i => i.EventName == "WelcomeDone");
     }
 
     [Fact]
-    public void SpeechDoneNothingStarts_IsADecisionWithATimeoutGate_AndFiresAtSixtySeconds()
+    public void SpeechDoneNothingStarts_IsADecisionWithNoGate_AndNeverFiresOnItsOwn()
     {
         var sim = new StorySimulator(Model(), Schema);
 
         var start = sim.Start();
         var orphan = Assert.Single(sim.GetInterventions(start), i => i.EventName == "Orphan");
         Assert.Equal("manual", orphan.Kind);
-        var gate = sim.GetGate(start, Id("Orphan"));
-        Assert.NotNull(gate);
-        Assert.Equal("0/60 s", gate.Label);
+        Assert.Null(sim.GetGate(start, Id("Orphan")));
 
-        var timedOut = sim.Tick(start, 60);
+        var later = sim.Tick(start, 600);
 
-        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, timedOut, "Orphan"));
-        Assert.Contains(timedOut.Steps, s => s.NodeId == Id("Orphan") && s.Cause == StorySimCause.Timeout);
+        Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, later, "Orphan"));
+        Assert.DoesNotContain(later.Steps, s => s.NodeId == Id("Orphan") && s.To == StoryEventLifecycle.Fired);
     }
 
     [Fact]
-    public void BattleOutcome_MakesTheOtherOutcomesListenerMoot_AndRaisesBattleEndClosed_AndEndsEverySpeech()
+    public void ASecondSpeech_EndsTheOnePlaying_AndFiresItsListenerBeforeItStarts()
+    {
+        var sim = new StorySimulator(Model(TwoSpeechesText), Schema);
+
+        var start = sim.Start();
+
+        // Welcome's speech was owed; Second's SPEECH reward killed it inside the same push.
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, start, "WelcomeDone"));
+        var killed = Assert.Single(start.Steps, s => s.NodeId == Id("WelcomeDone") && s.Cause == StorySimCause.Speech);
+        Assert.Equal(Id("Welcome"), killed.SourceNodeId);
+        // The new speech is the one still owed.
+        Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, start, "SecondDone"));
+        Assert.DoesNotContain(sim.GetInterventions(start), i => i.EventName == "SecondDone");
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, sim.Tick(start), "SecondDone"));
+    }
+
+    [Fact]
+    public void ASecondSpeech_EndsTheOnePlaying_EvenWhenMediaIsLeftToTheAuthor()
+    {
+        var sim = new StorySimulator(Model(TwoSpeechesText), Schema,
+            options: new StorySimOptions(AssumeMediaCompletes: false));
+
+        var start = sim.Start();
+
+        // The kill is the engine's, not an assumption: the first listener fires regardless...
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, start, "WelcomeDone"));
+        // ...and the speech now playing is the author's to end.
+        Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, start, "SecondDone"));
+        Assert.Contains(sim.GetInterventions(start), i => i.EventName == "SecondDone");
+        Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, sim.Tick(start, 600), "SecondDone"));
+    }
+
+    [Fact]
+    public void BattleOutcome_MakesTheOtherOutcomesListenerMoot_EndsEverySpeech_ThenRaisesBattleEndClosed()
     {
         var sim = new StorySimulator(Model(), Schema);
         var start = sim.Start();
         Assert.Contains(sim.GetInterventions(start), i => i.EventName == "Lost" && i.BattleKey == M2Key);
+        Assert.NotEmpty(start.Runtime.PendingCompletions);
 
         var resolved = sim.ResolveBattleOutcome(start,
             new StoryWorldChange(StoryWorldChangeKind.BattleWon) { BattleKey = M2Key });
@@ -140,10 +192,15 @@ public sealed class StorySimulatorMediaTest
         Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, resolved, "Win"));
         // The game never takes the losing route once the battle is won: not a decision any more.
         Assert.DoesNotContain(sim.GetInterventions(resolved), i => i.EventName == "Lost");
-        // Closing the summary raises the generic the galaxy listens for...
-        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, resolved, "Returned"));
-        // ...and ends every speech still playing (Trigger_All_Speech_Done_Events).
+        // Closing the summary ends every speech still playing (Trigger_All_Speech_Done_Events)...
         Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, resolved, "Orphan"));
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, resolved, "WelcomeDone"));
+        Assert.Empty(resolved.Runtime.PendingCompletions);
+        // ...and then raises the generic the galaxy listens for - measured in that order.
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, resolved, "Returned"));
+        var speechEnded = resolved.Steps.First(s => s.NodeId == Id("Orphan") && s.To == StoryEventLifecycle.Fired);
+        var summaryClosed = resolved.Steps.First(s => s.NodeId == Id("Returned") && s.To == StoryEventLifecycle.Fired);
+        Assert.True(speechEnded.Seq < summaryClosed.Seq, "speech-done listeners fire before battle_end_closed");
     }
 
     [Fact]

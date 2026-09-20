@@ -29,6 +29,9 @@ public sealed record StoryBattle(
 {
     /// <summary>The battle's plot files as its manifest writes them, in manifest order.</summary>
     public IReadOnlyList<string> ThreadFiles { get; init; } = [];
+
+    /// <summary>The scripts the battle's manifest attaches, as it writes them (extensionless), in manifest order.</summary>
+    public IReadOnlyList<string> LuaScripts { get; init; } = [];
 }
 
 /// <summary>
@@ -86,7 +89,8 @@ public static class StoryGraphScoper
     /// </summary>
     public static IReadOnlyList<StoryBattle> Battles(StoryGraph graph,
         IReadOnlyDictionary<string, IReadOnlySet<string>> tacticalManifestThreads,
-        IReadOnlyDictionary<string, IReadOnlyList<string>>? tacticalManifestFiles = null)
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? tacticalManifestFiles = null,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? tacticalManifestScripts = null)
     {
         if (tacticalManifestThreads.Count == 0) return [];
 
@@ -112,7 +116,9 @@ public static class StoryGraphScoper
                 : entries.Min(id => nodesById.GetValueOrDefault(id)?.Event?.Range.StartLine ?? int.MaxValue);
             var label = Path.GetFileNameWithoutExtension(StoryReferenceTypes.NormalizeRelativePath(manifest));
             var files = tacticalManifestFiles?.GetValueOrDefault(manifest) ?? [];
-            battles.Add((new StoryBattle(key, label, entries, 0, threads) { ThreadFiles = files }, visit, line));
+            var scripts = tacticalManifestScripts?.GetValueOrDefault(manifest) ?? [];
+            battles.Add((new StoryBattle(key, label, entries, 0, threads) { ThreadFiles = files, LuaScripts = scripts },
+                visit, line));
         }
 
         return battles
@@ -421,6 +427,17 @@ public static class StoryGraphScoper
         Dictionary<string, StoryNode> nodesById, string entryId)
     {
         return BattleEndDependants(graph, nodesById, entryId).Where(d => !d.Summary).Select(d => d.Node);
+    }
+
+    /// <summary>
+    ///     The ids of the galactic outcome listeners behind a battle's link event - the same walk
+    ///     the battle scope draws its exit portals from, through junctions and through the
+    ///     summary-closed listener the tutorial puts between the link and its failure branch.
+    /// </summary>
+    public static IEnumerable<string> OutcomeListenerIds(StoryGraph graph, string entryId)
+    {
+        var nodesById = graph.Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
+        return OutcomeDependants(graph, nodesById, entryId).Select(n => n.Id);
     }
 
     /// <summary>

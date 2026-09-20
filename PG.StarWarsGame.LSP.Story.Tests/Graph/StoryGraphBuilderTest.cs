@@ -220,6 +220,42 @@ public sealed class StoryGraphBuilderTest
         Assert.Contains("story_b.xml", problem.Message);
     }
 
+    // Measured: the engine raises 36 generic names from 53 call sites; a listener naming none of
+    // them fires only from a TRIGGER_EVENT push. The shipped corpus has exactly one such listener,
+    // Underworld's "right_click".
+    [Fact]
+    public void GenericListener_NameTheGameNeverRaises_AndNoTriggerPushesIt_IsReportedAsNeverFiring()
+    {
+        var graph = Build(Thread(UriA,
+            "<Event Name=\"Dead\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>right_click</Event_Param1></Event>"));
+
+        var problem = Assert.Single(graph.Problems);
+        Assert.Equal(StoryGraphProblemKind.GenericNeverRaised, problem.Kind);
+        Assert.Equal("right_click", problem.Reference);
+        Assert.Contains("never fires", problem.Message);
+        Assert.Contains("click", problem.Message);
+    }
+
+    [Fact]
+    public void GenericListener_EngineRaisedName_InAnyCasing_IsNotReported()
+    {
+        var graph = Build(Thread(UriA,
+            "<Event Name=\"Closed\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>BATTLE_END_CLOSED</Event_Param1></Event>" +
+            "<Event Name=\"Either\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>right_click, click</Event_Param1></Event>"));
+
+        Assert.Empty(graph.Problems);
+    }
+
+    [Fact]
+    public void GenericListener_PushedByATriggerEvent_IsNotReported()
+    {
+        var graph = Build(Thread(UriA,
+            "<Event Name=\"Dead\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>right_click</Event_Param1></Event>" +
+            "<Event Name=\"Push\"><Reward_Type>TRIGGER_EVENT</Reward_Type><Reward_Param1>Dead</Reward_Param1></Event>"));
+
+        Assert.Empty(graph.Problems);
+    }
+
     // Measured: DISABLE_STORY_EVENT reaches every subplot only when its third parameter is non-zero.
     [Fact]
     public void ControlEdge_DisableStoryEvent_ThirdParamNonZero_ReachesEveryThread()

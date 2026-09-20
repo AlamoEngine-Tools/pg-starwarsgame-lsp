@@ -294,6 +294,21 @@ public sealed class StorySimulationServiceTest
         Assert.Equal(StorySimFeature.DisabledMessage, result.Error);
     }
 
+    // Measured over the wire: a start request without the field arrived with the option OFF, since
+    // the deserializer fills a missing bool with false, never with the record's default. The field
+    // is nullable so that absent means the documented default.
+    [Fact]
+    public async Task Start_WithoutTheMediaField_AssumesMediaCompletes()
+    {
+        var (service, _) = BuildService();
+        var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags());
+
+        var started = await new StorySimStartHandler(service, config)
+            .Handle(new StorySimStartParams("GC", "Rebel") { AssumeMediaCompletes = null }, CancellationToken.None);
+
+        Assert.True(started.State!.AssumeMediaCompletes);
+    }
+
     [Fact]
     public async Task Handlers_FlagOn_PassThrough()
     {
