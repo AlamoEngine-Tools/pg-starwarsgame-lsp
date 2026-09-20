@@ -155,8 +155,9 @@ public sealed class StorySimulatorPendingBattleTest
         Assert.Equal("fight", start.Runtime.World.PendingBattleChoice);
         // Measured: the reward presses the component directly; the story's click event is not raised.
         Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, start, "Clicked"));
-        // The battle runs from here: nothing left to decide on the portal.
-        Assert.DoesNotContain(sim.GetInterventions(start), i => i.Kind == StorySimIntervention.BattleKind);
+        // The battle runs from here; the author still chooses to play it or to skip it with an outcome.
+        var starting = Assert.Single(sim.GetInterventions(start), i => i.Kind == StorySimIntervention.BattleKind);
+        Assert.Equal(["enter", "won", "lost"], starting.Options);
     }
 
     [Fact]
@@ -274,6 +275,78 @@ public sealed class StorySimulatorPendingBattleTest
         Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, start, "Retry"));
         Assert.DoesNotContain(sim.GetInterventions(start), i => i.EventName == "Retry");
         Assert.Contains(sim.GetInterventions(start), i => i.EventName == "Zoomed" && i.Kind == "manual");
+    }
+
+    // Measured: the tutorial dialog's Continue button is what raises "Continue_Tutorial"; a
+    // TUTORIAL_DIALOG reward puts the dialog up. Inferred: no dialog, no button, so a listener for
+    // it is nothing the author can answer until one shows - the tutorial's final listener has no
+    // prerequisite and would otherwise wait from tick 0.
+    [Fact]
+    public void ContinueTutorial_IsADecisionOnlyWhileADialogShows_AndContinuingCloses()
+    {
+        const string dialog =
+            "<Event Name=\"Dialog\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Returned</Prereq>" +
+            "<Reward_Type>TUTORIAL_DIALOG</Reward_Type><Reward_Param1>TEXT_DONE</Reward_Param1></Event>" +
+            "<Event Name=\"Continue\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>Continue_Tutorial</Event_Param1></Event>";
+        var sim = new StorySimulator(Model(GalaxyText(between: dialog)), Schema);
+        var start = sim.Start();
+
+        Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, start, "Continue"));
+        Assert.Null(start.Runtime.World.TutorialDialog);
+        Assert.DoesNotContain(sim.GetInterventions(start), i => i.EventName == "Continue");
+
+        var shown = sim.ResolveBattleOutcome(start,
+            new StoryWorldChange(StoryWorldChangeKind.BattleWon) { BattleKey = M2Key });
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, shown, "Dialog"));
+        Assert.Equal("TEXT_DONE", shown.Runtime.World.TutorialDialog);
+        Assert.Contains(sim.GetInterventions(shown), i => i.EventName == "Continue");
+
+        var continued = sim.ApplyWorldChange(shown,
+            new StoryWorldChange(StoryWorldChangeKind.Generic) { Name = "Continue_Tutorial" });
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, continued, "Continue"));
+        Assert.Null(continued.Runtime.World.TutorialDialog);
+    }
+
+    // A flag poll that already holds fires on the next tick with no help: the clock owes it, so
+    // the story is not waiting for input while the chain behind a flag write is still landing.
+    [Fact]
+    public void AFlagListenerWhoseConditionHolds_IsClockWork_NotAWait()
+    {
+        var sim = new StorySimulator(Model(GalaxyText()), Schema);
+        var start = sim.Start();
+        var idle = sim.GetClockPending(start);
+
+        var written = sim.SetFlag(start, "F", 1);
+
+        Assert.Equal(idle + 1, sim.GetClockPending(written));
+        var polled = sim.Tick(written);
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, polled, "Reader"));
+        Assert.Equal(idle, sim.GetClockPending(polled));
+    }
+
+    // The author's call that a listener will not fire in this run: it stays armed, as in the game,
+    // but is no decision until reconsidered - or until something fires it after all.
+    [Fact]
+    public void RuledOut_IsNoDecision_UntilReconsidered_AndClearsWhenItFires()
+    {
+        var sim = new StorySimulator(Model(GalaxyText()), Schema);
+        var start = sim.Start();
+        Assert.Contains(sim.GetInterventions(start), i => i.EventName == "Zoomed");
+
+        var ruledOut = sim.RuleOut(start, Id("Zoomed"), true);
+
+        Assert.Equal(StoryEventLifecycle.Armed, Lifecycle(sim, ruledOut, "Zoomed"));
+        Assert.Contains(Id("Zoomed"), ruledOut.Runtime.RuledOut);
+        Assert.DoesNotContain(sim.GetInterventions(ruledOut), i => i.EventName == "Zoomed");
+        Assert.Contains(ruledOut.Steps, s => s.NodeId == Id("Zoomed") && s.Cause == StorySimCause.RuledOut);
+
+        var reconsidered = sim.RuleOut(ruledOut, Id("Zoomed"), false);
+        Assert.Contains(sim.GetInterventions(reconsidered), i => i.EventName == "Zoomed");
+
+        var fired = sim.ApplyWorldChange(sim.RuleOut(reconsidered, Id("Zoomed"), true),
+            new StoryWorldChange(StoryWorldChangeKind.Generic) { Name = "zoomed_in" });
+        Assert.Equal(StoryEventLifecycle.Fired, Lifecycle(sim, fired, "Zoomed"));
+        Assert.DoesNotContain(Id("Zoomed"), fired.Runtime.RuledOut);
     }
 
     [Fact]

@@ -84,6 +84,12 @@ public static class StorySimCause
     /// <summary>A reward or command the engine would ignore (detail says why).</summary>
     public const string Ignored = "ignored";
 
+    /// <summary>The author ruled the listener out for this run: armed, but no decision.</summary>
+    public const string RuledOut = "ruledOut";
+
+    /// <summary>The author reconsidered a ruled-out listener: a decision again.</summary>
+    public const string Reconsidered = "reconsidered";
+
     /// <summary>The run halted after this tick because the node hit a breakpoint.</summary>
     public const string Breakpoint = "breakpoint";
 

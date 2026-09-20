@@ -83,6 +83,14 @@ public sealed record StoryWorld
         return this with { PendingBattle = null, PendingBattleChoice = null };
     }
 
+    /// <summary>
+    ///     The text key of the tutorial dialog a TUTORIAL_DIALOG reward put up, or null while none
+    ///     shows. Measured: the dialog's Continue button is what raises the "Continue_Tutorial"
+    ///     generic. Inferred: without the dialog there is no button, so a listener for it is
+    ///     nothing the author can answer meanwhile; continuing closes the dialog.
+    /// </summary>
+    public string? TutorialDialog { get; init; }
+
     /// <summary>Counters keyed "name|faction": battlesWon, battlesLost, conquered, built.</summary>
     public ImmutableDictionary<string, int> Counters { get; init; } =
         ImmutableDictionary.Create<string, int>(StringComparer.OrdinalIgnoreCase);

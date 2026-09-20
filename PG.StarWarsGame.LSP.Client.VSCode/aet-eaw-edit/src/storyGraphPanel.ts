@@ -223,7 +223,10 @@ export class StoryGraphPanel extends WebviewPanelHost {
         }
 
         if (result.error) {
-            void vscode.window.showErrorMessage(`EaWEdit: ${result.error}`);
+            // A refusal is the session's state, not a failure: the dock shows it beside the chip
+            // and stops play, since the same command would be refused again on the next tick. A
+            // toast per refusal was a storm once a battle panel kept playing past its end.
+            this.post({type: 'simError', message: result.error});
             return;
         }
         this.post({type: 'simState', state: result.state ?? null});

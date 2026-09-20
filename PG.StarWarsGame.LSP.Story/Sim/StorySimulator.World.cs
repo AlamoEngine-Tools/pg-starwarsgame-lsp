@@ -190,6 +190,11 @@ public sealed partial class StorySimulator
                 when change.UnitType is { } type && change.Planet is { } planet:
                 world = world.WithUnits(type, faction, planet, change.Amount);
                 break;
+            case StoryWorldChangeKind.Generic when string.Equals(change.Name,
+                StoryGraphBuilder.ContinueTutorialGeneric, StringComparison.OrdinalIgnoreCase):
+                // The Continue press closes the tutorial dialog that raised it.
+                world = world with { TutorialDialog = null };
+                break;
             case StoryWorldChangeKind.Corrupt when change.Planet is { } planet:
                 world = world.WithPlanet(
                     (world.Planets.GetValueOrDefault(planet) ?? new StoryPlanetFact(planet, null)) with
@@ -583,6 +588,11 @@ public sealed partial class StorySimulator
         {
             case "LINK_TACTICAL":
                 return LinkTactical(snapshot, node);
+            case "TUTORIAL_DIALOG" when Param(storyEvent, 0) is { } text:
+                // The dialog is up until its Continue button raises Continue_Tutorial; that
+                // generic is answerable only meanwhile (StoryWorld.TutorialDialog).
+                return Fact(snapshot, node, world with { TutorialDialog = text },
+                    $"  -> tutorial dialog {text} up - Continue raises {StoryGraphBuilder.ContinueTutorialGeneric}.");
             case "FORCE_CLICK_GUI" when Param(storyEvent, 0) is { } component:
             {
                 // Measured: the reward presses the named command-bar component's release handler

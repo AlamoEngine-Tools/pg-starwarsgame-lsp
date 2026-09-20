@@ -65,6 +65,10 @@ public sealed class StoryGraphProjectionScopeTest
         var portals = result.Nodes.Where(n => n.Kind == "GalacticPortal").Select(n => n.Id).ToList();
         Assert.Contains(entryPortal, portals);
         Assert.Contains(exitPortal, portals);
+        // A portal carries the type of the galactic event it stands for: the battle panel tells
+        // the victory listener from the loss listener among its exits when it hands the reader back.
+        Assert.Equal("STORY_VICTORY", result.Nodes.Single(n => n.Id == exitPortal).EventType);
+        Assert.Equal("STORY_TRIGGER", result.Nodes.Single(n => n.Id == entryPortal).EventType);
         // Upstream from the exit portal is the way back to the entry: the portals frame the battle.
         var upstream = await Handler().Handle(
             new GetStoryGraphParams("GC", "Empire", ReachableFrom: exitPortal, ReachableDirection: "Upstream",

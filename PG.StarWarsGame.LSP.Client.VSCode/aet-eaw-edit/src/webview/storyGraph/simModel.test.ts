@@ -2,7 +2,66 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import {battlesToEnter, portalPickAction, shouldResumeAfterAnswer} from './simModel';
+import {galacticReturnNode, hangingDecision, portalPickAction, shouldResumeAfterAnswer} from './simModel';
+
+// The decision that opens by itself: the battle, else the one armed last (the chain's next step),
+// else the first listed - never a listener armed at plot load ahead of the step that just came up.
+describe('hangingDecision', () => {
+    const decision = (nodeId: string, kind = 'manual', facet: string | null = 'generic') =>
+        ({kind, nodeId, eventName: nodeId, eventType: null, options: [], facet, suggested: null}) as never;
+    const armed = (nodeId: string, tick: number) =>
+        ({tick, seq: tick, nodeId, from: 'Waiting', to: 'Armed', sourceNodeId: null, cause: 'prereq', detail: null});
+    const atLoad = decision('g#continue');
+    const nextStep = decision('g#speech_done', 'manual', null);
+
+    it('picks the decision armed last over one armed at load', () => {
+        const steps = [armed('g#continue', 0), armed('g#speech_done', 7)];
+        assert.equal(hangingDecision([atLoad, nextStep], steps)?.nodeId, 'g#speech_done');
+    });
+
+    it('puts a battle first, falls back to the dock order without a trace, and is null when nothing waits', () => {
+        const battle = decision('tactical#m1', 'battle', null);
+        assert.equal(hangingDecision([atLoad, battle, nextStep], [armed('g#speech_done', 7)])?.nodeId, 'tactical#m1');
+        assert.equal(hangingDecision([nextStep, atLoad], [])?.nodeId, 'g#continue');
+        assert.equal(hangingDecision([], [armed('g#continue', 0)]), null);
+    });
+});
+
+// A battle resolved inside its own panel hands the reader back to the galaxy on the event the
+// story goes on from: the exit portal for the outcome, else any exit portal, else the entry.
+describe('galacticReturnNode', () => {
+    const portal = (id: string, target: string, eventType: string | null = null) =>
+        ({id, kind: 'GalacticPortal', label: target, portalTarget: target, eventType}) as never;
+    const nodes = [
+        portal('p#link', 'g#link'),
+        portal('p#returned', 'g#returned', 'STORY_GENERIC'),
+        portal('p#win', 'g#win', 'STORY_VICTORY'),
+        portal('p#lost', 'g#lost', 'STORY_MISSION_LOST'),
+        {id: 'e#ambush', kind: 'Event', label: 'Ambush'} as never,
+    ];
+    const edges = [
+        {fromId: 'p#link', toId: 'p#returned', kind: 'Tactical', label: 'outcome'},
+        {fromId: 'p#link', toId: 'p#win', kind: 'Tactical', label: 'outcome'},
+        {fromId: 'p#link', toId: 'p#lost', kind: 'Tactical', label: 'outcome'},
+        {fromId: 'p#link', toId: 'e#ambush', kind: 'TacticalEntry', label: null},
+    ];
+
+    it('prefers the outcome listener that matches the result', () => {
+        assert.equal(galacticReturnNode(nodes, edges, 'won'), 'g#win');
+        assert.equal(galacticReturnNode(nodes, edges, 'lost'), 'g#lost');
+    });
+
+    it('falls back to the summary listener, never to the other outcome, then to the entry', () => {
+        // The tutorial's shape: no galactic victory listener, the win is a flag read behind the
+        // summary listener, and the loss listener sits beside it.
+        const noWin = nodes.filter(n => (n as { id: string }).id !== 'p#win');
+        assert.equal(galacticReturnNode(noWin, edges, 'won'), 'g#returned');
+        const lossOnly = nodes.filter(n => !['p#win', 'p#returned'].includes((n as { id: string }).id));
+        assert.equal(galacticReturnNode(lossOnly, edges, 'won'), 'g#link');
+        assert.equal(galacticReturnNode([portal('p#link', 'g#link')], [], 'won'), 'g#link');
+        assert.equal(galacticReturnNode([], [], 'won'), null);
+    });
+});
 
 // A pick on a battle's portal: in Simulation it selects the battle's decision beside the dock -
 // the picker, not the other panel; in View it goes through to the battle's graph; in Edit a pick
@@ -13,25 +72,6 @@ describe('portalPickAction', () => {
         assert.equal(portalPickAction('simulate'), 'select');
         assert.equal(portalPickAction('view'), 'open');
         assert.equal(portalPickAction('edit'), 'none');
-    });
-});
-
-// The galaxy chose to fight (the author on the picker, or a forced click on the fight button): the
-// battle's panel opens into its session once, when the status turns, never again on a re-fetch.
-describe('battlesToEnter', () => {
-    const battle = (key: string, status: string) => ({key, label: key, status, tick: 0});
-
-    it('names a battle whose status just turned to fight', () => {
-        assert.deepEqual(battlesToEnter([battle('m1', 'pending')], [battle('m1', 'fight')]), ['m1']);
-        assert.deepEqual(battlesToEnter(null, [battle('m1', 'fight')]), ['m1']);
-    });
-
-    it('names nothing for a battle already fighting, running, pending or resolved', () => {
-        assert.deepEqual(battlesToEnter([battle('m1', 'fight')], [battle('m1', 'fight')]), []);
-        assert.deepEqual(battlesToEnter([battle('m1', 'fight')], [battle('m1', 'running')]), []);
-        assert.deepEqual(battlesToEnter([battle('m1', 'notStarted')], [battle('m1', 'pending')]), []);
-        assert.deepEqual(battlesToEnter([battle('m1', 'running')], [battle('m1', 'won')]), []);
-        assert.deepEqual(battlesToEnter([battle('m1', 'fight')], null), []);
     });
 });
 

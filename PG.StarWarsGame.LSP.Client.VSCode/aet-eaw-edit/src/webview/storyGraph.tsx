@@ -85,7 +85,14 @@ import {
 } from '../protocol';
 import {battleKeyOfNode} from '../storyBattles';
 import {
-    DEFAULT_PACE, battlesToEnter, paceIntervalMs, parsePace, portalPickAction, shouldResumeAfterAnswer, type SimPace,
+    DEFAULT_PACE,
+    galacticReturnNode,
+    hangingDecision,
+    paceIntervalMs,
+    parsePace,
+    portalPickAction,
+    shouldResumeAfterAnswer,
+    type SimPace,
 } from './storyGraph/simModel';
 import {
     type SimActions,
@@ -4655,6 +4662,17 @@ const Shell = styled.div`
     /* Header: one chip, the tick and the thing that stopped the clock. A button when there is
        something to open, a plain span when there is only the tick to read. */
 
+    /* What the server last refused: the reason play stopped, beside the chip until the next state. */
+
+    .sim-notice {
+        color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+        font-size: var(--font-size-11);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 320px;
+    }
+
     .sim-chip {
         display: inline-flex;
         align-items: center;
@@ -5021,6 +5039,14 @@ const Shell = styled.div`
         opacity: 0.22;
     }
 
+    /* Armed is not passed either: it waits for the story to reach it. Lighter than the waiting
+       tier, since it is in play, but never as strong as a node the story has run through - so
+       the path taken reads at a glance. */
+
+    &.lens-active-only [data-testid="node"].lc-Armed {
+        opacity: 0.6;
+    }
+
     &.lens-hide-flow [data-testid="connection"].flow-active path:not(.glow-underlay),
     &.lens-hide-flow [data-testid="connection"].flow-spent path:not(.glow-underlay) {
         stroke: revert-layer;
@@ -5333,8 +5359,12 @@ function App(): React.JSX.Element {
     // something - the three things that decide if play picks itself up again.
     const autoResumeRef = useRef(true);
     const pausedForWaitRef = useRef(false);
-    // The battles' standing as of the previous state, so a turn to "fight" opens the panel once.
-    const prevBattlesRef = useRef<StorySimBattleDto[] | null>(null);
+    // What the server last refused, shown beside the chip until the next state arrives.
+    const [simNotice, setSimNotice] = useState<string | null>(null);
+    // Whether this battle panel already handed the reader back to the galaxy for its outcome.
+    const resolvedOnceRef = useRef(false);
+    // The decision the last state hung on, so it opens once when it becomes that and not per tick.
+    const hangRef = useRef<string | null>(null);
     const answeredRef = useRef(false);
     const inFlightRef = useRef<number | null>(null);
     const setPace = useCallback((next: SimPace) => {
@@ -5384,6 +5414,9 @@ function App(): React.JSX.Element {
     const applySimOverlayRef = useRef<((state: StorySimStateDto | null, replay?: boolean) => void) | null>(null);
     // What the simulation flyout beside the dock shows, and which lenses the canvas wears.
     const [simSelection, setSimSelection] = useState<SimSelection | null>(null);
+    // Mirror for the overlay routine, which decides whether a wait already has its decision open.
+    const simSelectionRef = useRef<SimSelection | null>(null);
+    simSelectionRef.current = simSelection;
     const [simLenses, setSimLensesState] = useState<SimLenses>(() => readLenses());
     const setSimLenses = useCallback((next: SimLenses) => {
         setSimLensesState(next);
@@ -5595,6 +5628,22 @@ function App(): React.JSX.Element {
         simRef.current = state;
         setSimState(state);
         inFlightRef.current = null;
+        setSimNotice(null);
+        // A battle that has resolved takes no more ticks: play stops here rather than being
+        // refused once per interval - and the moment the outcome lands, the galaxy takes the
+        // reader back on the event the story goes on from, as the game returns to the galactic map.
+        if (state?.outcome) {
+            setPlayingBoth(false);
+            if (state.scope && !resolvedOnceRef.current) {
+                resolvedOnceRef.current = true;
+                const target = galacticReturnNode(simGraphRef.current.nodes, simGraphRef.current.edges, state.outcome);
+                if (target) {
+                    vscode.postMessage({type: 'revealScope', nodeId: target});
+                }
+            }
+        } else {
+            resolvedOnceRef.current = false;
+        }
         const handle = editorRef.current;
         if (!state?.running) {
             simLastSeq = 0;
@@ -5621,6 +5670,22 @@ function App(): React.JSX.Element {
         // every tick (measured on Underworld: play stopped after each tick and read as broken),
         // and stopping there is what run-to-decision is for.
         const waiting = state.interventions.length > 0 && (state.clockPending ?? 1) === 0;
+        // The decision the story hangs on (simModel.hangingDecision): a pending or starting battle
+        // whatever the clock still owes, else - once the clock has nothing left - the decision
+        // armed last. It opens beside the dock with its node in view the moment it becomes that
+        // decision, and not again while it stays so: a flyout the reader closed stays closed until
+        // the story hangs on something else.
+        const battleDecision = state.interventions.find(i => i.kind === 'battle');
+        const hang = battleDecision ?? (waiting ? hangingDecision(state.interventions, simStepsRef.current) : null);
+        const hangId = hang?.nodeId ?? null;
+        if (hangId && hangId !== hangRef.current) {
+            const current = simSelectionRef.current;
+            if (!(current?.kind === 'decision' && current.nodeId === hangId)) {
+                setSimSelection({kind: 'decision', nodeId: hangId});
+                editorRef.current?.centerNode(hangId);
+            }
+        }
+        hangRef.current = hangId;
         if (state.haltedAt || waiting) {
             // Remember that it was the wait, not the reader, that stopped play: an answer resumes it.
             if (playingRef.current && !state.haltedAt) {
@@ -5635,16 +5700,6 @@ function App(): React.JSX.Element {
             setPlayingBoth(true);
         }
         answeredRef.current = false;
-        // The galaxy chose to fight - the author on the picker, or a forced click on the fight
-        // button, as the tutorial does: the battle's panel opens straight into its own session,
-        // seeded with the galactic state. Once per turn of the status, never on a re-fetch.
-        if (!state.scope) {
-            for (const key of battlesToEnter(prevBattlesRef.current, state.battles)) {
-                const label = state.battles?.find(b => b.key === key)?.label ?? key;
-                vscode.postMessage({type: 'openScope', scope: key, label, simulate: true});
-            }
-        }
-        prevBattlesRef.current = state.battles ?? null;
         if (!handle) {
             simLastSeq = state.totalSteps;
             return;
@@ -5745,6 +5800,13 @@ function App(): React.JSX.Element {
         satisfy: nodeId => {
             answeredRef.current = true;
             simRequest('satisfyTrigger', {nodeId});
+        },
+        // Ruling a listener out answers the wait as much as firing it does; reconsidering does not.
+        ruleOut: (nodeId, ruledOut) => {
+            if (ruledOut) {
+                answeredRef.current = true;
+            }
+            simRequest('ruleOut', {nodeId, ruledOut});
         },
         world: change => {
             answeredRef.current = true;
@@ -5961,6 +6023,14 @@ function App(): React.JSX.Element {
                 }
                 case 'simState':
                     applySimOverlay((msg.state as StorySimStateDto | null) ?? null);
+                    break;
+                case 'simError':
+                    // The server refused the command: the slot is free, play stops - the next
+                    // tick would be refused the same way - and the dock says why until the next
+                    // state arrives.
+                    inFlightRef.current = null;
+                    setPlayingBoth(false);
+                    setSimNotice(String(msg.message ?? ''));
                     break;
                 case 'simChanged':
                     simRequest('getState');
@@ -6308,6 +6378,9 @@ function App(): React.JSX.Element {
                                 }}
                                 onPlayPause={simActions.playPause}
                             />
+                        ) : null}
+                        {mode === 'simulate' && simNotice ? (
+                            <span className="sim-notice" title={simNotice}>{simNotice}</span>
                         ) : null}
                         <SeverityTag
                             severity={severity}

@@ -55,6 +55,8 @@ internal static class StoryGraphProjection
         // it per model was measured on the shipped Underworld campaign (2196 nodes) at 135 -> 132 ms,
         // so the cost is the RESULT - 2196 node DTOs built and serialised - not this (#131).
         var reachable = evaluator.ComputeReachableEvents();
+        var eventOf = model.Graph.Nodes.Where(n => n.Event is not null)
+            .ToDictionary(n => n.Id, n => n.Event!, StringComparer.Ordinal);
 
         // Filters select EVENT nodes; virtual nodes and edges survive when both endpoints do.
         var keptEvents = new HashSet<string>(StringComparer.Ordinal);
@@ -117,10 +119,13 @@ internal static class StoryGraphProjection
             if (!keep) continue;
 
             keptIds.Add(node.Id);
+            // A portal stands for an event in the other scope: it carries that event's type, so a
+            // battle panel can tell the victory listener from the loss listener among its exits.
+            var portalEvent = node.PortalTarget is { } target ? eventOf.GetValueOrDefault(target) : null;
             keptNodes.Add(new StoryGraphNodeDto(
                 node.Id, node.Kind.ToString(), node.Label, node.ThreadUri,
                 node.Event?.NameRange.StartLine,
-                node.Event?.EventType, node.Event?.RewardType, node.Event?.Branch,
+                node.Event?.EventType ?? portalEvent?.EventType, node.Event?.RewardType, node.Event?.Branch,
                 node.Kind == StoryNodeKind.Event
                     ? evaluator.GetLifecycle(node.Id, state).ToString()
                     : null,

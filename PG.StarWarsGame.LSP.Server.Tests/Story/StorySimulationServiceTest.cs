@@ -110,13 +110,36 @@ public sealed class StorySimulationServiceTest
     }
 
     [Fact]
+    public void RuleOut_DropsTheDecision_IsOnTheState_AndSurvivesASeek()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+        var armed = service.GetState(Key).State!.Interventions.Single();
+
+        var (state, error) = service.RuleOut(Key, armed.NodeId, true);
+
+        Assert.Null(error);
+        Assert.Empty(state!.Interventions);
+        Assert.Equal([armed.NodeId], state.RuledOut);
+
+        service.Tick(Key, 2);
+        var sought = service.Seek(Key, 1).State!;
+        Assert.Equal([armed.NodeId], sought.RuledOut);
+        Assert.Empty(sought.Interventions);
+
+        var back = service.RuleOut(Key, armed.NodeId, false).State!;
+        Assert.Empty(back.RuledOut);
+        Assert.Single(back.Interventions);
+    }
+
+    [Fact]
     public void Mutations_WithoutSession_ReturnError()
     {
         var (service, _) = BuildService();
 
         var (_, error) = service.SetFlag(Key, "FLAG_X", 1);
 
-        Assert.Contains("No simulation is running", error);
+        Assert.Contains("No simulation running", error);
     }
 
     [Fact]

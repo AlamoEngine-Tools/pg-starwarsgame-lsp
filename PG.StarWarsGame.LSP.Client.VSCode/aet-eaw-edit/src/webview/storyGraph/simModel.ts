@@ -8,25 +8,68 @@
  */
 
 import {
-    StoryGraphEdgeDto, StoryGraphNodeDto, StorySimBattleDto, StorySimInterventionDto, StorySimStepDto,
-    StorySimWorldChangeDto, StorySimWorldDto,
+    StoryGraphEdgeDto, StoryGraphNodeDto, StorySimInterventionDto, StorySimStepDto, StorySimWorldChangeDto,
+    StorySimWorldDto,
 } from '../../protocol/story';
 
 // ── Decisions ────────────────────────────────────────────────────────────────
 
 /** What kind of answer a decision takes: a world change, a battle outcome, a Lua notification, or an assumption. */
 /**
- * The battles whose status just turned to `fight`: the galaxy chose to fight (the author on the
- * picker, or a forced click on the fight button), so each one's panel opens into its own session.
- * Only the turn counts - a re-fetch of the same state names nothing, and a battle already running,
- * pending or resolved is never opened by this.
+ * The decision the story hangs on, to open beside the dock by itself: a pending or starting battle
+ * (the galaxy is frozen for it), else the decision armed last - the next step of the chain that
+ * just ran, not a world listener armed at plot load - else the first in the dock's order. Null
+ * when nothing waits.
  */
-export function battlesToEnter(
-    previous: readonly StorySimBattleDto[] | null | undefined,
-    next: readonly StorySimBattleDto[] | null | undefined,
-): string[] {
-    const before = new Map((previous ?? []).map(b => [b.key, b.status]));
-    return (next ?? []).filter(b => b.status === 'fight' && before.get(b.key) !== 'fight').map(b => b.key);
+export function hangingDecision(
+    interventions: readonly StorySimInterventionDto[],
+    steps: readonly StorySimStepDto[],
+): StorySimInterventionDto | null {
+    const battle = interventions.find(i => i.kind === 'battle');
+    if (battle) {
+        return battle;
+    }
+    if (interventions.length === 0) {
+        return null;
+    }
+    const waiting = new Set(interventions.map(i => i.nodeId));
+    for (let i = steps.length - 1; i >= 0; i--) {
+        const step = steps[i];
+        if (step.to === 'Armed' && waiting.has(step.nodeId)) {
+            return interventions.find(x => x.nodeId === step.nodeId) ?? null;
+        }
+    }
+    return groupDecisions(interventions)[0]?.items[0] ?? null;
+}
+
+/**
+ * Where the galaxy takes the reader back once a battle resolved inside its own panel: the galactic
+ * event behind the exit portal for that outcome (the victory listener for a win, the loss listener
+ * for a loss), else any exit portal (the summary-closed listener, say), else the entry portal's
+ * event - the link that brought the story here. Null when the graph has no portal at all.
+ */
+export function galacticReturnNode(
+    nodes: readonly StoryGraphNodeDto[],
+    edges: readonly StoryGraphEdgeDto[],
+    outcome: 'won' | 'lost' | string,
+): string | null {
+    const portals = nodes.filter(n => n.kind === 'GalacticPortal' && n.portalTarget);
+    if (portals.length === 0) {
+        return null;
+    }
+    const exitIds = new Set(edges.filter(e => e.kind === 'Tactical' && e.label === 'outcome').map(e => e.toId));
+    const exits = portals.filter(p => exitIds.has(p.id));
+    const typeOf = (p: StoryGraphNodeDto): string => (p.eventType ?? '').toUpperCase();
+    const wanted = outcome === 'won' ? 'STORY_VICTORY' : outcome === 'lost' ? 'STORY_MISSION_LOST' : null;
+    const opposite = outcome === 'won' ? 'STORY_MISSION_LOST' : outcome === 'lost' ? 'STORY_VICTORY' : null;
+    // The listener for this outcome; else the summary-closed listener, which the story goes on
+    // from whatever happened (the tutorial's win is a flag read behind it); else any exit that is
+    // not the other outcome's listener - the game never takes that route now.
+    const landing = (wanted && exits.find(p => typeOf(p) === wanted))
+        ?? exits.find(p => typeOf(p) === 'STORY_GENERIC')
+        ?? exits.find(p => typeOf(p) !== opposite)
+        ?? portals[0];
+    return landing.portalTarget ?? null;
 }
 
 export type PortalPickAction = 'select' | 'open' | 'none';

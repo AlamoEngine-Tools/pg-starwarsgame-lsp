@@ -193,10 +193,15 @@ export class StoryNavigatorViewProvider
             campaignName, faction.faction);
         item.iconPath = new vscode.ThemeIcon('organization');
         item.contextValue = 'aetStoryFaction';
-        item.description = faction.manifestFile;
         item.tooltip = `${campaignName} - ${faction.faction}`
             + `\nDeclared by ${faction.manifestFile}`
-            + '\nClick the graph icon to open this faction\'s story graph';
+            + '\nClick to open this faction\'s story graph; its plot files and battles are beneath';
+        // A click opens the galactic graph, as a click on a battle opens the battle's.
+        item.command = {
+            command: 'aet-eaw-edit.lsp.openStoryGraph',
+            title: 'Open Story Graph',
+            arguments: [item],
+        };
         return item;
     }
 

@@ -64,8 +64,8 @@ export function galacticOf(target: StoryGraphTarget): StoryGraphTarget {
 export function panelTitle(target: StoryGraphTarget): string {
     const chain = `${target.campaign} - ${target.faction}`;
     return target.scope
-        ? `Battle: ${chain} - ${target.scopeLabel ?? target.scope}`
-        : `Story: ${chain}`;
+        ? `Battle - ${chain} - ${target.scopeLabel ?? target.scope}`
+        : `Story - ${chain}`;
 }
 
 /** Every campaign faction pair the navigator feed declares, in document order. */

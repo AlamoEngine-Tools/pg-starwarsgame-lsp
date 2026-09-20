@@ -178,6 +178,7 @@ public static class ServerConfigurator
             .WithHandler<StorySimSetFlagHandler>()
             .WithHandler<StorySimAdvanceClockHandler>()
             .WithHandler<StorySimLuaNotifyHandler>()
+            .WithHandler<StorySimRuleOutHandler>()
             .WithHandler<StorySimTickHandler>()
             .WithHandler<StorySimRunToDecisionHandler>()
             .WithHandler<StorySimSeekHandler>()

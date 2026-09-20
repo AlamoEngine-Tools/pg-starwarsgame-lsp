@@ -41,6 +41,7 @@ public interface IStorySimulationService
     (StorySimStateDto? State, string? Error) Stop(StorySimKey key);
     (StorySimStateDto? State, string? Error) GetState(StorySimKey key, int sinceSeq = 0);
     (StorySimStateDto? State, string? Error) SatisfyTrigger(StorySimKey key, string nodeId, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) RuleOut(StorySimKey key, string nodeId, bool ruledOut, int sinceSeq = 0);
     (StorySimStateDto? State, string? Error) SetFlag(StorySimKey key, string flag, int value, int sinceSeq = 0);
     (StorySimStateDto? State, string? Error) AdvanceClock(StorySimKey key, double seconds, int sinceSeq = 0);
     (StorySimStateDto? State, string? Error) LuaNotify(StorySimKey key, string id, int sinceSeq = 0);
@@ -127,7 +128,7 @@ public sealed class StorySimulationService(
                 if (battle is null)
                     return (null, $"'{key.Scope}' is not a battle of {key.Model}.");
                 if (RunningBattle(key.Model, key) is { } running)
-                    return (null, $"Battle '{running.Label}' is still running - resolve it first.");
+                    return (null, $"Battle '{running.Label}' is still running - resolve it first");
 
                 // The battle starts where the galaxy stands: its flags and its world, as the game
                 // hands a tactical mission the campaign state, and under the galaxy's options.
@@ -194,6 +195,12 @@ public sealed class StorySimulationService(
         return Mutate(key, new SimCommand(SimCommandKind.Satisfy, nodeId), sinceSeq);
     }
 
+    public (StorySimStateDto? State, string? Error) RuleOut(StorySimKey key, string nodeId, bool ruledOut,
+        int sinceSeq = 0)
+    {
+        return Mutate(key, new SimCommand(SimCommandKind.RuleOut, nodeId, ruledOut ? 1 : 0), sinceSeq);
+    }
+
     public (StorySimStateDto? State, string? Error) SetFlag(StorySimKey key, string flag, int value, int sinceSeq = 0)
     {
         return Mutate(key, new SimCommand(SimCommandKind.Flag, flag, value), sinceSeq);
@@ -238,7 +245,7 @@ public sealed class StorySimulationService(
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
-                return (null, $"No simulation is running for {key}.");
+                return (null, $"No simulation running for {key}");
             if (Refusal(session) is { } refusal)
                 return (null, refusal);
             if (tick < 0 || tick > session.Snapshot.Tick)
@@ -274,7 +281,7 @@ public sealed class StorySimulationService(
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
-                return (null, $"No simulation is running for {key}.");
+                return (null, $"No simulation running for {key}");
             next = session with
             {
                 Breakpoints = new StorySimBreakpoints(
@@ -298,7 +305,7 @@ public sealed class StorySimulationService(
             _sessions.TryGetValue(key.Galactic, out var galactic);
             _sessions.TryGetValue(battleSession, out var battle);
             if (galactic is null && battle is null)
-                return (null, $"No simulation is running for {key.Model}.");
+                return (null, $"No simulation running for {key.Model}");
             // A resolved session of a mission the galaxy has since linked again is the old attempt.
             if (battle?.Outcome is not null && galactic is not null
                                             && !ResolvedBattles(galactic).ContainsKey(battleSession.Scope!))
@@ -309,7 +316,7 @@ public sealed class StorySimulationService(
             }
 
             if (battle?.Outcome is not null)
-                return (null, $"Battle '{battle.Label}' is already {battle.Outcome}.");
+                return (null, $"Battle '{battle.Label}' is already {battle.Outcome}");
             var model = modelService.GetCampaignModel(key.Campaign, key.Faction);
             var label = model?.Battles.FirstOrDefault(b => b.Key == battleSession.Scope)?.Label;
             if (label is null)
@@ -386,7 +393,7 @@ public sealed class StorySimulationService(
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
-                return (null, $"No simulation is running for {key}.");
+                return (null, $"No simulation running for {key}");
             if (Refusal(session) is { } refusal)
                 return (null, refusal);
             next = session with
@@ -405,15 +412,15 @@ public sealed class StorySimulationService(
     private string? Refusal(Session session)
     {
         if (session.Outcome is not null)
-            return $"Battle '{session.Label}' is {session.Outcome} - start it again to run it once more.";
+            return $"Battle '{session.Label}' is {session.Outcome} - restart to run it again";
         if (session.Key.IsGalactic && RunningBattle(session.Key.Model, null) is { } running)
-            return $"The galaxy is paused while battle '{running.Label}' runs.";
+            return $"Galaxy paused - battle '{running.Label}' running";
         // The fight was chosen but the battle's panel is not up yet: the tactical mode is loading
         // and the galactic story is already frozen.
         if (session.Key.IsGalactic && session.Snapshot.Runtime.World is
                 { PendingBattle: { } pending, PendingBattleChoice: StoryBattleChoice.Fight })
-            return $"The galaxy is paused while battle '{
-                session.Battles.FirstOrDefault(b => b.Key == pending)?.Label ?? pending}' runs.";
+            return $"Galaxy paused - battle '{
+                session.Battles.FirstOrDefault(b => b.Key == pending)?.Label ?? pending}' starting";
         return null;
     }
 
@@ -430,6 +437,7 @@ public sealed class StorySimulationService(
         return command.Kind switch
         {
             SimCommandKind.Satisfy => sim.SatisfyTrigger(snapshot, command.Text!),
+            SimCommandKind.RuleOut => sim.RuleOut(snapshot, command.Text!, command.Number == 1),
             SimCommandKind.Flag => sim.SetFlag(snapshot, command.Text!, command.Number),
             SimCommandKind.Lua => sim.LuaNotify(snapshot, command.Text!),
             SimCommandKind.Tick => sim.Tick(snapshot, command.Number, breakpoints),
@@ -557,7 +565,8 @@ public sealed class StorySimulationService(
             pausedFor,
             session.Outcome,
             battles,
-            session.Simulator.Options.AssumeMediaCompletes);
+            session.Simulator.Options.AssumeMediaCompletes,
+            snapshot.Runtime.RuledOut.OrderBy(x => x, StringComparer.Ordinal).ToList());
     }
 
     private static List<StorySimLuaStateDto> ToLuaStates(Session session, StorySimSnapshot snapshot)
@@ -637,6 +646,9 @@ public sealed class StorySimulationService(
     private enum SimCommandKind
     {
         Satisfy,
+
+        /// <summary>Text is the node id, Number 1 to rule it out and 0 to reconsider.</summary>
+        RuleOut,
         Flag,
         Lua,
         Tick,

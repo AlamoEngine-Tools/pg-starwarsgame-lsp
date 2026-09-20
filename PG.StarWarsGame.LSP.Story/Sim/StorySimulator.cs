@@ -264,7 +264,7 @@ public sealed partial class StorySimulator
                 World = world ?? SeedWorld(_model.Seed),
                 Flags = flags ?? StoryRuntimeState.Initial.Flags
             },
-            Log = ImmutableList.Create(Scope is null ? "Simulation started." : $"Battle {Scope} started.")
+            Log = ImmutableList.Create(Scope is null ? "Simulation started" : $"Battle {Scope} started")
                 .AddRange(_startupNotes)
         };
 
@@ -330,9 +330,14 @@ public sealed partial class StorySimulator
                 IsActive(node, runtime)
                 && string.Equals(node.Event!.EventType, "STORY_ELAPSED", StringComparison.OrdinalIgnoreCase));
         var scripts = runtime.Scripts.Values.Count(s => s.TransitionPending);
+        // A flag poll that already holds fires on the next tick: the clock's, not the author's.
+        var polls = _eventNodes.Count(node =>
+            IsActive(node, runtime)
+            && string.Equals(node.Event!.EventType, "STORY_FLAG", StringComparison.OrdinalIgnoreCase)
+            && PolledTriggerSatisfied(node, snapshot));
         // Media left to the author is playing, not owed: the clock does nothing for it.
         var completions = Options.AssumeMediaCompletes ? runtime.PendingCompletions.Count : 0;
-        return timers + completions + runtime.PendingEmissions.Count + scripts;
+        return timers + polls + completions + runtime.PendingEmissions.Count + scripts;
     }
 
     /// <summary>Convenience over <see cref="Tick" />: whole seconds become ticks.</summary>
@@ -353,6 +358,29 @@ public sealed partial class StorySimulator
                 $"'{node.Event!.Name}' is not armed - trigger ignored.");
 
         return Fire(snapshot, node, StorySimCause.Manual, null, 0);
+    }
+
+    /// <summary>
+    ///     The author's call that an armed listener will not fire in this run (or, with
+    ///     <paramref name="ruledOut" /> false, that it may after all). Nothing changes for the
+    ///     engine - the listener stays armed - only the decision list.
+    /// </summary>
+    public StorySimSnapshot RuleOut(StorySimSnapshot snapshot, string nodeId, bool ruledOut)
+    {
+        snapshot = snapshot with { HaltedAt = null };
+        if (!_nodesById.TryGetValue(nodeId, out var node))
+            return snapshot with { Log = snapshot.Log.Add($"Unknown event node '{nodeId}'") };
+        var name = node.Event!.Name;
+        if (ruledOut == snapshot.Runtime.RuledOut.Contains(nodeId))
+            return Note(snapshot, nodeId, null, StorySimCause.Ignored,
+                ruledOut ? $"'{name}' is already ruled out" : $"'{name}' is not ruled out");
+        var runtime = snapshot.Runtime with
+        {
+            RuledOut = ruledOut ? snapshot.Runtime.RuledOut.Add(nodeId) : snapshot.Runtime.RuledOut.Remove(nodeId)
+        };
+        return Note(snapshot with { Runtime = runtime }, nodeId, null,
+            ruledOut ? StorySimCause.RuledOut : StorySimCause.Reconsidered,
+            ruledOut ? $"'{name}' ruled out - armed, no decision" : $"'{name}' reconsidered - a decision again");
     }
 
     public StorySimSnapshot SetFlag(StorySimSnapshot snapshot, string flag, int value)
@@ -408,16 +436,21 @@ public sealed partial class StorySimulator
     {
         var interventions = new List<StorySimIntervention>();
         // The pending battle is the author's decision before any listener's: fight or auto-resolve
-        // while the choice is up, then won or lost once auto-resolve was chosen. Once the fight
-        // is chosen the battle runs and the galaxy is frozen - nothing to decide here.
-        if (snapshot.Runtime.World is
-            { PendingBattle: { } pendingKey, PendingBattleChoice: not StoryBattleChoice.Fight })
+        // while the choice is up; then won or lost once auto-resolve was chosen; and once the
+        // fight is chosen, with the galaxy frozen, whether to play the battle in its own panel or
+        // skip it with an outcome and the flags it would have written.
+        if (snapshot.Runtime.World is { PendingBattle: { } pendingKey })
         {
             var choice = snapshot.Runtime.World.PendingBattleChoice;
             var label = _model.Battles.FirstOrDefault(b => b.Key == pendingKey)?.Label ?? pendingKey;
+            IReadOnlyList<string> options = choice switch
+            {
+                null => [StoryBattleChoice.Fight, StoryBattleChoice.AutoResolve],
+                StoryBattleChoice.Fight => ["enter", "won", "lost"],
+                _ => ["won", "lost"]
+            };
             interventions.Add(new StorySimIntervention(StorySimIntervention.BattleKind,
-                StoryGraphScoper.TacticalNodeId(pendingKey), label, null,
-                choice is null ? [StoryBattleChoice.Fight, StoryBattleChoice.AutoResolve] : ["won", "lost"])
+                StoryGraphScoper.TacticalNodeId(pendingKey), label, null, options)
             {
                 BattleKey = pendingKey
             });
@@ -426,16 +459,24 @@ public sealed partial class StorySimulator
         foreach (var node in _eventNodes)
         {
             if (!IsActive(node, snapshot.Runtime)) continue;
+            // Ruled out by the author for this run: armed, but nothing to answer.
+            if (snapshot.Runtime.RuledOut.Contains(node.Id)) continue;
             var storyEvent = node.Event!;
             var type = storyEvent.EventType?.ToUpperInvariant();
             // Polled types fire on their own; a STORY_TRIGGER only ever fires from a push.
             if (type is "STORY_ELAPSED" or "STORY_TRIGGER" or "STORY_FLAG") continue;
             // A generic the game never raises fires only from a TRIGGER_EVENT push, never from
-            // anything the player does: nothing for the author to answer.
+            // anything the player does: nothing for the author to answer. Continue_Tutorial is
+            // raised by the tutorial dialog's button alone, so it counts only while one shows.
             if (type == "STORY_GENERIC")
             {
                 var names = StringTokensOf(storyEvent).ToList();
-                if (names.Count > 0 && !names.Any(StoryGenericNames.IsEngineRaised)) continue;
+                var dialogUp = snapshot.Runtime.World.TutorialDialog is not null;
+                if (names.Count > 0 && !names.Any(n => StoryGenericNames.IsEngineRaised(n)
+                                                       && (dialogUp || !n.Equals(
+                                                           StoryGraphBuilder.ContinueTutorialGeneric,
+                                                           StringComparison.OrdinalIgnoreCase))))
+                    continue;
             }
 
             // The summary's generic is raised by the battle's resolution while one is pending or
@@ -524,8 +565,8 @@ public sealed partial class StorySimulator
             Clock = snapshot.Clock + ClockStepSeconds,
             GameplayClock = paused ? snapshot.GameplayClock : snapshot.GameplayClock + ClockStepSeconds,
             Log = snapshot.Log.Add(paused
-                ? $"Tick {snapshot.Tick + 1} ({snapshot.Clock + ClockStepSeconds:0.##}s, gameplay paused for the battle)."
-                : $"Tick {snapshot.Tick + 1} ({snapshot.Clock + ClockStepSeconds:0.##}s).")
+                ? $"Tick {snapshot.Tick + 1} ({snapshot.Clock + ClockStepSeconds:0.##}s, gameplay paused for the battle)"
+                : $"Tick {snapshot.Tick + 1} ({snapshot.Clock + ClockStepSeconds:0.##}s)")
         };
         snapshot = DispatchCompletions(snapshot);
         snapshot = ServiceScripts(snapshot);
@@ -668,7 +709,7 @@ public sealed partial class StorySimulator
         // The fire step always lands on Fired, even for a perpetual event whose lifecycle reads
         // Armed again the moment it re-arms: the engine sets Triggered here and clears it later.
         snapshot = Transition(snapshot, node, sourceId, cause, $"Fired '{storyEvent.Name}' ({cause}).",
-            r => r.WithFired(node.Id), StoryEventLifecycle.Fired);
+            r => r.WithFired(node.Id) with { RuledOut = r.RuledOut.Remove(node.Id) }, StoryEventLifecycle.Fired);
         snapshot = GiveReward(snapshot, node, depth);
 
         if (_dependantsById.TryGetValue(node.Id, out var dependants))

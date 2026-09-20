@@ -51,6 +51,8 @@ export interface SimActions {
     playPause: () => void;
     runToDecision: () => void;
     satisfy: (nodeId: string) => void;
+    /** The author's call that an armed listener will not fire in this run, or may after all. */
+    ruleOut: (nodeId: string, ruledOut: boolean) => void;
     world: (change: StorySimWorldChangeDto) => void;
     luaNotify: (id: string) => void;
     setFlag: (name: string, value: number) => void;
@@ -143,11 +145,12 @@ export function waitingOnAuthor(state: StorySimStateDto): boolean {
 
 /**
  * The dock header's simulation chip: the run state and the tick. Four states, one chip:
- * running (the clock is ticking - a live dot), paused, halted at a breakpoint, or waiting on the
- * author because the clock alone has nothing left to change. A real campaign has hundreds of
+ * running (the clock is ticking - a live dot), paused, halted at a breakpoint, or waiting for
+ * input because the clock alone has nothing left to change. A real campaign has hundreds of
  * armed world listeners from tick 0, so the mere count of decisions is an inventory figure, not
  * a warning. Pressing the chip acts on the state it shows: running pauses, paused plays, halted
- * and waiting open and centre the event concerned.
+ * and waiting open and centre the event concerned. The panel opens the first decision by itself
+ * when a wait begins (storyGraph.tsx, applySimOverlay); the chip press is the way back to it.
  */
 export function SimHeaderChip(props: {
     state: StorySimStateDto;
@@ -209,13 +212,13 @@ export function SimHeaderChip(props: {
             <button
                 type="button"
                 className="sim-chip owed"
-                title={`Clock idle - ${owed} decision${owed === 1 ? '' : 's'} pending`}
+                title={`Waiting for input - ${owed} decision${owed === 1 ? '' : 's'}`}
                 onClick={() => props.onSelect({kind: 'decision', nodeId: first.nodeId})}
             >
                 <span className="sim-chip-tick">t{state.tick}</span>
                 <span className="sim-chip-sep"/>
                 <Icon name="decision" size={13}/>
-                <span className="sim-chip-text">waiting on you</span>
+                <span className="sim-chip-text">Waiting for input</span>
             </button>
         );
     }
@@ -330,6 +333,34 @@ export function SimInventory(props: {
                         ))}
                     </div>
                 ))}
+                {state.ruledOut?.length ? (
+                    // Ruled out by the author for this run: armed as in the game, no decision.
+                    // Listed, not hidden - the call is reversible from here.
+                    <div className="sim-group">
+                        <div className="sim-group-title">
+                            <Icon name="remove" size={13}/>
+                            Ruled out
+                        </div>
+                        {state.ruledOut.map(nodeId => (
+                            <div className="sim-row decision" key={nodeId}>
+                                <button
+                                    type="button"
+                                    className="sim-row-main"
+                                    title="Never fires in this run - open the event"
+                                    onClick={() => pick({kind: 'node', nodeId})}
+                                >
+                                    <span className="sim-row-name">{labelFor(nodeId, props.labelOf)}</span>
+                                    <span className="sim-row-value">Ruled out</span>
+                                </button>
+                                <IconButton
+                                    icon="reset"
+                                    title="Reconsider - a decision again"
+                                    onClick={() => actions.ruleOut(nodeId, false)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
             </DockSection>
 
             {state.scope ? (
@@ -576,9 +607,10 @@ function BattleControls(props: { state: StorySimStateDto; battleKey: string; act
     // auto-resolves. The author's press is a real click, so the click event is raised with it.
     const pending = !inside && battle?.status === 'pending';
     const starting = !inside && battle?.status === 'fight';
-    // Deciding on the portal skips the battle's own run, so the flags it could have written are
-    // offered here; a battle that is running or being played writes them itself.
-    const writes = !inside && !running && !pending && !starting ? battle?.writes ?? [] : [];
+    // Deciding on the portal skips the battle's own run - before it is entered, or instead of
+    // entering it once the fight is chosen - so the flags it could have written are offered here;
+    // a battle that is running or being played writes them itself.
+    const writes = !inside && !running && !pending ? battle?.writes ?? [] : [];
     const [picked, setPicked] = useState<Set<string>>(() => new Set());
     useEffect(() => setPicked(new Set()), [battleKey]);
     const picks = writes.filter(w => picked.has(w.name));
@@ -601,12 +633,12 @@ function BattleControls(props: { state: StorySimStateDto; battleKey: string; act
             {pending ? (
                 <div className="sim-chip-row">
                     <button type="button" className="btn sim-answer"
-                            title="Press the fight button - the battle begins in its own panel"
+                            title="Fight - the battle runs in its own panel"
                             onClick={() => actions.world({kind: 'clickGui', name: 'choice_button_left'})}>
                         <Icon name="tactical" size={13}/>Fight
                     </button>
                     <button type="button" className="btn sim-answer"
-                            title="Press the auto-resolve button - decide the outcome here"
+                            title="Auto-resolve - decide the outcome here"
                             onClick={() => actions.world({kind: 'clickGui', name: 'choice_button_right'})}>
                         <Icon name="decision" size={13}/>Auto-resolve
                     </button>
@@ -615,9 +647,12 @@ function BattleControls(props: { state: StorySimStateDto; battleKey: string; act
             {!inside && !pending ? (
                 <button type="button" className="btn sim-answer" disabled={resolved}
                         title={resolved ? `Battle ${status.toLowerCase()} - restart the galaxy to play it again`
-                            : running ? 'Show the battle panel' : 'Open the battle in its own panel and run it'}
+                            : running ? 'Show the battle panel'
+                                : starting ? 'Play the battle in its own panel'
+                                    : 'Open the battle in its own panel'}
                         onClick={() => actions.openBattle(battleKey, label, !running)}>
-                    <Icon name="tactical" size={13}/>{running ? 'Show the battle' : 'Enter the battle'}
+                    <Icon name="tactical"
+                          size={13}/>{running ? 'Show the battle' : starting ? 'Play the battle' : 'Enter the battle'}
                 </button>
             ) : null}
             {writes.length > 0 && !resolved ? (
@@ -769,6 +804,11 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
                     <button type="button" className="btn sim-answer" title="Fire without a world change"
                             onClick={() => actions.satisfy(item.nodeId)}>
                         <Icon name="decision" size={13}/>Assume the trigger met
+                    </button>
+                    <button type="button" className="btn sim-answer"
+                            title="Never fires in this run - stays armed, no decision"
+                            onClick={() => actions.ruleOut(item.nodeId, true)}>
+                        <Icon name="remove" size={13}/>Rule out
                     </button>
                 </DockSection>
             ) : null}

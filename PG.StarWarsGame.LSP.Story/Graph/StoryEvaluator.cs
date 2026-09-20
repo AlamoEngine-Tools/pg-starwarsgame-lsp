@@ -39,6 +39,13 @@ public sealed record StoryRuntimeState
     public ImmutableHashSet<string> DisabledEvents { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 
+    /// <summary>
+    ///     Armed listeners the author ruled out for this run: they stay armed, as in the game, but
+    ///     are no decision until reconsidered. Firing one after all clears it.
+    /// </summary>
+    public ImmutableHashSet<string> RuledOut { get; init; } =
+        ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+
     public ImmutableHashSet<string> SuspendedThreads { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
 

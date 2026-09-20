@@ -405,6 +405,8 @@ export interface StorySimStateDto {
      * older server reads as "the clock may still run".
      */
     clockPending?: number;
+    /** Armed listeners the author ruled out for this run: no decision until reconsidered. */
+    ruledOut?: string[] | null;
     /** The battle this session runs, as the plots feed keys it; absent or null at the galactic level. */
     scope?: string | null;
     /**

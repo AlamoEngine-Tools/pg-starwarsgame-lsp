@@ -178,7 +178,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             state.Problems.Add(new StoryGraphProblem(StoryGraphProblemKind.GenericNeverRaised, thread.DocumentUri,
                 slot.Range, listed,
                 $"The game never raises '{listed}' as a generic trigger and no TRIGGER_EVENT pushes '{storyEvent.Name}' - it never fires. " +
-                $"The game raises: {string.Join(", ", StoryGenericNames.EngineRaised)}."));
+                $"The game raises {string.Join(", ", StoryGenericNames.EngineRaised)}."));
         }
 
         // Pass 4: tactical entry edges - root events (no incoming Prereq/Control) of a tactical

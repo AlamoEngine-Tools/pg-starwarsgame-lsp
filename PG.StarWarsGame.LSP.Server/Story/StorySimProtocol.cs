@@ -59,7 +59,9 @@ public sealed record StorySimStateDto(
     IReadOnlyList<StorySimBattleDto>? Battles = null,
     // Whether a speech or movie a reward starts is owed its completion on the next tick (the
     // session's option at start); off, the listener waits for the author or the engine's timeout.
-    bool AssumeMediaCompletes = true)
+    bool AssumeMediaCompletes = true,
+    // Armed listeners the author ruled out for this run: no decision until reconsidered.
+    IReadOnlyList<string>? RuledOut = null)
 {
     public static StorySimStateDto NotRunning { get; } =
         new(false, 0, 0, 1, [], [], [], [], [], [], 0, [], false, null, StorySimWorldDto.Empty, []);
@@ -209,6 +211,20 @@ public sealed record StorySimAdvanceClockParams(
     string Campaign,
     string Faction,
     double Seconds,
+    int SinceSeq = 0,
+    string? Scope = null)
+    : IRequest<StorySimStateResult>;
+
+/// <summary>
+///     The author's call that an armed listener will not fire in this run (RuledOut true), or may
+///     after all (false): it stays armed but leaves the decision list.
+/// </summary>
+[Method("aet/storySimRuleOut", Direction.ClientToServer)]
+public sealed record StorySimRuleOutParams(
+    string Campaign,
+    string Faction,
+    string NodeId,
+    bool RuledOut,
     int SinceSeq = 0,
     string? Scope = null)
     : IRequest<StorySimStateResult>;

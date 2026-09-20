@@ -84,6 +84,19 @@ public sealed class StorySimAdvanceClockHandler(IStorySimulationService sim, ILs
     }
 }
 
+public sealed class StorySimRuleOutHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimRuleOutParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimRuleOutParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.RuleOut(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.NodeId, request.RuledOut, request.SinceSeq);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
 public sealed class StorySimLuaNotifyHandler(IStorySimulationService sim, ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<StorySimLuaNotifyParams, StorySimStateResult>
 {
