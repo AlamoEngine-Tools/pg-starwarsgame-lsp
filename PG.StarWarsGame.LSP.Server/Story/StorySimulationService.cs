@@ -269,7 +269,8 @@ public sealed class StorySimulationService(
             session.Breakpoints.OnConditionalGates,
             snapshot.HaltedAt,
             ToWorldDto(snapshot.Runtime.World),
-            ToLuaStates(session, snapshot));
+            ToLuaStates(session, snapshot),
+            session.Simulator.GetClockPending(snapshot));
     }
 
     private static List<StorySimLuaStateDto> ToLuaStates(Session session, StorySimSnapshot snapshot)

@@ -353,6 +353,12 @@ export interface StorySimStateDto {
     haltedAt?: string | null;
     world: StorySimWorldDto;
     luaStates: StorySimLuaStateDto[];
+    /**
+     * How many things the clock alone can still change: armed timers, owed completions, script
+     * work. Zero means nothing more happens until the author answers a decision. Optional so an
+     * older server reads as "the clock may still run".
+     */
+    clockPending?: number;
 }
 
 /** A campaign script's state machine: where it is, where it goes next, what it still owes. */

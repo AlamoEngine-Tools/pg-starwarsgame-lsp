@@ -765,6 +765,8 @@ export const problemsPanelCss = `
     .panel-bar .panel-close { margin-left: auto; }
 
     /* The scrolling part: the title bar keeps its height and the rows take what is left. */
+    /* The frame is a column whose row list is the one scroller; the handle and the bar stay put. */
+    .panel-frame { display: flex; flex-direction: column; }
     .problem-list { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--space-2); }
 
     .problem-row { display: flex; gap: var(--space-6); align-items: center; padding: var(--space-1) var(--space-6); }

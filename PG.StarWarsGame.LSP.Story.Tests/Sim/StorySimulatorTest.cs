@@ -730,10 +730,10 @@ public sealed class StorySimulatorTest
         "\t</Event>\n" +
         "</Story>\n";
 
-    private static (StorySimulator Sim, StoryCampaignModel Model) BuildTimerChain()
+    private static (StorySimulator Sim, StoryCampaignModel Model) BuildTimerChain(string? text = null)
     {
         var schema = new SimSchemaProvider();
-        var thread = StoryThreadParser.Parse(TimerChainText, ThreadAUri);
+        var thread = StoryThreadParser.Parse(text ?? TimerChainText, ThreadAUri);
         var model = new StoryCampaignModel("GC", "Rebel", [thread],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             new StoryGraphBuilder(schema).Build([thread]));
@@ -753,6 +753,38 @@ public sealed class StorySimulatorTest
         Assert.Equal(2, snapshot.Tick);
         Assert.Equal("Decision", Assert.Single(sim.GetInterventions(snapshot)).EventName);
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "T1"));
+    }
+
+    // A real campaign has hundreds of armed world listeners from tick 0 - every one is a standing
+    // decision - so a run that stopped at "any decision" would never tick at all. It runs past the
+    // ones that were already there and stops when the story reaches a NEW one.
+    [Fact]
+    public void RunToDecision_RunsPastStandingDecisions_UntilANewOneAppears()
+    {
+        var (sim, model) = BuildTimerChain(TimerChainText.Replace("</Story>",
+            "\t<Event Name=\"Always\">\n\t\t<Event_Type>STORY_GENERIC</Event_Type>\n\t</Event>\n</Story>"));
+        var snapshot = sim.Start();
+        Assert.Equal("Always", Assert.Single(sim.GetInterventions(snapshot)).EventName);
+
+        snapshot = sim.RunToDecision(snapshot, StorySimBreakpoints.None);
+
+        Assert.Equal(2, snapshot.Tick);
+        Assert.Contains(sim.GetInterventions(snapshot), i => i.EventName == "Decision");
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "T1"));
+    }
+
+    // What the clock alone can still change: armed timers, owed completions, script work. Zero
+    // means nothing more happens until the author answers something.
+    [Fact]
+    public void GetClockPending_CountsArmedTimers_AndIsZeroWhenOnlyDecisionsRemain()
+    {
+        var (sim, _) = BuildTimerChain();
+        var snapshot = sim.Start();
+        Assert.Equal(1, sim.GetClockPending(snapshot));
+
+        snapshot = sim.RunToDecision(snapshot, StorySimBreakpoints.None);
+
+        Assert.Equal(0, sim.GetClockPending(snapshot));
     }
 
     [Fact]

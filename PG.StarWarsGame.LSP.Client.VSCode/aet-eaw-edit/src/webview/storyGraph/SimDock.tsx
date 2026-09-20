@@ -11,11 +11,16 @@
 // Everything here reads the flat state document and sends a request; storyGraph.tsx owns the state
 // and the canvas, and simModel.ts owns the arithmetic.
 
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 
 import type {
-    StoryGraphEdgeDto, StoryGraphNodeDto, StorySimInterventionDto, StorySimNodeStateDto, StorySimStateDto,
-    StorySimStepDto, StorySimWorldChangeDto,
+    StoryGraphEdgeDto,
+    StoryGraphNodeDto,
+    StorySimInterventionDto,
+    StorySimNodeStateDto,
+    StorySimStateDto,
+    StorySimStepDto,
+    StorySimWorldChangeDto,
 } from '../../protocol/story';
 import {IconButton} from '../shared/Button';
 import {DockSection} from '../shared/DockSection';
@@ -23,8 +28,15 @@ import {Icon, type IconName} from '../shared/Icon';
 import {ProblemsPanel} from '../shared/ProblemsPanel';
 
 import {
-    armingLines, type DecisionKind, describeChange, filterTrace, groupDecisions, labelFor, pickerCandidates,
-    type SimPace, traceRows,
+    armingLines,
+    type DecisionKind,
+    describeChange,
+    filterTrace,
+    groupDecisions,
+    labelFor,
+    pickerCandidates,
+    type SimPace,
+    traceRows,
 } from './simModel';
 
 // ── What the dock talks to ───────────────────────────────────────────────────
@@ -83,24 +95,35 @@ function shortId(nodeId: string): string {
 
 // ── Header ───────────────────────────────────────────────────────────────────
 
+/** Nothing more happens until the author answers something: the clock has no work left of its own. */
+export function waitingOnAuthor(state: StorySimStateDto): boolean {
+    return state.interventions.length > 0 && (state.clockPending ?? 1) === 0;
+}
+
 /**
- * The dock header's simulation chip: the tick, then the one thing that stops the clock - a
- * breakpoint hit, or decisions the author owes. Pressing it opens that thing beside the dock.
+ * The dock header's simulation chip: the run state and the tick. Four states, one chip:
+ * running (the clock is ticking - a live dot), paused, halted at a breakpoint, or waiting on the
+ * author because the clock alone has nothing left to change. A real campaign has hundreds of
+ * armed world listeners from tick 0, so the mere count of decisions is an inventory figure, not
+ * a warning. Pressing the chip acts on the state it shows: running pauses, paused plays, halted
+ * and waiting open and centre the event concerned.
  */
 export function SimHeaderChip(props: {
     state: StorySimStateDto;
+    playing: boolean;
     labelOf: (id: string) => string | undefined;
     onSelect: (selection: SimSelection) => void;
+    onPlayPause: () => void;
 }): React.JSX.Element {
     const {state} = props;
-    const owed = state.interventions.length;
+    const owed = waitingOnAuthor(state) ? state.interventions.length : 0;
     if (state.haltedAt) {
         const name = labelFor(state.haltedAt, props.labelOf);
         return (
             <button
                 type="button"
                 className="sim-chip halted"
-                title={`Halted at ${name} - press to show it`}
+                title={`Breakpoint - ${name}`}
                 onClick={() => props.onSelect({kind: 'node', nodeId: state.haltedAt!})}
             >
                 <span className="sim-chip-tick">t{state.tick}</span>
@@ -116,21 +139,43 @@ export function SimHeaderChip(props: {
             <button
                 type="button"
                 className="sim-chip owed"
-                title={`${owed} decision${owed === 1 ? '' : 's'} waiting - press to answer`}
+                title={`Clock idle - ${owed} decision${owed === 1 ? '' : 's'} pending`}
                 onClick={() => props.onSelect({kind: 'decision', nodeId: first.nodeId})}
             >
                 <span className="sim-chip-tick">t{state.tick}</span>
                 <span className="sim-chip-sep"/>
                 <Icon name="decision" size={13}/>
-                <span className="sim-chip-text">{owed}</span>
+                <span className="sim-chip-text">waiting on you</span>
+            </button>
+        );
+    }
+    if (props.playing) {
+        return (
+            <button
+                type="button"
+                className="sim-chip running"
+                title={`Running - tick ${state.tick}, ${state.clock.toFixed(0)} s - press to pause`}
+                onClick={props.onPlayPause}
+            >
+                <span className="sim-chip-dot" aria-hidden="true"/>
+                <span className="sim-chip-text">Running</span>
+                <span className="sim-chip-sep"/>
+                <span className="sim-chip-tick">t{state.tick}</span>
             </button>
         );
     }
     return (
-        <span className="sim-chip" title={`Tick ${state.tick} - ${state.clock.toFixed(0)} s of story time`}>
-            <Icon name="trace" size={13}/>
+        <button
+            type="button"
+            className="sim-chip paused"
+            title={`Paused - tick ${state.tick}, ${state.clock.toFixed(0)} s - press to play`}
+            onClick={props.onPlayPause}
+        >
+            <Icon name="pause" size={13}/>
+            <span className="sim-chip-text">Paused</span>
+            <span className="sim-chip-sep"/>
             <span className="sim-chip-tick">t{state.tick}</span>
-        </span>
+        </button>
     );
 }
 
@@ -161,7 +206,14 @@ export function SimInventory(props: {
     });
     const isSelected = (s: SimSelection): boolean =>
         selection !== null && JSON.stringify(selection) === JSON.stringify(s);
-    const pick = (s: SimSelection): void => props.onSelect(isSelected(s) ? null : s);
+    // A row opens its detail beside the dock and, for anything that IS an event, shows that event
+    // on the canvas too: the decision is about the event, so the reader wants to see it.
+    const pick = (s: SimSelection): void => {
+        props.onSelect(isSelected(s) ? null : s);
+        if (s.kind === 'decision' || s.kind === 'node') {
+            actions.centerNode(s.nodeId);
+        }
+    };
 
     const owners = useMemo(() => {
         const byOwner = new Map<string, number>();
@@ -182,9 +234,15 @@ export function SimInventory(props: {
             >
                 {groups.length === 0 ? (
                     <p className="field-note">
-                        {state.haltedAt ? 'Halted at a breakpoint' : 'Nothing waits on you - press play'}
+                        {state.haltedAt ? 'Halted at breakpoint' : 'No decision pending'}
                     </p>
-                ) : groups.map(group => (
+                ) : null}
+                {groups.length > 0 ? (
+                    <p className="field-note">
+                        {waitingOnAuthor(state) ? 'Clock idle - answer one to continue' : 'Clock running - answer any to steer'}
+                    </p>
+                ) : null}
+                {groups.map(group => (
                     <div className="sim-group" key={group.kind}>
                         <div className="sim-group-title">
                             <Icon name={DECISION_ICON[group.kind]} size={13}/>
@@ -262,7 +320,7 @@ export function SimInventory(props: {
                 <button
                     type="button"
                     className={'sim-row add' + (isSelected({kind: 'flag', name: ''}) ? ' selected' : '')}
-                    title="Set a flag the story has not written yet"
+                    title="Set a flag"
                     onClick={() => pick({kind: 'flag', name: ''})}
                 >
                     <Icon name="add" size={13}/>
@@ -288,7 +346,7 @@ export function SimInventory(props: {
                 count={state.luaStates.length}
                 id="sim-scripts" collapsed={folded.has('sim-scripts')} onToggle={toggle}
             >
-                {state.luaStates.length === 0 ? <p className="field-note">No campaign script in this plot</p> : null}
+                {state.luaStates.length === 0 ? <p className="field-note">No script attached</p> : null}
                 {state.luaStates.map(script => (
                     <button
                         type="button"
@@ -331,7 +389,7 @@ function DecisionRow(props: {
             <button
                 type="button"
                 className="sim-row-main"
-                title={`${item.eventName} (${item.eventType ?? '?'}) - press for the choices`}
+                title={`${item.eventName} - ${item.eventType ?? 'unknown type'}`}
                 onClick={props.onSelect}
             >
                 <span className="sim-row-name">{labelFor(item.nodeId, props.labelOf)}</span>
@@ -339,9 +397,9 @@ function DecisionRow(props: {
             </button>
             <IconButton
                 icon="check"
-                title={quick?.title ?? 'Pick an answer'}
+                title={quick?.title ?? 'No one-press answer'}
                 disabled={quick === null}
-                disabledReason="Pick an answer beside the dock"
+                disabledReason="No one-press answer - open the row"
                 onClick={() => quick?.run()}
             />
         </div>
@@ -405,7 +463,7 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
     const [chosen, setChosen] = useState('');
     useEffect(() => setChosen(''), [props.nodeId]);
     if (!item) {
-        return <p className="field-note">Answered - the story moved on</p>;
+        return <p className="field-note">Answered</p>;
     }
     const faction = factionOf(item, state);
     const candidates = pickerCandidates(item.facet, item.options, state.world, faction);
@@ -428,7 +486,7 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
     return (
         <>
             <div className="sim-detail-head">
-                <button type="button" className="link" title="Show in the graph"
+                <button type="button" className="link" title="Show in graph"
                         onClick={() => actions.centerNode(item.nodeId)}>
                     {name}
                 </button>
@@ -436,7 +494,7 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
             </div>
             {item.kind === 'lua' ? (
                 <DockSection title="Script_Event" count={item.options.length}>
-                    <p className="field-note">The script owes one of these; sending it fires the event</p>
+                    <p className="field-note">Story_Event ids the event listens for</p>
                     {item.options.map(id => (
                         <button type="button" className="btn sim-answer" key={id} title={`Story_Event("${id}")`}
                                 onClick={() => actions.luaNotify(id)}>
@@ -447,7 +505,7 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
             ) : null}
             {item.suggested ? (
                 <DockSection title="From the event">
-                    <button type="button" className="btn sim-answer" title="Apply this change to the world"
+                    <button type="button" className="btn sim-answer" title="Apply"
                             onClick={() => actions.world(item.suggested!)}>
                         <Icon name={item.kind === 'tactical' ? 'tactical' : 'world'} size={13}/>
                         {describeChange(item.suggested)}
@@ -459,8 +517,8 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
                     title={candidates.kind === 'planet' ? 'Planet' : candidates.kind === 'unit' ? 'Unit type' : 'Name'}>
                     <p className="field-note">
                         {candidates.preferred.length
-                            ? 'Likely first, then everything the world knows; any name can be typed'
-                            : 'Nothing in the world fits yet; type a name'}
+                            ? 'Likely candidates first - any name accepted'
+                            : 'No candidate in the world - any name accepted'}
                     </p>
                     <input
                         type="text"
@@ -491,14 +549,14 @@ function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Elem
                         ))}
                     </div>
                     <button type="button" className="btn sim-answer" disabled={!custom}
-                            title={custom ? describeChange(custom) : 'Type or pick a name first'}
+                            title={custom ? describeChange(custom) : 'No name entered'}
                             onClick={() => custom && actions.world(custom)}>
                         <Icon name="check" size={13}/>Apply
                     </button>
                 </DockSection>
             ) : null}
             <DockSection title="Or">
-                <button type="button" className="btn sim-answer" title="Fire the event without changing the world"
+                <button type="button" className="btn sim-answer" title="Fire without a world change"
                         onClick={() => actions.satisfy(item.nodeId)}>
                     <Icon name="decision" size={13}/>Assume the trigger met
                 </button>
@@ -524,7 +582,7 @@ function NodeDetail(props: DetailProps & { nodeId: string }): React.JSX.Element 
     return (
         <>
             <div className="sim-detail-head">
-                <button type="button" className="link" title="Show in the graph"
+                <button type="button" className="link" title="Show in graph"
                         onClick={() => actions.centerNode(props.nodeId)}>
                     {name}
                 </button>
@@ -549,7 +607,7 @@ function NodeDetail(props: DetailProps & { nodeId: string }): React.JSX.Element 
                 {dto?.perpetual ? <p className="field-note">Perpetual - re-arms after every fire</p> : null}
             </DockSection>
             <DockSection title="Arms when" count={lines.length || undefined}>
-                {lines.length === 0 ? <p className="field-note">A root - armed when its plot loads</p> : null}
+                {lines.length === 0 ? <p className="field-note">Root - armed at plot load</p> : null}
                 {lines.map((line, i) => (
                     <div className={'sim-arm-line' + (line.satisfied ? ' satisfied' : '')} key={i}>
                         {i > 0 ? <span className="sim-arm-or">or</span> : null}
@@ -557,7 +615,7 @@ function NodeDetail(props: DetailProps & { nodeId: string }): React.JSX.Element 
                             <span key={m.nodeId} className="sim-arm-member">
                                 {j > 0 ? <span className="sim-arm-and">and</span> : null}
                                 <button type="button" className={'link' + (m.fired ? ' fired' : '')}
-                                        title={m.fired ? 'Fired - press to show it' : 'Not fired yet - press to show it'}
+                                        title={m.fired ? 'Fired' : 'Not fired'}
                                         onClick={() => props.onSelect({kind: 'node', nodeId: m.nodeId})}>
                                     {m.label}
                                 </button>
@@ -569,19 +627,19 @@ function NodeDetail(props: DetailProps & { nodeId: string }): React.JSX.Element 
             <DockSection title="Do">
                 <button type="button" className={'btn sim-answer' + (hasBreakpoint ? ' active' : '')}
                         aria-pressed={hasBreakpoint}
-                        title={hasBreakpoint ? 'Breakpoint set - the clock halts after this fires' : 'Halt the clock after this fires'}
+                        title={hasBreakpoint ? 'Breakpoint set' : 'Break after this fires'}
                         onClick={toggleBreakpoint}>
                     <Icon name="breakpoint" size={13}/>{hasBreakpoint ? 'Clear breakpoint' : 'Break here'}
                 </button>
                 {owed ? (
-                    <button type="button" className="btn sim-answer" title="Open the decision this event waits on"
+                    <button type="button" className="btn sim-answer" title="Open decision"
                             onClick={() => props.onSelect({kind: 'decision', nodeId: props.nodeId})}>
                         <Icon name="decision" size={13}/>Answer its decision
                     </button>
                 ) : (
                     <button type="button" className="btn sim-answer"
                             disabled={nodeState?.lifecycle !== 'Armed'}
-                            title={nodeState?.lifecycle === 'Armed' ? 'Fire it now, whatever it waits on' : 'Only an armed event can be fired'}
+                            title={nodeState?.lifecycle === 'Armed' ? 'Fire now' : 'Not armed'}
                             onClick={() => actions.satisfy(props.nodeId)}>
                         <Icon name="fire" size={13}/>Fire now
                     </button>
@@ -636,7 +694,7 @@ function PlanetDetail(props: DetailProps & { name: string }): React.JSX.Element 
                 ))}
             </DockSection>
             <DockSection title="Capture">
-                <p className="field-note">Hands the planet to a faction, as a conquest would</p>
+                <p className="field-note">New owner - fires the capture listeners</p>
                 <input type="text" list="sim-factions" placeholder="Faction..." value={owner}
                        onChange={e => setOwner(e.target.value)}
                        onKeyDown={e => {
@@ -682,7 +740,7 @@ function FlagDetail(props: DetailProps & { name: string }): React.JSX.Element {
                 {existing ? <span className="sim-detail-type">= {existing.value}</span> : null}
             </div>
             <DockSection title="Set">
-                <p className="field-note">A STORY_FLAG event compares against this on the next tick</p>
+                <p className="field-note">Read by STORY_FLAG on the next tick</p>
                 {existing ? null : (
                     <input type="text" placeholder="Flag name..." value={name} onChange={e => setName(e.target.value)}/>
                 )}
@@ -703,7 +761,7 @@ function FlagDetail(props: DetailProps & { name: string }): React.JSX.Element {
                     ))}
                 </div>
                 <button type="button" className="btn sim-answer" disabled={!valid}
-                        title={valid ? 'Write the flag' : 'Name and a number first'}
+                        title={valid ? 'Set' : 'Name and value required'}
                         onClick={apply}>
                     <Icon name="check" size={13}/>Set flag
                 </button>
@@ -729,7 +787,7 @@ function ScriptDetail(props: DetailProps & { scriptUri: string }): React.JSX.Ele
                 <div className="sim-row static">
                     <span className="sim-row-name">Current</span>
                     {script.current ? (
-                        <button type="button" className="link" title="Show the state on the graph"
+                        <button type="button" className="link" title="Show in graph"
                                 onClick={() => actions.centerNode(stateNodeId(script.current!))}>{script.current}</button>
                     ) : <span className="sim-row-value">not started</span>}
                 </div>
@@ -749,8 +807,7 @@ function ScriptDetail(props: DetailProps & { scriptUri: string }): React.JSX.Ele
             </DockSection>
             {state.luaNotifications.length ? (
                 <DockSection title="Send" count={state.luaNotifications.length}>
-                    <p className="field-note">Any Story_Event id the plot listens for, as if the script called it
-                        now</p>
+                    <p className="field-note">Story_Event ids the plot listens for</p>
                     <div className="sim-chip-row">
                         {state.luaNotifications.map(id => (
                             <button type="button" className="btn sim-pick" key={id} title={`Story_Event("${id}")`}
@@ -784,49 +841,47 @@ export function SimTransport(props: {
     actions: SimActions;
 }): React.JSX.Element {
     const {state, pace, playing, lenses, actions} = props;
-    const owed = state.interventions.length > 0;
     const halted = !!state.haltedAt;
-    const blocked = owed ? 'Answer the decisions first' : null;
+    // Never gated on decisions: the engine's clock runs whatever the story waits on, and a real
+    // campaign waits on hundreds of things from tick 0. The title says when a tick is idle.
+    const idle = waitingOnAuthor(state);
     const stop = PACE_STOPS.indexOf(pace.mode);
     return (
         <div className="player sim-transport">
             <div className="player-row">
                 <IconButton
                     icon="firstFrame"
-                    title="Restart from tick 0"
+                    title="Restart"
                     disabled={state.tick === 0}
                     disabledReason="Already at tick 0"
                     onClick={actions.restart}
                 />
                 <IconButton
                     icon="previousClip"
-                    title="One tick back"
+                    title="Back one tick"
                     disabled={state.tick === 0}
                     disabledReason="Already at tick 0"
                     onClick={actions.back}
                 />
                 <IconButton
                     icon={playing ? 'pause' : 'play'}
-                    title={pace.mode === 'step' ? 'One tick' : playing ? 'Pause' : halted ? 'Resume from the breakpoint' : 'Play'}
-                    disabled={blocked !== null}
-                    disabledReason={blocked ?? ''}
+                    title={pace.mode === 'step' ? 'One tick'
+                        : playing ? 'Pause'
+                            : halted ? 'Resume from the breakpoint'
+                                : idle ? 'Play - clock idle' : 'Play'}
                     onClick={actions.playPause}
                 />
                 <IconButton
                     icon="nextClip"
-                    title="One tick"
-                    disabled={blocked !== null}
-                    disabledReason={blocked ?? ''}
+                    title={idle ? 'One tick - clock idle' : 'One tick'}
                     onClick={actions.tick}
                 />
                 <IconButton
                     icon="lastFrame"
-                    title="Run to the next decision or breakpoint"
-                    disabled={blocked !== null}
-                    disabledReason={blocked ?? ''}
+                    title="Run to next decision or breakpoint"
                     onClick={actions.runToDecision}
                 />
-                <span className="player-time" title={`Tick ${state.tick}, ${state.clock.toFixed(0)} s of story time`}>
+                <span className="player-time" title={`Tick ${state.tick} - ${state.clock.toFixed(0)} s`}>
                     t{state.tick}{' - '}{state.clock.toFixed(0)}s
                 </span>
             </div>
@@ -836,7 +891,7 @@ export function SimTransport(props: {
                 <input
                     className="sim-pace-slider"
                     type="range" min={0} max={2} step={1} value={stop < 0 ? 1 : stop}
-                    title="Pace - step, 1 s pulse, or a custom rate"
+                    title="Pace - Step / Pulse 1 s / Custom"
                     aria-label="Pace"
                     onChange={e => props.setPace({...pace, mode: PACE_STOPS[Number(e.target.value)]})}
                 />
@@ -844,7 +899,7 @@ export function SimTransport(props: {
                     className="sim-rate-slider"
                     type="range" min={1} max={30} step={1} value={pace.ticksPerSecond}
                     disabled={pace.mode !== 'custom'}
-                    title={pace.mode === 'custom' ? `${pace.ticksPerSecond} ticks per second` : 'Custom pace only'}
+                    title={pace.mode === 'custom' ? `Rate - ${pace.ticksPerSecond} ticks/s` : 'Rate - custom pace only'}
                     aria-label="Ticks per second"
                     onChange={e => props.setPace({...pace, ticksPerSecond: Number(e.target.value)})}
                 />
@@ -854,35 +909,35 @@ export function SimTransport(props: {
                     icon="trace"
                     className={props.traceOpen ? 'active' : undefined}
                     pressed={props.traceOpen}
-                    title={props.traceOpen ? 'Trace panel open' : 'Open the trace panel'}
+                    title="Trace"
                     onClick={() => props.setTraceOpen(!props.traceOpen)}
                 />
                 <IconButton
                     icon="breakpoint"
                     className={state.breakOnGates ? 'active' : undefined}
                     pressed={state.breakOnGates}
-                    title={state.breakOnGates ? 'Halting at every clock and flag gate' : 'Halt at every clock and flag gate'}
+                    title="Break on gates"
                     onClick={() => actions.setBreakpoints(state.breakpoints, !state.breakOnGates)}
                 />
                 <IconButton
                     icon="flow"
                     className={lenses.hideFlow ? undefined : 'active'}
                     pressed={!lenses.hideFlow}
-                    title={lenses.hideFlow ? 'Flow tints off' : 'Flow tints on the edges the story ran along'}
+                    title="Flow"
                     onClick={() => props.setLenses({...lenses, hideFlow: !lenses.hideFlow})}
                 />
                 <IconButton
                     icon="fire"
                     className={lenses.activeOnly ? 'active' : undefined}
                     pressed={lenses.activeOnly}
-                    title={lenses.activeOnly ? 'Showing the path the story took' : 'Dim everything the story has not reached'}
+                    title="Active path"
                     onClick={() => props.setLenses({...lenses, activeOnly: !lenses.activeOnly})}
                 />
                 <IconButton
                     icon="script"
                     className={lenses.hideLua ? undefined : 'active'}
                     pressed={!lenses.hideLua}
-                    title={lenses.hideLua ? 'Script states hidden' : 'Script states on the canvas'}
+                    title="Script states"
                     onClick={() => props.setLenses({...lenses, hideLua: !lenses.hideLua})}
                 />
             </div>
@@ -904,6 +959,15 @@ export function TracePanel(props: {
     const rows = useMemo(() => traceRows(props.steps, props.labelOf), [props.steps, props.labelOf]);
     const shown = useMemo(() => filterTrace(rows, query), [rows, query]);
     const tail = shown.slice(-400);
+    // A trace reads newest-last, so new rows keep the end in view. Measured on the shadow run:
+    // after a tick the panel sat at its top showing tick 0 rows while the new ones were below the
+    // fold. Only while the reader is not filtering - a filter is them looking at something else.
+    const endRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (!query) {
+            endRef.current?.scrollIntoView({block: 'end'});
+        }
+    }, [shown.length, query]);
     const copyText = (): string => shown
         .map(r => `t${r.tick}\t${r.node}\t${r.cause}${r.to ? `\t${r.from ?? ''} -> ${r.to}` : ''}${r.via ? `\tvia ${r.via}` : ''}${r.detail ? `\t${r.detail}` : ''}`)
         .join('\n');
@@ -917,33 +981,37 @@ export function TracePanel(props: {
         >
             <div className="sim-trace-tools">
                 <input
-                    type="text" placeholder="Filter the trace, or t12 for one tick" value={query}
+                    type="text" placeholder="Filter (t12 = tick 12)" value={query}
                     onChange={e => setQuery(e.target.value)}
                 />
-                <IconButton icon="copy" title="Copy the shown rows" disabled={shown.length === 0}
+                <IconButton icon="copy" title="Copy" disabled={shown.length === 0}
                             disabledReason="Nothing to copy" onClick={() => props.actions.copy(copyText())}/>
             </div>
-            {tail.length < shown.length ? (
-                <div className="sim-trace-row muted">{shown.length - tail.length} earlier rows not shown - narrow the
-                    filter</div>
-            ) : null}
-            {tail.map(row => (
-                <div
-                    className={'sim-trace-row cause-' + row.cause + (row.nodeId ? ' clickable' : '')}
-                    key={row.seq}
-                    title={row.nodeId ? 'Show this node in the graph' : undefined}
-                    onClick={row.nodeId ? () => props.actions.centerNode(row.nodeId) : undefined}
-                >
-                    <span className="sim-trace-tick">t{row.tick}</span>
-                    <span className="sim-trace-node" title={row.nodeId}>{row.node || shortId(row.nodeId)}</span>
-                    <span className="sim-trace-cause">{row.cause}</span>
-                    <span className="sim-trace-change">{row.to ? `${row.from ?? ''} -> ${row.to}` : ''}</span>
-                    <span className="sim-trace-via"
-                          title={row.viaId ?? undefined}>{row.via ? `via ${row.via}` : ''}</span>
-                    <span className="sim-trace-detail problem-msg"
-                          title={row.detail ?? undefined}>{row.detail ?? ''}</span>
-                </div>
-            ))}
+            <div className="problem-list">
+                {tail.length < shown.length ? (
+                    <div className="sim-trace-row muted">{shown.length - tail.length} earlier rows not shown - narrow
+                        the
+                        filter</div>
+                ) : null}
+                {tail.map((row, i) => (
+                    <div
+                        className={'sim-trace-row cause-' + row.cause + (row.nodeId ? ' clickable' : '')}
+                        key={row.seq}
+                        ref={i === tail.length - 1 ? endRef : undefined}
+                        title={row.nodeId ? 'Show in graph' : undefined}
+                        onClick={row.nodeId ? () => props.actions.centerNode(row.nodeId) : undefined}
+                    >
+                        <span className="sim-trace-tick">t{row.tick}</span>
+                        <span className="sim-trace-node" title={row.nodeId}>{row.node || shortId(row.nodeId)}</span>
+                        <span className="sim-trace-cause">{row.cause}</span>
+                        <span className="sim-trace-change">{row.to ? `${row.from ?? ''} -> ${row.to}` : ''}</span>
+                        <span className="sim-trace-via"
+                              title={row.viaId ?? undefined}>{row.via ? `via ${row.via}` : ''}</span>
+                        <span className="sim-trace-detail problem-msg"
+                              title={row.detail ?? undefined}>{row.detail ?? ''}</span>
+                    </div>
+                ))}
+            </div>
         </ProblemsPanel>
     );
 }

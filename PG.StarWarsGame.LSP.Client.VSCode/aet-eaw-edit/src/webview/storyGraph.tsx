@@ -15,21 +15,36 @@
 // a reconcile never reverts them.
 
 import {
-    CSSProperties, DragEvent, PointerEvent as ReactPointerEvent,
-    useCallback, useEffect, useMemo, useReducer, useRef, useState,
+    CSSProperties,
+    DragEvent,
+    PointerEvent as ReactPointerEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useReducer,
+    useRef,
+    useState,
 } from 'react';
 import {
-    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, playerCss, problemsPanelCss, rightDockCss,
-    rotarySwitchCss, stageChromeCss, stageFlyoutCss,
+    dockBodyCss,
+    dockChromeCss,
+    dockHeaderCss,
+    dockOverviewCss,
+    playerCss,
+    problemsPanelCss,
+    rightDockCss,
+    rotarySwitchCss,
+    stageChromeCss,
+    stageFlyoutCss,
 } from './shared/dockChrome';
-import {RotaryModeSwitch, type RotaryMode} from './shared/RotaryModeSwitch';
+import {type RotaryMode, RotaryModeSwitch} from './shared/RotaryModeSwitch';
 import {RightDock} from './shared/RightDock';
-import {ProblemsPanel, type ProblemFilterControl} from './shared/ProblemsPanel';
+import {type ProblemFilterControl, ProblemsPanel} from './shared/ProblemsPanel';
 import {filterProblems, resolveProblemJump} from './shared/problemFilter';
 import {ARRANGE_OPTIONS} from './storyGraph/arrangeOptions';
 import {type Adjacent, FIRE_CAUSES, groupByTick, isFlowStep, isLifecycleStep, resolvePath} from './simPlayback';
 import {ClearFiltersButton} from './storyGraph/ClearFiltersButton';
-import {canvasEdgeStyle, MUTED_EDGE_TOKEN, type CanvasEdgeStyle} from './storyGraph/canvasEdgeStyle';
+import {canvasEdgeStyle, type CanvasEdgeStyle, MUTED_EDGE_TOKEN} from './storyGraph/canvasEdgeStyle';
 import {branchKey, type BranchKeyEntry} from './storyGraph/colourKey';
 import {ColourKeyFlyout} from './storyGraph/ColourKeyFlyout';
 import {FrameNotifier} from './storyGraph/frameNotifier';
@@ -46,7 +61,6 @@ import {booleanParamLabel, shortParamLabel} from './storyGraph/paramLabels';
 import {paramRowSpecs} from './storyGraph/paramRows';
 import {StagedRenames} from './storyGraph/stagedRenames';
 import {optimisticEdit, PREVIEW_KINDS, STAGED_KINDS} from './staging';
-import {useEdgeResize} from './useEdgeResize';
 import {GRAPH_FILTER_DEBOUNCE_MS, useDebounced} from './loc/useDebounced';
 import {worstSeverity} from './loc/validateState';
 import {createRoot} from 'react-dom/client';
@@ -58,16 +72,27 @@ import {Drag, Presets, ReactArea2D, ReactPlugin, RenderEmit} from 'rete-react-pl
 import styled, {createGlobalStyle} from 'styled-components';
 
 import {
-    StoryDiagnosticDto, StoryGraphEdgeDto, StoryGraphNodeDto, StoryLayoutEntryDto,
-    StoryParamOptionDto, StoryParamSchemaDto, StorySimNodeStateDto, StorySimStateDto, StorySimStepDto,
+    StoryDiagnosticDto,
+    StoryGraphEdgeDto,
+    StoryGraphNodeDto,
+    StoryLayoutEntryDto,
+    StoryParamOptionDto,
+    StoryParamSchemaDto,
+    StorySimNodeStateDto,
+    StorySimStateDto,
+    StorySimStepDto,
 } from '../protocol';
 import {DEFAULT_PACE, paceIntervalMs, parsePace, type SimPace} from './storyGraph/simModel';
 import {
-    type SimActions, SimFlyout, SimHeaderChip, SimInventory, type SimLenses, type SimSelection, SimTransport,
+    type SimActions,
+    SimFlyout,
+    SimHeaderChip,
+    SimInventory,
+    type SimLenses,
+    type SimSelection,
+    SimTransport,
     TracePanel,
 } from './storyGraph/SimDock';
-
-import {readPanelSize, writePanelSize} from './shared/panelLayout';
 import {initPanelLayout} from './shared/panelLayoutBridge';
 import {Button, IconButton} from './shared/Button';
 import {DockSection} from './shared/DockSection';
@@ -75,8 +100,13 @@ import {colourResolver} from './shared/resolveColour';
 import {SeverityTag} from './shared/SeverityTag';
 import {tokensRootCss} from './shared/tokens';
 import {
-    EDGE_KINDS, JUNCTION_TOKEN, LANE_PALETTE, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN,
-    branchColours, laneToken, type BranchColour,
+    type BranchColour,
+    branchColours,
+    EDGE_KINDS,
+    JUNCTION_TOKEN,
+    laneToken,
+    LIFECYCLE_TOKENS,
+    UNKNOWN_LIFECYCLE_TOKEN,
 } from './storyGraph/palette';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -127,7 +157,9 @@ function simRequest(method: string, args?: Record<string, unknown>): void {
 // state document; a missing or broken store falls back to the defaults.
 const SIM_PACE_KEY = 'storyGraph.simPace';
 const SIM_LENS_KEY = 'storyGraph.simLenses';
-const DEFAULT_LENSES: SimLenses = {activeOnly: false, hideFlow: false, hideLua: false};
+// The path taken is what a simulation view is FOR, so the active-path lens is on until the reader
+// takes it off; the flow tints and the script states are on for the same reason.
+const DEFAULT_LENSES: SimLenses = {activeOnly: true, hideFlow: false, hideLua: false};
 
 function readPace(): SimPace {
     try {
@@ -149,7 +181,7 @@ function readLenses(): SimLenses {
     try {
         const parsed = JSON.parse(localStorage.getItem(SIM_LENS_KEY) ?? '{}') as Partial<SimLenses>;
         return {
-            activeOnly: parsed.activeOnly === true,
+            activeOnly: parsed.activeOnly !== false,
             hideFlow: parsed.hideFlow === true,
             hideLua: parsed.hideLua === true,
         };
@@ -473,6 +505,12 @@ interface EditorHandle {
     /** Paints the gate meters and breakpoint marks from the simulation state (null clears them). */
     applySimMarks(byNodeId: ReadonlyMap<string, StorySimNodeStateDto> | null, breakpoints: ReadonlySet<string>): void;
 
+    /** Recomputes the paths taken from the whole trace, without animating - for a graph rebuilt under a running simulation. */
+    applyFlow(steps: readonly StorySimStepDto[]): void;
+
+    /** The canvas lenses the overview has to honour as well as the mounted nodes. */
+    setSimLenses(lenses: SimLenses): void;
+
     /**
      * Plays a trace delta tick by tick: the edge from a step's source to its node flows for
      * `tickMs`, then the node takes the step's lifecycle and the edge stays tinted. Zero ms
@@ -550,6 +588,14 @@ interface EditorHandle {
      * canvas sized to the viewport, using the current pan/zoom transform. No-op clear when not
      * windowed (a small graph is fully mounted, so the real nodes are the view). */
     drawLodTo(canvas: HTMLCanvasElement): void;
+
+    /**
+     * Paints the simulation's flow - the edges the story has run along - onto a screen-space
+     * canvas, when rete is not drawing the edges itself (a windowed graph, or any graph zoomed out
+     * to the overview). `phase` is elapsed milliseconds and drives the marching dash. Returns
+     * whether any flow exists, so the caller knows whether to keep animating.
+     */
+    drawFlowTo(canvas: HTMLCanvasElement, phase: number): boolean;
 
     /** Bounding boxes (graph coords) of Event nodes grouped by thread or chapter - the swimlanes. */
     getGroupBounds(by: 'thread' | 'chapter'): {
@@ -1242,6 +1288,33 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // while `windowed`; the minimap always reads the full graphModel, not this.
     const mountedIds = new Set<string>();
     const mountedConnKeys = new Set<string>();
+    /**
+     * Simulation flow per edge, keyed like a mounted connection, for EVERY edge of the graph. The
+     * rete connections only exist for a small graph's mounted window; a large campaign mounts none
+     * and the LOD canvas draws its edges - so the flow has to live beside the model, not on the
+     * connection objects, or a real campaign never shows a path taken. Measured on Underworld
+     * (2492 nodes): zero flow edges before this existed.
+     */
+    const flowByEdge = new Map<string, { edge: StoryGraphEdgeDto; state: 'active' | 'spent' }>();
+    /**
+     * The rest of the simulation's paint, likewise beside the model. The server owns the
+     * simulation; the view only paints its last state, and a node mounted after that state
+     * arrived (a zoom across the LOD threshold, a relayout, a filter) reads its paint from here
+     * rather than starting blank. Lifecycles need no map: they are written into the model's own
+     * dto objects, which the mounted nodes share.
+     */
+    const simFireCounts = new Map<string, number>();
+    const simMarks = new Map<string, StorySimNodeStateDto>();
+    let simBreakpoints: ReadonlySet<string> = new Set<string>();
+    let simRunning = false;
+    let lensActiveOnly = false;
+    const decorateFromSim = (node: StoryNode): void => {
+        node.simFireCount = simFireCounts.get(node.id) ?? 0;
+        const mark = simMarks.get(node.id);
+        node.simGate = mark?.gateLabel ? {label: mark.gateLabel, progress: mark.gateProgress ?? null} : null;
+        node.simBreakpoint = simBreakpoints.has(node.id);
+    };
+    const reached = (dto: StoryGraphNodeDto): boolean => dto.lifecycle === 'Fired' || dto.lifecycle === 'Armed';
 
     // A node's rete size, computed without mounting it (mirrors StoryNode.applyDto).
     const modelSizeFor = (dto: StoryGraphNodeDto): { w: number; h: number } => {
@@ -1390,6 +1463,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 const m = graphModel.get(id)!;
                 const node = new StoryNode(m.dto, hasIn.has(id), hasOut.has(id));
                 node.branchGlow = branchOfNodeId(id, branches);
+                decorateFromSim(node);
                 mountedIds.add(id);
                 return node;
             });
@@ -1415,8 +1489,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                         continue;
                     }
                     mountedConnKeys.add(key);
-                    conns.push(new StoryConnection(s, t, edge.kind,
-                        edgeBranchFrom(edge.fromId, edge.toId, edge.kind, branches)));
+                    const conn = new StoryConnection(s, t, edge.kind,
+                        edgeBranchFrom(edge.fromId, edge.toId, edge.kind, branches));
+                    // A connection mounted after the story ran along its edge still shows the path.
+                    conn.flow = flowByEdge.get(key)?.state ?? 'idle';
+                    conns.push(conn);
                 }
                 await Promise.all(conns.map(c => editor.addConnection(c)));
             }
@@ -1806,6 +1883,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     const position = area.nodeViews.get(dto.id)?.position;
                     await editor.removeNode(dto.id);
                     const rebuilt = new StoryNode(dto, needsIn, needsOut);
+                    decorateFromSim(rebuilt);
                     await editor.addNode(rebuilt);
                     if (position) {
                         await area.translate(rebuilt.id, position);
@@ -1816,6 +1894,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             } else {
                 const node = new StoryNode(dto, needsIn, needsOut);
                 node.branchGlow = branchOfNodeId(dto.id, branches);
+                decorateFromSim(node);
                 await editor.addNode(node);
                 const key = dto.kind === 'Event' ? layoutKey(dto) : null;
                 const pending = key ? pendingDropPositions.get(key) : undefined;
@@ -1901,25 +1980,59 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             return result;
         },
         applyLifecycles(byNodeId: ReadonlyMap<string, string> | null): void {
+            // Into the MODEL first: every event's dto, mounted or not, so the overview colours from
+            // the same truth and a node mounted later carries it. The mounted nodes share these
+            // dto objects and only need repainting.
+            simRunning = byNodeId !== null;
+            const branches = branchIndex([...graphModel.values()].map(m => m.dto));
+            const changed = new Set<string>();
+            for (const m of graphModel.values()) {
+                if (m.dto.kind !== 'Event') {
+                    continue;
+                }
+                const next = byNodeId
+                    ? byNodeId.get(m.dto.id) ?? m.dto.lifecycle
+                    : staticLifecycles.get(m.dto.id);
+                if (next !== m.dto.lifecycle) {
+                    m.dto.lifecycle = next ?? null;
+                    m.colorToken = overviewToken(m.dto, branchOfNodeId(m.dto.id, branches));
+                    changed.add(m.dto.id);
+                }
+            }
             for (const node of editor.getNodes()) {
                 if (node.dto.kind !== 'Event') {
                     continue;
                 }
+                // A mounted node the model does not know yet (mid-patch) is written directly.
                 const next = byNodeId
                     ? byNodeId.get(node.id) ?? node.dto.lifecycle
                     : staticLifecycles.get(node.id);
                 if (next !== node.dto.lifecycle) {
                     node.dto.lifecycle = next ?? null;
+                    changed.add(node.id);
+                }
+                if (changed.has(node.id)) {
                     void area.update('node', node.id);
                 }
             }
+            if (changed.size > 0 || !byNodeId) {
+                scheduleGeometryChanged();
+            }
         },
         applyFireCounts(byNodeId: ReadonlyMap<string, number> | null): void {
+            simFireCounts.clear();
+            if (byNodeId) {
+                for (const [id, count] of byNodeId) {
+                    if (count > 0) {
+                        simFireCounts.set(id, count);
+                    }
+                }
+            }
             for (const node of editor.getNodes()) {
                 if (node.dto.kind !== 'Event') {
                     continue;
                 }
-                const next = byNodeId?.get(node.id) ?? 0;
+                const next = simFireCounts.get(node.id) ?? 0;
                 if (next !== node.simFireCount) {
                     node.simFireCount = next;
                     void area.update('node', node.id);
@@ -1927,11 +2040,20 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             }
         },
         applySimMarks(byNodeId: ReadonlyMap<string, StorySimNodeStateDto> | null, breakpoints: ReadonlySet<string>): void {
+            simMarks.clear();
+            if (byNodeId) {
+                for (const [id, state] of byNodeId) {
+                    if (state.gateLabel) {
+                        simMarks.set(id, state);
+                    }
+                }
+            }
+            simBreakpoints = breakpoints;
             for (const node of editor.getNodes()) {
                 if (node.dto.kind !== 'Event') {
                     continue;
                 }
-                const state = byNodeId?.get(node.id);
+                const state = simMarks.get(node.id);
                 const gate = state?.gateLabel ? {label: state.gateLabel, progress: state.gateProgress ?? null} : null;
                 const breakpoint = breakpoints.has(node.id);
                 const gateMoved = (gate?.label ?? null) !== (node.simGate?.label ?? null)
@@ -1943,31 +2065,93 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 }
             }
         },
-        async playSimSteps(steps: readonly StorySimStepDto[], tickMs: number): Promise<void> {
-            // Adjacency over the mounted connections; a windowed (LOD) graph simply has fewer
-            // edges to animate and the final state paint catches up on everything else.
+        applyFlow(steps: readonly StorySimStepDto[]): void {
+            // The paths taken, recomputed from the server's whole trace: what playSimSteps builds
+            // up tick by tick, without the animation, for a graph that was rebuilt underneath.
+            flowByEdge.clear();
             const adjacency = new Map<string, Adjacent[]>();
-            for (const conn of editor.getConnections()) {
-                const list = adjacency.get(conn.source) ?? [];
-                list.push({to: conn.target, connectionId: conn.id});
-                adjacency.set(conn.source, list);
+            const edgeByKey = new Map<string, StoryGraphEdgeDto>();
+            for (const edge of lastEdges) {
+                const key = connectionKey(edge.fromId, edge.toId, edge.kind);
+                edgeByKey.set(key, edge);
+                const list = adjacency.get(edge.fromId) ?? [];
+                list.push({to: edge.toId, connectionId: key});
+                adjacency.set(edge.fromId, list);
             }
-            const passThrough = (id: string): boolean => editor.getNode(id)?.dto.kind !== 'Event';
+            const passThrough = (id: string): boolean =>
+                (graphModel.get(id)?.dto ?? editor.getNode(id)?.dto)?.kind !== 'Event';
+            for (const step of steps) {
+                if (!isFlowStep(step)) {
+                    continue;
+                }
+                for (const key of resolvePath(step.sourceNodeId!, step.nodeId, adjacency, passThrough)) {
+                    const edge = edgeByKey.get(key);
+                    if (edge) {
+                        flowByEdge.set(key, {edge, state: 'spent'});
+                    }
+                }
+            }
+            for (const conn of editor.getConnections()) {
+                const state = flowByEdge.get(connectionKey(conn.source, conn.target, conn.kind))?.state ?? 'idle';
+                if (conn.flow !== state) {
+                    conn.flow = state;
+                    void area.update('connection', conn.id);
+                }
+            }
+            scheduleGeometryChanged();
+        },
+        setSimLenses(lenses: SimLenses): void {
+            if (lensActiveOnly !== lenses.activeOnly) {
+                lensActiveOnly = lenses.activeOnly;
+                scheduleGeometryChanged();
+            }
+        },
+        async playSimSteps(steps: readonly StorySimStepDto[], tickMs: number): Promise<void> {
+            // Adjacency over the MODEL's edges, not the mounted connections: a windowed graph
+            // mounts none, and the path the story took must exist whether or not it is on screen.
+            const adjacency = new Map<string, Adjacent[]>();
+            const edgeByKey = new Map<string, StoryGraphEdgeDto>();
+            for (const edge of lastEdges) {
+                const key = connectionKey(edge.fromId, edge.toId, edge.kind);
+                edgeByKey.set(key, edge);
+                const list = adjacency.get(edge.fromId) ?? [];
+                list.push({to: edge.toId, connectionId: key});
+                adjacency.set(edge.fromId, list);
+            }
+            const connByKey = new Map<string, StoryConnection>();
+            for (const conn of editor.getConnections()) {
+                connByKey.set(connectionKey(conn.source, conn.target, conn.kind), conn);
+            }
+            const passThrough = (id: string): boolean =>
+                (graphModel.get(id)?.dto ?? editor.getNode(id)?.dto)?.kind !== 'Event';
+            const setFlow = (key: string, state: 'active' | 'spent'): void => {
+                const edge = edgeByKey.get(key);
+                if (!edge) {
+                    return;
+                }
+                flowByEdge.set(key, {edge, state});
+                const conn = connByKey.get(key);
+                if (conn && conn.flow !== state) {
+                    conn.flow = state;
+                    void area.update('connection', conn.id);
+                }
+            };
             for (const group of groupByTick(steps)) {
-                const active: StoryConnection[] = [];
+                const active: string[] = [];
                 for (const step of group) {
                     if (!isFlowStep(step)) {
                         continue;
                     }
-                    for (const id of resolvePath(step.sourceNodeId!, step.nodeId, adjacency, passThrough)) {
-                        const conn = editor.getConnection(id);
-                        if (!conn || conn.flow === 'active') {
+                    for (const key of resolvePath(step.sourceNodeId!, step.nodeId, adjacency, passThrough)) {
+                        if (flowByEdge.get(key)?.state === 'active') {
                             continue;
                         }
-                        conn.flow = 'active';
-                        active.push(conn);
-                        void area.update('connection', id);
+                        setFlow(key, 'active');
+                        active.push(key);
                     }
+                }
+                if (active.length > 0) {
+                    scheduleGeometryChanged(); // the flow canvas repaints on this
                 }
                 if (tickMs > 0 && active.length > 0) {
                     await new Promise<void>(resolve => setTimeout(resolve, tickMs));
@@ -1990,13 +2174,21 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                         void area.update('node', node.id);
                     }
                 }
-                for (const conn of active) {
-                    conn.flow = 'spent';
-                    void area.update('connection', conn.id);
+                for (const key of active) {
+                    setFlow(key, 'spent');
+                }
+                if (active.length > 0) {
+                    scheduleGeometryChanged();
                 }
             }
         },
         resetSimVisuals(): void {
+            flowByEdge.clear();
+            simFireCounts.clear();
+            simMarks.clear();
+            simBreakpoints = new Set<string>();
+            simRunning = false;
+            scheduleGeometryChanged();
             for (const conn of editor.getConnections()) {
                 if (conn.flow === 'idle') {
                     continue;
@@ -2013,6 +2205,69 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 node.simBreakpoint = false;
                 void area.update('node', node.id);
             }
+        },
+        drawFlowTo(canvas: HTMLCanvasElement, phase: number): boolean {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return false;
+            }
+            const w = container.clientWidth, h = container.clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            // Rete's own connections carry the flow while they are the ones drawing the edges; the
+            // canvas takes over exactly when the LOD overview does (same rule as drawLodTo).
+            if (flowByEdge.size === 0 || (!windowed && !lodActive)) {
+                return flowByEdge.size > 0;
+            }
+            const {k, x, y} = area.area.transform;
+            const bezier = k >= K_LABEL;
+            const colour = colourResolver(container);
+            ctx.strokeStyle = colour(LIFECYCLE_TOKENS.Fired);
+            ctx.lineCap = 'round';
+            // Spent edges keep a slow march so the path taken stays alive; the active edge - the
+            // step in flight - runs fast and heavy, the same two speeds the SVG connections use.
+            for (const state of ['spent', 'active'] as const) {
+                const isActive = state === 'active';
+                ctx.lineWidth = isActive ? 3 : 2;
+                ctx.globalAlpha = isActive ? 1 : 0.85;
+                ctx.setLineDash(isActive ? [10, 4] : [6, 8]);
+                ctx.lineDashOffset = -(phase * (isActive ? 0.056 : 0.012)) % 1000;
+                ctx.beginPath();
+                let any = false;
+                for (const {edge, state: s} of flowByEdge.values()) {
+                    if (s !== state) {
+                        continue;
+                    }
+                    const a = graphModel.get(edge.fromId), b = graphModel.get(edge.toId);
+                    if (!a || !b) {
+                        continue;
+                    }
+                    const x1 = (a.x + a.w) * k + x, y1 = (a.y + a.h / 2) * k + y;
+                    const x2 = b.x * k + x, y2 = (b.y + b.h / 2) * k + y;
+                    if ((x1 < 0 && x2 < 0) || (x1 > w && x2 > w) || (y1 < 0 && y2 < 0) || (y1 > h && y2 > h)) {
+                        continue;
+                    }
+                    any = true;
+                    ctx.moveTo(x1, y1);
+                    if (bezier) {
+                        const dx = Math.max(20, Math.abs(x2 - x1) * 0.4);
+                        ctx.bezierCurveTo(x1 + dx, y1, x2 - dx, y2, x2, y2);
+                    } else {
+                        ctx.lineTo(x2, y2);
+                    }
+                }
+                if (any) {
+                    ctx.stroke();
+                }
+            }
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+            return true;
         },
         fit(): void {
             // Fit the whole MODEL whenever the mounted set is not the whole graph - which is any
@@ -2248,9 +2503,12 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     buckets.set(style.key, {style, edges: [e]});
                 }
             }
+            // The active-path lens: while a simulation runs, everything the story has not run
+            // along recedes and the flow canvas draws the paths taken over it.
+            const dimUnreached = simRunning && lensActiveOnly;
             for (const {style, edges: bucketEdges} of buckets.values()) {
                 const plain = style.token === MUTED_EDGE_TOKEN;
-                ctx.globalAlpha = plain ? 0.4 : 0.85;
+                ctx.globalAlpha = dimUnreached ? 0.15 : plain ? 0.4 : 0.85;
                 ctx.strokeStyle = colour(style.token);
                 ctx.lineWidth = plain ? 1 : 1.5;
                 ctx.setLineDash(style.dash as number[]);
@@ -2325,16 +2583,19 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     continue;
                 }
                 const color = colour(m.colorToken);
+                // Same dimming the mounted node gets from the lens class, so crossing the LOD
+                // threshold does not brighten what the detail view greys out.
+                const dim = dimUnreached && m.dto.kind === 'Event' && !reached(m.dto) ? 0.25 : 1;
                 // A junction keeps the silhouette it has when mounted - a circle for AND, a
                 // rotated square for OR - so structure stays readable zoomed out instead of
                 // becoming another rectangle. Rects keep the cheap path: fillRect/strokeRect are
                 // measurably faster than a path, and they are the overwhelming majority.
                 const shape = lodShape(m.dto.kind);
                 if (shape === 'rect') {
-                    ctx.globalAlpha = 0.28;
+                    ctx.globalAlpha = 0.28 * dim;
                     ctx.fillStyle = color;
                     ctx.fillRect(sx, sy, sw, sh);
-                    ctx.globalAlpha = 0.9;
+                    ctx.globalAlpha = 0.9 * dim;
                     ctx.strokeStyle = color;
                     ctx.lineWidth = 1.5;
                     ctx.strokeRect(sx, sy, sw, sh);
@@ -2353,16 +2614,16 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                         ctx.lineTo(cx - rx, cy);
                         ctx.closePath();
                     }
-                    ctx.globalAlpha = 0.28;
+                    ctx.globalAlpha = 0.28 * dim;
                     ctx.fillStyle = color;
                     ctx.fill();
-                    ctx.globalAlpha = 0.9;
+                    ctx.globalAlpha = 0.9 * dim;
                     ctx.strokeStyle = color;
                     ctx.lineWidth = 1.5;
                     ctx.stroke();
                 }
                 if (showLabels && sizeFor !== null && m.dto.kind === 'Event' && sw > 30) {
-                    ctx.globalAlpha = 1;
+                    ctx.globalAlpha = dim;
                     ctx.fillStyle = labelColor;
                     const {fontPx, maxLines} = sizeFor(
                         Math.max(0, sw - LABEL_PAD * 2), Math.max(0, sh - LABEL_PAD * 2));
@@ -3756,13 +4017,20 @@ const ConnSvg = styled.svg`
         animation: story-flow 0.5s linear infinite;
     }
 
+    /* The path taken keeps moving, slowly: the maintainer's spec is a flow view, and a still
+       tint reads as a colour key rather than as something that ran. Same dash the LOD flow
+       canvas draws, so a graph looks the same whether rete or the canvas holds its edges. */
+
     &.flow-spent path:not(.glow-underlay) {
         stroke: var(--lifecycle-fired, var(--vscode-testing-iconPassed, #73c991));
-        stroke-dasharray: none;
+        stroke-width: 2.5px;
+        stroke-dasharray: 6 8;
+        animation: story-flow 2.4s linear infinite;
     }
 
     @media (prefers-reduced-motion: reduce) {
-        &.flow-active path:not(.glow-underlay) {
+        &.flow-active path:not(.glow-underlay),
+        &.flow-spent path:not(.glow-underlay) {
             animation: none;
             stroke-dasharray: none;
         }
@@ -4318,6 +4586,36 @@ const Shell = styled.div`
         color: var(--vscode-foreground);
     }
 
+    /* Running is the one state that has to be legible at a glance from across the dock: the
+       fired colour on the border and a live dot. Paused keeps the quiet default look. */
+
+    .sim-chip.running {
+        border-color: var(--lifecycle-fired, #73c991);
+        color: var(--vscode-foreground);
+    }
+
+    .sim-chip-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--lifecycle-fired, #73c991);
+        animation: sim-live 1.2s ease-in-out infinite;
+    }
+
+    @keyframes sim-live {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.25;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .sim-chip-dot {
+            animation: none;
+        }
+    }
+
     .sim-chip-text {
         overflow: hidden;
         text-overflow: ellipsis;
@@ -4619,7 +4917,7 @@ const Shell = styled.div`
 
     .sim-trace-tools {
         position: sticky;
-        top: 22px;
+        top: 0;
         z-index: 1;
         display: flex;
         gap: var(--space-4);
@@ -4719,10 +5017,10 @@ const Shell = styled.div`
        shared block carries the localisation grids' 2px/6px, and the two differ by a pixel or two
        from a calibration that was done here. */
 
+    /* No stacking of its own: the resize handle overlaps the bar's top edge and has to win. With
+       the frame a flex column and the row list the scroller, the bar no longer needs to stick. */
+
     .panel-bar {
-        position: sticky;
-        top: 0;
-        z-index: 2;
         background: var(--vscode-sideBar-background);
         padding: var(--space-1) var(--space-4) var(--space-2);
     }
@@ -4941,6 +5239,10 @@ function App(): React.JSX.Element {
     const [showProblems, setShowProblems] = useState(false);
     const [showTrace, setShowTrace] = useState(true);
     const [simSteps, setSimSteps] = useState<StorySimStepDto[]>([]);
+    // Mirrors for the paint after a graph rebuild, which runs from a promise chain rather than a
+    // render: the accumulated trace and the overlay routine itself.
+    const simStepsRef = useRef<StorySimStepDto[]>([]);
+    const applySimOverlayRef = useRef<((state: StorySimStateDto | null, replay?: boolean) => void) | null>(null);
     // What the simulation flyout beside the dock shows, and which lenses the canvas wears.
     const [simSelection, setSimSelection] = useState<SimSelection | null>(null);
     const [simLenses, setSimLensesState] = useState<SimLenses>(() => readLenses());
@@ -4948,6 +5250,12 @@ function App(): React.JSX.Element {
         setSimLensesState(next);
         writeLenses(next);
     }, []);
+    const simLensesRef = useRef(simLenses);
+    simLensesRef.current = simLenses;
+    // The overview honours the lenses too, so a zoom across the LOD threshold changes nothing.
+    useEffect(() => {
+        editorRef.current?.setSimLenses(simLenses);
+    }, [simLenses]);
     // The graph as the server sent it, for the flyout's arming lines and the trace's node names.
     // Refs rather than state: the graph changes rarely and the canvas already re-renders on it.
     const simGraphRef = useRef<{ nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[] }>({nodes: [], edges: []});
@@ -5142,6 +5450,7 @@ function App(): React.JSX.Element {
             simLastSeq = 0;
             setPlayingBoth(false);
             setSimSteps([]);
+            simStepsRef.current = [];
             setSimSelection(null);
             handle?.resetSimVisuals();
             handle?.applyLifecycles(null);
@@ -5152,7 +5461,15 @@ function App(): React.JSX.Element {
         const fireCounts = new Map(state.nodes.map(n => [n.nodeId, n.fireCount]));
         const nodeStates = new Map(state.nodes.map(n => [n.nodeId, n]));
         const breakpoints = new Set(state.breakpoints);
-        if (state.haltedAt || state.interventions.length > 0) {
+        // Every state, not only a rebuild: the lens effect can run before the editor exists, and
+        // the overview must dim from the first state on. Measured: without this the zoomed-out
+        // view drew every unreached event at full strength while the detail view greyed it.
+        handle?.setSimLenses(simLensesRef.current);
+        // Play pauses itself only where the clock cannot go on: a breakpoint, or nothing left for
+        // the clock alone to change. Not on a new decision - on a real campaign one arms nearly
+        // every tick (measured on Underworld: play stopped after each tick and read as broken),
+        // and stopping there is what run-to-decision is for.
+        if (state.haltedAt || (state.interventions.length > 0 && (state.clockPending ?? 1) === 0)) {
             setPlayingBoth(false);
         }
         if (!handle) {
@@ -5160,9 +5477,13 @@ function App(): React.JSX.Element {
             return;
         }
         if (!replay) {
+            // The graph was rebuilt under the simulation: paint everything the server's state says,
+            // paths taken included, from the whole trace seen so far.
+            handle.setSimLenses(simLensesRef.current);
             handle.applyLifecycles(lifecycles);
             handle.applyFireCounts(fireCounts);
             handle.applySimMarks(nodeStates, breakpoints);
+            handle.applyFlow(simStepsRef.current);
             return;
         }
         // A rewind (seek, restart) hands back the trace from the top: repaint from nothing.
@@ -5172,7 +5493,11 @@ function App(): React.JSX.Element {
         simLastSeq = state.totalSteps;
         // The trace panel shows the whole record; each response carries only the steps after the
         // last one played, so they accumulate here and a rewind starts the record over.
-        setSimSteps(prev => (rewind || fresh ? [...state.steps] : [...prev, ...delta]));
+        setSimSteps(prev => {
+            const next = rewind || fresh ? [...state.steps] : [...prev, ...delta];
+            simStepsRef.current = next;
+            return next;
+        });
         const tickMs = fresh || rewind || prefersReducedMotion()
             ? 0
             : Math.min(600, paceIntervalMs(paceRef.current) * 0.6);
@@ -5191,6 +5516,7 @@ function App(): React.JSX.Element {
             })
             .catch(() => undefined);
     }, []);
+    applySimOverlayRef.current = applySimOverlay;
 
     // The transport timer: while playing in pulse or custom pace, request one tick per interval,
     // never more than one in flight. A response that never comes (an error dialog took it)
@@ -5282,6 +5608,13 @@ function App(): React.JSX.Element {
         // Re-apply staged edits once the (re)built graph settles, so a reconcile never reverts them.
         const done = handle.setGraph(g.nodes, g.edges, g.layout, g.full)
             .then(() => reapplyStagedCommands())
+            .then(() => {
+                // A running simulation is painted over the settled graph, not over the one that
+                // was there when its last state arrived - a filter or relayout replaces the nodes.
+                if (simRef.current?.running) {
+                    applySimOverlayRef.current?.(simRef.current, false);
+                }
+            })
             .then(() => {
                 // A jump parked by a problem click, now that its node is mounted and centreable.
                 const queued = pendingJumpRef.current;
@@ -5627,6 +5960,7 @@ function App(): React.JSX.Element {
                             showThread={showThreadLanes} showChapter={showChapterLanes}
                         />
                         <LodOverview getHandle={() => editorRef.current}/>
+                        <FlowOverlay getHandle={() => editorRef.current} hidden={simLenses.hideFlow}/>
                         <div
                             className="canvas" ref={containerRef}
                             onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
@@ -5723,7 +6057,19 @@ function App(): React.JSX.Element {
                             onSelect={switchMode}
                         />
                         {mode === 'simulate' && simState?.running ? (
-                            <SimHeaderChip state={simState} labelOf={labelOf} onSelect={setSimSelection}/>
+                            <SimHeaderChip
+                                state={simState}
+                                playing={playing}
+                                labelOf={labelOf}
+                                onSelect={selection => {
+                                    setSimSelection(selection);
+                                    // The chip names an event; show it too, as a row press does.
+                                    if (selection.kind === 'node' || selection.kind === 'decision') {
+                                        simActions.centerNode(selection.nodeId);
+                                    }
+                                }}
+                                onPlayPause={simActions.playPause}
+                            />
                         ) : null}
                         <SeverityTag
                             severity={severity}
@@ -5883,31 +6229,33 @@ function ProblemsBar(props: {
             filter={props.filter}
             onClose={props.onClose}
         >
-            {props.problems.map((problem, i) => (
-                <div
-                    className={'problem-row' + (problem.nodeId ? ' clickable' : '')}
-                    key={i}
-                    title={problem.nodeId ? 'Click to show this node in the graph' : undefined}
-                    onClick={problem.nodeId ? () => props.onJump(problem.nodeId!) : undefined}
-                >
+            <div className="problem-list">
+                {props.problems.map((problem, i) => (
+                    <div
+                        className={'problem-row' + (problem.nodeId ? ' clickable' : '')}
+                        key={i}
+                        title={problem.nodeId ? 'Click to show this node in the graph' : undefined}
+                        onClick={problem.nodeId ? () => props.onJump(problem.nodeId!) : undefined}
+                    >
                     <span className={'diag-badge diag-' + (problem.severity === 'error' ? 'error' : 'warning')}>
                         <span className={'codicon codicon-' + (problem.severity === 'error' ? 'error' : 'warning')}/>
                     </span>
-                    <span className="problem-node" title={problem.nodeId ?? problem.uri}>
+                        <span className="problem-node" title={problem.nodeId ?? problem.uri}>
                         {problem.nodeId
                             ? problem.nodeId.slice(problem.nodeId.indexOf('#') + 1)
                             : baseName(problem.uri)}
                     </span>
-                    <span className="problem-msg" title={problem.message}>{problem.message}</span>
-                    <button
-                        onClick={e => {
-                            e.stopPropagation(); // the XML button must not also trigger the row's jump
-                            vscode.postMessage({type: 'openXml', threadUri: problem.uri, line: problem.line});
-                        }}
-                        title="Open in XML"
-                    ><span className="codicon codicon-go-to-file"/></button>
-                </div>
-            ))}
+                        <span className="problem-msg" title={problem.message}>{problem.message}</span>
+                        <button
+                            onClick={e => {
+                                e.stopPropagation(); // the XML button must not also trigger the row's jump
+                                vscode.postMessage({type: 'openXml', threadUri: problem.uri, line: problem.line});
+                            }}
+                            title="Open in XML"
+                        ><span className="codicon codicon-go-to-file"/></button>
+                    </div>
+                ))}
+            </div>
         </ProblemsPanel>
     );
 }
@@ -6023,7 +6371,8 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Ele
                     );
                 })()}
             </svg>
-        );
+        )
+        ;
     }
     return <div className="minimap-wrap" ref={wrapRef}>{inner}</div>;
 }
@@ -6036,7 +6385,9 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Ele
  * is in LOD mode (large + zoomed out); zooming past K_DETAIL mounts the real nodes and this returns
  * null. This is what makes opening a large campaign instant - nothing is mounted into rete.
  */
-function LodOverview(props: { getHandle: () => EditorHandle | null }): React.JSX.Element {
+function LodOverview(props: {
+    getHandle: () => EditorHandle | null
+}): React.JSX.Element {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // A screen-space canvas sitting behind the nodes (z-index below .canvas). Redrawing a few
     // thousand rects/lines imperatively is ~1-2ms, so pan/zoom stays smooth - unlike an SVG in the
@@ -6071,12 +6422,66 @@ function LodOverview(props: { getHandle: () => EditorHandle | null }): React.JSX
 }
 
 /**
+ * The simulation's flow on a screen-space canvas over the LOD overview: the edges the story ran
+ * along, as a marching dash that keeps moving. Animates only while there is flow to show and the
+ * viewer has not asked for reduced motion; then it is one static paint per change. Hidden by the
+ * flow lens. Rete's SVG connections carry the same animation for a small, fully mounted graph, so
+ * the handle paints here only when the overview is the thing drawing the edges.
+ */
+function FlowOverlay(props: {
+    getHandle: () => EditorHandle | null;
+    hidden: boolean
+}): React.JSX.Element {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const {hidden} = props;
+    useEffect(() => {
+        let raf = 0;
+        const started = performance.now();
+        const reduced = prefersReducedMotion();
+        const frame = (): void => {
+            raf = 0;
+            const c = canvasRef.current;
+            const handle = props.getHandle();
+            if (!c || !handle) {
+                return;
+            }
+            if (hidden) {
+                c.getContext('2d')?.clearRect(0, 0, c.width, c.height);
+                return;
+            }
+            const hasFlow = handle.drawFlowTo(c, reduced ? 0 : performance.now() - started);
+            if (hasFlow && !reduced) {
+                raf = requestAnimationFrame(frame);
+            }
+        };
+        const kick = (): void => {
+            if (!raf) {
+                raf = requestAnimationFrame(frame);
+            }
+        };
+        kick();
+        const unA = subscribeAreaChange(kick);
+        const unG = subscribeGeometryChange(kick);
+        return () => {
+            if (raf) {
+                cancelAnimationFrame(raf);
+            }
+            unA();
+            unG();
+        };
+    }, [props, hidden]);
+    return <canvas ref={canvasRef} className="lod-canvas flow-canvas"/>;
+}
+
+/**
  * Tinted grouping rectangles behind the nodes - one per thread (solid) or chapter (dashed), drawn on
  * a screen-space canvas and redrawn on pan/zoom. Like the LOD overview, this avoids the transformed-
  * holder divs the swimlanes used to be, which re-rasterised (and stuttered) on every zoom frame.
  */
 function SwimlaneCanvas(props: {
-    getHandle: () => EditorHandle | null; showThread: boolean; showChapter: boolean;
+    getHandle: () => EditorHandle | null;
+    showThread: boolean;
+    showChapter: boolean;
 }): React.JSX.Element {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const {showThread, showChapter} = props;
@@ -6112,8 +6517,20 @@ function SwimlaneCanvas(props: {
 function TacticalCreateBar(props: {
     threads: string[];
     initialType: string | null;
-    onCreate(threadUri: string, newName: string, value: 'land' | 'space', file: string): void;
-    onClose(): void;
+    onCreate(threadUri
+             :
+             string, newName
+             :
+             string, value
+             :
+                 'land' | 'space', file
+             :
+             string
+    ):
+        void;
+    onClose()
+        :
+        void;
 }): React.JSX.Element {
     const [name, setName] = useState('New_Tactical_Link');
     const [thread, setThread] = useState(props.threads[0] ?? '');
@@ -6211,7 +6628,10 @@ function fadedBg(color: string): string {
     return `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
 }
 
-function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): React.JSX.Element {
+function NodePalette(props: {
+    eventTypes: string[];
+    rewardTypes: string[]
+}): React.JSX.Element {
     const [search, setSearch] = useState('');
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({Rewards: true});

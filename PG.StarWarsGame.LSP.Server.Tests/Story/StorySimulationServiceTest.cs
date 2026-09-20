@@ -260,6 +260,23 @@ public sealed class StorySimulationServiceTest
         Assert.Single(state.Interventions);
     }
 
+    [Fact]
+    public void State_CarriesWhatTheClockAloneCanStillChange()
+    {
+        var (service, _) = BuildService();
+        var started = service.Start(Key).State!;
+        Assert.True(started.ClockPending > 0, "a timer is armed at start");
+
+        // Manual is the new decision at tick 1, but Later's 2 s timer is still running.
+        var ran = service.RunToDecision(Key).State!;
+        Assert.Equal(1, ran.ClockPending);
+
+        // Once Later has fired nothing but the author can move the story.
+        var settled = service.Tick(Key, 5).State!;
+        Assert.Equal(0, settled.ClockPending);
+        Assert.Equal(0, StorySimStateDto.NotRunning.ClockPending);
+    }
+
     // ── Handler gating ───────────────────────────────────────────────────────
 
     [Fact]

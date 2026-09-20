@@ -43,7 +43,10 @@ public sealed record StorySimStateDto(
     bool BreakOnGates,
     string? HaltedAt,
     StorySimWorldDto World,
-    IReadOnlyList<StorySimLuaStateDto> LuaStates)
+    IReadOnlyList<StorySimLuaStateDto> LuaStates,
+    // How many things the clock alone can still change (armed timers, owed completions, script
+    // work). Zero: nothing more happens until the author answers a decision.
+    int ClockPending = 0)
 {
     public static StorySimStateDto NotRunning { get; } =
         new(false, 0, 0, 1, [], [], [], [], [], [], 0, [], false, null, StorySimWorldDto.Empty, []);

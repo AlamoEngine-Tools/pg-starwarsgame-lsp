@@ -193,16 +193,34 @@ public sealed partial class StorySimulator
     public StorySimSnapshot RunToDecision(StorySimSnapshot snapshot, StorySimBreakpoints breakpoints)
     {
         snapshot = snapshot with { HaltedAt = null };
+        // A real campaign has hundreds of armed world listeners from tick 0, each a standing
+        // decision; stopping at "any decision" would never tick. The run stops at a NEW one.
+        var standing = GetInterventions(snapshot).Select(i => i.NodeId).ToHashSet(StringComparer.Ordinal);
         for (var i = 0; i < MaxRunTicks; i++)
         {
             var before = snapshot.Steps.Count;
             snapshot = TickOnce(snapshot, breakpoints);
             if (snapshot.HaltedAt is not null) break;
-            if (GetInterventions(snapshot).Count > 0) break;
+            if (GetInterventions(snapshot).Any(d => !standing.Contains(d.NodeId))) break;
             if (snapshot.Steps.Count == before) break;
         }
 
         return snapshot;
+    }
+
+    /// <summary>
+    ///     What the clock alone can still change: armed timers, owed speech and movie completions,
+    ///     and script work (owed emissions, pending state changes). Zero means nothing more happens
+    ///     until the author answers a decision - the state the dock reports as waiting on them.
+    /// </summary>
+    public int GetClockPending(StorySimSnapshot snapshot)
+    {
+        var runtime = snapshot.Runtime;
+        var timers = _eventNodes.Count(node =>
+            IsActive(node, runtime)
+            && string.Equals(node.Event!.EventType, "STORY_ELAPSED", StringComparison.OrdinalIgnoreCase));
+        var scripts = runtime.Scripts.Values.Count(s => s.TransitionPending);
+        return timers + runtime.PendingCompletions.Count + runtime.PendingEmissions.Count + scripts;
     }
 
     /// <summary>Convenience over <see cref="Tick" />: whole seconds become ticks.</summary>
