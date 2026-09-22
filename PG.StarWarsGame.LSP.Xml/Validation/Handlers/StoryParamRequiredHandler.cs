@@ -17,10 +17,14 @@ public sealed class StoryParamRequiredHandler : XmlDiagnosticsHandler<StoryParam
 
         var prefix = fact.IsReward ? "Reward_Param" : "Event_Param";
         var tagName = $"{prefix}{fact.SlotPosition + 1}";
+        // The slot's label follows its name, so the message and the graph say the same word.
+        var label = fact.Def.Label.GetValueOrDefault(ctx.Locale) ?? fact.Def.Label.GetValueOrDefault("en");
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"{fact.EventType} requires {tagName}.")
+                label is null
+                    ? $"{fact.EventType} requires {tagName}."
+                    : $"{fact.EventType} requires {tagName} - {label}.")
         ];
     }
 }

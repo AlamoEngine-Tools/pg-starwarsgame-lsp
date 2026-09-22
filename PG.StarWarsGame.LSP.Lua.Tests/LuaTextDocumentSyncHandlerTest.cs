@@ -281,6 +281,19 @@ public sealed class LuaTextDocumentSyncHandlerTest
         Assert.Equal("lua", attrs.LanguageId);
     }
 
+    // OmniSharp asks every sync handler what a document is and routes the open to the handler
+    // whose selector matches the answer it takes. A handler claiming its own language for every
+    // URI made an XML open land here on some server starts, where it was ignored.
+    [Theory]
+    [InlineData("file:///d%3A/mod/data/xml/story_plot.xml", "xml")]
+    [InlineData("file:///d%3A/mod/data/text/dialog.txt", "plaintext")]
+    [InlineData("file:///d%3A/mod/data/scripts/story/plot.lua", "lua")]
+    public void GetTextDocumentAttributes_AnswersByExtension_NotByOwner(string uri, string language)
+    {
+        var (handler, _, _) = Build();
+        Assert.Equal(language, handler.GetTextDocumentAttributes(DocumentUri.From(uri)).LanguageId);
+    }
+
     // ── Fakes ────────────────────────────────────────────────────────────────
 
     internal sealed class FakeGameWorkspaceHost : IGameWorkspaceHost

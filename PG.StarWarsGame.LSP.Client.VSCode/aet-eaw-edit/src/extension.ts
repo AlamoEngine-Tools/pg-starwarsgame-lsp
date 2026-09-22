@@ -26,6 +26,7 @@ import {initViewerSettingsStorage} from './viewerSettingsStorage';
 import {initProjectSettingsStorage} from './projectSettingsStorage';
 import {LocalisationEditorPanel} from './localisationEditorPanel';
 import {LocalisationNavigatorViewProvider, LocTreeItem} from './localisationNavigatorViewProvider';
+import {logLine, setLogChannel} from './log';
 import {LspGateway} from './lsp/lspGateway';
 import {vscodeMessageSink} from './lsp/vscodeMessageSink';
 import {LUA_DEBUG_TYPE, LuaDebugAdapterDescriptorFactory} from './luaDebug/luaDebugAdapterFactory';
@@ -213,11 +214,6 @@ let storyNavigatorProvider: StoryNavigatorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
 let traceChannel: vscode.LogOutputChannel | undefined;
 let log: vscode.OutputChannel | undefined;
-
-function logLine(msg: string): void {
-    const ts = new Date().toISOString().replace('T', ' ').replace('Z', '');
-    log?.appendLine(`[${ts}] ${msg}`);
-}
 
 /**
  * vscode-languageclient v10 types `traceOutputChannel` as `LogOutputChannel` and writes protocol
@@ -1025,6 +1021,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(statusItem);
 
     log = vscode.window.createOutputChannel('EaWEdit');
+    setLogChannel(log);
     context.subscriptions.push(log);
 
     traceChannel = createTraceChannel('EaWEdit LSP Trace');

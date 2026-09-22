@@ -287,7 +287,8 @@ public sealed class GetStorySchemaHandler(ISchemaProvider schema, ILspConfigurat
                     p.Enum?.Name,
                     p.Optional,
                     p.Description.GetValueOrDefault("en"),
-                    p.Enum?.Values.Select(v => v.Name).ToList()))
+                    p.Enum?.Values.Select(v => v.Name).ToList(),
+                    p.Label.GetValueOrDefault("en")))
                 .ToList()));
         return types;
     }

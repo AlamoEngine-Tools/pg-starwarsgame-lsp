@@ -53,4 +53,37 @@ public static class ObjectBehaviors
     {
         return Of(obj).Contains(behavior);
     }
+
+    /// <summary>
+    ///     The behaviour tokens carried by an object's OWN tags, in the order they are written and
+    ///     without repeats. Empty when the object declares none.
+    /// </summary>
+    /// <remarks>
+    ///     The tokenizer both indexing paths share: the workspace parser reads an element's
+    ///     children, the baseline projector reads the captured tag list, and neither may disagree
+    ///     with the other about what an object is. Nothing here resolves variants - that needs the
+    ///     index, so it lives in <c>GameIndex.BehaviorsOf</c>.
+    /// </remarks>
+    public static string[] FromTags(IEnumerable<(string TagName, string Value)> tags)
+    {
+        List<string>? tokens = null;
+        HashSet<string>? seen = null;
+
+        foreach (var (tagName, value) in tags)
+        {
+            if (!BehaviorTags.Contains(tagName, StringComparer.OrdinalIgnoreCase)) continue;
+
+            foreach (var token in value.Split(Separators, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = token.Trim();
+                if (trimmed.Length == 0) continue;
+                seen ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (!seen.Add(trimmed)) continue;
+                tokens ??= [];
+                tokens.Add(trimmed);
+            }
+        }
+
+        return tokens?.ToArray() ?? [];
+    }
 }

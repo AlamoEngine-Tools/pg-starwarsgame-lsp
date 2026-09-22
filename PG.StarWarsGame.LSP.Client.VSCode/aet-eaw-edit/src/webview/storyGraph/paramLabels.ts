@@ -6,7 +6,16 @@
 // The schema documents params in sentences, which is right for hover text and far too long for a
 // 280px node body. These take the first useful phrase out of one.
 
-import { StoryParamSchemaDto } from '../../protocol';
+import {StoryParamSchemaDto} from '../../protocol';
+
+/**
+ * The row label for a param: the schema's label when it has one, else the first phrase of its
+ * description, else the generic name by position ("Param 3"). The description stays the tooltip.
+ */
+export function paramLabel(schema: StoryParamSchemaDto | undefined, generic: string): string {
+    const label = schema?.label?.trim();
+    return (label && label.length ? label : null) ?? shortParamLabel(schema) ?? generic;
+}
 
 /**
  * A short row label from a param description ("Attacker faction." -> "Attacker faction"), or null
@@ -14,7 +23,9 @@ import { StoryParamSchemaDto } from '../../protocol';
  */
 export function shortParamLabel(schema: StoryParamSchemaDto | undefined): string | null {
     const description = schema?.description?.trim();
-    if (!description) { return null; }
+    if (!description) {
+        return null;
+    }
 
     // Cut at the first clause break: the rest of a description is qualification, not the name.
     const label = description.split(/[(,;.]/)[0].trim();
@@ -29,7 +40,9 @@ export function shortParamLabel(schema: StoryParamSchemaDto | undefined): string
  * shape, which is the caller's cue to use the generic label instead.
  */
 export function booleanParamLabel(description: string | null | undefined): string | null {
-    if (!description) { return null; }
+    if (!description) {
+        return null;
+    }
 
     const match = /^\s*[01]\s*=\s*([^;.(]+)/.exec(description);
     const text = match?.[1].trim();

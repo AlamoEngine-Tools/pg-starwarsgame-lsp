@@ -24,7 +24,22 @@ public sealed record ParamDefinition
     /// <summary>Non-null when ReferenceKind is Enum — the resolved enum definition.</summary>
     public EnumDefinition? Enum { get; init; }
 
+    /// <summary>
+    ///     Non-null when the <c>referenceType</c> names an object KIND rather than a type - the
+    ///     slot then accepts whatever satisfies the predicate. Most story slots that take an object
+    ///     are of this shape: 58 of them ask for a planet.
+    /// </summary>
+    public ObjectKindDefinition? Kind { get; init; }
+
     public bool Optional { get; init; }
+
+    /// <summary>
+    ///     What the slot holds, in one to three words, per language - the field label in the story
+    ///     graph and the name a diagnostic quotes after the slot. Empty for a slot nobody has named
+    ///     yet; the description is the sentence, never a substitute label.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Label { get; init; } = new Dictionary<string, string>();
+
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
 }

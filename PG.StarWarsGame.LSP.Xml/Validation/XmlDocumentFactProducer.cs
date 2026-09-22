@@ -70,7 +70,9 @@ public sealed class XmlDocumentFactProducer(
             var tag = schema.GetTag(node.Name);
             if (tag is null || tag.Notes.Count == 0) continue;
             if (NoteIsAmbiguous(node.Name)) continue;
-            facts.Add(new XmlNotesFact(documentUri, XmlUtility.GetLine(node), 0, 0, tag));
+            // The note is about the tag: mark its name, one past the bracket.
+            var (noteLine, noteColumn) = lineIndex.GetPosition(node.StreamPosition + 1);
+            facts.Add(new XmlNotesFact(documentUri, noteLine, noteColumn, node.Name.Length, tag));
         }
 
         return facts;

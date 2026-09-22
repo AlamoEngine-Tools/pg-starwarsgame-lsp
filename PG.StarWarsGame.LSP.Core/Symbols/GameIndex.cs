@@ -244,6 +244,44 @@ public sealed record GameIndex(
             StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    ///     Every behaviour the object has as the engine reads it: its own when it declares any,
+    ///     otherwise its variant base's, walked up the chain. Case-insensitive, empty when nothing
+    ///     in the chain declares one.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Behaviour tags carry no variant mode, so they default to replace: declaring a list
+    ///         overrides the base's, and declaring none overrides nothing and leaves the base's
+    ///         standing. Measured over the shipped corpus - half the base chain and every faction
+    ///         leader read as behaviour-less without this walk, which would make them no kind at all.
+    ///     </para>
+    ///     <para>
+    ///         The chain is bounded rather than trusted. A variant loop is authorable, and it must
+    ///         cost a lookup rather than hang the server.
+    ///     </para>
+    /// </remarks>
+    public ImmutableHashSet<string> BehaviorsOf(GameSymbol symbol)
+    {
+        var current = symbol;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (true)
+        {
+            if (current.Behaviors is { Length: > 0 } own)
+                return own.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrEmpty(current.VariantBaseId) || !seen.Add(current.Id))
+                return ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+            var next = Resolve(current.VariantBaseId);
+            if (next is null)
+                return ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+            current = next;
+        }
+    }
+
     public GameSymbol? Resolve(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)

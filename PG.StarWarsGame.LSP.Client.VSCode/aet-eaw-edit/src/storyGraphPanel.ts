@@ -3,6 +3,7 @@
 
 import * as vscode from 'vscode';
 
+import {logLine} from './log';
 import {LspGateway} from './lsp/lspGateway';
 import {revealDefinition} from './revealDefinition';
 import {battleLabelOf} from './storyBattles';
@@ -218,6 +219,18 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 ...options,
                 ...(args ?? {})
             }, 'simulation request failed');
+        // The record of a run, for a report of "nothing happened": every command but the
+        // clock's own ticks and polls, with what came back.
+        if (method !== 'tick' && method !== 'getState') {
+            const s = result?.state;
+            const scope = this._target.scope ? ` [${this._target.scope}]` : '';
+            const outcome = result === undefined ? 'request failed'
+                : result.error ? `refused - ${result.error}`
+                    : s ? `tick ${s.tick}, clock pending ${s.clockPending ?? '?'}, decisions ${s.interventions.length}`
+                        + (s.pausedFor ? `, paused for ${s.pausedFor}` : '') + (s.outcome ? `, ${s.outcome}` : '')
+                        : 'no state';
+            logLine(`Story sim ${method}${scope} ${JSON.stringify(args ?? {})} -> ${outcome}`);
+        }
         if (result === undefined) {
             return;
         }

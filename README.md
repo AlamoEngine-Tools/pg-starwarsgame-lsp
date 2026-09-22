@@ -119,6 +119,8 @@ Scripts under the declared `scripts` directories are indexed.
 
 > **Work in progress, off by default.** Flag: `aet-eaw-edit.features.lua.debugger`. Requires a debug build of the game with its Lua debug server running; retail builds have none.
 
+> **With thanks to EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, whose [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) documented the game's Lua debug server protocol. This debugger was built against that description; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
 Debug type **Empire at War Lua**:
 
 - Breakpoints in project scripts
@@ -434,8 +436,14 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 
 ---
 
+## Acknowledgements
+
+**EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, for [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) - the Python client that documented the game's Lua debug server protocol. The [Lua debugger](#lua-debugger) here was built against that description.
+
+---
+
 ## Licensing and third-party components
 
-[MIT License](LICENSE). Third-party components: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Every release ships an SPDX SBOM per artifact (language server, extension) attached to the GitHub release.
+[MIT License](LICENSE). Third-party components and prior work: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Every release ships an SPDX SBOM per artifact (language server, extension) attached to the GitHub release.
 
 No game assets are redistributed; the editor reads game data from your own installation.

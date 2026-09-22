@@ -1,7 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
@@ -11,6 +13,79 @@ public sealed class ReferenceResolutionEvaluatorTest
     private static GameSymbol Symbol(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin("file:///a.xml", 0, null), null);
+    }
+
+    // ── kind references ───────────────────────────────────────────────────────
+    //
+    // A planet slot asks what the object IS. The index types a planet "GameObjectType" like
+    // everything else in its file, so comparing type names reported a mismatch on every correct
+    // planet reference in the corpus - the bug this branch exists to end.
+
+    private static readonly ObjectKindDefinition PlanetKind = new()
+    {
+        Kind = "Planet", Behaviors = ["PLANET"]
+    };
+
+    private static GameIndex IndexWith(string id, params string[] behaviors)
+    {
+        var symbol = new GameSymbol(id, GameSymbolKind.XmlObject, "GameObjectType",
+            new UnknownOrigin("test"), null, null, behaviors);
+        return GameIndex.Empty with
+        {
+            WorkspaceDefinitions = ImmutableDictionary
+                .Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+                .Add(id, [symbol])
+        };
+    }
+
+    [Fact]
+    public void Evaluate_KindSatisfied_IsSilentDespiteTheTypeName()
+    {
+        var index = IndexWith("Kashyyyk", "PLANET");
+
+        var result = ReferenceResolutionEvaluator.Evaluate("Kashyyyk", "Planet",
+            index.Resolve("Kashyyyk"), expectedKind: PlanetKind, index: index);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Evaluate_KindNotSatisfied_NamesTheMissingBehaviour()
+    {
+        var index = IndexWith("X_Wing", "DUMMY_STARSHIP");
+
+        var result = ReferenceResolutionEvaluator.Evaluate("X_Wing", "Planet",
+            index.Resolve("X_Wing"), expectedKind: PlanetKind, index: index);
+
+        Assert.NotNull(result);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Contains("Expected a Planet", result.Value.Message);
+        Assert.Contains("PLANET behaviour", result.Value.Message);
+    }
+
+    // The predicate cannot be judged without the index, and guessing would put an error on correct
+    // data. Silence is the only safe answer.
+    [Fact]
+    public void Evaluate_KindWithoutAnIndex_IsSilent()
+    {
+        var result = ReferenceResolutionEvaluator.Evaluate("X_Wing", "Planet",
+            Symbol("X_Wing", "GameObjectType"), expectedKind: PlanetKind);
+
+        Assert.Null(result);
+    }
+
+    // A baseline built before behaviours answers nothing for every shipped object. Reporting those
+    // would be an error on every correct reference into the base game.
+    [Fact]
+    public void Evaluate_KindUnjudgeable_IsSilent()
+    {
+        var index = IndexWith("Vader");
+        var heroKind = new ObjectKindDefinition { Kind = "HeroUnit", Flags = ["Is_Named_Hero"] };
+
+        var result = ReferenceResolutionEvaluator.Evaluate("Vader", "HeroUnit",
+            index.Resolve("Vader"), expectedKind: heroKind, index: index);
+
+        Assert.Null(result);
     }
 
     // ── unresolved ────────────────────────────────────────────────────────────

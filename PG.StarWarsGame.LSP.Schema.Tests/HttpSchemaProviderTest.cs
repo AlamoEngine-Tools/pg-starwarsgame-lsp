@@ -118,20 +118,70 @@ public sealed class HttpSchemaProviderTest
         Assert.Equal(1, provider.GetTagsForType("GameObjectType").Count);
     }
 
+    // HTTP is the path the shipped extension takes, so a category that loads from disk but not
+    // from the manifest would be dead in production while every local test stayed green.
+    [Fact]
+    public async Task LoadAsync_KindsFromTheManifest_AreIndexed()
+    {
+        var manifest = new
+        {
+            tags = Array.Empty<string>(), types = Array.Empty<string>(), kinds = new[] { "kinds.yaml" }
+        };
+        const string kindsYaml = """
+                                 kinds:
+                                   - kind: Planet
+                                     behaviors: [PLANET]
+                                 """;
+
+        var (provider, _) = Build(req =>
+            req.RequestUri!.AbsolutePath.EndsWith("_index.json")
+                ? JsonResponse(manifest)
+                : YamlResponse(kindsYaml));
+
+        await provider.LoadAsync();
+
+        Assert.Equal(new[] { "PLANET" }, provider.GetKind("Planet")?.Behaviors);
+        Assert.Single(provider.AllKinds);
+    }
+
+    [Fact]
+    public async Task LoadAsync_304OnKinds_RetainsThem()
+    {
+        var manifest = new
+        {
+            tags = Array.Empty<string>(), types = Array.Empty<string>(), kinds = new[] { "kinds.yaml" }
+        };
+        const string kindsYaml = "kinds:\n  - kind: Planet\n    behaviors: [PLANET]\n";
+
+        var callCount = 0;
+        var (provider, _) = Build(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("_index.json")) return JsonResponse(manifest);
+            return callCount++ == 0 ? YamlResponse(kindsYaml, "v1") : NotModified();
+        });
+
+        await provider.LoadAsync();
+        await provider.LoadAsync();
+
+        Assert.NotNull(provider.GetKind("Planet"));
+    }
+
     [Fact]
     public async Task LoadAsync_SecondLoad_SameManifest_OnlyFetchesIndex()
     {
         // When _index.json content hasn't changed the cache checksum matches,
         // so the second load skips all YAML downloads and serves from disk.
-        // Include hardcoded and meta to exercise all five categories.
+        // Include kinds, hardcoded and meta to exercise all six categories.
         var manifest = new
         {
             tags = new[] { "tags/Unit.yaml" },
             types = Array.Empty<string>(),
+            kinds = new[] { "kinds.yaml" },
             hardcoded = new[] { "hardcoded/BehaviorModule.yaml" },
             meta = new[] { "meta/metafiles.yaml" }
         };
         const string tagYaml = "tags:\n  - tag: Foo\n    type: Float\n";
+        const string kindsYaml = "kinds:\n  - kind: Planet\n    behaviors: [PLANET]\n";
         const string hardcodedYaml = "name: BehaviorModule\nvalues:\n  - name: TEST_VALUE\n";
         const string metaYaml =
             "metafiles:\n  - path: data/xml/test.xml\n    metaFileType: fileRegistry\n    types:\n      - GameObjectType\n";
@@ -140,6 +190,7 @@ public sealed class HttpSchemaProviderTest
         {
             var path = req.RequestUri!.AbsolutePath;
             if (path.EndsWith("_index.json")) return JsonResponse(manifest);
+            if (path.EndsWith("kinds.yaml")) return YamlResponse(kindsYaml, "v1");
             if (path.Contains("hardcoded")) return YamlResponse(hardcodedYaml, "v1");
             if (path.Contains("meta")) return YamlResponse(metaYaml, "v1");
             return YamlResponse(tagYaml, "v1");

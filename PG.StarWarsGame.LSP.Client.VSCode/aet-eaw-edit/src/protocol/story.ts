@@ -178,6 +178,8 @@ export interface StoryParamSchemaDto {
     optional: boolean;
     description?: string | null;
     enumValues?: string[] | null;
+    /** What the slot holds, in one to three words; absent for a slot nobody has named yet. */
+    label?: string | null;
 }
 
 export interface StoryTypeSchemaDto {

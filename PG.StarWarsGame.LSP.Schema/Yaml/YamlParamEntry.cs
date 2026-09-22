@@ -14,6 +14,7 @@ internal sealed class YamlParamEntry
     public string? ReferenceType { get; set; }
     public string? EnumName { get; set; }
     public bool Optional { get; set; }
+    public Dictionary<string, string> Label { get; set; } = [];
     public Dictionary<string, string> Description { get; set; } = [];
     public Dictionary<string, string> Notes { get; set; } = [];
 }

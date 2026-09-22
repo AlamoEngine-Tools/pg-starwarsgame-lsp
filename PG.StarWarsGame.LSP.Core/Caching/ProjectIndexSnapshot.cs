@@ -22,7 +22,10 @@ public sealed class ProjectIndexSnapshot
     // 5 = RelativePath keeps the file's real case (2026-09-09). Every snapshot written before this
     // holds lowercased keys, which are not names a case-sensitive host can open - so they are
     // discarded and rebuilt rather than read back and handed to the filesystem.
-    public const int CurrentSchemaVersion = 5;
+    // 6 = symbols carry their behaviour tokens (2026-09-21). A snapshot written before this replays
+    // objects with no behaviours, which reads as "this planet is not a planet" - every kind-filtered
+    // proposal and check over those files would come back empty rather than wrong-looking.
+    public const int CurrentSchemaVersion = 6;
 
     [Key(0)] public int SchemaVersion { get; set; }
 

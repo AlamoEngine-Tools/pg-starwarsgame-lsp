@@ -35,6 +35,40 @@ public sealed class BaselineSerializerTest
             DateTimeOffset.MinValue.ToUnixTimeMilliseconds()), result.BuiltAt);
     }
 
+    // ── Behaviours ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void RoundTrip_Behaviors()
+    {
+        var sym = Symbol("CORUSCANT", new UnknownOrigin("engine")) with
+        {
+            Behaviors = ["PLANET", "PRODUCTION"]
+        };
+
+        var result = Deserialize(BaselineSerializer.Serialize(Baseline(sym))).Symbols["CORUSCANT"];
+
+        Assert.Equal(["PLANET", "PRODUCTION"], result.Behaviors);
+    }
+
+    // The behaviour key is additive, so a baseline built before it still loads and simply answers
+    // no behaviours. That matters because the alternative - rejecting it - would leave a session
+    // with no shipped symbols at all until the maintainer rebuilds on their own game install.
+    [Fact]
+    public void Deserialize_SymbolWrittenBeforeBehaviours_ReadsAsNone()
+    {
+        var legacy = MessagePackSerializer.Serialize(
+            new LegacyGameSymbol
+            {
+                Id = "CORUSCANT", Kind = GameSymbolKind.XmlObject, TypeName = "GameObjectType",
+                Origin = new UnknownOrigin("engine")
+            });
+
+        var symbol = MessagePackSerializer.Deserialize<GameSymbol>(legacy);
+
+        Assert.Equal("CORUSCANT", symbol.Id);
+        Assert.Null(symbol.Behaviors);
+    }
+
     // ── SymbolOrigin union variants ──────────────────────────────────────────
 
     [Fact]
@@ -482,4 +516,20 @@ public sealed class BaselineSerializerTest
 
         return ms.ToArray();
     }
+}
+
+/// <summary>
+///     <see cref="GameSymbol" /> as it was written before it carried behaviours: the same keys 0 to
+///     5 and nothing after them. Serialising this and reading it back as a <c>GameSymbol</c> is how
+///     the additive promise is checked, since the real record can no longer produce the old shape.
+/// </summary>
+[MessagePackObject]
+public sealed class LegacyGameSymbol
+{
+    [Key(0)] public string Id { get; set; } = string.Empty;
+    [Key(1)] public GameSymbolKind Kind { get; set; }
+    [Key(2)] public string? TypeName { get; set; }
+    [Key(3)] public SymbolOrigin Origin { get; set; } = new UnknownOrigin("test");
+    [Key(4)] public string? Description { get; set; }
+    [Key(5)] public string? VariantBaseId { get; set; }
 }

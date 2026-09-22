@@ -41,8 +41,12 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
         string? tagsYaml2 = null, string? tagsFileName2 = null,
         string? typesYaml = null,
         string? enumsYaml = null, string? enumsFileName = "enum.yaml",
-        string? hardcodedYaml = null, string? hardcodedFileName = "set.yaml")
+        string? hardcodedYaml = null, string? hardcodedFileName = "set.yaml",
+        string? kindsYaml = null)
     {
+        if (kindsYaml is not null)
+            File.WriteAllText(Path.Combine(_tempDir, "kinds.yaml"), kindsYaml);
+
         var tagsDir = Path.Combine(_tempDir, "tags");
         if (tagsYaml is not null)
         {
@@ -78,6 +82,24 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
             NullLogger<LocalFileSchemaProvider>.Instance);
         provider.Load();
         return provider;
+    }
+
+    [Fact]
+    public void Load_KindsFileAtTheRoot_IsIndexed()
+    {
+        const string kindsYaml = """
+                                 kinds:
+                                   - kind: Planet
+                                     behaviors: [PLANET]
+                                 """;
+
+        using var provider = CreateAndLoad(kindsYaml: kindsYaml);
+
+        var planet = provider.GetKind("Planet");
+
+        Assert.NotNull(planet);
+        Assert.Equal(new[] { "PLANET" }, planet.Behaviors);
+        Assert.Single(provider.AllKinds);
     }
 
     [Fact]

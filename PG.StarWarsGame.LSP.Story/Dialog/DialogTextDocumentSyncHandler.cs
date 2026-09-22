@@ -99,9 +99,12 @@ public sealed class DialogTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         return Unit.Task;
     }
 
+    // By extension, like every sync handler: OmniSharp routes an open to the handler whose
+    // selector matches these attributes, so the three handlers must agree on what a file is.
+    // Answering "plaintext" for every URI sent XML opens here on some server starts.
     public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri)
     {
-        return new TextDocumentAttributes(uri, "plaintext");
+        return new TextDocumentAttributes(uri, DocumentLanguages.LanguageIdOf(uri.ToString()));
     }
 
     // Like the Lua handler: OmniSharp routes didChange/didClose by tracked attributes, so this

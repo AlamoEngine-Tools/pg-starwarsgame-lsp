@@ -974,6 +974,70 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("SpaceUnit", reference.ExpectedTypeName); // enclosing object's type, not GameObjectType
     }
 
+    // ── behaviours on the symbol ────────────────────────────────────────────
+    //
+    // A behaviour answers what an object IS, so kind-filtered completion reads it for every
+    // candidate. Resolving the effective object that many times is not affordable, so the tokens
+    // ride on the symbol and the parser is where they are picked up.
+
+    [Fact]
+    public async Task ParseAsync_Object_Carries_Its_Behaviour_Tokens()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Planet"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("planets.xml", ["Planet"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///planets.xml",
+            """<GameObjectFiles><Planet Name="CORUSCANT"><Behavior>PLANET, PRODUCTION</Behavior><SpaceBehavior>SELECTABLE</SpaceBehavior><Max_Health>100</Max_Health></Planet></GameObjectFiles>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], sym.Behaviors);
+    }
+
+    // Shape taken verbatim from the shipped Planets.xml - the real root element, the real tabs and
+    // CRLF, and the real Behavior spelling. The corpus itself is gitignored, so it is reproduced
+    // here rather than read: the unit tests above would pass just as happily if real planets
+    // reached the index down some other path and never carried a behaviour at all.
+    [Fact]
+    public async Task ParseAsync_ShippedPlanetShape_CarriesItsBehaviours()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Planet"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("planets.xml", ["Planet"]);
+
+        const string content = "<?xml version=\"1.0\"?>\r\n<Planets>\r\n\r\n\t<Planet Name=\"Alderaan\">\r\n"
+                               + " \t\t<Zoomed_Terrain_Index>0</Zoomed_Terrain_Index>\r\n"
+                               + "\t\t<Text_ID>TEXT_OBJECT_STAR_SYSTEM_ALDERAAN</Text_ID>\r\n"
+                               + "\t\t<Mass>1.0</Mass>\r\n"
+                               + "\t\t<Behavior>SELECTABLE, PLANET, PRODUCTION</Behavior>\r\n"
+                               + "\t</Planet>\r\n</Planets>\r\n";
+
+        var result = await Build(schema, registry).ParseAsync("file:///planets.xml", content, 1,
+            TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("Alderaan", sym.Id);
+        Assert.Equal(["SELECTABLE", "PLANET", "PRODUCTION"], sym.Behaviors);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Object_WithoutBehaviourTags_CarriesNone()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("units.xml", ["Unit"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///units.xml",
+            """<GameObjectFiles><Unit Name="UNIT_A"><Max_Health>100</Max_Health></Unit></GameObjectFiles>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Null(Assert.Single(result.Symbols).Behaviors);
+    }
+
     [Fact]
     public async Task ParseAsync_NonVariant_Object_Has_Null_VariantBaseId()
     {

@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Schema.Yaml.YamlKind;
 using PG.StarWarsGame.LSP.Schema.Yaml.YamlType;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -126,6 +127,23 @@ internal static class YamlSchemaParser
         return result;
     }
 
+    public static List<ObjectKindDefinition> ParseKindFile(string yaml)
+    {
+        var file = Deserializer.Deserialize<YamlKindFile>(yaml);
+        var result = new List<ObjectKindDefinition>(file.Kinds.Count);
+        foreach (var entry in file.Kinds)
+            result.Add(new ObjectKindDefinition
+            {
+                Kind = entry.Kind,
+                Behaviors = entry.Behaviors,
+                Flags = entry.Flags,
+                MemberOf = entry.MemberOf,
+                Description = entry.Description,
+                Notes = entry.Notes
+            });
+        return result;
+    }
+
     public static HardcodedReferenceSet ParseHardcodedSetFile(string yaml)
     {
         var file = Deserializer.Deserialize<YamlHardcodedSetFile>(yaml);
@@ -199,6 +217,7 @@ internal static class YamlSchemaParser
                         ReferenceType = p.ReferenceType,
                         EnumName = p.EnumName,
                         Optional = p.Optional,
+                        Label = p.Label,
                         Description = p.Description,
                         Notes = p.Notes
                     });

@@ -191,6 +191,98 @@ public sealed class StoryFactProducerTest
         Assert.False(f.Def!.Optional);
     }
 
+    // ── Anchors: a fact marks the element that caused it, never column 0 of a line ────
+    //
+    // The squiggle has to sit on the thing to fix: a type problem on the type's value, a param
+    // problem on the param's value, a MISSING param on the whole type element that demands it,
+    // a dialog problem on the dialog's value and a chapter problem on the chapter's.
+
+    private const string Anchored =
+        "<StoryParser>\n" +
+        "<Event Name=\"E\">\n" +
+        "    <Event_Type>MY_EVENT</Event_Type>\n" +
+        "    <Event_Param1>  42 </Event_Param1>\n" +
+        "    <Reward_Type>MY_REWARD</Reward_Type>\n" +
+        "    <Story_Dialog>Dialog_One</Story_Dialog>\n" +
+        "    <Story_Chapter>2</Story_Chapter>\n" +
+        "</Event>\n" +
+        "</StoryParser>";
+
+    private static StoryFactProducer AnchoredProducer()
+    {
+        return new StoryFactProducer(new SingleEventSchemaProvider(
+            new EnumDefinition
+            {
+                Name = "StoryEventType", Kind = EnumKind.SchemaFixed,
+                Values =
+                [
+                    new EnumValueDefinition
+                    {
+                        Name = "MY_EVENT",
+                        Params =
+                        [
+                            new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = false },
+                            new ParamDefinition { Position = 1, ValueType = XmlValueType.Int, Optional = false }
+                        ]
+                    }
+                ]
+            },
+            new EnumDefinition
+            {
+                Name = "StoryRewardType", Kind = EnumKind.SchemaFixed,
+                Values =
+                [
+                    new EnumValueDefinition
+                    {
+                        Name = "MY_REWARD",
+                        Params = [new ParamDefinition { Position = 0, ValueType = XmlValueType.Int, Optional = false }]
+                    }
+                ]
+            }));
+    }
+
+    [Fact]
+    public void Type_fact_marks_the_type_value()
+    {
+        var facts = AnchoredProducer().Produce(Anchored, "file:///test.xml").OfType<StoryEventFact>().ToList();
+
+        var eventType = facts.Single(f => !f.IsReward);
+        Assert.Equal((2, 16, 8), (eventType.Line, eventType.Column, eventType.Length));
+        var rewardType = facts.Single(f => f.IsReward);
+        Assert.Equal((4, 17, 9), (rewardType.Line, rewardType.Column, rewardType.Length));
+    }
+
+    [Fact]
+    public void Param_value_fact_marks_the_trimmed_value()
+    {
+        var facts = AnchoredProducer().Produce(Anchored, "file:///test.xml").OfType<StoryParamFact>().ToList();
+
+        var value = facts.Single(f => !f.IsReward && f.RawValue == "42");
+        Assert.Equal((3, 20, 2), (value.Line, value.Column, value.Length));
+    }
+
+    [Fact]
+    public void Missing_required_param_marks_the_whole_type_element_that_demands_it()
+    {
+        var facts = AnchoredProducer().Produce(Anchored, "file:///test.xml").OfType<StoryParamFact>().ToList();
+
+        var eventSlot = facts.Single(f => !f.IsReward && f.SlotPosition == 1);
+        Assert.Equal("", eventSlot.RawValue);
+        Assert.Equal((2, 4, 33), (eventSlot.Line, eventSlot.Column, eventSlot.Length));
+        var rewardSlot = facts.Single(f => f.IsReward && f.SlotPosition == 0);
+        Assert.Equal("", rewardSlot.RawValue);
+        Assert.Equal((4, 4, 36), (rewardSlot.Line, rewardSlot.Column, rewardSlot.Length));
+    }
+
+    [Fact]
+    public void Dialog_fact_marks_the_dialog_value_and_the_chapter_value()
+    {
+        var f = Assert.Single(AnchoredProducer().Produce(Anchored, "file:///test.xml").OfType<StoryDialogRefFact>());
+
+        Assert.Equal((5, 18, 10), (f.Line, f.Column, f.Length));
+        Assert.Equal((6, 19, 1), (f.ChapterLine, f.ChapterColumn, f.ChapterLength));
+    }
+
     [Fact]
     public void Missing_optional_param_emits_no_StoryParamFact()
     {
@@ -217,10 +309,11 @@ file sealed class SingleEventSchemaProvider : ISchemaProvider
 {
     private readonly Dictionary<string, EnumDefinition> _enums;
 
-    public SingleEventSchemaProvider(EnumDefinition enumDef)
+    public SingleEventSchemaProvider(params EnumDefinition[] enumDefs)
     {
-        _enums = new Dictionary<string, EnumDefinition>(StringComparer.OrdinalIgnoreCase)
-            { [enumDef.Name] = enumDef };
+        _enums = new Dictionary<string, EnumDefinition>(StringComparer.OrdinalIgnoreCase);
+        foreach (var enumDef in enumDefs)
+            _enums[enumDef.Name] = enumDef;
     }
 
     public EnumDefinition? GetEnum(string name)

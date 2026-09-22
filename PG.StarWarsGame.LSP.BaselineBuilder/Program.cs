@@ -24,6 +24,7 @@ using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Story.Discovery;
 // Aliased: BaselineTag would otherwise read ambiguously beside the engine's own XML tag types.
@@ -153,10 +154,13 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     // is the verbatim outer XML, and StartLine is the 0-based source line. This requires reading the
     // engine GameObjectType's underlying XML element/children via the PetroglyphTools API. Until wired,
     // ObjectTags is empty and variants whose base is a shipped object cannot be fully merged.
-    var gameObjects = engine.GameObjectTypeManager.GameObjectTypes
-        .Select(t => new ProjectableEntry(t.Name, t.ClassificationName, t.Location))
-        .ToList();
-    Console.WriteLine($"Game object types: {gameObjects.Count}");
+    //
+    // BEHAVIOURS are read separately and already, just below: they say what an object IS, so
+    // everything that matches objects by kind is blank for the whole base game without them, and
+    // waiting for the full tag tree would hold that hostage to a much larger question (every tag of
+    // every shipped object, carried verbatim, is a size worth measuring before committing to).
+    var gameObjectTypes = engine.GameObjectTypeManager.GameObjectTypes.ToList();
+    Console.WriteLine($"Game object types: {gameObjectTypes.Count}");
 
     var sfxEvents = engine.SfxGameManager.Entries
         .Select(s => new ProjectableEntry(s.Name, "SFXEVENT", s.Location))
@@ -308,6 +312,26 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
                       + $"({singletons.Sum(s => s.Tags?.Count ?? 0)} tag(s), direct-parsed stopgap)");
 
     var schemaProvider = sp.GetService<ISchemaProvider>();
+
+    // Kind facts, read here because the schema says which flags are worth carrying: exactly the
+    // ones some kind tests. Behaviours say what an object IS, so everything that matches objects
+    // by kind is blank for the whole base game without this - the engine's own object model
+    // carries neither behaviours nor the hero flags.
+    var facts = GameObjectFactsReader.Read(
+        gameObjectTypes.Select(t => (t.Name, (string?)t.Location.XmlFile)),
+        path => engine.GameRepository.TryOpenFile(path),
+        ObjectKinds.FlagTagsUsedBy(schemaProvider?.AllKinds ?? []),
+        problem => Console.Error.WriteLine($"Warning: kind facts unread for {problem}"));
+
+    var gameObjects = gameObjectTypes
+        .Select(t => facts.TryGetValue(t.Name, out var f)
+            ? new ProjectableEntry(t.Name, t.ClassificationName, t.Location,
+                Behaviors: f.Behaviors, Flags: f.Flags)
+            : new ProjectableEntry(t.Name, t.ClassificationName, t.Location))
+        .ToList();
+    Console.WriteLine($"Kind facts: {facts.Count} object(s) with behaviours, "
+                      + $"{facts.Values.Count(f => f.Flags.Length > 0)} with a tracked flag");
+
     var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
     var baseline = projector.Project(
         gameObjects, sfxEvents, manifestHash, musicEvents, shadowBlobMaterials, singletons);
@@ -522,7 +546,10 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     var manifestFile = Path.ChangeExtension(outputFile, ".manifest.json");
     await File.WriteAllTextAsync(manifestFile,
-        $$"""{ "version": 1, "hash": "{{Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant()}}" }""");
+        // version 2: symbols carry their behaviour tokens (2026-09-21). The payload itself stays
+        // backward compatible - the key is additive - so this marks which artefact answers kind
+        // questions, for a human or a future version check, rather than gating the load.
+        $$"""{ "version": 2, "hash": "{{Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant()}}" }""");
     Console.WriteLine($"Manifest: {manifestFile}");
 
     // ── Icon sidecar ──────────────────────────────────────────────────────────

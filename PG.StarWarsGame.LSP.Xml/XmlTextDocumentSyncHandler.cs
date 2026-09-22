@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using MediatR;
+using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -20,15 +21,18 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     private readonly IStartupGate _gate;
     private readonly IGameIndexService _indexService;
     private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILogger<XmlTextDocumentSyncHandler>? _logger;
 
     public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService,
-        IFileHelper fileHelper, IEaWXmlContext eaWXmlContext, IStartupGate gate)
+        IFileHelper fileHelper, IEaWXmlContext eaWXmlContext, IStartupGate gate,
+        ILogger<XmlTextDocumentSyncHandler>? logger = null)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
         _fileHelper = fileHelper;
         _eaWXmlContext = eaWXmlContext;
         _gate = gate;
+        _logger = logger;
     }
 
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
@@ -36,13 +40,19 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         var text = request.TextDocument.Text;
         var version = request.TextDocument.Version ?? 0;
+        _logger?.LogDebug("didOpen {Uri} v{Version}: gate {Gate}", uri, version, _gate.IsOpen ? "open" : "buffering");
 
         // While the startup pipeline runs, the gate buffers this open and replays it after the
         // index is built and the EaW directories are known. The IsEaWXmlFile gate is evaluated
         // inside the thunk so it sees the populated context at run time.
         await _gate.RunOrBufferAsync(async token =>
         {
-            if (!_eaWXmlContext.IsEaWXmlFile(uri)) return;
+            if (!_eaWXmlContext.IsEaWXmlFile(uri))
+            {
+                _logger?.LogDebug("didOpen {Uri} ignored: outside the EaW XML directories", uri);
+                return;
+            }
+
             _workspaceHost.AddOrUpdate(uri, text, version);
             // Open (not Update): client versions restart at 1 per open session, while the didClose
             // re-index below preserves the committed version - the open starts a new version epoch.
@@ -106,9 +116,11 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         return Unit.Task;
     }
 
+    // By extension, like every sync handler: OmniSharp routes an open to the handler whose
+    // selector matches these attributes, so the three handlers must agree on what a file is.
     public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri)
     {
-        return new TextDocumentAttributes(uri, "xml");
+        return new TextDocumentAttributes(uri, DocumentLanguages.LanguageIdOf(uri.ToString()));
     }
 
     protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(

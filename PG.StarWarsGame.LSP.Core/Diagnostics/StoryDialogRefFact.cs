@@ -15,4 +15,6 @@ public sealed record StoryDialogRefFact(
     int Length,
     string DialogName,
     int? Chapter,
-    int ChapterLine) : XmlFact(DocumentUri, Line, Column, Length);
+    int ChapterLine,
+    int ChapterColumn = -1,
+    int ChapterLength = 0) : XmlFact(DocumentUri, Line, Column, Length);

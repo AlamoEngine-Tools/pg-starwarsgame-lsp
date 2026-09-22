@@ -28,6 +28,19 @@ public sealed class SchemaIndexTest
         return new SchemaIndex(tagsByType, types ?? [], enums ?? []);
     }
 
+    // ── Kinds ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetKind_ByNameCaseInsensitive_AndListedInAllKinds()
+    {
+        var planet = new ObjectKindDefinition { Kind = "Planet", Behaviors = ["PLANET"] };
+        var index = new SchemaIndex([], [], [], kinds: [planet]);
+
+        Assert.Same(planet, index.GetKind("planet"));
+        Assert.Null(index.GetKind("StarBase"));
+        Assert.Equal(new[] { "Planet" }, index.AllKinds.Select(k => k.Kind));
+    }
+
     // ── GetTag ──────────────────────────────────────────────────────────────
 
     [Fact]
@@ -290,6 +303,37 @@ public sealed class SchemaIndexTest
         var enumDef = index.GetEnum("StoryEventType")!;
         var param = enumDef.Values.Single().Params!.Single();
         Assert.Same(planetType, param.ObjectType);
+    }
+
+    // The story enum files declare no referenceKind on their params: a DynamicEnumValue names its
+    // enum and a NameReference its type, and that is the whole of the declaration. The index
+    // resolves both from the name, or the enum params never complete or validate.
+    [Fact]
+    public void SchemaIndex_ResolvesParamEnumAndObjectType_FromTheirNamesAlone()
+    {
+        var planetType = Type("Planet");
+        var rawEnum = new RawEnumDefinition
+            { Name = "StoryEventFilter", Values = [new RawEnumValueDefinition { Name = "FILTER_NONE" }] };
+        var enumParam = new RawParamDefinition
+            { Position = 1, ValueType = XmlValueType.DynamicEnumValue, EnumName = "StoryEventFilter" };
+        var objectParam = new RawParamDefinition
+            { Position = 0, ValueType = XmlValueType.NameReferenceList, ReferenceType = "Planet" };
+        var events = new RawEnumDefinition
+        {
+            Name = "StoryEventType",
+            Values = [new RawEnumValueDefinition { Name = "STORY_ENTER", Params = [objectParam, enumParam] }]
+        };
+
+        // The referencing enum first: the file order must not decide whether the filter resolves
+        // (StoryEventType sorts before StoryFlagCompareMethod, and STORY_FLAG's compare method
+        // came back null for exactly that reason).
+        var index = Build([], [planetType], [events, rawEnum]);
+
+        var resolved = index.GetEnum("StoryEventType")!.Values.Single().Params!;
+        Assert.Same(planetType, resolved.Single(p => p.Position == 0).ObjectType);
+        Assert.Equal(ReferenceKind.XmlObject, resolved.Single(p => p.Position == 0).ReferenceKind);
+        Assert.Equal("FILTER_NONE", Assert.Single(resolved.Single(p => p.Position == 1).Enum!.Values).Name);
+        Assert.Equal(ReferenceKind.Enum, resolved.Single(p => p.Position == 1).ReferenceKind);
     }
 
     [Fact]

@@ -192,6 +192,15 @@ public sealed class XmlDocumentFactProducerTest
         Assert.Single(facts.OfType<XmlNotesFact>());
     }
 
+    // The note is about the tag, so the hint marks the tag name - not column 0 of its line.
+    [Fact]
+    public void Tag_with_notes_marks_the_tag_name()
+    {
+        const string xml = "<Root>\n  <Notes_Tag>1.0</Notes_Tag>\n</Root>";
+        var f = Assert.Single(Build(new NotesTagSchemaProvider()).Produce(xml, Uri).OfType<XmlNotesFact>());
+        Assert.Equal((1, 3, 9), (f.Line, f.Column, f.Length));
+    }
+
     [Fact]
     public void Tag_without_notes_does_not_emit_XmlNotesFact()
     {

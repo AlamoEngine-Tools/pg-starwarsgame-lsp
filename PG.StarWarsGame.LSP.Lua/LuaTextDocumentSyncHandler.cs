@@ -112,9 +112,11 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         return Unit.Task;
     }
 
+    // By extension, like every sync handler: OmniSharp routes an open to the handler whose
+    // selector matches these attributes, so the three handlers must agree on what a file is.
     public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri)
     {
-        return new TextDocumentAttributes(uri, "lua");
+        return new TextDocumentAttributes(uri, DocumentLanguages.LanguageIdOf(uri.ToString()));
     }
 
     protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(

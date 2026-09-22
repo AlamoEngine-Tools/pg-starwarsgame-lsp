@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 /// <summary>
 ///     Loads the schema from a local directory and hot-reloads on file changes.
 ///     Expects YAML files matching the same layout as the remote schema repository:
-///     <c>tags/*.yaml</c>, <c>types.yaml</c>, <c>enums/*.yaml</c>.
+///     <c>tags/*.yaml</c>, <c>types.yaml</c>, <c>kinds.yaml</c>, <c>enums/*.yaml</c>.
 /// </summary>
 public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaProvider, IDisposable
 {
@@ -83,6 +83,13 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaP
 
     public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
 
+    public IReadOnlyList<ObjectKindDefinition> AllKinds => _current.AllKinds;
+
+    public ObjectKindDefinition? GetKind(string kindName)
+    {
+        return _current.GetKind(kindName);
+    }
+
     /// <inheritdoc />
     public SchemaVersionCheck? LastVersionCheck { get; private set; }
 
@@ -107,6 +114,7 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaP
         var types = new List<GameObjectTypeDefinition>();
         var enums = new List<RawEnumDefinition>();
         var hardcodedSets = new List<HardcodedReferenceSet>();
+        var kinds = new List<ObjectKindDefinition>();
 
         foreach (var file in _fileSystem.Directory.EnumerateFiles(_rootPath, "*.yaml", SearchOption.AllDirectories))
         {
@@ -130,6 +138,10 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaP
             {
                 types.AddRange(YamlSchemaParser.ParseTypeFile(_fileSystem.File.ReadAllText(file)));
             }
+            else if (parts.Length == 1 && parts[0].Equals("kinds.yaml", StringComparison.OrdinalIgnoreCase))
+            {
+                kinds.AddRange(YamlSchemaParser.ParseKindFile(_fileSystem.File.ReadAllText(file)));
+            }
         }
 
         var metaPath = _fileSystem.Path.Combine(_rootPath, "meta", "metafiles.yaml");
@@ -137,12 +149,12 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaP
             ? YamlSchemaParser.ParseMetafileFile(_fileSystem.File.ReadAllText(metaPath))
             : (IReadOnlyList<MetafileDefinition>)[];
 
-        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
+        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds);
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);
 
         _logger.LogInformation(
-            "Schema loaded: {TagCount} tags across {TypeCount} types, {EnumCount} enums, {HardcodedCount} hardcoded set(s) from {Path}",
-            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllEnums.Count,
+            "Schema loaded: {TagCount} tags across {TypeCount} types, {KindCount} kinds, {EnumCount} enums, {HardcodedCount} hardcoded set(s) from {Path}",
+            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllKinds.Count, _current.AllEnums.Count,
             _current.AllHardcodedSets.Count, _rootPath);
     }
 

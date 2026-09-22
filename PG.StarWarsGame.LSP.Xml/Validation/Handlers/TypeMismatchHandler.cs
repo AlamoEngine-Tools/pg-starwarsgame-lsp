@@ -15,7 +15,10 @@ public sealed class TypeMismatchHandler : XmlDiagnosticsHandler<XmlReferenceFact
         if (fact.Resolved is null || fact.ExpectedTypeName is null)
             return [];
 
-        var eval = ReferenceResolutionEvaluator.Evaluate(fact.TargetId, fact.ExpectedTypeName, fact.Resolved);
+        // The expected name may be a KIND rather than a type - a planet slot, a hero slot - and the
+        // two never share a name, so looking it up here is unambiguous.
+        var eval = ReferenceResolutionEvaluator.Evaluate(fact.TargetId, fact.ExpectedTypeName, fact.Resolved,
+            expectedKind: ctx.Schema.GetKind(fact.ExpectedTypeName), index: ctx.Index);
         return eval is { } r ? [new XmlDiagnosticResult(r.Severity, r.Message)] : [];
     }
 }

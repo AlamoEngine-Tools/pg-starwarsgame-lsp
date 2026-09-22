@@ -19,28 +19,42 @@ public sealed class SchemaIndex
     private readonly Dictionary<string, XmlTagDefinition> _tags;
     private readonly Dictionary<string, IReadOnlyList<XmlTagDefinition>> _tagsByType;
     private readonly Dictionary<string, GameObjectTypeDefinition> _types;
+    private readonly Dictionary<string, ObjectKindDefinition> _kinds;
 
     internal SchemaIndex(
         IEnumerable<(string typeName, IReadOnlyList<RawTagDefinition> tags)> tagsByType,
         IEnumerable<GameObjectTypeDefinition> types,
         IEnumerable<RawEnumDefinition> enums,
         IEnumerable<HardcodedReferenceSet>? hardcodedSets = null,
-        IEnumerable<MetafileDefinition>? metafiles = null)
+        IEnumerable<MetafileDefinition>? metafiles = null,
+        IEnumerable<ObjectKindDefinition>? kinds = null)
     {
         _tags = new Dictionary<string, XmlTagDefinition>(StringComparer.OrdinalIgnoreCase);
         _tagsByType = new Dictionary<string, IReadOnlyList<XmlTagDefinition>>(StringComparer.OrdinalIgnoreCase);
         _allByTagName = new Dictionary<string, List<XmlTagDefinition>>(StringComparer.OrdinalIgnoreCase);
         _types = new Dictionary<string, GameObjectTypeDefinition>(StringComparer.OrdinalIgnoreCase);
         _enums = new Dictionary<string, EnumDefinition>(StringComparer.OrdinalIgnoreCase);
+        _kinds = new Dictionary<string, ObjectKindDefinition>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var type in types)
             _types[type.TypeName] = type;
 
+        // A kind is a predicate over an object's content, resolved by the index at query time; the
+        // schema only carries the definitions, so nothing here cross-references them yet.
+        foreach (var kind in kinds ?? [])
+            _kinds[kind.Kind] = kind;
+
         AllHardcodedSets = hardcodedSets?.ToArray() ?? [];
         var hardcodedByName = AllHardcodedSets.ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
 
-        // Phase 1: resolve enums (params may reference types - types are already indexed above)
-        foreach (var rawEnum in enums)
+        // Phase 1: resolve enums (params may reference types - types are already indexed above).
+        // A param may also name another ENUM (a story event's filter or compare method), which is
+        // resolved through _enums and so has to be there already: the first pass registers every
+        // enum, the second resolves the params against the complete set, whatever the file order.
+        var rawEnums = enums.ToList();
+        foreach (var rawEnum in rawEnums)
+            _enums[rawEnum.Name] = ResolveEnum(rawEnum);
+        foreach (var rawEnum in rawEnums)
             _enums[rawEnum.Name] = ResolveEnum(rawEnum);
 
         // Phase 2: resolve tags (may reference types, hardcoded sets, and enums - all indexed above)
@@ -62,11 +76,14 @@ public sealed class SchemaIndex
         AllObjectTypes = [.. _types.Values];
         AllEnums = [.. _enums.Values];
         AllMetafiles = metafiles?.ToArray() ?? [];
+        AllKinds = [.. _kinds.Values];
     }
 
     public IReadOnlyList<XmlTagDefinition> AllTags { get; }
 
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes { get; }
+
+    public IReadOnlyList<ObjectKindDefinition> AllKinds { get; }
 
     public IReadOnlyList<EnumDefinition> AllEnums { get; }
 
@@ -87,6 +104,11 @@ public sealed class SchemaIndex
     public GameObjectTypeDefinition? GetObjectType(string typeName)
     {
         return _types.TryGetValue(typeName, out var def) ? def : null;
+    }
+
+    public ObjectKindDefinition? GetKind(string kindName)
+    {
+        return _kinds.TryGetValue(kindName, out var def) ? def : null;
     }
 
     public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
@@ -116,6 +138,9 @@ public sealed class SchemaIndex
             Enum = raw.ReferenceKind == ReferenceKind.Enum && raw.EnumName is not null
                 ? _enums.GetValueOrDefault(raw.EnumName)
                 : null,
+            // A kind and a type never share a name, so this is unambiguous: whichever one the
+            // referenceType resolves to is what the slot accepts.
+            Kind = raw.ReferenceType is not null ? _kinds.GetValueOrDefault(raw.ReferenceType) : null,
             SemanticType = raw.SemanticType,
             ValueGroups = raw.ValueGroups,
             AllowedValues = raw.AllowedValues,
@@ -159,19 +184,30 @@ public sealed class SchemaIndex
 
     private ParamDefinition ResolveParam(RawParamDefinition raw)
     {
+        // A param declares its enum by name (DynamicEnumValue + enumName) and its object type by
+        // name (NameReference + referenceType), with no referenceKind: the kind follows from what
+        // the name resolves to. A referenceType that is no types.yaml type (StoryFlag, StoryEventName)
+        // keeps its name, its kind and a null ObjectType - the story graph keys edges on the name.
+        var objectType = raw.ReferenceType is not null ? _types.GetValueOrDefault(raw.ReferenceType) : null;
+        var enumDef = raw.EnumName is not null ? _enums.GetValueOrDefault(raw.EnumName) : null;
+        // A referenceType naming a KIND references an object just as much as one naming a type -
+        // 58 story slots ask for a planet this way - so it resolves to XmlObject too.
+        var objectKind = raw.ReferenceType is not null ? _kinds.GetValueOrDefault(raw.ReferenceType) : null;
+        var kind = raw.ReferenceKind != ReferenceKind.None ? raw.ReferenceKind
+            : enumDef is not null ? ReferenceKind.Enum
+            : objectType is not null || objectKind is not null ? ReferenceKind.XmlObject
+            : ReferenceKind.None;
         return new ParamDefinition
         {
             Position = raw.Position,
             ValueType = raw.ValueType,
-            ReferenceKind = raw.ReferenceKind,
+            ReferenceKind = kind,
             ReferenceTypeName = raw.ReferenceType,
-            ObjectType = raw.ReferenceKind == ReferenceKind.XmlObject && raw.ReferenceType is not null
-                ? _types.GetValueOrDefault(raw.ReferenceType)
-                : null,
-            Enum = raw.ReferenceKind == ReferenceKind.Enum && raw.EnumName is not null
-                ? _enums.GetValueOrDefault(raw.EnumName)
-                : null,
+            ObjectType = objectType,
+            Kind = objectKind,
+            Enum = enumDef,
             Optional = raw.Optional,
+            Label = raw.Label,
             Description = raw.Description,
             Notes = raw.Notes
         };

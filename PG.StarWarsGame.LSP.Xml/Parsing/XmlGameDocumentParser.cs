@@ -140,6 +140,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
         if (rootContainer is null) return symbols;
 
+        // Read off the schema per document rather than cached on this instance: the schema
+        // hot-reloads, and a kind added while the server runs must start being indexed.
+        var flagTags = ObjectKinds.FlagTagsUsedBy(_schema.AllKinds);
+
         // A SINGLETON type - no NameTag - has exactly one instance, so its type name is its id and
         // the root element itself is the object. Without this, everything in GameConstants that is
         // not enum-shaped (ShipNameTextFiles, the Encyclopedia_* geometry, the Corruption_*
@@ -176,7 +180,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var (variantBaseId, variantRef) = ResolveVariant(node, typeDef.TypeName, documentUri, lineIndex);
                 if (variantRef is not null) references.Add(variantRef);
                 symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
-                    new FileOrigin(documentUri, node.Line - 1, col), null, variantBaseId));
+                    new FileOrigin(documentUri, node.Line - 1, col), null, variantBaseId,
+                    CollectBehaviors(node), CollectFlags(node, flagTags)));
             }
         }
 
@@ -216,6 +221,37 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         }
 
         return (null, null);
+    }
+
+    /// <summary>
+    ///     The behaviour tokens an object element declares itself, or null when it declares none.
+    ///     Null rather than an empty array so the symbol stays the size it was for the great
+    ///     majority of objects, which carry no behaviour at all.
+    /// </summary>
+    private static string[]? CollectBehaviors(HtmlNode objectNode)
+    {
+        var tokens = ObjectBehaviors.FromTags(objectNode.ChildNodes
+            .Where(n => n.NodeType == HtmlNodeType.Element)
+            .Select(n => (n.Name, n.InnerText)));
+        return tokens.Length == 0 ? null : tokens;
+    }
+
+    /// <summary>
+    ///     The tracked boolean tags that are true on this object. Always a list, never null: the
+    ///     object WAS inspected, and a kind that tests a flag has to tell "has none" apart from
+    ///     "nobody looked", which is what a null means.
+    /// </summary>
+    private static string[] CollectFlags(HtmlNode objectNode, IReadOnlyCollection<string> flagTags)
+    {
+        if (flagTags.Count == 0) return [];
+
+        return objectNode.ChildNodes
+            .Where(n => n.NodeType == HtmlNodeType.Element
+                        && flagTags.Contains(n.Name, StringComparer.OrdinalIgnoreCase)
+                        && EngineBoolean.IsTrue(n.InnerText))
+            .Select(n => n.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static int? FindNameAttributeValueColumn(HtmlNode node, string nameTag, LineOffsetIndex lineIndex)

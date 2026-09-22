@@ -11,22 +11,44 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// </summary>
 internal static class StoryEventSchema
 {
-    private static readonly Lazy<RawEnumDefinition> Definition = new(Load);
+    private static readonly Lazy<RawEnumDefinition> Definition = new(() => Load("StoryEventType.yaml"));
+    private static readonly Lazy<RawEnumDefinition> Rewards = new(() => Load("StoryRewardType.yaml"));
 
     /// <summary>The named event, or throws naming it - a typo here should not read as "no params".</summary>
     public static RawEnumValueDefinition Value(string name)
     {
-        var value = Definition.Value.Values.FirstOrDefault(v =>
-            string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
-        return value
-               ?? throw new InvalidOperationException($"StoryEventType.yaml declares no '{name}'.");
+        return Value(Definition.Value, "StoryEventType", name);
     }
 
-    private static RawEnumDefinition Load()
+    /// <summary>The named reward, or throws naming it.</summary>
+    public static RawEnumValueDefinition Reward(string name)
     {
-        var path = Find("StoryEventType.yaml")
+        return Value(Rewards.Value, "StoryRewardType", name);
+    }
+
+    public static IReadOnlyList<RawEnumValueDefinition> AllEvents()
+    {
+        return Definition.Value.Values;
+    }
+
+    public static IReadOnlyList<RawEnumValueDefinition> AllRewards()
+    {
+        return Rewards.Value.Values;
+    }
+
+    private static RawEnumValueDefinition Value(RawEnumDefinition definition, string enumName, string name)
+    {
+        var value = definition.Values.FirstOrDefault(v =>
+            string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
+        return value
+               ?? throw new InvalidOperationException($"{enumName}.yaml declares no '{name}'.");
+    }
+
+    private static RawEnumDefinition Load(string enumFile)
+    {
+        var path = Find(enumFile)
                    ?? throw new InvalidOperationException(
-                       "schema/eaw/enums/StoryEventType.yaml not found - is the schema checked out?");
+                       $"schema/eaw/enums/{enumFile} not found - is the schema checked out?");
         return YamlSchemaParser.ParseEnumFile(File.ReadAllText(path));
     }
 

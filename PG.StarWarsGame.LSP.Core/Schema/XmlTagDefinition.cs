@@ -28,6 +28,18 @@ public record XmlTagDefinition
     public EnumDefinition? Enum { get; init; }
 
     /// <summary>
+    ///     Non-null when the <c>referenceType</c> names an object KIND rather than a type: what the
+    ///     slot accepts is then a predicate over an object's content, not a type name.
+    /// </summary>
+    /// <remarks>
+    ///     A kind and a type are mutually exclusive - a kind may not share a type's name, which the
+    ///     schema tests enforce - so a resolved kind here means <see cref="ObjectType" /> is null
+    ///     and the slot narrows by behaviour instead. <see cref="ReferenceTypeName" /> keeps the raw
+    ///     name either way, which is what the story graph keys its edges on.
+    /// </remarks>
+    public ObjectKindDefinition? Kind { get; init; }
+
+    /// <summary>
     ///     Optional semantic refinement of the base <see cref="ValueType" />.
     ///     <see cref="TagSemanticType.Default" /> when no refinement is specified.
     /// </summary>

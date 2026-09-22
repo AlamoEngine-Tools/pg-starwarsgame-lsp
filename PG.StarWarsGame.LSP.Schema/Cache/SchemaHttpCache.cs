@@ -44,6 +44,7 @@ public sealed class SchemaHttpCache
 
             var allRels = manifest.Tags
                 .Concat(manifest.Types)
+                .Concat(manifest.Kinds)
                 .Concat(manifest.Enums)
                 .Concat(manifest.Hardcoded)
                 .Concat(manifest.Meta)
@@ -70,12 +71,13 @@ public sealed class SchemaHttpCache
                     return false;
             }
 
-            // Parse all five categories from disk.
+            // Parse all six categories from disk.
             var tagsByType = new List<(string, IReadOnlyList<RawTagDefinition>)>();
             var types = new List<GameObjectTypeDefinition>();
             var enums = new List<RawEnumDefinition>();
             var hardcodedSets = new List<HardcodedReferenceSet>();
             var metafiles = new List<MetafileDefinition>();
+            var kinds = new List<ObjectKindDefinition>();
 
             foreach (var rel in manifest.Tags)
             {
@@ -86,6 +88,9 @@ public sealed class SchemaHttpCache
 
             foreach (var rel in manifest.Types)
                 types.AddRange(YamlSchemaParser.ParseTypeFile(
+                    _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
+            foreach (var rel in manifest.Kinds)
+                kinds.AddRange(YamlSchemaParser.ParseKindFile(
                     _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Enums)
                 enums.Add(YamlSchemaParser.ParseEnumFile(
@@ -99,7 +104,7 @@ public sealed class SchemaHttpCache
                     YamlSchemaParser.ParseMetafileFile(
                         _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
 
-            index = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
+            index = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds);
             return true;
         }
         catch (Exception ex)

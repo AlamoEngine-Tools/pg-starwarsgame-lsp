@@ -57,7 +57,7 @@ import {arrangePositions} from './storyGraph/modelArrange';
 import {lodShape} from './storyGraph/lodShape';
 import {needsFullMountForLayout, shouldShowOverview, shouldWindow} from './storyGraph/lodPolicy';
 import {Extent, fitZoom} from './storyGraph/viewportFit';
-import {booleanParamLabel, shortParamLabel} from './storyGraph/paramLabels';
+import {booleanParamLabel, paramLabel} from './storyGraph/paramLabels';
 import {paramRowSpecs} from './storyGraph/paramRows';
 import {StagedRenames} from './storyGraph/stagedRenames';
 import {optimisticEdit, PREVIEW_KINDS, STAGED_KINDS} from './staging';
@@ -3599,9 +3599,10 @@ function EventParamRows(props: {
     const label = props.kind === 'event' ? 'Param' : 'Reward';
     const schemaByPosition = new Map(props.schema.map(s => [s.position, s]));
     const diagnostics = nodeDiagnostics.get(props.nodeId) ?? [];
-    // "Planet", "Attacker faction", … from the schema description; "Param N" when it has none.
+    // The schema's label ("Planets", "Flash id"), else the first phrase of its description, else
+    // "Param N". The description is the tooltip.
     const rowLabel = (position: number): string =>
-        shortParamLabel(schemaByPosition.get(position)) ?? `${label} ${position + 1}`;
+        paramLabel(schemaByPosition.get(position), `${label} ${position + 1}`);
 
     const commit = (position: number, value: string): void => {
         sendCommand({
@@ -3647,7 +3648,7 @@ function EventParamRows(props: {
                                 />
                             </Drag.NoDrag>
                             <span className="bool-label" title={title}>
-                                {booleanParamLabel(schemaParam?.description) ?? rowLabel(row.position)}
+                                {schemaParam?.label ?? booleanParamLabel(schemaParam?.description) ?? rowLabel(row.position)}
                             </span>
                         </div>
                     );

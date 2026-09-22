@@ -83,6 +83,13 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
 
     public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
 
+    public IReadOnlyList<ObjectKindDefinition> AllKinds => _current.AllKinds;
+
+    public ObjectKindDefinition? GetKind(string kindName)
+    {
+        return _current.GetKind(kindName);
+    }
+
     /// <inheritdoc />
     public SchemaVersionCheck? LastVersionCheck { get; private set; }
 
@@ -140,6 +147,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
         var enums = new List<RawEnumDefinition>();
         var hardcodedSets = new List<HardcodedReferenceSet>();
         var metafiles = new List<MetafileDefinition>();
+        var kinds = new List<ObjectKindDefinition>();
         var fetchedFiles = new List<(string relativePath, string content)>();
 
         foreach (var path in manifest.Tags)
@@ -178,6 +186,18 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
             {
                 types.AddRange(parsed);
             }
+
+            if (raw is not null)
+                fetchedFiles.Add((path, raw));
+        }
+
+        foreach (var path in manifest.Kinds)
+        {
+            var (parsed, raw) = await FetchYamlAsync(path, YamlSchemaParser.ParseKindFile, ct);
+            if (parsed is null)
+                kinds.AddRange(_current.AllKinds);
+            else
+                kinds.AddRange(parsed);
 
             if (raw is not null)
                 fetchedFiles.Add((path, raw));
@@ -242,15 +262,15 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
             _rawTagFallbacks[tn] = tags;
         _rawEnumFallbacks = [.. enums];
 
-        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
+        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds);
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);
         _readyTcs.TrySetResult();
 
         _cache.Update(indexJson, fetchedFiles, manifest.BaselineHash);
 
         _logger.LogInformation(
-            "Schema index built: {TagCount} tags, {TypeCount} types, {EnumCount} enums, {HardcodedCount} hardcoded set(s)",
-            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllEnums.Count,
+            "Schema index built: {TagCount} tags, {TypeCount} types, {KindCount} kinds, {EnumCount} enums, {HardcodedCount} hardcoded set(s)",
+            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllKinds.Count, _current.AllEnums.Count,
             _current.AllHardcodedSets.Count);
     }
 

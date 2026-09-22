@@ -243,7 +243,8 @@ public static class ServerConfigurator
                     key => sp.GetRequiredService<ILanguageServerFacade>()
                         .SendNotification("aet/storySimChanged",
                             new StorySimChangedParams(key.Campaign, key.Faction, key.Scope)),
-                    new IndexWorldSymbols(sp.GetRequiredService<IGameIndexService>())));
+                    new IndexWorldSymbols(sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<ISchemaProvider>())));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
                 services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();

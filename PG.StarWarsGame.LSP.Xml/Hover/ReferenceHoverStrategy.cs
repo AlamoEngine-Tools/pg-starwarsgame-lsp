@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -27,7 +28,17 @@ internal sealed class ReferenceHoverStrategy : IXmlHoverStrategy
         if (symbol?.TypeName is null)
             return null;
 
-        var typeDef = ctx.Schema.GetObjectType(symbol.TypeName);
+        // When the slot asked for a KIND, name the kind rather than the type. The index types a
+        // planet "GameObjectType" like everything else in its file, so the type name is the least
+        // informative thing on offer, and "Planet" is what the author is actually looking at.
+        var kind = reference.ExpectedTypeName is not null ? ctx.Schema.GetKind(reference.ExpectedTypeName) : null;
+        var typeDef = kind is not null
+            ? new GameObjectTypeDefinition
+            {
+                TypeName = kind.Kind, NameTag = "Name",
+                Description = kind.Description, Notes = kind.Notes
+            }
+            : ctx.Schema.GetObjectType(symbol.TypeName);
         if (typeDef is null)
             return null;
 

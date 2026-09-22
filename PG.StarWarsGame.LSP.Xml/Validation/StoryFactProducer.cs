@@ -21,15 +21,18 @@ public sealed class StoryFactProducer(ISchemaProvider schema) : IStoryFactProduc
         foreach (var eventNode in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element &&
                                  string.Equals(n.Name, "Event", StringComparison.OrdinalIgnoreCase)))
-            CollectForEvent(eventNode, documentUri, facts);
+            CollectForEvent(eventNode, document.LineIndex, documentUri, facts);
 
         return facts;
     }
 
-    private void CollectForEvent(HtmlNode eventNode, string documentUri, List<XmlFact> facts)
+    // Every fact marks the element that caused it, from the document's own offsets (HAP's per-node
+    // line and column are unreliable for nested elements): a type problem sits on the type's
+    // value, a param problem on the param's value, a MISSING param on the whole type element that
+    // demands it, a dialog problem on the dialog's value. Column 0 of a line is never an anchor.
+    private void CollectForEvent(HtmlNode eventNode, LineOffsetIndex lineIndex, string documentUri,
+        List<XmlFact> facts)
     {
-        var eventNodeLine = Math.Max(0, eventNode.Line - 1);
-
         var eventTypeNode = FindChild(eventNode, "Event_Type");
         if (eventTypeNode is not null)
         {
@@ -38,10 +41,10 @@ public sealed class StoryFactProducer(ISchemaProvider schema) : IStoryFactProduc
             {
                 var def = schema.GetEnum("StoryEventType")?.Values
                     .FirstOrDefault(v => string.Equals(v.Name, eventType, StringComparison.OrdinalIgnoreCase));
-                facts.Add(new StoryEventFact(documentUri, Math.Max(0, eventTypeNode.Line - 1), 0, 0,
-                    eventType, false, def));
+                var (line, column, length) = XmlUtility.GetValuePosition(eventTypeNode, lineIndex);
+                facts.Add(new StoryEventFact(documentUri, line, column, length, eventType, false, def));
                 if (def is not null)
-                    CollectParamFacts(eventNode, eventNodeLine, eventType, false,
+                    CollectParamFacts(eventNode, eventTypeNode, lineIndex, eventType, false,
                         "Event_Param", MaxEventParamSlots, def.Params, documentUri, facts);
             }
         }
@@ -54,18 +57,19 @@ public sealed class StoryFactProducer(ISchemaProvider schema) : IStoryFactProduc
             {
                 var def = schema.GetEnum("StoryRewardType")?.Values
                     .FirstOrDefault(v => string.Equals(v.Name, rewardType, StringComparison.OrdinalIgnoreCase));
-                facts.Add(new StoryEventFact(documentUri, Math.Max(0, rewardTypeNode.Line - 1), 0, 0,
-                    rewardType, true, def));
+                var (line, column, length) = XmlUtility.GetValuePosition(rewardTypeNode, lineIndex);
+                facts.Add(new StoryEventFact(documentUri, line, column, length, rewardType, true, def));
                 if (def is not null)
-                    CollectParamFacts(eventNode, eventNodeLine, rewardType, true,
+                    CollectParamFacts(eventNode, rewardTypeNode, lineIndex, rewardType, true,
                         "Reward_Param", MaxRewardParamSlots, def.Params, documentUri, facts);
             }
         }
 
-        CollectDialogRefFact(eventNode, documentUri, facts);
+        CollectDialogRefFact(eventNode, lineIndex, documentUri, facts);
     }
 
-    private static void CollectDialogRefFact(HtmlNode eventNode, string documentUri, List<XmlFact> facts)
+    private static void CollectDialogRefFact(HtmlNode eventNode, LineOffsetIndex lineIndex, string documentUri,
+        List<XmlFact> facts)
     {
         var dialogNode = FindChild(eventNode, "Story_Dialog");
         var dialogName = dialogNode?.InnerText.Trim();
@@ -75,20 +79,36 @@ public sealed class StoryFactProducer(ISchemaProvider schema) : IStoryFactProduc
         // cross-check only cares about chapters it can actually look up.
         var chapterNode = FindChild(eventNode, "Story_Chapter");
         int? chapter = null;
-        var chapterLine = -1;
+        var (chapterLine, chapterColumn, chapterLength) = (-1, -1, 0);
         if (chapterNode is not null && int.TryParse(chapterNode.InnerText.Trim(), out var parsed))
         {
             chapter = parsed;
-            chapterLine = Math.Max(0, chapterNode.Line - 1);
+            (chapterLine, chapterColumn, chapterLength) = XmlUtility.GetValuePosition(chapterNode, lineIndex);
         }
 
-        facts.Add(new StoryDialogRefFact(documentUri, Math.Max(0, dialogNode!.Line - 1), 0, 0,
-            dialogName, chapter, chapterLine));
+        var (line, column, length) = XmlUtility.GetValuePosition(dialogNode!, lineIndex);
+        facts.Add(new StoryDialogRefFact(documentUri, line, column, length,
+            dialogName, chapter, chapterLine, chapterColumn, chapterLength));
+    }
+
+    /// <summary>
+    ///     A whole element's span, opening bracket through closing bracket, from the document's own
+    ///     offsets. Same-line elements carry a length; one that wraps carries an end position.
+    /// </summary>
+    private static (int Line, int Column, int Length, int? EndLine, int? EndColumn) ElementSpan(
+        HtmlNode node, LineOffsetIndex lineIndex)
+    {
+        var (line, column) = lineIndex.GetPosition(node.StreamPosition);
+        var (endLine, endColumn) = lineIndex.GetPosition(node.StreamPosition + node.OuterHtml.Length);
+        return endLine == line
+            ? (line, column, endColumn - column, null, null)
+            : (line, column, 0, endLine, endColumn);
     }
 
     private static void CollectParamFacts(
         HtmlNode eventNode,
-        int eventNodeLine,
+        HtmlNode typeNode,
+        LineOffsetIndex lineIndex,
         string eventType,
         bool isReward,
         string prefix,
@@ -110,28 +130,30 @@ public sealed class StoryFactProducer(ISchemaProvider schema) : IStoryFactProduc
             if (value.Length == 0) continue;
 
             var schemaPos = n - 1;
-            var childLine = Math.Max(0, child.Line - 1);
+            var (line, column, length) = XmlUtility.GetValuePosition(child, lineIndex);
 
             if (schemaPos > maxDefinedPos)
             {
-                facts.Add(new StoryParamFact(documentUri, childLine, 0, 0,
+                facts.Add(new StoryParamFact(documentUri, line, column, length,
                     eventType, isReward, schemaPos, null, value));
             }
             else
             {
                 var paramDef = paramDefs.FirstOrDefault(p => p.Position == schemaPos);
                 if (paramDef is null) continue;
-                facts.Add(new StoryParamFact(documentUri, childLine, 0, 0,
+                facts.Add(new StoryParamFact(documentUri, line, column, length,
                     eventType, isReward, schemaPos, paramDef, value));
             }
         }
 
+        // A missing param has no element of its own: the type that demands it is what to look at.
+        var (typeLine, typeColumn, typeLength, typeEndLine, typeEndColumn) = ElementSpan(typeNode, lineIndex);
         foreach (var p in paramDefs.Where(pd => !pd.Optional))
         {
             var child = FindChild(eventNode, $"{prefix}{p.Position + 1}");
             if (child is not null && child.InnerText.Trim().Length > 0) continue;
-            facts.Add(new StoryParamFact(documentUri, eventNodeLine, 0, 0,
-                eventType, isReward, p.Position, p, ""));
+            facts.Add(new StoryParamFact(documentUri, typeLine, typeColumn, typeLength,
+                eventType, isReward, p.Position, p, "") { EndLine = typeEndLine, EndColumn = typeEndColumn });
         }
     }
 

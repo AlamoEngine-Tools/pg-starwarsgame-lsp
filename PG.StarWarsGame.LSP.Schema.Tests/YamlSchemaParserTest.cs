@@ -8,6 +8,34 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 
 public sealed class YamlSchemaParserTest
 {
+    // ── ParseKindFile ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void ParseKindFile_ReadsEveryPredicateGroupAndText()
+    {
+        const string yaml = """
+                            kinds:
+                              - kind: HeroCompany
+                                behaviors: [DUMMY_GROUND_COMPANY]
+                                flags: [Is_Named_Hero, Is_Generic_Hero]
+                                description:
+                                  en: "A ground company that is itself a hero."
+                              - kind: SquadronUnit
+                                memberOf: [Squadron_Units]
+                            """;
+
+        var kinds = YamlSchemaParser.ParseKindFile(yaml);
+
+        Assert.Equal(2, kinds.Count);
+        Assert.Equal("HeroCompany", kinds[0].Kind);
+        Assert.Equal(new[] { "DUMMY_GROUND_COMPANY" }, kinds[0].Behaviors);
+        Assert.Equal(new[] { "Is_Named_Hero", "Is_Generic_Hero" }, kinds[0].Flags);
+        Assert.Empty(kinds[0].MemberOf);
+        Assert.Equal("A ground company that is itself a hero.", kinds[0].Description["en"]);
+        Assert.Equal(new[] { "Squadron_Units" }, kinds[1].MemberOf);
+        Assert.True(kinds[1].HasPredicate);
+    }
+
     // ── ParseTagFile: unknown semanticType fails closed ─────────────────────
 
     // semanticType describes the SHAPE of a value, so falling back to Default when it is
@@ -567,6 +595,8 @@ public sealed class YamlSchemaParserTest
                                   - position: 0
                                     type: NameReferenceList
                                     referenceType: Planet
+                                    label:
+                                      en: "Planets"
                                     description:
                                       en: "Planet(s) to watch."
                                   - position: 2
@@ -585,12 +615,14 @@ public sealed class YamlSchemaParserTest
         Assert.Equal(XmlValueType.NameReferenceList, p0.ValueType);
         Assert.Equal("Planet", p0.ReferenceType);
         Assert.Equal("Planet(s) to watch.", p0.Description["en"]);
+        Assert.Equal("Planets", p0.Label["en"]);
         Assert.False(p0.Optional);
 
         var p2 = value.Params.Single(p => p.Position == 2);
         Assert.Equal(XmlValueType.DynamicEnumValue, p2.ValueType);
         Assert.Equal("StoryEventFilter", p2.EnumName);
         Assert.True(p2.Optional);
+        Assert.Empty(p2.Label);
     }
 
     [Fact]

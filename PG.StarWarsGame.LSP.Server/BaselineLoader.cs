@@ -26,14 +26,34 @@ public sealed class BaselineLoader
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".aetswg", "baselines");
 
-    public Task<BaselineIndex> LoadAsync(BaselineSourceConfig config, CancellationToken ct)
+    public async Task<BaselineIndex> LoadAsync(BaselineSourceConfig config, CancellationToken ct)
     {
-        return config.Type switch
+        var baseline = await (config.Type switch
         {
             BaselineSourceType.Local => LoadLocalAsync(config.LocalPath, ct),
             BaselineSourceType.Http => LoadHttpAsync(config.Url, ct),
             _ => Task.FromResult(BaselineIndex.Empty)
-        };
+        });
+
+        WarnIfWithoutBehaviors(baseline);
+        return baseline;
+    }
+
+    /// <summary>
+    ///     Says so, once, when the loaded baseline predates behaviour tokens. It still loads - the
+    ///     key is additive - but every shipped object then answers "no behaviours", so anything
+    ///     asking what an object IS gets nothing back for the whole base game. That reads as a
+    ///     feature quietly doing nothing, which is worth a line in the log.
+    /// </summary>
+    private void WarnIfWithoutBehaviors(BaselineIndex baseline)
+    {
+        if (baseline.Symbols.IsEmpty) return;
+        if (baseline.Symbols.Values.Any(s => s.Behaviors is { Length: > 0 })) return;
+
+        _logger.LogWarning(
+            "Baseline holds {Count} symbol(s) but no behaviours - it predates behaviour indexing, so no " +
+            "shipped object can be matched by kind; rebuild it with the BaselineBuilder to restore that",
+            baseline.Symbols.Count);
     }
 
     private async Task<BaselineIndex> LoadLocalAsync(string? path, CancellationToken ct)

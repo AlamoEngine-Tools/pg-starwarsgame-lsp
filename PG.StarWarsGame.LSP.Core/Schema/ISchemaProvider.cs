@@ -19,6 +19,19 @@ public interface ISchemaProvider
     IReadOnlyList<MetafileDefinition> AllMetafiles { get; }
 
     /// <summary>
+    ///     Object kinds from <c>kinds.yaml</c>: what makes an object a planet, a star base, a
+    ///     squadron. Default empty so a provider that predates kinds, and every test double, still
+    ///     satisfies the interface.
+    /// </summary>
+    IReadOnlyList<ObjectKindDefinition> AllKinds => [];
+
+    /// <summary>The kind of that name, or null. Kind names are compared case-insensitively.</summary>
+    ObjectKindDefinition? GetKind(string kindName)
+    {
+        return null;
+    }
+
+    /// <summary>
     ///     A task that completes when the provider has finished its initial load and is ready for queries.
     ///     Providers that load synchronously (e.g. <c>LocalFileSchemaProvider</c>) return
     ///     <see cref="Task.CompletedTask" /> so callers can await without blocking.

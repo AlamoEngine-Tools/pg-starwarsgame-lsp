@@ -460,6 +460,10 @@ public sealed class StoryProtocolHandlersTest
         var trigger = Assert.Single(result.RewardTypes, t => t.Name == "TRIGGER_EVENT");
         var param = Assert.Single(trigger.Params);
         Assert.Equal("StoryEventName", param.ReferenceType);
+        // The slot's label travels with the schema; a slot without one ships null, never a stand-in.
+        Assert.Equal("Event", param.Label);
+        var enter = Assert.Single(result.EventTypes, t => t.Name == "STORY_ENTER");
+        Assert.Null(Assert.Single(enter.Params).Label);
         Assert.True(Assert.Single(result.EventTypes, t => t.Name == "STORY_UNTESTED").Untested);
     }
 
@@ -981,7 +985,8 @@ public sealed class StoryProtocolHandlersTest
                         new ParamDefinition
                         {
                             Position = 0, ValueType = XmlValueType.NameReference,
-                            ReferenceTypeName = "StoryEventName"
+                            ReferenceTypeName = "StoryEventName",
+                            Label = new Dictionary<string, string> { ["en"] = "Event" }
                         }
                     ]
                 },

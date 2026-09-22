@@ -224,7 +224,10 @@ public sealed record StoryParamSchemaDto(
     string? Description,
     // The enum's value names, shipped inline so enum params render as dropdowns without a
     // round trip. Null for non-enum params.
-    IReadOnlyList<string>? EnumValues = null);
+    IReadOnlyList<string>? EnumValues = null,
+    // What the slot holds, in one to three words: the field label. Null for a slot nobody has
+    // named yet, which the client labels by its position.
+    string? Label = null);
 
 // ── aet/getStoryParamOptions - completion candidates for one param slot ──────
 

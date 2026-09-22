@@ -142,6 +142,8 @@ Scripts under the declared `scripts` directories are indexed and checked.
 
 > **Work in progress, off by default.** Flag: `aet-eaw-edit.features.lua.debugger`. Requires a debug build of the game with its Lua debug server running; retail builds have none.
 
+> **With thanks to EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, whose [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) documented the game's Lua debug server protocol. This debugger was built against that description.
+
 Debug type **Empire at War Lua** in Run and Debug:
 
 - Breakpoints in Lua files under the project's script directories
@@ -304,6 +306,7 @@ Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `S
   - Filters: name, branch, lifecycle, plot state, the incoming or outgoing chain of one event - inside the panel's scope; the chain runs through a battle's portal
   - **Engine links** (dash-dot): the links the game makes that no prerequisite writes - a speech or movie to the listener that waits for it to end, a tutorial dialog to the listener for its Continue button, a battle to the galactic listeners for its outcome and for the summary dialog closing. Drawn so a sequence the game plays in order reads in order; never a prerequisite
   - Thread lanes on the galactic graph (Empire at War's acts); disabled inside a battle, which is one plot
+- **Params by name** - every event and reward slot carries a label from the schema ("Planets", "Flash id", "Required result"); the description with its legend and ranges is the tooltip, and a missing-param warning quotes the same name after the slot
 - **Colour key** - flyout keying node, border and edge styles, including per-branch hues on zoomed-out nodes
 - **Editing** (Edit mode)
   - Drag a prerequisite between events
@@ -665,6 +668,12 @@ Three data sources; nothing else is sent or received. No telemetry.
 **Launch refused: layer not runnable.** Declared directories under `Data/` and no space in the path, or pass the folders via `modPaths`. See [Lua debugger](#lua-debugger).
 
 **Raw server output.** `aet-eaw-edit.lsp.debug.traceServer` = `messages`; **EaWEdit** output channel.
+
+---
+
+## Acknowledgements
+
+**EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, for [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) - the Python client that documented the game's Lua debug server protocol. The [Lua debugger](#lua-debugger) here was built against that description.
 
 ---
 
