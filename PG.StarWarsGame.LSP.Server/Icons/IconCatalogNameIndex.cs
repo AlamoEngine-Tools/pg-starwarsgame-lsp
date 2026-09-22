@@ -40,8 +40,18 @@ public sealed class IconCatalogNameIndex(
 
         try
         {
+            // VSTHRD002: the block is deliberate, and the analyzer cannot see either reason it is
+            // safe. The deadlock it warns about needs a single-threaded SynchronizationContext to
+            // resume onto; the server is a console host, so continuations land on the thread pool.
+            // And the cost is bounded by the call site - see the remarks above: the handler reaches
+            // here only for a reference the file lookup already failed to resolve, and the catalog
+            // is cached per project root after the first build. Making this non-blocking means
+            // answering "unknown" until something else warms the catalog, which the remarks reject
+            // for a better reason than this warning gives to change it.
+#pragma warning disable VSTHRD002
             return catalog.GetAsync(CancellationToken.None).GetAwaiter().GetResult()
                 ?.Resolve(reference) is not null;
+#pragma warning restore VSTHRD002
         }
         catch (Exception ex)
         {

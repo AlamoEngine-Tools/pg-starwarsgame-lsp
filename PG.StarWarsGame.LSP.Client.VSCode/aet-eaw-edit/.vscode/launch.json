@@ -15,6 +15,14 @@
 			"outFiles": [
 				"${workspaceFolder}/out/**/*.js"
 			],
+			// Makes an extension-host abort say why. When the host dies during startup it never
+			// creates window<N>/exthost/exthost.log, so the only record is
+			// %APPDATA%/Code/logs/<session>/main.log - which gives the exit code (134 = SIGABRT)
+			// and nothing about the cause. With Electron logging on, a V8 fatal error or a native
+			// abort prints to this configuration's Debug Console instead of being discarded.
+			"env": {
+				"ELECTRON_ENABLE_LOGGING": "1"
+			},
 			"preLaunchTask": "${defaultBuildTask}"
 		}
 	]

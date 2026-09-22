@@ -100,31 +100,23 @@ public sealed class ModProjectResolver
 
     private static string GetDirectory(string normalizedPath)
     {
-        var idx = normalizedPath.LastIndexOf('/');
-        return idx < 0 ? string.Empty : normalizedPath[..idx];
+        return ProjectPathResolution.GetDirectory(normalizedPath);
     }
 
+    /// <summary>
+    ///     Resolves a referenced project path, folded to lower case.
+    /// </summary>
+    /// <remarks>
+    ///     The fold is this resolver's own: the result is used as a cache key for already-loaded
+    ///     projects, so two references spelled with different case have to land on one entry.
+    ///     <see cref="ProjectDependencyGraph" /> resolves the same way but does NOT fold here - it
+    ///     folds earlier, when it normalizes. Neither is moved into the shared walk, because a
+    ///     helper that lower-cased on everyone's behalf would be doing it to paths that are about
+    ///     to be shown to someone.
+    /// </remarks>
     private static string Combine(string directory, string relative)
     {
         var candidate = relative.Replace('\\', '/');
-        var basePath = string.IsNullOrEmpty(directory) ? "." : directory;
-        var segments = new List<string>(basePath.Split('/', StringSplitOptions.RemoveEmptyEntries));
-        var basePrefix = basePath.StartsWith('/') ? "/" : string.Empty;
-
-        foreach (var segment in candidate.Split('/', StringSplitOptions.RemoveEmptyEntries))
-            switch (segment)
-            {
-                case ".":
-                    continue;
-                case "..":
-                    if (segments.Count > 0)
-                        segments.RemoveAt(segments.Count - 1);
-                    break;
-                default:
-                    segments.Add(segment);
-                    break;
-            }
-
-        return (basePrefix + string.Join('/', segments)).ToLowerInvariant();
+        return ProjectPathResolution.Resolve(directory, candidate).ToLowerInvariant();
     }
 }

@@ -55,8 +55,11 @@ export const UNKNOWN_LIFECYCLE_TOKEN = '--colour-faint';
  * disagree with the edge it describes. `dash` is an SVG stroke-dasharray; empty means solid.
  * `Prereq` is the plain case and takes the chart foreground rather than a hue, because "A must
  * happen first" is the default relation and colouring it would say something it does not mean.
- * `LuaLink` is reserved and never produced yet, so it is deliberately absent and falls through to
- * the default stroke.
+ * `LuaLink` takes the muted token deliberately: a story event's hop through a Lua state is real but
+ * secondary, and it has its own lens to hide it. That is the same stroke `canvasEdgeStyle` falls
+ * back to, so listing it here changes no pixel - it changes whether the reader can look the edge up.
+ * It was absent for a long time on the belief that the server never produced it, which stopped being
+ * true when StoryGraphBuilder started emitting it for Story_Event_Trigger and Set_Next_State.
  */
 export interface EdgeKindStyle {
     /** Matches StoryEdgeKind on the server; `TacticalEntry` shares the tactical presentation. */
@@ -75,6 +78,7 @@ export const EDGE_KINDS: readonly EdgeKindStyle[] = [
     // a battle to its outcome and summary listeners. Dash-dot so it reads as neither the dashed
     // tactical edge nor the dotted flag edge, and in the neutral grey so no branch hue claims it.
     {kind: 'Implicit', token: '--colour-data-neutral', dash: '8 3 2 3', label: 'Engine link'},
+    {kind: 'LuaLink', token: '--colour-muted', dash: '', label: 'Lua script link'},
 ];
 
 /**

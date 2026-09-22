@@ -176,7 +176,9 @@ public sealed class GetEncyclopediaEntryHandler
     /// </summary>
     private Task<IconCatalog?> GetCatalogAsync(CancellationToken ct)
     {
-        return _catalog?.GetAsync(ct) ?? Task.FromResult<IconCatalog?>(null);
+        // Spelled as a branch rather than `_catalog?.GetAsync(ct) ?? ...`: inside a null-conditional
+        // the call reads as an unobserved awaitable (VSTHRD110) even though it is returned.
+        return _catalog is null ? Task.FromResult<IconCatalog?>(null) : _catalog.GetAsync(ct);
     }
 
     private static EncyclopediaIcon? ResolveIcon(IconCatalog? catalog, EffectiveObject effective)

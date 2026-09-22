@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -550,62 +551,5 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
         var completed = await Task.WhenAny(_fixture.ScanCompleted, Task.Delay(TimeSpan.FromSeconds(60)));
         if (completed != _fixture.ScanCompleted)
             throw new Exception("$XunitDynamicSkip$Workspace scan did not complete within 60 s.");
-    }
-
-    /// <summary>
-    ///     Returns the position of the first indented child element.
-    ///     Root elements and XML declarations (col 0) are skipped.
-    /// </summary>
-    private static (int line, int col) FindFirstChildElementPosition(string[] lines)
-    {
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt <= 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            return (i, lt + 1);
-        }
-
-        return (1, 1);
-    }
-
-    /// <summary>
-    ///     Returns the position of the first grandchild element (first tag inside the first
-    ///     type instance). Works regardless of indentation style (tabs vs spaces).
-    /// </summary>
-    private static (int line, int col) FindFirstGrandchildElementPosition(string[] lines)
-    {
-        // Locate the first child (depth-1) opening element.
-        var firstChildLine = -1;
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt <= 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            firstChildLine = i;
-            break;
-        }
-
-        if (firstChildLine < 0) return (1, 1);
-
-        // The first opening element after the first child's opening tag is the first grandchild.
-        for (var i = firstChildLine + 1; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt < 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            return (i, lt + 1);
-        }
-
-        return (1, 1);
     }
 }

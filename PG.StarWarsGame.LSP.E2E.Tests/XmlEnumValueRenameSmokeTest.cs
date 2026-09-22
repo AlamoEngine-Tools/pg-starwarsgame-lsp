@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -113,38 +114,6 @@ public sealed class XmlEnumValueRenameSmokeTest : IClassFixture<EawLspServerFixt
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    ///     Position of the first occurrence of <paramref name="value" /> anywhere in the file —
-    ///     for list values that do not share a line with their opening tag.
-    /// </summary>
-    private static (int line, int col) FindFirstOccurrencePosition(string[] lines, string value)
-    {
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var idx = lines[i].IndexOf(value, StringComparison.Ordinal);
-            if (idx >= 0) return (i, idx);
-        }
-
-        return (-1, -1);
-    }
-
-    private static (int line, int col) FindXmlTagBodyValuePosition(
-        string[] lines, string tagName, string value)
-    {
-        var tagOpen = $"<{tagName}>";
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var tagIdx = lines[i].IndexOf(tagOpen, StringComparison.OrdinalIgnoreCase);
-            if (tagIdx < 0) continue;
-            var searchFrom = tagIdx + tagOpen.Length;
-            var valueIdx = lines[i].IndexOf(value, searchFrom, StringComparison.OrdinalIgnoreCase);
-            if (valueIdx < 0) continue;
-            return (i, valueIdx);
-        }
-
-        return (-1, -1);
-    }
 
     private static void RequireEawWorkspace()
     {

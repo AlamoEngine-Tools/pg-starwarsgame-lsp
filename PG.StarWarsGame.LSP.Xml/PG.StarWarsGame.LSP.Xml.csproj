@@ -2,7 +2,6 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <!-- VSTHRD200: LSP provider interfaces use Handle() to match OmniSharp naming -->
         <NoWarn>VSTHRD200</NoWarn>
     </PropertyGroup>

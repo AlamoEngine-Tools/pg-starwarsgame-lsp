@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import {ChildProcess, spawn} from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -28,6 +29,7 @@ import {LocalisationEditorPanel} from './localisationEditorPanel';
 import {LocalisationNavigatorViewProvider, LocTreeItem} from './localisationNavigatorViewProvider';
 import {logLine, setLogChannel} from './log';
 import {LspGateway} from './lsp/lspGateway';
+import {stopClient} from './lsp/stopClient';
 import {vscodeMessageSink} from './lsp/vscodeMessageSink';
 import {LUA_DEBUG_TYPE, LuaDebugAdapterDescriptorFactory} from './luaDebug/luaDebugAdapterFactory';
 import {LuaDebugConfigurationProvider} from './luaDebug/luaDebugConfigurationProvider';
@@ -197,6 +199,15 @@ class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvid
 }
 
 let lspClient: LanguageClient | undefined;
+
+/**
+ * The server process, while one is running.
+ *
+ * Held because the language client does not hold it for us on the factory path, and because a
+ * shutdown that times out leaves nothing else able to reach it. Cleared by the process's own
+ * `exit`, so it never names something already gone.
+ */
+let serverProcess: ChildProcess | undefined;
 
 /**
  * Every request to the server goes through here.
@@ -385,9 +396,27 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     const serverExe = server.command;
     const serverArgs = [...server.args];
 
-    const serverOptions: ServerOptions = {
-        run: {command: serverExe, args: serverArgs, transport: TransportKind.stdio},
-        debug: {command: serverExe, args: serverArgs, transport: TransportKind.stdio},
+    // Spawned here rather than handed to the client as {command, args} so that WE hold the handle.
+    //
+    // With the Executable form the library owns the process, and its only cleanup for a shutdown
+    // that fails is `checkProcessDied` - a setTimeout(2000) that force-terminates if the process
+    // is still alive. On deactivate the extension host exits long before that timer runs, so the
+    // one case that strands a server is exactly the case the net does not cover. Holding the
+    // ChildProcess ourselves is what makes an immediate kill possible; see stopClient.
+    //
+    // The library still pipes stderr to the output channel on this path, so the server's own
+    // startup lines are not lost. It does NOT record the process (`_serverProcess` stays unset),
+    // which is the trade: no library-side cleanup at all, and all of it ours.
+    const serverOptions: ServerOptions = async () => {
+        const child = spawn(serverExe, serverArgs, {stdio: ['pipe', 'pipe', 'pipe']});
+        serverProcess = child;
+        // Only clear if this is still the current one - a restart may already have replaced it.
+        child.on('exit', () => {
+            if (serverProcess === child) {
+                serverProcess = undefined;
+            }
+        });
+        return child;
     };
 
     const schemaSource = cfg('lsp.schema').get<string>('source', 'http');
@@ -639,12 +668,36 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 }
 
 async function stopLspClient(): Promise<void> {
-    if (lspClient) {
-        logLine('Stopping LSP server.');
-        await lspClient.stop();
-        lspClient = undefined;
+    // The reference goes first, and on every path. `LanguageClient.stop()` throws when its
+    // shutdown handshake loses the race with its own timer, and the old shape - stop, then clear -
+    // meant a timeout skipped both the clear and the restart that three of the four callers do
+    // next. The visible symptom was the language server never coming back after a feature-flag
+    // change, with nothing in the log but "Stopping the server timed out".
+    const client = lspClient;
+    const child = serverProcess;
+    lspClient = undefined;
+    serverProcess = undefined;
+    try {
+        await stopClient(client, logLine, {forceKill: () => killServer(child)});
+    } finally {
         lsp.markStopped();
     }
+}
+
+/**
+ * Terminates a server that would not shut down.
+ *
+ * SIGKILL rather than SIGTERM: this only runs after the polite request has already failed, and on
+ * Windows node maps both to TerminateProcess anyway, so asking twice would only be slower. A
+ * process that has already exited is left alone - `exitCode`/`signalCode` are set the moment it
+ * goes, and killing a reaped pid is how you end up signalling whatever reused the number.
+ */
+function killServer(child: ChildProcess | undefined): void {
+    if (child === undefined || child.exitCode !== null || child.signalCode !== null) {
+        return;
+    }
+    logLine(`Killing LSP server process ${child.pid ?? '(no pid)'}.`);
+    child.kill('SIGKILL');
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {

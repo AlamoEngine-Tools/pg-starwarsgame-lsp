@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -64,21 +65,5 @@ public sealed class StartupBufferingSmokeTest : IClassFixture<LspServerFixture>
         Assert.NotNull(result);
         var content = result!.Contents.MarkupContent?.Value ?? string.Empty;
         Assert.Contains("HardPoint", content, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static (int line, int col) FindFirstChildElementPosition(string[] lines)
-    {
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt <= 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            return (i, lt + 1);
-        }
-
-        return (1, 1);
     }
 }

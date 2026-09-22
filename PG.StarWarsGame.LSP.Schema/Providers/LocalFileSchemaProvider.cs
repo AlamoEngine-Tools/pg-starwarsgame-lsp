@@ -15,13 +15,12 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 ///     Expects YAML files matching the same layout as the remote schema repository:
 ///     <c>tags/*.yaml</c>, <c>types.yaml</c>, <c>kinds.yaml</c>, <c>enums/*.yaml</c>.
 /// </summary>
-public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaProvider, IDisposable
+public sealed class LocalFileSchemaProvider : SchemaIndexProviderBase, IVersionedSchemaProvider, IDisposable
 {
     private readonly IFileSystem _fileSystem;
     private readonly ILogger<LocalFileSchemaProvider> _logger;
     private readonly string _rootPath;
     private readonly IFileSystemWatcher _watcher;
-    private volatile SchemaIndex _current = SchemaIndex.Empty;
 
     public LocalFileSchemaProvider(string rootPath, IFileSystem fileSystem,
         ILogger<LocalFileSchemaProvider> logger)
@@ -44,50 +43,6 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaP
     {
         _watcher.EnableRaisingEvents = false;
         _watcher.Dispose();
-    }
-
-    public event EventHandler? SchemaRefreshed;
-
-    public XmlTagDefinition? GetTag(string tagName)
-    {
-        return _current.GetTag(tagName);
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-    {
-        return _current.GetAllTagDefinitions(tagName);
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => _current.AllTags;
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        return _current.GetObjectType(typeName);
-    }
-
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => _current.AllObjectTypes;
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        return _current.GetTagsForType(typeName);
-    }
-
-    public EnumDefinition? GetEnum(string enumName)
-    {
-        return _current.GetEnum(enumName);
-    }
-
-    public IReadOnlyList<EnumDefinition> AllEnums => _current.AllEnums;
-
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _current.AllHardcodedSets;
-
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
-
-    public IReadOnlyList<ObjectKindDefinition> AllKinds => _current.AllKinds;
-
-    public ObjectKindDefinition? GetKind(string kindName)
-    {
-        return _current.GetKind(kindName);
     }
 
     /// <inheritdoc />
@@ -149,13 +104,12 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaP
             ? YamlSchemaParser.ParseMetafileFile(_fileSystem.File.ReadAllText(metaPath))
             : (IReadOnlyList<MetafileDefinition>)[];
 
-        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds);
-        SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+        Publish(new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds));
 
         _logger.LogInformation(
             "Schema loaded: {TagCount} tags across {TypeCount} types, {KindCount} kinds, {EnumCount} enums, {HardcodedCount} hardcoded set(s) from {Path}",
-            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllKinds.Count, _current.AllEnums.Count,
-            _current.AllHardcodedSets.Count, _rootPath);
+            Current.AllTags.Count, Current.AllObjectTypes.Count, Current.AllKinds.Count, Current.AllEnums.Count,
+            Current.AllHardcodedSets.Count, _rootPath);
     }
 
     /// <summary>

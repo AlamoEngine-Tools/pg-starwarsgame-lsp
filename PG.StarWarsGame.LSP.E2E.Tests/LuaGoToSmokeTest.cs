@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -113,20 +114,6 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
-
-    private static (int line, int col) FindLuaStringArgPosition(
-        string[] lines, string funcName, string value)
-    {
-        var marker = $"{funcName}(\"{value}\"";
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var idx = lines[i].IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) continue;
-            return (i, idx + funcName.Length + 2);
-        }
-
-        return (-1, -1);
-    }
 
     private static void RequireEawWorkspace()
     {

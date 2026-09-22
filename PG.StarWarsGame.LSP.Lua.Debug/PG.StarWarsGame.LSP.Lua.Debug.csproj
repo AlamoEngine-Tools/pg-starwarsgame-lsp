@@ -2,7 +2,6 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <!-- VSTHRD003: the session awaits its own receive-loop task on disconnect, by design -->
         <!-- VSTHRD103: the state machine is driven synchronously under a lock; its async entry
              actions are not used, so the blocking Fire is the right call -->

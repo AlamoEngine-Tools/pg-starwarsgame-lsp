@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -101,25 +102,5 @@ public sealed class WorkspaceSmokeTest : IClassFixture<LspServerFixture>
         var completed = await Task.WhenAny(_fixture.ScanStarted, Task.Delay(TimeSpan.FromSeconds(120)));
         if (completed != _fixture.ScanStarted)
             throw new Exception("$XunitDynamicSkip$Workspace scan did not complete within 120 s.");
-    }
-
-    /// <summary>
-    ///     Returns the position of the first indented child element in an XML file.
-    ///     Root elements and XML declarations (col 0) are skipped.
-    /// </summary>
-    private static (int line, int col) FindFirstChildElementPosition(string[] lines)
-    {
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt <= 0) continue; // skip root (lt==0) and blank lines
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            return (i, lt + 1); // col on first char of tag name
-        }
-
-        return (1, 1);
     }
 }

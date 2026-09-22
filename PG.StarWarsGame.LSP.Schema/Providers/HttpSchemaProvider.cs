@@ -17,7 +17,7 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 ///     Downloaded files are persisted to a local cache; the cache is validated by a SHA-256
 ///     checksum of the manifest plus all downloaded YAML file contents.
 /// </summary>
-public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvider
+public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSchemaProvider
 {
     private readonly string _baseUrl;
     private readonly SchemaHttpCache _cache;
@@ -31,7 +31,6 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
     private readonly TaskCompletionSource _readyTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private volatile SchemaIndex _current = SchemaIndex.Empty;
     private IReadOnlyList<RawEnumDefinition> _rawEnumFallbacks = [];
 
     public HttpSchemaProvider(HttpClient http, string baseUrl, SchemaHttpCache cache,
@@ -43,52 +42,8 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
         _logger = logger;
     }
 
-    public event EventHandler? SchemaRefreshed;
-
     /// <inheritdoc />
     public Task ReadyAsync => _readyTcs.Task;
-
-    public XmlTagDefinition? GetTag(string tagName)
-    {
-        return _current.GetTag(tagName);
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-    {
-        return _current.GetAllTagDefinitions(tagName);
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => _current.AllTags;
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        return _current.GetObjectType(typeName);
-    }
-
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => _current.AllObjectTypes;
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        return _current.GetTagsForType(typeName);
-    }
-
-    public EnumDefinition? GetEnum(string enumName)
-    {
-        return _current.GetEnum(enumName);
-    }
-
-    public IReadOnlyList<EnumDefinition> AllEnums => _current.AllEnums;
-
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _current.AllHardcodedSets;
-
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
-
-    public IReadOnlyList<ObjectKindDefinition> AllKinds => _current.AllKinds;
-
-    public ObjectKindDefinition? GetKind(string kindName)
-    {
-        return _current.GetKind(kindName);
-    }
 
     /// <inheritdoc />
     public SchemaVersionCheck? LastVersionCheck { get; private set; }
@@ -119,8 +74,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
             if (_cache.TryLoad(indexJson, manifest, out var cached))
             {
                 _logger.LogInformation("Schema loaded from local cache");
-                _current = cached;
-                SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+                Publish(cached);
                 _readyTcs.TrySetResult();
                 return;
             }
@@ -176,7 +130,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
             var (parsed, raw) = await FetchYamlAsync(path, YamlSchemaParser.ParseTypeFile, ct);
             if (parsed is null)
             {
-                var fallback = _current.AllObjectTypes;
+                var fallback = Current.AllObjectTypes;
                 if (fallback.Count == 0)
                     _logger.LogWarning(
                         "304 Not Modified for '{Path}' but no prior schema in memory - treating as empty", path);
@@ -195,7 +149,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
         {
             var (parsed, raw) = await FetchYamlAsync(path, YamlSchemaParser.ParseKindFile, ct);
             if (parsed is null)
-                kinds.AddRange(_current.AllKinds);
+                kinds.AddRange(Current.AllKinds);
             else
                 kinds.AddRange(parsed);
 
@@ -229,7 +183,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
                 path, yaml => [YamlSchemaParser.ParseHardcodedSetFile(yaml)], ct);
             if (parsed is null)
             {
-                var fallback = _current.AllHardcodedSets;
+                var fallback = Current.AllHardcodedSets;
                 if (fallback.Count == 0)
                     _logger.LogWarning(
                         "304 Not Modified for '{Path}' but no prior schema in memory - treating as empty", path);
@@ -249,7 +203,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
             var (parsed, raw) = await FetchYamlAsync<MetafileDefinition>(
                 path, yaml => [.. YamlSchemaParser.ParseMetafileFile(yaml)], ct);
             if (parsed is null)
-                metafiles.AddRange(_current.AllMetafiles);
+                metafiles.AddRange(Current.AllMetafiles);
             else
                 metafiles.AddRange(parsed);
 
@@ -262,16 +216,15 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
             _rawTagFallbacks[tn] = tags;
         _rawEnumFallbacks = [.. enums];
 
-        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds);
-        SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+        Publish(new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds));
         _readyTcs.TrySetResult();
 
         _cache.Update(indexJson, fetchedFiles, manifest.BaselineHash);
 
         _logger.LogInformation(
             "Schema index built: {TagCount} tags, {TypeCount} types, {KindCount} kinds, {EnumCount} enums, {HardcodedCount} hardcoded set(s)",
-            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllKinds.Count, _current.AllEnums.Count,
-            _current.AllHardcodedSets.Count);
+            Current.AllTags.Count, Current.AllObjectTypes.Count, Current.AllKinds.Count, Current.AllEnums.Count,
+            Current.AllHardcodedSets.Count);
     }
 
     // Returns (parsed, rawYaml). rawYaml is null on 304 (ETag hit); parsed is null on 304 too.

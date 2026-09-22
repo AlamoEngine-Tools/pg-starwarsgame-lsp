@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Server.Notifications;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -23,45 +24,23 @@ namespace PG.StarWarsGame.LSP.Server.Preview;
 ///         one it already has, which is what keeps an unrelated edit from costing any geometry.
 ///     </para>
 /// </summary>
-public sealed class PreviewSceneChangeNotifier
+public sealed class PreviewSceneChangeNotifier : DebouncedIndexNotifier
 {
-    private readonly int _debounceMs;
     private readonly ILogger<PreviewSceneChangeNotifier> _logger;
     private readonly Action<string> _send;
-    private int _pendingVersion;
 
     public PreviewSceneChangeNotifier(
         IGameIndexService indexService,
         Action<string> send,
         ILogger<PreviewSceneChangeNotifier> logger,
         int debounceMs = 100)
+        : base(indexService, debounceMs)
     {
         _send = send;
         _logger = logger;
-        _debounceMs = debounceMs;
-        indexService.IndexChanged += OnIndexChanged;
     }
 
-    private void OnIndexChanged(GameIndex index)
-    {
-        if (_debounceMs <= 0)
-        {
-            Notify();
-            return;
-        }
-
-        // The same collapse the story notifier does: a workspace-wide rename raises this event
-        // hundreds of times, and each one would otherwise cost every open preview a scene rebuild.
-        var version = Interlocked.Increment(ref _pendingVersion);
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(_debounceMs);
-            if (Volatile.Read(ref _pendingVersion) != version) return;
-            Notify();
-        });
-    }
-
-    private void Notify()
+    protected override void Notify()
     {
         try
         {

@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Server.Notifications;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
@@ -13,14 +14,12 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     consecutive changes (bulk indexing, workspace-wide rename) produce one notification. Only
 ///     already-built models are inspected - the notifier never triggers a rebuild itself.
 /// </summary>
-public sealed class StoryGraphChangeNotifier
+public sealed class StoryGraphChangeNotifier : DebouncedIndexNotifier
 {
     private readonly ILspConfigurationProvider _config;
-    private readonly int _debounceMs;
     private readonly ILogger<StoryGraphChangeNotifier> _logger;
     private readonly IStoryModelService _modelService;
     private readonly Action<StoryGraphChangedParams> _send;
-    private int _pendingVersion;
 
     public StoryGraphChangeNotifier(
         IGameIndexService indexService,
@@ -29,33 +28,15 @@ public sealed class StoryGraphChangeNotifier
         Action<StoryGraphChangedParams> send,
         ILogger<StoryGraphChangeNotifier> logger,
         int debounceMs = 100)
+        : base(indexService, debounceMs)
     {
         _modelService = modelService;
         _config = config;
         _send = send;
         _logger = logger;
-        _debounceMs = debounceMs;
-        indexService.IndexChanged += OnIndexChanged;
     }
 
-    private void OnIndexChanged(GameIndex index)
-    {
-        if (_debounceMs <= 0)
-        {
-            Notify();
-            return;
-        }
-
-        var version = Interlocked.Increment(ref _pendingVersion);
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(_debounceMs);
-            if (Volatile.Read(ref _pendingVersion) != version) return;
-            Notify();
-        });
-    }
-
-    private void Notify()
+    protected override void Notify()
     {
         try
         {

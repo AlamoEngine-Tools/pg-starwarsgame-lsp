@@ -38,6 +38,20 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "jsonc",
+        "extensions": [
+          ".pgproj"
+        ]
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "*.pgproj",
+        "url": "./resources/pgproj.schema.json"
+      }
+    ],
     "breakpoints": [
       {
         "language": "lua"
