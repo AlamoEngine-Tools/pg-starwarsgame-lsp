@@ -169,6 +169,67 @@ public class LspServerFixture : IAsyncLifetime
     ///     for <paramref name="uri" />, or faults with <see cref="TaskCanceledException" />
     ///     after <paramref name="timeout" />.
     /// </summary>
+    /// <summary>
+    ///     The diagnostics a document ENDS UP with: the last publish after they stop arriving for
+    ///     <paramref name="quiet" />, or null if none arrived at all.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         For a NEGATIVE assertion - that some name no longer appears - waiting for the next
+    ///         publish is not enough. An edit that touches several files is applied one didChange at
+    ///         a time, so a publish computed against a half-applied edit, or one already in flight
+    ///         when the edit landed, can be the one that arrives first. Asserting on it reports
+    ///         staleness that the author never sees.
+    ///     </para>
+    ///     <para>
+    ///         A predicate wait does not help here either: it would stop at the first publish that
+    ///         happens to satisfy a negative, which is the same coin the other way up. Settling is
+    ///         the only reading that matches what the assertion means.
+    ///     </para>
+    /// </remarks>
+    public async Task<PublishDiagnosticsParams?> WaitForSettledDiagnosticsAsync(
+        DocumentUri uri, TimeSpan quiet, TimeSpan timeout)
+    {
+        var uriStr = uri.ToString();
+        var gate = new object();
+        PublishDiagnosticsParams? last = null;
+        var lastAt = DateTime.UtcNow;
+
+        void Handler(PublishDiagnosticsParams p)
+        {
+            if (!string.Equals(p.Uri.ToString(), uriStr, StringComparison.OrdinalIgnoreCase)) return;
+            lock (gate)
+            {
+                last = p;
+                lastAt = DateTime.UtcNow;
+            }
+        }
+
+        DiagnosticsReceived += Handler;
+        try
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(25);
+                lock (gate)
+                {
+                    if (last is not null && DateTime.UtcNow - lastAt >= quiet)
+                        return last;
+                }
+            }
+
+            lock (gate)
+            {
+                return last;
+            }
+        }
+        finally
+        {
+            DiagnosticsReceived -= Handler;
+        }
+    }
+
     public Task<PublishDiagnosticsParams> WaitForDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
     {
         var tcs = new TaskCompletionSource<PublishDiagnosticsParams>(

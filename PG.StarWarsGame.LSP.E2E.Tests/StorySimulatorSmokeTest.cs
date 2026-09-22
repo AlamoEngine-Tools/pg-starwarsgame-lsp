@@ -54,23 +54,46 @@ public sealed class StorySimulatorSmokeTest : IClassFixture<LspServerFixture>
             Assert.All(atDecision.Steps, s => Assert.True(s.Seq >= started.TotalSteps));
 
             var decision = atDecision.Interventions[0];
-            var answered = decision.Suggested is not null
-                ? await SendAsync(new StorySimWorldParams(Campaign, Faction, decision.Suggested, atDecision.TotalSteps))
-                : await SendAsync(new StorySimSatisfyTriggerParams(Campaign, Faction, decision.NodeId,
-                    atDecision.TotalSteps));
 
-            var fired = answered.Nodes.Single(n => n.NodeId == decision.NodeId);
-            Assert.Equal("Fired", fired.Lifecycle);
-            Assert.True(fired.FireCount >= 1);
-            Assert.Contains(answered.Steps, s => s.NodeId == decision.NodeId && s.To == "Fired");
-            Assert.True(answered.TotalSteps > atDecision.TotalSteps);
+            // A battle waiting on the author is answered by resolving it, not by satisfying a
+            // trigger: its node is the tactical entry, and while it holds the galaxy still nothing
+            // else can fire anyway. Underworld opens on one, so this is the path it takes.
+            if (decision.BattleKey is { } battleKey)
+            {
+                var resolved = await SendAsync(
+                    new StorySimResolveBattleParams(Campaign, Faction, battleKey, true, atDecision.TotalSteps));
+
+                Assert.True(resolved.Running);
+                Assert.True(resolved.TotalSteps > atDecision.TotalSteps);
+                // The galaxy took the outcome, so it is no longer the decision on the table.
+                Assert.DoesNotContain(resolved.Interventions,
+                    i => i.BattleKey == battleKey && i.NodeId == decision.NodeId);
+            }
+            else
+            {
+                var answered = decision.Suggested is not null
+                    ? await SendAsync(new StorySimWorldParams(Campaign, Faction, decision.Suggested,
+                        atDecision.TotalSteps))
+                    : await SendAsync(new StorySimSatisfyTriggerParams(Campaign, Faction, decision.NodeId,
+                        atDecision.TotalSteps));
+
+                var fired = answered.Nodes.Single(n => n.NodeId == decision.NodeId);
+                Assert.Equal("Fired", fired.Lifecycle);
+                Assert.True(fired.FireCount >= 1);
+                Assert.Contains(answered.Steps, s => s.NodeId == decision.NodeId && s.To == "Fired");
+                Assert.True(answered.TotalSteps > atDecision.TotalSteps);
+            }
 
             var rewound = await SendAsync(new StorySimSeekParams(Campaign, Faction, 0));
             Assert.Equal(0, rewound.Tick);
             // A rewind hands the trace back from the top.
             Assert.Equal(rewound.Steps.Count, rewound.TotalSteps);
             Assert.All(rewound.Steps, s => Assert.Equal(0, s.Tick));
-            Assert.Equal("Armed", rewound.Nodes.Single(n => n.NodeId == decision.NodeId).Lifecycle);
+
+            // A battle's decision is its tactical entry rather than a story node, so only an
+            // event decision has a lifecycle to be back to.
+            if (decision.BattleKey is null)
+                Assert.Equal("Armed", rewound.Nodes.Single(n => n.NodeId == decision.NodeId).Lifecycle);
         }
         finally
         {

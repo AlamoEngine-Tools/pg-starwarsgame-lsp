@@ -33,4 +33,69 @@ public sealed record GameSymbol(
     // built before flags - and a kind that rests on one then answers Unknown rather than "no",
     // because putting an error on every shipped hero is the worse way to be wrong.
     [property: Key(7)] string[]? Flags = null
-);
+)
+{
+    /// <summary>
+    ///     Value equality, including the two array members - which a record would otherwise compare
+    ///     by reference.
+    /// </summary>
+    /// <remarks>
+    ///     <c>GameIndexService.ApplyDocumentIndex</c> recognises a content-only re-parse by
+    ///     comparing the old and new symbol lists, and keeps the workspace dictionaries
+    ///     reference-identical when they match, which is what lets the diagnostics publisher
+    ///     re-publish only the edited document. Reference equality here means two parses of the
+    ///     same unchanged text produce "different" symbols, so that guard never fires: every edit
+    ///     rebuilds the index and publishes beyond the file the author touched. It showed up as a
+    ///     rename leaving stale diagnostics behind in another file.
+    /// </remarks>
+    public bool Equals(GameSymbol? other)
+    {
+        return other is not null
+               && Id == other.Id
+               && Kind == other.Kind
+               && TypeName == other.TypeName
+               && Equals(Origin, other.Origin)
+               && Description == other.Description
+               && VariantBaseId == other.VariantBaseId
+               && SameTokens(Behaviors, other.Behaviors)
+               && SameTokens(Flags, other.Flags);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Id);
+        hash.Add(Kind);
+        hash.Add(TypeName);
+        hash.Add(Origin);
+        hash.Add(Description);
+        hash.Add(VariantBaseId);
+        AddTokens(ref hash, Behaviors);
+        AddTokens(ref hash, Flags);
+        return hash.ToHashCode();
+    }
+
+    /// <summary>
+    ///     Order counts and an empty list is not a missing one: "inspected and has none" and
+    ///     "nobody looked" are different answers, and the kind matcher reads them differently.
+    /// </summary>
+    private static bool SameTokens(string[]? left, string[]? right)
+    {
+        if (ReferenceEquals(left, right)) return true;
+        if (left is null || right is null) return false;
+        return left.AsSpan().SequenceEqual(right);
+    }
+
+    private static void AddTokens(ref HashCode hash, string[]? tokens)
+    {
+        if (tokens is null)
+        {
+            hash.Add(0);
+            return;
+        }
+
+        hash.Add(tokens.Length);
+        foreach (var token in tokens)
+            hash.Add(token);
+    }
+}

@@ -395,7 +395,16 @@ public sealed class StorySimulationService(
             if (!_sessions.TryGetValue(key, out var session))
                 return (null, $"No simulation running for {key}");
             if (Refusal(session) is { } refusal)
+            {
+                // Running to the next decision is not a command that can fail while a battle holds
+                // the galaxy: the battle IS the next decision, it is already in the state as an
+                // intervention, and there is nothing to advance past. Refusing it leaves the author
+                // asking "what needs me?" with an error and no state to read the answer from.
+                if (command.Kind == SimCommandKind.Run && FrozenByBattle(session))
+                    return (ToDto(session, sinceSeq), null);
                 return (null, refusal);
+            }
+
             next = session with
             {
                 Snapshot = Apply(session.Simulator, session.Snapshot, command, session.Breakpoints),
@@ -422,6 +431,25 @@ public sealed class StorySimulationService(
             return $"Galaxy paused - battle '{
                 session.Battles.FirstOrDefault(b => b.Key == pending)?.Label ?? pending}' starting";
         return null;
+    }
+
+    /// <summary>
+    ///     Whether this session is a galaxy held still by a battle, rather than one that has
+    ///     finished. Called under the gate.
+    /// </summary>
+    /// <remarks>
+    ///     The two are different refusals. A galaxy frozen by a battle still has somewhere for the
+    ///     author to go - the battle is waiting on them and says so in the state - while a battle
+    ///     session with an outcome is over, and asking it to run means nothing.
+    /// </remarks>
+    private bool FrozenByBattle(Session session)
+    {
+        if (!session.Key.IsGalactic || session.Outcome is not null)
+            return false;
+
+        return RunningBattle(session.Key.Model, null) is not null
+               || session.Snapshot.Runtime.World is
+                   { PendingBattle: not null, PendingBattleChoice: StoryBattleChoice.Fight };
     }
 
     /// <summary>The unresolved battle session of a campaign faction other than <paramref name="except" />, if any. Called under the gate.</summary>
