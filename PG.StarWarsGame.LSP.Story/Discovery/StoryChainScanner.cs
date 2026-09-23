@@ -110,7 +110,9 @@ public sealed class StoryChainScanner
                 state.Campaigns.Add(new StoryCampaignChain(campaignName, factionManifests)
                 {
                     SourceFile = campaignRel,
-                    Seed = ReadSeed(campaignNode)
+                    Seed = ReadSeed(campaignNode),
+                    PlayerFaction = ReadPlayerFaction(campaignNode),
+                    AiControl = ReadAiControl(campaignNode)
                 });
         }
 
@@ -160,6 +162,36 @@ public sealed class StoryChainScanner
         }
 
         return new StoryCampaignSeed(planets, forces, tech, credits, homes);
+    }
+
+    /// <summary><c>Starting_Active_Player</c>, trimmed; a later occurrence replaces an earlier one.</summary>
+    private static string? ReadPlayerFaction(HtmlNode campaignNode)
+    {
+        return campaignNode.ChildNodes
+            .Where(n => n.NodeType == HtmlNodeType.Element &&
+                        n.Name.Equals("Starting_Active_Player", StringComparison.OrdinalIgnoreCase))
+            .Select(n => n.InnerText.Trim())
+            .LastOrDefault(v => v.Length > 0);
+    }
+
+    /// <summary>
+    ///     <c>AI_Player_Control</c> as <c>PlayerListClass::Assign_AI_Control</c> applies it: the tokens
+    ///     of every occurrence form one flat (faction, type) list, walked to the end with a
+    ///     case-insensitive faction match, so the last pair for a faction wins.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> ReadAiControl(HtmlNode campaignNode)
+    {
+        var tokens = campaignNode.ChildNodes
+            .Where(n => n.NodeType == HtmlNodeType.Element &&
+                        n.Name.Equals("AI_Player_Control", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(n => n.InnerText.Split(',',
+                StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .ToList();
+
+        var control = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i + 1 < tokens.Count; i += 2)
+            control[tokens[i]] = tokens[i + 1];
+        return control;
     }
 
     private void AddManifest(string rawReference, SourceLocation origin,

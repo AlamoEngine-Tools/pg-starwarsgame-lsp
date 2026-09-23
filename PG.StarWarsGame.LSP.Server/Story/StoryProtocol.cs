@@ -61,8 +61,24 @@ public sealed record GetStoryPlotsResult(IReadOnlyList<StoryCampaignDto> Campaig
 // Set is the Campaign_Set grouping value (a referenceGroup key) this campaign belongs to, sourced
 // from the workspace group index; null when the campaign declares no Campaign_Set. The navigator
 // groups campaigns by it (set-less campaigns fall under an "Ungrouped" node).
-public sealed record StoryCampaignDto(string Name, IReadOnlyList<StoryFactionDto> Factions, string? Set = null);
+/// <param name="PlayerFaction">
+///     <c>Starting_Active_Player</c> - the faction the human plays, and what a <c>Campaign_Set</c>
+///     picks its member by. Null when the campaign names none.
+/// </param>
+/// <param name="DefinitionUri">The document declaring the campaign, or null when it is not indexed.</param>
+/// <param name="DefinitionLine">0-based line of the <c>&lt;Campaign&gt;</c> element in that document.</param>
+public sealed record StoryCampaignDto(
+    string Name,
+    IReadOnlyList<StoryFactionDto> Factions,
+    string? Set = null,
+    string? PlayerFaction = null,
+    string? DefinitionUri = null,
+    int? DefinitionLine = null);
 
+/// <param name="Control">
+///     The faction's <c>AI_Player_Control</c> player type as written (<c>BasicEmpire</c>, <c>None</c>,
+///     <c>Human</c>, ...), or null when the campaign has no pair for it.
+/// </param>
 public sealed record StoryFactionDto(
     string Faction,
     string ManifestFile,
@@ -70,7 +86,8 @@ public sealed record StoryFactionDto(
     IReadOnlyList<StoryLuaScriptDto> LuaScripts,
     // The faction's tactical battles in the order the galactic story reaches them; each opens as
     // its own graph through getStoryGraph's Scope.
-    IReadOnlyList<StoryBattleDto>? Battles = null);
+    IReadOnlyList<StoryBattleDto>? Battles = null,
+    string? Control = null);
 
 /// <param name="Key">The scope key for getStoryGraph.</param>
 /// <param name="Label">The plot manifest's file name without extension.</param>

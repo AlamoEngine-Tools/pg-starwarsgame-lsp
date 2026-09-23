@@ -1053,20 +1053,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // document when it was assembled, case-insensitively as the engine reads files. There is
         // no name search here - a workspace glob is case-sensitive and would answer by a different
         // rule than the one the model used, which is how a file that was right there read as missing.
-        vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryFile', async (fileName: string, uri?: string) => {
-            if (!uri) {
-                vscode.window.showWarningMessage(
-                    `EaWEdit: '${fileName}' is named by a plot manifest but the story model could not read it - `
-                    + 'a broken chain link, or a file outside the project and its dependencies.');
+        // Invoked from a navigator node's inline button with the node; a node with nothing to open
+        // offers the disabled twin instead, so this never runs for one.
+        vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryFile', async (item?: StoryTreeItem) => {
+            if (!item?.openUri) {
                 return;
             }
             try {
-                const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
-                await vscode.window.showTextDocument(doc, {preview: true});
+                const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(item.openUri));
+                const line = item.openLine ?? 0;
+                await vscode.window.showTextDocument(doc, {
+                    preview: true,
+                    selection: new vscode.Range(line, 0, line, 0),
+                });
             } catch (e) {
-                vscode.window.showWarningMessage(`EaWEdit: Cannot open '${fileName}' - ${e}`);
+                vscode.window.showWarningMessage(`EaWEdit: Cannot open '${String(item.label)}' - ${e}`);
             }
         }),
+        vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryFileUnavailable', () => undefined),
     );
 
     statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);

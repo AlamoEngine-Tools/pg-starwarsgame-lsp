@@ -234,6 +234,16 @@
       ]
     },
     "menus": {
+      "commandPalette": [
+        {
+          "command": "aet-eaw-edit.lsp.openStoryFile",
+          "when": "false"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
+          "when": "false"
+        }
+      ],
       "editor/title": [
         {
           "command": "aet-eaw-edit.lsp.previewCreditsCrawl",
@@ -297,6 +307,16 @@
         {
           "command": "aet-eaw-edit.lsp.openStoryGraph",
           "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryBattle",
+          "group": "inline"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openStoryFile",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem =~ /^aetStory(Campaign|File)$/",
+          "group": "inline"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem =~ /^aetStory(CampaignNoFile|FileMissing)$/",
           "group": "inline"
         },
         {
@@ -392,6 +412,18 @@
         "title": "EaWEdit: Open Story Graph",
         "icon": "$(type-hierarchy)",
         "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.openStoryFile",
+        "title": "Open File",
+        "icon": "$(go-to-file)",
+        "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
+        "title": "Open File - no document in the project",
+        "icon": "$(go-to-file)",
+        "enablement": "false"
       },
       {
         "command": "aet-eaw-edit.lsp.refreshStoryNavigator",

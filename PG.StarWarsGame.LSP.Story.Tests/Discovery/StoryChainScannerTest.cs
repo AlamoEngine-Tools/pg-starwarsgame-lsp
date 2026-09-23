@@ -59,6 +59,83 @@ public sealed class StoryChainScannerTest
         Assert.Equal("Hoth", seed.HomePlanets["Rebel"]);
     }
 
+    [Fact]
+    public void Scan_ReadsThePlayerFactionAndAiControl()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Main_Campaign_Empire">
+                    <Rebel_Story_Name>Story_Plots_Empire.xml</Rebel_Story_Name>
+                    <Starting_Active_Player> Empire </Starting_Active_Player>
+                    <AI_Player_Control> Empire, ScriptableHuman </AI_Player_Control>
+                    <AI_Player_Control> Rebel, None </AI_Player_Control>
+                    <AI_Player_Control> Pirates, None </AI_Player_Control>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Empire.xml", "<Story_Mode_Plots/>");
+
+        var campaign = Scan(resolver).Campaigns.Single();
+
+        Assert.Equal("Empire", campaign.PlayerFaction);
+        Assert.Equal("ScriptableHuman", campaign.AiControl["Empire"]);
+        Assert.Equal("None", campaign.AiControl["rebel"]);
+        Assert.Equal("None", campaign.AiControl["Pirates"]);
+    }
+
+    [Fact]
+    public void Scan_AiControl_PairsTheFlatListAndTheLastPairWins()
+    {
+        // Measured: PlayerListClass::Assign_AI_Control walks the whole flat (faction, type) list
+        // and calls Set_AI_Control on every case-insensitive match, so the last pair wins.
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Mod_Campaign">
+                    <Story_Name>Hutts, Story_Plots_Hutts.xml</Story_Name>
+                    <Starting_Active_Player>Hutts</Starting_Active_Player>
+                    <AI_Player_Control>Empire, BasicEmpire, Rebel, BasicRebel</AI_Player_Control>
+                    <AI_Player_Control>EMPIRE, None</AI_Player_Control>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Hutts.xml", "<Story_Mode_Plots/>");
+
+        var campaign = Scan(resolver).Campaigns.Single();
+
+        Assert.Equal("Hutts", campaign.PlayerFaction);
+        Assert.Equal("Hutts", campaign.FactionManifests.Single().Faction);
+        Assert.Equal("None", campaign.AiControl["Empire"]);
+        Assert.Equal("BasicRebel", campaign.AiControl["Rebel"]);
+        Assert.False(campaign.AiControl.ContainsKey("Hutts"));
+    }
+
+    [Fact]
+    public void Scan_NoStartingActivePlayer_LeavesThePlayerFactionUnset()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Test">
+                    <Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Rebel.xml", "<Story_Mode_Plots/>");
+
+        var campaign = Scan(resolver).Campaigns.Single();
+
+        Assert.Null(campaign.PlayerFaction);
+        Assert.Empty(campaign.AiControl);
+    }
+
     // ── Happy path ───────────────────────────────────────────────────────────
 
     [Fact]

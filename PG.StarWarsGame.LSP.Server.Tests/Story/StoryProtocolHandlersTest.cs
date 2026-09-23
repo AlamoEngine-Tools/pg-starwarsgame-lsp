@@ -115,6 +115,53 @@ public sealed class StoryProtocolHandlersTest
     }
 
     [Fact]
+    public async Task GetStoryPlots_CarriesThePlayerFactionAndEachFactionsControl()
+    {
+        // Main_Campaign_Empire's shape: the Empire is played, the plot is the Rebel faction's and no
+        // AI drives it. A plot faction with no AI_Player_Control pair has no control at all.
+        var models = new StubModelService
+        {
+            Chain = new StoryCampaignChain("GC",
+            [
+                new StoryFactionManifest("Rebel", "M.xml"),
+                new StoryFactionManifest("Hutts", "M.xml")
+            ])
+            {
+                PlayerFaction = "Empire",
+                AiControl = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    { ["rebel"] = "None", ["Empire"] = "ScriptableHuman" }
+            }
+        };
+
+        var result = await new GetStoryPlotsHandler(models, Index(), Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal("Empire", campaign.PlayerFaction);
+        Assert.Equal([("Rebel", "None"), ("Hutts", null)],
+            campaign.Factions.Select(f => (f.Faction, f.Control)));
+    }
+
+    [Fact]
+    public async Task GetStoryPlots_CarriesTheCampaignDefinitionLocation()
+    {
+        const string campUri = "file:///ws/data/xml/campaigns.xml";
+        var campaignSym = new GameSymbol("GC", GameSymbolKind.XmlObject, "Campaign",
+            new FileOrigin(campUri, 5, 4), null);
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("GC", [campaignSym])
+        };
+
+        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index }, Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal(campUri, campaign.DefinitionUri);
+        Assert.Equal(5, campaign.DefinitionLine);
+    }
+
+    [Fact]
     public async Task GetStoryPlots_CampaignWithoutSet_HasNullSet()
     {
         var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
@@ -816,11 +863,14 @@ public sealed class StoryProtocolHandlersTest
             return Model.Threads.Any(t => t.DocumentUri == canonicalUri) ? [Model] : [];
         }
 
+        public StoryCampaignChain Chain { get; init; } =
+            new("GC", [new StoryFactionManifest("Rebel", "M.xml")]);
+
         public StoryChainScanResult GetChainResult()
         {
             return StoryChainScanResult.Empty with
             {
-                Campaigns = [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M.xml")])],
+                Campaigns = [Chain],
                 Manifests =
                 [
                     new StoryManifestContents("M.xml", ["Story_Act_I.xml"], ["Story_Act_II.xml"], ["Story_Lua"])

@@ -19,6 +19,21 @@ public sealed record StoryCampaignChain(string Name, IReadOnlyList<StoryFactionM
 
     /// <summary>The campaign's starting world, for the simulator. Empty for pre-seed cached results.</summary>
     public StoryCampaignSeed Seed { get; init; } = StoryCampaignSeed.Empty;
+
+    /// <summary>
+    ///     The faction the human plays (<c>Starting_Active_Player</c>): the engine makes that faction's
+    ///     player the local one and marks it human, and a <c>Campaign_Set</c> picks its member by it.
+    ///     Null when the campaign does not name one.
+    /// </summary>
+    public string? PlayerFaction { get; init; }
+
+    /// <summary>
+    ///     <c>AI_Player_Control</c> as the engine applies it: faction (case-insensitive) to the raw
+    ///     player type as written - an AI player type, <c>None</c>, <c>Human</c>, ... A faction with
+    ///     no pair is absent.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> AiControl { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>The parsed entries of one plot manifest (xml-relative thread files, raw Lua names).</summary>

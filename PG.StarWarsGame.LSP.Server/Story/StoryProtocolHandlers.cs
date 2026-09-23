@@ -42,10 +42,9 @@ public sealed class GetStoryPlotsHandler(
 
         // The Campaign_Set a campaign belongs to: resolve the campaign object, then look up the set
         // that records a member at its definition origin (the group index keys set -> members).
-        string? SetForCampaign(string campaignName)
+        string? SetForCampaign(FileOrigin? origin)
         {
-            return index.Resolve(campaignName, "Campaign") is { Origin: FileOrigin fo }
-                   && setByCampaignOrigin.TryGetValue((fo.Uri, fo.Line), out var set)
+            return origin is not null && setByCampaignOrigin.TryGetValue((origin.Uri, origin.Line), out var set)
                 ? set
                 : null;
         }
@@ -100,10 +99,14 @@ public sealed class GetStoryPlotsHandler(
                             .ToList()))
                     .ToList();
                 factions.Add(new StoryFactionDto(faction.Faction, faction.ManifestFile,
-                    threads, luaScripts, battles));
+                    threads, luaScripts, battles, campaign.AiControl.GetValueOrDefault(faction.Faction)));
             }
 
-            campaigns.Add(new StoryCampaignDto(campaign.Name, factions, SetForCampaign(campaign.Name)));
+            // A baseline definition carries a game-relative path the editor cannot open.
+            var origin = index.Resolve(campaign.Name, "Campaign")?.Origin as FileOrigin;
+            var navigable = origin is { IsNavigable: true } ? origin : null;
+            campaigns.Add(new StoryCampaignDto(campaign.Name, factions, SetForCampaign(origin),
+                campaign.PlayerFaction, navigable?.Uri, navigable?.Line));
         }
 
         return Task.FromResult(new GetStoryPlotsResult(campaigns));

@@ -47,6 +47,11 @@ export interface StoryFactionDto {
     luaScripts: StoryLuaScriptDto[];
     /** Absent from an older server; treat as none. */
     battles?: StoryBattleDto[] | null;
+    /**
+     * The faction's `AI_Player_Control` player type as written (`BasicEmpire`, `None`, `Human`, ...);
+     * null when the campaign has no pair for it.
+     */
+    control?: string | null;
 }
 
 /** `set` is the Campaign_Set this campaign belongs to; null when it declares none. */
@@ -54,6 +59,12 @@ export interface StoryCampaignDto {
     name: string;
     factions: StoryFactionDto[];
     set?: string | null;
+    /** `Starting_Active_Player` - the faction the human plays; null when the campaign names none. */
+    playerFaction?: string | null;
+    /** The document declaring the campaign; null when it is not openable (baseline or unindexed). */
+    definitionUri?: string | null;
+    /** 0-based line of the `<Campaign>` element in `definitionUri`. */
+    definitionLine?: number | null;
 }
 
 export interface GetStoryPlotsResult {
