@@ -75,10 +75,14 @@ import {cameraPose, cameraViewOptions, modelCameraEntries} from './preview/model
 import {becauseText, setRow} from './preview/visibility';
 import {rowEye, type EyeState} from './preview/rowEye';
 import {
-    luaFor, poseFromPreset, presetFromPose, type CameraPreset,
+    luaFor, nextPresetName, poseFromPreset, presetFromPose, renamePreset, type CameraPreset,
 } from './preview/cameraPresets';
 import {bindingFor, type CameraBinding, type PreviewSubject} from './preview/cameraBindings';
-import {CAPTURE_SIZES, captureFileName, captureSize} from './preview/capture';
+import {
+    CAPTURE_SIZES, captureFileName, captureSize, DEFAULT_CAPTURE_SIZE, iconFileName, MAX_SIDE,
+} from './preview/capture';
+import {IntegerField} from './shared/IntegerField';
+import {parseInteger} from './shared/integerValue';
 import {BREAKOFF_ATTACHMENT, VIEWPORT_BACKGROUND} from './preview/viewport';
 import {parseFxManifest, selectTechnique} from './preview/fx/fxParser';
 import {materialStateFrom} from './preview/fx/renderState';
@@ -1259,14 +1263,7 @@ const Shell = styled.div`
         max-width: 100%;
     }
 
-    /* Icon-only buttons are square rather than pill-shaped; the padding that makes room for a word
-       beside the glyph just makes them lopsided without one. */
-
-    .stage-chrome.icon-only .icon-btn {
-        width: 22px;
-        padding: 0;
-        border-radius: var(--radius-3);
-    }
+    /* Icon-only plates are square-buttoned by the shared stageChromeCss. */
 
     /* ONE height for everything on the stage, set here rather than left to each control's
        contents. A glyph and a word are different heights, and the plates ended up stepped: the
@@ -1443,6 +1440,71 @@ const Shell = styled.div`
         min-height: 0;
         display: flex;
         container-type: inline-size;
+    }
+
+    /* The capture frame: its host is a size container over the canvas, so the frame can be the
+       largest box of the capture's shape that fits - full height or full width - in plain CSS. The
+       shadow dims everything outside it; the host clips the shadow to the viewport. Under the stage
+       chrome, and never under the pointer. */
+
+    .capture-frame-host {
+        position: absolute;
+        inset: 0;
+        container-type: size;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .capture-frame {
+        position: relative;
+        width: min(100cqw, calc(100cqh * var(--capture-ratio)));
+        aspect-ratio: var(--capture-ratio);
+        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+        outline: 1px dashed var(--vscode-focusBorder);
+    }
+
+    .capture-frame-size {
+        position: absolute;
+        top: var(--space-4);
+        left: var(--space-4);
+        padding: 0 var(--space-4);
+        font-size: var(--font-size-smaller);
+        font-variant-numeric: tabular-nums;
+        color: var(--vscode-foreground);
+        background: color-mix(in srgb, var(--vscode-editorWidget-background, #202020) 82%, transparent);
+        border-radius: var(--radius-3);
+    }
+
+    .capture-custom .integer-field {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    /* One line per preset whatever its name: the name gives way, the row's actions never wrap. */
+
+    .preset-list .view-row {
+        flex-wrap: nowrap;
+    }
+
+    .preset-name, .preset-apply {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    /* The button is a flex row, so the ellipsis belongs to the name inside it. */
+
+    .preset-apply {
+        justify-content: flex-start;
+    }
+
+    .preset-apply-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     /* The cover over a subject that is still assembling.
@@ -2353,18 +2415,36 @@ function ModelPreview(): React.JSX.Element {
     const [lights, setLights] = useState<LightRig>(DEFAULT_LIGHTS);
 
     /**
-     * The reader's own saved shots.
+     * The reader's own camera presets.
      *
      * Tier 1, with the rest of the room: a preset exists to frame a ROSTER the same way, so it has
      * to outlive the subject it was built on.
      */
     const [cameraPresets, setCameraPresets] = useState<CameraPreset[]>([]);
+    /** The preset whose name is being edited in its row, if any. */
+    const [renamingPreset, setRenamingPreset] = useState<string | null>(null);
 
-    /** Which saved shot a kind of subject opens with. Tier 1 with the presets they point at. */
+    /** Which camera preset a kind of subject opens with. Tier 1 with the presets they point at. */
     const [cameraBindings, setCameraBindings] = useState<CameraBinding[]>([]);
 
-    /** How big a capture is written, and whether it carries the room with it. */
-    const [captureSizePx, setCaptureSizePx] = useState(128);
+    /**
+     * How big a capture is written - one of the game's icon sizes, or a custom one - and whether it
+     * carries the room with it. The custom sides are the fields' text, so a half-typed number
+     * survives until it is finished.
+     */
+    const [captureSizeId, setCaptureSizeId] = useState(DEFAULT_CAPTURE_SIZE.id);
+    const [customCapture, setCustomCapture] = useState({width: '256', height: '256'});
+    // The capture's pixel size, or null while a custom side is not a whole number from 1 to 4096.
+    const captureDims = ((): { width: number; height: number } | null => {
+        if (captureSizeId !== 'custom') {
+            const preset = CAPTURE_SIZES.find(s => s.id === captureSizeId) ?? DEFAULT_CAPTURE_SIZE;
+            return {width: preset.width, height: preset.height};
+        }
+        const width = parseInteger(customCapture.width);
+        const height = parseInteger(customCapture.height);
+        return width !== null && height !== null && width >= 1 && height >= 1
+        && width <= MAX_SIDE && height <= MAX_SIDE ? {width, height} : null;
+    })();
     const [captureTransparent, setCaptureTransparent] = useState(true);
     const [captureScenery, setCaptureScenery] = useState(false);
     const [wind, setWind] = useState<Wind>(DEFAULT_VIEWER_SETTINGS.wind);
@@ -2410,7 +2490,7 @@ function ModelPreview(): React.JSX.Element {
     /** What the subject IS, as far as a binding rule can see. */
     const subjectFacts = useMemo<PreviewSubject>(() => ({
         // Only a game object has an id worth matching. A bare model is previewed by filename, which
-        // is not a thing anyone binds a roster shot to.
+        // is not a thing anyone binds a roster preset to.
         objectId: scene?.kind === 'Object' ? scene.subject : null,
         objectType: scene?.objectType ?? null,
         categories: scene?.categories ?? [],
@@ -6503,6 +6583,22 @@ function ModelPreview(): React.JSX.Element {
                         <canvas ref={canvasRef}/>
                         <div className="bone-labels" ref={labelsRef}/>
 
+                        {/* The area a capture writes, while the capture settings are open: the
+                            largest box of the capture's shape that fits, centred, with the rest
+                            dimmed - the same arithmetic the capture renders with (captureFrame). */}
+                        {cameraOpen && !folded.has('camera.capture') && captureDims !== null && (
+                            <div className="capture-frame-host" aria-hidden="true">
+                                <div
+                                    className="capture-frame"
+                                    style={{['--capture-ratio' as string]: String(captureDims.width / captureDims.height)}}
+                                >
+                                    <span className="capture-frame-size">
+                                        {captureDims.width} x {captureDims.height}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Over the canvas while the subject assembles itself.
 
                             The parts arrive one at a time and a part's textures cannot be asked for
@@ -7193,66 +7289,88 @@ function ModelPreview(): React.JSX.Element {
 
                                     <DockSection
                                         id="camera.shots"
-                                        title="Saved shots" count={cameraPresets.length}
+                                        title="Camera presets" count={cameraPresets.length}
+                                        end={<InfoBadge>
+                                            Kept in radii, not game units, so one preset frames a trooper and
+                                            a Star Destroyer the same way. Copy as Lua works the distance out
+                                            for the model on screen.
+                                        </InfoBadge>}
                                         collapsed={folded.has('camera.shots')}
                                         onToggle={toggleSection}
                                     >
-                                        <Field
-                                            label="Camera presets"
-                                            value={cameraPresets.length}
-                                            info={<>
-                                                Saved shots are kept in RADII rather than in game units, so one preset
-                                                frames a
-                                                trooper and a Star Destroyer the same way. Copy as Lua works the
-                                                distance back out
-                                                for whatever is on screen.
-                                            </>}
-                                        >
+                                        <div className="preset-list">
 
                                             {cameraPresets.map(saved => (
                                                 <span className="view-row" key={saved.id}>
-                    <Button
-                        title={`Frame this model the way ${saved.name} does: `
-                            + `${saved.distance.toFixed(1)} radii out, pitch `
-                            + `${Math.round(saved.pitch)}, yaw ${Math.round(saved.yaw)}`}
-                        onClick={() => {
-                            const viewport = viewportRef.current;
-                            if (viewport === null) {
-                                return;
-                            }
+                                                    {renamingPreset === saved.id ? (
+                                                        // Enter or leaving the field keeps the name, Escape keeps the old one; an
+                                                        // empty name keeps the old one too (renamePreset).
+                                                        <input
+                                                            type="text" className="preset-name" aria-label="Preset name"
+                                                            defaultValue={saved.name} autoFocus
+                                                            onFocus={e => e.currentTarget.select()}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.currentTarget.blur();
+                                                                } else if (e.key === 'Escape') {
+                                                                    e.stopPropagation();
+                                                                    setRenamingPreset(null);
+                                                                }
+                                                            }}
+                                                            onBlur={e => {
+                                                                const name = e.currentTarget.value;
+                                                                setCameraPresets(current => renamePreset(current, saved.id, name));
+                                                                setRenamingPreset(null);
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <Button
+                                                            className="preset-apply"
+                                                            title={`Frame this model the way ${saved.name} does: `
+                                                                + `${saved.distance.toFixed(1)} radii out, pitch `
+                                                                + `${Math.round(saved.pitch)}, yaw ${Math.round(saved.yaw)}`}
+                                                            onClick={() => {
+                                                                const viewport = viewportRef.current;
+                                                                if (viewport === null) {
+                                                                    return;
+                                                                }
 
-                            const pose = poseFromPreset(saved, viewport.subjectSphere);
-                            viewport.applyCameraPose(pose.position, pose.target);
-                            setCameraView(null);
-                        }}
-                    >
-                        {saved.name}
-                    </Button>
-                    <Button
-                        title={'Copy this shot as a Set_Cinematic_Camera_Key line, with the '
-                            + 'distance worked out for the model on screen'}
-                        onClick={() => {
-                            const viewport = viewportRef.current;
-                            if (viewport === null) {
-                                return;
-                            }
+                                                                const pose = poseFromPreset(saved, viewport.subjectSphere);
+                                                                viewport.applyCameraPose(pose.position, pose.target);
+                                                                setCameraView(null);
+                                                            }}
+                                                        >
+                                                            <span className="preset-apply-name">{saved.name}</span>
+                                                        </Button>
+                                                    )}
+                                                    <IconButton
+                                                        icon="rename"
+                                                        title={`Rename ${saved.name}`}
+                                                        onClick={() => setRenamingPreset(saved.id)}
+                                                    />
+                                                    <IconButton
+                                                        icon="copy"
+                                                        title="Copy as Lua - Set_Cinematic_Camera_Key, distance for the model on screen"
+                                                        onClick={() => {
+                                                            const viewport = viewportRef.current;
+                                                            if (viewport === null) {
+                                                                return;
+                                                            }
 
-                            void navigator.clipboard.writeText(luaFor(
-                                saved, viewport.subjectSphere,
-                                sceneRef.current?.kind === 'Object'
-                                    ? sceneRef.current.subject
-                                    : null));
-                        }}
-                    >
-                        Copy as Lua
-                    </Button>
-                    <IconButton
-                        icon="remove"
-                        title={`Delete ${saved.name}`}
-                        onClick={() => setCameraPresets(
-                            current => current.filter(p => p.id !== saved.id))}
-                    />
-                </span>
+                                                            void navigator.clipboard.writeText(luaFor(
+                                                                saved, viewport.subjectSphere,
+                                                                sceneRef.current?.kind === 'Object'
+                                                                    ? sceneRef.current.subject
+                                                                    : null));
+                                                        }}
+                                                    />
+                                                    <IconButton
+                                                        icon="remove"
+                                                        title={`Delete ${saved.name}`}
+                                                        onClick={() => setCameraPresets(
+                                                            current => current.filter(p => p.id !== saved.id))}
+                                                    />
+                                                </span>
                                             ))}
 
                                             <Button
@@ -7262,20 +7380,20 @@ function ModelPreview(): React.JSX.Element {
                                                         return;
                                                     }
 
-                                                    // Named for where it is in the list rather than prompting: a webview has no
-                                                    // modal worth the name, and a preset is renamed by editing its name field.
+                                                    // Named after the first free number rather than prompting; the
+                                                    // row's pencil renames it in place.
                                                     const saved = presetFromPose(
-                                                        `Shot ${cameraPresets.length + 1}`,
+                                                        nextPresetName(cameraPresets),
                                                         viewport.cameraPosition, viewport.subjectSphere);
 
                                                     setCameraPresets(current => [...current, saved]);
                                                 }}
                                             >
                                                 <Icon name="add"/>
-                                                Save this shot
+                                                New camera preset
                                             </Button>
 
-                                        </Field>
+                                        </div>
 
                                         <Field
                                             label="Opens with"
@@ -7283,27 +7401,27 @@ function ModelPreview(): React.JSX.Element {
                                             info={<>
                                                 {bindTargets.length === 0
                                                     ? 'A model opened on its own has no object, type or category to bind to. Open '
-                                                    + 'it through a game object to bind a shot to a whole roster.'
-                                                    : 'A bound shot is applied when the model opens, most specific rule first: '
+                                                    + 'it through a game object to bind a preset to a whole roster.'
+                                                    : 'A bound preset is applied when the model opens, most specific rule first: '
                                                     + 'this object beats its type, and its type beats a category. Moving the '
                                                     + 'camera afterwards is always allowed.'}
                                             </>}
                                             value={boundRule === null
                                                 ? 'nothing'
-                                                : cameraPresets.find(p => p.id === boundRule.presetId)?.name ?? 'a lost shot'}
+                                                : cameraPresets.find(p => p.id === boundRule.presetId)?.name ?? 'a deleted preset'}
                                         >
 
-                                            {/* Bind the LAST saved shot: with no preset there is nothing to bind, and picking
+                                            {/* Bind the LAST camera preset: with no preset there is nothing to bind, and picking
                 which one belongs in a list rather than in three buttons. */}
                                             {bindTargets.map(target => (
                                                 <Button
                                                     key={target.kind}
                                                     title={`Open every ${target.what} with ${
                                                         cameraPresets.length === 0
-                                                            ? 'a saved shot'
+                                                            ? 'a camera preset'
                                                             : cameraPresets[cameraPresets.length - 1].name}`}
                                                     disabled={cameraPresets.length === 0}
-                                                    disabledReason="Save a shot first - there is nothing to bind yet"
+                                                    disabledReason="No camera preset to bind"
                                                     onClick={() => {
                                                         const preset = cameraPresets[cameraPresets.length - 1];
                                                         setCameraBindings(current => [
@@ -7328,7 +7446,7 @@ function ModelPreview(): React.JSX.Element {
                                             {boundRule !== null && (
                                                 <Button
                                                     title={`Stop opening ${boundRule.kind === 'object' ? 'this object' : `every ${
-                                                        boundRule.value}`} with a saved shot`}
+                                                        boundRule.value}`} with a camera preset`}
                                                     onClick={() => setCameraBindings(
                                                         current => current.filter(b => b.id !== boundRule.id))}
                                                 >
@@ -7350,7 +7468,7 @@ function ModelPreview(): React.JSX.Element {
                                             label="Draw distance"
                                             info={<>
                                                 The fit already reaches the end of the effects, not just the hull.
-                                                Reach further for a long trail; a huge model may z-fight if you do.
+                                                Reach further for a long trail; a huge model may z-fight then.
                                             </>}
                                         >
                                             <ModeSelector
@@ -7375,27 +7493,44 @@ function ModelPreview(): React.JSX.Element {
                                     >
                                         <Field
                                             label="Capture"
-                                            value={<>{captureSizePx}px</>}
+                                            value={captureDims ? `${captureDims.width} x ${captureDims.height}` : '-'}
                                             info={<>
-                                                Renders the shot on screen at the chosen size and asks where to put it.
-                                                Off by
-                                                default the grid, the floor, the effects and every annotation stay out
-                                                of it, which
-                                                is what an icon wants - tick the box to capture the room exactly as you
-                                                see it.
+                                                Writes the framed area at the chosen size. Grid, floor, effects
+                                                and annotations stay out unless kept.
                                             </>}
                                         >
 
                                             <ModeSelector
                                                 label="Capture size"
-                                                value={String(captureSizePx)}
-                                                options={CAPTURE_SIZES.map(size => ({
-                                                    id: String(size),
-                                                    label: String(size),
-                                                    title: `Write a ${size} by ${size} image`,
-                                                }))}
-                                                onSelect={id => setCaptureSizePx(Number(id))}
+                                                value={captureSizeId}
+                                                options={[
+                                                    ...CAPTURE_SIZES.map(size => ({
+                                                        id: size.id, label: size.label, title: size.title,
+                                                    })),
+                                                    {
+                                                        id: 'custom',
+                                                        label: 'Custom',
+                                                        title: `Custom - up to ${MAX_SIDE}`
+                                                    },
+                                                ]}
+                                                onSelect={setCaptureSizeId}
                                             />
+
+                                            <span className="view-row capture-custom">
+                                                <IntegerField
+                                                    value={customCapture.width} ariaLabel="Width"
+                                                    disabled={captureSizeId !== 'custom'}
+                                                    disabledReason="Custom size only"
+                                                    onChange={width => setCustomCapture(c => ({...c, width}))}
+                                                />
+                                                x
+                                                <IntegerField
+                                                    value={customCapture.height} ariaLabel="Height"
+                                                    disabled={captureSizeId !== 'custom'}
+                                                    disabledReason="Custom size only"
+                                                    onChange={height => setCustomCapture(c => ({...c, height}))}
+                                                />
+                                            </span>
 
                                             <label className="check-row">
                                                 <input
@@ -7416,13 +7551,18 @@ function ModelPreview(): React.JSX.Element {
                                             </label>
 
                                             <Button
+                                                disabled={captureDims === null}
+                                                disabledReason={`Width and height must be whole numbers from 1 to ${MAX_SIDE}`}
                                                 onClick={() => {
                                                     const viewport = viewportRef.current;
                                                     if (viewport === null) {
                                                         return;
                                                     }
 
-                                                    const size = captureSize(captureSizePx, captureSizePx);
+                                                    if (captureDims === null) {
+                                                        return;
+                                                    }
+                                                    const size = captureSize(captureDims.width, captureDims.height);
                                                     const dataUrl = viewport.capture({
                                                         ...size,
                                                         // The reader's own backdrop when they asked to keep the room, so what they
@@ -7442,7 +7582,11 @@ function ModelPreview(): React.JSX.Element {
                                                     vscode.postMessage({
                                                         type: 'saveCapture',
                                                         dataUrl,
-                                                        fileName: captureFileName(scene?.subject ?? 'capture', size.width),
+                                                        // The unit's own icons are named the way the engine looks them up.
+                                                        fileName: iconFileName(
+                                                                CAPTURE_SIZES.find(s => s.id === captureSizeId) ?? null,
+                                                                scene?.iconName)
+                                                            ?? captureFileName(scene?.subject ?? 'capture', size.width, size.height),
                                                     });
                                                 }}
                                             >

@@ -225,6 +225,38 @@ public sealed class StorySimulatorMediaTest
 
         Assert.Equal([("M2_Done", 3), ("M2_Score", 1)], writes.Select(w => (w.Flag, w.Value)));
     }
+
+    /// <summary>
+    ///     The tutorial's M01 shape: the win flag is reset at the start and incremented by the victory
+    ///     listener. Deciding the battle runs that listener, so the flag is the outcome's to write and
+    ///     no pick - offering the reset's 0 read as "the battle set the win to 0".
+    /// </summary>
+    [Fact]
+    public void FlagWritesOf_LeavesOutWhatTheOutcomeListenersWrite()
+    {
+        const string writer =
+            "<Story><Event Name=\"Reset\"><Event_Type>STORY_GENERIC</Event_Type>" +
+            "<Reward_Type>SET_FLAG</Reward_Type><Reward_Param1>M2_Win</Reward_Param1><Reward_Param2>0</Reward_Param2></Event>" +
+            "<Event Name=\"Victory\"><Event_Type>STORY_VICTORY</Event_Type>" +
+            "<Reward_Type>INCREMENT_FLAG</Reward_Type><Reward_Param1>M2_Win</Reward_Param1><Reward_Param2>1</Reward_Param2></Event>" +
+            "<Event Name=\"Lost\"><Event_Type>STORY_MISSION_LOST</Event_Type>" +
+            "<Reward_Type>SET_FLAG</Reward_Type><Reward_Param1>M2_Lost</Reward_Param1><Reward_Param2>1</Reward_Param2></Event>" +
+            "<Event Name=\"Other\"><Event_Type>STORY_GENERIC</Event_Type>" +
+            "<Reward_Type>SET_FLAG</Reward_Type><Reward_Param1>M2_Extra</Reward_Param1><Reward_Param2>2</Reward_Param2></Event></Story>";
+        var threads = new List<StoryThread>
+        {
+            StoryThreadParser.Parse(GalaxyText, Galaxy), StoryThreadParser.Parse(writer, Battle)
+        };
+        var manifests = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+            { [M2] = new HashSet<string> { Battle } };
+        var graph = new StoryGraphBuilder(Schema).Build(threads, manifests);
+        var model = new StoryCampaignModel("GC", "Empire", threads, new HashSet<string>(StringComparer.Ordinal), graph)
+            { TacticalManifestThreads = manifests };
+
+        var writes = StorySimulator.FlagWritesOf(model, Schema, M2Key);
+
+        Assert.Equal([("M2_Extra", 2)], writes.Select(w => (w.Flag, w.Value)));
+    }
 }
 
 file sealed class MediaSchemaProvider : ISchemaProvider

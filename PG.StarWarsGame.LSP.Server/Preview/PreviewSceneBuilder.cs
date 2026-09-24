@@ -387,7 +387,8 @@ public sealed class PreviewSceneBuilder(
             FirstToken(Tag(effective, "Affiliation")),
             stages,
             DamageTable(effective),
-            EngineScaleFactor.Of(Tag(effective, "Scale_Factor")));
+            EngineScaleFactor.Of(Tag(effective, "Scale_Factor")),
+            IconName: Tag(effective, EncyclopediaTags.IconName));
     }
 
     /// <summary>

@@ -741,6 +741,11 @@ export interface PreviewScene {
      * `Viewport.setModelScale`.
      */
     scaleFactor?: number | null;
+    /**
+     * The subject's `Icon_Name`, verbatim, or null for a bare model or an object that names none.
+     * A large capture is named `big_` + this, the name the engine looks the large icon up by.
+     */
+    iconName?: string | null;
     factions: PreviewFaction[];
     problems: PreviewProblem[];
     /** The cameras the subject's own model declares. Empty for the 87% that carry none. */

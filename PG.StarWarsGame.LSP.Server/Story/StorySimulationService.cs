@@ -64,6 +64,13 @@ public interface IStorySimulationService
     /// </summary>
     (StorySimStateDto? State, string? Error) ResolveBattle(StorySimKey key, string battleKey, bool won,
         int sinceSeq = 0, IReadOnlyList<StorySimFlagDto>? flags = null);
+
+    /// <summary>
+    ///     The game's retry after a battle: the galaxy back to just before the battle's resolution.
+    ///     Answers with the state of <paramref name="key" />'s own scope - the rewound galaxy, or a
+    ///     battle panel's closed session.
+    /// </summary>
+    (StorySimStateDto? State, string? Error) RetryBattle(StorySimKey key, string battleKey);
 }
 
 /// <summary>
@@ -294,6 +301,39 @@ public sealed class StorySimulationService(
         return (ToDto(next, next.Snapshot.Steps.Count), null);
     }
 
+    /// <summary>
+    ///     The game's retry after a lost battle reloads the pre-battle autosave. Here: the galaxy goes
+    ///     back to just before the battle's resolution - the battle at its choice again, nothing of the
+    ///     outcome applied - and the battle session that outcome closed is dropped. Refused when the
+    ///     galaxy's log no longer holds the resolution (a seek cut it, or it never happened).
+    /// </summary>
+    public (StorySimStateDto? State, string? Error) RetryBattle(StorySimKey key, string battleKey)
+    {
+        var battleSession = new StorySimKey(key.Campaign, key.Faction, battleKey);
+        var toNotify = new List<StorySimKey> { key.Galactic };
+        Session next;
+        lock (_gate)
+        {
+            if (!_sessions.TryGetValue(key.Galactic, out var galactic))
+                return (null, $"No simulation running for {key.Model}");
+            var resolved = galactic.Commands.Any(c => c.Kind == SimCommandKind.Battle
+                                                      && string.Equals(c.Text, battleSession.Scope,
+                                                          StringComparison.OrdinalIgnoreCase));
+            if (!resolved || !galactic.RetryPoints.TryGetValue(battleSession.Scope!, out var point))
+                return (null, $"Battle '{battleKey}' has no outcome to retry");
+            next = galactic with
+            {
+                Snapshot = point.Snapshot, Commands = point.Commands,
+                RetryPoints = galactic.RetryPoints.Remove(battleSession.Scope!)
+            };
+            _sessions[key.Galactic] = next;
+            if (_sessions.Remove(battleSession)) toNotify.Add(battleSession);
+        }
+
+        foreach (var changed in toNotify) notifyChanged(changed);
+        return key.IsGalactic ? (ToDto(next, 0), null) : (StorySimStateDto.NotRunning, null);
+    }
+
     public (StorySimStateDto? State, string? Error) ResolveBattle(StorySimKey key, string battleKey, bool won,
         int sinceSeq = 0, IReadOnlyList<StorySimFlagDto>? flags = null)
     {
@@ -356,12 +396,13 @@ public sealed class StorySimulationService(
             foreach (var (flag, value) in ended.Runtime.Flags)
                 if (!seed.TryGetValue(flag, out var before) || before != value)
                     writes.Add(new StoryFlagWrite(flag, value));
-            // The author's picks: what the battle could have set but nothing decided on its own.
+            // The author's picks: what the battle could have set but nothing decided on its own. A
+            // flag the outcome wrote is the battle's own answer and a pick never overrides it - the
+            // tutorial's M01 resets its win flag at the start, so a pick of that reset would undo
+            // the victory's increment and the galaxy would never see the win.
             foreach (var pick in flags ?? [])
-            {
-                writes.RemoveAll(w => w.Flag.Equals(pick.Name, StringComparison.OrdinalIgnoreCase));
-                writes.Add(new StoryFlagWrite(pick.Name, pick.Value));
-            }
+                if (!writes.Any(w => w.Flag.Equals(pick.Name, StringComparison.OrdinalIgnoreCase)))
+                    writes.Add(new StoryFlagWrite(pick.Name, pick.Value));
 
             if (galactic is not null)
             {
@@ -374,7 +415,9 @@ public sealed class StorySimulationService(
                 galactic = galactic with
                 {
                     Snapshot = Apply(galactic.Simulator, galactic.Snapshot, command, galactic.Breakpoints),
-                    Commands = galactic.Commands.Add(command)
+                    Commands = galactic.Commands.Add(command),
+                    RetryPoints = galactic.RetryPoints.SetItem(battleSession.Scope!,
+                        (galactic.Snapshot, galactic.Commands))
                 };
                 _sessions[key.Galactic] = galactic;
                 toNotify.Add(key.Galactic);
@@ -716,5 +759,15 @@ public sealed class StorySimulationService(
         public ImmutableDictionary<string, int> SeedFlags { get; init; } = StoryRuntimeState.Initial.Flags;
         public StoryWorld? SeedWorld { get; init; }
         public string? Outcome { get; init; }
+
+        /// <summary>
+        ///     Galactic only: per battle, the galaxy as it stood just before that battle's resolution -
+        ///     what a retry restores, the simulator's pre-battle autosave. Exact, rather than a replay
+        ///     to a tick: a run replayed without the breakpoints it ran under could overshoot.
+        /// </summary>
+        public ImmutableDictionary<string, (StorySimSnapshot Snapshot, ImmutableList<SimCommand> Commands)>
+            RetryPoints { get; init; } =
+            ImmutableDictionary<string, (StorySimSnapshot, ImmutableList<SimCommand>)>.Empty
+                .WithComparers(StringComparer.OrdinalIgnoreCase);
     }
 }

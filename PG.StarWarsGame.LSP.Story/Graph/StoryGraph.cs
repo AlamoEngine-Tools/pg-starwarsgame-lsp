@@ -91,7 +91,14 @@ public enum StoryGraphProblemKind
     ///     the engine's call sites, see <see cref="StoryGenericNames" />) and which no
     ///     TRIGGER_EVENT pushes: it never fires.
     /// </summary>
-    GenericNeverRaised
+    GenericNeverRaised,
+
+    /// <summary>
+    ///     A STORY_MISSION_LOST listener that can only arm once the battle summary has closed
+    ///     (every prerequisite line waits on a battle_end_closed listener). Measured: the loss is
+    ///     delivered before the summary closes, so the listener never fires.
+    /// </summary>
+    MissionLostAfterSummary
 }
 
 /// <summary>A resolution defect found while building the graph, anchored to the referencing value.</summary>

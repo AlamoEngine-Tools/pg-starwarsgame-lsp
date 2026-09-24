@@ -95,11 +95,13 @@ import {
     StoryGraphEdgeDto,
     StoryGraphNodeDto,
     StorySimInterventionDto,
+    StorySimStateDto,
     StorySimStepDto,
     StorySimWorldDto
 } from '../../protocol/story';
 import {
-    armingLines, filterTrace, groupDecisions, labelFor, paceIntervalMs, parsePace, pickerCandidates, traceRows,
+    armingLines, DEFAULT_PACE, filterTrace, groupDecisions, labelFor, paceIntervalMs, parsePace, pickerCandidates,
+    retryableBattle, selectionAnswered, SPEED_STOPS, speedLabel, speedStopOf, traceRows,
 } from './simModel';
 
 function intervention(name: string, kind: string, facet: string | null, options: string[] = []): StorySimInterventionDto {
@@ -241,9 +243,72 @@ describe('pickerCandidates', () => {
 describe('pace', () => {
     it('parses a stored pace and falls back on garbage', () => {
         assert.deepEqual(parsePace('{"mode":"custom","ticksPerSecond":8}'), {mode: 'custom', ticksPerSecond: 8});
-        assert.deepEqual(parsePace('{"mode":"fast"}').mode, 'pulse');
-        assert.deepEqual(parsePace('nonsense').mode, 'pulse');
+        assert.deepEqual(parsePace('{"mode":"step","ticksPerSecond":4}'), {mode: 'step', ticksPerSecond: 4});
+        assert.deepEqual(parsePace('{"mode":"fast"}'), DEFAULT_PACE);
+        assert.deepEqual(parsePace('nonsense'), DEFAULT_PACE);
         assert.equal(paceIntervalMs({mode: 'custom', ticksPerSecond: 4}), 250);
-        assert.equal(paceIntervalMs({mode: 'pulse', ticksPerSecond: 4}), 1000);
+    });
+
+    /** Pulse and custom at 1/s ran the same 1000 ms interval: one stop, not two controls. */
+    it('folds a stored pulse into 1 tick per second', () => {
+        assert.deepEqual(parsePace('{"mode":"pulse","ticksPerSecond":4}'), {mode: 'custom', ticksPerSecond: 1});
+    });
+
+    it('moves a stored rate between stops to the nearest stop', () => {
+        assert.equal(parsePace('{"mode":"custom","ticksPerSecond":5}').ticksPerSecond, 4);
+        assert.equal(parsePace('{"mode":"custom","ticksPerSecond":20}').ticksPerSecond, 15);
+        assert.equal(parsePace('{"mode":"custom","ticksPerSecond":29}').ticksPerSecond, 30);
+    });
+});
+
+describe('selectionAnswered', () => {
+    const state = {interventions: [{nodeId: 'a#open'}]} as unknown as StorySimStateDto;
+
+    /**
+     * A decision's dialog closes once the decision is answered: the battle's decision, opened by
+     * the wait, stayed up after the loss resolved it and read only "Answered".
+     */
+    it('is answered once the decision is no longer owed', () => {
+        assert.equal(selectionAnswered({kind: 'decision', nodeId: 'a#gone'}, state), true);
+        assert.equal(selectionAnswered({kind: 'decision', nodeId: 'a#open'}, state), false);
+    });
+
+    it('never calls anything but a decision answered', () => {
+        assert.equal(selectionAnswered({kind: 'node', nodeId: 'a#gone'}, state), false);
+    });
+});
+
+describe('retryableBattle', () => {
+    const galaxy = (overrides: Record<string, unknown>) => ({
+        scope: null, interventions: [], clockPending: 0,
+        battles: [{key: 'm01', label: 'M01', status: 'lost', tick: 0}], ...overrides,
+    }) as unknown as StorySimStateDto;
+
+    /**
+     * Where the game shows its retry dialog: a battle lost and the galaxy with nothing left to do.
+     * The tutorial's own failure branch arms too late to hear the loss, so this is the only way on.
+     */
+    it('offers the lost battle when the galaxy has nothing left to do', () => {
+        assert.equal(retryableBattle(galaxy({})), 'm01');
+    });
+
+    it('offers nothing while the story still moves, inside a battle, or with no loss', () => {
+        assert.equal(retryableBattle(galaxy({clockPending: 2})), null);
+        assert.equal(retryableBattle(galaxy({interventions: [{nodeId: 'a#x'}]})), null);
+        assert.equal(retryableBattle(galaxy({scope: 'm01'})), null);
+        assert.equal(retryableBattle(galaxy({battles: [{key: 'm01', label: 'M01', status: 'won', tick: 0}]})), null);
+    });
+});
+
+describe('speed stops', () => {
+    it('is one ordered axis: step first, then ticks per second', () => {
+        assert.deepEqual(SPEED_STOPS.map(p => speedLabel(p)),
+            ['Step', '1/s', '2/s', '4/s', '8/s', '15/s', '30/s']);
+    });
+
+    it('finds the stop a pace sits on', () => {
+        assert.equal(speedStopOf({mode: 'step', ticksPerSecond: 8}), 0);
+        assert.equal(speedStopOf({mode: 'custom', ticksPerSecond: 1}), 1);
+        assert.equal(speedStopOf({mode: 'custom', ticksPerSecond: 30}), 6);
     });
 });

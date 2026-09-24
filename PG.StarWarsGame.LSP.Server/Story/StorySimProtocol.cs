@@ -294,6 +294,17 @@ public sealed record StorySimResolveBattleParams(
     IReadOnlyList<StorySimFlagDto>? Flags = null) : IRequest<StorySimStateResult>;
 
 /// <summary>
+///     Retries a battle: the galaxy back to just before its resolution, as the game's retry reloads
+///     the pre-battle autosave. <c>Battle</c> is the battle's key; <c>Scope</c> the asking panel's.
+/// </summary>
+[Method("aet/storySimRetryBattle", Direction.ClientToServer)]
+public sealed record StorySimRetryBattleParams(
+    string Campaign,
+    string Faction,
+    string Battle,
+    string? Scope = null) : IRequest<StorySimStateResult>;
+
+/// <summary>
 ///     Server -> client push after any simulation state change; the client whose panel shows that
 ///     campaign faction and scope re-fetches the state. A battle's resolution pushes both scopes.
 /// </summary>

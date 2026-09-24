@@ -602,6 +602,44 @@ public sealed class StoryProtocolHandlersTest
     }
 
     [Fact]
+    public async Task GetStoryParamOptions_QueryMatchesAnywhereInTheName_PrefixMatchesFirst()
+    {
+        // The field filters what it holds by substring, so the server has to answer the same way:
+        // a prefix-only answer never fetched Mustafar for "ta" and left the list claiming no match.
+        var index = IndexWith(("Coruscant", "Planet"), ("Mustafar", "Planet"), ("Tatooine", "Planet"));
+
+        var result = await OptionsHandler(index)
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "event", "STORY_ENTER", 0, "ta"),
+                CancellationToken.None);
+
+        Assert.Equal(["Tatooine", "Mustafar"], result.Options.Select(o => o.Value));
+    }
+
+    [Fact]
+    public async Task GetStoryParamOptions_QueryMatchesAnywhereInCampaignNames()
+    {
+        var result = await OptionsHandler()
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "reward", "TRIGGER_EVENT", 0, "xt"),
+                CancellationToken.None);
+
+        Assert.Equal(["Next"], result.Options.Select(o => o.Value));
+    }
+
+    [Fact]
+    public async Task GetStoryParamOptions_DefaultLimitIs2000()
+    {
+        // Measured on eaw with the foc baseline: every slot but the object types holds at most 937
+        // candidates (SpeechEvent), and at the old 50 the list was cut short in 127 of 218 slots.
+        var index = IndexWith(Enumerable.Range(0, 2500).Select(i => ($"Planet_{i:D4}", "Planet")).ToArray());
+
+        var result = await OptionsHandler(index)
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "event", "STORY_ENTER", 0),
+                CancellationToken.None);
+
+        Assert.Equal(2000, result.Options.Count);
+    }
+
+    [Fact]
     public async Task GetStoryParamOptions_StoryEditorOff_ReturnsDisabledMessage()
     {
         var result = await OptionsHandler(storyEditor: false)

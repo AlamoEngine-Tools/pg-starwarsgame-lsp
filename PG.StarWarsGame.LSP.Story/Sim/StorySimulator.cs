@@ -218,16 +218,24 @@ public sealed partial class StorySimulator
 
     public StorySimOptions Options { get; }
 
+    /// <summary>The listeners a battle's outcome fires when it is decided (see <c>WorldVerdict</c>).</summary>
+    private static readonly HashSet<string> OutcomeEventTypes = new(StringComparer.OrdinalIgnoreCase)
+        { "STORY_VICTORY", "STORY_MISSION_LOST", "STORY_MISSION_FAILED" };
+
     /// <summary>
     ///     What a battle can write into the shared flag table: every flag its events' SET_FLAG and
     ///     INCREMENT_FLAG rewards name, with the value the reward would set or add - the picks a
     ///     portal offers when the battle is decided without being played. First reward per flag.
+    ///     A flag an outcome listener writes is left out: deciding the battle runs that listener, so
+    ///     the flag is the outcome's answer, not the author's - M01 resets its win flag at the start
+    ///     and increments it on victory, and offering the reset's 0 read as a losing value.
     /// </summary>
     public static IReadOnlyList<StoryFlagWrite> FlagWritesOf(StoryCampaignModel model, ISchemaProvider schema,
         string scope)
     {
         var rewardParamTypes = StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryRewardType"));
         var writes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var outcomeWritten = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var node in StoryGraphScoper.Scope(model, scope).Nodes.Where(n => n.Kind == StoryNodeKind.Event))
         {
             var storyEvent = node.Event!;
@@ -235,14 +243,18 @@ public sealed partial class StorySimulator
             if (reward is null) continue;
             var rawAmount = storyEvent.RewardParams.FirstOrDefault(p => p.Position == 1)?.RawValue;
             var amount = int.TryParse(rawAmount, out var parsed) ? parsed : 1;
+            var byOutcome = storyEvent.EventType is { } type && OutcomeEventTypes.Contains(type.Trim());
             foreach (var slot in storyEvent.RewardParams)
             {
                 if (rewardParamTypes.GetValueOrDefault((reward, slot.Position)) != StoryReferenceTypes.Flag) continue;
-                writes.TryAdd(slot.RawValue.Trim(), amount);
+                var flag = slot.RawValue.Trim();
+                writes.TryAdd(flag, amount);
+                if (byOutcome) outcomeWritten.Add(flag);
             }
         }
 
-        return writes.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+        return writes.Where(kvp => !outcomeWritten.Contains(kvp.Key))
+            .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
             .Select(kvp => new StoryFlagWrite(kvp.Key, kvp.Value)).ToList();
     }
 

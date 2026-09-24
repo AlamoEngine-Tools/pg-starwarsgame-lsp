@@ -15,7 +15,7 @@ import { DIALOG_IDS } from '../shared/dialogGeometryStore';
 import {
     canCopyBetweenLanguages, copyFromOptions, FillSource, nextCopyFrom, resolveFillSource,
 } from './fillLanguage';
-import { LocModal } from './LocModal';
+import { Modal } from '../shared/Modal';
 import { DockSection } from '../shared/DockSection';
 import { LocTile, LocTileGrid } from './LocTile';
 import { Field } from '../shared/Field';
@@ -200,7 +200,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
             </DockSection>
 
             {dialog === 'language' && (
-                <LocModal
+                <Modal
                     dialogId={DIALOG_IDS.addLanguage}
                     // Two different things happen, so the dialog must not describe only one of
                     // them: a format that takes a column stages an edit, and a single-language
@@ -268,11 +268,11 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
                         </>
                     )}
-                </LocModal>
+                </Modal>
             )}
 
             {dialog === 'copy' && (
-                <LocModal
+                <Modal
                     dialogId={DIALOG_IDS.fillLanguage}
                     title="Fill in a language"
                     confirmLabel="Fill"
@@ -374,11 +374,11 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                             filling those in would credit the wrong people.
                         </p>
                     )}
-                </LocModal>
+                </Modal>
             )}
 
             {dialog === 'convert' && (
-                <LocModal
+                <Modal
                     dialogId={DIALOG_IDS.convertFormat}
                     footnote={'The new file is written beside this one and the original is kept.'}
                     title="Convert to another format"
@@ -400,11 +400,11 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                             </label>
                         ))}
                     </div>
-                </LocModal>
+                </Modal>
             )}
 
             {dialog === 'export' && (
-                <LocModal
+                <Modal
                     dialogId={DIALOG_IDS.exportDat}
                     title="Export to DAT"
                     confirmLabel="Export"
@@ -419,7 +419,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         This exports what is saved on disk, not what is staged - save first if you
                         want your pending edits included.
                     </p>
-                </LocModal>
+                </Modal>
             )}
         </>
     );

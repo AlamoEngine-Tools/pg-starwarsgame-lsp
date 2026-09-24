@@ -164,7 +164,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 break;
             case 'paramOptions':
                 await this._sendParamOptions(msg.requestId as number, msg.side as string,
-                    msg.typeName as string, msg.position as number, msg.prefix as string | undefined);
+                    msg.typeName as string, msg.position as number, msg.query as string | undefined);
                 break;
             case 'resolveRef':
                 await this._resolveRef(msg.value as string, msg.referenceType as string | undefined);
@@ -293,7 +293,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * the webview's suggestion dropdown awaits the requestId and must not hang on errors.
      */
     private async _sendParamOptions(
-        requestId: number, side: string, typeName: string, position: number, prefix: string | undefined
+        requestId: number, side: string, typeName: string, position: number, query: string | undefined
     ): Promise<void> {
         // Always answers, empty on any failure - the webview's suggestion dropdown awaits this
         // requestId and would hang forever on a silent return.
@@ -301,7 +301,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
             'aet/getStoryParamOptions',
             {
                 campaign: this._target.campaign, faction: this._target.faction, side, typeName, position,
-                prefix: prefix || undefined, limit: 50,
+                query: query || undefined,
             },
             {options: []});
 

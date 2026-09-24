@@ -5,8 +5,8 @@
 //
 // Header: the tick and what the story is waiting on - state and warnings. Content: the inventories -
 // decisions the author owes, the world's facts, the flags, the scripts. Foot: the transport, which
-// is the preview's animation player with ticks for frames. A row's detail opens BESIDE the dock as
-// a stage flyout, never by unfolding inside the list.
+// is the preview's animation player with ticks for frames. A row's detail opens as ONE dialog -
+// never by unfolding inside the list, never as a flyout, never as a dialog on top of another.
 //
 // Everything here reads the flat state document and sends a request; storyGraph.tsx owns the state
 // and the canvas, and simModel.ts owns the arithmetic.
@@ -24,8 +24,13 @@ import type {
     StorySimStepDto,
     StorySimWorldChangeDto,
 } from '../../protocol/story';
-import {IconButton} from '../shared/Button';
+import {Button, IconButton} from '../shared/Button';
+import {Combobox} from '../shared/Combobox';
+import {IntegerField} from '../shared/IntegerField';
+import {parseInteger} from '../shared/integerValue';
+import {Modal} from '../shared/Modal';
 import {DockSection} from '../shared/DockSection';
+import {Field} from '../shared/Field';
 import {Icon, type IconName} from '../shared/Icon';
 import {ProblemsPanel} from '../shared/ProblemsPanel';
 
@@ -37,7 +42,11 @@ import {
     groupDecisions,
     labelFor,
     pickerCandidates,
+    retryableBattle,
     type SimPace,
+    SPEED_STOPS,
+    speedLabel,
+    speedStopOf,
     traceRows,
 } from './simModel';
 
@@ -66,9 +75,11 @@ export interface SimActions {
      * merge into the galaxy, and the outcome fires there.
      */
     resolveBattle: (battleKey: string, won: boolean, picks?: readonly StorySimFlagDto[]) => void;
+    /** The game's retry after a lost battle: the galaxy back to just before the outcome. */
+    retryBattle: (battleKey: string) => void;
 }
 
-/** What the flyout beside the dock is showing. */
+/** What the detail dialog is showing. */
 export type SimSelection =
     | { kind: 'decision'; nodeId: string }
     | { kind: 'node'; nodeId: string }
@@ -118,7 +129,7 @@ export interface SimLenses {
     hideLua: boolean;
 }
 
-/** The graph the flyout reads arming lines off. */
+/** The graph the event dialog reads arming lines off. */
 export interface SimGraph {
     nodes: readonly StoryGraphNodeDto[];
     edges: readonly StoryGraphEdgeDto[];
@@ -144,112 +155,95 @@ export function waitingOnAuthor(state: StorySimStateDto): boolean {
 }
 
 /**
- * The dock header's simulation chip: the run state and the tick. Four states, one chip:
- * running (the clock is ticking - a live dot), paused, halted at a breakpoint, or waiting for
- * input because the clock alone has nothing left to change. A real campaign has hundreds of
- * armed world listeners from tick 0, so the mere count of decisions is an inventory figure, not
- * a warning. Pressing the chip acts on the state it shows: running pauses, paused plays, halted
- * and waiting open and centre the event concerned. The panel opens the first decision by itself
- * when a wait begins (storyGraph.tsx, applySimOverlay); the chip press is the way back to it.
+ * The player's status readout, in the slot the preview's player gives its scrubber: what the run
+ * is doing on the left, the tick and the clock at the right. Running (a live dot), paused, halted at
+ * a breakpoint, waiting for input because the clock alone has nothing left to change, the galaxy
+ * paused for a battle, or a battle's outcome. A real campaign has hundreds of armed world listeners
+ * from tick 0, so the mere count of decisions is an inventory figure, not a warning. Pressing it
+ * acts on the state it shows: running pauses, paused plays, halted and waiting open the event
+ * concerned. The panel opens the decision the story hangs on by itself when a wait begins
+ * (storyGraph.tsx, applySimOverlay); the press is the way back to it.
  */
-export function SimHeaderChip(props: {
+export function SimStatus(props: {
     state: StorySimStateDto;
     playing: boolean;
     labelOf: (id: string) => string | undefined;
     onSelect: (selection: SimSelection) => void;
     onPlayPause: () => void;
+    /** The game's retry after a lost battle: the galaxy back to just before the outcome. */
+    onRetry?: (battleKey: string) => void;
 }): React.JSX.Element {
     const {state} = props;
+    const time = `t${state.tick} - ${state.clock.toFixed(0)}s`;
+    const retry = retryableBattle(state);
     const owed = waitingOnAuthor(state) ? state.interventions.length : 0;
-    if (state.pausedFor) {
-        // The game freezes the galaxy during a tactical battle; the chip names the battle and
-        // opens it, since that is where the story goes on.
-        const battle = state.battles?.find(b => b.label === state.pausedFor);
-        return (
-            <button
-                type="button"
-                className="sim-chip battle"
-                title={`Galaxy paused - battle ${state.pausedFor}`}
-                onClick={() => battle && props.onSelect({kind: 'battle', key: battle.key})}
-            >
-                <span className="sim-chip-tick">t{state.tick}</span>
-                <span className="sim-chip-sep"/>
-                <Icon name="tactical" size={13}/>
-                <span className="sim-chip-text">{state.pausedFor}</span>
-            </button>
-        );
-    }
-    if (state.outcome) {
-        return (
-            <span className={'sim-chip resolved ' + state.outcome}
-                  title={`Battle ${state.outcome} - tick ${state.tick}`}>
-                <span className="sim-chip-tick">t{state.tick}</span>
-                <span className="sim-chip-sep"/>
-                <Icon name="tactical" size={13}/>
-                <span className="sim-chip-text">{state.outcome === 'won' ? 'Won' : 'Lost'}</span>
-            </span>
-        );
-    }
-    if (state.haltedAt) {
-        const name = labelFor(state.haltedAt, props.labelOf);
-        return (
-            <button
-                type="button"
-                className="sim-chip halted"
-                title={`Breakpoint - ${name}`}
-                onClick={() => props.onSelect({kind: 'node', nodeId: state.haltedAt!})}
-            >
-                <span className="sim-chip-tick">t{state.tick}</span>
-                <span className="sim-chip-sep"/>
-                <Icon name="breakpoint" size={13}/>
-                <span className="sim-chip-text">{name}</span>
-            </button>
-        );
-    }
-    if (owed > 0) {
-        const first = state.interventions[0];
-        return (
-            <button
-                type="button"
-                className="sim-chip owed"
-                title={`Waiting for input - ${owed} decision${owed === 1 ? '' : 's'}`}
-                onClick={() => props.onSelect({kind: 'decision', nodeId: first.nodeId})}
-            >
-                <span className="sim-chip-tick">t{state.tick}</span>
-                <span className="sim-chip-sep"/>
-                <Icon name="decision" size={13}/>
-                <span className="sim-chip-text">Waiting for input</span>
-            </button>
-        );
-    }
-    if (props.playing) {
-        return (
-            <button
-                type="button"
-                className="sim-chip running"
-                title={`Running - tick ${state.tick}, ${state.clock.toFixed(0)} s - press to pause`}
-                onClick={props.onPlayPause}
-            >
-                <span className="sim-chip-dot" aria-hidden="true"/>
-                <span className="sim-chip-text">Running</span>
-                <span className="sim-chip-sep"/>
-                <span className="sim-chip-tick">t{state.tick}</span>
-            </button>
-        );
-    }
-    return (
-        <button
-            type="button"
-            className="sim-chip paused"
-            title={`Paused - tick ${state.tick}, ${state.clock.toFixed(0)} s - press to play`}
-            onClick={props.onPlayPause}
-        >
-            <Icon name="pause" size={13}/>
-            <span className="sim-chip-text">Paused</span>
-            <span className="sim-chip-sep"/>
-            <span className="sim-chip-tick">t{state.tick}</span>
-        </button>
+    const status = ((): {
+        kind: string; glyph: React.ReactNode; text: string; title: string; onClick?: () => void;
+    } => {
+        if (state.pausedFor) {
+            // The game freezes the galaxy during a tactical battle; the readout names the battle and
+            // opens it, since that is where the story goes on.
+            const battle = state.battles?.find(b => b.label === state.pausedFor);
+            return {
+                kind: 'battle', glyph: <Icon name="tactical" size={14}/>, text: state.pausedFor,
+                title: `Galaxy paused - battle ${state.pausedFor}`,
+                onClick: () => battle && props.onSelect({kind: 'battle', key: battle.key}),
+            };
+        }
+        if (state.outcome) {
+            const text = state.outcome === 'won' ? 'Won' : 'Lost';
+            return {
+                kind: 'resolved ' + state.outcome, glyph: <Icon name="tactical" size={14}/>, text,
+                title: `Battle ${state.outcome}`,
+            };
+        }
+        if (retry && props.onRetry) {
+            // Where the game shows its retry dialog: the story cannot go on from a lost battle.
+            const label = state.battles?.find(b => b.key === retry)?.label ?? retry;
+            return {
+                kind: 'lost', glyph: <Icon name="restart" size={14}/>, text: `Battle lost - ${label}`,
+                title: 'Retry - back to just before the outcome',
+                onClick: () => props.onRetry!(retry),
+            };
+        }
+        if (state.haltedAt) {
+            const name = labelFor(state.haltedAt, props.labelOf);
+            return {
+                kind: 'halted', glyph: <Icon name="breakpoint" size={14}/>, text: name,
+                title: `Breakpoint - ${name}`,
+                onClick: () => props.onSelect({kind: 'node', nodeId: state.haltedAt!}),
+            };
+        }
+        if (owed > 0) {
+            const first = state.interventions[0];
+            return {
+                kind: 'owed', glyph: <Icon name="decision" size={14}/>, text: 'Waiting for input',
+                title: `Waiting for input - ${owed} decision${owed === 1 ? '' : 's'}`,
+                onClick: () => props.onSelect({kind: 'decision', nodeId: first.nodeId}),
+            };
+        }
+        if (props.playing) {
+            return {
+                kind: 'running', glyph: <span className="sim-status-dot" aria-hidden="true"/>, text: 'Running',
+                title: 'Running - press to pause', onClick: props.onPlayPause,
+            };
+        }
+        return {
+            kind: 'paused', glyph: <Icon name="pause" size={14}/>, text: 'Paused',
+            title: 'Paused - press to play', onClick: props.onPlayPause,
+        };
+    })();
+    const body = (
+        <>
+            {status.glyph}
+            <span className="sim-status-text">{status.text}</span>
+            <span className="sim-status-time">{time}</span>
+        </>
     );
+    return status.onClick
+        ? <button type="button" className={'sim-status ' + status.kind} title={status.title}
+                  onClick={status.onClick}>{body}</button>
+        : <span className={'sim-status ' + status.kind} title={status.title}>{body}</span>;
 }
 
 // ── Content ──────────────────────────────────────────────────────────────────
@@ -548,27 +542,34 @@ export function SimFlyout(props: {
     onClose: () => void;
 }): React.JSX.Element {
     const {selection} = props;
-    const title = selection.kind === 'decision' ? 'Decision'
-        : selection.kind === 'node' ? 'Event'
-            : selection.kind === 'planet' ? 'Planet'
-                : selection.kind === 'flag' ? 'Flag'
-                    : selection.kind === 'battle' ? 'Battle' : 'Script';
-    return (
-        <div className="stage-flyout on-right sizeable sim-flyout" role="dialog" aria-label={title}>
-            <div className="stage-flyout-head">
-                {title}
-                <IconButton icon="close" title="Close" onClick={props.onClose}/>
-            </div>
-            <div className="stage-flyout-body">
-                {selection.kind === 'decision' ? <DecisionDetail {...props} nodeId={selection.nodeId}/> : null}
-                {selection.kind === 'node' ? <NodeDetail {...props} nodeId={selection.nodeId}/> : null}
-                {selection.kind === 'planet' ? <PlanetDetail {...props} name={selection.name}/> : null}
-                {selection.kind === 'flag' ? <FlagDetail {...props} name={selection.name}/> : null}
-                {selection.kind === 'script' ? <ScriptDetail {...props} scriptUri={selection.scriptUri}/> : null}
-                {selection.kind === 'battle' ? <BattleDetail {...props} battleKey={selection.key}/> : null}
-            </div>
-        </div>
-    );
+    // Every detail is ONE dialog. One with a value applies it on OK; the rest show, answer through
+    // their button row, and close. Never a flyout, and never a dialog on top of another window.
+    if (selection.kind === 'flag') {
+        return <FlagDialog state={props.state} name={selection.name} actions={props.actions}
+                           onClose={props.onClose}/>;
+    }
+    if (selection.kind === 'planet') {
+        return <PlanetDialog state={props.state} name={selection.name} actions={props.actions}
+                             onClose={props.onClose}/>;
+    }
+    const decision = selection.kind === 'decision'
+        ? props.state.interventions.find(i => i.nodeId === selection.nodeId)
+        : undefined;
+    if (decision && decisionPicker(decision, props.state)) {
+        return <DecisionDialog state={props.state} item={decision} actions={props.actions}
+                               onClose={props.onClose}/>;
+    }
+    const detail = {...props, onClose: props.onClose};
+    if (selection.kind === 'decision') {
+        return <AnswerDialog {...detail} nodeId={selection.nodeId}/>;
+    }
+    if (selection.kind === 'node') {
+        return <EventDialog {...detail} nodeId={selection.nodeId}/>;
+    }
+    if (selection.kind === 'script') {
+        return <ScriptDialog {...detail} scriptUri={selection.scriptUri}/>;
+    }
+    return <BattleDialog {...detail} battleKey={selection.key}/>;
 }
 
 type DetailProps = {
@@ -577,7 +578,20 @@ type DetailProps = {
     labelOf: (id: string) => string | undefined;
     actions: SimActions;
     onSelect: (selection: SimSelection | null) => void;
+    onClose: () => void;
 };
+
+/** "Show in graph": the dialog would cover what it points at, so it closes first. */
+function ShowInGraph(props: { nodeId: string; actions: SimActions; onClose: () => void }): React.JSX.Element {
+    return (
+        <Button title="Centre the graph on it" onClick={() => {
+            props.onClose();
+            props.actions.centerNode(props.nodeId);
+        }}>
+            <Icon name="search" size={13}/>Show
+        </Button>
+    );
+}
 
 function factionOf(item: StorySimInterventionDto | undefined, state: StorySimStateDto): string | null {
     const named = item?.suggested?.faction;
@@ -593,7 +607,11 @@ function factionOf(item: StorySimInterventionDto | undefined, state: StorySimSta
  * its outcome here without entering - the tactical decision the game leaves to play. Shared by
  * the battle row, the tactical decision that waits on it, and the paused chip.
  */
-function BattleControls(props: { state: StorySimStateDto; battleKey: string; actions: SimActions }): React.JSX.Element {
+function BattleControls(props: {
+    state: StorySimStateDto; battleKey: string; actions: SimActions;
+    /** The dialog title already names the battle: the status row then names only its state. */
+    titled?: boolean;
+}): React.JSX.Element {
     const {state, battleKey, actions} = props;
     const inside = state.scope === battleKey;
     const battle = state.battles?.find(b => b.key === battleKey);
@@ -627,7 +645,7 @@ function BattleControls(props: { state: StorySimStateDto; battleKey: string; act
         <>
             <div className="sim-row static">
                 <Icon name="tactical" size={13}/>
-                <span className="sim-row-name">{label}</span>
+                <span className="sim-row-name">{props.titled ? 'Status' : label}</span>
                 <span className="sim-row-value">{status}</span>
             </div>
             {pending ? (
@@ -682,141 +700,86 @@ function BattleControls(props: { state: StorySimStateDto; battleKey: string; act
                     </button>
                 </div>
             ) : null}
+            {!inside && battle?.status === 'lost' ? (
+                // The game's answer to a lost battle: retry, which reloads the pre-battle autosave.
+                <button type="button" className="btn sim-answer" title="Retry - back to just before the outcome"
+                        onClick={() => actions.retryBattle(battleKey)}>
+                    <Icon name="restart" size={13}/>Retry
+                </button>
+            ) : null}
         </>
     );
 }
 
-function BattleDetail(props: DetailProps & { battleKey: string }): React.JSX.Element {
+function BattleDialog(props: DetailProps & { battleKey: string }): React.JSX.Element {
+    const battle = props.state.battles?.find(b => b.key === props.battleKey);
     return (
-        <DockSection title="Battle">
-            <BattleControls state={props.state} battleKey={props.battleKey} actions={props.actions}/>
-        </DockSection>
+        <Modal title={battle?.label ?? props.battleKey} onCancel={props.onClose}>
+            <BattleControls state={props.state} battleKey={props.battleKey} actions={props.actions} titled/>
+        </Modal>
     );
 }
 
-function DecisionDetail(props: DetailProps & { nodeId: string }): React.JSX.Element {
+/**
+ * A decision with no value to pick: a script event, a battle's outcome, a bare trigger. The answers
+ * are the button row - the event's own change, Fire, Rule out - and each one closes the dialog.
+ */
+function AnswerDialog(props: DetailProps & { nodeId: string }): React.JSX.Element {
     const {state, actions} = props;
     const item = state.interventions.find(i => i.nodeId === props.nodeId);
-    const [chosen, setChosen] = useState('');
-    useEffect(() => setChosen(''), [props.nodeId]);
-    if (!item) {
-        return <p className="field-note">Answered</p>;
-    }
-    const faction = factionOf(item, state);
-    const candidates = pickerCandidates(item.facet, item.options, state.world, faction);
-    const name = labelFor(item.nodeId, props.labelOf);
-    const change = (value: string): StorySimWorldChangeDto | null => {
-        if (!item.facet) {
-            return null;
-        }
-        const base: StorySimWorldChangeDto = {...(item.suggested ?? {kind: item.facet}), kind: item.facet};
-        if (candidates.kind === 'planet') {
-            return {...base, planet: value, faction: base.faction ?? faction};
-        }
-        if (candidates.kind === 'unit') {
-            return {...base, unitType: value, faction: base.faction ?? faction};
-        }
-        return {...base, name: value};
+    // A battle's decision sits on its portal, whose id is the manifest file: name the battle instead.
+    const name = item?.kind === 'battle' ? item.eventName : labelFor(props.nodeId, props.labelOf);
+    const answer = (run: () => void): void => {
+        run();
+        props.onClose();
     };
-    const custom = chosen.trim() ? change(chosen.trim()) : null;
-
+    if (!item) {
+        return <Modal title={name} onCancel={props.onClose}><p className="modal-note">Answered</p></Modal>;
+    }
     return (
-        <>
-            <div className="sim-detail-head">
-                <button type="button" className="link" title="Show in graph"
-                        onClick={() => actions.centerNode(item.nodeId)}>
-                    {name}
+        <Modal
+            title={name} onCancel={props.onClose}
+            actions={<>
+                <ShowInGraph nodeId={item.nodeId} actions={actions} onClose={props.onClose}/>
+                {!item.battleKey && item.suggested ? (
+                    <Button title="The change the event names"
+                            onClick={() => answer(() => actions.world(item.suggested!))}>
+                        <Icon name={item.kind === 'tactical' ? 'tactical' : 'world'} size={13}/>
+                        {describeChange(item.suggested)}
+                    </Button>
+                ) : null}
+                {item.kind !== 'battle' ? (
+                    // A battle is not a trigger: it ends through its outcome or nothing.
+                    <>
+                        <Button title="Assume the trigger met"
+                                onClick={() => answer(() => actions.satisfy(item.nodeId))}>
+                            <Icon name="decision" size={13}/>Fire
+                        </Button>
+                        <Button title="Never fires in this run - stays armed"
+                                onClick={() => answer(() => actions.ruleOut(item.nodeId, true))}>
+                            <Icon name="remove" size={13}/>Rule out
+                        </Button>
+                    </>
+                ) : null}
+            </>}
+        >
+            <p className="modal-note">{item.eventType ?? ''}</p>
+            {item.kind === 'lua' ? item.options.map(id => (
+                <button type="button" className="btn sim-answer" key={id} title={`Story_Event("${id}")`}
+                        onClick={() => answer(() => actions.luaNotify(id))}>
+                    <Icon name="script" size={13}/>{id}
                 </button>
-                <span className="sim-detail-type">{item.eventType ?? ''}</span>
-            </div>
-            {item.kind === 'lua' ? (
-                <DockSection title="Script_Event" count={item.options.length}>
-                    <p className="field-note">Story_Event ids the event listens for</p>
-                    {item.options.map(id => (
-                        <button type="button" className="btn sim-answer" key={id} title={`Story_Event("${id}")`}
-                                onClick={() => actions.luaNotify(id)}>
-                            <Icon name="script" size={13}/>{id}
-                        </button>
-                    ))}
-                </DockSection>
-            ) : null}
+            )) : null}
             {item.battleKey ? (
                 // The outcome this listener waits on is a battle's: deciding it here resolves the
                 // battle, so the portal, the dock and the galaxy agree on what happened.
-                <DockSection title="Battle">
-                    <BattleControls state={state} battleKey={item.battleKey} actions={actions}/>
-                </DockSection>
-            ) : item.suggested ? (
-                <DockSection title="From the event">
-                    <button type="button" className="btn sim-answer" title="Apply"
-                            onClick={() => actions.world(item.suggested!)}>
-                        <Icon name={item.kind === 'tactical' ? 'tactical' : 'world'} size={13}/>
-                        {describeChange(item.suggested)}
-                    </button>
-                </DockSection>
+                <BattleControls state={state} battleKey={item.battleKey} actions={actions}/>
             ) : null}
-            {candidates.kind !== 'none' ? (
-                <DockSection
-                    title={candidates.kind === 'planet' ? 'Planet' : candidates.kind === 'unit' ? 'Unit type' : 'Name'}>
-                    <p className="field-note">
-                        {candidates.preferred.length
-                            ? 'Likely candidates first - any name accepted'
-                            : 'No candidate in the world - any name accepted'}
-                    </p>
-                    <input
-                        type="text"
-                        list={'sim-pick-' + candidates.kind}
-                        placeholder={candidates.kind === 'planet' ? 'Planet...' : candidates.kind === 'unit' ? 'Unit type...' : 'Name...'}
-                        value={chosen}
-                        onChange={e => setChosen(e.target.value)}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' && custom) {
-                                actions.world(custom);
-                            }
-                        }}
-                    />
-                    <datalist id={'sim-pick-' + candidates.kind}>
-                        {[...new Set([...candidates.preferred, ...candidates.all])].map(v => <option key={v}
-                                                                                                     value={v}/>)}
-                    </datalist>
-                    <div className="sim-chip-row">
-                        {candidates.preferred.slice(0, 8).map(v => (
-                            <button type="button" className="btn sim-pick" key={v}
-                                    title={change(v) ? describeChange(change(v)!) : v}
-                                    onClick={() => {
-                                        const c = change(v);
-                                        if (c) {
-                                            actions.world(c);
-                                        }
-                                    }}>{v}</button>
-                        ))}
-                    </div>
-                    <button type="button" className="btn sim-answer" disabled={!custom}
-                            title={custom ? describeChange(custom) : 'No name entered'}
-                            onClick={() => custom && actions.world(custom)}>
-                        <Icon name="check" size={13}/>Apply
-                    </button>
-                </DockSection>
-            ) : null}
-            {item.kind !== 'battle' ? (
-                // A battle is not a trigger: it ends through its outcome or nothing.
-                <DockSection title="Or">
-                    <button type="button" className="btn sim-answer" title="Fire without a world change"
-                            onClick={() => actions.satisfy(item.nodeId)}>
-                        <Icon name="decision" size={13}/>Assume the trigger met
-                    </button>
-                    <button type="button" className="btn sim-answer"
-                            title="Never fires in this run - stays armed, no decision"
-                            onClick={() => actions.ruleOut(item.nodeId, true)}>
-                        <Icon name="remove" size={13}/>Rule out
-                    </button>
-                </DockSection>
-            ) : null}
-        </>
+        </Modal>
     );
 }
 
-function NodeDetail(props: DetailProps & { nodeId: string }): React.JSX.Element {
+function EventDialog(props: DetailProps & { nodeId: string }): React.JSX.Element {
     const {state, actions, graph} = props;
     const nodeState: StorySimNodeStateDto | undefined = state.nodes.find(n => n.nodeId === props.nodeId);
     const dto = graph.nodes.find(n => n.id === props.nodeId);
@@ -830,15 +793,30 @@ function NodeDetail(props: DetailProps & { nodeId: string }): React.JSX.Element 
     const toggleBreakpoint = (): void => actions.setBreakpoints(
         hasBreakpoint ? state.breakpoints.filter(id => id !== props.nodeId) : [...state.breakpoints, props.nodeId],
         state.breakOnGates);
+    const armed = nodeState?.lifecycle === 'Armed';
     return (
-        <>
-            <div className="sim-detail-head">
-                <button type="button" className="link" title="Show in graph"
-                        onClick={() => actions.centerNode(props.nodeId)}>
-                    {name}
-                </button>
-                <span className="sim-detail-type">{dto?.eventType ?? ''}</span>
-            </div>
+        <Modal
+            title={name} onCancel={props.onClose}
+            actions={<>
+                <ShowInGraph nodeId={props.nodeId} actions={actions} onClose={props.onClose}/>
+                <Button title={hasBreakpoint ? 'Clear the breakpoint' : 'Break after this fires'}
+                        className={hasBreakpoint ? 'active' : undefined} onClick={toggleBreakpoint}>
+                    <Icon name="breakpoint" size={13}/>{hasBreakpoint ? 'Clear break' : 'Break here'}
+                </Button>
+                {owed ? (
+                    <Button title="Its decision"
+                            onClick={() => props.onSelect({kind: 'decision', nodeId: props.nodeId})}>
+                        <Icon name="decision" size={13}/>Answer
+                    </Button>
+                ) : (
+                    <Button title="Fire now" disabled={!armed} disabledReason="Not armed"
+                            onClick={() => actions.satisfy(props.nodeId)}>
+                        <Icon name="fire" size={13}/>Fire
+                    </Button>
+                )}
+            </>}
+        >
+            <p className="modal-note">{dto?.eventType ?? ''}</p>
             <DockSection title="State">
                 <div className="sim-row static">
                     <span className="sim-row-name">Lifecycle</span>
@@ -875,32 +853,18 @@ function NodeDetail(props: DetailProps & { nodeId: string }): React.JSX.Element 
                     </div>
                 ))}
             </DockSection>
-            <DockSection title="Do">
-                <button type="button" className={'btn sim-answer' + (hasBreakpoint ? ' active' : '')}
-                        aria-pressed={hasBreakpoint}
-                        title={hasBreakpoint ? 'Breakpoint set' : 'Break after this fires'}
-                        onClick={toggleBreakpoint}>
-                    <Icon name="breakpoint" size={13}/>{hasBreakpoint ? 'Clear breakpoint' : 'Break here'}
-                </button>
-                {owed ? (
-                    <button type="button" className="btn sim-answer" title="Open decision"
-                            onClick={() => props.onSelect({kind: 'decision', nodeId: props.nodeId})}>
-                        <Icon name="decision" size={13}/>Answer its decision
-                    </button>
-                ) : (
-                    <button type="button" className="btn sim-answer"
-                            disabled={nodeState?.lifecycle !== 'Armed'}
-                            title={nodeState?.lifecycle === 'Armed' ? 'Fire now' : 'Not armed'}
-                            onClick={() => actions.satisfy(props.nodeId)}>
-                        <Icon name="fire" size={13}/>Fire now
-                    </button>
-                )}
-            </DockSection>
-        </>
+        </Modal>
     );
 }
 
-function PlanetDetail(props: DetailProps & { name: string }): React.JSX.Element {
+/**
+ * A planet as one dialog: its owner is the value to change - a new owner applies on OK and fires
+ * the capture listeners - and the facts and units beside it are read-only. The draft is taken
+ * once, when the dialog opens, so a tick landing mid-typing leaves it alone.
+ */
+function PlanetDialog(props: {
+    state: StorySimStateDto; name: string; actions: SimActions; onClose: () => void;
+}): React.JSX.Element {
     const {state, actions} = props;
     const planet = state.world.planets.find(p => p.name === props.name);
     const factions = useMemo(() => {
@@ -915,132 +879,181 @@ function PlanetDetail(props: DetailProps & { name: string }): React.JSX.Element 
         }
         return [...set].sort();
     }, [state.world]);
-    const [owner, setOwner] = useState('');
-    useEffect(() => setOwner(''), [props.name]);
-    if (!planet) {
-        return <p className="field-note">Not in the world</p>;
-    }
-    const here = state.world.units.filter(u => u.planet === planet.name);
+    const [owner, setOwner] = useState(() => planet?.owner ?? '');
+    const draft = owner.trim();
+    const changed = !!planet && draft.length > 0 && draft.toLowerCase() !== (planet.owner ?? '').toLowerCase();
+    const here = planet ? state.world.units.filter(u => u.planet === planet.name) : [];
     return (
-        <>
-            <div className="sim-detail-head">
-                <span className="sim-detail-name">{planet.name}</span>
-                <span className="sim-detail-type">{planet.owner ?? 'Neutral'}</span>
-            </div>
-            <DockSection title="Facts">
-                <div className="sim-row static"><span className="sim-row-name">Revealed</span><span
-                    className="sim-row-value">{planet.revealed ? 'yes' : 'no'}</span></div>
-                <div className="sim-row static"><span className="sim-row-name">Corrupted</span><span
-                    className="sim-row-value">{planet.corrupted ? 'yes' : 'no'}</span></div>
-                <div className="sim-row static"><span className="sim-row-name">Destroyed</span><span
-                    className="sim-row-value">{planet.destroyed ? 'yes' : 'no'}</span></div>
-            </DockSection>
-            <DockSection title="Units here" count={here.reduce((n, u) => n + u.count, 0)}>
-                {here.length === 0 ? <p className="field-note">None</p> : null}
-                {here.map(u => (
-                    <div className="sim-row static" key={u.type + '|' + u.owner}>
-                        <span className="sim-row-name">{u.type}</span>
-                        <span className="sim-row-value">{u.owner} x{u.count}</span>
-                    </div>
-                ))}
-            </DockSection>
-            <DockSection title="Capture">
-                <p className="field-note">New owner - fires the capture listeners</p>
-                <input type="text" list="sim-factions" placeholder="Faction..." value={owner}
-                       onChange={e => setOwner(e.target.value)}
-                       onKeyDown={e => {
-                           if (e.key === 'Enter' && owner.trim()) {
-                               actions.world({kind: 'capturePlanet', planet: planet.name, faction: owner.trim()});
-                           }
-                       }}/>
-                <datalist id="sim-factions">{factions.map(f => <option key={f} value={f}/>)}</datalist>
-                <div className="sim-chip-row">
-                    {factions.filter(f => f !== planet.owner).map(f => (
-                        <button type="button" className="btn sim-pick" key={f} title={`${f} captures ${planet.name}`}
-                                onClick={() => actions.world({
-                                    kind: 'capturePlanet',
-                                    planet: planet.name,
-                                    faction: f
-                                })}>{f}</button>
+        <Modal
+            form title={props.name} confirmLabel="OK"
+            canConfirm={changed} disabledReason={draft ? 'Owner unchanged' : 'Owner required'}
+            onConfirm={() => {
+                if (changed) {
+                    actions.world({kind: 'capturePlanet', planet: planet!.name, faction: draft});
+                    props.onClose();
+                }
+            }}
+            onCancel={props.onClose}
+        >
+            {planet ? (
+                <>
+                    <Combobox
+                        value={owner} onChange={setOwner} placeholder="Owner" ariaLabel="Owner" icon="search"
+                        options={factions.map(f => ({value: f}))} autoFocus
+                    />
+                    <div className="sim-row static"><span className="sim-row-name">Revealed</span><span
+                        className="sim-row-value">{planet.revealed ? 'yes' : 'no'}</span></div>
+                    <div className="sim-row static"><span className="sim-row-name">Corrupted</span><span
+                        className="sim-row-value">{planet.corrupted ? 'yes' : 'no'}</span></div>
+                    <div className="sim-row static"><span className="sim-row-name">Destroyed</span><span
+                        className="sim-row-value">{planet.destroyed ? 'yes' : 'no'}</span></div>
+                    {here.map(u => (
+                        <div className="sim-row static" key={u.type + '|' + u.owner}>
+                            <span className="sim-row-name">{u.type}</span>
+                            <span className="sim-row-value">{u.owner} x{u.count}</span>
+                        </div>
                     ))}
-                </div>
-            </DockSection>
-        </>
+                </>
+            ) : <p className="modal-note">Not in the world</p>}
+        </Modal>
     );
 }
 
-function FlagDetail(props: DetailProps & { name: string }): React.JSX.Element {
+/**
+ * Setting a flag: a form, so it is a modal with OK and Cancel rather than a flyout - the row already
+ * shows the flag and its value, and nothing changes until OK. The draft is taken once, when the
+ * dialog opens: a running simulation re-renders on every tick and must not overwrite what is being
+ * typed.
+ */
+function FlagDialog(props: {
+    state: StorySimStateDto; name: string; actions: SimActions; onClose: () => void;
+}): React.JSX.Element {
     const {state, actions} = props;
     const existing = state.flags.find(f => f.name === props.name);
     const [name, setName] = useState(props.name);
-    const [value, setValue] = useState(String(existing?.value ?? 1));
-    useEffect(() => {
-        setName(props.name);
-        setValue(String(state.flags.find(f => f.name === props.name)?.value ?? 1));
-    }, [props.name, state.flags]);
-    const valid = name.trim().length > 0 && Number.isFinite(Number(value));
-    const apply = (): void => {
-        if (valid) {
-            actions.setFlag(name.trim(), Number(value));
-        }
-    };
+    const [value, setValue] = useState(() => String(existing?.value ?? 1));
+    const parsed = parseInteger(value);
+    const valid = name.trim().length > 0 && parsed !== null;
     return (
-        <>
-            <div className="sim-detail-head">
-                <span className="sim-detail-name">{existing ? existing.name : 'New flag'}</span>
-                {existing ? <span className="sim-detail-type">= {existing.value}</span> : null}
-            </div>
-            <DockSection title="Set">
-                <p className="field-note">Read by STORY_FLAG on the next tick</p>
+        <Modal
+            form title={existing ? `Set ${existing.name}` : 'Set flag'} confirmLabel="OK"
+            canConfirm={valid}
+            disabledReason={name.trim() ? 'Whole number required' : 'Flag name required'}
+            onConfirm={() => {
+                if (valid) {
+                    actions.setFlag(name.trim(), parsed!);
+                    props.onClose();
+                }
+            }}
+            onCancel={props.onClose}
+        >
+            <div className="form-row">
                 {existing ? null : (
-                    <input type="text" placeholder="Flag name..." value={name} onChange={e => setName(e.target.value)}/>
+                    <Combobox
+                        value={name} onChange={setName} placeholder="Flag name" ariaLabel="Flag name" icon="search"
+                        options={state.flags.map(f => ({value: f.name, detail: `= ${f.value}`}))}
+                        autoFocus
+                    />
                 )}
-                <div className="sim-row static">
-                    <span className="sim-row-name">Value</span>
-                    <input type="number" className="sim-number" value={value} onChange={e => setValue(e.target.value)}
-                           onKeyDown={e => {
-                               if (e.key === 'Enter') {
-                                   apply();
-                               }
-                           }}/>
-                </div>
-                <div className="sim-chip-row">
-                    {[0, 1, 2, 3].map(v => (
-                        <button type="button" className="btn sim-pick" key={v} title={`Set to ${v}`}
-                                disabled={!name.trim()}
-                                onClick={() => actions.setFlag(name.trim(), v)}>{v}</button>
-                    ))}
-                </div>
-                <button type="button" className="btn sim-answer" disabled={!valid}
-                        title={valid ? 'Set' : 'Name and value required'}
-                        onClick={apply}>
-                    <Icon name="check" size={13}/>Set flag
-                </button>
-            </DockSection>
-        </>
+                <IntegerField value={value} onChange={setValue} ariaLabel="Value" autoFocus={!!existing}/>
+            </div>
+        </Modal>
     );
 }
 
-function ScriptDetail(props: DetailProps & { scriptUri: string }): React.JSX.Element {
+/**
+ * A decision waiting for a value - a planet, a unit type, a name - as one dialog. The field starts
+ * at what the event itself names and applies on OK; Fire and Rule out answer at once without a
+ * value.
+ */
+function DecisionDialog(props: {
+    state: StorySimStateDto; item: StorySimInterventionDto; actions: SimActions; onClose: () => void;
+}): React.JSX.Element {
+    const {state, item, actions} = props;
+    const picker = decisionPicker(item, state)!;
+    const [text, setText] = useState(() => picker.initial);
+    const value = text.trim();
+    const answer = (run: () => void): void => {
+        run();
+        props.onClose();
+    };
+    return (
+        <Modal
+            form title={picker.title} confirmLabel="OK"
+            canConfirm={value.length > 0} disabledReason={`${picker.noun} required`}
+            onConfirm={() => {
+                const change = value ? picker.change(value) : null;
+                if (change) {
+                    answer(() => actions.world(change));
+                }
+            }}
+            onCancel={props.onClose}
+            actions={<>
+                <Button title="Assume the trigger met" onClick={() => answer(() => actions.satisfy(item.nodeId))}>
+                    <Icon name="decision" size={13}/>Fire
+                </Button>
+                <Button title="Never fires in this run - stays armed"
+                        onClick={() => answer(() => actions.ruleOut(item.nodeId, true))}>
+                    <Icon name="remove" size={13}/>Rule out
+                </Button>
+            </>}
+        >
+            <Combobox
+                value={text} onChange={setText} placeholder={picker.noun} ariaLabel={picker.noun} icon="search"
+                options={picker.options.map(o => ({value: o}))} autoFocus
+            />
+        </Modal>
+    );
+}
+
+/**
+ * What a decision's value is and how it becomes a world change - null when the decision takes no
+ * value (a script event, a battle's outcome, a trigger with no facet), which opens as an answer dialog instead.
+ */
+function decisionPicker(item: StorySimInterventionDto, state: StorySimStateDto): {
+    title: string; noun: string; initial: string; options: string[];
+    change: (value: string) => StorySimWorldChangeDto | null;
+} | null {
+    if (!item.facet || item.battleKey || item.kind === 'lua' || item.kind === 'battle') {
+        return null;
+    }
+    const faction = factionOf(item, state);
+    const candidates = pickerCandidates(item.facet, item.options, state.world, faction);
+    if (candidates.kind === 'none') {
+        return null;
+    }
+    const facet = item.facet;
+    const base: StorySimWorldChangeDto = {...(item.suggested ?? {kind: facet}), kind: facet};
+    const kind = candidates.kind;
+    return {
+        title: kind === 'planet' ? 'Select a planet' : kind === 'unit' ? 'Select a unit type' : 'Enter a name',
+        noun: kind === 'planet' ? 'Planet' : kind === 'unit' ? 'Unit type' : 'Name',
+        initial: (kind === 'planet' ? base.planet : kind === 'unit' ? base.unitType : base.name) ?? '',
+        options: [...new Set([...candidates.preferred, ...candidates.all])],
+        change: value => kind === 'planet' ? {...base, planet: value, faction: base.faction ?? faction}
+            : kind === 'unit' ? {...base, unitType: value, faction: base.faction ?? faction}
+                : {...base, name: value},
+    };
+}
+
+function ScriptDialog(props: DetailProps & { scriptUri: string }): React.JSX.Element {
     const {state, actions} = props;
     const script = state.luaStates.find(s => s.scriptUri === props.scriptUri);
     if (!script) {
-        return <p className="field-note">Not in this plot</p>;
+        return <Modal title="Script" onCancel={props.onClose}><p className="modal-note">Not in this plot</p></Modal>;
     }
     const stateNodeId = (name: string): string => `${script.scriptUri}#lua#${name.toLowerCase()}`;
     return (
-        <>
-            <div className="sim-detail-head">
-                <span className="sim-detail-name">{script.scriptName}</span>
-                <span className="sim-detail-type">PGStateMachine</span>
-            </div>
+        <Modal
+            title={script.scriptName} onCancel={props.onClose}
+            actions={script.current
+                ? <ShowInGraph nodeId={stateNodeId(script.current)} actions={actions} onClose={props.onClose}/>
+                : undefined}
+        >
             <DockSection title="Where it is">
                 <div className="sim-row static">
                     <span className="sim-row-name">Current</span>
-                    {script.current ? (
-                        <button type="button" className="link" title="Show in graph"
-                                onClick={() => actions.centerNode(stateNodeId(script.current!))}>{script.current}</button>
-                    ) : <span className="sim-row-value">not started</span>}
+                    <span className="sim-row-value">{script.current ?? 'not started'}</span>
                 </div>
                 <div className="sim-row static">
                     <span className="sim-row-name">Next</span>
@@ -1067,31 +1080,30 @@ function ScriptDetail(props: DetailProps & { scriptUri: string }): React.JSX.Ele
                     </div>
                 </DockSection>
             ) : null}
-        </>
+        </Modal>
     );
 }
 
 // ── Foot ─────────────────────────────────────────────────────────────────────
 
-const PACE_STOPS: SimPace['mode'][] = ['step', 'pulse', 'custom'];
-
 /**
- * The tick transport, in the dock foot. The preview's animation player row: |<< back to the
- * start, |< one tick back, play or pause, >| one tick, >>| run to the next decision - then the
- * pace under it, three stops on a slider because it is an ordered axis with few values.
+ * The tick transport, in the dock foot, laid out as the preview's animation player: the transport
+ * row - |<< back to the start, |< one tick back, play or pause, >| one tick, >>| run to the next
+ * decision, and Break on gates at the far end where a player keeps its record button - then the
+ * status readout in the scrubber's slot, then the speed, one slider over an ordered axis.
  */
 export function SimTransport(props: {
     state: StorySimStateDto;
     pace: SimPace;
     playing: boolean;
-    lenses: SimLenses;
-    traceOpen: boolean;
     setPace: (pace: SimPace) => void;
-    setLenses: (lenses: SimLenses) => void;
-    setTraceOpen: (open: boolean) => void;
     actions: SimActions;
+    labelOf: (id: string) => string | undefined;
+    onSelect: (selection: SimSelection) => void;
+    /** What the server last refused, shown under the readout until the next state. */
+    notice: string | null;
 }): React.JSX.Element {
-    const {state, pace, playing, lenses, actions} = props;
+    const {state, pace, playing, actions} = props;
     const halted = !!state.haltedAt;
     // Never gated on decisions: the engine's clock runs whatever the story waits on, and a real
     // campaign waits on hundreds of things from tick 0. The title says when a tick is idle.
@@ -1100,7 +1112,7 @@ export function SimTransport(props: {
     // A disabled control always carries its reason, so the gate is one object spread in.
     const frozen = frozenReason(state);
     const gate = frozen === null ? {} : {disabled: true as const, disabledReason: frozen};
-    const stop = PACE_STOPS.indexOf(pace.mode);
+    const stop = speedStopOf(pace);
     return (
         <div className="player sim-transport">
             <div className="player-row">
@@ -1139,66 +1151,70 @@ export function SimTransport(props: {
                     {...gate}
                     onClick={actions.runToDecision}
                 />
-                <span className="player-time" title={`Tick ${state.tick} - ${state.clock.toFixed(0)} s`}>
-                    t{state.tick}{' - '}{state.clock.toFixed(0)}s
-                </span>
-            </div>
-            <div className="player-row sim-pace">
-                <span
-                    className="sim-pace-label">{pace.mode === 'step' ? 'Step' : pace.mode === 'pulse' ? 'Pulse 1 s' : `${pace.ticksPerSecond}/s`}</span>
-                <input
-                    className="sim-pace-slider"
-                    type="range" min={0} max={2} step={1} value={stop < 0 ? 1 : stop}
-                    title="Pace - Step / Pulse 1 s / Custom"
-                    aria-label="Pace"
-                    onChange={e => props.setPace({...pace, mode: PACE_STOPS[Number(e.target.value)]})}
-                />
-                <input
-                    className="sim-rate-slider"
-                    type="range" min={1} max={30} step={1} value={pace.ticksPerSecond}
-                    disabled={pace.mode !== 'custom'}
-                    title={pace.mode === 'custom' ? `Rate - ${pace.ticksPerSecond} ticks/s` : 'Rate - custom pace only'}
-                    aria-label="Ticks per second"
-                    onChange={e => props.setPace({...pace, ticksPerSecond: Number(e.target.value)})}
-                />
-            </div>
-            <div className="player-row sim-lenses">
-                <IconButton
-                    icon="trace"
-                    className={props.traceOpen ? 'active' : undefined}
-                    pressed={props.traceOpen}
-                    title="Trace"
-                    onClick={() => props.setTraceOpen(!props.traceOpen)}
-                />
                 <IconButton
                     icon="breakpoint"
-                    className={state.breakOnGates ? 'active' : undefined}
+                    className={'sim-break-gates' + (state.breakOnGates ? ' active' : '')}
                     pressed={state.breakOnGates}
                     title="Break on gates"
                     onClick={() => actions.setBreakpoints(state.breakpoints, !state.breakOnGates)}
                 />
-                <IconButton
-                    icon="flow"
-                    className={lenses.hideFlow ? undefined : 'active'}
-                    pressed={!lenses.hideFlow}
-                    title="Flow"
-                    onClick={() => props.setLenses({...lenses, hideFlow: !lenses.hideFlow})}
-                />
-                <IconButton
-                    icon="fire"
-                    className={lenses.activeOnly ? 'active' : undefined}
-                    pressed={lenses.activeOnly}
-                    title="Active path"
-                    onClick={() => props.setLenses({...lenses, activeOnly: !lenses.activeOnly})}
-                />
-                <IconButton
-                    icon="script"
-                    className={lenses.hideLua ? undefined : 'active'}
-                    pressed={!lenses.hideLua}
-                    title="Script states"
-                    onClick={() => props.setLenses({...lenses, hideLua: !lenses.hideLua})}
-                />
             </div>
+            <SimStatus state={state} playing={playing} labelOf={props.labelOf} onSelect={props.onSelect}
+                       onPlayPause={actions.playPause} onRetry={actions.retryBattle}/>
+            {props.notice ? <span className="sim-notice" title={props.notice}>{props.notice}</span> : null}
+            <Field label="Speed" value={speedLabel(pace)}>
+                <input
+                    type="range" min={0} max={SPEED_STOPS.length - 1} step={1} value={stop}
+                    title="Speed" aria-label="Speed"
+                    onChange={e => props.setPace(SPEED_STOPS[Number(e.target.value)])}
+                />
+            </Field>
+        </div>
+    );
+}
+
+/**
+ * The simulation's view toggles, on a plate in the canvas's top-left corner - where the preview
+ * keeps its viewport toggles - so every view setting sits in one place: the trace panel and the
+ * three lenses on the running story.
+ */
+export function SimViewToggles(props: {
+    lenses: SimLenses;
+    traceOpen: boolean;
+    setLenses: (lenses: SimLenses) => void;
+    setTraceOpen: (open: boolean) => void;
+}): React.JSX.Element {
+    const {lenses} = props;
+    return (
+        <div className="stage-chrome icon-only lens-corner">
+            <IconButton
+                icon="trace"
+                className={props.traceOpen ? 'active' : undefined}
+                pressed={props.traceOpen}
+                title="Trace"
+                onClick={() => props.setTraceOpen(!props.traceOpen)}
+            />
+            <IconButton
+                icon="flow"
+                className={lenses.hideFlow ? undefined : 'active'}
+                pressed={!lenses.hideFlow}
+                title="Flow"
+                onClick={() => props.setLenses({...lenses, hideFlow: !lenses.hideFlow})}
+            />
+            <IconButton
+                icon="fire"
+                className={lenses.activeOnly ? 'active' : undefined}
+                pressed={lenses.activeOnly}
+                title="Active path"
+                onClick={() => props.setLenses({...lenses, activeOnly: !lenses.activeOnly})}
+            />
+            <IconButton
+                icon="script"
+                className={lenses.hideLua ? undefined : 'active'}
+                pressed={!lenses.hideLua}
+                title="Script states"
+                onClick={() => props.setLenses({...lenses, hideLua: !lenses.hideLua})}
+            />
         </div>
     );
 }

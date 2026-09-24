@@ -8,8 +8,8 @@
  */
 
 import {
-    StoryGraphEdgeDto, StoryGraphNodeDto, StorySimInterventionDto, StorySimStepDto, StorySimWorldChangeDto,
-    StorySimWorldDto,
+    StoryGraphEdgeDto, StoryGraphNodeDto, StorySimInterventionDto, StorySimStateDto, StorySimStepDto,
+    StorySimWorldChangeDto, StorySimWorldDto,
 } from '../../protocol/story';
 
 // ── Decisions ────────────────────────────────────────────────────────────────
@@ -350,28 +350,86 @@ export function shouldResumeAfterAnswer(args: {
     return args.autoResume && args.pausedForWait && !args.stillWaiting && !args.halted;
 }
 
+/**
+ * Whether a selected decision has been answered - it is no longer owed - so its dialog should close
+ * rather than stay up reading "Answered". Only a decision is ever answered; any other selection
+ * shows something that goes on existing.
+ */
+export function selectionAnswered(selection: { kind: string; nodeId?: string }, state: StorySimStateDto): boolean {
+    return selection.kind === 'decision' && !state.interventions.some(i => i.nodeId === selection.nodeId);
+}
+
+/**
+ * The battle to retry, where the game would show its retry dialog: in the galaxy, a battle lost and
+ * nothing left to do - no decision owed and nothing the clock alone still changes. Measured: the
+ * loss reaches the galaxy before the summary closes, so a failure branch behind the summary listener
+ * never hears it (the tutorials'); the game's way on is retry, which reloads the pre-battle autosave.
+ */
+export function retryableBattle(state: StorySimStateDto): string | null {
+    if (state.scope || state.interventions.length > 0 || (state.clockPending ?? 1) !== 0) {
+        return null;
+    }
+    return state.battles?.find(b => b.status === 'lost')?.key ?? null;
+}
+
+/**
+ * How fast play runs: `step` sends one tick per press and runs no timer; `custom` ticks at
+ * `ticksPerSecond`. A stop on {@link SPEED_STOPS}, one ordered axis on one slider.
+ */
 export interface SimPace {
-    mode: 'pulse' | 'step' | 'custom';
+    mode: 'step' | 'custom';
     ticksPerSecond: number;
 }
 
-export const DEFAULT_PACE: SimPace = {mode: 'pulse', ticksPerSecond: 4};
+/** Rates a slider can land on: step, then doubling up to the engine's own 30 Hz. */
+const RATES = [1, 2, 4, 8, 15, 30] as const;
+
+/** The speed slider's stops, slowest first; step is the stop below every rate. */
+export const SPEED_STOPS: readonly SimPace[] = [
+    {mode: 'step', ticksPerSecond: 1},
+    ...RATES.map(ticksPerSecond => ({mode: 'custom' as const, ticksPerSecond})),
+];
+
+export const DEFAULT_PACE: SimPace = {mode: 'custom', ticksPerSecond: 1};
+
+/** A stop's readout: `Step`, or ticks per second. */
+export function speedLabel(pace: SimPace): string {
+    return pace.mode === 'step' ? 'Step' : `${pace.ticksPerSecond}/s`;
+}
+
+/** The stop a pace sits on - step, or the nearest rate. */
+export function speedStopOf(pace: SimPace): number {
+    if (pace.mode === 'step') {
+        return 0;
+    }
+    return 1 + RATES.indexOf(nearestRate(pace.ticksPerSecond));
+}
+
+function nearestRate(tps: number): (typeof RATES)[number] {
+    return RATES.reduce((best, rate) => Math.abs(rate - tps) < Math.abs(best - tps) ? rate : best, RATES[0]);
+}
 
 /** Milliseconds between tick requests for a pace; step mode never runs a timer. */
 export function paceIntervalMs(pace: SimPace): number {
-    return pace.mode === 'custom' ? 1000 / Math.max(0.25, Math.min(30, pace.ticksPerSecond)) : 1000;
+    return 1000 / Math.max(0.25, Math.min(30, pace.ticksPerSecond));
 }
 
-/** A stored pace, or the default when the stored shape is not one. */
+/**
+ * A stored pace, or the default when the stored shape is not one. The old three-mode pace
+ * migrates: pulse ran the 1000 ms interval, so it is 1/s; a rate between stops takes the nearest.
+ */
 export function parsePace(raw: string | null): SimPace {
     if (!raw) {
         return DEFAULT_PACE;
     }
     try {
-        const parsed = JSON.parse(raw) as Partial<SimPace>;
-        if (parsed.mode === 'pulse' || parsed.mode === 'step' || parsed.mode === 'custom') {
-            const tps = Number(parsed.ticksPerSecond);
-            return {mode: parsed.mode, ticksPerSecond: tps > 0 ? Math.min(30, tps) : DEFAULT_PACE.ticksPerSecond};
+        const parsed = JSON.parse(raw) as { mode?: string; ticksPerSecond?: unknown };
+        const tps = Number(parsed.ticksPerSecond);
+        if (parsed.mode === 'pulse') {
+            return {mode: 'custom', ticksPerSecond: 1};
+        }
+        if (parsed.mode === 'step' || parsed.mode === 'custom') {
+            return {mode: parsed.mode, ticksPerSecond: tps > 0 ? nearestRate(tps) : DEFAULT_PACE.ticksPerSecond};
         }
     } catch {
         // Not JSON: the default is fine.

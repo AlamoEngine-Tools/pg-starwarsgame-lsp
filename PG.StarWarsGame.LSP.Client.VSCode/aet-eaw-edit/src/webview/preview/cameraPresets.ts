@@ -14,7 +14,7 @@
 // different shot on every one of them. It is resolved back to world units at the moment it is
 // written out as Lua, which is the only place the engine's own units are wanted.
 
-import { type BoundingSphere, type Vec3 } from './framing';
+import {type BoundingSphere, type Vec3} from './framing';
 
 /** A saved shot. */
 export interface CameraPreset {
@@ -65,7 +65,7 @@ export function poseFromPreset(preset: CameraPreset, sphere: BoundingSphere): Pr
             y: sphere.center.y + distance * Math.sin(pitch),
             z: sphere.center.z + horizontal * Math.cos(yaw),
         },
-        target: { ...sphere.center },
+        target: {...sphere.center},
     };
 }
 
@@ -122,4 +122,21 @@ export function luaFor(
 /** Two decimals at most: this is going into a script a person reads and edits. */
 function round(value: number): number {
     return Math.round(value * 100) / 100;
+}
+
+/** A new preset's name: `Camera preset N`, N the first number no preset carries (any casing). */
+export function nextPresetName(presets: readonly CameraPreset[]): string {
+    const taken = new Set(presets.map(p => p.name.trim().toLowerCase()));
+    for (let n = 1; ; n++) {
+        const name = `Camera preset ${n}`;
+        if (!taken.has(name.toLowerCase())) {
+            return name;
+        }
+    }
+}
+
+/** The presets with one renamed, trimmed; an empty name keeps the old one. */
+export function renamePreset(presets: readonly CameraPreset[], id: string, name: string): CameraPreset[] {
+    const trimmed = name.trim();
+    return presets.map(p => p.id === id && trimmed ? {...p, name: trimmed} : p);
 }

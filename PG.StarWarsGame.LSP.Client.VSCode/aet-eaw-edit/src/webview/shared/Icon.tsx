@@ -30,7 +30,7 @@ import {
     IconInfoCircle,
     IconLayoutGrid, IconMesh,
     IconPerspective, IconPhoto, IconPlayerPause, IconPlayerPlay, IconPlayerSkipBack,
-    IconPlayerSkipForward, IconPlayerTrackNext, IconPlayerTrackPrev, IconPlus,
+    IconMinus, IconPencil, IconPlayerSkipForward, IconPlayerTrackNext, IconPlayerTrackPrev, IconPlus,
     IconPlayerStop, IconPolygon, IconRadar, IconRefresh, IconRepeat,
     IconCrosshair, IconTargetArrow, IconTool, IconHistory,
     IconRuler, IconSearch, IconSettings, IconShadow, IconSparkles, IconStack2,
@@ -146,6 +146,10 @@ const ICONS = {
     loop: IconRepeat,
     reset: IconArrowBackUp,
     add: IconPlus,
+    // Stepping a number down. Not `remove`, which deletes and is drawn as a trash can.
+    decrement: IconMinus,
+    // Editing a name in place.
+    rename: IconPencil,
     remove: IconTrash,
     copy: IconClipboardCopy,
     save: IconDeviceFloppy,

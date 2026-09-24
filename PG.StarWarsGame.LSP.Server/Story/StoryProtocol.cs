@@ -251,6 +251,11 @@ public sealed record StoryParamSchemaDto(
 /// <param name="Side"><c>event</c> or <c>reward</c>.</param>
 /// <param name="TypeName">The event/reward type whose param schema applies.</param>
 /// <param name="Position">0-based param slot.</param>
+/// <param name="Query">
+///     Text the name must contain, case-insensitively; names that START with it come first. A
+///     substring rather than a prefix because the field filters what it holds the same way.
+/// </param>
+/// <param name="Limit">At most this many options; 2000 when absent.</param>
 [Method("aet/getStoryParamOptions", Direction.ClientToServer)]
 public sealed record GetStoryParamOptionsParams(
     string Campaign,
@@ -258,7 +263,7 @@ public sealed record GetStoryParamOptionsParams(
     string Side,
     string TypeName,
     int Position,
-    string? Prefix = null,
+    string? Query = null,
     int? Limit = null) : IRequest<GetStoryParamOptionsResult>;
 
 public sealed record GetStoryParamOptionsResult(

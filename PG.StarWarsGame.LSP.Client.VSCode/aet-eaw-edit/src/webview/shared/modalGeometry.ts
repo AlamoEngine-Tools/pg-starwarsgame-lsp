@@ -4,14 +4,25 @@
 // Where a dragged or resized modal is allowed to end up.
 //
 // Kept free of React and the DOM so the rules can be tested directly - the pointer plumbing in
-// LocModal is then only about turning events into these calls.
+// useMovableDialog is then only about turning events into these calls.
 
-export interface Point { x: number; y: number }
-export interface Size { width: number; height: number }
-export interface Viewport { width: number; height: number }
+export interface Point {
+    x: number;
+    y: number
+}
+
+export interface Size {
+    width: number;
+    height: number
+}
+
+export interface Viewport {
+    width: number;
+    height: number
+}
 
 /** Smallest usable dialog: below this the buttons start overlapping the body. */
-export const MIN_MODAL_SIZE: Size = { width: 260, height: 160 };
+export const MIN_MODAL_SIZE: Size = {width: 260, height: 160};
 
 /**
  * Keeps a moved dialog reachable.
@@ -96,13 +107,14 @@ export function fromStoredGeometry(stored: StoredGeometry, viewport: Viewport): 
         size,
         viewport);
 
-    return { ...position, ...size };
+    return {...position, ...size};
 }
 
 /** Which edge or corner is being dragged. Named like the CSS cursors they map to. */
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
-export interface Rect extends Point, Size {}
+export interface Rect extends Point, Size {
+}
 
 /**
  * The rectangle a resize drag produces.
@@ -134,7 +146,7 @@ export function resizeRect(
         bottom = clamp(bottom + dy, top + MIN_MODAL_SIZE.height, viewport.height);
     }
 
-    return { x: left, y: top, width: right - left, height: bottom - top };
+    return {x: left, y: top, width: right - left, height: bottom - top};
 }
 
 function clamp(value: number, min: number, max: number): number {

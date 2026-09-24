@@ -181,6 +181,46 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
                 $"The game raises {string.Join(", ", StoryGenericNames.EngineRaised)}."));
         }
 
+        // Pass 3d: loss listeners that arm too late. Measured: STORY_MISSION_LOST is delivered to
+        // the galaxy on its first frame back from the battle - before the summary closes, so before
+        // battle_end_closed. A loss listener misses it when it arms only after ITS OWN battle's
+        // summary: every prerequisite line waits on a battle_end_closed listener that follows the
+        // LINK_TACTICAL to the plot the listener names, or on an event that itself arms only after
+        // one. An earlier battle's summary does not count - the listener is armed long before its
+        // battle ends. Corpus (eaw + foc): the four tutorials' Failed listeners, nothing else.
+        foreach (var (thread, node) in eventNodes)
+        {
+            var storyEvent = node.Event!;
+            if (!string.Equals(storyEvent.EventType, "STORY_MISSION_LOST", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var plot = PlotFileName(storyEvent.EventParams.FirstOrDefault(p => p.Position == 0)?.RawValue);
+            if (plot is null) continue;
+            var threadEvents = eventNodes.Where(pair => pair.Thread.DocumentUri == thread.DocumentUri)
+                .Select(pair => pair.Node).ToList();
+            var links = threadEvents
+                .Where(n => string.Equals(n.Event!.RewardType, "LINK_TACTICAL", StringComparison.OrdinalIgnoreCase)
+                            && PlotFileName(n.Event.RewardParams.FirstOrDefault(p => p.Position == 6)?.RawValue) is
+                                { } linked
+                            && linked.Equals(plot, StringComparison.OrdinalIgnoreCase))
+                .ToDictionary(n => n.Id, n => n.Event!.Name, StringComparer.Ordinal);
+            if (links.Count == 0) continue;
+            var afterLink = ArmsOnlyAfter(state, thread, threadEvents, links);
+            var summaries = afterLink.Keys
+                .Select(id => threadEvents.First(n => n.Id == id))
+                .Where(n => string.Equals(n.Event!.EventType, "STORY_GENERIC", StringComparison.OrdinalIgnoreCase)
+                            && NameTokens(n.Event.EventParams.FirstOrDefault(p => p.Position == 0)?.RawValue)
+                                .Contains(Sim.StorySimulator.BattleEndClosed))
+                .ToDictionary(n => n.Id, n => n.Event!.Name, StringComparer.Ordinal);
+            if (summaries.Count == 0) continue;
+            if (!ArmsOnlyAfter(state, thread, threadEvents, summaries).TryGetValue(node.Id, out var summaryListener))
+                continue;
+            state.Problems.Add(new StoryGraphProblem(StoryGraphProblemKind.MissionLostAfterSummary,
+                thread.DocumentUri, storyEvent.NameRange, storyEvent.Name,
+                $"'{storyEvent.Name}' never fires: the game delivers STORY_MISSION_LOST before the battle summary closes, " +
+                $"and '{storyEvent.Name}' arms only after '{summaryListener}' (battle_end_closed). " +
+                "After a lost battle the game offers a retry instead."));
+        }
+
         // Pass 4: tactical entry edges - root events (no incoming Prereq/Control) of a tactical
         // manifest's own threads get an edge from that manifest's stub node, so "reachable from
         // here" can jump straight into the battle's story.
@@ -245,6 +285,49 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         foreach (var token in raw.Split([' ', '\t', '\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries))
             set.Add(token);
         return set;
+    }
+
+    /// <summary>A plot reference's file name, however it is pathed; null when there is none.</summary>
+    private static string? PlotFileName(string? raw)
+    {
+        var value = raw?.Trim();
+        if (string.IsNullOrEmpty(value)) return null;
+        var slash = value.LastIndexOfAny(['/', '\\']);
+        return slash < 0 ? value : value[(slash + 1)..];
+    }
+
+    /// <summary>
+    ///     The thread's events that can only arm after one of <paramref name="seeds" />: the seeds, and
+    ///     every event each of whose prerequisite lines names one of them (to a fixpoint). Each maps to
+    ///     the name of the seed it waits on, for the message.
+    /// </summary>
+    private static Dictionary<string, string> ArmsOnlyAfter(BuildState state, StoryThread thread,
+        IReadOnlyList<StoryNode> threadEvents, IReadOnlyDictionary<string, string> seeds)
+    {
+        var after = new Dictionary<string, string>(seeds, StringComparer.Ordinal);
+        for (var changed = true; changed;)
+        {
+            changed = false;
+            foreach (var node in threadEvents)
+            {
+                var groups = node.Event!.PrereqGroups;
+                if (groups.Count == 0 || after.ContainsKey(node.Id)) continue;
+                string? via = null;
+                var everyLine = groups.All(group => group.Tokens.Any(token =>
+                {
+                    var source = state.EventsByThreadAndName
+                        .GetValueOrDefault((thread.DocumentUri, token.Text.ToLowerInvariant()))?
+                        .FirstOrDefault(n => after.ContainsKey(n.Id));
+                    if (source is not null) via ??= after[source.Id];
+                    return source is not null;
+                }));
+                if (!everyLine) continue;
+                after[node.Id] = via!;
+                changed = true;
+            }
+        }
+
+        return after;
     }
 
     public static string LuaStateNodeId(string scriptUri, string stateName)

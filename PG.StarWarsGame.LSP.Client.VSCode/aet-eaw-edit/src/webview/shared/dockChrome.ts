@@ -303,8 +303,10 @@ ${tokensCss}
        press rather than open-then-pick. Segments share their borders, so the group reads as one
        control rather than as a row of separate buttons. */
     .mode-selector { display: inline-flex; width: 100%; }
+    /* Sized from the label, then the spare room shared: equal zero-basis segments cut "100x50" to
+       "10..." beside "24" while the row still had space. */
     .mode-selector button {
-        flex: 1;
+        flex: 1 1 auto;
         min-width: 0;
         padding: var(--space-2) var(--space-6);
         border: var(--space-1) solid var(--vscode-panel-border, #444);
@@ -473,6 +475,38 @@ ${tokensCss}
         overflow-y: auto;
     }
     .modal-note { margin: 0; opacity: 0.8; font-size: var(--font-size-smaller); line-height: 1.35; }
+
+    /* A form dialog: a field or two, never resized, so nothing needs clipping - and a field's
+       dropdown must be free to hang below the body instead of scrolling inside it. */
+    .modal.modal-form,
+    .modal.modal-form .modal-body { overflow: visible; }
+    .modal-form .modal-buttons { justify-content: flex-end; }
+    /* Answers that act at once, on the left; the auto margin pushes Cancel and OK to the right. */
+    .modal-actions { display: flex; gap: var(--space-4); margin-right: auto; }
+    .modal-form .form-row { display: flex; gap: var(--space-4); align-items: center; }
+    .modal-form .form-row .integer-field { flex: 0 0 auto; width: 120px; }
+    .modal-form label.modal-field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    /* A whole-number field: the text between a decrement and an increment button. */
+    .integer-field {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+    .integer-field input {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+    .integer-field input[aria-invalid="true"] {
+        outline: var(--space-1) solid var(--vscode-inputValidation-errorBorder, #be1100);
+    }
+
     .modal-title, .modal > h2.drag-handle, .modal-buttons, .dialog-actions,
     .modal-pinned { flex: 0 0 auto; }
 
@@ -924,6 +958,89 @@ export const stageChromeCss = `
         /* Never wider than the stage; a long faction roster wraps rather than running off it. */
         max-width: calc(100% - 16px);
         flex-wrap: wrap;
+    }
+
+    /* Icon-only buttons are square rather than pill-shaped; the padding that makes room for a word
+       beside the glyph just makes them lopsided without one. */
+    .stage-chrome.icon-only .icon-btn {
+        width: 22px;
+        padding: 0;
+        border-radius: var(--radius-3);
+    }
+`;
+
+/**
+ * The shared `Combobox`: a text field over a suggestion list. The list is absolutely placed under
+ * the field, so a host must not clip it (it renders inside node bodies, forms and flyouts).
+ */
+export const comboboxCss = `
+    .suggest {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+        display: flex;
+    }
+
+    .suggest input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* The leading glyph sits inside the field; the text starts after it. */
+    .suggest-icon {
+        position: absolute;
+        left: var(--space-6);
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        opacity: 0.7;
+        pointer-events: none;
+    }
+    /* The attribute selector outranks a host's own input[type=text] padding. */
+    .suggest.with-icon input[type="text"] { padding-left: calc(var(--space-6) + var(--icon-size-14) + var(--space-4)); }
+
+    .suggest-list {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 160px;
+        overflow-y: auto;
+        z-index: 30;
+        background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+        border: var(--space-1) solid var(--vscode-focusBorder);
+        font-size: var(--font-size-11);
+    }
+
+    /* A field at the foot of the dock drops its list upward (Combobox measures the room). */
+    .suggest-list.up {
+        top: auto;
+        bottom: 100%;
+    }
+
+    .suggest-item {
+        padding: var(--space-2) var(--space-6);
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .suggest-item:hover,
+    .suggest-item.highlighted {
+        background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.2));
+    }
+
+    /* The value the field already holds: offered with the rest, marked so it can be found. */
+    .suggest-item.current {
+        font-weight: 600;
+        color: var(--vscode-list-activeSelectionForeground, inherit);
+        background: var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.25));
+    }
+
+    .suggest-item.current:hover,
+    .suggest-item.current.highlighted {
+        background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.2));
     }
 `;
 

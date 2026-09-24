@@ -893,7 +893,17 @@ public sealed record PreviewScene(
     ///         at odds with their own weapon ranges.
     ///     </para>
     /// </remarks>
-    float ScaleFactor = 1f)
+    float ScaleFactor = 1f,
+    /// <summary>
+    ///     The subject's <c>Icon_Name</c>, verbatim, or null for a bare model or an object that
+    ///     declares none.
+    /// </summary>
+    /// <remarks>
+    ///     Carried for the capture's file name. The large command-bar icon has no tag of its own: the
+    ///     engine formats <c>big_</c> + <c>Icon_Name</c> and falls back to the plain icon when that
+    ///     texture is missing, so the name is the whole link between a capture and its slot.
+    /// </remarks>
+    string? IconName = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

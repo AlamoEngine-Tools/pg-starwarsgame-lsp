@@ -185,6 +185,7 @@ public static class ServerConfigurator
             .WithHandler<StorySimBreakpointsHandler>()
             .WithHandler<StorySimWorldHandler>()
             .WithHandler<StorySimResolveBattleHandler>()
+            .WithHandler<StorySimRetryBattleHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);

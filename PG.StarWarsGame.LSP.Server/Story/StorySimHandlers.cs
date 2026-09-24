@@ -187,3 +187,16 @@ public sealed class StorySimResolveBattleHandler(IStorySimulationService sim, IL
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
+
+public sealed class StorySimRetryBattleHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimRetryBattleParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimRetryBattleParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.RetryBattle(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Battle);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}

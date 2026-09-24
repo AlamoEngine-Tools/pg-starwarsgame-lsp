@@ -305,7 +305,9 @@ public sealed class GetStoryParamOptionsHandler(
     ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetStoryParamOptionsParams, GetStoryParamOptionsResult>
 {
-    private const int DefaultLimit = 100;
+    // Measured on eaw with the foc baseline: every slot but the object types (8870) holds at most
+    // 937 candidates (SpeechEvent). 2000 leaves a mod room without shipping the whole object list.
+    private const int DefaultLimit = 2000;
 
     public Task<GetStoryParamOptionsResult> Handle(GetStoryParamOptionsParams request, CancellationToken ct)
     {
@@ -321,21 +323,34 @@ public sealed class GetStoryParamOptionsHandler(
         if (paramDef is null)
             return Task.FromResult(new GetStoryParamOptionsResult([]));
 
-        var prefix = request.Prefix ?? string.Empty;
+        var query = request.Query?.Trim() ?? string.Empty;
         var limit = request.Limit is int l and > 0 ? l : DefaultLimit;
 
         // Story-scoped names resolve campaign-wide - the campaign model gives a far tighter
         // candidate set than the index (which mixes every campaign's names together).
-        var campaignScoped =
-            CampaignScopedOptions(paramDef.ReferenceTypeName, request.Campaign, request.Faction, prefix);
-        if (campaignScoped is not null)
-            return Task.FromResult(new GetStoryParamOptionsResult(campaignScoped.Take(limit).ToList()));
+        var candidates =
+            CampaignScopedOptions(paramDef.ReferenceTypeName, request.Campaign, request.Faction)
+            // Unfiltered, so the query can match anywhere; the provider only narrows by prefix.
+            ?? proposals.GetProposals(paramDef, string.Empty, indexService.Current)
+                .Select(p => new StoryParamOptionDto(p.Label, p.Detail));
 
-        var options = proposals.GetProposals(paramDef, prefix, indexService.Current)
-            .Take(limit)
-            .Select(p => new StoryParamOptionDto(p.Label, p.Detail))
+        return Task.FromResult(new GetStoryParamOptionsResult(Matching(candidates, query).Take(limit).ToList()));
+    }
+
+    /// <summary>
+    ///     The options containing the query, those starting with it first, each group in its own order.
+    /// </summary>
+    private static IEnumerable<StoryParamOptionDto> Matching(IEnumerable<StoryParamOptionDto> options, string query)
+    {
+        if (query.Length == 0)
+            return options;
+
+        var containing = options
+            .Where(o => o.Value.Contains(query, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        return Task.FromResult(new GetStoryParamOptionsResult(options));
+        return containing
+            .Where(o => o.Value.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+            .Concat(containing.Where(o => !o.Value.StartsWith(query, StringComparison.OrdinalIgnoreCase)));
     }
 
     /// <summary>
@@ -345,7 +360,7 @@ public sealed class GetStoryParamOptionsHandler(
     ///     e.g. Lua-side Story_Event ids, and the generic provider handles them).
     /// </summary>
     private IEnumerable<StoryParamOptionDto>? CampaignScopedOptions(
-        string? referenceType, string campaign, string faction, string prefix)
+        string? referenceType, string campaign, string faction)
     {
         if (referenceType is not (StoryReferenceTypes.EventName or StoryReferenceTypes.Branch
             or StoryReferenceTypes.PlotFile))
@@ -366,7 +381,6 @@ public sealed class GetStoryParamOptionsHandler(
         };
 
         return names
-            .Where(n => prefix.Length == 0 || n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
             .Select(n => new StoryParamOptionDto(n));

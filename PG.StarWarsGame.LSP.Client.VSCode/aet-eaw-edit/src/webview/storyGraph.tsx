@@ -25,7 +25,11 @@ import {
     useRef,
     useState,
 } from 'react';
+import {Combobox} from './shared/Combobox';
+import {ModalLayerContext} from './shared/Modal';
+import {SelectField} from './shared/SelectField';
 import {
+    comboboxCss,
     dockBodyCss,
     dockChromeCss,
     dockHeaderCss,
@@ -89,6 +93,7 @@ import {
     galacticReturnNode,
     hangingDecision,
     paceIntervalMs,
+    selectionAnswered,
     parsePace,
     portalPickAction,
     shouldResumeAfterAnswer,
@@ -97,7 +102,7 @@ import {
 import {
     type SimActions,
     SimFlyout,
-    SimHeaderChip,
+    SimViewToggles,
     SimInventory,
     type SimLenses,
     type SimSelection,
@@ -229,12 +234,12 @@ let optionRequestCounter = 0;
 const pendingOptionRequests = new Map<number, (options: StoryParamOptionDto[]) => void>();
 
 function fetchParamOptions(
-    side: 'event' | 'reward', typeName: string, position: number, prefix: string,
+    side: 'event' | 'reward', typeName: string, position: number, query: string,
 ): Promise<StoryParamOptionDto[]> {
     const requestId = ++optionRequestCounter;
     return new Promise(resolve => {
         pendingOptionRequests.set(requestId, resolve);
-        vscode.postMessage({type: 'paramOptions', requestId, side, typeName, position, prefix});
+        vscode.postMessage({type: 'paramOptions', requestId, side, typeName, position, query});
         window.setTimeout(() => {
             if (pendingOptionRequests.delete(requestId)) {
                 resolve([]);
@@ -3217,8 +3222,8 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
            These four rules, those swatches and a hex mirror for the canvas used to be three separate
            copies of one mapping, kept in step by hand. */
     ${Object.entries(LIFECYCLE_TOKENS)
-            .map(([lifecycle, token]) => `&.lc-${lifecycle} { border-color: var(${token}); }`)
-            .join('\n    ')}
+        .map(([lifecycle, token]) => `&.lc-${lifecycle} { border-color: var(${token}); }`)
+        .join('\n    ')}
     &.unreachable {
         opacity: 0.5;
     }
@@ -3477,47 +3482,25 @@ function BlurCommitInput(props: {
 }
 
 /**
- * A reference-typed value input: commits on blur like `BlurCommitInput`, plus a debounced
- * suggestion dropdown fed by the server (aet/getStoryParamOptions via the extension). Picking a
- * suggestion commits immediately - `onMouseDown` + `preventDefault` so the input never blurs
- * mid-pick (a blur would commit the half-typed prefix first). `lastSent` guards the follow-up
- * blur from re-committing the same value while the server round trip is still in flight.
+ * A reference-typed value input: commits on blur like `BlurCommitInput`, over the shared
+ * `Combobox` fed by the server (aet/getStoryParamOptions via the extension). The list opens with
+ * every option rather than only the current value; picking one commits at once. `lastSent` guards
+ * the follow-up blur from re-committing the same value while the server round trip is in flight.
  */
 function RefValueInput(props: {
     value: string; disabled: boolean; onCommit: (v: string) => void;
-    fetchOptions: (prefix: string) => Promise<StoryParamOptionDto[]>;
-    onInput?: (v: string) => void;
+    fetchOptions: (query: string) => Promise<StoryParamOptionDto[]>;
     placeholder?: string; className?: string;
 }): React.JSX.Element {
     const [value, setValue] = useState(props.value);
-    const [options, setOptions] = useState<StoryParamOptionDto[]>([]);
-    const [open, setOpen] = useState(false);
     const focused = useRef(false);
-    const fetchSeq = useRef(0);
     const lastSent = useRef<string | null>(null);
-    const debounce = useRef<number | undefined>(undefined);
     useEffect(() => {
         lastSent.current = null;
         if (!focused.current) {
             setValue(props.value);
         }
     }, [props.value]);
-    useEffect(() => () => window.clearTimeout(debounce.current), []);
-
-    const query = (prefix: string): void => {
-        const seq = ++fetchSeq.current;
-        window.clearTimeout(debounce.current);
-        debounce.current = window.setTimeout(() => {
-            void props.fetchOptions(prefix).then(fetched => {
-                // Stale replies (an older prefix) and replies landing after focus left are dropped.
-                if (seq !== fetchSeq.current || !focused.current) {
-                    return;
-                }
-                setOptions(fetched);
-                setOpen(fetched.length > 0);
-            });
-        }, 150);
-    };
 
     const commit = (v: string): void => {
         if (v !== props.value && v !== lastSent.current) {
@@ -3527,52 +3510,21 @@ function RefValueInput(props: {
     };
 
     return (
-        <div className="suggest">
-            <input
-                type="text" className={props.className} value={value} disabled={props.disabled}
-                placeholder={props.placeholder}
-                onFocus={() => {
-                    focused.current = true;
-                    query(value);
-                }}
-                onChange={e => {
-                    setValue(e.target.value);
-                    props.onInput?.(e.target.value);
-                    query(e.target.value);
-                }}
-                onBlur={() => {
-                    focused.current = false;
-                    setOpen(false);
-                    commit(value);
-                }}
-                onKeyDown={e => {
-                    if (e.key === 'Escape') {
-                        setOpen(false);
-                    }
-                    if (e.key === 'Enter') {
-                        setOpen(false);
-                        commit(value);
-                    }
-                }}
-            />
-            {open && !props.disabled ? (
-                <div className="suggest-list">
-                    {options.map(option => (
-                        <div
-                            key={option.value} className="suggest-item"
-                            title={option.detail ?? undefined}
-                            onMouseDown={e => {
-                                e.preventDefault(); // keep the input focused - no blur-commit race
-                                setValue(option.value);
-                                props.onInput?.(option.value);
-                                setOpen(false);
-                                commit(option.value);
-                            }}
-                        >{option.value}</div>
-                    ))}
-                </div>
-            ) : null}
-        </div>
+        <Combobox
+            className={props.className} value={value} disabled={props.disabled}
+            placeholder={props.placeholder}
+            fetchOptions={props.fetchOptions}
+            onFocus={() => {
+                focused.current = true;
+            }}
+            onChange={setValue}
+            onPick={commit}
+            onEnter={commit}
+            onBlur={v => {
+                focused.current = false;
+                commit(v);
+            }}
+        />
     );
 }
 
@@ -3675,8 +3627,8 @@ function EventParamRows(props: {
                                     value={row.value} disabled={props.readOnly}
                                     placeholder={row.missing ? 'required' : optionalUnset ? '(optional)' : undefined}
                                     onCommit={v => commit(row.position, v)}
-                                    fetchOptions={prefix =>
-                                        fetchParamOptions(props.kind, typeName, row.position, prefix)}
+                                    fetchOptions={query =>
+                                        fetchParamOptions(props.kind, typeName, row.position, query)}
                                 />
                             ) : (
                                 <BlurCommitInput
@@ -4261,46 +4213,10 @@ const GlobalStyle = createGlobalStyle`
         animation: story-flash 0.8s ease-in-out 2;
     }
 
-    /* Server-backed suggestion dropdown (RefValueInput) - global because it renders both inside
-       Event node bodies and in the toolbar's create forms. */
-    .suggest {
-        position: relative;
-        flex: 1;
-        min-width: 0;
-        display: flex;
-    }
-
-    .suggest input {
-        width: 100%;
-        min-width: 0;
-    }
-
-    .suggest-list {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        max-height: 160px;
-        overflow-y: auto;
-        z-index: 30;
-        background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-        border: var(--space-1) solid var(--vscode-focusBorder);
-        font-size: var(--font-size-11);
-    }
-
-    .suggest-item {
-        padding: var(--space-2) var(--space-6);
-        cursor: pointer;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .suggest-item:hover {
-        background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.2));
-    }
-
-    /* Diagnostic severity accents - node header badges and the problems list. */
+    /* The shared Combobox - global because it renders inside Event node bodies, the toolbar's
+       create forms and the simulator's dialogs. */
+    ${comboboxCss}
+        /* Diagnostic severity accents - node header badges and the problems list. */
     .diag-badge {
         font-size: var(--font-size-10);
         font-weight: bold;
@@ -4540,7 +4456,8 @@ const Shell = styled.div`
         gap: var(--space-4);
     }
 
-    .filters-below select {
+    .filters-below .select-field {
+        display: flex;
         width: 100%;
     }
 
@@ -4660,49 +4577,54 @@ const Shell = styled.div`
 
     /* ── Simulation (storyGraph/SimDock) ───────────────────────────────── */
 
-    /* Header: one chip, the tick and the thing that stopped the clock. A button when there is
-       something to open, a plain span when there is only the tick to read. */
+    /* The player's status readout, in the slot the preview's player gives its scrubber: dock-wide,
+       the state at the left and the tick and clock at the right. A button when there is something
+       to open or to play, a plain span when there is only the state to read. */
 
-    /* What the server last refused: the reason play stopped, beside the chip until the next state. */
-
-    .sim-notice {
-        color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
-        font-size: var(--font-size-11);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 320px;
-    }
-
-    .sim-chip {
-        display: inline-flex;
+    .sim-status {
+        display: flex;
         align-items: center;
-        gap: var(--space-4);
-        padding: var(--space-2) var(--space-6);
-        border-radius: var(--radius-pill);
+        gap: var(--space-6);
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 28px;
+        padding: var(--space-4) var(--space-8);
+        border-radius: var(--radius-6);
         border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         background: transparent;
         color: var(--vscode-descriptionForeground);
         font: inherit;
-        font-size: var(--font-size-11);
-        font-variant-numeric: tabular-nums;
-        max-width: 140px;
+        font-size: var(--font-size-12);
+        text-align: left;
     }
 
-    button.sim-chip {
+    button.sim-status {
         cursor: pointer;
     }
 
-    button.sim-chip:hover {
+    button.sim-status:hover {
         background: var(--vscode-toolbar-hoverBackground);
     }
 
-    .sim-chip.owed {
+    .sim-status-text {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sim-status-time {
+        flex: none;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sim-status.owed {
         border-color: var(--lifecycle-armed, #e2b93d);
         color: var(--vscode-foreground);
     }
 
-    .sim-chip.halted {
+    .sim-status.halted {
         border-color: var(--vscode-debugIcon-breakpointForeground, #e51400);
         color: var(--vscode-foreground);
     }
@@ -4710,24 +4632,37 @@ const Shell = styled.div`
     /* Running is the one state that has to be legible at a glance from across the dock: the
        fired colour on the border and a live dot. Paused keeps the quiet default look. */
 
-    .sim-chip.running {
+    .sim-status.running {
         border-color: var(--lifecycle-fired, #73c991);
         color: var(--vscode-foreground);
     }
 
     /* The galaxy standing still for a battle, and a battle that has ended. */
 
-    .sim-chip.battle {
+    .sim-status.battle {
         border-color: var(--vscode-focusBorder);
         color: var(--vscode-foreground);
     }
 
-    .sim-chip.resolved.won {
+    .sim-status.resolved.won {
         border-color: var(--lifecycle-fired, #73c991);
     }
 
-    .sim-chip.resolved.lost {
+    .sim-status.resolved.lost,
+    .sim-status.lost {
         border-color: var(--vscode-errorForeground);
+        color: var(--vscode-foreground);
+    }
+
+    /* What the server last refused: the reason play stopped, under the readout until the next
+       state. */
+
+    .sim-notice {
+        color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+        font-size: var(--font-size-11);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     /* The portal's picks: the flags a battle could write, chosen before it is decided unplayed. */
@@ -4744,7 +4679,8 @@ const Shell = styled.div`
         margin: 0 var(--space-1) 0 0;
     }
 
-    .sim-chip-dot {
+    .sim-status-dot {
+        flex: none;
         width: 8px;
         height: 8px;
         border-radius: 50%;
@@ -4761,21 +4697,9 @@ const Shell = styled.div`
         }
     }
     @media (prefers-reduced-motion: reduce) {
-        .sim-chip-dot {
+        .sim-status-dot {
             animation: none;
         }
-    }
-
-    .sim-chip-text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .sim-chip-sep {
-        width: 1px;
-        align-self: stretch;
-        background: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
     }
 
     .sim-row.add {
@@ -4891,39 +4815,6 @@ const Shell = styled.div`
         overflow-y: auto;
     }
 
-    .sim-number {
-        width: 72px;
-    }
-
-    /* The flyout beside the dock. Sizeable rather than capped at the stage's top band: the
-       decision list can run long and the reader wants to see the whole of it. */
-
-    .sim-flyout {
-        top: 8px;
-        max-height: calc(100% - 16px);
-    }
-
-    .sim-detail-head {
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-6);
-        min-width: 0;
-    }
-
-    .sim-detail-name, .sim-detail-head .link {
-        font-weight: 600;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        min-width: 0;
-    }
-
-    .sim-detail-type {
-        color: var(--vscode-descriptionForeground);
-        font-size: var(--font-size-smaller);
-        flex: none;
-    }
-
     .link {
         border: none;
         background: transparent;
@@ -5001,33 +4892,20 @@ const Shell = styled.div`
         color: var(--lifecycle-disabled, #f14c4c);
     }
 
-    /* Foot: the transport is the shared player; the pace is a three-stop slider with the custom
-       rate beside it, dead until Custom is the stop. */
+    /* Foot: the transport is the shared player - the status readout in the scrubber's slot, the
+       speed one slider under it. Break on gates takes the far end of the transport row, where a
+       player keeps its record button. */
 
     ${playerCss}
-    .sim-pace {
-        gap: var(--space-6);
+    .sim-transport .sim-break-gates {
+        margin-left: auto;
     }
 
-    .sim-pace-label {
-        flex: none;
-        min-width: 56px;
-        font-size: var(--font-size-smaller);
-        color: var(--vscode-descriptionForeground);
-    }
+    /* The view toggles' plate: the canvas's top-left corner, the colour key's opposite. */
 
-    .sim-pace-slider {
-        width: 64px;
-        flex: none;
-    }
-
-    .sim-rate-slider {
-        flex: 1;
-        min-width: 40px;
-    }
-
-    .sim-lenses {
-        gap: var(--space-2);
+    .lens-corner {
+        left: 8px;
+        top: 8px;
     }
 
     /* Lenses. Each hides one thing; a node that is not an Event has no lifecycle class and is
@@ -5413,7 +5291,7 @@ function App(): React.JSX.Element {
     // render: the accumulated trace and the overlay routine itself.
     const simStepsRef = useRef<StorySimStepDto[]>([]);
     const applySimOverlayRef = useRef<((state: StorySimStateDto | null, replay?: boolean) => void) | null>(null);
-    // What the simulation flyout beside the dock shows, and which lenses the canvas wears.
+    // What the simulation's detail dialog shows, and which lenses the canvas wears.
     const [simSelection, setSimSelection] = useState<SimSelection | null>(null);
     // Mirror for the overlay routine, which decides whether a wait already has its decision open.
     const simSelectionRef = useRef<SimSelection | null>(null);
@@ -5429,7 +5307,7 @@ function App(): React.JSX.Element {
     useEffect(() => {
         editorRef.current?.setSimLenses(simLenses);
     }, [simLenses]);
-    // The graph as the server sent it, for the flyout's arming lines and the trace's node names.
+    // The graph as the server sent it, for the event dialog's arming lines and the trace's node names.
     // Refs rather than state: the graph changes rarely and the canvas already re-renders on it.
     const simGraphRef = useRef<{ nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[] }>({nodes: [], edges: []});
     const [simGraphVersion, setSimGraphVersion] = useState(0);
@@ -5674,8 +5552,13 @@ function App(): React.JSX.Element {
         // The decision the story hangs on (simModel.hangingDecision): a pending or starting battle
         // whatever the clock still owes, else - once the clock has nothing left - the decision
         // armed last. It opens beside the dock with its node in view the moment it becomes that
-        // decision, and not again while it stays so: a flyout the reader closed stays closed until
+        // decision, and not again while it stays so: a dialog the reader closed stays closed until
         // the story hangs on something else.
+        // A decision's dialog closes once the decision is answered - by its own answer, or by a
+        // battle's outcome landing - rather than staying up with nothing left to answer.
+        if (simSelectionRef.current && selectionAnswered(simSelectionRef.current, state)) {
+            setSimSelection(null);
+        }
         const battleDecision = state.interventions.find(i => i.kind === 'battle');
         const hang = battleDecision ?? (waiting ? hangingDecision(state.interventions, simStepsRef.current) : null);
         const hangId = hang?.nodeId ?? null;
@@ -5822,6 +5705,9 @@ function App(): React.JSX.Element {
             simRequest('resolveBattle', {
                 battle: battleKey, won, flags: picks?.length ? [...picks] : undefined,
             });
+        },
+        retryBattle: battleKey => {
+            simRequest('retryBattle', {battle: battleKey});
         },
         luaNotify: id => {
             answeredRef.current = true;
@@ -6229,286 +6115,290 @@ function App(): React.JSX.Element {
     // The badge follows what is ON SCREEN, so it agrees with the table under it. What stops that
     // reading as all-clear over a hidden error is the panel's own "n of m" and its filter chip.
     const severity = !validated ? 'unvalidated' : worstSeverity(problemView.shown);
+    const [modalLayer, setModalLayer] = useState<HTMLElement | null>(null);
 
     return (
-        <Shell className={mode === 'simulate' ? [
-            simLenses.activeOnly ? 'lens-active-only' : '',
-            simLenses.hideFlow ? 'lens-hide-flow' : '',
-            simLenses.hideLua ? 'lens-hide-lua' : '',
-        ].filter(c => c).join(' ') : undefined}>
-            <GlobalStyle/>
-            <svg width="0" height="0" style={{position: 'absolute'}} aria-hidden="true">
-                <defs>
-                    <marker id="story-arrow" viewBox="0 0 10 10" refX="9" refY="5"
-                            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--vscode-charts-foreground, #999)"/>
-                    </marker>
-                </defs>
-            </svg>
-            {createRequest && createRequest.category === 'tactical' && mode === 'edit' ? (
-                <TacticalCreateBar
-                    key={`tactical:${createRequest.type ?? ''}`}
-                    threads={threads}
-                    initialType={createRequest.type}
-                    onCreate={(threadUri, newName, value, file) => {
-                        if (createRequest.position) {
-                            editorRef.current?.presetPosition(threadUri, newName, createRequest.position);
-                        }
-                        sendCommand({kind: 'createTacticalAttachment', threadUri, newName, value, file});
-                        setCreateRequest(null);
-                    }}
-                    onClose={() => setCreateRequest(null)}
-                />
-            ) : null}
-            <div className="body">
-                <div className="canvas-column">
-                    <div className="canvas-area">
-                        {/* Screen-space canvases behind the nodes (.canvas is z-index 1), redrawn on pan/zoom. */}
-                        <SwimlaneCanvas
-                            getHandle={() => editorRef.current}
-                            showThread={showThreadLanes && scope === null} showChapter={showChapterLanes}
-                        />
-                        <LodOverview getHandle={() => editorRef.current}/>
-                        <FlowOverlay getHandle={() => editorRef.current} hidden={simLenses.hideFlow}/>
-                        <div
-                            className="canvas" ref={containerRef}
-                            onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
-                        />
-                        {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
-                        {/* The colour key, on a corner plate like the preview's stage controls. After
+        <ModalLayerContext.Provider value={modalLayer}>
+            <Shell className={mode === 'simulate' ? [
+                simLenses.activeOnly ? 'lens-active-only' : '',
+                simLenses.hideFlow ? 'lens-hide-flow' : '',
+                simLenses.hideLua ? 'lens-hide-lua' : '',
+            ].filter(c => c).join(' ') : undefined}>
+                <GlobalStyle/>
+                <svg width="0" height="0" style={{position: 'absolute'}} aria-hidden="true">
+                    <defs>
+                        <marker id="story-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--vscode-charts-foreground, #999)"/>
+                        </marker>
+                    </defs>
+                </svg>
+                {createRequest && createRequest.category === 'tactical' && mode === 'edit' ? (
+                    <TacticalCreateBar
+                        key={`tactical:${createRequest.type ?? ''}`}
+                        threads={threads}
+                        initialType={createRequest.type}
+                        onCreate={(threadUri, newName, value, file) => {
+                            if (createRequest.position) {
+                                editorRef.current?.presetPosition(threadUri, newName, createRequest.position);
+                            }
+                            sendCommand({kind: 'createTacticalAttachment', threadUri, newName, value, file});
+                            setCreateRequest(null);
+                        }}
+                        onClose={() => setCreateRequest(null)}
+                    />
+                ) : null}
+                <div className="body">
+                    <div className="canvas-column">
+                        <div className="canvas-area">
+                            {/* Screen-space canvases behind the nodes (.canvas is z-index 1), redrawn on pan/zoom. */}
+                            <SwimlaneCanvas
+                                getHandle={() => editorRef.current}
+                                showThread={showThreadLanes && scope === null} showChapter={showChapterLanes}
+                            />
+                            <LodOverview getHandle={() => editorRef.current}/>
+                            <FlowOverlay getHandle={() => editorRef.current} hidden={simLenses.hideFlow}/>
+                            <div
+                                className="canvas" ref={containerRef}
+                                onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
+                            />
+                            {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
+                            {/* The colour key, on a corner plate like the preview's stage controls. After
                         the status cover, so the key can still be opened while a layout runs. */}
-                        <div className="stage-chrome key-corner">
-                            <IconButton
-                                icon="details"
-                                title="Colour key"
-                                className={colourKeyOpen ? 'active' : undefined}
-                                expanded={colourKeyOpen}
-                                onClick={() => setColourKeyOpen(open => !open)}
-                            />
-                        </div>
-                        {colourKeyOpen ? (
-                            <ColourKeyFlyout branches={branchEntries} onClose={() => setColourKeyOpen(false)}/>
-                        ) : null}
-                        {/* A simulation row's detail, beside the dock rather than unfolded inside it. */}
-                        {mode === 'simulate' && simState?.running && simSelection ? (
-                            <SimFlyout
-                                key={simGraphVersion}
-                                state={simState}
-                                selection={simSelection}
-                                graph={simGraphRef.current}
-                                labelOf={labelOf}
-                                actions={simActions}
-                                onSelect={setSimSelection}
-                                onClose={() => setSimSelection(null)}
-                            />
-                        ) : null}
-                    </div>
-                    <div className="bottom-panels">
-                        {showProblems && problems.length ? (
-                            <ProblemsBar
-                                problems={problemView.shown}
-                                label={problemView.label}
-                                filter={{
-                                    hidden: problemView.hidden,
-                                    showingAll: showAllProblems,
-                                    filterable: problemView.filterable,
-                                    onToggle: () => setShowAllProblems(open => !open),
-                                }}
-                                onJump={id => {
-                                    // Centring on a node the server filtered out is a no-op, so a
-                                    // problem from outside the view clears the filter and jumps when
-                                    // the fuller graph lands.
-                                    if (resolveProblemJump(id, graphNodeIds) === 'unfilter') {
-                                        pendingJumpRef.current = id;
-                                        clearFilters();
-                                        return;
-                                    }
-                                    editorRef.current?.centerNode(id);
-                                }}
-                                onClose={() => setShowProblems(false)}
-                            />
-                        ) : null}
-                        {mode === 'simulate' && simState?.running && showTrace ? (
-                            <TracePanel
-                                state={simState}
-                                steps={simSteps}
-                                labelOf={labelOf}
-                                actions={simActions}
-                                onClose={() => setShowTrace(false)}
-                            />
-                        ) : null}
-                    </div>
-                </div>
-                <RightDock
-                    memoKey="storyGraph.dock"
-                    initialWidth={300}
-                    minWidth={210}
-                    maxWidth={520}
-                    header={<>
-                        {mode === 'edit' ? (
-                            <IconButton
-                                icon="save"
-                                className={'header-left' + (pendingCount > 0 ? ' active' : '')}
-                                title="Save - write all staged changes to the XML files"
-                                badge={pendingCount > 0 ? ` ${pendingCount}` : ''}
-                                disabled={pendingCount === 0 || saving}
-                                disabledReason={saving
-                                    ? 'Save - writing the staged changes now'
-                                    : 'Save - nothing is staged'}
-                                onClick={saveEdits}
-                            />
-                        ) : null}
-                        <RotaryModeSwitch
-                            mode={mode}
-                            modes={STORY_MODES.filter(
-                                m => (m.id === 'edit' ? availableModes.edit
-                                    : m.id === 'simulate' ? availableModes.simulate : true))}
-                            onSelect={switchMode}
-                        />
-                        {mode === 'simulate' && simState?.running ? (
-                            <SimHeaderChip
-                                state={simState}
-                                playing={playing}
-                                labelOf={labelOf}
-                                onSelect={selection => {
-                                    setSimSelection(selection);
-                                    // The chip names an event; show it too, as a row press does.
-                                    if (selection.kind === 'node' || selection.kind === 'decision') {
-                                        simActions.centerNode(selection.nodeId);
-                                    }
-                                }}
-                                onPlayPause={simActions.playPause}
-                            />
-                        ) : null}
-                        {mode === 'simulate' && simNotice ? (
-                            <span className="sim-notice" title={simNotice}>{simNotice}</span>
-                        ) : null}
-                        <SeverityTag
-                            severity={severity}
-                            count={problems.length}
-                            title="Validate - check the story for problems (opens the panel below)"
-                            onClick={() => {
-                                validateEdits();
-                            }}
-                        />
-                    </>}
-                    content={<>
-                        {mode === 'edit'
-                            ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes}/> : null}
-                        {mode === 'simulate' && simState?.running ? (
-                            <SimInventory
-                                state={simState}
-                                selection={simSelection}
-                                labelOf={labelOf}
-                                actions={simActions}
-                                onSelect={setSimSelection}
-                            />
-                        ) : null}
-                        {mode === 'simulate' && !simState?.running
-                            ? <div className="dock-hint">Starting simulation...</div> : null}
-                        {mode === 'view'
-                            ? <div className="dock-hint">Read-only. Switch to Edit to change the story,
-                                or Simulation to run it forward.</div> : null}
-                    </>}
-                    overview={<>
-                        {/* In Simulation the foot is the tick transport - the preview's player with
-                            ticks for frames - above the view controls every mode has. */}
-                        {mode === 'simulate' && simState?.running ? (
-                            <SimTransport
-                                state={simState}
-                                pace={pace}
-                                playing={playing}
-                                lenses={simLenses}
-                                traceOpen={showTrace}
-                                setPace={setPace}
-                                setLenses={setSimLenses}
-                                setTraceOpen={setShowTrace}
-                                actions={simActions}
-                            />
-                        ) : null}
-                        <div className="dock-search">
-                            <div className="dock-section-title">Filter</div>
-                            <div className="search-field">
-                                {/* The box shows what was typed at once; only the APPLIED filter waits -
-                                    each one costs a server request and a full rebuild (#131). */}
-                                <input
-                                    type="text" placeholder="Filter event names..." value={nameDraft}
-                                    onChange={e => setNameDraft(e.target.value)}
+                            <div className="stage-chrome key-corner">
+                                <IconButton
+                                    icon="details"
+                                    title="Colour key"
+                                    className={colourKeyOpen ? 'active' : undefined}
+                                    expanded={colourKeyOpen}
+                                    onClick={() => setColourKeyOpen(open => !open)}
                                 />
                             </div>
-                        </div>
-                        <div className="overview-mid">
-                            <div className="overview-tools">
-                                {/* The draft, so the button wakes with the first letter rather than with
-                                    the fetch it is waiting on. */}
-                                <ClearFiltersButton
-                                    filters={{...filters, nameFilter: nameDraft}}
-                                    onClear={clearFilters}
+                            {colourKeyOpen ? (
+                                <ColourKeyFlyout branches={branchEntries} onClose={() => setColourKeyOpen(false)}/>
+                            ) : null}
+                            {/* The simulation's view toggles, top-left, where the preview keeps its own. */}
+                            {mode === 'simulate' && simState?.running ? (
+                                <SimViewToggles
+                                    lenses={simLenses} traceOpen={showTrace}
+                                    setLenses={setSimLenses} setTraceOpen={setShowTrace}
                                 />
-                                <IconButton
-                                    icon="arrange"
-                                    onClick={() => {
-                                        const handle = editorRef.current;
-                                        if (!handle) {
+                            ) : null}
+                            {/* A simulation row's detail, beside the dock rather than unfolded inside it. */}
+                            {mode === 'simulate' && simState?.running && simSelection ? (
+                                <SimFlyout
+                                    key={simGraphVersion}
+                                    state={simState}
+                                    selection={simSelection}
+                                    graph={simGraphRef.current}
+                                    labelOf={labelOf}
+                                    actions={simActions}
+                                    onSelect={setSimSelection}
+                                    onClose={() => setSimSelection(null)}
+                                />
+                            ) : null}
+                        </div>
+                        <div className="bottom-panels">
+                            {showProblems && problems.length ? (
+                                <ProblemsBar
+                                    problems={problemView.shown}
+                                    label={problemView.label}
+                                    filter={{
+                                        hidden: problemView.hidden,
+                                        showingAll: showAllProblems,
+                                        filterable: problemView.filterable,
+                                        onToggle: () => setShowAllProblems(open => !open),
+                                    }}
+                                    onJump={id => {
+                                        // Centring on a node the server filtered out is a no-op, so a
+                                        // problem from outside the view clears the filter and jumps when
+                                        // the fuller graph lands.
+                                        if (resolveProblemJump(id, graphNodeIds) === 'unfilter') {
+                                            pendingJumpRef.current = id;
+                                            clearFilters();
                                             return;
                                         }
-                                        setLayouting(true);
-                                        // Let the overlay paint before the (heavy, synchronous) arrange
-                                        // starts, so a big graph's multi-second freeze is covered by it.
-                                        requestAnimationFrame(() => requestAnimationFrame(() => {
-                                            void handle.autoArrange().finally(() => setLayouting(false));
-                                        }));
+                                        editorRef.current?.centerNode(id);
                                     }}
-                                    title="Arrange - recompute the automatic layout"
+                                    onClose={() => setShowProblems(false)}
                                 />
-                                <IconButton
-                                    icon="frame"
-                                    title="Fit graph to view"
-                                    onClick={() => editorRef.current?.fit()}
+                            ) : null}
+                            {mode === 'simulate' && simState?.running && showTrace ? (
+                                <TracePanel
+                                    state={simState}
+                                    steps={simSteps}
+                                    labelOf={labelOf}
+                                    actions={simActions}
+                                    onClose={() => setShowTrace(false)}
                                 />
+                            ) : null}
+                        </div>
+                    </div>
+                    <RightDock
+                        memoKey="storyGraph.dock"
+                        initialWidth={300}
+                        minWidth={210}
+                        maxWidth={520}
+                        header={<>
+                            {mode === 'edit' ? (
                                 <IconButton
-                                    icon="threadLanes"
-                                    className={showThreadLanes && scope === null ? 'active' : undefined}
-                                    pressed={showThreadLanes && scope === null}
-                                    title="Toggle thread lanes"
-                                    disabled={scope !== null}
-                                    disabledReason="Thread lanes - galactic graph only"
-                                    onClick={() => toggleLane('thread')}
+                                    icon="save"
+                                    className={'header-left' + (pendingCount > 0 ? ' active' : '')}
+                                    title="Save - write all staged changes to the XML files"
+                                    badge={pendingCount > 0 ? ` ${pendingCount}` : ''}
+                                    disabled={pendingCount === 0 || saving}
+                                    disabledReason={saving
+                                        ? 'Save - writing the staged changes now'
+                                        : 'Save - nothing is staged'}
+                                    onClick={saveEdits}
                                 />
-                                <IconButton
-                                    icon="chapterLanes"
-                                    className={showChapterLanes ? 'active' : undefined}
-                                    pressed={showChapterLanes}
-                                    title="Toggle chapter lanes"
-                                    onClick={() => toggleLane('chapter')}
+                            ) : null}
+                            <RotaryModeSwitch
+                                mode={mode}
+                                modes={STORY_MODES.filter(
+                                    m => (m.id === 'edit' ? availableModes.edit
+                                        : m.id === 'simulate' ? availableModes.simulate : true))}
+                                onSelect={switchMode}
+                            />
+                            <SeverityTag
+                                severity={severity}
+                                count={problems.length}
+                                title="Validate - check the story for problems (opens the panel below)"
+                                onClick={() => {
+                                    validateEdits();
+                                }}
+                            />
+                        </>}
+                        content={<>
+                            {mode === 'edit'
+                                ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes}/> : null}
+                            {mode === 'simulate' && simState?.running ? (
+                                <SimInventory
+                                    state={simState}
+                                    selection={simSelection}
+                                    labelOf={labelOf}
+                                    actions={simActions}
+                                    onSelect={setSimSelection}
+                                />
+                            ) : null}
+                            {mode === 'simulate' && !simState?.running
+                                ? <div className="dock-hint">Starting simulation...</div> : null}
+                            {mode === 'view'
+                                ? <div className="dock-hint">Read-only. Switch to Edit to change the story,
+                                    or Simulation to run it forward.</div> : null}
+                        </>}
+                        overview={<>
+                            {/* In Simulation the foot is the tick transport - the preview's player with
+                            ticks for frames - above the view controls every mode has. */}
+                            {mode === 'simulate' && simState?.running ? (
+                                <SimTransport
+                                    state={simState}
+                                    pace={pace}
+                                    playing={playing}
+                                    setPace={setPace}
+                                    actions={simActions}
+                                    labelOf={labelOf}
+                                    notice={simNotice}
+                                    onSelect={selection => {
+                                        setSimSelection(selection);
+                                        // The readout names an event; show it too, as a row press does.
+                                        if (selection.kind === 'node' || selection.kind === 'decision') {
+                                            simActions.centerNode(selection.nodeId);
+                                        }
+                                    }}
+                                />
+                            ) : null}
+                            <div className="dock-search">
+                                <div className="dock-section-title">Filter</div>
+                                <div className="search-field">
+                                    {/* The box shows what was typed at once; only the APPLIED filter waits -
+                                    each one costs a server request and a full rebuild (#131). */}
+                                    <input
+                                        type="text" placeholder="Filter event names..." value={nameDraft}
+                                        onChange={e => setNameDraft(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <div className="overview-mid">
+                                <div className="overview-tools">
+                                    {/* The draft, so the button wakes with the first letter rather than with
+                                    the fetch it is waiting on. */}
+                                    <ClearFiltersButton
+                                        filters={{...filters, nameFilter: nameDraft}}
+                                        onClear={clearFilters}
+                                    />
+                                    <IconButton
+                                        icon="arrange"
+                                        onClick={() => {
+                                            const handle = editorRef.current;
+                                            if (!handle) {
+                                                return;
+                                            }
+                                            setLayouting(true);
+                                            // Let the overlay paint before the (heavy, synchronous) arrange
+                                            // starts, so a big graph's multi-second freeze is covered by it.
+                                            requestAnimationFrame(() => requestAnimationFrame(() => {
+                                                void handle.autoArrange().finally(() => setLayouting(false));
+                                            }));
+                                        }}
+                                        title="Arrange - recompute the automatic layout"
+                                    />
+                                    <IconButton
+                                        icon="frame"
+                                        title="Fit graph to view"
+                                        onClick={() => editorRef.current?.fit()}
+                                    />
+                                    <IconButton
+                                        icon="threadLanes"
+                                        className={showThreadLanes && scope === null ? 'active' : undefined}
+                                        pressed={showThreadLanes && scope === null}
+                                        title="Toggle thread lanes"
+                                        disabled={scope !== null}
+                                        disabledReason="Thread lanes - galactic graph only"
+                                        onClick={() => toggleLane('thread')}
+                                    />
+                                    <IconButton
+                                        icon="chapterLanes"
+                                        className={showChapterLanes ? 'active' : undefined}
+                                        pressed={showChapterLanes}
+                                        title="Toggle chapter lanes"
+                                        onClick={() => toggleLane('chapter')}
+                                    />
+                                </div>
+                                <Minimap getHandle={() => editorRef.current}/>
+                            </div>
+                            <div className="filters-below">
+                                <SelectField
+                                    value={filters.branch} ariaLabel="Branch" title="Branch" icon="search"
+                                    options={[{value: '', label: 'All branches'}, ...branches.map(b => ({value: b}))]}
+                                    onChange={branch => setFilter({branch})}
+                                />
+                                <SelectField
+                                    value={filters.lifecycle} ariaLabel="Lifecycle" title="Lifecycle" icon="search"
+                                    options={[{
+                                        value: '',
+                                        label: 'Any lifecycle'
+                                    }, ...LIFECYCLES.map(l => ({value: l}))]}
+                                    onChange={lifecycle => setFilter({lifecycle})}
+                                />
+                                <SelectField
+                                    value={filters.plotState} ariaLabel="Plot state" icon="search"
+                                    title="Plot state - how this faction's manifest registers the thread an event lives in"
+                                    options={[{
+                                        value: '',
+                                        label: 'Any plot state'
+                                    }, ...PLOT_STATES.map(p => ({value: p}))]}
+                                    onChange={plotState => setFilter({plotState})}
                                 />
                             </div>
-                            <Minimap getHandle={() => editorRef.current}/>
-                        </div>
-                        <div className="filters-below">
-                            <select value={filters.branch} onChange={e => setFilter({branch: e.target.value})}
-                                    title="Branch">
-                                <option value="">All branches</option>
-                                {branches.map(b => <option key={b} value={b}>{b}</option>)}
-                            </select>
-                            <select value={filters.lifecycle} onChange={e => setFilter({lifecycle: e.target.value})}
-                                    title="Lifecycle">
-                                <option value="">Any lifecycle</option>
-                                {LIFECYCLES.map(l => <option key={l} value={l}>{l}</option>)}
-                            </select>
-                            <select
-                                value={filters.plotState}
-                                onChange={e => setFilter({plotState: e.target.value})}
-                                title="Plot state - how this faction's manifest registers the thread an event lives in"
-                            >
-                                <option value="">Any plot state</option>
-                                {PLOT_STATES.map(p => <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                    </>}
-                />
-            </div>
-        </Shell>
+                        </>}
+                    />
+                </div>
+                {/* Last in the shell, so a modal opened from inside a panel with its own stacking
+                    context (the canvas area, the dock) still covers the whole view. */}
+                <div className="modal-layer" ref={setModalLayer}/>
+            </Shell>
+        </ModalLayerContext.Provider>
     );
 }
 

@@ -246,6 +246,76 @@ public sealed class StoryGraphBuilderTest
         Assert.Empty(graph.Problems);
     }
 
+    // Measured: STORY_MISSION_LOST reaches the galaxy on its first frame back from the battle, before
+    // the summary closes and so before battle_end_closed. A loss listener that can only arm once
+    // ITS OWN battle's summary has closed misses it - the tutorial's Tutorial_I_Failed, behind
+    // Returned_01, behind the link to M01. Corpus: the four tutorials' Failed listeners, nothing else.
+    private static string Link(string name, string plot, string? prereq = null)
+    {
+        return $"<Event Name=\"{name}\"><Reward_Type>LINK_TACTICAL</Reward_Type>" +
+               $"<Reward_Param7>{plot}</Reward_Param7>{(prereq is null ? "" : $"<Prereq>{prereq}</Prereq>")}</Event>";
+    }
+
+    private static string Returned(string name, string prereq)
+    {
+        return $"<Event Name=\"{name}\"><Event_Type>STORY_GENERIC</Event_Type>" +
+               $"<Event_Param1>battle_end_closed</Event_Param1><Prereq>{prereq}</Prereq></Event>";
+    }
+
+    private static string Failed(string plot, string prereqs)
+    {
+        return "<Event Name=\"Failed\"><Event_Type>STORY_MISSION_LOST</Event_Type>" +
+               $"<Event_Param1>{plot}</Event_Param1>{prereqs}</Event>";
+    }
+
+    [Fact]
+    public void MissionLostListener_BehindItsBattlesSummaryListener_IsReportedAsMissingTheLoss()
+    {
+        var graph = Build(Thread(UriA, Link("Link", "M01.xml") + Returned("Returned", "Link") +
+                                       Failed("M01.XML", "<Prereq>Returned</Prereq>")));
+
+        var problem = Assert.Single(graph.Problems);
+        Assert.Equal(StoryGraphProblemKind.MissionLostAfterSummary, problem.Kind);
+        Assert.Equal("Failed", problem.Reference);
+        Assert.Contains("never fires", problem.Message);
+        Assert.Contains("Returned", problem.Message);
+    }
+
+    [Fact]
+    public void MissionLostListener_BehindAnEventThatWaitsForTheSummary_IsReportedToo()
+    {
+        var graph = Build(Thread(UriA, Link("Link", "M01.xml") + Returned("Returned", "Link") +
+                                       "<Event Name=\"Later\"><Prereq>Returned</Prereq></Event>" +
+                                       Failed("M01.xml", "<Prereq>Later</Prereq>")));
+
+        Assert.Equal(StoryGraphProblemKind.MissionLostAfterSummary, Assert.Single(graph.Problems).Kind);
+    }
+
+    [Fact]
+    public void MissionLostListener_WithAPrereqLineFreeOfTheSummary_IsNotReported()
+    {
+        // One line waits for the summary, the other does not: the second arms it in time.
+        var graph = Build(Thread(UriA, Link("Link", "M01.xml") + Returned("Returned", "Link") +
+                                       Failed("M01.xml", "<Prereq>Returned</Prereq><Prereq>Link</Prereq>")));
+
+        Assert.Empty(graph.Problems);
+    }
+
+    /// <summary>
+    ///     The false positive the corpus caught: Empire Act I's M03 loss listener waits on M03's link,
+    ///     which the story reaches after M02's summary - an EARLIER battle's. It is armed long before
+    ///     M03 ends, so it hears the loss.
+    /// </summary>
+    [Fact]
+    public void MissionLostListener_BehindAnEarlierBattlesSummary_IsNotReported()
+    {
+        var graph = Build(Thread(UriA, Link("LinkM02", "M02.xml") + Returned("ReturnedM02", "LinkM02") +
+                                       Link("LinkM03", "M03.xml", "ReturnedM02") +
+                                       Failed("M03.xml", "<Prereq>LinkM03</Prereq>")));
+
+        Assert.Empty(graph.Problems);
+    }
+
     [Fact]
     public void GenericListener_PushedByATriggerEvent_IsNotReported()
     {

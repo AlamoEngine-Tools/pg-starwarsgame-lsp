@@ -30,6 +30,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 {
                     StoryGraphProblemKind.AmbiguousTarget => XmlDiagnosticSeverity.Warning,
                     StoryGraphProblemKind.GenericNeverRaised => XmlDiagnosticSeverity.Warning,
+                    StoryGraphProblemKind.MissionLostAfterSummary => XmlDiagnosticSeverity.Warning,
                     _ => XmlDiagnosticSeverity.Error
                 }));
 

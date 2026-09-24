@@ -230,6 +230,74 @@ public sealed class StorySimulationBattleTest
         Assert.Contains(replayed.Flags, f => f.Name == "Score" && f.Value == 7);
     }
 
+    /// <summary>
+    ///     A pick fills in what the battle could have written but its outcome did not decide. It never
+    ///     overrides what the outcome itself wrote: the tutorial's M01 resets its win flag to 0 at the
+    ///     start and increments it on victory, the portal offered that 0, and picking it replaced the
+    ///     victory's 1 - the galaxy's "win >= 1" listener then never fired.
+    /// </summary>
+    [Fact]
+    public void ResolveBattle_APick_NeverOverridesWhatTheOutcomeWrote()
+    {
+        var (service, _) = BuildService();
+        service.Start(GalaxyKey);
+
+        var (state, error) = service.ResolveBattle(GalaxyKey, M2Key, true, 0, [new StorySimFlagDto("W", 0)]);
+
+        Assert.Null(error);
+        Assert.Contains(state!.Flags, f => f.Name == "W" && f.Value == 1);
+        Assert.Equal("Fired", LifecycleOf(state, Galaxy, "Win"));
+    }
+
+    /// <summary>
+    ///     The game's retry after a lost battle reloads the pre-battle autosave; the simulator's retry
+    ///     cuts the galactic log just before the battle's resolution, so the story stands where the
+    ///     outcome was taken - the battle back at its choice, nothing of the loss applied.
+    /// </summary>
+    [Fact]
+    public void RetryBattle_TakesTheGalaxyBackToJustBeforeTheOutcome()
+    {
+        var (service, _) = BuildService();
+        service.Start(GalaxyKey);
+        service.Tick(GalaxyKey, 2);
+        var before = service.GetState(GalaxyKey).State!;
+        service.ResolveBattle(GalaxyKey, M2Key, false);
+
+        var (state, error) = service.RetryBattle(GalaxyKey, M2Key);
+
+        Assert.Null(error);
+        var battle = state!.Battles.Single(b => b.Key == M2Key);
+        Assert.Equal(before.Battles.Single(b => b.Key == M2Key).Status, battle.Status);
+        Assert.Equal(before.Tick, state.Tick);
+        // The battle can be decided again.
+        Assert.Null(service.ResolveBattle(GalaxyKey, M2Key, true).Error);
+    }
+
+    [Fact]
+    public void RetryBattle_DropsTheSessionTheLossWasPlayedIn()
+    {
+        var (service, _) = BuildService();
+        service.Start(GalaxyKey);
+        service.Start(M2Session);
+        service.ResolveBattle(M2Session, M2Key, false);
+
+        service.RetryBattle(GalaxyKey, M2Key);
+
+        Assert.False(service.GetState(M2Session).State!.Running);
+    }
+
+    [Fact]
+    public void RetryBattle_WithoutAnOutcome_SaysSo()
+    {
+        var (service, _) = BuildService();
+        service.Start(GalaxyKey);
+
+        var (state, error) = service.RetryBattle(GalaxyKey, M2Key);
+
+        Assert.Null(state);
+        Assert.Contains("no outcome", error);
+    }
+
     [Fact]
     public void State_ListsWhatEachBattleCanWrite_ForThePortalsPicks()
     {
@@ -238,7 +306,8 @@ public sealed class StorySimulationBattleTest
         var state = service.Start(GalaxyKey).State!;
 
         var m2 = state.Battles.Single(b => b.Key == M2Key);
-        Assert.Equal([("F", 1), ("W", 1)], m2.Writes.Select(w => (w.Name, w.Value)).Order());
+        // W is written by M2's own victory listener: deciding the battle writes it, so it is no pick.
+        Assert.Equal([("F", 1)], m2.Writes.Select(w => (w.Name, w.Value)).Order());
         Assert.Empty(state.Battles.Single(b => b.Key == M5Key).Writes);
     }
 
