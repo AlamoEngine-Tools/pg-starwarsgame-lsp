@@ -672,10 +672,11 @@ public sealed partial class StorySimulator
             }
             case "STORY_FLAG":
             {
-                // Measured: OR over the flag list; an unset flag never compares; the constructor
-                // default is EQUAL_TO 0; an operator name the engine does not know falls to
-                // COMPARE_NONE, which the switch treats as GREATER_THAN. NOT_EQUAL_TO is in the
-                // schema but has no case in the engine's switch, so it never fires (inferred).
+                // Measured: OR over the flag list; an unset flag never compares; with no operator
+                // given the default is EQUAL_TO 0; an operator name the engine does not know falls
+                // to the same slot as "none", which compares with GREATER_THAN. NOT_EQUAL_TO parses
+                // and reaches a branch that does nothing, so the event never fires - and the
+                // out-of-range default lands on that same branch, so neither path can trigger it.
                 var flags = FlagsReadBy(storyEvent).ToList();
                 if (flags.Count == 0) return false;
                 var rawTarget = storyEvent.EventParams.FirstOrDefault(p => p.Position == 1)?.RawValue;

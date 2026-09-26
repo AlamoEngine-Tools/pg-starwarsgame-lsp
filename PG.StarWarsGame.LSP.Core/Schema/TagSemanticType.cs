@@ -61,12 +61,14 @@ public enum TagSemanticType
     OwnerAgnosticReference,
 
     /// <summary>
-    ///     The list holds repeated (object, battle mode) pairs flattened into one comma-separated
-    ///     value, e.g. <c>Fondor, land, Geonosis, land, Jabiim, space</c>: every even slot names an
-    ///     object (<c>referenceType</c>), every odd slot the <c>StoryBattleMode</c> it applies in.
-    ///     Used by <c>Campaign.Autoresolve_Exclusion_Locations</c>. Refines the canonical
-    ///     <see cref="XmlValueType.TypeReferenceList" /> rather than being a value type of its own -
-    ///     the engine has no such type, only a list whose tokens alternate in meaning.
+    ///     The list holds repeated (object, mode) pairs flattened into one comma-separated value,
+    ///     e.g. <c>Fondor, land, Geonosis, land, Jabiim, space</c>: every even slot names an object
+    ///     (<c>referenceType</c>), every odd slot the literal <c>land</c> or <c>space</c> it applies
+    ///     in (<c>AutoresolveExclusionMode</c> - the engine compares with those two words only, not
+    ///     with the story battle modes). Used by <c>Campaign.Autoresolve_Exclusion_Locations</c>.
+    ///     Refines the canonical <see cref="XmlValueType.TypeReferenceList" /> rather than being a
+    ///     value type of its own - the engine has no such type, only a list whose tokens alternate in
+    ///     meaning.
     /// </summary>
     PlanetModePairList,
 
@@ -81,11 +83,12 @@ public enum TagSemanticType
     FactionPlotFilePairList,
 
     /// <summary>
-    ///     A <c>Faction, MarkupFile</c> pair where only the leading faction is an indexable object.
-    ///     Used by <c>Campaign.Markup_Filename</c>: slot 0 names a <c>Faction</c>; slot 1 names a GUI
-    ///     hint-markup file that is not part of the XML object/workspace-file index (loaded by the
-    ///     engine from the GUI markup set, not shipped as a navigable workspace object), so it is left
-    ///     unresolved rather than reported as a missing reference. Refines <see cref="XmlValueType.NameReferenceList" />.
+    ///     A <c>Faction, MarkupName</c> pair where only the leading faction is an indexable object.
+    ///     Used by <c>Campaign.Markup_Filename</c>: slot 0 names a <c>Faction</c>; slot 1 names the
+    ///     AI galactic perception markup the engine loads from
+    ///     <c>Data/XML/AI/GalacticMarkup/&lt;MarkupName&gt;.xml</c>. The AI tree is not indexed yet,
+    ///     so slot 1 is left unmodelled rather than reported as a missing reference. Refines
+    ///     <see cref="XmlValueType.NameReferenceList" />.
     /// </summary>
     FactionMarkupPairList,
 
@@ -98,5 +101,14 @@ public enum TagSemanticType
     ///     in all 484 occurrences (178 eaw, 306 foc) and never longer, which is what makes reading
     ///     slot 1 positionally safe here and not for the type's other tags.
     /// </summary>
-    FactionAiPlayerPairList
+    FactionAiPlayerPairList,
+
+    /// <summary>
+    ///     A <c>Planet, Number</c> pair carried by the per-faction reader. Used by
+    ///     <c>Campaign.Corruption_Level_Override</c>: the engine parses it with the same reader as
+    ///     <c>Starting_Credits</c> (<see cref="XmlValueType.PerFactionValue" />), but its only
+    ///     consumer looks slot 0 up as an object type and requires a planet. So slot 0 resolves
+    ///     against the tag's own <c>referenceType</c>, never against the Faction pool.
+    /// </summary>
+    PlanetValuePair
 }

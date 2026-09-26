@@ -48,9 +48,10 @@ public static class ReferenceResolutionEvaluator
             // baseline before it trusts a faction lookup.
             if (expectedTypeName is not null && indexedTypeNames is { Count: > 0 }
                                              && !indexedTypeNames.Contains(expectedTypeName))
+                // The gap is the tool's (the AI tree, for one, is a later milestone), so the notice
+                // names it as an unsupported check rather than as something missing from the data.
                 return (XmlDiagnosticSeverity.Information,
-                    $"Cannot verify reference '{displayId}': No {expectedTypeName} is indexed yet, "
-                    + "so this reference cannot be checked.",
+                    $"Cannot verify reference '{displayId}': Checking {expectedTypeName} references is not supported yet.",
                     DiagnosticIds.ReferenceTypeNotIndexed);
 
             return (XmlDiagnosticSeverity.Error,

@@ -20,10 +20,16 @@ public sealed class StoryFactProducerTest
         Dictionary<string, string>? notes = null,
         ParamDefinition[]? paramDefs = null)
     {
+        // Two separate knobs in the old model, one list in the new one.
+        var valueNotes = new List<SchemaNote>();
+        if (deprecated)
+            valueNotes.Add(new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>()));
+        if (notes is not null) valueNotes.Add(new SchemaNote(SchemaNoteKind.Remark, notes));
+
         var value = new EnumValueDefinition
         {
-            Name = name, Deprecated = deprecated,
-            Notes = notes ?? new Dictionary<string, string>(),
+            Name = name,
+            Notes = valueNotes,
             Params = paramDefs is { Length: > 0 } ? [.. paramDefs] : null
         };
         return new SingleEventSchemaProvider(new EnumDefinition

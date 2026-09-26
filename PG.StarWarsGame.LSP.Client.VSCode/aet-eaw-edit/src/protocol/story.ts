@@ -193,10 +193,21 @@ export interface StoryParamSchemaDto {
     label?: string | null;
 }
 
+/** One thing the schema says about a type. `kind` is a SchemaNoteKind name. */
+export interface StoryNoteDto {
+    kind: string;
+    text?: string | null;
+    value?: string | null;
+}
+
 export interface StoryTypeSchemaDto {
     name: string;
     description?: string | null;
-    untested: boolean;
+    /**
+     * Everything the schema says about this type, ranked worst first. Replaced a lone `untested`
+     * boolean in schema 2.0.0, which could not tell an unverified type from one the engine ignores.
+     */
+    notes: StoryNoteDto[];
     params: StoryParamSchemaDto[];
 }
 

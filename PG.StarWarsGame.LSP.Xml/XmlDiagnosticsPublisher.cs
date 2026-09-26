@@ -479,7 +479,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                             v.Groups.Any(g => groups.Contains(g, StringComparer.OrdinalIgnoreCase)));
         var validNames = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         foreach (var value in applicableValues)
-            validNames[value.Name] = value.Deprecated;
+            validNames[value.Name] = value.Notes.Has(SchemaNoteKind.Deprecated);
 
         var innerText = child.InnerText;
         char[] separators = [',', ' ', '\t', '\r', '\n'];

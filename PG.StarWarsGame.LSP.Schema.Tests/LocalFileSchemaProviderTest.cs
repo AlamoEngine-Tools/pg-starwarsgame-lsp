@@ -226,14 +226,18 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
     }
 
     [Fact]
-    public void ParseTagFile_DeprecatedAndAvailableSince_Parsed()
+    public void ParseTagFile_NotesSurviveTheWholeLoad()
     {
         const string yaml = """
                             tags:
                               - tag: Old_Tag
                                 type: Float
-                                deprecated: true
-                                availableSince: "FoC 1.0"
+                                notes:
+                                  - kind: Deprecated
+                                    text:
+                                      en: "Use New_Tag."
+                                  - kind: Since
+                                    value: "FoC 1.0"
                             """;
 
         using var provider = CreateAndLoad(yaml);
@@ -241,8 +245,9 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
         var tag = provider.GetTag("Old_Tag");
 
         Assert.NotNull(tag);
-        Assert.True(tag.Deprecated);
-        Assert.Equal("FoC 1.0", tag.AvailableSince);
+        Assert.Equal(SchemaNoteKind.Deprecated, tag.Notes[0].Kind);
+        Assert.Equal("Use New_Tag.", tag.Notes[0].Text["en"]);
+        Assert.Equal("FoC 1.0", tag.Notes[1].Value);
     }
 
     [Fact]

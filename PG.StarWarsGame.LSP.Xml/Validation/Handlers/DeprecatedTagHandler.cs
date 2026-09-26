@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -12,7 +13,7 @@ public sealed class DeprecatedTagHandler : XmlDiagnosticsHandler<XmlTagValueFact
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (!fact.Tag.Deprecated)
+        if (!fact.Tag.Notes.Has(SchemaNoteKind.Deprecated))
             return [];
 
         // The schema usually records WHY a tag was retired, in its own description - and "do not

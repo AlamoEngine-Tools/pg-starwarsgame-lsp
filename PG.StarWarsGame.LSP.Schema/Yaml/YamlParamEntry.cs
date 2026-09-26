@@ -16,5 +16,5 @@ internal sealed class YamlParamEntry
     public bool Optional { get; set; }
     public Dictionary<string, string> Label { get; set; } = [];
     public Dictionary<string, string> Description { get; set; } = [];
-    public Dictionary<string, string> Notes { get; set; } = [];
+    public List<YamlNote> Notes { get; set; } = [];
 }

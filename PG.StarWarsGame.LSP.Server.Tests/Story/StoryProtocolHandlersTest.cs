@@ -511,7 +511,34 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal("Event", param.Label);
         var enter = Assert.Single(result.EventTypes, t => t.Name == "STORY_ENTER");
         Assert.Null(Assert.Single(enter.Params).Label);
-        Assert.True(Assert.Single(result.EventTypes, t => t.Name == "STORY_UNTESTED").Untested);
+        // Notes travel whole rather than as one boolean: the editor has to tell an untested type
+        // from one the engine ignores, and until 2.0.0 the wire could only say "untested".
+        var untested = Assert.Single(
+            Assert.Single(result.EventTypes, t => t.Name == "STORY_UNTESTED").Notes);
+        Assert.Equal(nameof(SchemaNoteKind.Untested), untested.Kind);
+    }
+
+    // The kinds that say something is wrong have to survive the trip, or the story graph cannot
+    // show what it was told.
+    [Fact]
+    public async Task GetStorySchema_ShipsEveryNoteKind_WithItsTextAndValue()
+    {
+        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider(), Config())
+            .Handle(new GetStorySchemaParams(), CancellationToken.None);
+
+        var bugged = Assert.Single(result.EventTypes, t => t.Name == "STORY_BUGGED");
+
+        Assert.Collection(bugged.Notes,
+            n =>
+            {
+                Assert.Equal(nameof(SchemaNoteKind.BuggedInEngine), n.Kind);
+                Assert.Equal("The engine ignores this.", n.Text);
+            },
+            n =>
+            {
+                Assert.Equal(nameof(SchemaNoteKind.Since), n.Kind);
+                Assert.Equal("FoC 1.1", n.Value);
+            });
     }
 
     [Fact]
@@ -1044,7 +1071,23 @@ public sealed class StoryProtocolHandlersTest
             [
                 new EnumValueDefinition { Name = "STORY_ELAPSED" },
                 new EnumValueDefinition { Name = "STORY_TRIGGER" },
-                new EnumValueDefinition { Name = "STORY_UNTESTED", Untested = true },
+                new EnumValueDefinition
+                {
+                    Name = "STORY_UNTESTED",
+                    Notes = [new SchemaNote(SchemaNoteKind.Untested, new Dictionary<string, string>())]
+                },
+                // Two kinds on one type, written in the wrong order on purpose: the wire must rank
+                // them, so a client showing a single badge shows the engine bug and not the version.
+                new EnumValueDefinition
+                {
+                    Name = "STORY_BUGGED",
+                    Notes =
+                    [
+                        new SchemaNote(SchemaNoteKind.Since, new Dictionary<string, string>(), "FoC 1.1"),
+                        new SchemaNote(SchemaNoteKind.BuggedInEngine,
+                            new Dictionary<string, string> { ["en"] = "The engine ignores this." })
+                    ]
+                },
                 new EnumValueDefinition
                 {
                     Name = "STORY_ENTER",

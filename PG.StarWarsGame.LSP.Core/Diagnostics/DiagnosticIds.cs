@@ -304,6 +304,18 @@ public static class DiagnosticIds
     public static readonly DiagnosticId XmlNotes = new(DiagnosticGroup.Structure, 7);
     public static readonly DiagnosticId XmlStructure = new(DiagnosticGroup.Structure, 8);
 
+    // Notes carried by an enum VALUE that a file names. New in schema 2.0.0: until then only a
+    // hardcoded-set value could say anything about itself, so an enum member the engine ignores had
+    // nowhere to say so. One id per kind, because suppressing "this is a rare value" must not also
+    // suppress "this value does nothing"; the existing tag and event-type ids are untouched, so no
+    // suppression anyone has already written changes meaning.
+    // Appended after 13, the highest this group had used. The group's members are written in
+    // feature-area blocks rather than in numeric order, so the next free number is not the one
+    // below the next declaration - DiagnosticIdCatalogueTest is what catches a collision.
+    public static readonly DiagnosticId EnumValueDeprecated = new(DiagnosticGroup.Structure, 14);
+    public static readonly DiagnosticId EnumValueUntested = new(DiagnosticGroup.Structure, 15);
+    public static readonly DiagnosticId EnumValueNotes = new(DiagnosticGroup.Structure, 16);
+
     // Lua imports. Structure rather than a Lua-specific group: the group says what kind of problem
     // was reported, not which language reported it.
     public static readonly DiagnosticId LuaRedundantRequire = new(DiagnosticGroup.Structure, 9);
@@ -534,6 +546,10 @@ public static class DiagnosticIds
     // A local captured as an upvalue by a function the engine calls: an engine-hardcoded
     // expectation, the same kind of problem as the XML entries above.
     public static readonly DiagnosticId LuaEngineUpvalue = new(DiagnosticGroup.Engine, 5);
+
+    // A value the parser accepts and the engine then ignores or mishandles. An engine fact, which
+    // is why it sits in this group rather than with the structural notes.
+    public static readonly DiagnosticId EnumValueBuggedInEngine = new(DiagnosticGroup.Engine, 6);
 
     // ── Syntax ──
     // Lua's parse errors come from Loretta already numbered and are mapped across by

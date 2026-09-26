@@ -73,12 +73,15 @@ internal static class HoverUtility
 
         sb.Append("`*\n");
 
-        if (tag.AvailableSince is not null || tag.Deprecated)
+        // The status line above the description. It repeats what the notes below also say, because
+        // this is the line a reader sees before deciding to read on.
+        var since = tag.Notes.ValueFor(SchemaNoteKind.Since);
+        if (since is not null || tag.Notes.Has(SchemaNoteKind.Deprecated))
         {
             var parts = new List<string>();
-            if (tag.AvailableSince is not null) parts.Add($"Since {tag.AvailableSince}");
-            if (tag.Deprecated) parts.Add("Deprecated");
-            sb.AppendLine($"**{string.Join(" · ", parts)}**");
+            if (since is not null) parts.Add($"Since {since}");
+            if (tag.Notes.Has(SchemaNoteKind.Deprecated)) parts.Add("Deprecated");
+            sb.AppendLine($"**{string.Join(" - ", parts)}**");
         }
 
         sb.AppendLine();
@@ -92,7 +95,8 @@ internal static class HoverUtility
             sb.Append(hint);
         }
 
-        AppendNotes(sb, tag.Notes, locale);
+        // Since and Deprecated are already on the status line above the description.
+        AppendNotes(sb, tag.Notes, locale, SummarisedOnTheStatusLine);
 
         return new Hover
         {
@@ -236,14 +240,64 @@ internal static class HoverUtility
             : "Defined in a dependency project");
     }
 
-    private static void AppendNotes(StringBuilder sb, IReadOnlyDictionary<string, string> notes, string locale)
+    // Every note the element carries, in rank order, each labelled by its kind - the reader needs to
+    // know whether they are looking at a caveat or at "the engine ignores this". English is the
+    // fallback for a note that has not been translated yet: a note in the wrong language still says
+    // more than no note at all.
+    /// <param name="summarised">
+    ///     Kinds a caller has already put in its own status line. A note of such a kind is still
+    ///     listed when it has words of its own - the reason a tag was retired is worth reading - but
+    ///     a bare one is dropped, because repeating "Deprecated" under a line that just said
+    ///     "Deprecated" tells the reader nothing twice.
+    /// </param>
+    private static void AppendNotes(StringBuilder sb, IReadOnlyList<SchemaNote> notes, string locale,
+        IReadOnlySet<SchemaNoteKind>? summarised = null)
     {
-        if (!notes.TryGetValue(locale, out var note) && !notes.TryGetValue("en", out note))
-            return;
+        // Ranked here rather than trusted to arrive ranked: the parser ranks what it reads, but a
+        // definition built in code has not been through it, and "worst first" is the promise.
+        var lines = new List<string>();
+        foreach (var note in SchemaNote.Ranked(notes))
+        {
+            var text = note.Text.GetValueOrDefault(locale) ?? note.Text.GetValueOrDefault("en");
+            if (string.IsNullOrWhiteSpace(text) && summarised?.Contains(note.Kind) == true)
+                continue;
+
+            var label = $"> **{NoteLabel(note.Kind)}:**";
+
+            // The kind alone is worth saying. Most notes carry nothing else: the schema 2.0.0 sweep
+            // turned every `deprecated: true` into a Deprecated note with no words, and dropping
+            // those here would silence the majority of what the schema knows.
+            lines.Add((text, note.Value) switch
+            {
+                ({ } t, _) when !string.IsNullOrWhiteSpace(t) => $"{label} *{t}*",
+                // A Since note is a version and no prose, so the value reads as its own sentence.
+                (_, { } v) => $"{label} {v}",
+                _ => label
+            });
+        }
+
+        if (lines.Count == 0) return;
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.Append($"> **Note:** *{note}*");
+        // AppendLine per note, so the block uses the same line ending as everything above it.
+        foreach (var line in lines) sb.AppendLine(line);
+    }
+
+    /// <summary>The kinds a tag hover puts in its status line, and so need not repeat below it.</summary>
+    private static readonly HashSet<SchemaNoteKind> SummarisedOnTheStatusLine =
+        [SchemaNoteKind.Since, SchemaNoteKind.Deprecated];
+
+    private static string NoteLabel(SchemaNoteKind kind)
+    {
+        return kind switch
+        {
+            SchemaNoteKind.BuggedInEngine => "Does not work",
+            SchemaNoteKind.Deprecated => "Deprecated",
+            SchemaNoteKind.Untested => "Untested",
+            SchemaNoteKind.Since => "Since",
+            _ => "Note"
+        };
     }
 
     private static Range MakeRange(int line, int colStart, int length)

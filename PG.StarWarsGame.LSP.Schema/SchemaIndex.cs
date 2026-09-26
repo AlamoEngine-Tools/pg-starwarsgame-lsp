@@ -144,8 +144,6 @@ public sealed class SchemaIndex
             SemanticType = raw.SemanticType,
             ValueGroups = raw.ValueGroups,
             AllowedValues = raw.AllowedValues,
-            Deprecated = raw.Deprecated,
-            AvailableSince = raw.AvailableSince,
             Description = raw.Description,
             Notes = raw.Notes,
             MultipleAllowed = raw.MultipleAllowed,
@@ -161,9 +159,6 @@ public sealed class SchemaIndex
             Name = rawVal.Name,
             Description = rawVal.Description,
             Notes = rawVal.Notes,
-            Deprecated = rawVal.Deprecated,
-            Untested = rawVal.Untested,
-            AvailableSince = rawVal.AvailableSince,
             Groups = rawVal.Groups,
             Params = rawVal.Params?.Select(ResolveParam).ToList()
         }).ToList();
@@ -176,8 +171,6 @@ public sealed class SchemaIndex
             SourceFile = raw.SourceFile,
             Description = raw.Description,
             Notes = raw.Notes,
-            Deprecated = raw.Deprecated,
-            AvailableSince = raw.AvailableSince,
             Values = values
         };
     }

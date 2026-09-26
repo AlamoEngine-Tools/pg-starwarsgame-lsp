@@ -104,7 +104,7 @@ internal static class MegaTextureFixture
     {
         var fileSystem = new MockFileSystem();
         fileSystem.AddFile(path, new MockFileData(mtdBytes));
-        return CreateMtdService(fileSystem).Load(path).Content;
+        return CreateMtdService(fileSystem).LoadFile(path).Content;
     }
 
     /// <summary>
@@ -117,7 +117,7 @@ internal static class MegaTextureFixture
     ///     directory reader needs the hashing services; PetroglyphCommons.ContributeServices uses
     ///     TryAdd and does not supply IHashingService itself, so it has to be registered first.
     /// </remarks>
-    public static IMtdFileService CreateMtdService(IFileSystem fileSystem)
+    public static IMtdService CreateMtdService(IFileSystem fileSystem)
     {
         var services = new ServiceCollection();
         services.AddSingleton(fileSystem);
@@ -125,7 +125,7 @@ internal static class MegaTextureFixture
         PetroglyphCommons.ContributeServices(services);
         services.SupportMTD();
 
-        return services.BuildServiceProvider().GetRequiredService<IMtdFileService>();
+        return services.BuildServiceProvider().GetRequiredService<IMtdService>();
     }
 
     private static void WriteUInt32(byte[] buffer, int offset, uint value)

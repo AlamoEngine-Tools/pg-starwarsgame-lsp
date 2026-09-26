@@ -22,6 +22,7 @@ public sealed class LocalisationFileNameLanguageResolverTest
     private static ILanguageService LangService()
     {
         var services = new ServiceCollection();
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         return services.BuildServiceProvider().GetRequiredService<ILanguageService>();
     }

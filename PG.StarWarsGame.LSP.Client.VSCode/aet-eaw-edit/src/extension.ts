@@ -389,9 +389,20 @@ function validateConfiguration(): boolean {
 
 async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     const waitForDebugger = cfg('lsp.debug').get<boolean>('waitForDebugger', false);
+    const extraArgs: string[] = [];
+    if (waitForDebugger) {
+        extraArgs.push('--wait-for-debugger');
+    }
+    // Where the server's debug log goes. Without it the server writes beside its own binary,
+    // because a spawned process inherits the EDITOR's working directory - one session's log landed
+    // inside the VS Code installation folder, and the workspace showed none at all.
+    const logRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (logRoot) {
+        extraArgs.push(`--log-dir=${logRoot}`);
+    }
     // The same resolution starts the Lua debug adapter (see luaDebugAdapterFactory), which is this
     // binary in a different mode; keeping it in one place is what keeps the two from drifting.
-    const server = resolveServerCommand(context.extensionPath, waitForDebugger ? ['--wait-for-debugger'] : []);
+    const server = resolveServerCommand(context.extensionPath, extraArgs);
     logLine(`Starting LSP server: ${server.description}`);
     const serverExe = server.command;
     const serverArgs = [...server.args];

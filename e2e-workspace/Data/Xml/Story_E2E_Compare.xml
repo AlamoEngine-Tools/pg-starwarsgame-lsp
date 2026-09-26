@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+	Fixture for StoryCompareMethodSmokeTest.
+
+	E2E_Compare_Bugged is INVALID ON PURPOSE. NOT_EQUAL_TO is a real member of
+	StoryFlagCompareMethod and the parser accepts it, but the engine's comparison has a branch for
+	it that does nothing at all, so the event never fires. The shipped corpus contains no use of it -
+	nobody writes an operator that never worked - which is exactly why the case has to be authored
+	here. Do not "fix" the operator; the test asserts that it is reported.
+
+	E2E_Compare_Working is the control. It differs only in the operator, so a check that flagged
+	every compare method would fail on it instead of passing quietly.
+-->
+
+<Story>
+
+	<Event Name="E2E_Compare_Bugged">
+		<Event_Type>STORY_FLAG</Event_Type>
+		<Event_Param1>E2E_Compare_Flag</Event_Param1>
+		<Event_Param2>1</Event_Param2>
+		<Event_Param3>NOT_EQUAL_TO</Event_Param3>
+	</Event>
+
+	<Event Name="E2E_Compare_Working">
+		<Event_Type>STORY_FLAG</Event_Type>
+		<Event_Param1>E2E_Compare_Flag</Event_Param1>
+		<Event_Param2>1</Event_Param2>
+		<Event_Param3>GREATER_THAN_EQUAL_TO</Event_Param3>
+	</Event>
+
+</Story>

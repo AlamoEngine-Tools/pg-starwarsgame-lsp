@@ -109,11 +109,15 @@ public sealed class YamlSchemaParserTest
                                 type: Float
                                 referenceType: FooRef
                                 enumName: BarEnum
-                                deprecated: true
-                                availableSince: "EaW 1.0"
                                 multipleAllowed: true
                                 description:
                                   en: "Health points"
+                                notes:
+                                  - kind: Deprecated
+                                    text:
+                                      en: "Use Tactical_Health_Percent."
+                                  - kind: Since
+                                    value: "EaW 1.0"
                             """;
 
         var tags = YamlSchemaParser.ParseTagFile(yaml);
@@ -123,8 +127,8 @@ public sealed class YamlSchemaParserTest
         Assert.Equal(XmlValueType.Float, tag.ValueType);
         Assert.Equal("FooRef", tag.ReferenceType);
         Assert.Equal("BarEnum", tag.EnumName);
-        Assert.True(tag.Deprecated);
-        Assert.Equal("EaW 1.0", tag.AvailableSince);
+        Assert.Equal(SchemaNoteKind.Deprecated, tag.Notes[0].Kind);
+        Assert.Equal("EaW 1.0", tag.Notes[1].Value);
         Assert.True(tag.MultipleAllowed);
         Assert.Equal("Health points", tag.Description["en"]);
     }
@@ -230,11 +234,10 @@ public sealed class YamlSchemaParserTest
         var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
 
         Assert.Equal("Speed", tag.Tag);
-        Assert.False(tag.Deprecated);
         Assert.False(tag.MultipleAllowed);
         Assert.Null(tag.ReferenceType);
         Assert.Null(tag.EnumName);
-        Assert.Null(tag.AvailableSince);
+        Assert.Empty(tag.Notes);
         Assert.Empty(tag.Description);
     }
 
@@ -402,14 +405,17 @@ public sealed class YamlSchemaParserTest
                             name: BehaviorModule
                             description:
                               en: "Known C++ behaviour module names."
-                            deprecated: true
-                            availableSince: "EaW 1.0"
+                            notes:
+                              - kind: Deprecated
+                                text:
+                                  en: "The whole list went with FoC."
                             values:
                               - name: GenericTransport
                                 description:
                                   en: "Generic transport."
-                                deprecated: false
-                                availableSince: "EaW 1.0"
+                                notes:
+                                  - kind: Since
+                                    value: "EaW 1.0"
                                 groups:
                                   - space
                                   - land
@@ -419,14 +425,12 @@ public sealed class YamlSchemaParserTest
 
         Assert.Equal("BehaviorModule", set.Name);
         Assert.Equal("Known C++ behaviour module names.", set.Description["en"]);
-        Assert.True(set.Deprecated);
-        Assert.Equal("EaW 1.0", set.AvailableSince);
+        Assert.Equal(SchemaNoteKind.Deprecated, Assert.Single(set.Notes).Kind);
 
         var value = Assert.Single(set.Values);
         Assert.Equal("GenericTransport", value.Name);
         Assert.Equal("Generic transport.", value.Description["en"]);
-        Assert.False(value.Deprecated);
-        Assert.Equal("EaW 1.0", value.AvailableSince);
+        Assert.Equal("EaW 1.0", Assert.Single(value.Notes).Value);
         Assert.Equal(["space", "land"], value.Groups);
     }
 
@@ -442,14 +446,12 @@ public sealed class YamlSchemaParserTest
         var set = YamlSchemaParser.ParseHardcodedSetFile(yaml);
 
         Assert.Equal("BehaviorModule", set.Name);
-        Assert.False(set.Deprecated);
-        Assert.Null(set.AvailableSince);
+        Assert.Empty(set.Notes);
         Assert.Empty(set.Description);
 
         var value = Assert.Single(set.Values);
         Assert.Equal("GenericTransport", value.Name);
-        Assert.False(value.Deprecated);
-        Assert.Null(value.AvailableSince);
+        Assert.Empty(value.Notes);
         Assert.Empty(value.Groups);
     }
 
@@ -547,20 +549,20 @@ public sealed class YamlSchemaParserTest
                             name: StoryEventType
                             description:
                               en: "Trigger condition type."
-                            deprecated: false
-                            availableSince: "FoC 1.0"
+                            notes:
+                              - kind: Since
+                                value: "FoC 1.0"
                             values:
                               - name: STORY_CONQUER
                                 description:
                                   en: "Fires when control of a planet changes."
-                                deprecated: false
                             """;
 
         var def = YamlSchemaParser.ParseEnumFile(yaml);
 
         Assert.Equal("StoryEventType", def.Name);
         Assert.Equal("Trigger condition type.", def.Description["en"]);
-        Assert.Equal("FoC 1.0", def.AvailableSince);
+        Assert.Equal("FoC 1.0", Assert.Single(def.Notes).Value);
 
         var value = Assert.Single(def.Values);
         Assert.Equal("STORY_CONQUER", value.Name);
@@ -568,20 +570,24 @@ public sealed class YamlSchemaParserTest
     }
 
     [Fact]
-    public void ParseEnumFile_UntestedValue_MapsUntestedFlag()
+    public void ParseEnumFile_UntestedValue_MapsAnUntestedNote()
     {
         const string yaml = """
                             name: StoryDialogCommand
                             values:
                               - name: CLEAR_TEXT
-                                untested: true
+                                notes:
+                                  - kind: Untested
+                                    text:
+                                      en: "Never seen in the shipped corpus."
                               - name: TEXT
                             """;
 
         var def = YamlSchemaParser.ParseEnumFile(yaml);
 
-        Assert.True(def.Values.Single(v => v.Name == "CLEAR_TEXT").Untested);
-        Assert.False(def.Values.Single(v => v.Name == "TEXT").Untested);
+        Assert.Equal(SchemaNoteKind.Untested,
+            Assert.Single(def.Values.Single(v => v.Name == "CLEAR_TEXT").Notes).Kind);
+        Assert.Empty(def.Values.Single(v => v.Name == "TEXT").Notes);
     }
 
     [Fact]
@@ -663,120 +669,6 @@ public sealed class YamlSchemaParserTest
         var param = Assert.Single(value.Params!);
         Assert.Equal(0, param.Position);
         Assert.Equal(XmlValueType.NameReferenceList, param.ValueType);
-    }
-
-    [Fact]
-    public void ParseEnumFile_WithValueNotes_ReturnsNotes()
-    {
-        const string yaml = """
-                            name: StoryEventType
-                            values:
-                              - name: STORY_GARRISON_UNIT
-                                description:
-                                  en: "Fires when the specified unit is garrisoned."
-                                notes:
-                                  en: "Never used in vanilla. Parameters 2 and 3 are probably non-functional."
-                            """;
-
-        var def = YamlSchemaParser.ParseEnumFile(yaml);
-        var value = Assert.Single(def.Values);
-
-        Assert.Equal("Never used in vanilla. Parameters 2 and 3 are probably non-functional.",
-            value.Notes["en"]);
-    }
-
-    [Fact]
-    public void ParseEnumFile_WithEnumLevelNotes_ReturnsNotes()
-    {
-        const string yaml = """
-                            name: StoryEventType
-                            notes:
-                              en: "FoC-only enum."
-                            values: []
-                            """;
-
-        var def = YamlSchemaParser.ParseEnumFile(yaml);
-
-        Assert.Equal("FoC-only enum.", def.Notes["en"]);
-    }
-
-    [Fact]
-    public void ParseEnumFile_WithoutNotes_ReturnsEmptyNotes()
-    {
-        const string yaml = """
-                            name: StoryEventType
-                            values:
-                              - name: STORY_TRIGGER
-                            """;
-
-        var def = YamlSchemaParser.ParseEnumFile(yaml);
-        var value = Assert.Single(def.Values);
-
-        Assert.Empty(value.Notes);
-        Assert.Empty(def.Notes);
-    }
-
-    [Fact]
-    public void ParseTagFile_WithNotes_ReturnsNotes()
-    {
-        const string yaml = """
-                            tags:
-                              - tag: Event_Type
-                                type: DynamicEnumValue
-                                enumName: StoryEventType
-                                notes:
-                                  en: "Determines the trigger condition for this event block."
-                            """;
-
-        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
-
-        Assert.Equal("Determines the trigger condition for this event block.", tag.Notes["en"]);
-    }
-
-    [Fact]
-    public void ParseTagFile_WithoutNotes_ReturnsEmptyNotes()
-    {
-        const string yaml = """
-                            tags:
-                              - tag: Speed
-                                type: Float
-                            """;
-
-        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
-
-        Assert.Empty(tag.Notes);
-    }
-
-    [Fact]
-    public void ParseHardcodedSetFile_WithValueNotes_ReturnsNotes()
-    {
-        const string yaml = """
-                            name: BehaviorModule
-                            values:
-                              - name: GenericTransport
-                                notes:
-                                  en: "Only available in space tactical mode."
-                            """;
-
-        var set = YamlSchemaParser.ParseHardcodedSetFile(yaml);
-        var value = Assert.Single(set.Values);
-
-        Assert.Equal("Only available in space tactical mode.", value.Notes["en"]);
-    }
-
-    [Fact]
-    public void ParseHardcodedSetFile_WithSetLevelNotes_ReturnsNotes()
-    {
-        const string yaml = """
-                            name: BehaviorModule
-                            notes:
-                              en: "Deprecated module list."
-                            values: []
-                            """;
-
-        var set = YamlSchemaParser.ParseHardcodedSetFile(yaml);
-
-        Assert.Equal("Deprecated module list.", set.Notes["en"]);
     }
 
     // ── ParseMetafileFile ───────────────────────────────────────────────────

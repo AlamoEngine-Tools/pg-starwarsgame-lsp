@@ -19,7 +19,7 @@ public sealed class StoryParamNotesHandlerTest
             Position = 0,
             ValueType = XmlValueType.Int,
             Optional = true,
-            Notes = new Dictionary<string, string> { [locale] = note }
+            Notes = [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { [locale] = note })]
         };
     }
 

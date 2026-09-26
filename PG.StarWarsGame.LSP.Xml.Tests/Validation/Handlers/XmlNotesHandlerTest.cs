@@ -18,7 +18,7 @@ public sealed class XmlNotesHandlerTest
         {
             Tag = "Speed",
             ValueType = XmlValueType.Float,
-            Notes = new Dictionary<string, string> { [locale] = note }
+            Notes = [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { [locale] = note })]
         };
     }
 

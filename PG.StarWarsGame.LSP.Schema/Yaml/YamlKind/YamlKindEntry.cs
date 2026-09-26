@@ -10,5 +10,5 @@ internal sealed class YamlKindEntry
     public List<string> Flags { get; set; } = [];
     public List<string> MemberOf { get; set; } = [];
     public Dictionary<string, string> Description { get; set; } = [];
-    public Dictionary<string, string> Notes { get; set; } = [];
+    public List<YamlNote> Notes { get; set; } = [];
 }

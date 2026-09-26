@@ -17,6 +17,37 @@ internal static class YamlSchemaParser
         .IgnoreUnmatchedProperties()
         .Build();
 
+    /// <summary>
+    ///     Reads an element's notes.
+    ///     <para>
+    ///         Fails closed on a kind this server does not know. A note is the schema telling the
+    ///         author that something is wrong with what they are using; dropping one we cannot
+    ///         classify would turn "this never fires" into silence, which is worse than refusing to
+    ///         load. The version gate is what normally catches a newer schema - this is the backstop
+    ///         for a kind added within the same major.
+    ///     </para>
+    /// </summary>
+    private static IReadOnlyList<SchemaNote> ReadNotes(List<YamlNote> notes)
+    {
+        if (notes.Count == 0) return [];
+
+        var read = new List<SchemaNote>(notes.Count);
+        foreach (var note in notes)
+        {
+            if (!Enum.TryParse<SchemaNoteKind>(note.Kind, true, out var kind))
+                throw new InvalidOperationException(
+                    $"Unknown note kind '{note.Kind}'. The schema declares a note this version of " +
+                    "aet-eaw-edit cannot classify, so it cannot say what it means - update the " +
+                    $"extension. Known kinds: {string.Join(", ", Enum.GetNames<SchemaNoteKind>())}.");
+
+            read.Add(new SchemaNote(kind, note.Text, note.Value));
+        }
+
+        // Ranked here, once, rather than at each of the places that show notes: the order is a fact
+        // about the kinds, so every reader should get the same one without having to ask for it.
+        return SchemaNote.Ranked(read);
+    }
+
     public static List<RawTagDefinition> ParseTagFile(string yaml, ILogger? logger = null)
     {
         var file = Deserializer.Deserialize<YamlTagFile>(yaml);
@@ -99,10 +130,8 @@ internal static class YamlSchemaParser
                 AllowedValues = entry.AllowedValues ?? [],
                 SemanticType = st,
                 ValueGroups = ParseValueGroups(entry.ValueGroup),
-                Deprecated = entry.Deprecated,
-                AvailableSince = entry.AvailableSince,
                 Description = entry.Description,
-                Notes = entry.Notes,
+                Notes = ReadNotes(entry.Notes),
                 MultipleAllowed = entry.MultipleAllowed,
                 VariantMode = variantMode,
                 ValidationOverride = validationOverride
@@ -122,7 +151,7 @@ internal static class YamlSchemaParser
                 TypeName = entry.TypeName,
                 NameTag = entry.NameTag,
                 Description = entry.Description,
-                Notes = entry.Notes
+                Notes = ReadNotes(entry.Notes)
             });
         return result;
     }
@@ -139,7 +168,7 @@ internal static class YamlSchemaParser
                 Flags = entry.Flags,
                 MemberOf = entry.MemberOf,
                 Description = entry.Description,
-                Notes = entry.Notes
+                Notes = ReadNotes(entry.Notes)
             });
         return result;
     }
@@ -153,18 +182,14 @@ internal static class YamlSchemaParser
             {
                 Name = v.Name,
                 Description = v.Description,
-                Notes = v.Notes,
-                Deprecated = v.Deprecated,
-                AvailableSince = v.AvailableSince,
+                Notes = ReadNotes(v.Notes),
                 Groups = v.Groups
             });
         return new HardcodedReferenceSet
         {
             Name = file.Name,
             Description = file.Description,
-            Notes = file.Notes,
-            Deprecated = file.Deprecated,
-            AvailableSince = file.AvailableSince,
+            Notes = ReadNotes(file.Notes),
             Values = values
         };
     }
@@ -219,7 +244,7 @@ internal static class YamlSchemaParser
                         Optional = p.Optional,
                         Label = p.Label,
                         Description = p.Description,
-                        Notes = p.Notes
+                        Notes = ReadNotes(p.Notes)
                     });
                 }
             }
@@ -228,10 +253,7 @@ internal static class YamlSchemaParser
             {
                 Name = v.Name,
                 Description = v.Description,
-                Notes = v.Notes,
-                Deprecated = v.Deprecated,
-                Untested = v.Untested,
-                AvailableSince = v.AvailableSince,
+                Notes = ReadNotes(v.Notes),
                 Groups = v.Groups,
                 Params = paramDefs?.Count > 0 ? paramDefs : null
             });
@@ -244,9 +266,7 @@ internal static class YamlSchemaParser
             IsBitfield = file.IsBitfield,
             SourceFile = file.SourceFile,
             Description = file.Description,
-            Notes = file.Notes,
-            Deprecated = file.Deprecated,
-            AvailableSince = file.AvailableSince,
+            Notes = ReadNotes(file.Notes),
             Values = values
         };
     }
@@ -271,7 +291,10 @@ internal static class YamlSchemaParser
                 continue;
 
             var normalizedPath = entry.Path.Replace('\\', '/').ToLowerInvariant();
-            result.Add(new MetafileDefinition(normalizedPath, metafileType, entry.Types));
+            result.Add(new MetafileDefinition(normalizedPath, metafileType, entry.Types)
+            {
+                Notes = ReadNotes(entry.Notes)
+            });
         }
 
         return result;

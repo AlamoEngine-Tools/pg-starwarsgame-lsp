@@ -7,10 +7,7 @@ public sealed record HardcodedReferenceSetValue
 {
     public required string Name { get; init; }
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
-    public bool Deprecated { get; init; }
-    public string? AvailableSince { get; init; }
-
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
     /// <summary>
     ///     Zero or more value-group keys this value belongs to. Empty means "all groups."
     ///     Used to filter valid values when the enclosing tag carries a <c>valueGroup</c> annotation.

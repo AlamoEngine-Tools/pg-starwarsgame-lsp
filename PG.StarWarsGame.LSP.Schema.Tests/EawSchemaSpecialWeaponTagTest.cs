@@ -35,7 +35,7 @@ public sealed class EawSchemaSpecialWeaponTagTest
     {
         var tag = Tag("Standalone_Space_Maps_Special_Weapon_B");
 
-        Assert.True(tag.Deprecated, "the engine supports only one special weapon");
+        Assert.Contains(tag.Notes, n => n.Kind == SchemaNoteKind.Deprecated);
         Assert.True(tag.Description.TryGetValue("en", out var reason) && reason.Length > 0,
             "a deprecation the reader cannot explain is not actionable - the handler surfaces this text");
     }
@@ -47,7 +47,7 @@ public sealed class EawSchemaSpecialWeaponTagTest
 
         Assert.Equal(ReferenceKind.XmlObject, tag.ReferenceKind);
         Assert.Equal("GameObjectType", tag.ReferenceType);
-        Assert.False(tag.Deprecated);
+        Assert.DoesNotContain(tag.Notes, n => n.Kind == SchemaNoteKind.Deprecated);
 
         // Vanilla's own values would fail a Hypervelocity/Ion name check.
         var text = tag.Description.GetValueOrDefault("en", string.Empty);

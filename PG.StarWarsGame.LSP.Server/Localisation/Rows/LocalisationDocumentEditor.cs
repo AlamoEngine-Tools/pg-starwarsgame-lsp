@@ -20,14 +20,14 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 {
     private const string XmlNs = "urn:alamoenginetools:localisation:v1";
 
-    private readonly IDatFileService _datFileService;
+    private readonly IDatService _datFileService;
     private readonly IFileHelper _fileHelper;
     private readonly ICrc32HashingService _hashing;
     private readonly ILocalisationRowReader _reader;
 
     public LocalisationDocumentEditor(
         ILocalisationRowReader reader,
-        IDatFileService datFileService,
+        IDatService datFileService,
         ICrc32HashingService hashing,
         IFileHelper fileHelper)
     {
@@ -235,7 +235,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         string filePath, IReadOnlyList<LocEditCommandDto> commands)
     {
         var fs = _fileHelper.FileSystem;
-        var sortOrder = _datFileService.Load(filePath).Content.KeySortOrder;
+        var sortOrder = _datFileService.LoadFile(filePath).Content.Layout;
         var document = _reader.ReadFile(filePath);
 
         var rows = document.Rows.ToList();
@@ -264,9 +264,9 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             _hashing.GetCrc32(r.Key, Encoding.ASCII),
             r.Values.FirstOrDefault(v => v.Language == language)?.Value ?? string.Empty)).ToList();
 
-        var fileType = sortOrder == DatFileType.OrderedByCrc32
-            ? DatFileType.OrderedByCrc32
-            : DatFileType.NotOrdered;
+        var fileType = sortOrder == DatLayoutKind.OrderedByCrc32
+            ? DatLayoutKind.OrderedByCrc32
+            : DatLayoutKind.NotOrdered;
 
         // Written beside the target and moved over it, so the original survives every way this can
         // fail - a rejected entry, a full disk, a crash halfway through. Truncating the real file
@@ -276,7 +276,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         {
             using (var stream = fs.File.Create(temporary))
             {
-                _datFileService.CreateDatFile(stream, entries, fileType);
+                _datFileService.CreateDatBinary(stream, entries, fileType);
             }
 
             fs.File.Move(temporary, filePath, true);

@@ -16,8 +16,6 @@ internal sealed record RawEnumDefinition
     public bool IsBitfield { get; init; }
     public string? SourceFile { get; init; }
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
-    public bool Deprecated { get; init; }
-    public string? AvailableSince { get; init; }
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
     public required IReadOnlyList<RawEnumValueDefinition> Values { get; init; }
 }

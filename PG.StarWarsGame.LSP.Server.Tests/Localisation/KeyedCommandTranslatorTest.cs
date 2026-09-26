@@ -25,6 +25,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new MockFileSystem());
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         return services.BuildServiceProvider().GetRequiredService<ICrc32HashingService>();
     }

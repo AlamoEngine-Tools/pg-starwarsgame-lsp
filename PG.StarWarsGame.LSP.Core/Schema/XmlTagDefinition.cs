@@ -73,17 +73,11 @@ public record XmlTagDefinition
     /// </remarks>
     public IReadOnlyList<string> AllowedValues { get; init; } = [];
 
-    /// <summary>If true, this tag is deprecated and should not be used in new files.</summary>
-    public bool Deprecated { get; init; }
-
-    /// <summary>Game version in which this tag was introduced, e.g. "EaW 1.0" or "FoC 1.0". Null if unknown.</summary>
-    public string? AvailableSince { get; init; }
-
     /// <summary>Locale → description text (e.g. "en" → "Max hit points…").</summary>
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
 
     /// <summary>Locale → secondary caveat text (e.g. "en" → "Deprecated; use Foo instead.").</summary>
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
 
     /// <summary>If true, this tag may appear more than once under the same parent element; the engine merges all occurrences.</summary>
     public bool MultipleAllowed { get; init; }

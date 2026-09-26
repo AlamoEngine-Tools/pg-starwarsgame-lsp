@@ -272,6 +272,7 @@ public sealed class TranslationBatchHandlerTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(fs);
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
         services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());

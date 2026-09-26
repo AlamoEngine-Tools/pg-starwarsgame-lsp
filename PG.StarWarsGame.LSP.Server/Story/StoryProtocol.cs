@@ -229,8 +229,16 @@ public sealed record GetStorySchemaResult(
 public sealed record StoryTypeSchemaDto(
     string Name,
     string? Description,
-    bool Untested,
+    // Everything the schema says about this type, ranked worst first. This replaced a lone
+    // `untested` boolean in schema 2.0.0: the editor has to tell a type nobody has verified from
+    // one the engine ignores outright, and a boolean could only ever say the first.
+    IReadOnlyList<StoryNoteDto> Notes,
     IReadOnlyList<StoryParamSchemaDto> Params);
+
+/// <param name="Kind">A <c>SchemaNoteKind</c> name. Unknown to an older client, which ignores it.</param>
+/// <param name="Text">The note in the session's locale, already resolved, or null when it has none.</param>
+/// <param name="Value">What the kind carries instead of prose - a version for <c>Since</c>.</param>
+public sealed record StoryNoteDto(string Kind, string? Text, string? Value);
 
 public sealed record StoryParamSchemaDto(
     int Position,

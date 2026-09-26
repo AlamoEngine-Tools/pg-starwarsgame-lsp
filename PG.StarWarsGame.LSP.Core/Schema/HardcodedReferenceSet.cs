@@ -8,7 +8,5 @@ public sealed record HardcodedReferenceSet
     public required string Name { get; init; }
     public IReadOnlyList<HardcodedReferenceSetValue> Values { get; init; } = [];
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
-    public bool Deprecated { get; init; }
-    public string? AvailableSince { get; init; }
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
 }

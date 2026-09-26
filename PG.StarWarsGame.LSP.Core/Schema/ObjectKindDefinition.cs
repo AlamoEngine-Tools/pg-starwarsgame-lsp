@@ -37,7 +37,7 @@ public sealed record ObjectKindDefinition
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
 
     /// <summary>Locale to caveat text.</summary>
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
 
     /// <summary>A kind with no predicate at all matches nothing; the schema test rejects it.</summary>
     public bool HasPredicate => Behaviors.Count > 0 || Flags.Count > 0 || MemberOf.Count > 0;

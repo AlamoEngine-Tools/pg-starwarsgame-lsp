@@ -35,7 +35,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
     private readonly ILspConfigurationProvider _config;
 
     private readonly ICsvTranslationImporter _csvImporter;
-    private readonly IDatFileService _datFileService;
+    private readonly IDatService _datFileService;
     private readonly IDatTranslationImporter _datImporter;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
@@ -53,7 +53,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         IXmlTranslationImporter xmlImporter,
         IPropertiesTranslationImporter nlsImporter,
         IDatTranslationImporter datImporter,
-        IDatFileService datFileService,
+        IDatService datFileService,
         ITranslationDatabaseFactory factory,
         ILanguageService langService,
         ILocalisationSeedFileWriter seedWriter,
@@ -260,7 +260,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
 
             try
             {
-                using var datFile = _datFileService.Load(path);
+                using var datFile = _datFileService.LoadFile(path);
                 _datImporter.Import(datFile.Content, language!, db);
             }
             catch (Exception ex)

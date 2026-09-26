@@ -15,15 +15,20 @@ public sealed class PerFactionValueHandler : CommaSeparatedPairHandlerBase
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        var parts = SplitOnFirstComma(fact.RawValue.Trim());
-        if (parts.Length != 2 || parts[0].Trim().Length == 0 ||
-            !LenientFloatParser.TryParse(parts[1].Trim(), out _))
+        var raw = fact.RawValue.Trim();
+        var parts = raw.Split(',').Select(p => p.Trim()).ToArray();
+
+        // Same reader, different first slot: Corruption_Level_Override names a planet.
+        var planet = fact.Tag.SemanticType == TagSemanticType.PlanetValuePair;
+        if (parts.Length < 2 || parts[0].Length == 0 || !LenientFloatParser.TryParse(parts[1], out _))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid per-faction value for <{fact.Tag.Tag}>. Expected: FactionName, Number.")
+                    planet
+                        ? $"'{raw}' is not a valid planet value for <{fact.Tag.Tag}>. Expected: Planet, Number."
+                        : $"'{raw}' is not a valid per-faction value for <{fact.Tag.Tag}>. Expected: FactionName, Number.")
             ];
 
-        return [];
+        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 2) is { } extra ? [extra] : [];
     }
 }

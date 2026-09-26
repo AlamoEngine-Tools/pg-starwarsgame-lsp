@@ -71,7 +71,7 @@ public sealed record SchemaVersionCheck(
 public static class SchemaVersionGate
 {
     /// <summary>npm-style range of schema contract versions this server implements.</summary>
-    public const string SupportedRange = ">=1.0.0 <2.0.0";
+    public const string SupportedRange = ">=2.0.0 <3.0.0";
 
     /// <summary>
     ///     Highest MAJOR covered by <see cref="SupportedRange" />. Declared separately because a
@@ -79,7 +79,7 @@ public static class SchemaVersionGate
     ///     have opposite outcomes. <c>SchemaVersionGateTest.SupportedRange_AgreesWith_HighestSupportedMajor</c>
     ///     keeps them in step.
     /// </summary>
-    public const int HighestSupportedMajor = 1;
+    public const int HighestSupportedMajor = 2;
 
     public static SchemaVersionCheck Check(string? declaredVersion, string supportedRange = SupportedRange)
     {
@@ -108,6 +108,21 @@ public static class SchemaVersionGate
                 $"support (it understands {supportedRange}). XML support is disabled until you " +
                 "update the extension - loading it anyway would report problems that are not real.");
 
+        // An older MAJOR is refused too, and for the same reason as a newer one: MAJOR means the
+        // file's shape changed, so the parser cannot read it - not that it holds fewer tags. This
+        // used to load, which was right while every change was additive; 2.0.0 removed a shape, and
+        // a schema that still uses it would load here and then fail in the middle of parsing, which
+        // is precisely the outcome this gate exists to prevent.
+        if (version.Major < HighestSupportedMajor)
+            return new SchemaVersionCheck(
+                SchemaVersionCompatibility.Unsupported, raw, supportedRange,
+                $"The game schema is version {raw}, which this version of aet-eaw-edit can no " +
+                $"longer read (it understands {supportedRange}). XML support is disabled until the " +
+                "schema is updated - its files use a format that has since been replaced.");
+
+        // Same major, outside the range only by minor or patch: the server knows more than the
+        // schema uses, so tags it expects are merely absent. Missing tags mean no validation for
+        // them, never wrong validation.
         return new SchemaVersionCheck(
             SchemaVersionCompatibility.OutOfRange, raw, supportedRange,
             $"The game schema is version {raw}, older than this version of aet-eaw-edit expects " +

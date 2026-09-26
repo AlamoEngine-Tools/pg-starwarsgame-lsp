@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -12,7 +13,7 @@ public sealed class DeprecatedEventTypeHandler : XmlDiagnosticsHandler<StoryEven
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(StoryEventFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Def is null || !fact.Def.Deprecated)
+        if (fact.Def is null || !fact.Def.Notes.Has(SchemaNoteKind.Deprecated))
             return [];
 
         return

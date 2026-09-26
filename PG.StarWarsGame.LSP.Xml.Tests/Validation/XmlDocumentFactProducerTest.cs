@@ -778,7 +778,7 @@ file sealed class NotesTagSchemaProvider : ISchemaProvider
     private static readonly XmlTagDefinition NotesTag = new()
     {
         Tag = "Notes_Tag", ValueType = XmlValueType.Float, MultipleAllowed = false,
-        Notes = new Dictionary<string, string> { ["en"] = "A tag with notes" }
+        Notes = [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { ["en"] = "A tag with notes" })]
     };
 
     public XmlTagDefinition? GetTag(string tagName)

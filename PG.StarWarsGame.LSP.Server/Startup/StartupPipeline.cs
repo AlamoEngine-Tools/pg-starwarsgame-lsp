@@ -15,17 +15,21 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 ///     guarded so the gate always opens, even if a stage fails - a degraded server still edits.
 ///     Workspace indexing (including the no-pgproj case) is delegated to
 ///     <see cref="IModProjectReloadService" />, the one index path shared with reload and pgproj-watch.
+///     Anything that asks the user a question comes AFTER the gate, never inside a stage: see the
+///     project-file migration offer at the end of <see cref="RunAsync" />.
 /// </summary>
 public sealed class StartupPipeline
 {
     private readonly IBaselineBootstrapper _baseline;
     private readonly IStartupGate _gate;
     private readonly ILogger<StartupPipeline> _logger;
+    private readonly IPgprojMigrationOffer? _migrationOffer;
     private readonly IStartupNotifier _notifier;
     private readonly IStartupProgress _progress;
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaBootstrapper _schema;
 
+    // migrationOffer is optional so the minimal test setups can omit it; production always wires it.
     public StartupPipeline(
         ISchemaBootstrapper schema,
         IBaselineBootstrapper baseline,
@@ -33,8 +37,10 @@ public sealed class StartupPipeline
         IStartupGate gate,
         IStartupProgress progress,
         IStartupNotifier notifier,
-        ILogger<StartupPipeline> logger)
+        ILogger<StartupPipeline> logger,
+        IPgprojMigrationOffer? migrationOffer = null)
     {
+        _migrationOffer = migrationOffer;
         _schema = schema;
         _baseline = baseline;
         _reloadService = reloadService;
@@ -68,6 +74,22 @@ public sealed class StartupPipeline
             _progress.Complete();
             _notifier.NotifyScanComplete();
             _logger.LogInformation("Startup pipeline finished");
+        }
+
+        // Last, and deliberately outside everything above: the offer is a question, and nothing
+        // else on this task runs until the user answers it. Behind an open gate that costs them
+        // nothing; in front of it, it WAS the server - 22.1s of a startup that otherwise takes
+        // 1.75s, measured on the eaw workspace, with every buffered notification waiting on a
+        // dialog. A degraded start still asks: the file it offers to write may be the fix.
+        if (_migrationOffer is null) return;
+        try
+        {
+            await _migrationOffer.OfferPendingAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // Startup is fire-and-forget, so an escaping exception here is an unobserved one.
+            _logger.LogWarning(ex, "Could not offer pending project-file migrations.");
         }
     }
 }

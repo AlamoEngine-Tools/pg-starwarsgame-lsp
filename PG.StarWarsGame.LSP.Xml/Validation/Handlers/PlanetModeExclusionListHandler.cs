@@ -15,12 +15,18 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     <para>
 ///         The planet half is indexed as an object reference by the parser, so the generic
 ///         unresolved-reference pipeline already covers it; this handler owns what that pipeline
-///         cannot see - that the modes are real battle modes and that no planet was left without one.
+///         cannot see - that the modes are ones the exclusion matches and that no planet was left
+///         without one.
+///     </para>
+///     <para>
+///         Measured in the 2018 build: the exclusion test compares the mode slot case-insensitively
+///         with the literals <c>land</c> and <c>space</c> only, so the story battle modes GROUND and
+///         EITHER exclude nothing.
 ///     </para>
 /// </summary>
 public sealed class PlanetModeExclusionListHandler : CommaSeparatedPairHandlerBase
 {
-    private const string ModeEnumName = "StoryBattleMode";
+    private const string ModeEnumName = "AutoresolveExclusionMode";
 
     /// <inheritdoc />
     public override DiagnosticId? DefaultId => DiagnosticIds.PlanetModeExclusionList;

@@ -563,8 +563,12 @@ export class StoryGraphPanel extends WebviewPanelHost {
             type: 'schema',
             eventTypes: events.map(t => t.name),
             rewardTypes: rewards.map(t => t.name),
-            untestedEventTypes: events.filter(t => t.untested).map(t => t.name),
-            untestedRewardTypes: rewards.filter(t => t.untested).map(t => t.name),
+            // Keyed by type name, ranked worst first, events and rewards together: a node knows
+            // which of the two it is, and the webview only ever looks one name up.
+            typeNotes: Object.fromEntries(
+                [...events, ...rewards]
+                    .filter(t => (t.notes ?? []).length > 0)
+                    .map(t => [t.name, t.notes])),
             eventTypeParams: Object.fromEntries(events.map(t => [t.name, t.params ?? []])),
             rewardTypeParams: Object.fromEntries(rewards.map(t => [t.name, t.params ?? []])),
         });

@@ -36,6 +36,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
     private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
 
+    // The game compares the value with this word case-insensitively and removes the AI instead of
+    // creating one, so it names no AIPlayerType.
+    private const string HumanControlKeyword = "Human";
+
     private readonly ILspConfigurationProvider? _configProvider;
     private readonly IEaWXmlContext? _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
@@ -347,7 +351,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 if (tagDef.ValueType == XmlValueType.UnitSpawnTable)
                 {
                     if (HasChildElement(child)) continue;
-                    CollectUnitSpawnUnitReference(child, lineIndex, documentUri, references);
+                    CollectLeadingSlotReference(child, null, lineIndex, documentUri, references);
                     continue;
                 }
 
@@ -359,6 +363,18 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 {
                     if (HasChildElement(child)) continue;
                     CollectDeathCloneReferences(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
+                // (Planet, Number) on the per-faction reader - Corruption_Level_Override. Checked before
+                // the per-faction tuples below, which would emit slot 0 as a Faction. The planet
+                // resolves against the tag's own referenceType; a kind (null ObjectType) resolves by
+                // name and narrows by behaviour elsewhere.
+                if (tagDef.SemanticType == TagSemanticType.PlanetValuePair)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectLeadingSlotReference(child, tagDef.ObjectType?.TypeName, lineIndex, documentUri,
+                        references);
                     continue;
                 }
 
@@ -377,9 +393,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
-                // Campaign Markup_Filename "Faction, MarkupFile": only the leading faction is an
-                // indexable object; the GUI hint-markup file is not a workspace object, so slot 1 is
-                // intentionally left unmodelled (a reference to it would only be a false unresolved).
+                // Campaign Markup_Filename "Faction, MarkupName": only the leading faction is an
+                // indexable object; the markup is an AI galactic perception file under the AI tree,
+                // which is not indexed, so slot 1 is left unmodelled (a reference to it would only be
+                // a false unresolved).
                 if (tagDef.SemanticType == TagSemanticType.FactionMarkupPairList)
                 {
                     if (HasChildElement(child)) continue;
@@ -473,11 +490,11 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         }
     }
 
-    // Slot 0 of a UnitSpawnTable tuple ("StarViper_Squadron, 2") as a wildcard-typed game object
-    // reference. Only the unit half is an object; the count is validated by UnitSpawnTableHandler.
-    // ExpectedTypeName stays null so resolution is by name across any object type, matching the
-    // untyped lookup the handler used to perform.
-    private static void CollectUnitSpawnUnitReference(HtmlNode child,
+    // Slot 0 of an (object, number) tuple as a game object reference; the number is the handler's.
+    // UnitSpawnTable ("StarViper_Squadron, 2") passes no expected type, so resolution is by name
+    // across any object type, matching the untyped lookup its handler used to perform. A
+    // PlanetValuePair passes the tag's own type, or none when its referenceType is a kind.
+    private static void CollectLeadingSlotReference(HtmlNode child, string? expectedTypeName,
         LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
     {
         var innerText = child.InnerText;
@@ -492,7 +509,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         references.Add(new GameReference(
             token,
             GameSymbolKind.XmlObject,
-            null,
+            expectedTypeName,
             documentUri,
             line,
             column,
@@ -667,7 +684,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             if (slot > 1) break;
 
             var expectedType = slot == 0 ? "Faction" : tagDef.ObjectType?.TypeName;
-            slot++;
+            if (slot++ == 1 && string.Equals(token, HumanControlKeyword, StringComparison.OrdinalIgnoreCase))
+                continue;
 
             var (line, column, length) =
                 XmlUtility.GetInnerOffsetValuePosition(child, offset, token.Length, lineIndex);

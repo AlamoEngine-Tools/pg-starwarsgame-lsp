@@ -345,10 +345,10 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     // semantics: EaW entries are written first, engine (FoC) entries overwrite
     // them for the same normalised path.
 
-    var megFileService = sp.GetRequiredService<IMegFileService>();
+    var megFileService = sp.GetRequiredService<IMegService>();
     var megExtractor = sp.GetRequiredService<IMegFileExtractor>();
     var aloFileService = sp.GetRequiredService<IAloFileService>();
-    var mtdFileService = sp.GetRequiredService<IMtdFileService>();
+    var mtdFileService = sp.GetRequiredService<IMtdService>();
     var assetLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(MegAssetCatalogBuilder));
 
     var entryLookup = new Dictionary<string, MegDataEntryLocationReference>(StringComparer.OrdinalIgnoreCase);
@@ -361,7 +361,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     foreach (var megPath in orderedMegPaths)
         try
         {
-            var megFile = megFileService.Load(megPath);
+            var megFile = megFileService.LoadFile(megPath);
             var entryPaths = new List<string>(megFile.Archive.Count);
             foreach (var entry in megFile.Archive)
             {
@@ -382,7 +382,8 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
         if (!entryLookup.TryGetValue(normalizedPath, out var locationRef)) return null;
         try
         {
-            return megExtractor.GetData(locationRef);
+            // 4.1.4 moved this off the extractor and onto the reference; same read-only stream.
+            return locationRef.GetData();
         }
         catch
         {
@@ -517,7 +518,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     {
         try
         {
-            return mtdFileService.Load(stream).Content.Select(e => e.FileName);
+            return mtdFileService.LoadFile(stream).Content.Select(e => e.FileName);
         }
         catch
         {
@@ -566,7 +567,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
 static async Task WriteIconSidecarAsync(
     IStarWarsGameEngineHandle engine,
-    IMtdFileService mtdFileService,
+    IMtdService mtdFileService,
     string outputFile,
     string manifestHash)
 {
@@ -588,7 +589,7 @@ static async Task WriteIconSidecarAsync(
                 return;
             }
 
-            var directory = mtdFileService.Load(mtdStream).Content;
+            var directory = mtdFileService.LoadFile(mtdStream).Content;
             icons = MegaTextureIconExtractor.ExtractAll(directory, textureStream);
         }
 

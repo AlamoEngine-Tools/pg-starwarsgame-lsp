@@ -56,6 +56,7 @@ import {canReuseStoredLayout, layoutEntryKey, nodeLayoutKey} from './storyGraph/
 import {createLabelSizer, LINE_RATIO, wrapLabel} from './storyGraph/lodLabel';
 import {facetList} from './storyGraph/facets';
 import {PathFilterMenu} from './storyGraph/PathFilterMenu';
+import {noteBadge, type StoryNote} from './storyGraph/typeNotes';
 import {type PathDirection} from './storyGraph/pathDirection';
 import {arrangePositions} from './storyGraph/modelArrange';
 import {lodShape} from './storyGraph/lodShape';
@@ -253,8 +254,8 @@ const EMPTY_FILTERS: FilterState = {
     reachableDirection: 'Downstream', plotState: '',
 };
 
-/** Event/reward type names flagged `untested` in the schema - set once, read during render. */
-const untestedTypes = new Set<string>();
+/** Event/reward type name → what the schema says about it - set once, read during render. */
+const typeNotes = new Map<string, StoryNote[]>();
 
 /** Event/reward type name → its param schema - set once from the 'schema' message; read by node bodies. */
 const eventTypeParams = new Map<string, StoryParamSchemaDto[]>();
@@ -3228,8 +3229,26 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         opacity: 0.5;
     }
 
+    /* Nobody has verified this type against the game. The dashed border predates the note model
+       and readers already know it, so it stayed. */
+
     &.untested {
         border-style: dashed;
+    }
+
+    /* The engine accepts this type and then ignores it, or does the wrong thing with it. Louder
+       than untested, because the node is not merely unverified - it does not work. */
+
+    &.note-bugged {
+        border-color: var(--vscode-editorError-foreground);
+        border-style: dashed;
+    }
+
+    /* Still works, something replaced it. Struck through the way the editor marks a deprecated
+       symbol anywhere else, rather than inventing a second vocabulary for the same idea. */
+
+    &.note-deprecated .title {
+        text-decoration: line-through;
     }
 
     .header {
@@ -3746,11 +3765,11 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): R
     const input = props.data.inputs['in'];
     const output = props.data.outputs['out'];
     const readOnly = currentMode !== 'edit';
-    const untested = untestedTypes.has(dto.eventType ?? '') || untestedTypes.has(dto.rewardType ?? '');
+    const badge = noteBadge(typeNotes.get(dto.eventType ?? '') ?? typeNotes.get(dto.rewardType ?? ''));
     const classes = [
         'lc-' + (dto.lifecycle ?? 'Inactive'),
         dto.reachable ? '' : 'unreachable',
-        untested ? 'untested' : '',
+        badge?.className ?? '',
     ].filter(c => c).join(' ');
     return (
         <EventBody
@@ -3762,6 +3781,9 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): R
             data-testid="node"
             data-node-id={dto.id}
             data-branch={props.data.branchGlow ?? undefined}
+            // The border says something is wrong with this type; the tooltip says what. A remark
+            // gets one of these without changing how the node looks.
+            title={badge?.title}
         >
             <EventForm dto={dto} readOnly={readOnly}/>
             {props.data.simFireCount > 0 ? (
@@ -5824,12 +5846,10 @@ function App(): React.JSX.Element {
             const msg = event.data as { type: string; [key: string]: unknown };
             switch (msg.type) {
                 case 'schema': {
-                    untestedTypes.clear();
-                    for (const name of (msg.untestedEventTypes as string[] | undefined) ?? []) {
-                        untestedTypes.add(name);
-                    }
-                    for (const name of (msg.untestedRewardTypes as string[] | undefined) ?? []) {
-                        untestedTypes.add(name);
+                    typeNotes.clear();
+                    for (const [name, notes] of Object.entries(
+                        (msg.typeNotes as Record<string, StoryNote[]> | undefined) ?? {})) {
+                        typeNotes.set(name, notes);
                     }
                     setEventTypes((msg.eventTypes as string[] | undefined) ?? []);
                     setRewardTypes((msg.rewardTypes as string[] | undefined) ?? []);

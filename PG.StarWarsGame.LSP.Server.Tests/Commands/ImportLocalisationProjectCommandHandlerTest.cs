@@ -495,6 +495,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(mockFs);
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         return services.BuildServiceProvider();
     }
@@ -505,7 +506,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var factory = sp.GetRequiredService<ITranslationDatabaseFactory>();
         var exporter = sp.GetRequiredService<IDatTranslationExporter>();
-        var datFileService = sp.GetRequiredService<IDatFileService>();
+        var datFileService = sp.GetRequiredService<IDatService>();
 
         var db = factory.CreateKeyed([language]);
         db.SetTranslation(key, language, value);
@@ -513,7 +514,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
 
         mockFs.Directory.CreateDirectory(mockFs.Path.GetDirectoryName(path)!);
         using var stream = mockFs.File.Create(path);
-        datFileService.CreateDatFile(stream, model, model.KeySortOrder);
+        datFileService.CreateDatBinary(stream, model, model.Layout);
     }
 
     private static ExecuteCommandParams Request(
@@ -545,6 +546,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
 
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(mockFs);
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
 
@@ -567,7 +569,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             sp.GetRequiredService<IXmlTranslationImporter>(),
             sp.GetRequiredService<IPropertiesTranslationImporter>(),
             sp.GetRequiredService<IDatTranslationImporter>(),
-            sp.GetRequiredService<IDatFileService>(),
+            sp.GetRequiredService<IDatService>(),
             sp.GetRequiredService<ITranslationDatabaseFactory>(),
             sp.GetRequiredService<ILanguageService>(),
             seedWriter,

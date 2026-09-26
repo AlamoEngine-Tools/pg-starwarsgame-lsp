@@ -24,6 +24,7 @@ public sealed class TranslationKeyInspectorTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new MockFileSystem());
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         return services.BuildServiceProvider().GetRequiredService<ICrc32HashingService>();
     }

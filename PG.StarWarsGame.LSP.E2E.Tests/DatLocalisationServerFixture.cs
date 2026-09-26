@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
+using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
@@ -46,6 +48,11 @@ public sealed class DatLocalisationServerFixture : LspServerFixture
         // The real filesystem on purpose: the DAT services resolve paths through it, and this
         // fixture's whole point is that the files really exist on disk.
         services.AddSingleton<IFileSystem>(new FileSystem());
+        // PG.Commons' hashing, which SupportDAT no longer TryAdds on the way through. This project
+        // is also where the older PG.Commons build wins the copy-local conflict, and that one's
+        // ContributeServices builds a Crc32HashingService that resolves IHashingService eagerly -
+        // so without this the fixture throws before a single test runs.
+        services.TryAddSingleton<IHashingService>(sp => new HashingService(sp));
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
 
@@ -60,7 +67,7 @@ public sealed class DatLocalisationServerFixture : LspServerFixture
         var fileSystem = sp.GetRequiredService<IFileSystem>();
         using (var stream = fileSystem.File.Create(DatPath))
         {
-            sp.GetRequiredService<IDatFileService>().CreateDatFile(stream, model, model.KeySortOrder);
+            sp.GetRequiredService<IDatService>().CreateDatBinary(stream, model, model.Layout);
         }
 
         return WorkspaceRoot;

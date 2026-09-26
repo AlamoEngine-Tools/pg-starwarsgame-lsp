@@ -281,7 +281,12 @@ public sealed class GetStorySchemaHandler(ISchemaProvider schema, ILspConfigurat
             types.Add(new StoryTypeSchemaDto(
                 value.Name,
                 value.Description.GetValueOrDefault("en"),
-                value.Untested,
+                // Ranked, so a client that shows only one note shows the worst. Text resolved to
+                // English here exactly as the description above it is.
+                SchemaNote.Ranked(value.Notes)
+                    .Select(n => new StoryNoteDto(
+                        n.Kind.ToString(), n.Text.GetValueOrDefault("en"), n.Value))
+                    .ToList(),
                 (value.Params ?? (IReadOnlyList<ParamDefinition>)[])
                 .Select(p => new StoryParamSchemaDto(
                     p.Position,

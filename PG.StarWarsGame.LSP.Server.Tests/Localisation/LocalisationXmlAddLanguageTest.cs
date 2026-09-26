@@ -51,6 +51,7 @@ public sealed class LocalisationXmlAddLanguageTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
         services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());

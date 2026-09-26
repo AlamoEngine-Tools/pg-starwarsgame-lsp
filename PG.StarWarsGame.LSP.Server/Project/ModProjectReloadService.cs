@@ -104,10 +104,11 @@ public sealed class ModProjectReloadService : IModProjectReloadService
             _logger.LogError(ex, "Workspace localisation load failed.");
         }
 
-        // Last, and only once the workspace works: a project brought forward while loading has
-        // already been read as its current shape, so the question is whether to write that down -
-        // which is worth asking after the editor is usable, not in the middle of making it so.
-        if (_migrationOffer is not null) await _migrationOffer.OfferPendingAsync(ct);
+        // No migration offer here, on purpose. A project brought forward while loading has already
+        // been read as its current shape; whether to write that down is a QUESTION, and this method
+        // is awaited by the startup pipeline before it opens the gate. Asked from here it stopped
+        // the whole server until the user answered. The startup path asks once the gate is open;
+        // ReloadAsync asks after the reload. Anything still queued waits for the next of those.
     }
 
     public async Task ReloadAsync(CancellationToken ct)
@@ -127,6 +128,11 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         {
             _logger.LogError(ex, "Mod project reload failed.");
         }
+
+        // After the reload rather than inside the load: the question is the same one startup asks,
+        // and it must not hold the index path open while the user reads a diff. A reload has no
+        // gate in front of it, so this is simply the first moment the workspace is settled again.
+        if (_migrationOffer is not null) await _migrationOffer.OfferPendingAsync(ct);
     }
 
     public async Task ReloadLocalisationAsync(CancellationToken ct)

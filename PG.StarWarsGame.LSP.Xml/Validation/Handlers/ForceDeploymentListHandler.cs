@@ -16,14 +16,14 @@ public sealed class ForceDeploymentListHandler : SingleValueTypeHandlerBase
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         var trimmed = fact.RawValue.Trim();
-        var parts = trimmed.Split(',');
-        if (parts.Length < 3 || parts.Any(p => p.Trim().Length == 0))
+        var parts = trimmed.Split(',').Select(p => p.Trim()).ToArray();
+        if (parts.Length < 3 || parts.Take(3).Any(p => p.Length == 0))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                     $"'{trimmed}' is not a valid force deployment entry for <{fact.Tag.Tag}>. Expected: FactionName, PlanetName, UnitTypeName.")
             ];
 
-        return [];
+        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 3) is { } extra ? [extra] : [];
     }
 }

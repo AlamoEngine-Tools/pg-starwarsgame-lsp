@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Lua.Debug.Dap;
 using PG.StarWarsGame.LSP.Server;
+using PG.StarWarsGame.LSP.Server.Startup;
 using Serilog;
 
 Console.Error.WriteLine(
@@ -26,9 +27,12 @@ if (waitForDebugger)
 }
 
 #if DEBUG
+// An absolute path, never a relative one: see ServerLogPath for what a relative one cost.
+var logPath = ServerLogPath.Resolve(args, AppContext.BaseDirectory);
+Console.Error.WriteLine($"[LSP] Logging to {logPath}");
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
-    .WriteTo.File("aetswg-.log", rollingInterval: RollingInterval.Day)
+    .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
     .MinimumLevel.Debug()
     .CreateLogger();
 #endif

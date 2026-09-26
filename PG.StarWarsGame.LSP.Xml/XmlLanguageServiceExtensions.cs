@@ -179,6 +179,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, EventTypeNotesHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamRequiredHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamNotesHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, StoryParamValueNotesHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamEnumHandler>();
         // Story param object references (Planet, GameObjectType, …) are validated by the generic

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+	Fixture for StoryCompareMethodSmokeTest.
+
+	Exists only to attach Story_Plots_E2E.xml to something. The tags here are the minimum that makes
+	this a story campaign; anything else a campaign can declare belongs in the baseline, not here.
+-->
+
+<Campaigns>
+
+	<Campaign Name="E2E_Compare_Campaign">
+		<Is_Story_Campaign>true</Is_Story_Campaign>
+		<Empire_Story_Name>Story_Plots_E2E.xml</Empire_Story_Name>
+	</Campaign>
+
+</Campaigns>

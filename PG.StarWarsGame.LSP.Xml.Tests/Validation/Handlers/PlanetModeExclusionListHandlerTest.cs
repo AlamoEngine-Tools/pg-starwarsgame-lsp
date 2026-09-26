@@ -28,15 +28,30 @@ public sealed class PlanetModeExclusionListHandlerTest
     {
         var schema = new StubSchemaWithModeEnum(new EnumDefinition
         {
-            Name = "StoryBattleMode", Kind = EnumKind.DynamicXml, Values = []
+            Name = "AutoresolveExclusionMode", Kind = EnumKind.DynamicXml, Values = []
         });
         var index = GameIndex.Empty with
         {
             WorkspaceDynamicEnumValues = ImmutableDictionary
                 .Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase)
-                .Add("StoryBattleMode", [.. modes])
+                .Add("AutoresolveExclusionMode", [.. modes])
         };
         return new DiagnosticsContext(schema, index, "file:///test.xml", "en");
+    }
+
+    [Theory]
+    [InlineData("GROUND")]
+    [InlineData("Either")]
+    public void BattleModeThatTheExclusionNeverMatches_IsReported(string mode)
+    {
+        // The game compares the odd slot with the literals "land" and "space" only. GROUND and EITHER
+        // are story battle modes, but here they exclude nothing.
+        var ctx = CtxWithModes("Land", "Space");
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, $"Fondor, {mode}"), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Contains(mode, d.Message);
+        Assert.Contains("AutoresolveExclusionMode", d.Message);
     }
 
     [Theory]

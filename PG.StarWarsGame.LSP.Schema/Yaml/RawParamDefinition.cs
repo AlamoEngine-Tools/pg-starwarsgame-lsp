@@ -16,5 +16,5 @@ internal sealed record RawParamDefinition
     public bool Optional { get; init; }
     public IReadOnlyDictionary<string, string> Label { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
 }

@@ -165,10 +165,20 @@ public sealed class XmlDocumentFactProducer(
 
         return declarations
             .Where(d => d.Notes.Count > 0)
-            .Select(d => string.Join('', d.Notes.OrderBy(n => n.Key, StringComparer.Ordinal)
-                .Select(n => n.Key + '' + n.Value)))
+            .Select(d => string.Join('', d.Notes.Select(Fingerprint)))
             .Distinct(StringComparer.Ordinal)
             .Count() > 1;
+    }
+
+    // A note list compared by content. The list arrives ranked, so its order is already a function
+    // of the notes themselves and needs no sorting here; two same-kind notes written in a different
+    // order really are different content, and this says so.
+    private static string Fingerprint(SchemaNote note)
+    {
+        var text = string.Join('', note.Text
+            .OrderBy(t => t.Key, StringComparer.Ordinal)
+            .Select(t => t.Key + '' + t.Value));
+        return $"{note.Kind}{note.Value}{text}";
     }
 
     /// <summary>

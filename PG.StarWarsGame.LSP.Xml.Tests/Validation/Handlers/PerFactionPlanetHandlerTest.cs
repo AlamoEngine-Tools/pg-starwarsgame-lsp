@@ -23,6 +23,18 @@ public sealed class PerFactionPlanetHandlerTest
         Assert.Empty(results);
     }
 
+    [Fact]
+    public void ExtraPairsInOneTag_AreAWarningThatOnlyTheFirstIsRead()
+    {
+        // The engine's per-faction reader takes two tokens per tag and drops the rest.
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Rebel, Yavin, Empire, Coruscant"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("Empire, Coruscant", d.Message);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("REBEL")]

@@ -865,8 +865,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_MarkupFilename_EmitsFactionSlotOnly_NotTheMarkupFile()
     {
-        // "Empire, DefaultGalacticHints": the faction navigates; the GUI markup file is not an
-        // indexable workspace object and must not be emitted (it would be a false unresolved ref).
+        // "Empire, DefaultGalacticHints": the faction navigates; the AI galactic markup file lives in
+        // the unindexed AI tree and must not be emitted (it would be a false unresolved ref).
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Campaign"));
         schema.AddTag(new XmlTagDefinition
@@ -883,6 +883,57 @@ public sealed class XmlGameDocumentParserTest
         var reference = Assert.Single(result.References);
         Assert.Equal("Empire", reference.TargetId);
         Assert.Equal("Faction", reference.ExpectedTypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_PlanetValuePair_EmitsThePlanetSlot_NotAFaction()
+    {
+        // Corruption_Level_Override shares the per-faction reader with Starting_Credits, but the game
+        // looks slot 0 up as an object type and requires a planet. Emitting it as a Faction made
+        // vanilla's "Endor, 1" an unresolved faction.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "Corruption_Level_Override",
+            ValueType = XmlValueType.PerFactionValue,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceTypeName = "Planet",
+            SemanticType = TagSemanticType.PlanetValuePair
+        });
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            """<Campaign Name="C"><Corruption_Level_Override>Endor, 1</Corruption_Level_Override></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("Endor", reference.TargetId);
+        Assert.NotEqual("Faction", reference.ExpectedTypeName);
+    }
+
+    [Theory]
+    [InlineData("Human")]
+    [InlineData("HUMAN")]
+    public async Task AiPlayerControl_HumanKeyword_EmitsNoAiPlayerReference(string keyword)
+    {
+        // The game compares the value case-insensitively with "Human" and removes the AI; no
+        // AIPlayerType is looked up. Emitting it as one made every human-played faction a "cannot
+        // check this type" notice.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "AI_Player_Control",
+            ValueType = XmlValueType.PerFactionObjectList,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ObjectType = new GameObjectTypeDefinition { TypeName = "AIPlayerType" },
+            SemanticType = TagSemanticType.FactionAiPlayerPairList
+        });
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            $"<Campaign>\n<AI_Player_Control> Rebel, {keyword} </AI_Player_Control>\n</Campaign>",
+            1, default);
+
+        Assert.Equal(["Rebel"], index.References.Select(r => r.TargetId));
     }
 
     [Theory]

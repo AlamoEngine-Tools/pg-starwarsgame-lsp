@@ -153,6 +153,18 @@ public sealed class ReferenceResolutionEvaluatorTest
     }
 
     [Fact]
+    public void Evaluate_Unresolved_ExpectedTypeHasNoIndexedInstances_SaysTheCheckIsNotSupportedYet()
+    {
+        // The AI tree is a later milestone: the gap is the tool's, and the notice has to say so
+        // rather than read as "nothing is indexed" - which sounds like the data is missing.
+        var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
+            indexedTypeNames: new HashSet<string> { "Faction" });
+
+        Assert.Equal("Cannot verify reference 'BasicEmpire': Checking AIPlayerType references is not supported yet.",
+            result!.Value.Message);
+    }
+
+    [Fact]
     public void Evaluate_Unresolved_ExpectedTypeIsIndexed_StaysAnError()
     {
         // The type indexes fine and the name is still missing: that is a typo, and it keeps the

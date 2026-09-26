@@ -3,7 +3,9 @@
 
 using System.IO.Abstractions;
 using System.Reflection;
+using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -299,11 +301,12 @@ public static class ServerConfigurator
                 services.AddSingleton<StartupPipeline>();
 
                 // One instance behind both roles: the loader reports migrated projects into it as
-                // the sink, and the reload service asks it to put the question once the workspace
-                // is up. Two registrations of the same type would queue into one and ask the other.
+                // the sink, and the startup pipeline asks it to put the question once the gate is
+                // open. Two registrations of the same type would queue into one and ask the other.
                 services.AddSingleton<IPgprojMigrationPrompt, WindowPgprojMigrationPrompt>();
                 services.AddSingleton<PgprojMigrationOffer>();
                 services.AddSingleton<IPgprojMigrationSink>(sp => sp.GetRequiredService<PgprojMigrationOffer>());
+                services.AddSingleton<IPgprojMigrationOffer>(sp => sp.GetRequiredService<PgprojMigrationOffer>());
 
 
                 services.AddSingleton<BaselineLoader>(sp =>
@@ -312,13 +315,15 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IFileHelper>(),
                         sp.GetRequiredService<ILogger<BaselineLoader>>()));
 
-                // Icon preview. The MTD reader needs PG.Commons' CRC32 hashing, but do NOT register
-                // it here: SupportLocalisationBaseline below already reaches SupportDAT, which calls
-                // PetroglyphCommons.ContributeServices and TryAddSingleton<IHashingService>.
-                // Registering it again crashes the server at startup with "Hash provider with key
-                // 'CRC32' is already registered" - HashingService's constructor walks every
-                // IHashAlgorithmProvider it can see and rejects a duplicate key. Registration order
-                // is irrelevant to resolution, so SupportMTD can sit here regardless.
+                // Icon preview. The MTD reader needs PG.Commons' CRC32 hashing, and as of the 4.1.4
+                // packages nothing else supplies it: SupportDAT used to TryAdd IHashingService on
+                // the way through and no longer does, which left 127 tests resolving nothing.
+                //
+                // TryAdd, never Add. HashingService's constructor walks every IHashAlgorithmProvider
+                // it can see and rejects a duplicate 'CRC32' key, so registering it twice crashes
+                // the server at startup; TryAdd keeps this a no-op if a library starts supplying it
+                // again. Registration order is irrelevant to resolution.
+                services.TryAddSingleton<IHashingService>(sp => new HashingService(sp));
                 services.SupportMTD();
                 services.AddSingleton<IconPackLoader>(sp =>
                     new IconPackLoader(
@@ -477,29 +482,14 @@ public static class ServerConfigurator
                 server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
                 server.Services.GetRequiredService<StoryGraphChangeNotifier>();
                 server.Services.GetRequiredService<PreviewSceneChangeNotifier>();
-                var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
-                var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
-                var reload = server.Services.GetRequiredService<IModProjectReloadService>();
-                var notifier = server.Services.GetRequiredService<IStartupNotifier>();
-                var gate = server.Services.GetRequiredService<IStartupGate>();
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await schema.LoadAsync(CancellationToken.None);
-                        await baseline.LoadAsync(CancellationToken.None);
-                        await reload.LoadAsync(scanRoots, CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        initLogger.LogError(ex, "Startup pipeline failed");
-                    }
-                    finally
-                    {
-                        await gate.OpenAsync();
-                        notifier.NotifyScanComplete();
-                    }
-                }, CancellationToken.None);
+                // StartupPipeline rather than the same stages written out again here: this copy had
+                // already drifted from it - it ran schema and baseline one after the other, skipped
+                // progress reporting entirely, and had no place to put the project-migration
+                // question, which therefore sat inside the indexing stage and held the gate shut
+                // until the user answered it.
+                var pipeline = server.Services.GetRequiredService<StartupPipeline>();
+                _ = Task.Run(() => pipeline.RunAsync(scanRoots, CancellationToken.None),
+                    CancellationToken.None);
 
                 await Task.CompletedTask;
             });

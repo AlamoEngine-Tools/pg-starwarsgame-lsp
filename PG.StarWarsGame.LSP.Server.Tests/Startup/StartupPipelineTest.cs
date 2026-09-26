@@ -10,7 +10,9 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Startup;
 
 public sealed class StartupPipelineTest
 {
-    private static StartupPipeline Build(Log log, IModProjectReloadService reloadService, IStartupGate gate)
+    private static StartupPipeline Build(
+        Log log, IModProjectReloadService reloadService, IStartupGate gate,
+        IPgprojMigrationOffer? migrationOffer = null)
     {
         return new StartupPipeline(
             new RecordingSchemaBootstrapper(log),
@@ -19,7 +21,8 @@ public sealed class StartupPipelineTest
             gate,
             new RecordingProgress(log),
             new RecordingNotifier(log),
-            NullLogger<StartupPipeline>.Instance);
+            NullLogger<StartupPipeline>.Instance,
+            migrationOffer);
     }
 
     [Fact]
@@ -83,6 +86,38 @@ public sealed class StartupPipelineTest
 
         Assert.Contains("gate.open", log.Entries);
         Assert.True(gate.Opened);
+    }
+
+    [Fact]
+    public async Task RunAsync_AsksAboutPendingMigrations_OnlyOnceTheGateIsOpen()
+    {
+        // The offer is a modal question about the user's own project file. Asked from inside the
+        // load, it sits in front of the gate: every buffered notification waits for the answer, and
+        // the server says nothing for as long as the user reads. Measured at 22.1s on the eaw
+        // workspace, against 1.75s for the same startup with nothing left to migrate.
+        var log = new Log();
+        var gate = new RecordingGate(log);
+        var pipeline = Build(log, new RecordingReloadService(log), gate, new RecordingMigrationOffer(log));
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Contains("migration.offer", log.Entries);
+        Assert.True(log.Entries.IndexOf("gate.open") < log.Entries.IndexOf("migration.offer"),
+            "'gate.open' must precede 'migration.offer'");
+    }
+
+    [Fact]
+    public async Task RunAsync_StillAsksAboutPendingMigrations_WhenIndexingThrows()
+    {
+        // A project file brought forward in memory is the one thing a degraded start must still
+        // offer to write down - the failure it degraded on may be the very thing it fixes.
+        var log = new Log();
+        var pipeline = Build(log, new ThrowingReloadService(), new RecordingGate(log),
+            new RecordingMigrationOffer(log));
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Contains("migration.offer", log.Entries);
     }
 
     [Fact]
@@ -194,6 +229,22 @@ public sealed class StartupPipelineTest
 
         public Task ReloadLocalisationAsync(CancellationToken ct)
         {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingMigrationOffer : IPgprojMigrationOffer
+    {
+        private readonly Log _log;
+
+        public RecordingMigrationOffer(Log log)
+        {
+            _log = log;
+        }
+
+        public Task OfferPendingAsync(CancellationToken ct)
+        {
+            _log.Add("migration.offer");
             return Task.CompletedTask;
         }
     }

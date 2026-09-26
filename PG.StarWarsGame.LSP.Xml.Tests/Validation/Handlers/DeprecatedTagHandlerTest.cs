@@ -15,7 +15,7 @@ public sealed class DeprecatedTagHandlerTest
     {
         return new XmlTagDefinition
         {
-            Tag = name, ValueType = XmlValueType.Float, Deprecated = true
+            Tag = name, ValueType = XmlValueType.Float, Notes = [new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>())]
         };
     }
 
@@ -23,7 +23,7 @@ public sealed class DeprecatedTagHandlerTest
     {
         return new XmlTagDefinition
         {
-            Tag = name, ValueType = XmlValueType.Float, Deprecated = false
+            Tag = name, ValueType = XmlValueType.Float, Notes = []
         };
     }
 
@@ -61,7 +61,7 @@ public sealed class DeprecatedTagHandlerTest
         {
             Tag = "Old_Field",
             ValueType = XmlValueType.Float,
-            Deprecated = true,
+            Notes = [new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>())],
             Description = new Dictionary<string, string>
             {
                 ["en"] = "Multiple special weapons are not supported by the game engine."
@@ -84,7 +84,7 @@ public sealed class DeprecatedTagHandlerTest
         {
             Tag = "Old_Field",
             ValueType = XmlValueType.Float,
-            Deprecated = true,
+            Notes = [new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>())],
             Description = new Dictionary<string, string> { ["de"] = "Nicht mehr verwenden." }
         };
 
@@ -101,7 +101,7 @@ public sealed class DeprecatedTagHandlerTest
     [InlineData(XmlValueType.Boolean)]
     public void Deprecated_tag_emits_warning_regardless_of_value_type(XmlValueType type)
     {
-        var tag = new XmlTagDefinition { Tag = "Old", ValueType = type, Deprecated = true };
+        var tag = new XmlTagDefinition { Tag = "Old", ValueType = type, Notes = [new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>())] };
         var fact = XmlHandlerTestFixtures.MakeFact(tag, "value");
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);

@@ -33,7 +33,7 @@ public static class IconCatalogLoader
     /// <param name="logger">Optional; receives one line per layer that could not be read.</param>
     public static IconCatalog Load(
         IFileSystem fileSystem,
-        IMtdFileService mtdFileService,
+        IMtdService mtdFileService,
         string rootPath,
         IconProjectSettings settings,
         IconPack baseline,
@@ -70,7 +70,7 @@ public static class IconCatalogLoader
     /// </summary>
     private static IReadOnlyDictionary<string, byte[]>? LoadWorkspaceMegaTexture(
         IFileSystem fileSystem,
-        IMtdFileService mtdFileService,
+        IMtdService mtdFileService,
         string rootPath,
         IconProjectSettings settings,
         ILogger logger)
@@ -83,7 +83,7 @@ public static class IconCatalogLoader
 
         try
         {
-            var directory = mtdFileService.Load(mtdPath).Content;
+            var directory = mtdFileService.LoadFile(mtdPath).Content;
             using var texture = fileSystem.File.OpenRead(texturePath);
             return MegaTextureIconExtractor.ExtractAll(directory, texture);
         }

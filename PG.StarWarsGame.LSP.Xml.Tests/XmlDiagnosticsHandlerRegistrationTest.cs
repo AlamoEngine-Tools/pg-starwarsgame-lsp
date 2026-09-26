@@ -297,7 +297,11 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // DeathBehaviorClass::Init plays Specific_Death_Anim_Type at its index; the model call returns false
         // past the last take, and with Remove_Upon_Death set Init then destroys the object at once. Vanilla:
         // 2 eaw, 10 foc, none with Remove_Upon_Death.
-        const int expectedHandlerCount = 152;
+        // 152 -> 153: StoryParamValueNotesHandler added with schema 2.0.0. Notes moved onto the enum
+        // VALUE a parameter names, and nothing surfaced those: only a hardcoded-set value could say
+        // anything about itself, so an enum member the engine ignores had nowhere to say so.
+        // NOT_EQUAL_TO on StoryFlagCompareMethod is the first of them.
+        const int expectedHandlerCount = 153;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

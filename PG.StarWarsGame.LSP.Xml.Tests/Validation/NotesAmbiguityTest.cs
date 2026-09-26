@@ -95,8 +95,8 @@ public sealed class NotesAmbiguityTest
                     Tag = tag,
                     ValueType = XmlValueType.Float,
                     Notes = note is null
-                        ? new Dictionary<string, string>()
-                        : new Dictionary<string, string> { ["en"] = note }
+                        ? []
+                        : [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { ["en"] = note })]
                 });
         }
 

@@ -46,13 +46,13 @@ public sealed class IconCatalogProvider : IIconCatalogProvider
     private readonly IFileHelper _fileHelper;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly ILogger<IconCatalogProvider> _logger;
-    private readonly IMtdFileService _mtdFileService;
+    private readonly IMtdService _mtdFileService;
     private readonly IconPackLoader _packLoader;
     private IconPack? _baseline;
 
     public IconCatalogProvider(
         IconPackLoader packLoader,
-        IMtdFileService mtdFileService,
+        IMtdService mtdFileService,
         IFileHelper fileHelper,
         ILspConfigurationProvider config,
         ILogger<IconCatalogProvider> logger)
