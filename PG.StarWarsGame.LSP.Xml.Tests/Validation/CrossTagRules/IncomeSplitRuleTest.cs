@@ -177,6 +177,11 @@ public sealed class IncomeSplitRuleTest
             .ToList();
     }
 
+    /// <summary>
+    ///     What the RULE said, and nothing else. The producer also reports document-level facts -
+    ///     the fixture URI is registered to no file type, which is itself worth a warning - and a
+    ///     bare "no facts" assertion would fail on those without the rule having said anything.
+    /// </summary>
     private static IReadOnlyList<XmlFact> Facts(string body, IXmlCrossTagRule rule)
     {
         var producer = new XmlDocumentFactProducer(
@@ -186,7 +191,11 @@ public sealed class IncomeSplitRuleTest
             new XmlStructuralValidator(),
             [rule]);
 
-        return producer.Produce("<Root>\n" + body + "\n</Root>", Uri);
+        return
+        [
+            .. producer.Produce("<Root>\n" + body + "\n</Root>", Uri)
+                .Where(f => f is not XmlUnregisteredFileFact)
+        ];
     }
 }
 

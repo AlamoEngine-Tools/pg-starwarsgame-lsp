@@ -27,7 +27,8 @@ public sealed class SchemaIndex
         IEnumerable<RawEnumDefinition> enums,
         IEnumerable<HardcodedReferenceSet>? hardcodedSets = null,
         IEnumerable<MetafileDefinition>? metafiles = null,
-        IEnumerable<ObjectKindDefinition>? kinds = null)
+        IEnumerable<ObjectKindDefinition>? kinds = null,
+        IEnumerable<ScannedDirectoryDefinition>? scannedDirectories = null)
     {
         _tags = new Dictionary<string, XmlTagDefinition>(StringComparer.OrdinalIgnoreCase);
         _tagsByType = new Dictionary<string, IReadOnlyList<XmlTagDefinition>>(StringComparer.OrdinalIgnoreCase);
@@ -77,6 +78,7 @@ public sealed class SchemaIndex
         AllEnums = [.. _enums.Values];
         AllMetafiles = metafiles?.ToArray() ?? [];
         AllKinds = [.. _kinds.Values];
+        AllScannedDirectories = scannedDirectories?.ToArray() ?? [];
     }
 
     public IReadOnlyList<XmlTagDefinition> AllTags { get; }
@@ -90,6 +92,8 @@ public sealed class SchemaIndex
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets { get; }
 
     public IReadOnlyList<MetafileDefinition> AllMetafiles { get; }
+
+    public IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories { get; }
 
     public XmlTagDefinition? GetTag(string tagName)
     {

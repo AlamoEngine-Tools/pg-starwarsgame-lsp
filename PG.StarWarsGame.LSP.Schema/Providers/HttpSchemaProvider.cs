@@ -101,6 +101,7 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
         var enums = new List<RawEnumDefinition>();
         var hardcodedSets = new List<HardcodedReferenceSet>();
         var metafiles = new List<MetafileDefinition>();
+        var scannedDirectories = new List<ScannedDirectoryDefinition>();
         var kinds = new List<ObjectKindDefinition>();
         var fetchedFiles = new List<(string relativePath, string content)>();
 
@@ -207,8 +208,18 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
             else
                 metafiles.AddRange(parsed);
 
+            // The scanned directories live in the same file, so they come from the copy just
+            // fetched rather than a second request; a fetch that failed keeps what is already held,
+            // the same way the metafiles above do.
             if (raw is not null)
+            {
+                scannedDirectories.AddRange(YamlSchemaParser.ParseScannedDirectories(raw));
                 fetchedFiles.Add((path, raw));
+            }
+            else
+            {
+                scannedDirectories.AddRange(Current.AllScannedDirectories);
+            }
         }
 
         _rawTagFallbacks.Clear();
@@ -216,7 +227,7 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
             _rawTagFallbacks[tn] = tags;
         _rawEnumFallbacks = [.. enums];
 
-        Publish(new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds));
+        Publish(new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds, scannedDirectories));
         _readyTcs.TrySetResult();
 
         _cache.Update(indexJson, fetchedFiles, manifest.BaselineHash);

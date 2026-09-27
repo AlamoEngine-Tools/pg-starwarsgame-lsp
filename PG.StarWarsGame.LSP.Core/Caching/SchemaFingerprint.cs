@@ -70,6 +70,17 @@ public static class SchemaFingerprint
             sb.Append('\n');
         }
 
+        // A scanned directory decides whether the files under it are exempt from the
+        // unregistered-file check, so it changes what a persisted index means. Leaving it out would
+        // let an index built under the old list be reused under the new one.
+        foreach (var d in schema.AllScannedDirectories.OrderBy(d => d.Path, StringComparer.Ordinal))
+        {
+            sb.Append("scan:").Append(d.Path);
+            foreach (var t in d.Types.OrderBy(t => t, StringComparer.Ordinal))
+                sb.Append('|').Append(t);
+            sb.Append('\n');
+        }
+
         foreach (var set in schema.AllHardcodedSets.OrderBy(s => s.Name, StringComparer.Ordinal))
         {
             sb.Append("set:").Append(set.Name);

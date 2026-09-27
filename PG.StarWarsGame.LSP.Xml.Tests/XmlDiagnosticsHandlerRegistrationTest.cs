@@ -301,7 +301,10 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // VALUE a parameter names, and nothing surfaced those: only a hardcoded-set value could say
         // anything about itself, so an enum member the engine ignores had nowhere to say so.
         // NOT_EQUAL_TO on StoryFlagCompareMethod is the first of them.
-        const int expectedHandlerCount = 153;
+        // 153 -> 154: UnregisteredXmlFileHandler. A file is read because a registry lists it, because
+        // the engine opens it by a name compiled in, or because it sits in a directory the engine
+        // walks; one that is none of those is never opened, and nothing in the file says so.
+        const int expectedHandlerCount = 154;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

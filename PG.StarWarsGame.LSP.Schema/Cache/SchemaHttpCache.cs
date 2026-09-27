@@ -99,12 +99,16 @@ public sealed class SchemaHttpCache
                 hardcodedSets.Add(
                     YamlSchemaParser.ParseHardcodedSetFile(
                         _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
+            var scannedDirectories = new List<ScannedDirectoryDefinition>();
             foreach (var rel in manifest.Meta)
-                metafiles.AddRange(
-                    YamlSchemaParser.ParseMetafileFile(
-                        _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
+            {
+                var metaYaml =
+                    _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel));
+                metafiles.AddRange(YamlSchemaParser.ParseMetafileFile(metaYaml));
+                scannedDirectories.AddRange(YamlSchemaParser.ParseScannedDirectories(metaYaml));
+            }
 
-            index = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds);
+            index = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds, scannedDirectories);
             return true;
         }
         catch (Exception ex)

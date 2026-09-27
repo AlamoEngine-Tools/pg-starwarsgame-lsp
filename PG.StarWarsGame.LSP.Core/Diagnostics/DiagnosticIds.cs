@@ -336,6 +336,16 @@ public static class DiagnosticIds
     /// </remarks>
     public static readonly DiagnosticId UnknownTag = new(DiagnosticGroup.Structure, 12);
 
+    /// <summary>
+    ///     An XML file in the workspace that no registry names, so the engine never opens it.
+    /// </summary>
+    /// <remarks>
+    ///     Appended after 16, the highest this group had used - the members are written in
+    ///     feature-area blocks rather than in numeric order, so the next free number is not the one
+    ///     below the next declaration.
+    /// </remarks>
+    public static readonly DiagnosticId UnregisteredXmlFile = new(DiagnosticGroup.Structure, 17);
+
     // ── CrossTag ──
     public static readonly DiagnosticId DamageNonzero = new(DiagnosticGroup.CrossTag, 1);
     public static readonly DiagnosticId DisallowedOrOperator = new(DiagnosticGroup.CrossTag, 2);

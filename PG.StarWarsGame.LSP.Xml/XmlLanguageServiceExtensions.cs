@@ -129,6 +129,9 @@ public static class XmlLanguageServiceExtensions
         // XmlStructureFact handler (well-formedness)
         services.AddSingleton<IXmlDiagnosticsHandler, XmlStructureHandler>();
 
+        // XmlUnregisteredFileFact handler (nothing reaches this file)
+        services.AddSingleton<IXmlDiagnosticsHandler, UnregisteredXmlFileHandler>();
+
         // XmlDuplicateTagFact + XmlNotesFact handlers (document-level)
         services.AddSingleton<IXmlDiagnosticsHandler, XmlDuplicateTagHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, XmlNotesHandler>();

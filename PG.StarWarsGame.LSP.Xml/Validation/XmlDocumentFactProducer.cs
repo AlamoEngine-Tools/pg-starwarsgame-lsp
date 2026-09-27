@@ -31,6 +31,9 @@ public sealed class XmlDocumentFactProducer(
         var lineIndex = document.LineIndex;
 
         var fileTypes = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri));
+
+        CollectUnregisteredFile(doc, fileTypes.IsEmpty, documentUri, facts);
+
         var isTypeContainerLevel = !fileTypes.IsEmpty &&
                                    fileTypes.Any(t => schema.GetObjectType(t)?.NameTag is not null);
 
@@ -192,6 +195,36 @@ public sealed class XmlDocumentFactProducer(
     ///     element children are considered, which is what keeps the 44 vanilla files whose
     ///     <c>Name=""</c> sits inside a comment block silent.
     /// </remarks>
+    /// <summary>
+    ///     Reports a file nothing registers, anchored on its root element.
+    ///     <para>
+    ///         The root element is the one node whose HAP position can be trusted - the per-node
+    ///         line and column are unreliable for NESTED elements, which is why every other fact
+    ///         here takes its position from the document's own offsets. Column 0 of line 0 would
+    ///         have put the squiggle on the XML declaration, which is not what is wrong.
+    ///     </para>
+    ///     <para>
+    ///         A document under a directory the engine WALKS is exempt: its files are read for
+    ///         sitting there, so no registry names them and none was ever meant to.
+    ///     </para>
+    /// </summary>
+    private void CollectUnregisteredFile(
+        HtmlDocument doc, bool hasNoFileType, string documentUri, List<XmlFact> facts)
+    {
+        if (!hasNoFileType) return;
+        if (schema.IsInScannedDirectory(documentUri)) return;
+
+        var rootNode = doc.DocumentNode.ChildNodes.FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
+        if (rootNode is null) return;
+
+        var slash = documentUri.LastIndexOf('/');
+        var fileName = slash < 0 ? documentUri : documentUri[(slash + 1)..];
+
+        // LinePosition points at the '<', so the name starts one past it.
+        facts.Add(new XmlUnregisteredFileFact(
+            documentUri, XmlUtility.GetLine(rootNode), rootNode.LinePosition + 1, rootNode.Name.Length, fileName));
+    }
+
     private void CollectUnnamedObjects(
         HtmlDocument doc, List<XmlFact> facts, LineOffsetIndex lineIndex, string documentUri)
     {

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -12,7 +13,8 @@ public sealed class StartupPipelineTest
 {
     private static StartupPipeline Build(
         Log log, IModProjectReloadService reloadService, IStartupGate gate,
-        IPgprojMigrationOffer? migrationOffer = null)
+        IPgprojMigrationOffer? migrationOffer = null,
+        IEnumerable<IDiagnosticsRepublisher>? republishers = null)
     {
         return new StartupPipeline(
             new RecordingSchemaBootstrapper(log),
@@ -22,7 +24,52 @@ public sealed class StartupPipelineTest
             new RecordingProgress(log),
             new RecordingNotifier(log),
             NullLogger<StartupPipeline>.Instance,
-            migrationOffer);
+            migrationOffer,
+            republishers);
+    }
+
+    /// <summary>
+    ///     Diagnostics have to be published for the workspace once the scan is done.
+    ///     <para>
+    ///         Measured 2026-09-27: they were not, and nothing else did it either - the only path to
+    ///         a published diagnostic was <c>didOpen</c>. When the server starts in a state where
+    ///         the XML sync handler never receives that notification (roughly one start in three on
+    ///         the eaw workspace) the session produced no diagnostics for ANY file until it was
+    ///         restarted, and nothing in the log said why.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_RepublishesDiagnosticsAfterTheScan()
+    {
+        var log = new Log();
+        var pipeline = Build(log, new RecordingReloadService(log), new RecordingGate(log),
+            republishers: [new RecordingRepublisher(log, "xml"), new RecordingRepublisher(log, "lua")]);
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Contains("republish.xml", log.Entries);
+        Assert.Contains("republish.lua", log.Entries);
+
+        // After the gate, never before it: the sweep touches every indexed document, and holding
+        // the gate shut for it would put that work in front of the editor becoming usable.
+        Assert.True(log.Entries.IndexOf("gate.open") < log.Entries.IndexOf("republish.xml"),
+            "the gate must open before the workspace republish");
+    }
+
+    /// <summary>
+    ///     Startup is fire-and-forget, so an escaping exception here is an unobserved one - and one
+    ///     publisher failing must not cost the others their sweep.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_RepublishFailure_DoesNotStopTheOthers()
+    {
+        var log = new Log();
+        var pipeline = Build(log, new RecordingReloadService(log), new RecordingGate(log),
+            republishers: [new ThrowingRepublisher(), new RecordingRepublisher(log, "xml")]);
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Contains("republish.xml", log.Entries);
     }
 
     [Fact]
@@ -305,6 +352,32 @@ public sealed class StartupPipelineTest
         public void NotifyScanComplete()
         {
             _log.Add("notify");
+        }
+    }
+
+    private sealed class RecordingRepublisher : IDiagnosticsRepublisher
+    {
+        private readonly Log _log;
+        private readonly string _name;
+
+        public RecordingRepublisher(Log log, string name)
+        {
+            _log = log;
+            _name = name;
+        }
+
+        public Task RepublishAllAsync(CancellationToken ct)
+        {
+            _log.Add($"republish.{_name}");
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingRepublisher : IDiagnosticsRepublisher
+    {
+        public Task RepublishAllAsync(CancellationToken ct)
+        {
+            throw new InvalidOperationException("republish blew up");
         }
     }
 

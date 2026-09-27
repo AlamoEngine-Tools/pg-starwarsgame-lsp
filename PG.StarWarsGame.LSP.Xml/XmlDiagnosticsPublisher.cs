@@ -265,21 +265,39 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
     {
-        if (!DiagnosticsEnabled) return;
+        // Every early return below used to be silent, which is why "no diagnostics anywhere" was
+        // indistinguishable from "a handler that did not fire" and took a day of inference from
+        // timestamps. Whatever else is true, the log should be able to answer "did it publish?".
+        if (!DiagnosticsEnabled)
+        {
+            _logger.LogDebug("Revalidate workspace skipped: XML diagnostics are turned off");
+            return;
+        }
 
         ClearAllPublished();
         var index = _indexService.Current;
+        _logger.LogDebug("Revalidating {Count} indexed document(s)", index.Documents.Count);
         foreach (var uri in index.Documents.Keys)
             await RevalidateDocumentAsync(uri, ct);
     }
 
     public Task RevalidateDocumentAsync(string uri, CancellationToken ct)
     {
-        if (!DiagnosticsEnabled) return Task.CompletedTask;
+        if (!DiagnosticsEnabled)
+        {
+            _logger.LogDebug("Revalidate {Uri} skipped: XML diagnostics are turned off", uri);
+            return Task.CompletedTask;
+        }
 
         var index = _indexService.Current;
         var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
-        if (text is null) return Task.CompletedTask;
+        if (text is null)
+        {
+            // The text source holds what the client has opened plus what the indexer read. A miss
+            // here is the difference between "diagnosed and clean" and "never looked at".
+            _logger.LogDebug("Revalidate {Uri} skipped: no text available", uri);
+            return Task.CompletedTask;
+        }
 
         PublishForDocument(uri, text, index);
         return Task.CompletedTask;
@@ -330,6 +348,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
         _fixCache[normalizedUri] = fixes;
 
+        _logger.LogDebug("Publishing {Count} diagnostic(s) for {Uri}", allDiags.Count, uri);
         Publish(new PublishDiagnosticsParams
         {
             Uri = DocumentUri.From(uri),

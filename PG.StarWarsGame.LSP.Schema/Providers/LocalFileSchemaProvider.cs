@@ -100,16 +100,20 @@ public sealed class LocalFileSchemaProvider : SchemaIndexProviderBase, IVersione
         }
 
         var metaPath = _fileSystem.Path.Combine(_rootPath, "meta", "metafiles.yaml");
-        var metafiles = _fileSystem.File.Exists(metaPath)
-            ? YamlSchemaParser.ParseMetafileFile(_fileSystem.File.ReadAllText(metaPath))
-            : (IReadOnlyList<MetafileDefinition>)[];
+        var metaYaml = _fileSystem.File.Exists(metaPath) ? _fileSystem.File.ReadAllText(metaPath) : null;
+        var metafiles = metaYaml is null
+            ? (IReadOnlyList<MetafileDefinition>)[]
+            : YamlSchemaParser.ParseMetafileFile(metaYaml);
+        var scannedDirectories = metaYaml is null
+            ? (IReadOnlyList<ScannedDirectoryDefinition>)[]
+            : YamlSchemaParser.ParseScannedDirectories(metaYaml);
 
-        Publish(new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds));
+        Publish(new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds, scannedDirectories));
 
         _logger.LogInformation(
-            "Schema loaded: {TagCount} tags across {TypeCount} types, {KindCount} kinds, {EnumCount} enums, {HardcodedCount} hardcoded set(s) from {Path}",
+            "Schema loaded: {TagCount} tags across {TypeCount} types, {KindCount} kinds, {EnumCount} enums, {HardcodedCount} hardcoded set(s), {ScannedCount} scanned director(ies) from {Path}",
             Current.AllTags.Count, Current.AllObjectTypes.Count, Current.AllKinds.Count, Current.AllEnums.Count,
-            Current.AllHardcodedSets.Count, _rootPath);
+            Current.AllHardcodedSets.Count, Current.AllScannedDirectories.Count, _rootPath);
     }
 
     /// <summary>

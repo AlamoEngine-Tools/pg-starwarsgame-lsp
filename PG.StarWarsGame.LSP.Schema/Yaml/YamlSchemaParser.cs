@@ -287,11 +287,45 @@ internal static class YamlSchemaParser
         var result = new List<MetafileDefinition>(file.Metafiles.Count);
         foreach (var entry in file.Metafiles)
         {
+            // Fails closed, for the same reason an unknown note kind does. Skipping the entry
+            // registers nothing for that path, so every file behind it stays untyped - and an
+            // untyped file is indistinguishable from one the schema never mentioned, which is
+            // exactly the question the unregistered-file check has to answer.
             if (!Enum.TryParse<MetafileType>(entry.MetaFileType, true, out var metafileType))
-                continue;
+                throw new InvalidOperationException(
+                    $"Unknown metaFileType '{entry.MetaFileType}' on '{entry.Path}'. The schema " +
+                    "declares a metafile this version of aet-eaw-edit cannot classify, so it " +
+                    "cannot register what the file holds - update the extension. Known types: " +
+                    $"{string.Join(", ", Enum.GetNames<MetafileType>())}.");
 
             var normalizedPath = entry.Path.Replace('\\', '/').ToLowerInvariant();
             result.Add(new MetafileDefinition(normalizedPath, metafileType, entry.Types)
+            {
+                Notes = ReadNotes(entry.Notes)
+            });
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Reads the directories the engine walks, from the same file the metafiles come from.
+    ///     <para>
+    ///         Kept a separate call rather than folded into <see cref="ParseMetafileFile" />'s return
+    ///         so that the three providers already reading metafiles do not change shape for a
+    ///         second list; they pick this up where they need it.
+    ///     </para>
+    /// </summary>
+    public static IReadOnlyList<ScannedDirectoryDefinition> ParseScannedDirectories(string yaml)
+    {
+        var file = Deserializer.Deserialize<YamlMetafileFile>(yaml);
+        var result = new List<ScannedDirectoryDefinition>(file.ScannedDirectories.Count);
+        foreach (var entry in file.ScannedDirectories)
+        {
+            // A trailing slash is what tells a directory from a file downstream, so it is added
+            // here rather than trusted to the author of the YAML.
+            var normalizedPath = entry.Path.Replace('\\', '/').ToLowerInvariant().TrimEnd('/') + "/";
+            result.Add(new ScannedDirectoryDefinition(normalizedPath, entry.Types)
             {
                 Notes = ReadNotes(entry.Notes)
             });

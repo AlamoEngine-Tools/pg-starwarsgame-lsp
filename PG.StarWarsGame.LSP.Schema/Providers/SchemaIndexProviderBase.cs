@@ -71,6 +71,8 @@ public abstract class SchemaIndexProviderBase : ISchemaProvider
 
     public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
 
+    public IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories => _current.AllScannedDirectories;
+
     public IReadOnlyList<ObjectKindDefinition> AllKinds => _current.AllKinds;
 
     public ObjectKindDefinition? GetKind(string kindName)

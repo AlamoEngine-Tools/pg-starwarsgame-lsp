@@ -126,6 +126,14 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(
         TextSynchronizationCapability capability, ClientCapabilities clientCapabilities)
     {
+        // Logged because the server sometimes starts without XML document sync reaching this
+        // handler at all - didOpen is then routed to nothing, no text ever enters the workspace
+        // host, and the session publishes no diagnostics for any file until it is restarted. A
+        // debugger breakpoint proves the call happened but suspends the handshake, which makes an
+        // intermittent fault impractical to count; this line can be counted over many restarts.
+        _logger?.LogDebug("XML document sync registered (client synchronization capability: {Capability})",
+            capability is null ? "not declared" : "declared");
+
         return new TextDocumentSyncRegistrationOptions
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("xml"),

@@ -524,6 +524,58 @@ public sealed class YamlSchemaParserTest
         Assert.Equal(MetafileType.Special, entry.MetafileType);
     }
 
+    // A metaFileType this server does not know used to be skipped in silence, which registered
+    // nothing for that path and left every file behind it untyped - with no way to tell that from a
+    // schema that never mentioned the file. Fail closed, the way an unknown note kind does.
+    [Fact]
+    public void ParseMetafileFile_UnknownMetaFileType_Throws()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/gameobjectfiles.xml
+                                metaFileType: scannedDirectory
+                                types:
+                                  - GameObjectType
+                            """;
+
+        var ex = Assert.Throws<InvalidOperationException>(() => YamlSchemaParser.ParseMetafileFile(yaml));
+
+        Assert.Contains("scannedDirectory", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("data/xml/gameobjectfiles.xml", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParseScannedDirectories_ReadsThemFromTheSameFile()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/movies.xml
+                                metaFileType: directContent
+                            scannedDirectories:
+                              - path: DATA\XML\AI\Goals
+                            """;
+
+        var directory = Assert.Single(YamlSchemaParser.ParseScannedDirectories(yaml));
+
+        // Lower-cased, forward slashes, and given the trailing slash the author left off - the
+        // slash is what tells a directory from a file downstream.
+        Assert.Equal("data/xml/ai/goals/", directory.Path);
+    }
+
+    // The two lists are independent: a file that declares only one of them still parses, which is
+    // what lets a schema without scanned directories load on a server that has them.
+    [Fact]
+    public void ParseScannedDirectories_NoneDeclared_ReturnsEmpty()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/movies.xml
+                                metaFileType: directContent
+                            """;
+
+        Assert.Empty(YamlSchemaParser.ParseScannedDirectories(yaml));
+    }
+
     [Fact]
     public void ParseMetafileFile_UpperCaseBackslashPath_NormalisedToLowercaseForwardSlash()
     {

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -27,6 +28,7 @@ public sealed class StartupPipeline
     private readonly IStartupNotifier _notifier;
     private readonly IStartupProgress _progress;
     private readonly IModProjectReloadService _reloadService;
+    private readonly IReadOnlyList<IDiagnosticsRepublisher> _republishers;
     private readonly ISchemaBootstrapper _schema;
 
     // migrationOffer is optional so the minimal test setups can omit it; production always wires it.
@@ -38,8 +40,10 @@ public sealed class StartupPipeline
         IStartupProgress progress,
         IStartupNotifier notifier,
         ILogger<StartupPipeline> logger,
-        IPgprojMigrationOffer? migrationOffer = null)
+        IPgprojMigrationOffer? migrationOffer = null,
+        IEnumerable<IDiagnosticsRepublisher>? republishers = null)
     {
+        _republishers = republishers?.ToList() ?? [];
         _migrationOffer = migrationOffer;
         _schema = schema;
         _baseline = baseline;
@@ -74,6 +78,32 @@ public sealed class StartupPipeline
             _progress.Complete();
             _notifier.NotifyScanComplete();
             _logger.LogInformation("Startup pipeline finished");
+        }
+
+        // Publish diagnostics for the indexed workspace, behind the open gate.
+        //
+        // Measured 2026-09-27: nothing did this, and the ONLY path to a published diagnostic was a
+        // didOpen. The server starts in a state where the XML sync handler never receives that
+        // notification often enough to matter - 7 of 8 starts in one batch on the eaw workspace,
+        // 1 of 4 in another - and such a session then published nothing for ANY file until it was
+        // restarted. The publishers already read a closed document's text from disk, so the sweep
+        // needs no editor buffer; it simply was never asked to run.
+        //
+        // After the gate on purpose: it touches every indexed document, and holding the gate for it
+        // would put that work in front of the editor becoming usable.
+        foreach (var republisher in _republishers)
+        {
+            try
+            {
+                await republisher.RepublishAllAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                // Startup is fire-and-forget, so an escaping exception here is unobserved - and one
+                // publisher failing must not cost the others their sweep.
+                _logger.LogWarning(ex, "Could not publish workspace diagnostics for {Publisher}.",
+                    republisher.GetType().Name);
+            }
         }
 
         // Last, and deliberately outside everything above: the offer is a question, and nothing
