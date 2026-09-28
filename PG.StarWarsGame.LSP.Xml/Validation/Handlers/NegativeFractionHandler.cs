@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     never becomes a bonus.
 /// </summary>
 /// <remarks>
-///     <c>Error: (%s) Min_Income_Modifier must be between -1.0 and 0.0</c> (<c>015558ec</c>). Both
+///     <c>Error: (%s) Min_Income_Modifier must be between -1.0 and 0.0</c>. Both
 ///     ends are inclusive: -1.0 removes the income entirely and 0.0 leaves it untouched, and both
 ///     are meaningful settings.
 /// </remarks>

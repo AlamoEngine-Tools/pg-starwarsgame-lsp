@@ -14,7 +14,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 /// <remarks>
 ///     <para>
 ///         Scoped by the two TAGS rather than by an element, deliberately.
-///         <c>SpecialAbilityClass::Validate_Data</c> is the base every ability class calls first, so
+///         the engine's load-time validation is the base every ability class calls first, so
 ///         this is every ability type's rule; naming elements here would mean listing all of them
 ///         and silently missing whichever one a mod reaches for.
 ///     </para>
@@ -29,7 +29,7 @@ public sealed class AutomaticAbilityDespawnRule : IXmlCrossTagRule
 {
     /// <summary>
     ///     The six styles in the complaining arm of the switch in
-    ///     <c>SpecialAbilityClass::Validate_Data</c>. MEASURED from that switch, not inferred from
+    ///     the engine's load-time validation. MEASURED from that switch, not inferred from
     ///     the names: the other six cases (<c>Ground_Activated</c>, <c>Hero_Detected</c>,
     ///     <c>Combat_Imminent</c>, <c>Special_Attack</c>, <c>Take_Damage</c>, <c>User_Input</c>)
     ///     break out of it without a word.

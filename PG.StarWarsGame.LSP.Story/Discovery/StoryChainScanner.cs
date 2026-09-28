@@ -175,7 +175,7 @@ public sealed class StoryChainScanner
     }
 
     /// <summary>
-    ///     <c>AI_Player_Control</c> as <c>PlayerListClass::Assign_AI_Control</c> applies it: the tokens
+    ///     <c>AI_Player_Control</c> as <c>Assign_AI_Control</c> applies it: the tokens
     ///     of every occurrence form one flat (faction, type) list, walked to the end with a
     ///     case-insensitive faction match, so the last pair for a faction wins.
     /// </summary>

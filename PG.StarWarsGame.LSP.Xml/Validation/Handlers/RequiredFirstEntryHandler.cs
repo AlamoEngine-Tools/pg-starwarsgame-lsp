@@ -34,9 +34,9 @@ public sealed class RequiredFirstEntryHandler : XmlDiagnosticsHandler<XmlTagValu
     private static readonly Dictionary<(string Owner, string Tag), string> RequiredFirst =
         new(FirstEntryKeyComparer.Instance)
         {
-            // GameConstants.cpp:1170 - DamageTypeNames[ 0 ] == "Damage_Default"
+            // The engine asserts that entry 0 of the damage-type list is "Damage_Default"
             [("GameConstants", "Damage_Types")] = "Damage_Default",
-            // GameConstants.cpp:1180 - ArmorTypeNames[ 0 ] == "Armor_Default"
+            // ... and that entry 0 of the armour-type list is "Armor_Default"
             [("GameConstants", "Armor_Types")] = "Armor_Default"
         };
 

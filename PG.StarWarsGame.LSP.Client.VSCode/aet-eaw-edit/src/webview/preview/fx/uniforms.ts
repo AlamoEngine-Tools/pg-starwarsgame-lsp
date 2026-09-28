@@ -41,7 +41,7 @@ export interface AlamoFrame {
      * The whole rig as a light probe, three 4x4 matrices flattened to 48 numbers.
      *
      * `m_sphAll` to the shaders. This is not an ambient term with the lights added on top - for
-     * every mesh effect it IS the diffuse lighting, all of it. `MeshAlpha.fx:53` has no N.L
+     * every mesh effect it IS the diffuse lighting, all of it. `MeshAlpha.fx` has no N.L
      * anywhere in it.
      */
     sphericalHarmonics: readonly number[];

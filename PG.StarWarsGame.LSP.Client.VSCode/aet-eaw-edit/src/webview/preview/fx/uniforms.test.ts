@@ -318,7 +318,7 @@ describe('sphericalHarmonics', () => {
 
     it('lights the shaded side of the default rig, which a flat probe never did', () => {
         // The regression this port exists for. Every mesh shader takes its ENTIRE diffuse term
-        // from this probe - `MeshAlpha.fx:53` has no separate N.L - so a probe holding nothing but
+        // from this probe - `MeshAlpha.fx` has no separate N.L - so a probe holding nothing but
         // the ambient rendered the whole corpus at a flat 0.1 grey, and the reader reported the
         // scene as far too dark. The engine's own rig is a 0.5 sun and two 0.5 blue fills.
         const sun = lit(UP, [1, 1, 1], 0.5);

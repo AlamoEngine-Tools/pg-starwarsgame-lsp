@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <c>Error: (%s) Max_Projectile_Redirection_Angle_In_Degrees must be between 0 and 180.</c>
-///     (<c>01555e40</c>). A redirection angle is measured off the incoming heading, so 180 is a full
+///    . A redirection angle is measured off the incoming heading, so 180 is a full
 ///     reversal and there is nothing beyond it to express.
 /// </remarks>
 public sealed class AngleDegreesHalfTurnHandler : NumericRangeHandlerBase

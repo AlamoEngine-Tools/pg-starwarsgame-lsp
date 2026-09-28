@@ -52,10 +52,10 @@ public sealed class PreviewSceneBuilder(
 
     /// <summary>
     ///     The engine's defaults for the two turret extents, from the
-    ///     <c>GameObjectTypeClass</c> constructor at <c>00a87243</c> and <c>00a87256</c>.
+    ///     <c>GameObjectTypeClass</c> constructor.
     /// </summary>
     /// <remarks>
-    ///     Both comparisons in <c>Is_In_Cone_Of_Fire</c> are then always true, so an object that
+    ///     Both comparisons in the cone-of-fire test are then always true, so an object that
     ///     sets neither fires in ANY direction. 175 of the 291 objects with a <c>WEAPON</c>
     ///     behaviour set neither, which makes unrestricted the COMMON case - reading an absent tag
     ///     as zero gave the majority of armed units the narrowest arc possible.
@@ -69,14 +69,14 @@ public sealed class PreviewSceneBuilder(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>HardPointDataClass::HardPointDataClass</c> (<c>00be1220</c>) writes
+    ///         <c>HardPointDataClass</c> writes
     ///         <c>TurretRotateExtentDegrees = 180.0</c> and
     ///         <c>TurretElevateExtentDegrees = 90.0</c>. A hardpoint's turret fields are a parallel
     ///         set to the unit's rather than the same ones, and so are their defaults.
     ///     </para>
     ///     <para>
     ///         180 is the exact threshold at which
-    ///         <c>HardPointClass::Calculate_Desired_Turret_Angle</c> skips its motion clamp - the
+    ///         the turret-angle calculation skips its motion clamp - the
     ///         gate is <c>extent &lt; 180.0 &amp;&amp; extent &gt; 0.0</c> - so the default yaw is a
     ///         free turn and the default pitch is a real stop at plus or minus 90.
     ///     </para>
@@ -1185,10 +1185,10 @@ public sealed class PreviewSceneBuilder(
         //
         // GameObjectClass::Take_Damage finds the hardpoint by NAME, an exact _stricmp against each
         // Collision_Mesh - but first replaces the name with the hardpoint's OWN value when the hit is
-        // aimed at it (0097386a), and in a second path taken from the attacker (009738cc). The lookup
+        // aimed at it, and in a second path taken from the attacker. The lookup
         // then compares a value with itself, so a Collision_Mesh the model lacks is still reachable
         // by aimed fire: the Gargantuan's eight hardpoints all write one, and it dies through them.
-        // An EMPTY name fails the size check before the lookup (00973ad9), aimed or not, so that
+        // An EMPTY name fails the size check before the lookup, aimed or not, so that
         // hardpoint never dies and the all-destroyed branch can never complete.
         //
         // The mismatched-name case used to be reported here as well, as an error saying no shot could
@@ -1318,10 +1318,10 @@ public sealed class PreviewSceneBuilder(
     ///     Whether the engine can ever put this unit in the deployed state.
     /// </summary>
     /// <remarks>
-    ///     <c>GameObjectClass::Is_Deployed</c> (<c>0096ed30</c>) requires the type's <c>Deploys</c> flag
-    ///     (<c>Is_Deployable</c>, field <c>+0xf6</c>) and then asks the locomotor. The base
-    ///     <c>LocomotorInterfaceClass::Is_Deployed</c> returns false; only
-    ///     <c>WalkLocomotorBehaviorClass</c> answers yes, in <c>LST_WALK_DEPLOYED</c>. Any other locomotor
+    ///     the is-deployed test requires the type's <c>Deploys</c> flag
+    ///     (the is-deployable test, field <c>+0xf6</c>) and then asks the locomotor. The base
+    ///     the is-deployed test returns false; only
+    ///     the WALK locomotor behaviour answers yes, in <c>LST_WALK_DEPLOYED</c>. Any other locomotor
     ///     with <c>Deploys</c> set is never deployed, so it has no second arc to draw.
     /// </remarks>
     private static bool CanDeploy(EffectiveObject effective)
@@ -1336,7 +1336,7 @@ public sealed class PreviewSceneBuilder(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The conversion is the point. <c>Is_In_Cone_Of_Fire</c> tests
+    ///         The conversion is the point. the cone-of-fire test tests
     ///         <c>|yaw| &gt; Turret_Rotate_Extent_Degrees</c> WITHOUT halving, so the extent is a
     ///         plus-or-minus bound and the swept angle is twice it. The hardpoint path on the same
     ///         DTO field tests <c>|yaw| &gt; Fire_Cone_Width / 2.0</c>, so THAT number is already a
@@ -1365,8 +1365,8 @@ public sealed class PreviewSceneBuilder(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>Calculate_Projectile_Facing</c> returns the object's own facing and returns true
-    ///         before <c>Is_In_Cone_Of_Fire</c> is reached, so authored extents are not widened or
+    ///         the projectile-facing calculation returns the object's own facing and returns true
+    ///         before the cone-of-fire test is reached, so authored extents are not widened or
     ///         narrowed - they are never read. Null then means "no arc concept", which is a
     ///         different statement from 360 ("unrestricted") and 0 ("dead ahead only").
     ///     </para>
@@ -1383,7 +1383,7 @@ public sealed class PreviewSceneBuilder(
 
     /// <summary>The vertical arc, as a full angle.</summary>
     /// <remarks>
-    ///     <c>Turret_XY_Only</c> makes <c>Is_In_Cone_Of_Fire</c> skip the pitch test ENTIRELY rather
+    ///     <c>Turret_XY_Only</c> makes the cone-of-fire test skip the pitch test ENTIRELY rather
     ///     than flattening it, so the elevation is unbounded however the extent is authored.
     /// </remarks>
     /// <param name="deployed">As for <see cref="UnitArcYawDegrees" />.</param>
@@ -1391,7 +1391,7 @@ public sealed class PreviewSceneBuilder(
     {
         if (FiresForward(effective) || (deployed && !CanDeploy(effective))) return null;
 
-        // Tested before the pitch is read in Is_In_Cone_Of_Fire, so it drops the deployed test too.
+        // Tested before the pitch is read in the cone-of-fire test, so it drops the deployed test too.
         if (EngineBoolean.IsTrue(Tag(effective, "Turret_XY_Only")))
             return FullTurnDegrees;
 
@@ -1417,7 +1417,7 @@ public sealed class PreviewSceneBuilder(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>HardPointClass::Can_Weapon_Point_At</c> branches and the two arms are EXCLUSIVE:
+    ///         the weapon-aim test branches and the two arms are EXCLUSIVE:
     ///         <c>if (Is_Turret)</c> it tests <c>Turret_Rotate_Extent_Degrees &lt; |yaw|</c>, and
     ///         the fire cone is tested only in the <c>else</c>. A turret's cone is therefore never
     ///         read - all seven shipped turret hardpoints declare one anyway, and
@@ -1441,7 +1441,7 @@ public sealed class PreviewSceneBuilder(
     /// <remarks>
     ///     The turret arm of that branch tests yaw and then returns - there is no elevation test on
     ///     the SHOT at all. <c>Turret_Elevate_Extent_Degrees</c> is read only by
-    ///     <c>Calculate_Desired_Turret_Angle</c>, which bounds where the BARREL may point. Reporting
+    ///     the turret-angle calculation, which bounds where the BARREL may point. Reporting
     ///     the barrel's limit as the shot's would draw an arc the engine does not enforce.
     /// </remarks>
     private static float? HardpointArcPitchDegrees(EffectiveObject effective)
@@ -1477,7 +1477,7 @@ public sealed class PreviewSceneBuilder(
             return null;
 
         // EFFECTIVE, like the hardpoint's - but off the UNIT's defaults, which are 360 and 180. The
-        // deployed pair has the same defaults, and TurretBehaviorClass::Adjust_Turret_Facing swaps it in
+        // deployed pair has the same defaults, and Adjust_Turret_Facing swaps it in
         // whenever the unit is deployed - so only a unit that can deploy gets one.
         var canDeploy = CanDeploy(effective);
         return new PreviewTurret(

@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///     A <c>System_Spy_Ability</c> detail flag needs the summary flag it reads from.
 /// </summary>
 /// <remarks>
-///     All five are stated in <c>SystemSpyAbilityClass::Validate_Data</c> (<c>0101da00</c>) as
+///     All five are stated in the engine's load-time validation as
 ///     <c>if (detail != false &amp;&amp; summary == false)</c>, followed by the engine setting the
 ///     summary flag to true itself. The pattern is consistent: you cannot see the breakdown of
 ///     something you are not being shown at all.
@@ -56,7 +56,7 @@ public sealed class SeePoliticalControlBreakdownNeedsControlRule : BooleanGatedR
 /// </summary>
 /// <remarks>
 ///     The one rule of the six that gates a NUMBER rather than another flag.
-///     <c>GalacticSabotageAbilityClass::Validate_Data</c> (<c>00ef6c30</c>) tests
+///     the engine's load-time validation tests
 ///     <c>CanHaltCreditProduction == true &amp;&amp; DurationOfCreditHalt &lt;= 0.0</c> and then
 ///     forces the duration to 10.0 - so leaving it at zero does not disable the halt, it buys a
 ///     ten-second one at a value nobody chose.

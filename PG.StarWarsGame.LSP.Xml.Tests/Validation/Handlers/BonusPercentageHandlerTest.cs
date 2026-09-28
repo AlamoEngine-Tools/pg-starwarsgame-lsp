@@ -18,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 ///             Error: (%s) Health_Bonus_Percentage cannot be
 ///             -1.0 or less.
 ///         </c>
-///         (<c>01552038</c>) and, for one, <c>cannot be less than -1.0</c>. The
+///         and, for one, <c>cannot be less than -1.0</c>. The
 ///         bound is exclusive in the first wording: -1.0 itself is rejected.
 ///     </para>
 ///     <para>

@@ -56,7 +56,7 @@ const HARDPOINTS = [
 
 describe('hardpointPool', () => {
     it('is the SUM of the destroyable hardpoints', () => {
-        // The denominator the engine divides by in Get_Combined_Hard_Point_Health_Percent.
+        // The denominator the engine divides by in the combined hardpoint-health reading.
         // Not the hull - that is the unit's own Tactical_Health and lives in `hullPool`.
         const pool = hardpointPool(HARDPOINTS, { A: 350, B: 375, C: 325 });
 
@@ -229,7 +229,7 @@ describe('a unit with no hardpoints dying', () => {
     });
 
     it('kills a unit whose hull is empty even with hardpoints standing', () => {
-        // The hull is what dies - Take_Direct_Damage is the only route to Kill - so a unit whose own
+        // The hull is what dies - the direct-damage path is the only route to Kill - so a unit whose own
         // health is gone is finished whatever its hardpoints are doing. This used to assert the
         // opposite, on the reading that a unit with hardpoints could only die through them.
         const empty = { current: 0, max: 2000 };

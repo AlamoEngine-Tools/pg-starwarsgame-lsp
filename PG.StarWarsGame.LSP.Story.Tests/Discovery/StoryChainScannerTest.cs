@@ -89,7 +89,7 @@ public sealed class StoryChainScannerTest
     [Fact]
     public void Scan_AiControl_PairsTheFlatListAndTheLastPairWins()
     {
-        // Measured: PlayerListClass::Assign_AI_Control walks the whole flat (faction, type) list
+        // Measured: Assign_AI_Control walks the whole flat (faction, type) list
         // and calls Set_AI_Control on every case-insensitive match, so the last pair wins.
         var resolver = new FakeResolver()
             .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))

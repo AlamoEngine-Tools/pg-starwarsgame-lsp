@@ -241,7 +241,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, RemoteBombTossAnimationRule>();
         // From the assert seam rather than a message - a weapon hardpoint whose fire cone the
         // engine's own default cannot satisfy. Gated on Type, because the asserts sit behind
-        // Is_Weapon().
+        // the is-a-weapon test.
         services.AddSingleton<IXmlCrossTagRule, WeaponHardpointFireConeRule>();
         // The engine's three "set either A or B, otherwise this ability won't do anything" pairs.
         services.AddSingleton<IXmlCrossTagRule, HeroAssassinTargetsRule>();
@@ -256,7 +256,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, RedirectBlasterApplicableUnitsRule>();
         // Stated on the ability base class, so it is scoped by its two tags rather than by element.
         services.AddSingleton<IXmlCrossTagRule, AutomaticAbilityDespawnRule>();
-        // The three conditional rules in IncomeStreamAbilityClass::Validate_Data.
+        // The three conditional rules in the engine's load-time validation.
         services.AddSingleton<IXmlCrossTagRule, OwnerIncomeShareRule>();
         services.AddSingleton<IXmlCrossTagRule, SplitFavorsOwnerIgnoredRule>();
         services.AddSingleton<IXmlCrossTagRule, SplitFavorsOwnerVsFullAmountRule>();

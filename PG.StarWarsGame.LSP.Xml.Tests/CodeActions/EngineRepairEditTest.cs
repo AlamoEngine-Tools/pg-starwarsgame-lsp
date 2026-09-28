@@ -30,7 +30,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.CodeActions;
 ///         index, rather than by re-parsing the document in the code-action layer.
 ///     </para>
 ///     <para>
-///         Both repairs are measured: <c>SpecialAbilityClass::Validate_Data</c> assigns
+///         Both repairs are measured: the engine's load-time validation assigns
 ///         <c>CausesDespawn = false</c>, and the same function calls
 ///         <c>std::swap(MinRespawnTime, MaxRespawnTime)</c>.
 ///     </para>

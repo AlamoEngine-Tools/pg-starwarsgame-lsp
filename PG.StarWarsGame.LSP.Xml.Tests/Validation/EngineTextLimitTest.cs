@@ -18,17 +18,15 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Two limits, both in <c>DatabaseMap.cpp</c>, and both the same shape: an assert, then an
+///         Two limits, both in the same engine routine, and both the same shape: an assert, then an
 ///         unbounded <c>strcpy</c> into a stack buffer.
 ///     </para>
 ///     <list type="bullet">
 ///         <item>
-///             A tag's VALUE goes into <c>strtok_string_buffer[8192]</c> -
-///             <c>DatabaseMapClass::Map_Data_Of_Type</c>, line 5582, <c>CMP EAX, 0x2000</c>.
+///             A tag's VALUE goes into an 8192-byte buffer when the engine maps it.
 ///         </item>
 ///         <item>
-///             An object's NAME goes into a 128-byte buffer to be uppercased and hashed -
-///             <c>GameObjectTypeClass::Get_Name_CRC</c>, <c>GameObjectType.cpp</c> line 2225.
+///             An object's NAME goes into a 128-byte buffer to be uppercased and hashed.
 ///         </item>
 ///     </list>
 ///     <para>
@@ -160,7 +158,7 @@ public sealed class EngineTextLimitTest
     ///     long it is.
     /// </summary>
     /// <remarks>
-    ///     <c>Map_Data_Of_Type</c> is one switch on the type code, so the <c>strtok_string_buffer</c>
+    ///     the engine's tag-value mapper is one switch on the type code, so the <c>strtok_string_buffer</c>
     ///     copy belongs to individual cases: 50 of the 83 codes, all composites. A
     ///     <c>Float</c> is read straight out of the node and never copied, so reporting the limit on
     ///     it would be wider than the engine. Nothing reachable turns on this - vanilla's longest
@@ -209,7 +207,7 @@ public sealed class EngineTextLimitTest
             Tag = "HardPoints", ValueType = XmlValueType.NameReferenceList
         };
 
-        // A scalar, for the narrowing: its case in Map_Data_Of_Type never copies into the buffer.
+        // A scalar, for the narrowing: its case in the engine's tag-value mapper never copies into the buffer.
         private static readonly XmlTagDefinition MaxSpeed = new()
         {
             Tag = "Max_Speed", ValueType = XmlValueType.Float

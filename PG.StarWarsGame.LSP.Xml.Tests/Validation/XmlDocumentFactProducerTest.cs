@@ -391,7 +391,7 @@ public sealed class XmlDocumentFactProducerTest
     ///     An object name the engine cannot hold.
     /// </summary>
     /// <remarks>
-    ///     <c>GameObjectTypeClass::Get_Name_CRC</c> (<c>GameObjectType.cpp</c> line 2225) copies the
+    ///     <c>GameObjectTypeClass::Get_Name_CRC</c> copies the
     ///     name into a 128-byte buffer to uppercase and hash it, guarded by an assert and followed
     ///     by a bare <c>strcpy</c> - so the bound exists in the build Petroglyph tested with and not
     ///     in the one anyone plays. The longest shipped name is 76 characters.
@@ -632,7 +632,7 @@ public sealed class XmlDocumentFactProducerTest
     ///     exists only for that class, and there is no second derivation path in the engine. Every
     ///     other class parses its own tags and warns about what it does not recognise:
     ///     <c>
-    ///         HardPointDataClass::Parse_Database_Entry() - Unprocessed entry
+    ///         Parse_Database_Entry() - Unprocessed entry
     ///         'Variant_Of_Existing_Type'
     ///     </c>
     ///     . The object loads anyway, with the tag ignored.

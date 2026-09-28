@@ -422,7 +422,7 @@ public sealed class XmlDocumentFactProducer(
                     context?.ObjectTypeName));
 
                 // The database mapper strcpy's this into a fixed stack buffer - but only for the
-                // value types whose case in Map_Data_Of_Type does that copy. It is one switch on
+                // value types whose case in the engine's tag-value mapper does that copy. It is one switch on
                 // the type code, so the check belongs to a CASE and not to the function: 50 of the
                 // 83 codes, every one a composite. A scalar or a single reference is read straight
                 // out of the node and never copied, so the limit does not bind it.

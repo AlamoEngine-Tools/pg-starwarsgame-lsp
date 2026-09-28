@@ -18,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.CrossTagRules;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>SystemSpyAbilityClass::Validate_Data</c> branches on the style and demands the
+///         the engine's load-time validation branches on the style and demands the
 ///         OPPOSITE sign in each arm: <c>Galactic_Automatic</c> requires a negative duration (a
 ///         permanent effect) and repairs to <c>-1.0</c>; <c>Ground_Activated</c> requires a positive
 ///         one and repairs to <c>30.0</c>. No other style is supported.

@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The general rule is the opposite: <c>DatabaseMapClass::Map_DB_Data_To_Class</c> copies a
+///         The general rule is the opposite: the engine's tag-name mapper copies a
 ///         tag name into <c>uppercase_key_name</c>, uppercases it, and matches that - so casing is
 ///         free for everything the table parses. These are the exceptions, and they are exceptions
 ///         because they have a PARSER OF THEIR OWN.
@@ -25,7 +25,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 public static class CaseSensitiveTags
 {
     /// <summary>
-    ///     <c>StoryModeClass::Load_Plots</c> (<c>00ab3665</c>) compares each key against these two
+    ///     <c>StoryModeClass::Load_Plots</c> compares each key against these two
     ///     literals with <c>std::operator==</c>, then passes <c>key == "Active_Plot"</c> straight to
     ///     <c>Load_Single_Plot</c> as its <c>is_active</c> argument.
     /// </summary>

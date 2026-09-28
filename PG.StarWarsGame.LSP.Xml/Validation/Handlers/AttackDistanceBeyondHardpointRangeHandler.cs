@@ -14,8 +14,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// <remarks>
 ///     <para>
 ///         Measured in the 2018 build. Movement closes to <c>Targeting_Max_Attack_Distance</c> plus the
-///         target's size - <c>MovementCoordinatorClass::Compute_Targeting_Approach_Distance</c> - and
-///         <c>HardPointClass::Attempt_Fire_At_Target</c> refuses a shot beyond the hardpoint's own
+///         target's size - the targeting approach-distance calculation - and
+///         <c>Attempt_Fire_At_Target</c> refuses a shot beyond the hardpoint's own
 ///         <c>Fire_Range_Distance</c> plus the target's soft radius. With the first above the second the
 ///         unit can stop where no hardpoint fires. The two pads differ and the hardpoint sits off the
 ///         unit's centre, so the message says CAN, not WILL. <c>Fire_Range_Distance</c> defaults to 0 in

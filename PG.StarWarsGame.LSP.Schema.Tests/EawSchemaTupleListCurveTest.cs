@@ -12,12 +12,12 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// <remarks>
 ///     <para>
 ///         The rule was adopted from three <c>Cost_Mod_By_*</c> messages in
-///         <c>NeutralizeHeroAbilityClass</c> and three curves in <c>SlicerAbilityClass</c>, so it
+///         <c>Neutralize_Hero_Ability</c> and three curves in <c>Slicer_Ability</c>, so it
 ///         was opted in on those six tags. That is where it came from, not where it applies.
 ///     </para>
 ///     <para>
-///         <c>DatabaseMapClass::Map_Data_Of_Type</c> asserts <c>counter >= 2</c> in the case for
-///         BOTH tuple-list type codes - <c>DatabaseMap.cpp:4990</c> for <c>0x2f FloatTupleList</c>
+///         the engine's tag-value mapper asserts <c>counter >= 2</c> in the case for
+///         BOTH tuple-list type codes - the engine registers <c>0x2f FloatTupleList</c>
 ///         and <c>:5030</c> for <c>0x30 IntFloatTupleList</c> - and on failure jumps straight to the
 ///         function exit. So it binds every tag of either type, whatever ability declares it, and
 ///         the six opt-ins were a sixth of the real reach.
@@ -60,7 +60,7 @@ public sealed class EawSchemaTupleListCurveTest
         Assert.True(seen >= 15, $"expected the tuple-list tags to still be there, found {seen}");
 
         Assert.True(missing.Count == 0,
-            "the engine asserts counter >= 2 for BOTH tuple-list type codes in Map_Data_Of_Type, so "
+            "the engine asserts counter >= 2 for BOTH tuple-list type codes in the engine's tag-value mapper, so "
             + "every tag of either type needs control-point-curve - these do not have it: "
             + string.Join(", ", missing));
     }

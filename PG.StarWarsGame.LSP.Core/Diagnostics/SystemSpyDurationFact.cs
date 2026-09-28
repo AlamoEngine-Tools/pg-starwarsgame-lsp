@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>SystemSpyAbilityClass::Validate_Data</c> (<c>0101dcdf</c>) branches on the style and
+///         the engine's load-time validation branches on the style and
 ///         demands the OPPOSITE sign in each arm: under <c>Galactic_Automatic</c> it complains when
 ///         <c>0.0 &lt;= duration</c> and writes <c>-1.0</c>; under <c>Ground_Activated</c> it
 ///         complains when <c>duration &lt;= 0.0</c> and writes <c>30.0</c>. Both comparisons are

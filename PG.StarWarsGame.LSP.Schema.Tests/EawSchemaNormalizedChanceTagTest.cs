@@ -18,9 +18,9 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 ///         initialises, and the engine says so in its own words:
 ///     </para>
 ///     <para>
-///         <c>Error: (%s) Absorb_Chance must be between 0 and 1.</c> (<c>01551084</c>),
-///         <c>Damage_Absorb_Percentage</c> (<c>01551044</c>), <c>Damage_Percentage</c>
-///         (<c>01551260</c>), <c>Block_Chance</c>, <c>Redirect_Chance</c>,
+///         <c>Error: (%s) Absorb_Chance must be between 0 and 1.</c>,
+///         <c>Damage_Absorb_Percentage</c>, <c>Damage_Percentage</c>
+///        , <c>Block_Chance</c>, <c>Redirect_Chance</c>,
 ///         <c>Activation_Chance</c>, <c>Chance_To_Succeed</c>,
 ///         <c>Chance_To_Be_Caught_Upon_Failure</c> and <c>Chance_To_Win</c>.
 ///     </para>

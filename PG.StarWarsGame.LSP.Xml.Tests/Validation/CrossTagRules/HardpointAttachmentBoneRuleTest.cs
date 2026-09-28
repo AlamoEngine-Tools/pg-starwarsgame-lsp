@@ -53,14 +53,14 @@ public sealed class HardpointAttachmentBoneRuleTest
     /// <remarks>
     ///     <para>
     ///         Measured in the 2018 binary.
-    ///         <c>HardPointClass::Get_Transformed_World_Position</c> (<c>009c92a0</c>) asserts
+    ///         the engine's world-position lookup asserts
     ///         <c>AttachmentBoneIndex &gt;= 0 || FireBoneAIndex &gt;= 0</c> and falls back to the
-    ///         fire bone when the attachment bone is absent - the error at <c>014d6160</c> fires
+    ///         fire bone when the attachment bone is absent - the error fires
     ///         only when BOTH are -1.
     ///     </para>
     ///     <para>
     ///         That is the whole basis of the rule: <c>HardPointClass::Take_Damage</c>
-    ///         (<c>009c8510</c>) never consults a bone at all - it checks <c>Is_Destroyable()</c>
+    ///         never consults a bone at all - it checks <c>Is_Destroyable()</c>
     ///         and health. A boneless hardpoint is indestructible because it has no world position
     ///         and so cannot be targeted, not because destruction reads the bone. Give it a fire
     ///         bone and it has a position again.

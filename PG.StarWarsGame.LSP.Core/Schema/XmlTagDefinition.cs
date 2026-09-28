@@ -61,7 +61,7 @@ public record XmlTagDefinition
     ///     <para>
     ///         The restriction belongs to the owning type, not to the enum: eleven ability classes
     ///         accept exactly one <c>Activation_Style</c> and say so in their own
-    ///         <c>Validate_Data</c> ("The only currently supported Activation_Style is
+    ///         the engine's load-time validation ("The only currently supported Activation_Style is
     ///         Galactic_Automatic."), while the same nine-value enum stays correct everywhere else
     ///         it appears.
     ///     </para>

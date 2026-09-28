@@ -8,7 +8,7 @@ using PG.StarWarsGame.LSP.Xml.Util;
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
 /// <summary>
-///     Reports an object that omits a tag its own <c>Validate_Data</c> refuses to run without.
+///     Reports an object that omits a tag its own the engine's load-time validation refuses to run without.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -22,7 +22,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///         Which element owns a requirement is taken from the xref to the engine's own message
 ///         string, never from where our schema happens to declare the tag. The two answers differ:
 ///         our schema carries <c>Bomb_Type</c> on three types and only
-///         <c>DemolitionAbilityClass::Validate_Data</c> demands it.
+///         the engine's load-time validation demands it.
 ///     </para>
 /// </remarks>
 public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
@@ -90,7 +90,7 @@ public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
     /// <remarks>
     ///     Most of these asserts are unconditional once the class is right, so the default is yes.
     ///     Some sit behind a test on the object's own data - a hardpoint's fire cone is demanded
-    ///     only after <c>Is_Weapon()</c> passes - and a rule that ignored the gate would report
+    ///     only after the is-a-weapon test passes - and a rule that ignored the gate would report
     ///     objects the engine never asks. Same shape as the gate on
     ///     <c>ForceHealingApplicableUnitsRule</c>.
     /// </remarks>

@@ -12,10 +12,10 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         MEASURED, the lower bound: <c>HardPointClass::Can_Weapon_Point_At</c> asserts
-///         <c>Get_Fire_Cone_Width() &gt; 0.0f</c> (<c>HardPoint.cpp:1857</c>) and the same for the
+///         MEASURED, the lower bound: the weapon-aim test asserts
+///         a fire-cone width above zero and the same for the
 ///         height (<c>:1858</c>), and the non-turret branch then tests
-///         <c>Get_Fire_Cone_Width() / 2.0 &lt; |yaw|</c>. At zero that test rejects every bearing
+///         half the cone width against the bearing. At zero that test rejects every bearing
 ///         off dead centre, so the hardpoint can point at nothing.
 ///     </para>
 ///     <para>

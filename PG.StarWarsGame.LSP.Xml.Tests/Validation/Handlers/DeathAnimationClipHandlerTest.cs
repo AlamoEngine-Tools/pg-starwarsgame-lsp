@@ -14,8 +14,8 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Measured in the 2018 build. <c>DeathBehaviorClass::Init</c> plays the type at
-///         <c>Specific_Death_Anim_Index</c> (unset: a random take). <c>ModelClass::Set_Active_Animation_Type</c>
+///         Measured in the 2018 build. <c>Init</c> plays the type at
+///         <c>Specific_Death_Anim_Index</c> (unset: a random take). the active-animation setter
 ///         returns false, without an assert, when the model has no take at that index. On that failure, with
 ///         <c>Remove_Upon_Death</c> set and no spin-away, the object is destroyed at once; otherwise it simply
 ///         plays no death animation.

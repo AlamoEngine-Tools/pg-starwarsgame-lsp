@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// <remarks>
 ///     <para>
 ///         From the assert seam rather than from any engine message - there is no message.
-///         <c>GameConstants.cpp:1170</c> states <c>DamageTypeNames[ 0 ] == "Damage_Default"</c> and
+///         The engine states <c>DamageTypeNames[ 0 ] == "Damage_Default"</c> and
 ///         <c>:1180</c> states <c>ArmorTypeNames[ 0 ] == "Armor_Default"</c>, both assert-shaped, so
 ///         the expression is the condition that must hold.
 ///     </para>

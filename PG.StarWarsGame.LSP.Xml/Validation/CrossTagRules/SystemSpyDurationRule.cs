@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>SystemSpyAbilityClass::Validate_Data</c> (<c>0101dcdf</c>) demands the opposite sign
+///         the engine's load-time validation demands the opposite sign
 ///         in each arm: <c>Galactic_Automatic</c> complains when <c>0.0 &lt;= duration</c> and
 ///         repairs to <c>-1.0</c>, <c>Ground_Activated</c> complains when <c>duration &lt;= 0.0</c>
 ///         and repairs to <c>30.0</c>. Zero is refused by both, which the comparisons say and the

@@ -11,14 +11,14 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>GameObjectTypeClass::Get_Fires_Forward</c> has one caller,
-///         <c>WeaponBehaviorClass::Calculate_Projectile_Facing</c>, reached only from the WEAPON
-///         behaviour's <c>Fire_Projectile</c>. Hardpoints fire through <c>HardPoint.cpp</c> and never call
+///         the Fires_Forward reading has one caller,
+///         the projectile-facing calculation, reached only from the WEAPON
+///         behaviour's <c>Fire_Projectile</c>. Hardpoints fire through their own path and never call
 ///         it. So on an object without WEAPON the flag does nothing - zero such objects in eaw/ and foc/.
 ///     </para>
 ///     <para>
-///         With WEAPON it returns before <c>Is_In_Cone_Of_Fire</c>, the firing-side reader of the four
-///         turret-extent tags, so those stop limiting the shot. <c>TurretBehaviorClass</c> reads the same
+///         With WEAPON it returns before the cone-of-fire test, the firing-side reader of the four
+///         turret-extent tags, so those stop limiting the shot. the TURRET behaviour reads the same
 ///         tags to swing the turret, which is why the message changes when the object has a TURRET.
 ///         Vanilla does this once per game (<c>Y-Wing_Bombing_Run</c>) with a comment saying it means to.
 ///     </para>

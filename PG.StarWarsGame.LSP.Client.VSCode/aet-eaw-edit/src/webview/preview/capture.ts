@@ -30,7 +30,7 @@ function square(side: number, what: string): CaptureSize {
 /**
  * The sizes the game's icons are, measured from Mt_commandbar.mtd (eaw and foc) - the individual
  * icons, not the atlas page, which is the only power of two involved. The large icons are the
- * command bar's `big_` + Icon_Name lookup (measured, CommandBarClass::Setup_List_Button): a side
+ * command bar's `big_` + Icon_Name lookup (measured, Setup_List_Button): a side
  * of 52 or more doubles the slot that way, so a large icon is 100x50 or 100x100.
  */
 export const CAPTURE_SIZES: readonly CaptureSize[] = [
@@ -100,7 +100,7 @@ export function captureFileName(subject: string, width: number, height: number):
  * null when the size is not one of the unit's icons or the subject names no icon.
  *
  * The build icon is Icon_Name itself, and the engine finds the large one as `big_` + Icon_Name and
- * nothing else (CommandBarClass::Setup_List_Button), so a capture named any other way has to be
+ * nothing else (Setup_List_Button), so a capture named any other way has to be
  * renamed before the game can use it. The icon's own extension goes: the file written is a png,
  * whatever the icon is packed as.
  */

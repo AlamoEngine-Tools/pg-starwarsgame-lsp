@@ -35,7 +35,7 @@ export interface HullPool {
 /**
  * The combined hardpoint pool: every DESTROYABLE hardpoint's health, summed.
  *
- * This is the sum the engine divides by in `Get_Combined_Hard_Point_Health_Percent`, so it is a
+ * This is the sum the engine divides by in the combined hardpoint-health reading, so it is a
  * denominator rather than a hull. A hardpoint with no declared `Health` contributes nothing to
  * either end. 210 of foc's hardpoints declare none, and they are INDESTRUCTIBLE rather than already
  * dead - counting a null as a zero would open every such ship at less than full strength.
@@ -103,7 +103,7 @@ export function hullPool(
 /**
  * Whether the unit is finished.
  *
- * The hull is what dies: `Take_Direct_Damage` is the only route to `Kill`. Destroying every
+ * The hull is what dies: the direct-damage path is the only route to `Kill`. Destroying every
  * destroyable hardpoint is a second route ONLY when
  * `Should_Be_Destroyed_When_All_Hardpoints_Destroyed` says so, and even then the engine spends it by
  * setting the hull to zero rather than by killing the object directly.

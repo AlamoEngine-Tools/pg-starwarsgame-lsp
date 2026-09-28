@@ -12,8 +12,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>Validate_Respawn_Times</c>, shared by <c>SlicerAbilityClass</c> (<c>00f1ed76</c>) and
-///         <c>BlackMarketAbilityClass</c> (<c>00f213d6</c>), makes three checks in sequence and
+///         the engine's respawn-list check, shared by <c>Slicer_Ability</c> and
+///         <c>Black_Market_Ability</c>, makes three checks in sequence and
 ///         returns false at the first failure. The caller then CLEARS both the min and max lists, so
 ///         one bad entry costs the whole table and the ability silently loses its respawn feature.
 ///     </para>

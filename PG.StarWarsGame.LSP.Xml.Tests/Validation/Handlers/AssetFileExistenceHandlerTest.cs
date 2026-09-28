@@ -349,11 +349,10 @@ public sealed class AssetFileExistenceHandlerTest
     public void Map_Absent_IsAnError_NotAWarning()
     {
         // #132. A missing map is not a degraded battle, it is no battle: measured in the 2018 build,
-        // GameModeClass::Load_Named_Map retries with the resolved map path and a .ted extension, and
-        // when the file still will not open it calls Assert_Handler("false", "GameMode.cpp", 0x8db)
-        // and returns false. The hardcoded _Desert_L5_01.ted / _Space_Temperate1.ted defaults sit on
-        // the EMPTY-name path in Transition_To_Sub_Mode, not on this one, so nothing stands in for a
-        // map that was named and is not there.
+        // the engine retries with the resolved map path and a .ted extension, and when the file
+        // still will not open it asserts and returns false. The hardcoded _Desert_L5_01.ted /
+        // _Space_Temperate1.ted defaults sit on the EMPTY-name path, not on this one, so nothing
+        // stands in for a map that was named and is not there.
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.MapFile), "missing.ted");
         var ctx = CtxWith("data/maps/skirmish.ted");
 

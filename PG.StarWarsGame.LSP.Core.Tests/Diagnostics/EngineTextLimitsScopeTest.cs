@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>DatabaseMapClass::Map_Data_Of_Type</c> is one switch on the type code
+///         the engine's tag-value mapper is one switch on the type code
 ///         (<c>CMP 0x52; JA default; JMP [ECX*4 + 0xcbbed4]</c>, 83 entries), so the
 ///         <c>strtok_string_buffer</c> copy belongs to individual CASES rather than to the function.
 ///         Mapping all 50 assert sites through that jump table gives 50 of the 83 codes, every one

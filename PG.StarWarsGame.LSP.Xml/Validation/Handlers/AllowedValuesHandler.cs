@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// <remarks>
 ///     <para>
 ///         Several ability classes accept exactly one value for a tag and say so in their own
-///         <c>Validate_Data</c>: nine name a single <c>Activation_Style</c>, and
+///         the engine's load-time validation: nine name a single <c>Activation_Style</c>, and
 ///         <c>GalacticSabotageAbility</c> demands <c>Causes_Despawn</c> be Yes. In every case the
 ///         engine REPAIRS the object rather than refusing it, so the ability runs on a value the
 ///         author did not write and nothing on screen says so.

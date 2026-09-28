@@ -732,8 +732,8 @@ export class PreviewViewport {
      * The subject's GEOMETRY, carrying the object's `Scale_Factor`.
      *
      * Between `modelRoot` and the parts rather than on `modelRoot` itself, and the split is the
-     * engine's own. `GameObjectClass::Update_Transform` puts no scale in the object's world matrix
-     * and then calls `Model->Set_Scale`, so the scale belongs to the MODEL: geometry and bones are
+     * engine's own. the engine's transform update puts no scale in the object's world matrix
+     * and then calls `Model->the model-scale setter`, so the scale belongs to the MODEL: geometry and bones are
      * model units and reach the world multiplied by it, while positions - and every range the XML
      * declares - are already world units.
      *
@@ -820,8 +820,8 @@ export class PreviewViewport {
     /**
      * The light probe the translated shaders read, kept in step with the rig.
      *
-     * ALL of their diffuse lighting, not an ambient on top of it - `MeshAlpha.fx:53` sets the whole
-     * vertex colour from `Sph_Compute_Diffuse_Light_All` and has no N.L anywhere. So the sun and
+     * ALL of their diffuse lighting, not an ambient on top of it - `MeshAlpha.fx` sets the whole
+     * vertex colour from the spherical-harmonic probe and has no N.L anywhere. So the sun and
      * both fills go in here or they do not reach a Game-mode surface at all, which is what a flat
      * probe built from the ambient alone was doing: 0.1 grey over the entire model, unshaded.
      *
@@ -2942,10 +2942,10 @@ export class PreviewViewport {
             // Which frame the arc is measured in is the engine's choice, not ours, and the two
             // firing paths disagree:
             //
-            //   bone - HardPointClass::Can_Weapon_Point_At measures in the hardpoint's OWN
+            //   bone - the weapon-aim test measures in the hardpoint's OWN
             //          coordinate system, so the bone's rotation IS the aim and parenting to it is
             //          exactly right.
-            //   hull - WeaponBehaviorClass::Is_In_Cone_Of_Fire reads the muzzle matrix for its
+            //   hull - the cone-of-fire test reads the muzzle matrix for its
             //          TRANSLATION and then discards the rotation, rebuilding the frame from
             //          owner->Get_Facing(). The arc starts at the bone and points where the HULL
             //          points, so a rotated MuzzleA must not carry it round.
@@ -3149,7 +3149,7 @@ export class PreviewViewport {
      * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest.
      *
      * Two axes and no third: the engine has no roll on a turret -
-     * `Calculate_Desired_Turret_Angle` returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
+     * the turret-angle calculation returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
      *
      * Each track spans only what the engine allows, so the stop is visible before it is reached.
      * Which turrets these are is {@link turretHandles}' decision, off the arc toggle, and not this

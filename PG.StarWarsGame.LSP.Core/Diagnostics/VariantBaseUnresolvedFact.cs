@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// <remarks>
 ///     <para>
 ///         The engine's one completely silent variant failure.
-///         <c>GameObjectTypeManagerClass::Overlay_Object_Type</c> gives up and returns false, and
+///         <c>Overlay_Object_Type</c> gives up and returns false, and
 ///         the caller ignores the return value - no assert, no warning, nothing in the log. The
 ///         object still loads, carrying only the tags the author wrote, so everything it expected
 ///         to inherit is simply missing and the only symptom is a unit behaving like a blank slate.

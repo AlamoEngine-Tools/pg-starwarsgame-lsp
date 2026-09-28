@@ -12,15 +12,15 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The ability half is an engine assert. <c>VehicleThiefBehaviorClass::Begin_Stealing_Vehicle</c>
-///         asserts the clone has <c>EJECT_VEHICLE_THIEF</c> (<c>VehicleThiefBehavior.cpp:0x112</c>) and
+///         The ability half is an engine assert. the vehicle-theft entry point
+///         asserts the clone has <c>EJECT_VEHICLE_THIEF</c> and
 ///         activates the eject only when it does, so without it the thief can never get out. All 18
 ///         clones vanilla points at carry it.
 ///     </para>
 ///     <para>
 ///         The behaviour half is the tag's documented requirement. The capture never reads
 ///         <c>GARRISON_VEHICLE</c>, but it loads the thief into the vehicle's flagship container, and
-///         <c>GarrisonableBehaviorClass::Garrison_Unit</c> loads garrisoned units into that same
+///         <c>Garrison_Unit</c> loads garrisoned units into that same
 ///         container. Two vanilla clones - <c>F9TZ_Cloaking_Transport_Captured</c> and
 ///         <c>HAV_Juggernaut_Captured</c> - inherit the behaviour from their base and are reported; what
 ///         a garrison beside the thief actually does in play is not measured, so the message states the

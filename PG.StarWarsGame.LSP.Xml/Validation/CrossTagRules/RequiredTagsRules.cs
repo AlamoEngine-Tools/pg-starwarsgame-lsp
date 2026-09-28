@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>DemolitionAbilityClass::Validate_Data</c> refers to the message at <c>01552660</c>:
+///         the engine's load-time validation refers to an engine message:
 ///         <c>You must specify a Bomb_Type. Defaulting to "Demolition_Bomb".</c> The engine
 ///         repairs rather than refuses, so the ability runs and spawns a bomb type the author
 ///         never chose.
@@ -37,10 +37,10 @@ public sealed class DemolitionBombTypeRule : RequiredTagsRuleBase
 ///     An attack ability with no animation to play.
 /// </summary>
 /// <remarks>
-///     <c>Error: (%s) You must specify an Attack_Animation!</c> (<c>0155122c</c>), referenced by
-///     exactly three classes: <c>ArcSweepAttackAbilityClass</c> (<c>00ff5e4b</c>),
-///     <c>GenericAttackAbilityClass</c> (<c>0100a95b</c>) and <c>EatAttackAbilityClass</c>
-///     (<c>0100046b</c>). All 19 shipped instances across <c>eaw/</c> and <c>foc/</c> set the tag,
+///     <c>Error: (%s) You must specify an Attack_Animation!</c>, referenced by
+///     exactly three classes: <c>ArcSweepAttackAbilityClass</c>,
+///     <c>GenericAttackAbilityClass</c> and <c>EatAttackAbilityClass</c>
+///    . All 19 shipped instances across <c>eaw/</c> and <c>foc/</c> set the tag,
 ///     so the base game agrees with the engine and the rule is silent on vanilla data.
 /// </remarks>
 public sealed class ArcSweepAttackAnimationRule : RequiredTagsRuleBase
@@ -70,7 +70,7 @@ public sealed class EatAttackAnimationRule : RequiredTagsRuleBase
 ///     A bounty with nobody to collect it from.
 /// </summary>
 /// <remarks>
-///     <c>BountyOnFactionAbilityClass::Validate_Data</c> (<c>00ff8a10</c>) warns when the faction
+///     the engine's load-time validation warns when the faction
 ///     list is empty. Its message says <c>Target_Factions</c>, which is a stale field name - the
 ///     parser table registers <c>Target_Faction_Names</c>, and that is what the XML takes.
 /// </remarks>
@@ -85,7 +85,7 @@ public sealed class BountyTargetFactionsRule : RequiredTagsRuleBase
 ///     A garrison upgrade that adds no units.
 /// </summary>
 /// <remarks>
-///     <c>GarrisonUpgradeAbilityClass::Validate_Data</c> (<c>0100a35e</c>) counts the list and warns
+///     the engine's load-time validation counts the list and warns
 ///     at zero: "otherwise this ability has no effect".
 /// </remarks>
 public sealed class GarrisonUpgradeUnitsRule : RequiredTagsRuleBase
@@ -132,14 +132,14 @@ public sealed class RemoteBombTossAnimationRule : RequiredTagsRuleBase
 /// <remarks>
 ///     <para>
 ///         From the ASSERT seam rather than an engine message.
-///         <c>HardPointClass::Can_Weapon_Point_At</c> asserts
-///         <c>Data-&gt;Get_Fire_Cone_Width() &gt; 0.0f</c> (<c>HardPoint.cpp:0x741</c>) and the same
+///         the weapon-aim test asserts
+///         <c>Data-&gt;the fire-cone width reading &gt; 0.0f</c> and the same
 ///         for the height (<c>:0x742</c>) before it does anything else, and
 ///         <c>HardPointDataClass</c>'s constructor leaves both at <c>0.0</c>. The default therefore
 ///         cannot satisfy the check: a weapon hardpoint that declares neither can point at nothing.
 ///     </para>
 ///     <para>
-///         Gated on <c>Type</c> because the asserts sit behind <c>Is_Weapon()</c>. A shield
+///         Gated on <c>Type</c> because the asserts sit behind the is-a-weapon test. A shield
 ///         generator, an engine or a fighter bay is never asked for a cone, and demanding one would
 ///         report objects the engine does not look at - 118 of the 557 shipped hardpoints.
 ///     </para>

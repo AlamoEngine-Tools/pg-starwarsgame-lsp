@@ -11,7 +11,7 @@ import { isDeployedClip, weaponsInState } from './deployedState';
 describe('isDeployedClip', () => {
     /**
      * The engine is deployed only in `LST_WALK_DEPLOYED` - after the deploy has run, not while it runs
-     * (`Is_Deploying`). So the deploy clip counts once it has played to its end and is held there.
+     * (the is-deploying test). So the deploy clip counts once it has played to its end and is held there.
      */
     it('counts the deploy clip only once it is held at its end', () => {
         assert.equal(isDeployedClip({ action: 'deploy', stance: 'normal' }, false), false);

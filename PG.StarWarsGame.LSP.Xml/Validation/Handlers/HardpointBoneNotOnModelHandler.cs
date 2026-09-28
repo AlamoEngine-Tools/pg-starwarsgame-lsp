@@ -43,11 +43,11 @@ public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<Hardp
         // Collision_Mesh says what the mismatch COSTS, because the obvious reading - nothing can hit
         // the hardpoint - is wrong. GameObjectClass::Take_Damage replaces the name it looks a hardpoint
         // up by with the hardpoint's OWN Collision_Mesh when a hit is aimed at it, and on land with the
-        // nearest live targetable hardpoint's (Find_Closest_Hard_Point, SUB_GAME_MODE_LAND); the exact
+        // nearest live targetable hardpoint's (the closest-hardpoint search, SUB_GAME_MODE_LAND); the exact
         // _stricmp then matches that value against itself. So aimed fire and land projectiles land: the
         // Gargantuan's eight hardpoints all write such a name and still die. Only untargeted space fire
         // is looked up by the struck renderable's name, and that is always a mesh name
-        // (alRenderableMesh::Get_Name, vtable slot 0x18) - a name on no model never comes back.
+        // (Get_Name, vtable slot 0x18) - a name on no model never comes back.
         //
         // "Does not exist" is kept on purpose: the hardpoint E2E smoke test keys on it.
         var message = $"<{fact.TagName}> names '{fact.BoneName}', which does not exist as a mesh or a bone "

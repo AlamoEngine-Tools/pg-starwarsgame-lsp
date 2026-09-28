@@ -7,8 +7,8 @@
 // carry their meaning in semantics; GLSL ES has `main()`, interface variables of basic types only,
 // a declared fragment output, and `gl_Position`. This bridges the two.
 
-import { translateHlslBody } from './hlsl';
-import { bindField } from './attributes';
+import {translateHlslBody} from './hlsl';
+import {bindField} from './attributes';
 import {
     fillEmptyFunctions, fixBooleanConditions, fixReturnWidths, fixVectorTruncation, zeroFor,
     zeroStructCasts,
@@ -36,10 +36,10 @@ export function findStructs(source: string): HlslStruct[] {
 
         for (const field of match[2].matchAll(
             /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*([A-Za-z_][A-Za-z0-9_]*))?\s*;/g)) {
-            fields.push({ type: field[1], name: field[2], semantic: field[3] });
+            fields.push({type: field[1], name: field[2], semantic: field[3]});
         }
 
-        structs.push({ name: match[1], fields });
+        structs.push({name: match[1], fields});
     }
 
     return structs;
@@ -82,7 +82,7 @@ export function resolveShaderHandle(source: string, name: string): ShaderHandle 
     const match = pattern.exec(source);
     if (match === null) {
         // Not a handle: some effects name the function directly.
-        return { entry: name, args: [] };
+        return {entry: name, args: []};
     }
 
     return {
@@ -181,9 +181,9 @@ export function stripFxScaffolding(source: string): string {
 /**
  * Makes the vertex-packing helpers do nothing, because our attributes arrive already unpacked.
  *
- * The RSkin vertex formats store UVs and normals as SCALED SHORTS - `Unpack_UV` divides by 4096,
- * `Unpack_Normal` by 16384 - and the shaders call them on the way in. The ALO reader decodes those
- * fields when it builds the glTF, so by the time the attribute reaches this shader it is already a
+ * The RSkin vertex formats store UVs and normals as SCALED SHORTS - the UV helper divides by 4096
+ * and the normal helper by 16384 - and the shaders call them on the way in. The ALO reader decodes
+ * those fields when it builds the glTF, so by the time the attribute reaches this shader it is a
  * real UV and a real unit normal. Leaving the division in place shrinks every UV to a 4096th of
  * itself: the whole mesh samples a single texel and draws as one flat colour, which is exactly how
  * the skinned models looked.
@@ -204,7 +204,7 @@ function removeBlocks(text: string, header: RegExp): string {
     let cursor = 0;
 
     header.lastIndex = 0;
-    for (;;) {
+    for (; ;) {
         header.lastIndex = cursor;
         const match = header.exec(text);
         if (match === null) {
@@ -223,7 +223,10 @@ function removeBlocks(text: string, header: RegExp): string {
                 depth++;
             } else if (text[i] === '}') {
                 depth--;
-                if (depth === 0) { close = i; break; }
+                if (depth === 0) {
+                    close = i;
+                    break;
+                }
             }
         }
 
@@ -292,7 +295,7 @@ function declareSemanticUniforms(source: string): string {
     let out = '';
     let cursor = 0;
 
-    for (;;) {
+    for (; ;) {
         declaration.lastIndex = cursor;
         const match = declaration.exec(source);
         if (match === null) {
@@ -384,7 +387,7 @@ function translateUnit(hlsl: string, handleName: string): TranslationUnit | Glsl
 
     const entry = findEntry(hlsl, handle.entry);
     if (entry === null) {
-        return { source: null, refusal: `No entry point named '${handle.entry}'.` };
+        return {source: null, refusal: `No entry point named '${handle.entry}'.`};
     }
 
     const struct = findStructs(hlsl).find(s => s.name === entry.parameterType);
@@ -446,7 +449,7 @@ export function buildFragmentShader(hlsl: string, handleName: string): GlslProgr
         return unit;
     }
 
-    const { handle, entry, struct, fields, body } = unit;
+    const {handle, entry, struct, fields, body} = unit;
 
     // Everything except the POSITION field, which the vertex stage delivers through `gl_Position`
     // rather than as a varying. Measured across the corpus: all thirty pixel entries take a struct
@@ -485,7 +488,7 @@ export function buildFragmentShader(hlsl: string, handleName: string): GlslProgr
         `    ${struct.name} ${entry.parameterName};`,
         assignments,
         `    ${FRAGMENT_OUTPUT} = ${handle.entry}(`
-            + [entry.parameterName, ...handle.args].join(', ') + ');',
+        + [entry.parameterName, ...handle.args].join(', ') + ');',
         '',
         // `AlphaFunc = Greater` in every alpha-tested effect the game ships, so the fragment
         // survives only above the reference.
@@ -494,7 +497,7 @@ export function buildFragmentShader(hlsl: string, handleName: string): GlslProgr
         '',
     ].join('\n');
 
-    return { source, refusal: null };
+    return {source, refusal: null};
 }
 
 /**
@@ -514,7 +517,7 @@ export function buildVertexShader(hlsl: string, handleName: string): GlslProgram
         return unit;
     }
 
-    const { handle, entry, struct, fields, body } = unit;
+    const {handle, entry, struct, fields, body} = unit;
 
     const outputStruct = findStructs(hlsl).find(s => s.name === entry.returnType);
     if (outputStruct === undefined) {
@@ -575,16 +578,16 @@ export function buildVertexShader(hlsl: string, handleName: string): GlslProgram
         '{',
         // Zero-initialised, so a field no attribute feeds is a defined zero rather than garbage.
         `    ${struct.name} ${entry.parameterName} = ${struct.name}(`
-            + fields.map(field => zeroFor(field.glslType)).join(', ') + ');',
+        + fields.map(field => zeroFor(field.glslType)).join(', ') + ');',
         fills.join('\n'),
         '',
         `    ${entry.returnType} Out = ${handle.entry}(`
-            + [entry.parameterName, ...handle.args].join(', ') + ');',
+        + [entry.parameterName, ...handle.args].join(', ') + ');',
         carried.map(field => `    v_${field.name} = Out.${field.name};`).join('\n'),
         `    gl_Position = Out.${position.name};`,
         '}',
         '',
     ].join('\n');
 
-    return { source, refusal: null };
+    return {source, refusal: null};
 }

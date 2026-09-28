@@ -257,7 +257,7 @@ public sealed class EffectiveObjectResolverTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Measured in <c>DatabaseMapClass::Map_Data_Of_Type</c>: the 17 additive type codes
+    ///         Measured in the engine's tag-value mapper: the 17 additive type codes
     ///         push into a plain vector with no reset and no membership test on either path, so the
     ///         engine's list really does carry the repeat. Nothing in the engine ever removes one.
     ///     </para>

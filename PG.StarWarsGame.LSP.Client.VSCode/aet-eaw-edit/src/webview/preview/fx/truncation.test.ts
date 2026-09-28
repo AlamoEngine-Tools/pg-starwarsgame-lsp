@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { collectFunctions, collectGlobals, collectStructs, inferType } from './glslTypes';
-import { fixBooleanConditions, fixVectorTruncation, narrowExpression } from './truncation';
+import {collectFunctions, collectGlobals, collectStructs, inferType} from './glslTypes';
+import {fixBooleanConditions, fixVectorTruncation, narrowExpression} from './truncation';
 
 const SOURCE = `
 uniform vec4 m_light0Vector;
@@ -239,8 +239,9 @@ VS_OUTPUT vs_main(VS_INPUT In)
 });
 
 describe('fixVectorTruncation, with the unit`s own helpers', () => {
-    // `Compute_Fog(float3)` returns a float. Guessing that a call has the type of its first argument
-    // - true for the componentwise intrinsics - made this a vec3 and hung a `.x` on a scalar.
+    // The fog helper takes a float3 and returns a float. Guessing that a call has the type of its
+    // first argument - true for the componentwise intrinsics - made this a vec3 and hung a `.x` on
+    // a scalar.
     const HELPER_SOURCE = `
 struct VS_OUTPUT
 {

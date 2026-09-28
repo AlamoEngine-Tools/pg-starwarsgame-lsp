@@ -4,7 +4,7 @@
 // Manual turret control: two axes, their legal stops, and where the reader has pointed a turret.
 //
 // The instrument is Blender's, reduced to what this engine actually has. Two axes and not three,
-// because a turret has no roll: `Calculate_Desired_Turret_Angle` builds its answer as
+// because a turret has no roll: the turret-angle calculation builds its answer as
 // `Vector3(0.0, pitch, yaw)` and the X component is a literal zero.
 //
 // Everything here is the CLAMP, not the arc. They are different envelopes and that is the whole
@@ -20,7 +20,7 @@ export type TurretAxis = 'yaw' | 'pitch';
 /**
  * The extent at or above which the engine applies no stop at all.
  *
- * `HardPointClass::Calculate_Desired_Turret_Angle` gates BOTH clamps on
+ * the turret-angle calculation gates BOTH clamps on
  * `extent < 180.0 && extent > 0.0`, so the band that actually clamps is open at both ends.
  */
 const CLAMP_BAND_MAX = 180;
@@ -53,7 +53,7 @@ export interface TurretAxisRange {
  * - `extent <= 0` - ALSO no clamp. The gate excludes it, so the desired angle passes through
  *   untouched and the bone turns freely.
  *
- * That last case disagrees with the FIRING gate, where `Can_Weapon_Point_At` refuses any bearing
+ * That last case disagrees with the FIRING gate, where the weapon-aim test refuses any bearing
  * with `extent < |yaw|` and an extent of zero therefore refuses everything off dead centre. A
  * turret authored at zero would turn freely and be unable to shoot anywhere it turned. Nothing in
  * `eaw/` or `foc/` authors one - all 7 turret hardpoints declare an extent - and the preview does
@@ -210,9 +210,9 @@ function axisText(label: string, range: TurretAxisRange, degrees: number): strin
 /**
  * The two envelopes a TURRET hardpoint keeps, which are not the same shape.
  *
- * This is what manual control is for. `Can_Weapon_Point_At`'s turret branch tests the yaw extent
+ * This is what manual control is for. the weapon-aim test's turret branch tests the yaw extent
  * and NOTHING else - there is no pitch test on the shot at all - while
- * `Calculate_Desired_Turret_Angle` clamps both. So the barrel is elevation-limited and the shot is
+ * the turret-angle calculation clamps both. So the barrel is elevation-limited and the shot is
  * not, which is the opposite way round from what the tag names suggest and is invisible unless the
  * two are drawn apart.
  */

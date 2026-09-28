@@ -121,8 +121,8 @@ const FRAMES_PER_SECOND = 1 / ALAMO_FRAME_SECONDS;
  *
  * The unit is INFERRED, and the inference is worth stating. What is measured is the frame length
  * above, and that the engine's own accessors for data-driven rates of this kind are named for the
- * frame - `GameObjectTypeClass::Get_Projectile_Acceleration_Per_Frame`,
- * `HardPointDataClass::Get_Repair_Amount_Per_Frame` - and that a debris lifetime is stored as an
+ * frame - the per-frame projectile acceleration,
+ * the per-frame repair amount - and that a debris lifetime is stored as an
  * expiration FRAME (`DEBRIS_LIFETIME_EXPIRATION_FRAME_MICRO_CHUNK`), so seconds are converted to
  * frames somewhere. The same reading applies to `Max_Speed`, where it is the only one that makes
  * sense of a turbolaser bolt declaring 25 against 2200 units of flight: 88 seconds per shot as

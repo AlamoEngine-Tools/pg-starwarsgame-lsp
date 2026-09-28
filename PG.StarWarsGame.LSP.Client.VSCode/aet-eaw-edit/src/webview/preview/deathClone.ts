@@ -97,9 +97,9 @@ export interface SweepPose {
  *
  * The extents are PLUS-OR-MINUS bounds, so a 90-degree extent swings 90 EITHER SIDE of rest - a
  * 180-degree sweep. The engine is explicit about it in two places:
- * `HardPointClass::Calculate_Desired_Turret_Angle` builds `min = -extent` (an `FCHS` on the value it
- * just read) and `max = +extent` and clamps between them, and both `Can_Weapon_Point_At` and
- * `Is_In_Cone_Of_Fire` refuse only when `extent < |yaw|`. Nothing halves it.
+ * the turret-angle calculation builds `min = -extent` (an `FCHS` on the value it
+ * just read) and `max = +extent` and clamps between them, and both the weapon-aim test and
+ * the cone-of-fire test refuse only when `extent < |yaw|`. Nothing halves it.
  *
  * That is the opposite of `Fire_Cone_Width`, which the engine DOES halve - the two conventions sit
  * on adjacent tags and an earlier reading of this function halved the wrong one, costing every
@@ -115,7 +115,7 @@ export interface SweepPose {
 /**
  * The extent at which a traverse stops having end stops.
  *
- * The engine's own threshold: `Calculate_Desired_Turret_Angle` skips its clamp entirely once the
+ * The engine's own threshold: the turret-angle calculation skips its clamp entirely once the
  * extent reaches this, since plus or minus 180 is already the whole circle.
  */
 const CONTINUOUS_TURN_DEGREES = 180;

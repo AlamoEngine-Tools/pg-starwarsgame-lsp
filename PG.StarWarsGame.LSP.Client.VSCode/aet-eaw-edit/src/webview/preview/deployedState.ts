@@ -4,8 +4,8 @@
 // The deployed state, and what it does to a unit's arcs (P5).
 //
 // Measured in the 2018 build: only a unit with `Deploys` and the walk locomotor is ever deployed, and
-// `WalkLocomotorBehaviorClass::Is_Deployed` answers yes in `LST_WALK_DEPLOYED` alone - after the deploy
-// has played, not while it plays. While it does, the shot, the turret's swing and `Can_Point_At` all read
+// the is-deployed test answers yes in `LST_WALK_DEPLOYED` alone - after the deploy
+// has played, not while it plays. While it does, the shot, the turret's swing and the aim test all read
 // `Deployed_Turret_*_Extent_Degrees`, whose defaults are 360 / 180. So the AT-AT's 55 / 60 arc becomes no
 // limit at all, and 19 foc and 8 eaw deploying walkers are in that shape.
 //
@@ -20,7 +20,7 @@ import type { AnimationAction } from './animationNames';
  * Whether the clip on the playhead shows the unit deployed.
  *
  * A `deployed_*` clip is played in the state, wherever its playhead is. The deploy clip itself is the way
- * IN, so it counts only once it is held at its end - mid-clip the engine reports `Is_Deploying`, not
+ * IN, so it counts only once it is held at its end - mid-clip the engine reports the is-deploying test, not
  * deployed. The undeploy clip is the way out and never counts.
  */
 export function isDeployedClip(

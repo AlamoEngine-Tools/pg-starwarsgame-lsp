@@ -12,15 +12,14 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     <para>
 ///         From the ASSERT seam rather than an engine message - these two say nothing at runtime, so
 ///         neither message harvest could have found them.
-///         <c>Abilities\GrenadeAttackAbility.cpp:440</c> (<c>0100bcad</c>) and
-///         <c>Abilities\RemoteBombAbility.cpp:388</c> (<c>0102b056</c>) both read
-///         <c>!type-&gt;Is_Projectile_Grenade()</c>, and the branch settles the polarity: the assert
+///         The grenade ability and the remote bomb ability both test the projectile the same way,
+///         and the branch settles the polarity: the assert
 ///         fires when the call returns FALSE, so the text states the FAILURE and the rule is its
 ///         opposite. Reading the expression alone would have produced exactly the wrong rule.
 ///     </para>
 ///     <para>
-///         The property is one comparison - <c>GameObjectTypeClass::Is_Projectile_Grenade</c>
-///         (<c>009a7520</c>) is <c>ProjCategory == PROJECTILE_CATEGORY_GRENADE</c> - so the check is
+///         The property is one comparison - the is-a-grenade test
+///         is <c>ProjCategory == PROJECTILE_CATEGORY_GRENADE</c> - so the check is
 ///         the target's <c>Projectile_Category</c> and nothing more.
 ///     </para>
 ///     <para>

@@ -14,7 +14,7 @@ using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.CrossTagRules;
 
 /// <summary>
-///     The three rules in <c>IncomeStreamAbilityClass::Validate_Data</c> (<c>0100f6a0</c>).
+///     The three rules in the engine's load-time validation.
 /// </summary>
 /// <remarks>
 ///     <para>

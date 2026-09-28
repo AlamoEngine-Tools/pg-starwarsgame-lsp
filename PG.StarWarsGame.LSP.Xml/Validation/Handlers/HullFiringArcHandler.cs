@@ -14,10 +14,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>WeaponBehaviorClass::Is_In_Cone_Of_Fire</c> refuses a shot whose yaw exceeds
+///         the cone-of-fire test refuses a shot whose yaw exceeds
 ///         <c>Turret_Rotate_Extent_Degrees</c> or whose pitch exceeds <c>Turret_Elevate_Extent_Degrees</c> -
 ///         the deployed pair while deployed, and no pitch test at all with <c>Turret_XY_Only</c> - measured
-///         from the object's own facing. Its only other reader is <c>TurretBehaviorClass</c>. Without the
+///         from the object's own facing. Its only other reader is the TURRET behaviour. Without the
 ///         TURRET behaviour, then, tags named for a turret restrict where the hull can shoot.
 ///     </para>
 ///     <para>

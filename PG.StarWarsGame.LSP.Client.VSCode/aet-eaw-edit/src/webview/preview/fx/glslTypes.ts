@@ -34,7 +34,7 @@ export function componentCount(type: GlslType | null): number {
     }
 }
 
-const VECTOR_BY_COUNT: Record<number, GlslType> = { 1: 'float', 2: 'vec2', 3: 'vec3', 4: 'vec4' };
+const VECTOR_BY_COUNT: Record<number, GlslType> = {1: 'float', 2: 'vec2', 3: 'vec3', 4: 'vec4'};
 
 /** The swizzle that narrows a vector to `count` components. */
 export function narrowingSwizzle(count: number): string {
@@ -117,9 +117,10 @@ export function collectGlobals(source: string): Scope {
 /**
  * Reads the declared signature of every function in the unit.
  *
- * Worth knowing rather than guessing, on both halves. `Compute_Fog(float3)` returns a float, so the
- * "a call has the type of its first argument" rule - right for the componentwise intrinsics -
- * answered float3 and hung a `.x` on a scalar. The parameter types matter because HLSL truncates an
+ * Worth knowing rather than guessing, on both halves. The fog helper takes a float3 and returns a
+ * float, so the "a call has the type of its first argument" rule - right for the componentwise
+ * intrinsics - answered float3 and hung a `.x` on a scalar. The parameter types matter because
+ * HLSL truncates an
  * ARGUMENT as silently as it truncates an assignment: the tangent-space helpers take float3 while
  * every caller holds float4s. Includes are flattened by now, so the whole unit is here to read.
  */
@@ -137,7 +138,7 @@ export function collectFunctions(source: string): FunctionTable {
             .filter(parameter => parameter !== '')
             .map(parameter => parameter.split(/\s+/)[0]);
 
-        functions.set(match[2], { returnType: match[1], parameters });
+        functions.set(match[2], {returnType: match[1], parameters});
     }
 
     return functions;
@@ -329,7 +330,7 @@ function splitAtOperator(
                 continue;
             }
 
-            return { left, right: text.slice(i + 1) };
+            return {left, right: text.slice(i + 1)};
         }
     }
 

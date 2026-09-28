@@ -11,9 +11,9 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Measured in the 2018 binary: the member table is three consecutive strings at
-///         <c>01535250</c>, <c>0153525c</c> and <c>01535268</c> - <c>Standard</c>, <c>SameOrder</c>,
-///         <c>Solo</c>. There is no <c>Same_Order</c> anywhere in the image.
+///         Measured in the 2018 build: the member table is three consecutive strings -
+///         <c>Standard</c>, <c>SameOrder</c>, <c>Solo</c>. There is no <c>Same_Order</c> anywhere
+///         in the image.
 ///     </para>
 ///     <para>
 ///         Shipped data cannot arbitrate this one: vanilla only ever writes <c>Solo</c> (20 uses)
