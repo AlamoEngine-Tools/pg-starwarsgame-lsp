@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
+using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Story.Discovery;
 
@@ -42,6 +43,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<WorkspaceIndexer> _logger;
+    private readonly IMegEntryReader _megEntries;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
     private readonly IStoryChainProblemStore _storyChainProblems;
@@ -52,6 +54,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         ILuaAnnotationRepository annotationRepository,
         IStoryChainProblemStore storyChainProblems,
         ILspConfigurationProvider configProvider,
+        IMegEntryReader megEntries,
         ILogger<WorkspaceIndexer> logger)
     {
         _fileHelper = fileHelper;
@@ -64,6 +67,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _annotationRepository = annotationRepository;
         _storyChainProblems = storyChainProblems;
         _configProvider = configProvider;
+        _megEntries = megEntries;
         _logger = logger;
     }
 
@@ -141,14 +145,21 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     }
 
     /// <summary>
-    ///     Globs loose asset files (textures, models, audio, maps) under the given roots,
-    ///     normalises them relative to their root, unions with the baseline catalog, and publishes
-    ///     the merged <see cref="IAssetFileIndex" /> on the GameIndex.
+    ///     Collects the workspace's asset files (textures, models, audio, maps) under the given
+    ///     roots - loose on disk AND packed into the workspace's own MEG archives - normalises them
+    ///     relative to their root, unions with the baseline catalog, and publishes the merged
+    ///     <see cref="IAssetFileIndex" /> on the GameIndex.
     /// </summary>
+    /// <remarks>
+    ///     The archives are not optional. A mod ships its assets packed, so globbing loose files
+    ///     alone reported every reference into a mod's own archives as a missing file, and the
+    ///     shipped game escaped only because its baseline was built from its archives.
+    /// </remarks>
     public void ApplyAssetCatalog(IReadOnlyList<string> roots)
     {
         var baseline = _indexService.Current.Baseline.AssetFiles;
         var workspace = new List<string>();
+        var packed = 0;
 
         foreach (var root in roots)
         {
@@ -165,11 +176,25 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 var relative = _fileHelper.FileSystem.Path.GetRelativePath(root, file);
                 workspace.Add(_fileHelper.NormalizeGamePath(relative));
             }
+
+            foreach (var megPath in MegArchiveDiscovery.Under(_fileHelper.FileSystem, root))
+            foreach (var entry in _megEntries.EnumerateEntryPaths(megPath))
+            {
+                // Through the baseline builder's own rules, so a packed asset is spelled the same
+                // whether it reached the catalog from the shipped game or from the workspace.
+                var normalized = MegAssetCatalogBuilder.ApplySfxConventions(
+                    MegAssetCatalogBuilder.NormalizeMegPath(entry),
+                    _fileHelper.FileSystem.Path.GetFileName(megPath));
+                if (!MegAssetCatalogBuilder.IsAssetExtension(Path.GetExtension(normalized)))
+                    continue;
+                workspace.Add(normalized);
+                packed++;
+            }
         }
 
         _logger.LogInformation(
-            "Asset catalog: {Workspace} workspace asset(s) merged with {Baseline} baseline asset(s)",
-            workspace.Count, baseline.Count);
+            "Asset catalog: {Workspace} workspace asset(s) ({Packed} from MEG archives) merged with {Baseline} baseline asset(s)",
+            workspace.Count, packed, baseline.Count);
 
         _indexService.ApplyAssetFiles(MergedAssetFileIndex.Merge(baseline, workspace));
     }

@@ -134,39 +134,25 @@ public static class MegAssetCatalogBuilder
     }
 
     /// <summary>
-    ///     Applies SFX packaging conventions to an already-normalised MEG entry path.
-    ///     <list type="bullet">
-    ///         <item>Flat paths (no directory) from SFX MEGs are prefixed with <c>data/audio/sfx/</c>.</item>
-    ///         <item>
-    ///             <c>_eng</c> stem suffix is stripped from <c>.wav</c> and <c>.mp3</c> files
-    ///             (localized audio; XML references the base name without the language suffix).
-    ///         </item>
-    ///     </list>
+    ///     Applies SFX packaging conventions to an already-normalised MEG entry path: a flat path
+    ///     (no directory) from an SFX MEG is prefixed with <c>data/audio/sfx/</c>, because the MEG
+    ///     itself IS that directory.
     /// </summary>
+    /// <remarks>
+    ///     The entry name is otherwise kept verbatim, language suffix included. This used to strip a
+    ///     <c>_eng</c> stem suffix from <c>.wav</c> and <c>.mp3</c> entries on the premise that XML
+    ///     names sounds without one, and the premise was false on every side: the localised MEG
+    ///     spells 6825 of its 6835 audio entries <c>I000_EHD0101_ENG.WAV</c>, the loose install
+    ///     spells the same line <c>Data/Audio/Speech/English/C000_emp0101_eng.mp3</c>, and the XML
+    ///     asks for <c>U000_SPD0101_ENG.wav</c>. Folding the suffix away in the catalog alone left
+    ///     every localised reference in the game unresolvable - 7480 warnings over one message.
+    /// </remarks>
     public static string ApplySfxConventions(string normalizedPath, string megName)
     {
-        // Flat path from an SFX MEG → the MEG itself is the DATA/AUDIO/SFX directory.
-        if (!normalizedPath.Contains('/') &&
-            megName.Contains("sfx", StringComparison.OrdinalIgnoreCase))
-            normalizedPath = "data/audio/sfx/" + normalizedPath;
-
-        // Strip _eng suffix from audio file stems - XML references sounds without language suffix.
-        var ext = Path.GetExtension(normalizedPath);
-        if (ext.Equals(".wav", StringComparison.OrdinalIgnoreCase) ||
-            ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase))
-        {
-            var stem = Path.GetFileNameWithoutExtension(normalizedPath);
-            if (stem.EndsWith("_eng", StringComparison.OrdinalIgnoreCase))
-            {
-                var dir = Path.GetDirectoryName(normalizedPath)?.Replace('\\', '/');
-                var newStem = stem[..^4];
-                normalizedPath = string.IsNullOrEmpty(dir)
-                    ? newStem + ext
-                    : $"{dir}/{newStem}{ext}";
-            }
-        }
-
-        return normalizedPath;
+        return !normalizedPath.Contains('/') &&
+               megName.Contains("sfx", StringComparison.OrdinalIgnoreCase)
+            ? "data/audio/sfx/" + normalizedPath
+            : normalizedPath;
     }
 
     /// <summary>Returns true when the file extension belongs to the tracked asset categories.</summary>

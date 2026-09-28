@@ -32,7 +32,23 @@ public sealed class XmlDocumentFactProducer(
 
         var fileTypes = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri));
 
-        CollectUnregisteredFile(doc, fileTypes.IsEmpty, documentUri, facts);
+        // Asked of the registry's KEYS, not of the type list. A metafile whose contents the schema
+        // does not model yet registers with an empty type list, and an empty type list is what an
+        // unregistered file returns too - so testing the types reports a file the engine opens by a
+        // compiled-in name as read by nothing.
+        var isRegistered = fileTypeRegistry.IsRegistered(fileHelper.NormalizeUri(documentUri));
+        CollectUnregisteredFile(doc, !isRegistered, documentUri, facts);
+
+        // Registered, but the schema models nothing of what is inside it: the engine opens the file
+        // by a name compiled into it and we have not described its contents. Stop here, with the
+        // well-formedness facts already collected and nothing else.
+        //
+        // Continuing would walk the tags with no file type, so every name resolves through the
+        // global-tag fallback and picks up whatever unrelated type declares the same name. That is
+        // where guidialogs.xml's <Size> was being checked against a Float2 belonging to something
+        // else. Validating with the wrong rules is worse than not validating: the author gets
+        // errors they cannot act on, and learns to ignore the file.
+        if (isRegistered && fileTypes.IsEmpty) return facts;
 
         var isTypeContainerLevel = !fileTypes.IsEmpty &&
                                    fileTypes.Any(t => schema.GetObjectType(t)?.NameTag is not null);

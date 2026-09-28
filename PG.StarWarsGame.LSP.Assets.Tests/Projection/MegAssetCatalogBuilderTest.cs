@@ -175,9 +175,9 @@ public sealed class MegAssetCatalogBuilderTest
     [Theory]
     [InlineData("SFX2D_NON_LOCALIZED.MEG", "UNIT_ATTACK.WAV", "data/audio/sfx/unit_attack.wav")]
     [InlineData("SFX3D_NON_LOCALIZED.MEG", "AMBIENT_WIND.WAV", "data/audio/sfx/ambient_wind.wav")]
-    [InlineData("SFX2D_ENGLISH.MEG", "UNIT_MOVE_ENG.WAV", "data/audio/sfx/unit_move.wav")]
+    [InlineData("SFX2D_ENGLISH.MEG", "UNIT_MOVE_ENG.WAV", "data/audio/sfx/unit_move_eng.wav")]
     [InlineData("SFX2D_ENGLISH.MEG", "NO_SUFFIX.WAV", "data/audio/sfx/no_suffix.wav")]
-    public void ApplySfxConventions_FlatSfxEntry_PrefixedAndEngStripped(string megName, string rawPath, string expected)
+    public void ApplySfxConventions_FlatSfxEntry_PrefixedAndSuffixKept(string megName, string rawPath, string expected)
     {
         Assert.Equal(expected, MegAssetCatalogBuilder.ApplySfxConventions(
             MegAssetCatalogBuilder.NormalizeMegPath(rawPath), megName));
@@ -201,10 +201,28 @@ public sealed class MegAssetCatalogBuilderTest
         Assert.Equal("unit.tga", MegAssetCatalogBuilder.ApplySfxConventions(normalized, "FoC_Art.meg"));
     }
 
+    /// <summary>
+    ///     The language suffix is part of the file's NAME, and the catalog keeps it.
+    /// </summary>
+    /// <remarks>
+    ///     Measured on the shipped corpus, on all three sides at once: <c>sfx2d_english.meg</c> spells
+    ///     6825 of its 6835 audio entries <c>I000_EHD0101_ENG.WAV</c>; the loose install spells the
+    ///     same line <c>Data/Audio/Speech/English/C000_emp0101_eng.mp3</c>; and the XML asks for
+    ///     <c>U000_SPD0101_ENG.wav</c>. The ten entries without a suffix are droid lines, which have
+    ///     no language, and <c>sfx2d_non_localized.meg</c> carries none at all - so both spellings
+    ///     exist and each side agrees with the others.
+    ///     <para>
+    ///         Stripping it here on the premise that "XML references sounds without the language
+    ///         suffix" made every localised reference in the game miss the catalog: 7480 warnings
+    ///         over one message, the largest single item in the workspace.
+    ///     </para>
+    /// </remarks>
     [Theory]
-    [InlineData("SFX2D_ENGLISH.MEG", @"DATA\AUDIO\SFX\SOUND_ENG.WAV", "data/audio/sfx/sound.wav")]
+    [InlineData("SFX2D_ENGLISH.MEG", @"DATA\AUDIO\SFX\SOUND_ENG.WAV", "data/audio/sfx/sound_eng.wav")]
+    [InlineData("englishspeech.meg", @"DATA\AUDIO\SPEECH\ENGLISH\C000_EMP0101_ENG.MP3",
+        "data/audio/speech/english/c000_emp0101_eng.mp3")]
     [InlineData("FoC_Art.meg", @"DATA\ART\UNIT_ENG.ALO", "data/art/unit_eng.alo")]
-    public void ApplySfxConventions_EngSuffix_StrippedOnlyForAudio(string megName, string rawPath, string expected)
+    public void ApplySfxConventions_LanguageSuffix_IsKept(string megName, string rawPath, string expected)
     {
         Assert.Equal(expected, MegAssetCatalogBuilder.ApplySfxConventions(
             MegAssetCatalogBuilder.NormalizeMegPath(rawPath), megName));
@@ -219,13 +237,16 @@ public sealed class MegAssetCatalogBuilderTest
         Assert.DoesNotContain("unit_attack.wav", assets);
     }
 
+    /// <summary>
+    ///     The catalog spells a localised sound the way the archive and the XML both spell it.
+    /// </summary>
     [Fact]
-    public void Build_EngSuffixAudio_StoredWithoutSuffix()
+    public void Build_LocalisedAudio_StoredUnderItsRealName()
     {
         var megs = OneMeg("SFX2D_ENGLISH.MEG", ["UNIT_MOVE_ENG.WAV"]);
         var (assets, _) = Build(megs, new MockFileSystem());
-        Assert.Contains("data/audio/sfx/unit_move.wav", assets);
-        Assert.DoesNotContain("data/audio/sfx/unit_move_eng.wav", assets);
+        Assert.Contains("data/audio/sfx/unit_move_eng.wav", assets);
+        Assert.DoesNotContain("data/audio/sfx/unit_move.wav", assets);
     }
 
     // ── MTD icon extraction ───────────────────────────────────────────────────

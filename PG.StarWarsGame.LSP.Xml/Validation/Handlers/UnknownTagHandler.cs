@@ -16,7 +16,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///         data is full of abandoned ones - 458 distinct names over 3800 occurrences across
 ///         <c>foc/</c> and <c>eaw/</c>, measured at this rule's exact scope. Every one of those was
 ///         checked against the engine's own parser table and none has a row, so the count is loud
-///         but not wrong.
+///         but not wrong. Re-verified since against a SECOND, independent source: the engine's
+///         exported parameter list (<c>DatabaseMapExport.xml</c>, 123 tables, 2756 parameters)
+///         accepts none of the 150 (type, tag) pairs this fires on across <c>eaw/</c> either, and
+///         the two sources are different vintages, so they cannot both be stale in the same way.
 ///     </para>
 ///     <para>
 ///         Not an error, because being unknown to US is weaker evidence than being unknown to the
@@ -32,7 +35,7 @@ public sealed class UnknownTagHandler : XmlDiagnosticsHandler<XmlUnknownTagFact>
         XmlUnknownTagFact fact, DiagnosticsContext ctx)
     {
         var message = fact.Suggestion is null
-            ? $"<{fact.TagName}> is not a known {fact.OwnerElement} tag. The engine discards it"
+            ? $"<{fact.TagName}> is not a known {fact.OwnerElement} tag. The engine discards it."
             : $"<{fact.TagName}> is not a known {fact.OwnerElement} tag. Did you mean " +
               $"<{fact.Suggestion}>?";
 

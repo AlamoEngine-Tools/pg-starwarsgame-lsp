@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -14,7 +15,8 @@ public sealed class StartupPipelineTest
     private static StartupPipeline Build(
         Log log, IModProjectReloadService reloadService, IStartupGate gate,
         IPgprojMigrationOffer? migrationOffer = null,
-        IEnumerable<IDiagnosticsRepublisher>? republishers = null)
+        IEnumerable<IDiagnosticsRepublisher>? republishers = null,
+        bool workspaceDiagnosticsOnStartup = false)
     {
         return new StartupPipeline(
             new RecordingSchemaBootstrapper(log),
@@ -25,25 +27,59 @@ public sealed class StartupPipelineTest
             new RecordingNotifier(log),
             NullLogger<StartupPipeline>.Instance,
             migrationOffer,
-            republishers);
+            republishers,
+            new StubConfigurationProvider(workspaceDiagnosticsOnStartup));
+    }
+
+    private sealed class StubConfigurationProvider : ILspConfigurationProvider
+    {
+        public StubConfigurationProvider(bool workspaceDiagnosticsOnStartup)
+        {
+            Current = new LspConfiguration
+            {
+                Diagnostics = new DiagnosticsConfig { WorkspaceOnStartup = workspaceDiagnosticsOnStartup }
+            };
+        }
+
+        public LspConfiguration Current { get; }
+
+        public void LoadFrom(object? initializationOptions)
+        {
+        }
     }
 
     /// <summary>
-    ///     Diagnostics have to be published for the workspace once the scan is done.
+    ///     The workspace sweep is OFF unless asked for.
     ///     <para>
-    ///         Measured 2026-09-27: they were not, and nothing else did it either - the only path to
-    ///         a published diagnostic was <c>didOpen</c>. When the server starts in a state where
-    ///         the XML sync handler never receives that notification (roughly one start in three on
-    ///         the eaw workspace) the session produced no diagnostics for ANY file until it was
-    ///         restarted, and nothing in the log said why.
+    ///         Measured 2026-09-28 on the eaw workspace - the base game, not a mod: 18,281
+    ///         diagnostics, 21.8 MiB on the wire, 11s of publishing after a 2s scan. FoC is larger
+    ///         and a real mod larger again. That cannot be what a server does on every start.
     ///     </para>
     /// </summary>
     [Fact]
-    public async Task RunAsync_RepublishesDiagnosticsAfterTheScan()
+    public async Task RunAsync_ByDefault_DoesNotSweepTheWorkspace()
     {
         var log = new Log();
         var pipeline = Build(log, new RecordingReloadService(log), new RecordingGate(log),
-            republishers: [new RecordingRepublisher(log, "xml"), new RecordingRepublisher(log, "lua")]);
+            republishers: [new RecordingRepublisher(log, "xml")]);
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.DoesNotContain("republish.xml", log.Entries);
+    }
+
+    /// <summary>
+    ///     Turned on, it sweeps - the escape hatch for the case it exists to cover: a start where
+    ///     the XML sync handler never receives <c>didOpen</c>, after which the session publishes
+    ///     nothing for any file until it is restarted.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_WhenEnabled_RepublishesDiagnosticsAfterTheScan()
+    {
+        var log = new Log();
+        var pipeline = Build(log, new RecordingReloadService(log), new RecordingGate(log),
+            republishers: [new RecordingRepublisher(log, "xml"), new RecordingRepublisher(log, "lua")],
+            workspaceDiagnosticsOnStartup: true);
 
         await pipeline.RunAsync(["/ws"], CancellationToken.None);
 
@@ -65,7 +101,8 @@ public sealed class StartupPipelineTest
     {
         var log = new Log();
         var pipeline = Build(log, new RecordingReloadService(log), new RecordingGate(log),
-            republishers: [new ThrowingRepublisher(), new RecordingRepublisher(log, "xml")]);
+            republishers: [new ThrowingRepublisher(), new RecordingRepublisher(log, "xml")],
+            workspaceDiagnosticsOnStartup: true);
 
         await pipeline.RunAsync(["/ws"], CancellationToken.None);
 

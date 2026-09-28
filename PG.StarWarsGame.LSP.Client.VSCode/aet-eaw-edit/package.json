@@ -517,6 +517,12 @@
             "markdownDescription": "Path to `PG.StarWarsGame.LSP.Server.exe`. Download the server archive from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases), extract it, and point this setting at the `.exe`.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode.enabled#` is `false`.",
             "scope": "machine-overridable"
           },
+          "aet-eaw-edit.diagnostics.workspaceOnStartup": {
+            "order": 390,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Diagnose every indexed file once the startup scan finishes, instead of only the files that get opened.\n\n**Expensive.** Measured on the base game - 580 files, smaller than any real mod - this publishes **18,281 diagnostics, 21.8 MiB**, over about **11 seconds** after the scan, and the editor holds all of it in the problems list before a single file has been opened. A mod is larger.\n\nThe scan runs after the server is ready, so nothing waits on it; the cost is editor memory and the problems list, not server responsiveness.\n\nLeave this off unless a session starts with no diagnostics at all - a known fault where the editor's open-document notification never reaches the server, which nothing else recovers from until a restart."
+          },
           "aet-eaw-edit.lsp.locale": {
             "order": 400,
             "type": "string",

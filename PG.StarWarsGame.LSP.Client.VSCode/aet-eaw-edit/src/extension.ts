@@ -476,6 +476,12 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
                 ? (cfg('lsp.source.baseline').get<string>('url') || undefined)
                 : undefined,
             baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined,
+            // Off by default and deliberately so: on the base game the startup sweep is 18,281
+            // diagnostics and 21.8 MiB, and a mod is larger. It is the escape hatch for a start
+            // where didOpen never reaches the server, not a normal mode.
+            diagnostics: {
+                workspaceOnStartup: cfg('diagnostics').get<boolean>('workspaceOnStartup', false)
+            },
             features: resolveFeatureFlags()
         },
         middleware: {

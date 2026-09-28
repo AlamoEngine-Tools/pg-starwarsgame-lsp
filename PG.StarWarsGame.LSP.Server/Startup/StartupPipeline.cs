@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -27,6 +28,7 @@ public sealed class StartupPipeline
     private readonly IPgprojMigrationOffer? _migrationOffer;
     private readonly IStartupNotifier _notifier;
     private readonly IStartupProgress _progress;
+    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IModProjectReloadService _reloadService;
     private readonly IReadOnlyList<IDiagnosticsRepublisher> _republishers;
     private readonly ISchemaBootstrapper _schema;
@@ -41,8 +43,10 @@ public sealed class StartupPipeline
         IStartupNotifier notifier,
         ILogger<StartupPipeline> logger,
         IPgprojMigrationOffer? migrationOffer = null,
-        IEnumerable<IDiagnosticsRepublisher>? republishers = null)
+        IEnumerable<IDiagnosticsRepublisher>? republishers = null,
+        ILspConfigurationProvider? configProvider = null)
     {
+        _configProvider = configProvider;
         _republishers = republishers?.ToList() ?? [];
         _migrationOffer = migrationOffer;
         _schema = schema;
@@ -80,29 +84,42 @@ public sealed class StartupPipeline
             _logger.LogInformation("Startup pipeline finished");
         }
 
-        // Publish diagnostics for the indexed workspace, behind the open gate.
+        // Diagnose the whole indexed workspace, behind the open gate - OFF unless asked for.
         //
-        // Measured 2026-09-27: nothing did this, and the ONLY path to a published diagnostic was a
-        // didOpen. The server starts in a state where the XML sync handler never receives that
-        // notification often enough to matter - 7 of 8 starts in one batch on the eaw workspace,
-        // 1 of 4 in another - and such a session then published nothing for ANY file until it was
-        // restarted. The publishers already read a closed document's text from disk, so the sweep
-        // needs no editor buffer; it simply was never asked to run.
+        // What it is for: the server sometimes starts in a state where the XML sync handler never
+        // receives didOpen (7 of 8 starts in one batch on the eaw workspace, 1 of 4 in another).
+        // Since didOpen is the only other path to a published diagnostic, such a session publishes
+        // nothing for ANY file until it is restarted. The sweep covers that, because the publishers
+        // read a closed document's text from disk and need no editor buffer.
+        //
+        // Why it is not the default: measured on eaw - the BASE game, 580 files, smaller than any
+        // real mod - the sweep is 18,281 diagnostics and 21.8 MiB over 11s, on top of a 2s scan.
+        // Doing that on every start, for files nobody opened, is worse than the fault it covers.
         //
         // After the gate on purpose: it touches every indexed document, and holding the gate for it
         // would put that work in front of the editor becoming usable.
-        foreach (var republisher in _republishers)
+        // Not an early return: the migration offer below has to run either way.
+        if (_configProvider?.Current.Diagnostics.WorkspaceOnStartup == true)
         {
-            try
+            _logger.LogWarning(
+                "Diagnosing the whole workspace on startup. This publishes a diagnostic for every " +
+                "indexed file - on the base game that is 18,281 of them and 21.8 MiB - and the " +
+                "editor holds all of it. Turn aet-eaw-edit.diagnostics.workspaceOnStartup off " +
+                "unless a start has left the session with no diagnostics at all.");
+
+            foreach (var republisher in _republishers)
             {
-                await republisher.RepublishAllAsync(ct);
-            }
-            catch (Exception ex)
-            {
-                // Startup is fire-and-forget, so an escaping exception here is unobserved - and one
-                // publisher failing must not cost the others their sweep.
-                _logger.LogWarning(ex, "Could not publish workspace diagnostics for {Publisher}.",
-                    republisher.GetType().Name);
+                try
+                {
+                    await republisher.RepublishAllAsync(ct);
+                }
+                catch (Exception ex)
+                {
+                    // Startup is fire-and-forget, so an escaping exception here is unobserved - and
+                    // one publisher failing must not cost the others their sweep.
+                    _logger.LogWarning(ex, "Could not publish workspace diagnostics for {Publisher}.",
+                        republisher.GetType().Name);
+                }
             }
         }
 

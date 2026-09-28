@@ -18,6 +18,8 @@ using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
+using PG.StarWarsGame.LSP.Server.Assets;
+
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
 public sealed class GameDidChangeWatchedFilesHandlerTest
@@ -68,6 +70,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             new LuaAnnotationRepository(),
             new StoryChainProblemStore(),
             new FakeLspConfigurationProvider(),
+            NoMegEntries.Instance,
             NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,

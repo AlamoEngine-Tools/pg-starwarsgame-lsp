@@ -226,6 +226,40 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Equal("de", provider.Current.Locale);
     }
 
+    // ── diagnostics ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Every key in initializationOptions is read by NAME, so a node nobody parses is dropped in
+    ///     silence. That is how the workspace-sweep setting first shipped doing nothing: its unit
+    ///     tests passed, the client sent the key, and the server never looked at it.
+    /// </summary>
+    [Fact]
+    public void LoadFrom_DiagnosticsNode_IsRead()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { diagnostics = new { workspaceOnStartup = true } }));
+
+        Assert.True(provider.Current.Diagnostics.WorkspaceOnStartup);
+    }
+
+    [Fact]
+    public void LoadFrom_NoDiagnosticsNode_WorkspaceSweepIsOff()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { locale = "en" }));
+
+        Assert.False(provider.Current.Diagnostics.WorkspaceOnStartup);
+    }
+
+    [Fact]
+    public void LoadFrom_DiagnosticsNodeFalse_StaysOff()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { diagnostics = new { workspaceOnStartup = false } }));
+
+        Assert.False(provider.Current.Diagnostics.WorkspaceOnStartup);
+    }
+
     // ── feature flags ────────────────────────────────────────────────────────
 
     [Fact]

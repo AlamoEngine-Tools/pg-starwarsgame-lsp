@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
+using PG.StarWarsGame.LSP.Server.Assets;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -30,7 +31,7 @@ public sealed class WorkspaceIndexerTest
         IProjectIndexCache? cache = null, ILuaAnnotationRepository? repo = null,
         params IGameDocumentParser[] parsers)
     {
-        return BuildWithHost(fs, svc, registry, schema, cache, repo, null, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, cache, repo, null, null, null, parsers);
     }
 
     // Overload kept for callers that pass parsers without a cache
@@ -38,13 +39,21 @@ public sealed class WorkspaceIndexerTest
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return BuildWithHost(fs, svc, registry, schema, null, null, null, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, null, null, null, null, null, parsers);
+    }
+
+    private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithMegReader(
+        MockFileSystem fs, IGameIndexService svc, IMegEntryReader megReader)
+    {
+        return BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+            null, null, null, null, megReader);
     }
 
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithHost(
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         IProjectIndexCache? cache, ILuaAnnotationRepository? repo,
         IStoryChainProblemStore? storyProblems, ILspConfigurationProvider? config,
+        IMegEntryReader? megReader = null,
         params IGameDocumentParser[] parsers)
     {
         var fh = new FileHelper(fs);
@@ -53,6 +62,7 @@ public sealed class WorkspaceIndexerTest
             cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
             storyProblems ?? new StoryChainProblemStore(),
             config ?? new FakeLspConfigurationProvider(),
+            megReader ?? NoMegEntries.Instance,
             NullLogger<WorkspaceIndexer>.Instance);
         return (indexer, ctx);
     }
@@ -532,6 +542,56 @@ public sealed class WorkspaceIndexerTest
         Assert.NotNull(svc.AppliedAssetFiles);
         Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/local.tga"));
         Assert.True(svc.AppliedAssetFiles.Contains("data/art/textures/shipped.tga"));
+    }
+
+    /// <summary>
+    ///     What a workspace archive holds counts as present.
+    /// </summary>
+    /// <remarks>
+    ///     The catalog used to glob loose files only, so a mod that ships its assets packed - which
+    ///     is how a mod ships - had every reference into its own archives reported missing. The
+    ///     shipped game is spared only because the baseline was built from its archives.
+    /// </remarks>
+    [Fact]
+    public void ApplyAssetCatalog_ReadsWorkspaceMegArchives()
+    {
+        var root = Root("ws");
+        var meg = Path.Combine(root, "Data", "mod.meg");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [meg] = new("not a real archive - the reader is the seam")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = BuildWithMegReader(fs, svc,
+            new FakeMegEntryReader(meg, [@"DATA\ART\TEXTURES\PACKED.TGA"]));
+
+        indexer.ApplyAssetCatalog([root]);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/packed.tga"));
+    }
+
+    /// <summary>
+    ///     An SFX archive IS the <c>data/audio/sfx</c> directory, so its flat entries are stored
+    ///     under that prefix - the same rule the baseline builder applies, from the same code.
+    /// </summary>
+    [Fact]
+    public void ApplyAssetCatalog_AppliesSfxConventionsToWorkspaceArchives()
+    {
+        var root = Root("ws");
+        var meg = Path.Combine(root, "Data", "Audio", "SFX", "sfx2d_english.meg");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [meg] = new("not a real archive - the reader is the seam")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = BuildWithMegReader(fs, svc,
+            new FakeMegEntryReader(meg, ["U000_SPD0101_ENG.WAV"]));
+
+        indexer.ApplyAssetCatalog([root]);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/audio/sfx/u000_spd0101_eng.wav"));
     }
 
     [Fact]
@@ -1248,7 +1308,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), null, null,
-            null, null, new FakeParser());
+            null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
@@ -1269,7 +1329,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService();
         var config = ConfigWithLayer(xmlDir, pgproj);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            null, null, null, null, new FakeParser());
+            null, null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
@@ -1307,7 +1367,7 @@ public sealed class WorkspaceIndexerTest
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            cache, null, null, null, new FakeParser());
+            cache, null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
@@ -1343,6 +1403,16 @@ public sealed class WorkspaceIndexerTest
         public void EnsureGitHygiene(string pgprojPath)
         {
             HygienePaths.Add(pgprojPath);
+        }
+    }
+
+    /// <summary>An archive whose entry table is whatever the test says it is.</summary>
+    private sealed class FakeMegEntryReader(string megFilePath, IReadOnlyList<string> entryPaths)
+        : IMegEntryReader
+    {
+        public IEnumerable<string> EnumerateEntryPaths(string path)
+        {
+            return path.Equals(megFilePath, StringComparison.OrdinalIgnoreCase) ? entryPaths : [];
         }
     }
 

@@ -362,6 +362,9 @@ public static class ServerConfigurator
                 // nothing for this registration.
                 services.SupportMEG();
                 services.AddSingleton<IMegArchiveSet, MegArchiveSet>();
+                // What the workspace's own archives HOLD, for the asset catalog. Read once at
+                // startup, unlike the archive set, which reads bytes on demand.
+                services.AddSingleton<IMegEntryReader, MegEntryReader>();
                 services.AddSingleton<IGameAssetResolver, GameAssetResolver>();
 
                 // The textures a model names inside itself, for the XML diagnostics. Registered

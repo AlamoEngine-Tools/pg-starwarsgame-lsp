@@ -57,6 +57,58 @@ public sealed class UnregisteredXmlFileFactTest
         Assert.Equal("Orphan", line.Substring(fact.Column, fact.Length));
     }
 
+    /// <summary>
+    ///     A metafile the schema declares but whose CONTENTS it does not model yet registers with an
+    ///     empty type list. The engine opens such a file by a name compiled into it, so it is read -
+    ///     and reporting it as unregistered says the opposite of the truth.
+    /// </summary>
+    /// <remarks>
+    ///     <c>GetTypesForFile</c> returns the same empty array for "registered, no types" and "never
+    ///     registered", so the question has to be asked of the registry's keys instead.
+    ///     <c>guidialogs.xml</c> is the case that surfaced it.
+    /// </remarks>
+    [Fact]
+    public void AFileRegisteredWithoutTypesIsSilent()
+    {
+        var registry = new BareFileTypeRegistry();
+        registry.RegisterFile("file:///data/xml/Orphan.xml", []);
+
+        var facts = Build(registry: registry).Produce(Xml, "file:///data/xml/Orphan.xml");
+
+        Assert.Empty(facts.OfType<XmlUnregisteredFileFact>());
+    }
+
+    /// <summary>
+    ///     A file we know is read but whose contents we have not modelled is not validated at all.
+    ///     <para>
+    ///         Without a file type every tag resolves through the global-tag fallback, so a name
+    ///         that exists on some unrelated type wins: <c>&lt;Size&gt;</c> in
+    ///         <c>guidialogs.xml</c> was being checked against a Float2 belonging to something else
+    ///         entirely. Validating with the wrong rules is worse than not validating - the author
+    ///         gets errors they cannot act on and learns to ignore the file.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public void AFileWhoseContentsAreNotModelledIsNotValidated()
+    {
+        var registry = new BareFileTypeRegistry();
+        registry.RegisterFile("file:///data/xml/Guidialogs.xml", []);
+
+        // The schema knows a global <Size> belonging to something else entirely - which is exactly
+        // the situation that produced the false Float2 errors.
+        var schema = new BareSchemaProvider
+        {
+            GlobalTag = new XmlTagDefinition { Tag = "Size", ValueType = XmlValueType.FloatVector2 }
+        };
+
+        var facts = Build(schema, registry)
+            .Produce("<GUIDialogs>\n  <Dialog>\n    <Size>7</Size>\n  </Dialog>\n</GUIDialogs>",
+                "file:///data/xml/Guidialogs.xml");
+
+        Assert.Empty(facts.OfType<XmlTagValueFact>());
+        Assert.Empty(facts.OfType<XmlUnregisteredFileFact>());
+    }
+
     [Fact]
     public void AFileWithARegisteredTypeIsSilent()
     {
@@ -141,9 +193,14 @@ file sealed class BareSchemaProvider : ISchemaProvider
 
     public IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories => ScannedDirectories;
 
+    /// <summary>A tag the schema knows globally, standing in for a name shared across types.</summary>
+    public XmlTagDefinition? GlobalTag { get; init; }
+
     public XmlTagDefinition? GetTag(string tagName)
     {
-        return null;
+        return GlobalTag is not null && tagName.Equals(GlobalTag.Tag, StringComparison.OrdinalIgnoreCase)
+            ? GlobalTag
+            : null;
     }
 
     public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
