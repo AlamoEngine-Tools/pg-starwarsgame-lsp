@@ -173,8 +173,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 if (!MegAssetCatalogBuilder.IsAssetExtension(
                         _fileHelper.FileSystem.Path.GetExtension(file)))
                     continue;
-                var relative = _fileHelper.FileSystem.Path.GetRelativePath(root, file);
-                workspace.Add(_fileHelper.NormalizeGamePath(relative));
+                workspace.Add(GameRelativePath(file, root));
             }
 
             foreach (var megPath in MegArchiveDiscovery.Under(_fileHelper.FileSystem, root))
@@ -197,6 +196,32 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             workspace.Count, packed, baseline.Count);
 
         _indexService.ApplyAssetFiles(MergedAssetFileIndex.Merge(baseline, workspace));
+    }
+
+    /// <summary>
+    ///     Where an asset sits in the GAME tree, which is the only spelling the catalog can match on.
+    /// </summary>
+    /// <remarks>
+    ///     A .pgproj declares its asset roots as <c>data/audio</c>, <c>data/art</c> and so on, so
+    ///     taking the path relative to the root that matched threw the <c>data/audio/</c> prefix
+    ///     away and stored <c>announcer/foo.wav</c>. The baseline stores <c>data/...</c>, and a
+    ///     reference is written game-relative too - EaWX writes
+    ///     <c>Data\Audio\Announcer\foo.wav</c> - so the two halves of the merged catalog never met.
+    ///     Anchoring on the LAST <c>data</c> segment is what the engine's own layering does: a mod
+    ///     root holds a <c>Data</c> directory and everything is addressed from inside it. With no
+    ///     such segment the root-relative path stands, so a root outside a game tree is not guessed
+    ///     at.
+    /// </remarks>
+    private string GameRelativePath(string absoluteFile, string root)
+    {
+        var normalized = _fileHelper.NormalizeGamePath(absoluteFile);
+        var segments = normalized.Split('/');
+        var data = Array.LastIndexOf(segments, "data");
+        if (data >= 0 && data < segments.Length - 1)
+            return string.Join('/', segments[data..]);
+
+        return _fileHelper.NormalizeGamePath(
+            _fileHelper.FileSystem.Path.GetRelativePath(root, absoluteFile));
     }
 
     /// <summary>

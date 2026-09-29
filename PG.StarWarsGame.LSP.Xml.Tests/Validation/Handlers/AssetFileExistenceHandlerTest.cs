@@ -65,6 +65,53 @@ public sealed class AssetFileExistenceHandlerTest
         Assert.Contains("missing.tga", d.Message);
     }
 
+    /// <summary>
+    ///     A reference may spell its path the way the ENGINE spells paths - backslashes, and an
+    ///     optional <c>./</c> anchor at the data directory.
+    /// </summary>
+    /// <remarks>
+    ///     Measured: vanilla writes <c>./Data/Music/Credits.mp3</c>, and EaWX writes 304 references
+    ///     as <c>Data\Audio\SFX\...</c>. The engine's own compiled-in paths are backslash
+    ///     (<c>.\Data\XML\...</c>) and it opens files through the Win32 API, which takes either
+    ///     separator. The catalog is normalised to lowercase forward-slash, so a reference that is
+    ///     not normalised the same way misses both the exact match and the suffix match, and 307
+    ///     perfectly good references in one mod were reported as missing files.
+    /// </remarks>
+    [Theory]
+    [InlineData(@"Data\Art\Textures\foo.tga")]
+    [InlineData("./Data/Art/Textures/foo.tga")]
+    [InlineData(@".\Data\Art\Textures\foo.tga")]
+    [InlineData("Data/Art/Textures/foo.tga")]
+    public void Texture_EngineStylePath_Resolves(string reference)
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), reference);
+        var ctx = CtxWith("data/art/textures/foo.tga");
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    /// <summary>A partial path is still anchored at a segment boundary, not mid-name.</summary>
+    [Fact]
+    public void Texture_EngineStylePath_DoesNotMatchAcrossASegmentBoundary()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), @"Textures\oo.tga");
+        var ctx = CtxWith("data/art/textures/foo.tga");
+
+        Assert.Single(TextureSut.Handle(fact, ctx));
+    }
+
+    /// <summary>Audio carries the bulk of these - the mod writes them under <c>Data\Audio</c>.</summary>
+    [Fact]
+    public void Audio_EngineStylePath_Resolves()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("SFXEvent", XmlValueType.NameReference,
+            referenceKind: ReferenceKind.AudioFile);
+        var fact = XmlHandlerTestFixtures.MakeFact(tag, @"Data\Audio\SFX\AT_AT\AT_AT_Side_Fire.wav");
+        var ctx = CtxWith("data/audio/sfx/at_at/at_at_side_fire.wav");
+
+        Assert.Empty(AudioSut.Handle(fact, ctx));
+    }
+
     [Fact]
     public void Texture_CaseInsensitiveLookup_EmitsNothing()
     {

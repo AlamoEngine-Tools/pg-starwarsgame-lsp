@@ -15,5 +15,13 @@ export function setLogChannel(next: vscode.OutputChannel | undefined): void {
 
 export function logLine(msg: string): void {
     const ts = new Date().toISOString().replace('T', ' ').replace('Z', '');
-    channel?.appendLine(`[${ts}] ${msg}`);
+    try {
+        channel?.appendLine(`[${ts}] ${msg}`);
+    } catch {
+        // The host disposes the output channel before every extension's deactivate() has finished,
+        // and a disposed channel THROWS on append rather than ignoring it. The lines that land
+        // there are the last ones a session writes - how the server was stopped - so this fired on
+        // every exit, was logged as an extension error, and could abandon the rest of the shutdown
+        // from inside stopClient. There is no API to ask whether a channel is still open.
+    }
 }

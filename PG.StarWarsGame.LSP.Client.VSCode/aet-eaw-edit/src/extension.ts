@@ -568,6 +568,16 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
         await lspClient?.setTrace(resolvedTrace);
         logLine('LSP server started and initialized.');
 
+        // The handshake is done and the server is answering; what remains is the workspace scan,
+        // which runs in the background and can take half a minute on a large mod. Saying so is the
+        // whole point of splitting these two states: the status used to read "Starting..." from
+        // before start() until $/workspaceScanComplete, so a 30-second scan was indistinguishable
+        // from a server that never came up - which is exactly how it was reported.
+        if (statusItem) {
+            statusItem.text = '$(loading~spin) EaWEdit LSP: Indexing workspace...';
+            statusItem.tooltip = 'The server is connected. Language features become complete when the scan finishes.';
+        }
+
         // Anything already waiting on a server can go now. A model preview restored when the window
         // opened is resolved by VS Code long before this point, and without being told it would sit
         // blank for ever on the one request it made and lost.
@@ -657,6 +667,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
         logLine('Workspace scan complete.');
         if (statusItem) {
             statusItem.text = '$(check) EaWEdit LSP';
+            statusItem.tooltip = undefined;
         }
         // Both navigators fetch now rather than when they are first opened. A tree view only asks
         // for its children on reveal, so without this the first click on either paid for a round

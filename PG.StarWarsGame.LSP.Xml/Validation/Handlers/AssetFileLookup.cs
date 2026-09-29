@@ -52,20 +52,43 @@ public static class AssetFileLookup
                 yield return normalised[..^ext.Length] + other;
     }
 
+    /// <summary>
+    ///     The reference as the CATALOG spells paths: forward slashes, no <c>./</c> anchor, no
+    ///     leading separator.
+    /// </summary>
+    /// <remarks>
+    ///     A reference may be written the way the ENGINE spells paths. Measured: vanilla writes
+    ///     <c>./Data/Music/Credits.mp3</c>, EaWX writes 304 references as <c>Data\Audio\SFX\...</c>,
+    ///     and the engine's own compiled-in paths are backslash (<c>.\Data\XML\...</c>) - it opens
+    ///     files through the Win32 API, which takes either separator. The catalog is normalised to
+    ///     lowercase forward-slash when it is built, so without this the two spellings never meet
+    ///     and every such reference is reported as a missing file.
+    /// </remarks>
+    private static string Canonical(string reference)
+    {
+        var path = reference.Replace('\\', '/');
+        if (path.StartsWith("./", StringComparison.Ordinal))
+            path = path[2..];
+        return path.TrimStart('/');
+    }
+
     private static bool Exists(
         IAssetFileIndex index, string normalised, IReadOnlyList<string> allowedExtensions)
     {
+        var canonical = Canonical(normalised);
+
         // Exact relative-path match (e.g. "data/art/textures/foo.tga").
-        if (index.Contains(normalised))
+        if (index.Contains(canonical))
             return true;
 
         // Bare filename or partial path (e.g. "foo.tga"): match any catalog entry of the right
-        // asset type whose path ends with "/<value>".
-        var suffix = "/" + normalised;
+        // asset type whose path ends with "/<value>". The leading separator is what keeps this
+        // anchored at a segment boundary - "oo.tga" must not satisfy "foo.tga".
+        var suffix = "/" + canonical;
         foreach (var ext in allowedExtensions)
         foreach (var path in index.GetByExtension(ext))
             if (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(path, normalised, StringComparison.OrdinalIgnoreCase))
+                string.Equals(path, canonical, StringComparison.OrdinalIgnoreCase))
                 return true;
 
         return false;

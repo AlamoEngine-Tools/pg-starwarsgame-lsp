@@ -545,6 +545,58 @@ public sealed class WorkspaceIndexerTest
     }
 
     /// <summary>
+    ///     A workspace asset is catalogued by its GAME-relative path, not by its path relative to
+    ///     whichever asset root happened to find it.
+    /// </summary>
+    /// <remarks>
+    ///     A .pgproj declares its asset roots as <c>data/audio</c>, <c>data/art</c> and so on, so
+    ///     normalising against the root that matched threw the <c>data/audio/</c> prefix away and
+    ///     stored <c>announcer/foo.wav</c>. The baseline stores <c>data/...</c>, and references are
+    ///     written game-relative too - EaWX writes <c>Data\Audio\Announcer\foo.wav</c> - so the two
+    ///     halves of the merged catalog never met and every such reference read as a missing file.
+    /// </remarks>
+    [Fact]
+    public void ApplyAssetCatalog_StoresWorkspaceAssetsGameRelative()
+    {
+        var root = Root("ws");
+        var audioRoot = Path.Combine(root, "Data", "Audio");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(audioRoot, "Announcer", "Destroyed_ENG.wav")] = new("")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+
+        // The asset ROOT is the audio directory itself, which is how a .pgproj declares it.
+        indexer.ApplyAssetCatalog([audioRoot]);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/audio/announcer/destroyed_eng.wav"),
+            "expected the game-relative path, got: " + string.Join(", ", svc.AppliedAssetFiles));
+    }
+
+    /// <summary>
+    ///     A root with no <c>data</c> segment above the file still yields something usable: the
+    ///     path relative to the root, as before. Nothing outside a game tree is guessed at.
+    /// </summary>
+    [Fact]
+    public void ApplyAssetCatalog_RootOutsideAGameTree_KeepsTheRootRelativePath()
+    {
+        var root = Root("loose");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "extra", "stray.tga")] = new("")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+
+        indexer.ApplyAssetCatalog([root]);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("extra/stray.tga"));
+    }
+
+    /// <summary>
     ///     What a workspace archive holds counts as present.
     /// </summary>
     /// <remarks>
