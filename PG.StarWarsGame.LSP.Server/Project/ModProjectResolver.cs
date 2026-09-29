@@ -71,7 +71,8 @@ public sealed class ModProjectResolver
                 file.Localisation?.Type, path)
             {
                 StoryDialogRoots = layerStoryDialog,
-                Credits = file.Localisation?.Credits
+                Credits = file.Localisation?.Credits,
+                Icons = file.Icons
             });
         }
 

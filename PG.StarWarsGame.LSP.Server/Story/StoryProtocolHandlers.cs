@@ -7,6 +7,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
@@ -158,7 +159,12 @@ public sealed class GetStoryPlotsHandler(
     }
 }
 
-public sealed class GetStoryGraphHandler(IStoryModelService modelService, ILspConfigurationProvider config)
+public sealed class GetStoryGraphHandler(
+    IStoryModelService modelService,
+    ILspConfigurationProvider config,
+    // Optional so the minimal test setups can omit it; production always wires it. Without it
+    // every node reports editable, which is exactly right for a workspace with no layers.
+    IModProjectReloadService? reloadService = null)
     : IJsonRpcRequestHandler<GetStoryGraphParams, GetStoryGraphResult>
 {
     public Task<GetStoryGraphResult> Handle(GetStoryGraphParams request, CancellationToken ct)
@@ -173,7 +179,8 @@ public sealed class GetStoryGraphHandler(IStoryModelService modelService, ILspCo
 
         return Task.FromResult(StoryGraphProjection.Project(
             model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
-            request.PlotState, request.ReachableDirection, request.Scope));
+            request.PlotState, request.ReachableDirection, request.Scope,
+            uri => DependencyOwnership.ReadOnlyOwner(reloadService?.LastWorkspaceConfig, uri)));
     }
 }
 

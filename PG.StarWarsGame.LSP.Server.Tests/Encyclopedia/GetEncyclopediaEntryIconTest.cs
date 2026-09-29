@@ -462,7 +462,7 @@ public sealed class GetEncyclopediaEntryIconTest
 
     private sealed class StubIconCatalogProvider(IconCatalog catalog) : IIconCatalogProvider
     {
-        public Task<IconCatalog> GetAsync(string projectRoot, IconProjectSettings? settings, CancellationToken ct)
+        public Task<IconCatalog> GetAsync(IReadOnlyList<IconLayer> layers, CancellationToken ct)
         {
             return Task.FromResult(catalog);
         }
@@ -476,7 +476,7 @@ public sealed class GetEncyclopediaEntryIconTest
 
     private sealed class ThrowingIconCatalogProvider : IIconCatalogProvider
     {
-        public Task<IconCatalog> GetAsync(string projectRoot, IconProjectSettings? settings, CancellationToken ct)
+        public Task<IconCatalog> GetAsync(IReadOnlyList<IconLayer> layers, CancellationToken ct)
         {
             throw new IOException("atlas unreadable");
         }

@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -27,6 +28,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly IClientRefreshNotifier? _refresh;
     private readonly IProjectConfigurationResolver _resolver;
 
+    private readonly IIconCatalogProvider? _icons;
     private List<string>? _lastRoots;
 
     // refresh is optional so the many minimal test setups can omit it; production always wires it.
@@ -42,7 +44,12 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         IUserNotifier notifier,
         ILogger<ModProjectReloadService> logger,
         IClientRefreshNotifier? refresh = null,
-        PgprojMigrationOffer? migrationOffer = null)
+        PgprojMigrationOffer? migrationOffer = null,
+        // Optional for the same reason as refresh: the minimal test setups omit it. Production
+        // wires it, and without it a catalog built before the projects resolved - by any preview
+        // restored while the window was opening - answers with baseline icons for the whole
+        // session, because nothing else ever drops it.
+        IIconCatalogProvider? icons = null)
     {
         _resolver = resolver;
         _indexer = indexer;
@@ -53,6 +60,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         _logger = logger;
         _refresh = refresh;
         _migrationOffer = migrationOffer;
+        _icons = icons;
     }
 
     public IReadOnlyList<string>? LastAssetRoots { get; private set; }
@@ -85,6 +93,12 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         }
 
         LastWorkspaceConfig = config;
+        // The icon catalog is keyed on the project roots it was built from and cached, so one built
+        // before this point - by any preview that asked for an icon while the scan was still
+        // running - was built from the fallback workspace root with no layers at all and would
+        // answer with baseline icons for the rest of the session. Dropping it here is what makes
+        // the workspace's own icons appear once the projects are known.
+        _icons?.Invalidate();
         // Publish layer precedence before indexing so each document is stamped with its rank
         // (indexing itself stays parallel - correctness comes from the rank, not insertion order).
         _layerMap.SetLayers(config.Layers);

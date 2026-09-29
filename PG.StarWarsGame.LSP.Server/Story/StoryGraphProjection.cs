@@ -33,10 +33,17 @@ internal static class StoryGraphProjection
     /// <summary>The whole path through the anchored event - both directions at once.</summary>
     private const string Both = "Both";
 
+    /// <param name="readOnlyOwner">
+    ///     The referenced project that owns a thread, or null when this workspace may edit it. A
+    ///     thread that comes in through a referenced project is read-only, and the node names its
+    ///     owner rather than letting the client offer an edit the command boundary would refuse.
+    ///     Omitted means everything is editable, which is the unlayered case and every existing
+    ///     caller.
+    /// </param>
     public static GetStoryGraphResult Project(
         StoryCampaignModel model, string? nameFilter, string? branch, string? lifecycle,
         string? reachableFrom, string? plotState = null, string? reachableDirection = null,
-        string? scope = null)
+        string? scope = null, Func<string?, string?>? readOnlyOwner = null)
     {
         // The scope decides which nodes a panel can show at all; the filters below then choose
         // among them. Lifecycles and reachability still come from the WHOLE graph, because a
@@ -135,7 +142,8 @@ internal static class StoryGraphProjection
                 node.Event?.Perpetual ?? false,
                 node.Event?.StoryDialog,
                 node.Event?.StoryChapter,
-                node.PortalTarget));
+                node.PortalTarget,
+                readOnlyOwner?.Invoke(node.ThreadUri)));
         }
 
         var edges = scoped.Edges

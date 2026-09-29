@@ -65,6 +65,7 @@ import {Extent, fitZoom} from './storyGraph/viewportFit';
 import {booleanParamLabel, paramLabel} from './storyGraph/paramLabels';
 import {paramRowSpecs} from './storyGraph/paramRows';
 import {StagedRenames} from './storyGraph/stagedRenames';
+import {readOnlyMessage, readOnlyOwnerOf, readOnlyThreadIndex} from './storyGraph/dependencyEdit';
 import {optimisticEdit, PREVIEW_KINDS, STAGED_KINDS} from './staging';
 import {GRAPH_FILTER_DEBOUNCE_MS, useDebounced} from './loc/useDebounced';
 import {worstSeverity} from './loc/validateState';
@@ -413,6 +414,14 @@ function baseName(uri: string | null | undefined): string {
  * to the extension (which owns confirmation dialogs and error toasts). View/Simulate never mutate.
  */
 function sendCommand(payload: Record<string, unknown>, confirm?: string, refreshDetail?: string): void {
+    // A thread that comes in through a referenced project is read-only here. The controls for one
+    // are disabled, so this only catches the gestures that have no control to disable - a wire
+    // dragged onto a node, a type dropped on one - and it catches them before anything is staged.
+    const owner = threadReadOnlyOwner(payload.threadUri as string | null | undefined);
+    if (owner) {
+        reportStatus(readOnlyMessage(owner));
+        return;
+    }
     if (currentMode === 'edit' && STAGED_KINDS.has(payload.kind as string)) {
         if (confirm) {
             // Destructive gesture: the extension owns the modal and the persisted "don't ask again"
@@ -725,6 +734,27 @@ type EditorMode = 'view' | 'edit' | 'simulate';
  * outside React) can gate gestures on it without recreating the editor on every mode change.
  */
 let currentMode: EditorMode = 'view';
+
+/**
+ * Threads the current graph draws from a REFERENCED project, keyed to the project that owns them.
+ *
+ * Rebuilt from every graph push, beside the pipes rather than in React state for the same reason
+ * `currentMode` is: the rete pipes are created once, outside React, and have to consult it.
+ */
+let readOnlyThreads: ReadonlyMap<string, string> = new Map();
+
+/** The project blocking an edit to this thread, or null when the thread is this project's own. */
+function threadReadOnlyOwner(threadUri: string | null | undefined): string | null {
+    return readOnlyOwnerOf(readOnlyThreads, threadUri);
+}
+
+/**
+ * Set by App so the gesture handlers below - which live outside React, beside the rete pipes - can
+ * put a line in the status slot.
+ */
+let reportStatus: (message: string) => void = () => {
+    /* until App mounts there is no status slot to write to */
+};
 
 // ── Edit-mode staging ──────────────────────────────────────────────────────────────────────────
 //
@@ -1087,6 +1117,16 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const target = editor.getNode(removed.target);
             if (target?.dto.kind === 'StagingAnd' || target?.dto.kind === 'StagingOr') {
                 return context; // discarding one accumulated source - nothing was ever sent for it
+            }
+            // The prereq lives in the TARGET's file (or, through a junction, in its owner's), so
+            // that is the thread this gesture would write. When a referenced project owns it, the
+            // removal is blocked here rather than in sendCommand - a local removal that plays out
+            // would take the edge off the canvas until the next refresh put it back.
+            const writeTarget = target?.dto.kind === 'AndJunction' ? junctionOwner(target)?.owner : target;
+            const blockedBy = threadReadOnlyOwner(writeTarget?.dto.threadUri);
+            if (blockedBy) {
+                reportStatus(readOnlyMessage(blockedBy));
+                return undefined;
             }
             const isPrereq = (removed.kind ?? 'Prereq') === 'Prereq';
             if (isPrereq && source?.dto.kind === 'Event'
@@ -2008,6 +2048,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 for (const dto of nodes) {
                     staticLifecycles.set(dto.id, dto.lifecycle);
                 }
+                readOnlyThreads = readOnlyThreadIndex(nodes);
                 applyingServerGraph = true;
                 try {
                     // patch() reconciles the FULL server graph against the mounted nodes - it assumes
@@ -3421,6 +3462,25 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         cursor: help;
     }
 
+    /* Names the referenced project that owns this thread, next to the controls it disables. It
+       reads as state rather than as a warning - nothing is wrong, the edit just belongs elsewhere -
+       so it takes the muted foreground, not an error colour. */
+
+    .header .ro-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        flex-shrink: 0;
+        min-width: 0;
+        max-width: 40%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--font-size-10);
+        color: var(--vscode-descriptionForeground, #9d9d9d);
+        cursor: help;
+    }
+
     /* Boolean rows lead with the checkbox; the label text takes the rest of the row. */
 
     .row > span:has(> input[type=checkbox]) {
@@ -3764,7 +3824,10 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): R
     const dto = props.data.dto;
     const input = props.data.inputs['in'];
     const output = props.data.outputs['out'];
-    const readOnly = currentMode !== 'edit';
+    // Edit mode is the first gate; owning the thread is the second. A thread drawn from a
+    // referenced project stays visible - hiding it would hide half the graph - and reads like a
+    // node in View mode, with the owner named on the mark beside its title.
+    const readOnly = currentMode !== 'edit' || Boolean(dto.readOnlyOwner);
     const badge = noteBadge(typeNotes.get(dto.eventType ?? '') ?? typeNotes.get(dto.rewardType ?? ''));
     const classes = [
         'lc-' + (dto.lifecycle ?? 'Inactive'),
@@ -3938,6 +4001,13 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                     // click; that's why rename is a dedicated NoDrag button.)
                     <span className="title" title={`${dto.label} - drag to move`}>{dto.label}</span>
                 )}
+                {/* The controls below are disabled for a referenced project's thread, so the reader
+                    needs to be told which project owns it - otherwise the node just looks inert. */}
+                {dto.readOnlyOwner ? (
+                    <span className="ro-badge" title={readOnlyMessage(dto.readOnlyOwner)}>
+                        <span className="codicon codicon-lock"/>{dto.readOnlyOwner}
+                    </span>
+                ) : null}
                 {readOnly || editingTitle ? null : (
                     <Drag.NoDrag>
                         <button title="Rename this event" onClick={openRename}><span className="codicon codicon-edit"/>
@@ -5241,6 +5311,9 @@ function App(): React.JSX.Element {
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
     const [status, setStatus] = useState<string | null>('Loading story graph...');
+    // The gesture handlers live outside React, beside the rete pipes, and a refused gesture has to
+    // reach this same slot. setStatus is stable, so one assignment covers the panel's life.
+    reportStatus = setStatus;
     // True while a full rebuild's auto-arrange is in flight, so the canvas stays covered instead
     // of flashing the pre-layout node stack (every node starts at the same spot) before it settles.
     const [layouting, setLayouting] = useState(false);
@@ -5448,6 +5521,13 @@ function App(): React.JSX.Element {
         const thread = handle.nearestEventThread(position, threads);
         if (!thread) {
             setStatus('This campaign has no thread file to add events to - create a thread first.');
+            return;
+        }
+        // The landing thread is picked by proximity, so a drop near a referenced project's events
+        // lands in a file this workspace cannot write. Say so here rather than at Save.
+        const owner = threadReadOnlyOwner(thread);
+        if (owner) {
+            setStatus(`${readOnlyMessage(owner)}. Drop the event beside this project's own events`);
             return;
         }
         const taken = new Set(handle.eventLabels());

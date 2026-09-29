@@ -28,6 +28,7 @@ import {initProjectSettingsStorage} from './projectSettingsStorage';
 import {LocalisationEditorPanel} from './localisationEditorPanel';
 import {LocalisationNavigatorViewProvider, LocTreeItem} from './localisationNavigatorViewProvider';
 import {logLine, setLogChannel} from './log';
+import {directoriesNeedingOwnWatcher} from './dependencyWatchers';
 import {LspGateway} from './lsp/lspGateway';
 import {stopClient} from './lsp/stopClient';
 import {vscodeMessageSink} from './lsp/vscodeMessageSink';
@@ -223,6 +224,73 @@ let pgprojProposedProvider: PgprojProposedContentProvider | undefined;
 let localisationNavigatorProvider: LocalisationNavigatorViewProvider | undefined;
 let storyNavigatorProvider: StoryNavigatorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
+
+/**
+ * The globs the server reacts to on disk. Kept in one place because two watcher sets are built
+ * from it: the workspace-folder ones VS Code resolves itself, and the per-directory ones below.
+ */
+const WATCHED_GLOBS = ['**/*.xml', '**/*.lua', '**/*.pgproj', '**/*.csv', '**/*.properties', '**/*.dat'];
+
+/**
+ * Watchers over project directories that lie OUTSIDE the open workspace folders.
+ *
+ * A bare glob only ever watches the folders the window is open on, so a project reached through
+ * `projectReferences` was invisible: editing a dependency's XML, scripts, localisation or its own
+ * `.pgproj` produced no `didChangeWatchedFiles` at all, and nothing re-indexed until the server was
+ * restarted. These carry an absolute `RelativePattern` instead, and their events are forwarded by
+ * hand because `synchronize.fileEvents` is fixed when the client is constructed, long before the
+ * server has resolved which projects exist.
+ */
+let dependencyWatchers: vscode.Disposable[] = [];
+
+/** A `.pgproj` may have changed the layer set, so the watched directories are rebuilt. */
+function onProjectFileTouched(uri: vscode.Uri): void {
+    if (uri.fsPath.toLowerCase().endsWith('.pgproj')) {
+        void refreshDependencyWatchers();
+    }
+}
+
+/**
+ * Asks the server where this workspace's content lives and watches whatever the open folders do
+ * not already cover. Safe to call repeatedly: the previous set is disposed first.
+ */
+async function refreshDependencyWatchers(): Promise<void> {
+    const answer = await lsp.request<{ directories?: readonly string[] }>('aet/getWatchDirectories');
+    if (!answer.ok) {
+        return;
+    }
+
+    const folders = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath);
+    const outside = directoriesNeedingOwnWatcher(answer.value.directories ?? [], folders);
+
+    for (const watcher of dependencyWatchers) {
+        watcher.dispose();
+    }
+    dependencyWatchers = [];
+
+    for (const directory of outside) {
+        for (const glob of WATCHED_GLOBS) {
+            const watcher = vscode.workspace.createFileSystemWatcher(
+                new vscode.RelativePattern(vscode.Uri.file(directory), glob));
+            dependencyWatchers.push(
+                watcher,
+                // 1 = Created, 2 = Changed, 3 = Deleted in the LSP FileChangeType enum.
+                watcher.onDidCreate(uri => forwardFileChange(uri, 1)),
+                watcher.onDidChange(uri => forwardFileChange(uri, 2)),
+                watcher.onDidDelete(uri => forwardFileChange(uri, 3)));
+        }
+    }
+
+    logLine(outside.length === 0
+        ? 'No project directories outside the workspace folders; no extra watchers needed.'
+        : `Watching ${outside.length} project director(y/ies) outside the workspace: ${outside.join(', ')}`);
+}
+
+function forwardFileChange(uri: vscode.Uri, type: 1 | 2 | 3): void {
+    void lsp.notify('workspace/didChangeWatchedFiles',
+        {changes: [{uri: uri.toString(), type}]});
+}
+
 let traceChannel: vscode.LogOutputChannel | undefined;
 let log: vscode.OutputChannel | undefined;
 
@@ -453,8 +521,15 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     // and it equally affected asset, project-file and localisation reloads.
     //
     // Keep this list in step with the server's registration options.
-    const fileEvents = ['**/*.xml', '**/*.lua', '**/*.pgproj', '**/*.csv', '**/*.properties', '**/*.dat']
-        .map(glob => vscode.workspace.createFileSystemWatcher(glob));
+    const fileEvents = WATCHED_GLOBS.map(glob => vscode.workspace.createFileSystemWatcher(glob));
+    // A .pgproj change can add or drop a project reference, which moves the very directories the
+    // dependency watchers cover - so rebuild them whenever one changes, wherever it lives.
+    for (const watcher of fileEvents) {
+        context.subscriptions.push(
+            watcher.onDidCreate(uri => onProjectFileTouched(uri)),
+            watcher.onDidChange(uri => onProjectFileTouched(uri)),
+            watcher.onDidDelete(uri => onProjectFileTouched(uri)));
+    }
     // The client disposes what it is given, but only on a clean shutdown; tying them to the
     // extension's own lifetime means a failed start cannot leak OS watchers.
     context.subscriptions.push(...fileEvents);
@@ -669,11 +744,19 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
             statusItem.text = '$(check) EaWEdit LSP';
             statusItem.tooltip = undefined;
         }
+        // Only now does the server know which projects the workspace resolved to, so this is the
+        // first moment the dependency directories can be asked for. The notification fires on
+        // startup only, which is why a .pgproj change rebuilds them separately.
+        void refreshDependencyWatchers();
         // Both navigators fetch now rather than when they are first opened. A tree view only asks
         // for its children on reveal, so without this the first click on either paid for a round
         // trip - and until the scan finished they had nothing to show but a "loading" line.
         void storyNavigatorProvider?.preload();
         void localisationNavigatorProvider?.preload();
+        // An encyclopedia card opened during the scan was answered from the baseline alone and kept
+        // that answer: measured on EaWX, the popup width came back as vanilla's 262 before the scan
+        // and the mod's own 340 after it. Nothing re-asked, so the card stayed vanilla all session.
+        EncyclopediaPanel.refresh();
     });
 
     lspClient.onNotification('aet/localisationIndexUpdated', () => {

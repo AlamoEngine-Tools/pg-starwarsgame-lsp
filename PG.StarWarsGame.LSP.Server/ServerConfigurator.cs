@@ -39,6 +39,7 @@ using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.ShipNames;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Workspace;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Suppression;
 using PG.StarWarsGame.LSP.Server.Symbols;
@@ -154,6 +155,7 @@ public static class ServerConfigurator
             // from. The adapter itself runs as a separate process of this exe (--debug-adapter),
             // never in here.
             .WithHandler<GetLaunchLayersHandler>()
+            .WithHandler<GetWatchDirectoriesHandler>()
             .WithHandler<GetEncyclopediaEntryHandler>()
             .WithHandler<GetPreviewSceneHandler>()
             .WithHandler<GetModelGlbHandler>()

@@ -38,6 +38,13 @@ public sealed class ExecuteStoryCommandHandler(
         if (StoryEditingFeature.Rejection(config) is { } rejection)
             return Task.FromResult(Error(rejection));
 
+        // A referenced project is read-only. The client hides the affordances; this refuses
+        // anything that reaches the boundary another way, before any edit is staged - the point
+        // being that the refusal arrives instead of the work, not after it.
+        if (DependencyOwnership.Rejection(reloadService.LastWorkspaceConfig, request.ThreadUri)
+            is { } notOurs)
+            return Task.FromResult(Error(notOurs));
+
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(Error($"Campaign '{request.Campaign}' was not found."));

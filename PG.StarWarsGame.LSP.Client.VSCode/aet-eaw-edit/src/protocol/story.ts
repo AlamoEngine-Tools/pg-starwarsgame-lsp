@@ -97,6 +97,16 @@ export interface StoryGraphNodeDto {
     storyChapter?: number | null;
     /** For a GalacticPortal node: the galactic event it stands for. */
     portalTarget?: string | null;
+    /**
+     * The REFERENCED project that owns this node's thread, which makes it read-only here.
+     *
+     * A parent project is a library: inspect it, run it, do not edit it. The node is still shown -
+     * hiding it would hide half the graph - but its editing controls are disabled and name this
+     * owner, because an edit staged against it is refused at the command boundary. Per node, since
+     * a leaf commonly extends a graph it does not wholly own. Absent or null means editable, which
+     * is the unlayered case.
+     */
+    readOnlyOwner?: string | null;
 }
 
 export interface StoryGraphEdgeDto {

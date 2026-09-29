@@ -183,7 +183,15 @@ public sealed record StoryGraphNodeDto(
     string? StoryDialog = null,
     int? StoryChapter = null,
     // For a GalacticPortal: the galactic event it stands for, so the client can jump to it.
-    string? PortalTarget = null);
+    string? PortalTarget = null,
+    // Names the REFERENCED project that owns the node's thread, which makes it read-only here: the
+    // client shows the node and disables its editing affordances rather than offering an edit that
+    // would be refused at the boundary. It carries the NAME rather than a flag because a disabled
+    // control has to say why, and with several layers in play "which project owns this" is the
+    // author's question. Per node rather than per graph, because a leaf commonly extends a graph it
+    // does not wholly own and the two kinds sit side by side in one view. Null - the default - is
+    // editable, so an unlayered workspace and every existing caller are unaffected.
+    string? ReadOnlyOwner = null);
 
 public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, string? Label);
 
