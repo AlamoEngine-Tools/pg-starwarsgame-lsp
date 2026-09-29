@@ -400,6 +400,16 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     if (logRoot) {
         extraArgs.push(`--log-dir=${logRoot}`);
     }
+    // How loud that log is. Only passed when it differs from the server's own default, so the
+    // common case still starts with the command line it always had. Worth having as a setting
+    // rather than a rebuild: the lines that say whether a document reached a sync handler are
+    // Debug, so a session that publishes nothing cannot be diagnosed at the default level - and
+    // reading one of those lines as absent, when the level suppresses it always, is how an
+    // intermittent outage got a confident and wrong explanation.
+    const logLevel = cfg('lsp.debug').get<string>('logLevel', 'Information');
+    if (logLevel && logLevel !== 'Information') {
+        extraArgs.push(`--log-level=${logLevel}`);
+    }
     // The same resolution starts the Lua debug adapter (see luaDebugAdapterFactory), which is this
     // binary in a different mode; keeping it in one place is what keeps the two from drifting.
     const server = resolveServerCommand(context.extensionPath, extraArgs);

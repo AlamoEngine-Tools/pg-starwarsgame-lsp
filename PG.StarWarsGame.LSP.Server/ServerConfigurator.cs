@@ -56,8 +56,14 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public static class ServerConfigurator
 {
+    /// <param name="logLevel">
+    ///     How loud to be. Comes from <c>--log-level=</c> via <see cref="ServerLogLevel" />; the
+    ///     default is Information. Raise it to Debug to see whether a document actually reached the
+    ///     XML sync handler - those lines are <c>LogDebug</c>, and reading their absence at
+    ///     Information once produced a wrong diagnosis of an intermittent no-diagnostics session.
+    /// </param>
     public static LanguageServerOptions Apply(LanguageServerOptions options,
-        CoreServerOptions? serverOptions = null)
+        CoreServerOptions? serverOptions = null, LogLevel? logLevel = null)
     {
         // Installed before anything else: it decides how the preview protocol's enums reach the
         // client, and getting it wrong is silent - ordinals where names were expected.
@@ -75,7 +81,7 @@ public static class ServerConfigurator
 
         return options
             .ConfigureLogging(x => x
-                    .SetMinimumLevel(LogLevel.Information)
+                    .SetMinimumLevel(logLevel ?? ServerLogLevel.Default)
                     .AddLanguageProtocolLogging()
 #if DEBUG
                     .AddSerilog(dispose: true)

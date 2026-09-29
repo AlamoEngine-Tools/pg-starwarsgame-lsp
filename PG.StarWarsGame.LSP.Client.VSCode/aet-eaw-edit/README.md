@@ -493,6 +493,7 @@ Flag column: the feature-flag id without its common prefix.
 | `aet-eaw-edit.lsp.locale` | `en` | Language of hover text and diagnostics (`en`, `de`, `fr`, `es`, `it`, `pl`, `ru`) |
 | `aet-eaw-edit.lsp.localisation.language` | `ENGLISH` | Game language for displayed localisation text (hovers, inlay hints, encyclopedia card) |
 | `aet-eaw-edit.lsp.debug.traceServer` | `off` | `messages` or `verbose`: LSP traffic in the EaWEdit output channel |
+| `aet-eaw-edit.lsp.debug.logLevel` | `Information` | Detail in the server's own log file; `Debug` records whether a document reached a sync handler |
 
 ### Game installation and external tools
 
@@ -668,6 +669,8 @@ Three data sources; nothing else is sent or received. No telemetry.
 **Launch refused: layer not runnable.** Declared directories under `Data/` and no space in the path, or pass the folders via `modPaths`. See [Lua debugger](#lua-debugger).
 
 **Raw server output.** `aet-eaw-edit.lsp.debug.traceServer` = `messages`; **EaWEdit** output channel.
+
+**No diagnostics at all, for any file.** `aet-eaw-edit.lsp.debug.logLevel` = `Debug`, then restart the server and read `aetswg-*.log` in the workspace root: it records whether XML document sync was registered and whether each `didOpen` reached the handler. At the default level neither line is written.
 
 ---
 

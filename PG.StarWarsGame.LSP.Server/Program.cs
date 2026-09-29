@@ -54,6 +54,7 @@ if (args.Contains("--debug-adapter"))
     return;
 }
 
+var logLevel = ServerLogLevel.Resolve(args);
 var serverOptions = LoadServerOptions();
 if (waitForDebugger)
     serverOptions = serverOptions.WithDebugger();
@@ -75,7 +76,7 @@ if (tcpPortArg is not null && int.TryParse(tcpPortArg["--tcp=".Length..], out va
         var server = await LanguageServer.From(options =>
             ServerConfigurator.Apply(options
                 .WithInput(stream)
-                .WithOutput(stream), serverOptions));
+                .WithOutput(stream), serverOptions, logLevel));
         await server.WaitForExit;
         Console.Error.WriteLine("[LSP] Client disconnected - waiting for next connection");
     }
@@ -85,7 +86,7 @@ if (tcpPortArg is not null && int.TryParse(tcpPortArg["--tcp=".Length..], out va
     var server = await LanguageServer.From(options =>
         ServerConfigurator.Apply(options
             .WithInput(Console.OpenStandardInput())
-            .WithOutput(Console.OpenStandardOutput()), serverOptions));
+            .WithOutput(Console.OpenStandardOutput()), serverOptions, logLevel));
 
     await server.WaitForExit;
 }

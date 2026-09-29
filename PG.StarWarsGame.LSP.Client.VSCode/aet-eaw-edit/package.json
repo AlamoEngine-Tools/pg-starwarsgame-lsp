@@ -722,6 +722,26 @@
               "Verbose"
             ]
           },
+          "aet-eaw-edit.lsp.debug.logLevel": {
+            "order": 1950,
+            "type": "string",
+            "default": "Information",
+            "markdownDescription": "How much the LSP server writes to its own log file. `Debug` adds the lines that say whether a document reached a sync handler, which is what a session publishing no diagnostics has to be diagnosed from.\n\nThis is the server's FILE log, not the output panel - see `#aet-eaw-edit.lsp.debug.traceServer#` for wire traffic. Takes effect on the next server start.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "enum": [
+              "Trace",
+              "Debug",
+              "Information",
+              "Warning",
+              "Error"
+            ],
+            "enumItemLabels": [
+              "Trace",
+              "Debug",
+              "Information (default)",
+              "Warning",
+              "Error"
+            ]
+          },
           "aet-eaw-edit.lsp.debug.waitForDebugger": {
             "order": 2000,
             "type": "boolean",
