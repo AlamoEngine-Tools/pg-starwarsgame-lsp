@@ -1104,6 +1104,17 @@
     "test": "vscode-test",
     "package": "vsce package --no-dependencies"
   },
+  "_overridesNote": [
+    "serialize-javascript: mocha 11 (via @vscode/test-cli 0.0.15, the LATEST) pulls 6.0.2, which",
+    "carries a ReDoS - Dependabot #3 and #4. mocha 12 moved to ^7.1.1, but test-cli has not",
+    "followed, and npm's own offer is to DOWNGRADE test-cli to 0.0.11, which is backwards.",
+    "Scope is small: this chain is dev-only, CI runs dotnet test alone, and the client's own suite",
+    "is node --test - nothing automated runs mocha. Pinned forward rather than left to rot so a",
+    "real alert is not buried under a standing one. Drop this entry once test-cli ships mocha 12."
+  ],
+  "overrides": {
+    "serialize-javascript": "^7.0.5"
+  },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "^26.1.2",

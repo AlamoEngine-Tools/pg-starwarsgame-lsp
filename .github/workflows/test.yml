@@ -8,6 +8,17 @@ on:
   pull_request:
     branches: [ master ]
 
+# Least privilege for GITHUB_TOKEN. Every step here only READS the repository: checkout, restore,
+# build, test, and two SBOM generations that upload their output as workflow artifacts rather than
+# attaching it to a release. Without this block the token carries whatever the repository default
+# grants, which on a public repo that takes pull requests is worth narrowing.
+#
+# NOTE for `workflow_call`: a called workflow cannot be granted more than its caller has, and this
+# line now caps it regardless of the caller. If a future step needs to write - attaching an SBOM to
+# a release, pushing a comment - it has to be added here deliberately.
+permissions:
+  contents: read
+
 jobs:
   build-test:
     name: Build & Test

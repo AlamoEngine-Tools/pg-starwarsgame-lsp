@@ -46,6 +46,7 @@ import {groundRange, snapToZero} from './preview/groundRange';
 import {InfoBadge} from './shared/InfoBadge';
 import {Button, IconButton} from './shared/Button';
 import {DockSection} from './shared/DockSection';
+import {safeImageSource} from './shared/safeImage';
 import {Field} from './shared/Field';
 import {Icon, type IconName} from './shared/Icon';
 import {addressingFor} from './preview/textures';
@@ -7729,7 +7730,7 @@ function ModelPreview(): React.JSX.Element {
                                         {ability.iconDataUri !== null ? (
                                             <img
                                                 className="ability-icon"
-                                                src={ability.iconDataUri}
+                                                src={safeImageSource(ability.iconDataUri)}
                                                 alt=""
                                             />
                                         ) : (
@@ -7908,7 +7909,7 @@ function ModelPreview(): React.JSX.Element {
                                                     {ability.iconDataUri !== null && (
                                                         <img
                                                             className="ability-icon"
-                                                            src={ability.iconDataUri}
+                                                            src={safeImageSource(ability.iconDataUri)}
                                                             alt=""
                                                         />
                                                     )}
@@ -9239,8 +9240,8 @@ ${becauseText(node.because)}`}
                                                                 && (
                                                                     <img
                                                                         className="card-reticle"
-                                                                        src={reticleFor(
-                                                                            scene?.reticles, card.type) ?? ''}
+                                                                        src={safeImageSource(reticleFor(
+                                                                            scene?.reticles, card.type))}
                                                                         alt=""
                                                                         title={card.isTargetable
                                                                             ? 'The mark the game draws over this'

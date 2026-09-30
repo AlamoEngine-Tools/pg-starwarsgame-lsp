@@ -29,6 +29,7 @@ import {cssFontStack} from './encyclopediaFonts';
 import {encyclopediaIconTitle} from './encyclopediaIconTitle';
 import {wrapByCharacterBudget} from './encyclopediaWrap';
 import {drawsPopulationBlip} from './encyclopediaBlip';
+import {safeImageSource} from './shared/safeImage';
 
 /*
  * Glyph size arrives on the style as `fontUnits`, already in card units.
@@ -416,7 +417,7 @@ function AgainstPanel(
                             {ref?.iconDataUri
                                 ? (
                                     <img
-                                        src={ref.iconDataUri}
+                                        src={safeImageSource(ref.iconDataUri)}
                                         alt={ref.displayName ?? ref.objectId}
                                         style={{
                                             width: '100%',
@@ -701,7 +702,7 @@ export function EncyclopediaCard(
                             {chrome?.credit
                                 ? (
                                     <img
-                                        src={chrome.credit.dataUri}
+                                        src={safeImageSource(chrome.credit.dataUri)}
                                         alt="credits"
                                         // Its own proportions at the row's height, so a reskinned
                                         // coin keeps its shape instead of being squared off.
@@ -791,7 +792,7 @@ export function EncyclopediaCard(
                 >
                     {entry.icon ? (
                         <img
-                            src={entry.icon.dataUri}
+                            src={safeImageSource(entry.icon.dataUri)}
                             alt={entry.icon.name}
                             style={{
                                 // Its OWN proportions, scaled the way the engine scales it - not
@@ -921,7 +922,7 @@ export function EncyclopediaCard(
                             >
                                 {ability.icon ? (
                                     <img
-                                        src={ability.icon.dataUri}
+                                        src={safeImageSource(ability.icon.dataUri)}
                                         alt={ability.type}
                                         style={{
                                             width: '100%',

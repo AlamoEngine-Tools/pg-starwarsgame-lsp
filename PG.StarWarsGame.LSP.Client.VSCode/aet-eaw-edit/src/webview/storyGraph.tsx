@@ -6060,9 +6060,20 @@ function App(): React.JSX.Element {
                     break;
                 }
                 case 'paramOptions': {
-                    const resolve = pendingOptionRequests.get(msg.requestId as number);
-                    if (resolve) {
-                        pendingOptionRequests.delete(msg.requestId as number);
+                    // The id is taken as a NUMBER before it is used as a key, and the value is
+                    // checked to be callable before it is called. Neither is theatre: the id
+                    // arrives over the message channel, and a Map lookup on an arbitrary key is
+                    // how a value of the wrong shape would reach a call position. The map only
+                    // ever holds resolvers we put there, so this costs nothing and removes the
+                    // question - see the js/unvalidated-dynamic-method-call alert.
+                    const requestId = typeof msg.requestId === 'number' ? msg.requestId : null;
+                    if (requestId === null) {
+                        break;
+                    }
+
+                    const resolve = pendingOptionRequests.get(requestId);
+                    if (typeof resolve === 'function') {
+                        pendingOptionRequests.delete(requestId);
                         resolve((msg.options as StoryParamOptionDto[] | undefined) ?? []);
                     }
                     break;
