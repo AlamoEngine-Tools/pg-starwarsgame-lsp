@@ -38,6 +38,22 @@ public static class AssetFileLookup
             .Any(alternate => Exists(index, alternate, allowedExtensions));
     }
 
+    /// <summary>
+    ///     Whether <paramref name="path" /> carries one of the asset types this lookup accepts.
+    ///     An empty list accepts anything, which is how a caller asks "does this exact path exist"
+    ///     without naming a type.
+    /// </summary>
+    private static bool HasAllowedExtension(string path, IReadOnlyList<string> allowedExtensions)
+    {
+        if (allowedExtensions.Count == 0) return true;
+
+        for (var i = 0; i < allowedExtensions.Count; i++)
+            if (path.EndsWith(allowedExtensions[i], StringComparison.OrdinalIgnoreCase))
+                return true;
+
+        return false;
+    }
+
     /// <summary>The same name with each other interchangeable extension.</summary>
     public static IEnumerable<string> AlternateNames(
         string normalised, IReadOnlyList<string> interchangeable)
@@ -81,15 +97,31 @@ public static class AssetFileLookup
         if (index.Contains(canonical))
             return true;
 
-        // Bare filename or partial path (e.g. "foo.tga"): match any catalog entry of the right
-        // asset type whose path ends with "/<value>". The leading separator is what keeps this
-        // anchored at a segment boundary - "oo.tga" must not satisfy "foo.tga".
+        // Bare filename or partial path (e.g. "foo.tga", "textures/foo.tga"): match any catalog
+        // entry of the right asset type whose path ends with "/<value>". The leading separator is
+        // what keeps this anchored at a segment boundary - "oo.tga" must not satisfy "foo.tga".
+        //
+        // Candidates come from the filename bucket rather than from every path of the allowed
+        // extensions. A reference's final segment IS the filename of anything that can match it,
+        // so the bucket cannot exclude a true match, and the two tests below still decide - the
+        // answer is identical, the search is not. Scanning instead made this quadratic: MEASURED,
+        // one prop file spent 24.6s of an 83s workspace sweep here, because each of its models
+        // names textures that each rescanned ~38,000 paths, worst of all when the texture really
+        // was missing and every extension was scanned to no purpose.
+        var fileName = MergedAssetFileIndex.FileNameOf(canonical);
+        if (fileName.Length == 0)
+            return false;
+
         var suffix = "/" + canonical;
-        foreach (var ext in allowedExtensions)
-        foreach (var path in index.GetByExtension(ext))
+        foreach (var path in index.GetByFileName(fileName))
+        {
+            if (!HasAllowedExtension(path, allowedExtensions))
+                continue;
+
             if (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(path, canonical, StringComparison.OrdinalIgnoreCase))
                 return true;
+        }
 
         return false;
     }

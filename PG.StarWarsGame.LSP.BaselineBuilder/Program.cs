@@ -526,13 +526,25 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
         }
     };
 
-    var (assetFiles, modelBones) = MegAssetCatalogBuilder.Build(
-        megEntries, looseFileSystem, engine.GameRepository.Path,
-        openMegEntry, getBones, getMtdIcons, assetLogger);
+    // Textures come straight off the bytes, so this needs none of the stream care above.
+    Func<Stream, IReadOnlyList<string>> getTextures = stream =>
+    {
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return ModelTextureNames.Read(buffer.ToArray());
+    };
 
-    baseline = baseline with { AssetFiles = assetFiles, ModelBones = modelBones };
+    var (assetFiles, modelBones, modelTextures) = MegAssetCatalogBuilder.Build(
+        megEntries, looseFileSystem, engine.GameRepository.Path,
+        openMegEntry, getBones, getMtdIcons, assetLogger, getTextures);
+
+    baseline = baseline with
+    {
+        AssetFiles = assetFiles, ModelBones = modelBones, ModelTextures = modelTextures
+    };
     Console.WriteLine($"Asset files: {baseline.AssetFiles.Count} asset file(s) (MEG + loose)");
     Console.WriteLine($"Model bones: {baseline.ModelBones.Count} model(s) with bone data");
+    Console.WriteLine($"Model textures: {baseline.ModelTextures.Count} model(s) scanned for textures");
 
     // ── Serialize ─────────────────────────────────────────────────────────────
 

@@ -79,7 +79,7 @@ public sealed class HardpointBoneNotOnModelHandlerTest
     ///     and what it does not.
     /// </summary>
     /// <remarks>
-    ///     <c>GameObjectClass::Take_Damage</c> replaces the name it looks a hardpoint up by with the
+    ///     The engine's damage path replaces the name it looks a hardpoint up by with the
     ///     hardpoint's own <c>Collision_Mesh</c> when the hit is aimed at that hardpoint, and on land
     ///     with the nearest live targetable hardpoint's, so aimed fire and land projectiles land. Only
     ///     untargeted space fire uses the struck renderable's name, and that is always a MESH name

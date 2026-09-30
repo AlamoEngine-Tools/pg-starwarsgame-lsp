@@ -42,6 +42,20 @@ public interface IGameIndexService
     void ApplyLocalisation(ILocalisationIndex index);
     void ApplyAssetFiles(IAssetFileIndex index);
     void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones);
+
+    /// <summary>
+    ///     Publishes the merged texture catalog - the names each <c>.alo</c> carries inside itself.
+    /// </summary>
+    /// <remarks>
+    ///     Defaulted to a no-op so the many narrow test doubles of this interface are unaffected;
+    ///     the real service overrides it. A double that ignores this publishes no catalog, which
+    ///     is the pre-catalog behaviour - the validator then opens the model, so the answer stays
+    ///     correct and only the cost returns.
+    /// </remarks>
+    void ApplyModelTextures(ImmutableDictionary<string, ImmutableArray<string>> textures)
+    {
+    }
+
     void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values);
 
     void ApplyWorkspaceEnumValueDefinitions(

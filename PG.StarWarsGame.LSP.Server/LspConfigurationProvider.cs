@@ -38,8 +38,9 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
 
         var workspaceRoot = ResolveWorkspaceRoot(initializationOptions);
         var fromFile = LoadConfigFile(workspaceRoot);
-        var overlay = ParseInitOptions(initializationOptions, out var overlayFeatures, out var overlayDiagnostics);
-        Current = Merge(fromFile, overlay, overlayFeatures, overlayDiagnostics);
+        var overlay = ParseInitOptions(initializationOptions, out var overlayFeatures,
+            out var overlayDiagnostics, out var overlayEncyclopedia);
+        Current = Merge(fromFile, overlay, overlayFeatures, overlayDiagnostics, overlayEncyclopedia);
 
         _logger.LogInformation("LSP configuration loaded (locale={Locale}, gamePath={GamePath})",
             Current.Locale, Current.GamePath ?? "<none>");
@@ -75,10 +76,11 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
     }
 
     private LspConfiguration ParseInitOptions(object? initOptions, out FeatureFlags? features,
-        out DiagnosticsConfig? diagnostics)
+        out DiagnosticsConfig? diagnostics, out EncyclopediaConfig? encyclopedia)
     {
         features = null;
         diagnostics = null;
+        encyclopedia = null;
         if (initOptions is null) return new LspConfiguration();
 
         JsonElement elem;
@@ -107,6 +109,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
 
         features = ParseFeatures(elem);
         diagnostics = ParseDiagnostics(elem);
+        encyclopedia = ParseEncyclopedia(elem);
 
         var workspaceRoot = TryGetString(elem, "workspaceRoot");
         var baseGamePath = TryGetString(elem, "baseGamePath");
@@ -193,8 +196,27 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         }
     }
 
+    /// <summary>
+    ///     Extracts the optional <c>encyclopedia</c> node. Absent or malformed returns <c>null</c>,
+    ///     so the .pg-lsp.json value (or the default screen) applies.
+    /// </summary>
+    private EncyclopediaConfig? ParseEncyclopedia(JsonElement elem)
+    {
+        if (!elem.TryGetProperty("encyclopedia", out var node)) return null;
+        try
+        {
+            return node.Deserialize<EncyclopediaConfig>(FeatureJsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Malformed 'encyclopedia' node in InitializationOptions; ignoring it");
+            return null;
+        }
+    }
+
     private static LspConfiguration Merge(LspConfiguration file, LspConfiguration overlay,
-        FeatureFlags? overlayFeatures, DiagnosticsConfig? overlayDiagnostics)
+        FeatureFlags? overlayFeatures, DiagnosticsConfig? overlayDiagnostics,
+        EncyclopediaConfig? overlayEncyclopedia)
     {
         return new LspConfiguration
         {
@@ -202,6 +224,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             // the client always sends the complete resolved object, so no per-leaf merge.
             Features = overlayFeatures ?? file.Features,
             Diagnostics = overlayDiagnostics ?? file.Diagnostics,
+            Encyclopedia = overlayEncyclopedia ?? file.Encyclopedia,
             WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,

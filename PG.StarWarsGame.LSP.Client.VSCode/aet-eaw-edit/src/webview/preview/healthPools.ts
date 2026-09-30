@@ -52,7 +52,7 @@ export function percentOf(pool: Pool): number {
 /**
  * Both corrections, in the order the engine runs them.
  *
- * The hull is pulled first, inside `GameObjectClass::Service`, and the hardpoint step then reads the UPDATED hull -
+ * The hull is pulled first, inside the engine's per-frame object update, and the hardpoint step then reads the UPDATED hull -
  * which is what makes the two meet rather than merely approach when the constraint is 0.
  *
  * @param constraint `Hull_Vs_Hard_Points_Health_Constraint`. At 1 every cap clamps to 100% and

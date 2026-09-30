@@ -56,3 +56,16 @@ export function nodeLayoutKey(node: LayoutNodeLike): string {
 export function layoutEntryKey(entry: LayoutEntryLike): string {
     return entry.nodeId ? entry.nodeId : `${entry.threadUri} ${entry.eventName}`.toLowerCase();
 }
+
+/**
+ * The key for an event that does not exist yet - one being dropped onto the canvas.
+ *
+ * Exists so the side that RESERVES a position and the side that CONSUMES it cannot drift apart.
+ * They did: the reserving side built its key from the thread's BASE NAME while this key moved onto
+ * the full `threadUri`, so nothing ever matched, every reservation was ignored, and a dropped event
+ * landed wherever `placeNewNode` guessed instead of under the cursor. Nothing failed loudly - the
+ * fallback is a perfectly good position, just not the one that was asked for.
+ */
+export function newEventLayoutKey(threadUri: string | null | undefined, eventName: string): string {
+    return nodeLayoutKey({kind: 'Event', threadUri, label: eventName});
+}

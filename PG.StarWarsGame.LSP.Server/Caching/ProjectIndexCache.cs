@@ -9,8 +9,12 @@ namespace PG.StarWarsGame.LSP.Server.Caching;
 
 public sealed class ProjectIndexCache : IProjectIndexCache
 {
-    private static readonly string GitignoreContent =
-        "# Remove the line below to share index snapshots with your team via version control\nindices/\n";
+    // Every generated directory under .aetswg. Listed rather than a bare "*" so a project can
+    // still keep something of its own in here.
+    private static readonly string[] GitignoreEntries = ["indices/", "bones/"];
+
+    private static readonly string GitignoreHeader =
+        "# Remove a line below to share that cache with your team via version control\n";
 
     private static readonly string GitattributesContent = "*.msgpack binary\n";
 
@@ -68,8 +72,38 @@ public sealed class ProjectIndexCache : IProjectIndexCache
         var aetswgDir = ProjectIndexLocator.GetAetswgDirectory(pgprojPath);
         _fileHelper.FileSystem.Directory.CreateDirectory(aetswgDir);
 
-        WriteIfAbsent(aetswgDir + "/.gitignore", GitignoreContent);
+        EnsureIgnored(aetswgDir + "/.gitignore");
         WriteIfAbsent(aetswgDir + "/.gitattributes", GitattributesContent);
+    }
+
+    /// <summary>
+    ///     Makes sure every generated directory is ignored, APPENDING to a .gitignore that already
+    ///     exists rather than leaving it as it was.
+    /// </summary>
+    /// <remarks>
+    ///     Write-if-absent was enough while <c>indices/</c> was the only entry, but it silently
+    ///     skips every project set up before a new cache was added - so bone snapshots would have
+    ///     been committed by everyone who had ever opened the project before today. An entry the
+    ///     author deliberately deleted comes back; that is the lesser harm, and the header says how
+    ///     to opt out.
+    /// </remarks>
+    private void EnsureIgnored(string path)
+    {
+        var fs = _fileHelper.FileSystem;
+        var existing = fs.File.Exists(path) ? fs.File.ReadAllText(path) : string.Empty;
+
+        var lines = existing.Replace("\r\n", "\n").Split('\n');
+        var missing = GitignoreEntries
+            .Where(entry => !lines.Any(line => line.Trim().Equals(entry, StringComparison.Ordinal)))
+            .ToArray();
+
+        if (missing.Length == 0) return;
+
+        var content = existing.Length == 0
+            ? GitignoreHeader + string.Join('\n', missing) + "\n"
+            : existing.TrimEnd('\n', '\r') + "\n" + string.Join('\n', missing) + "\n";
+
+        fs.File.WriteAllText(path, content);
     }
 
     private void WriteIfAbsent(string path, string content)

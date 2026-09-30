@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     <para>
 ///         Measured in the 2018 build (issue #98). Both paths that create the weapon test
 ///         <c>Get_Special_Weapon_Index() &gt;= 0</c> and assert when it is not;
-///         <c>GameModeClass::Add_Special_Weapon</c> then asserts the index is below
+///         Special-weapon registration then asserts the index is below
 ///         the special-weapon slot count, which returns 3. Outside 0 to 2 the weapon is never registered.
 ///         The type's constructor sets the index to -1, so an object that never writes the tag fails.
 ///     </para>

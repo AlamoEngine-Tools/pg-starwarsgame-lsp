@@ -277,6 +277,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IStartupGate, StartupGate>();
 
                 services.AddSingleton<IProjectIndexCache, ProjectIndexCache>();
+                services.AddSingleton<IModelBoneCatalogCache, ModelBoneCatalogCache>();
                 services.AddSingleton<WorkspaceIndexer>();
                 services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 

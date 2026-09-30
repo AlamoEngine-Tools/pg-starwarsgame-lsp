@@ -4,7 +4,37 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {canReuseStoredLayout, layoutEntryKey, nodeLayoutKey} from './layoutReuse';
+import {canReuseStoredLayout, layoutEntryKey, newEventLayoutKey, nodeLayoutKey} from './layoutReuse';
+
+describe('newEventLayoutKey', () => {
+    // The regression this exists to stop. Dropping an event RESERVES a position under this key and
+    // patch() consumes it under nodeLayoutKey once the node arrives from the server. The reserving
+    // side keyed on the thread's BASE NAME while nodeLayoutKey moved onto the full threadUri, so
+    // nothing matched, every reservation was dropped, and the node landed where placeNewNode
+    // guessed instead of under the cursor. Nothing failed loudly - the fallback is a valid
+    // position, just not the one asked for.
+    it('matches the key patch() will look the node up by', () => {
+        const threadUri = 'file:///c:/dev/eawx/rev/data/xml/Conquests/Player_Agnostic_Plot.xml';
+
+        assert.equal(
+            newEventLayoutKey(threadUri, 'New_Event'),
+            nodeLayoutKey({kind: 'Event', threadUri, label: 'New_Event'}));
+    });
+
+    it('carries the whole thread uri, not just its file name', () => {
+        const key = newEventLayoutKey('file:///c:/mods/rev/data/xml/Story.xml', 'E');
+
+        assert.match(key, /c:\/mods\/rev\/data\/xml/);
+    });
+
+    // Two projects in a layered workspace legitimately ship a thread of the same NAME; keying on
+    // the base name alone would collide them and hand one event the other's position.
+    it('separates same-named threads from different projects', () => {
+        assert.notEqual(
+            newEventLayoutKey('file:///rev/data/xml/Story.xml', 'E'),
+            newEventLayoutKey('file:///core/data/xml/Story.xml', 'E'));
+    });
+});
 
 describe('layout keys', () => {
     it('name an event by thread and event, folded, and a stored event entry the same way', () => {

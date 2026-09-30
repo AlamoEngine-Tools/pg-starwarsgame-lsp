@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Assets;
@@ -29,8 +30,11 @@ namespace PG.StarWarsGame.LSP.Server.Assets;
 /// </remarks>
 public sealed class ModelTextureIndex(
     IGameAssetResolver assets,
+    IGameIndexService index,
     ILogger<ModelTextureIndex> logger) : IModelTextureIndex
 {
+    private readonly IGameIndexService _index = index;
+
     /// <summary>
     ///     Parsed texture lists, by the reference as the XML wrote it.
     /// </summary>
@@ -48,7 +52,20 @@ public sealed class ModelTextureIndex(
         if (string.IsNullOrWhiteSpace(modelReference))
             return [];
 
-        return _cache.GetOrAdd(modelReference.Trim(), Read);
+        var reference = modelReference.Trim();
+
+        // The catalog first: it was built offline (baseline) or during indexing (workspace) from
+        // the same bytes, so consulting it costs a dictionary lookup where opening the model cost
+        // MEASURED seconds - one prop file spent 17.2s of its 17.5s in this method before the
+        // catalog existed.
+        //
+        // A model ABSENT from the catalog is not a model with no textures: it may be packed in an
+        // archive nothing has scanned, or named in a way the catalog does not key. Those fall
+        // through to the parse below, so the answer is never weakened - only its cost.
+        if (_index.Current.ModelTextures.TryGetValue(ModelBoneKey.From(reference), out var known))
+            return known;
+
+        return _cache.GetOrAdd(reference, Read);
     }
 
     /// <summary>Forgets everything, for when the asset layers underneath have moved.</summary>

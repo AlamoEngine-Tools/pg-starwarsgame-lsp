@@ -567,6 +567,12 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
             diagnostics: {
                 workspaceOnStartup: cfg('diagnostics').get<boolean>('workspaceOnStartup', false)
             },
+            // Which screen the encyclopedia card is drawn for. The game sizes that popup's glyphs
+            // from the display it runs on, so a preview has to be told which display to match.
+            encyclopedia: {
+                screenWidth: cfg('encyclopedia').get<number>('screenWidth', 1920),
+                screenHeight: cfg('encyclopedia').get<number>('screenHeight', 1080)
+            },
             features: resolveFeatureFlags()
         },
         middleware: {

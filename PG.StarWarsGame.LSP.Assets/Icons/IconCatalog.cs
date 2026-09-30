@@ -79,7 +79,7 @@ public sealed record IconResolution(byte[] Png, IconSource Source, bool IsMegaTe
 public sealed class IconCatalog
 {
     private readonly ImmutableDictionary<string, byte[]> _baseline;
-    private readonly ImmutableDictionary<string, byte[]> _loose;
+    private readonly LooseIconStore _loose;
     private readonly ImmutableDictionary<string, byte[]>? _workspace;
 
     /// <param name="workspaceMegaTexture">
@@ -87,19 +87,34 @@ public sealed class IconCatalog
     ///     <c>.TGA</c> suffix). <see langword="null" /> - not empty - when the workspace ships no
     ///     mega texture at all; the distinction drives whether the baseline is consulted.
     /// </param>
-    /// <param name="looseSources">Raw source images, keyed by base name without extension.</param>
+    /// <param name="looseSources">
+    ///     Raw source images, keyed by base name without extension. Only the NAMES are read unless a
+    ///     lookup reaches this layer - see <see cref="LooseIconStore" /> for why that matters.
+    /// </param>
     /// <param name="baseline">The base game's baked icons, keyed as the .mtd records them.</param>
     public IconCatalog(
         IReadOnlyDictionary<string, byte[]>? workspaceMegaTexture,
-        IReadOnlyDictionary<string, byte[]> looseSources,
+        LooseIconStore looseSources,
         IReadOnlyDictionary<string, byte[]> baseline)
     {
         ArgumentNullException.ThrowIfNull(looseSources);
         ArgumentNullException.ThrowIfNull(baseline);
 
         _workspace = workspaceMegaTexture?.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
-        _loose = looseSources.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
+        _loose = looseSources;
         _baseline = baseline.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     A catalog over loose sources that are already decoded - the shape most tests and the
+    ///     baseline path hand over.
+    /// </summary>
+    public IconCatalog(
+        IReadOnlyDictionary<string, byte[]>? workspaceMegaTexture,
+        IReadOnlyDictionary<string, byte[]> looseSources,
+        IReadOnlyDictionary<string, byte[]> baseline)
+        : this(workspaceMegaTexture, LooseIconStore.FromDecoded(looseSources), baseline)
+    {
     }
 
     /// <summary>Whether the workspace ships its own mega texture.</summary>
@@ -122,7 +137,8 @@ public sealed class IconCatalog
             if (_workspace is null)
                 return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            return _loose.Keys
+            // Names only, so this answers without decoding a single source.
+            return _loose.Names
                 .Where(name => !_workspace.ContainsKey(WithTgaSuffix(name)))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
@@ -148,14 +164,14 @@ public sealed class IconCatalog
 
             // Drawn but not repacked: render it so the author can see their work, and flag the
             // discrepancy so they learn the game would not show it yet.
-            return _loose.TryGetValue(bare, out var stale)
-                ? new IconResolution(stale, IconSource.LooseSource, true)
+            return _loose.TryGet(bare, out var stale)
+                ? new IconResolution(stale!, IconSource.LooseSource, true)
                 : null;
         }
 
         // No workspace mega texture: the project's own raw art still outranks the base game's.
-        if (_loose.TryGetValue(bare, out var loose))
-            return new IconResolution(loose, IconSource.LooseSource);
+        if (_loose.TryGet(bare, out var loose))
+            return new IconResolution(loose!, IconSource.LooseSource);
 
         return _baseline.TryGetValue(suffixed, out var baseline)
             ? new IconResolution(baseline, IconSource.Baseline)

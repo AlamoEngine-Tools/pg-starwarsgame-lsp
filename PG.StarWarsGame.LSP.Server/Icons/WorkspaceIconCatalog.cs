@@ -50,8 +50,18 @@ public sealed class WorkspaceIconCatalog(
         var layers = IconLayersOf(projects?.LastWorkspaceConfig);
         if (layers.Count == 0)
         {
-            // No resolved project: fall back to the workspace root, which is what a heuristic scan
-            // with no .pgproj has to work from.
+            // "No layers" means two different things, and answering the wrong one is how the first
+            // card opened after startup came back drawn entirely from the baked base game - the
+            // wrong portrait, and a 262-wide band on a card the mod had widened to 340.
+            //
+            // A load that has FINISHED and found no project file leaves nothing but the workspace
+            // root to scan, and the heuristic fallback below is the right answer. A load still in
+            // flight looks identical from here, and falling back then answers from the base game
+            // while the project holding the real art is still being read. Nothing is served until
+            // it is known which case this is; the next request gets the real catalog.
+            if (projects is { HasLoadedProjects: false })
+                return null;
+
             var root = projects?.LastWorkspaceRoots?.FirstOrDefault() ?? config.Current.WorkspaceRoot;
             if (string.IsNullOrEmpty(root))
                 return null;

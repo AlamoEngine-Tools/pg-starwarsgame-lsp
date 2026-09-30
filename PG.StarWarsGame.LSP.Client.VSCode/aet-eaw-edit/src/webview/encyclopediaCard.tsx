@@ -25,30 +25,23 @@ import {
     EncyclopediaImage, EncyclopediaLayout, EncyclopediaReference, EncyclopediaRgba,
     EncyclopediaTextStyle, GetEncyclopediaEntryResult,
 } from '../protocol/encyclopedia';
-import { cssFontStack } from './encyclopediaFonts';
-import { encyclopediaIconTitle } from './encyclopediaIconTitle';
+import {cssFontStack} from './encyclopediaFonts';
+import {encyclopediaIconTitle} from './encyclopediaIconTitle';
+import {wrapByCharacterBudget} from './encyclopediaWrap';
+import {drawsPopulationBlip} from './encyclopediaBlip';
 
-/**
- * Point sizes are not unit sizes: 7 units of text in a 262-unit popup is roughly half the size the
- * game draws. This is the multiplier between the two.
+/*
+ * Glyph size arrives on the style as `fontUnits`, already in card units.
  *
- * Calibrated against the game's own wrapping. Luke's stock bio is a SINGLE localisation key
- * (`<Encyclopedia_Text>TEXT_TOOLTIP_LUKE_SKYWALKER_JEDI</Encyclopedia_Text>`), so the four lines
- * the game shows are computed - Win32 DrawText with DT_WORDBREAK - and reproducing them is the
- * whole job:
+ * It used to be a fitted multiplier on the point size here, calibrated so that the body reproduced
+ * the shipped line breaks of Luke Skywalker's biography. That calibration was doubly misdirected:
+ * the game does not wrap by measuring text at all (see `encyclopediaWrap.ts`), and the size it
+ * draws at is not linear in the point size - it derives from the screen's height and truncates to
+ * an integer twice. One constant therefore could not be right at two resolutions, which is exactly
+ * how a mod-widened card ended up breaking dividers the mod had tuned to fit.
  *
- *     Once a farm boy from Tatooine, Luke
- *     Skywalker trained under Jedi Master Yoda
- *     to become the first of a new generation
- *     of Jedi Knights.
- *
- * The content box is 250 units: 262 wide, less the 1-unit border and the 5-unit inset on each
- * side. Mind that border - dropping it gives 252 and a font size ~0.8% too large, which is enough
- * to lose "Yoda" off the second line. With Tahoma metrics (see cssFontStack) any size in
- * (13.37, 13.57] px reproduces all four breaks plus both breaks of the capture sentence, and
- * 7 * 1.924 = 13.47 sits mid-window. Re-fit against this bio if the wrapping ever drifts.
+ * The server owns that arithmetic now, so nothing here needs to know the screen.
  */
-const POINT_TO_UNIT = 1.924;
 
 
 /**
@@ -84,11 +77,11 @@ function drawnSize(
     art: EncyclopediaImage | null | undefined, scale: number, fallback: number,
 ): { width: number; height: number } {
     if (!art || art.width <= 0 || art.height <= 0) {
-        return { width: fallback, height: fallback };
+        return {width: fallback, height: fallback};
     }
 
     const factor = (scale > 0 ? scale : REFERENCE_ICON_SCALE) / REFERENCE_ICON_SCALE;
-    return { width: art.width * factor, height: art.height * factor };
+    return {width: art.width * factor, height: art.height * factor};
 }
 
 
@@ -104,9 +97,6 @@ const CHROME = {
     // 262 is the card's own width - so the band is a full-width strip and the atlas settles its
     // height. Two variants ship, `E_TOPBAR` and `E_TOPBAR2`, at identical size.
     headerHeight: 20,
-    /** The icon's own inset. Larger when a blip is present, since the two overlap. */
-    iconLeftWithBlip: 13,
-    iconLeftNoBlip: 8,
     iconTop: 1,
     /** Gap between the icon's right edge and the name/class left edge (measured 69.3 - 63). */
     textGap: 6,
@@ -149,7 +139,7 @@ const CHROME = {
      * 127.5x42 we measured, and `E_UNIT_AGAINST` is a 43x43 square, matching the derived slot.
      * The atlas is the better source, so those are the numbers to trust if the two ever disagree.
      */
-    againstFrame: { width: 129, height: 43 },
+    againstFrame: {width: 129, height: 43},
     againstSlotSize: 43,
     againstSlots: 3,
     againstGap: 5,
@@ -257,7 +247,7 @@ export function fontOf(fontName: string): React.CSSProperties {
     let fontWeight: React.CSSProperties['fontWeight'] = 'normal';
     let fontStyle: React.CSSProperties['fontStyle'] = 'normal';
 
-    for (;;) {
+    for (; ;) {
         const lower = family.toLowerCase();
         if (lower.endsWith(' bold')) {
             // The family suffix is stripped but the weight is NOT applied: measuring the game's
@@ -274,7 +264,7 @@ export function fontOf(fontName: string): React.CSSProperties {
         }
     }
 
-    return { fontFamily: cssFontStack(family), fontWeight, fontStyle };
+    return {fontFamily: cssFontStack(family), fontWeight, fontStyle};
 }
 
 function textStyle(
@@ -282,7 +272,8 @@ function textStyle(
 ): React.CSSProperties {
     return {
         ...fontOf(style.fontName),
-        fontSize: u(style.fontPointSize * style.scale * POINT_TO_UNIT),
+        // Already in card units and already scaled - the server derived it from the target screen.
+        fontSize: u(style.fontUnits),
         // The Y of encyclopedia_back's `Size` is the row height - one text line - so it is the
         // line box, not decoration. Leaving it to the browser's default gave lines ~36% further
         // apart than the game's and was the single biggest visual difference in the card.
@@ -334,11 +325,11 @@ function AgainstPanel(
     // Fixed width, not flex: a panel shown on its own keeps its half-card size rather than
     // stretching to fill the row.
     return (
-        <div style={{ width: u(width), flex: '0 0 auto' }}>
+        <div style={{width: u(width), flex: '0 0 auto'}}>
             <div
                 style={{
                     ...fontOf(layout.header.fontName),
-                    fontSize: u(layout.header.fontPointSize * POINT_TO_UNIT),
+                    fontSize: u(layout.header.fontUnits),
                     lineHeight: u(layout.rowHeight),
                     color: labelColor,
                     // The box sits ~0.6 units off the card edge but the label ~2.8, so the text
@@ -367,7 +358,7 @@ function AgainstPanel(
                             // contents by that edge so the frame reads as a frame on every side.
                             padding: u(1),
                         }
-                        : { border: `${u(1)} solid ${border}` }),
+                        : {border: `${u(1)} solid ${border}`}),
                     height: u(panelHeight),
                     boxSizing: 'border-box',
                     display: 'flex',
@@ -382,7 +373,7 @@ function AgainstPanel(
                     card's own portrait uses - missing-icon placeholder included. A unit whose icon
                     cannot be found therefore looks the same here as anywhere else. The name only
                     appears when the unit names no icon at all, or is unknown. */}
-                {Array.from({ length: CHROME.againstSlots }, (_, i) => {
+                {Array.from({length: CHROME.againstSlots}, (_, i) => {
                     const ref = refs[i];
                     return (
                         <div
@@ -457,7 +448,7 @@ function AgainstPanel(
  * anchor is chosen.
  */
 function Divider(
-    { art, u, marginTop, marginBottom }: {
+    {art, u, marginTop, marginBottom}: {
         art?: EncyclopediaImage | null;
         u: (n: number) => string;
         marginTop: number;
@@ -472,9 +463,9 @@ function Divider(
                 position: 'relative',
                 height: 0,
                 // The 1px rule is the fallback for an atlas without the art.
-                ...(art ? {} : { borderTop: `${u(1)} solid ${CHROME.separator}` }),
+                ...(art ? {} : {borderTop: `${u(1)} solid ${CHROME.separator}`}),
                 marginTop: u(marginTop),
-                ...(marginBottom === undefined ? {} : { marginBottom: u(marginBottom) }),
+                ...(marginBottom === undefined ? {} : {marginBottom: u(marginBottom)}),
             }}
         >
             {art && (
@@ -501,7 +492,7 @@ function Divider(
  * identical at any zoom - only legibility changes.
  */
 export function EncyclopediaCard(
-    { entry, zoom, factionSlot = 0 }: {
+    {entry, zoom, factionSlot = 0}: {
         entry: GetEncyclopediaEntryResult;
         zoom: number;
         /**
@@ -519,11 +510,28 @@ export function EncyclopediaCard(
     const chrome = entry.chrome;
     const u = (n: number): string => `${n * zoom}px`;
 
-    // With no Population_Value the game shifts the header left into the blip's space. The blip
-    // does not sit beside the icon though - they overlap, the blip spanning 4.9..23.3 while the
-    // icon starts at 13.0 - so this is a measured pair of insets, not icon + blip width.
-    const hasBlip = entry.populationValue !== null && entry.populationValue !== undefined;
-    const iconLeft = hasBlip ? CHROME.iconLeftWithBlip : CHROME.iconLeftNoBlip;
+    // The header's positions come from GameConstants, not from constants of ours. A mod that moves
+    // the blip or the portrait there moves them in the game, and these used to be insets measured
+    // off a screenshot of the base game - right for that card, wrong for anyone who edited them.
+    //
+    // The engine places the portrait by its CENTRE, so the left edge is that less half the slot.
+    // With no Population_Value it shifts everything left into the blip's space; offsets.iconXFor
+    // and nameFor carry that rule.
+    const offsets = layout.offsets;
+    const hasBlip = drawsPopulationBlip(entry.populationValue);
+    const hasIcon = entry.icon !== null && entry.icon !== undefined;
+    // The portrait is placed by its CENTRE, from Encyclopedia_Icon_X_Offset. Read out of the
+    // engine, not fitted to a screenshot: the add-icon path clamps the position symmetrically
+    // against half the icon's DRAWN width (texture size times scale) at each edge, which only
+    // makes sense about a centre, and the header band goes through that same path at Size.X / 2
+    // while being the card's full width. It shifts left into the blip's space when there is no
+    // population, like the name does.
+    //
+    // Do not try to match this against a screenshot by eye. A portrait is art with its own
+    // transparent margins inside the slot, so the leftmost DRAWN pixel differs from icon to icon;
+    // comparing two different units measures their margins, not their placement.
+    const iconCentre = hasBlip ? offsets.iconX : offsets.iconX - offsets.population;
+    const iconLeft = iconCentre - ICON_SIZE / 2;
     // The band art already contains the disc, so the variant IS the blip's background.
     const topBarArt = hasBlip ? chrome?.topBar : chrome?.topBarNoBlip;
     // The band's own height, not an assumed 20: it is atlas art and a mod may ship it taller.
@@ -535,10 +543,15 @@ export function EncyclopediaCard(
     // drawn at its true proportions - several shipped portraits are NOT square (50x49, 47x47,
     // 44x45) and stretching them all into a square box visibly distorted those.
     const portrait = drawnSize(entry.icon, layout.iconScale, ICON_SIZE);
-    // The name and the class line share this left edge - measured at x=206 and x=205 in the game's
-    // galactic card. The name is NOT centred; it only looked centred in the tactical card because
-    // that particular name happened to be long enough to fill the row.
-    const textLeft = iconLeft + ICON_SIZE + CHROME.textGap;
+    // The name and the class line share this left edge, and it is a LEFT edge because both rows are
+    // left-justified - the same GameConstants number would be a centre for an icon and a right edge
+    // for the cost. Nothing is left holding empty space: with no blip the name moves left by the
+    // blip's own offset, with no portrait it closes the portrait's share too, and with neither it
+    // simply starts where the blip would have.
+    const textLeft = !hasIcon && !hasBlip ? offsets.population
+        : !hasBlip ? offsets.name - offsets.population
+            : !hasIcon ? offsets.name - (offsets.iconX - offsets.population)
+                : offsets.name;
 
     // The faction frame the engine would draw for the viewing player's faction. Absent art is
     // normal - the base game ships no frame past slot 1, and a mod may name one the atlas lacks.
@@ -565,7 +578,7 @@ export function EncyclopediaCard(
                 // which is the feathered ring on the empire frame and flat colour on the rebel one.
                 border: `${u(1)} solid ${CHROME.border}`,
                 ...(factionFrame
-                    ? { borderImage: `url("${factionFrame.dataUri}") 25% stretch` }
+                    ? {borderImage: `url("${factionFrame.dataUri}") 25% stretch`}
                     : {}),
                 // Anchors the backdrop layer, and the z-index makes this a stacking context so a
                 // negative-z child cannot escape behind the panel's own background.
@@ -628,7 +641,7 @@ export function EncyclopediaCard(
               * name is centred on the whole card too (its centre lands within a pixel of the
               * card's), not on the space beside the portrait.
               */}
-            <div style={{ position: 'relative', height: u(CHROME.headerBlockHeight) }}>
+            <div style={{position: 'relative', height: u(CHROME.headerBlockHeight)}}>
                 <div
                     style={{
                         position: 'absolute',
@@ -651,24 +664,69 @@ export function EncyclopediaCard(
                         boxSizing: 'border-box',
                     }}
                 >
-                    <span
-                        style={{
-                            ...textStyle(layout.header, layout, u),
-                            color: '#ffffff',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                        }}
-                    >
-                        {entry.displayName ?? entry.objectId}
+                    {/* Wrapped on its own budget, not the header component's: with no cost drawn
+                        beside it the name is given eight more characters of the row. `pre` so CSS
+                        cannot re-break what the budget already decided. */}
+                    <span style={{...textStyle(layout.header, layout, u), color: '#ffffff'}}>
+                        {wrapByCharacterBudget(
+                            entry.displayName ?? entry.objectId,
+                            entry.rowBudgets?.name ?? layout.header.wrapChars,
+                        ).map((line, i) => (
+                            <div key={i} style={{whiteSpace: 'pre'}}>{line}</div>
+                        ))}
                     </span>
+
+                    {/* The cost, at the right end of the same band. The engine formats it as
+                        "$ %d" - a LITERAL dollar sign, which reads as the credits coin only
+                        because this row is set in EmpireAtWar-Bold, where that glyph is the
+                        currency symbol. The preview cannot ship that font, so it draws the dollar
+                        sign the data actually contains; the notice beside the card says why.
+
+                        Right-aligned to the card's own inset. The engine places it from a
+                        GameConstant (Encyclopedia_Cost_Offset) that nothing here reads yet, so this
+                        is the card's inset rather than that value. */}
+                    {entry.buildCost !== null && entry.buildCost !== undefined && entry.buildCost > 0 && (
+                        <span
+                            style={{
+                                ...textStyle(layout.costText, layout, u),
+                                marginLeft: 'auto',
+                                paddingRight: u(layout.offsetX),
+                                whiteSpace: 'pre',
+                                flex: '0 0 auto',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: u(2),
+                            }}
+                        >
+                            {chrome?.credit
+                                ? (
+                                    <img
+                                        src={chrome.credit.dataUri}
+                                        alt="credits"
+                                        // Its own proportions at the row's height, so a reskinned
+                                        // coin keeps its shape instead of being squared off.
+                                        style={{
+                                            height: u(layout.costText.fontUnits),
+                                            width: 'auto',
+                                            display: 'block',
+                                        }}
+                                    />
+                                )
+                                : '$ '}
+                            {wrapByCharacterBudget(
+                                String(entry.buildCost), layout.costText.wrapChars,
+                            ).join(' ')}
+                        </span>
+                    )}
                 </div>
 
                 {hasBlip && (
                     <div
                         style={{
                             position: 'absolute',
-                            left: u(CHROME.blipLeft),
+                            // The box is centred on the offset, so the digits inside it land where
+                            // the engine puts them whatever the mod moves that offset to.
+                            left: u(offsets.population - CHROME.blipSize / 2),
                             top: u(CHROME.blipTop),
                             width: u(CHROME.blipSize),
                             height: u(CHROME.blipSize),
@@ -680,16 +738,20 @@ export function EncyclopediaCard(
                             // that supplied no band at all.
                             ...(topBarArt
                                 ? {}
-                                : { borderRadius: '50%', background: CHROME.blipFill }),
+                                : {borderRadius: '50%', background: CHROME.blipFill}),
                             color: CHROME.blipLabel,
                             display: 'flex',
                             alignItems: 'center',
-                            // Right-justified, per the TextButton's Text_Offset X of 12: the digit's
-                            // right edge lands at 12 against a disc centred on 10, which is what
-                            // makes the number sit a shade left of centre in the game rather than
-                            // dead centre as a naive rendering does.
-                            justifyContent: 'flex-end',
-                            paddingRight: u(CHROME.blipSize + CHROME.blipLeft - CHROME.blipTextRight),
+                            // CENTRED on Encyclopedia_Population_Offset. The engine adds this
+                            // number as an `encyclopedia_center_text` line at that offset, and that
+                            // component declares neither justify tag - which is what centres it.
+                            //
+                            // It was right-justified here, from reading `encyclopedia_icon`'s
+                            // Text_Offset of 12. That is the wrong component: encyclopedia_icon
+                            // draws the band and the portrait, not this number. The mistake put the
+                            // digits at 6.8 units where the engine puts them at 11 - visibly left
+                            // of the disc baked into the band art, which sits at about 10.
+                            justifyContent: 'center',
                             boxSizing: 'border-box',
                             ...fontOf('Arial Bold'),
                             fontSize: u(CHROME.blipSize * 0.62),
@@ -791,9 +853,6 @@ export function EncyclopediaCard(
                                 color: '#ffffff',
                                 flex: '1 1 0',
                                 minWidth: 0,
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
                             }}
                         >
                             {/* Verbatim - do NOT prepend "Class: ". That label is part of the
@@ -801,8 +860,18 @@ export function EncyclopediaCard(
                                 MasterTextFile stores whole values like "Class: Turret" and
                                 "Class: Tank", and it could not be hardcoded anyway since the game
                                 ships French, German, Spanish and Italian. Prefixing it here
-                                rendered "Class: Class: Corvette". */}
-                            {entry.unitClass ?? ''}
+                                rendered "Class: Class: Corvette".
+
+                                Budget 32, less 4 for every ability icon sharing this row - so this
+                                does NOT use the body component's, even though it is drawn with the
+                                body's font. It used to truncate with an ellipsis, which the game
+                                never does; it wraps. */}
+                            {wrapByCharacterBudget(
+                                entry.unitClass ?? '',
+                                entry.rowBudgets?.unitClass ?? 0,
+                            ).map((line, i) => (
+                                <div key={i} style={{whiteSpace: 'pre'}}>{line}</div>
+                            ))}
                         </span>
 
                     {/* Exactly two slots: ability 0 left, ability 1 right. Anything further down
@@ -818,74 +887,74 @@ export function EncyclopediaCard(
                         // differ the same way, exactly as the engine draws them.
                         const slot = abilitySlotSize(layout, ability.icon);
                         return (
-                        <div
-                            key={ability.abilityName ?? ability.type}
-                            style={{
-                                width: u(slot),
-                                height: u(slot),
-                                flex: '0 0 auto',
-                                // No background and no border, for the same reason as the portrait:
-                                // the game draws no slot chrome here. Ability icons merely LOOK like
-                                // filled squares because most of them are opaque and square - that
-                                // is the artwork, not a frame around it. Painting one would show
-                                // through every icon that is not.
-                                boxSizing: 'border-box',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                // No padding: the engine scales the atlas cut to fill the slot, so
-                                // insetting it here drew every icon a unit smaller than the game's.
-                                // The text fallback below opts back into its own padding.
-                                ...fontOf('Arial'),
-                                fontSize: u(3.4),
-                                lineHeight: u(3.8),
-                                color: 'rgba(255, 255, 255, 0.9)',
-                                textAlign: 'center',
-                                overflow: 'hidden',
-                                wordBreak: 'break-word',
-                            }}
-                            title={
-                                `${ability.type}${ability.abilityName ? ` (${ability.abilityName})` : ''}`
-                                + `${ability.alternateIconName
-                                    ? ` - alternate icon ${ability.alternateIconName}` : ''}`
-                            }
-                        >
-                            {ability.icon ? (
-                                <img
-                                    src={ability.icon.dataUri}
-                                    alt={ability.type}
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        display: 'block',
-                                        objectFit: 'fill',
-                                        imageRendering: 'pixelated',
-                                    }}
-                                />
-                            ) : (
-                                // No icon resolved - the engine's ability-to-icon mapping is not in
-                                // the data, so this is expected for a good share of abilities. The
-                                // type text is still the most useful thing to show, and unlike the
-                                // icon it needs an outline to read as a slot at all. That outline is
-                                // an editor affordance; the game draws nothing here.
-                                <div
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        background: CHROME.abilitySlot,
-                                        border: `${u(1)} solid rgba(255, 255, 255, 0.25)`,
-                                        boxSizing: 'border-box',
-                                        padding: u(0.5),
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        overflow: 'hidden',
-                                    }}
-                                >
-                                    {ability.type}
-                                </div>
-                            )}
-                        </div>
+                            <div
+                                key={ability.abilityName ?? ability.type}
+                                style={{
+                                    width: u(slot),
+                                    height: u(slot),
+                                    flex: '0 0 auto',
+                                    // No background and no border, for the same reason as the portrait:
+                                    // the game draws no slot chrome here. Ability icons merely LOOK like
+                                    // filled squares because most of them are opaque and square - that
+                                    // is the artwork, not a frame around it. Painting one would show
+                                    // through every icon that is not.
+                                    boxSizing: 'border-box',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    // No padding: the engine scales the atlas cut to fill the slot, so
+                                    // insetting it here drew every icon a unit smaller than the game's.
+                                    // The text fallback below opts back into its own padding.
+                                    ...fontOf('Arial'),
+                                    fontSize: u(3.4),
+                                    lineHeight: u(3.8),
+                                    color: 'rgba(255, 255, 255, 0.9)',
+                                    textAlign: 'center',
+                                    overflow: 'hidden',
+                                    wordBreak: 'break-word',
+                                }}
+                                title={
+                                    `${ability.type}${ability.abilityName ? ` (${ability.abilityName})` : ''}`
+                                    + `${ability.alternateIconName
+                                        ? ` - alternate icon ${ability.alternateIconName}` : ''}`
+                                }
+                            >
+                                {ability.icon ? (
+                                    <img
+                                        src={ability.icon.dataUri}
+                                        alt={ability.type}
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            display: 'block',
+                                            objectFit: 'fill',
+                                            imageRendering: 'pixelated',
+                                        }}
+                                    />
+                                ) : (
+                                    // No icon resolved - the engine's ability-to-icon mapping is not in
+                                    // the data, so this is expected for a good share of abilities. The
+                                    // type text is still the most useful thing to show, and unlike the
+                                    // icon it needs an outline to read as a slot at all. That outline is
+                                    // an editor affordance; the game draws nothing here.
+                                    <div
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            background: CHROME.abilitySlot,
+                                            border: `${u(1)} solid rgba(255, 255, 255, 0.25)`,
+                                            boxSizing: 'border-box',
+                                            padding: u(0.5),
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            overflow: 'hidden',
+                                        }}
+                                    >
+                                        {ability.type}
+                                    </div>
+                                )}
+                            </div>
                         );
                     })}
                 </div>
@@ -894,38 +963,46 @@ export function EncyclopediaCard(
             {/* Everything below the band keeps the horizontal inset, so the body's content box
                 stays 250 units (262 less the 1-unit border and 5-unit inset per side) - the width
                 the wrap calibration is fitted to. */}
-            <div style={{ padding: `0 ${u(layout.offsetX)}` }}>
-            {/* Full width. An earlier scan found no line to the left of the icon and I read that as
+            <div style={{padding: `0 ${u(layout.offsetX)}`}}>
+                {/* Full width. An earlier scan found no line to the left of the icon and I read that as
                 the divider starting at the icon's edge - but the icon is 50 units tall in a 42-unit
                 header block, so at the divider's row the scan was hitting the icon, which is drawn
                 over the line. */}
-            <Divider
-                art={chrome?.line}
-                u={u}
-                marginTop={CHROME.separatorGap}
-                marginBottom={CHROME.bodyTopGap}
-            />
+                <Divider
+                    art={chrome?.line}
+                    u={u}
+                    marginTop={CHROME.separatorGap}
+                    marginBottom={CHROME.bodyTopGap}
+                />
 
-            {/* Body runs the full width, under the portrait - not in the column beside it. */}
-            <div>
-                {entry.body.map((line, i) => (
-                    line.text === null || line.text === undefined
-                        ? (
-                            <div
-                                key={`${line.key}-${i}`}
-                                style={{ ...textStyle(layout.body, layout, u), color: '#f04c4c' }}
-                                title={`No translation loaded for '${line.key}'`}
-                            >
-                                {`<${line.key}>`}
-                            </div>
-                        )
-                        : (
-                            <div key={`${line.key}-${i}`} style={textStyle(layout.body, layout, u)}>
-                                {line.text}
-                            </div>
-                        )
-                ))}
-            </div>
+                {/* Body runs the full width, under the portrait - not in the column beside it.
+
+                Line breaks come from the CHARACTER budget, never from the browser: the game counts
+                characters and measures no glyphs, so a modder can author a run of `=` that spans
+                the card exactly. `pre` is what stops CSS from second-guessing that - letting it
+                wrap as well would break exactly the lines this rule exists to keep whole. */}
+                <div>
+                    {entry.body.map((line, i) => (
+                        line.text === null || line.text === undefined
+                            ? (
+                                <div
+                                    key={`${line.key}-${i}`}
+                                    style={{...textStyle(layout.body, layout, u), color: '#f04c4c'}}
+                                    title={`No translation loaded for '${line.key}'`}
+                                >
+                                    {`<${line.key}>`}
+                                </div>
+                            )
+                            : wrapByCharacterBudget(line.text, layout.body.wrapChars).map((wrapped, w) => (
+                                <div
+                                    key={`${line.key}-${i}-${w}`}
+                                    style={{...textStyle(layout.body, layout, u), whiteSpace: 'pre'}}
+                                >
+                                    {wrapped}
+                                </div>
+                            ))
+                    ))}
+                </div>
             </div>
 
             {/* All or nothing: either tag being set brings up BOTH panels, so the six slots always
@@ -935,7 +1012,7 @@ export function EncyclopediaCard(
             {/* The game repeats the divider above this section, but only when the section is there
                 at all - it separates the body from the panels, so with no panels there is nothing
                 to separate. Same art and same core-row offset as the divider under the class row. */}
-            {hasAgainst && <Divider art={chrome?.line} u={u} marginTop={CHROME.sectionGap} />}
+            {hasAgainst && <Divider art={chrome?.line} u={u} marginTop={CHROME.sectionGap}/>}
 
             {hasAgainst && (
                 <div

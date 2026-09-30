@@ -220,7 +220,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // its longest value of any kind 2,535, so the headroom is real but spendable.
         // 142 -> 143: CaseSensitiveTagHandler added - a tag spelled in a casing its own parser will
         // not accept. Rare by design: DatabaseMapClass uppercases every key it handles, so casing is
-        // free for all but the tags with a hand-rolled parser. StoryModeClass::Load_Plots is one,
+        // free for all but the tags with a hand-rolled parser. The plot loader is one,
         // comparing with std::operator==, and the result of its Active_Plot test becomes the
         // is_active argument to Load_Single_Plot - so <active_plot> loads SUSPENDED and the campaign
         // never starts, with nothing said at runtime.

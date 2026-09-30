@@ -12,7 +12,7 @@
 
 import * as React from 'react';
 
-import { type ChoiceOption } from './choice';
+import {type ChoiceOption} from './choice';
 
 /**
  * One position on the dial.
@@ -57,13 +57,21 @@ export function RotaryModeSwitch<Id extends string>(props: {
     modes: readonly RotaryMode<Id>[];
     onSelect: (mode: Id) => void;
 }): React.JSX.Element {
-    const { modes } = props;
+    const {modes} = props;
     const active = modes.find(mode => mode.id === props.mode) ?? modes[0];
     const order = modes.map(mode => mode.id);
 
+    // Steps to the next mode that can actually be taken. Cycling blindly walked straight into a
+    // disabled one, which is how a graph nothing could edit still ended up in Edit mode.
     const cycle = (): void => {
         const at = order.indexOf(props.mode);
-        props.onSelect(order[(at + 1) % order.length]);
+        for (let step = 1; step <= order.length; step++) {
+            const candidate = modes[(at + step) % order.length];
+            if (candidate.disabled !== true) {
+                props.onSelect(candidate.id);
+                return;
+            }
+        }
     };
 
     return (
@@ -77,12 +85,18 @@ export function RotaryModeSwitch<Id extends string>(props: {
                     <button
                         key={mode.id}
                         className={'rotary-pos' + (mode.id === props.mode ? ' active' : '')}
-                        style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}
-                        title={mode.count === undefined
-                            ? mode.label
-                            : `${mode.label} (${mode.count})`}
+                        style={{transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`}}
+                        disabled={mode.disabled ?? false}
+                        // The reason outranks the label: it is the only thing worth saying about a
+                        // mode that cannot be entered, and saying it HERE is what stops someone
+                        // working in a mode whose edits will be refused later.
+                        title={mode.disabled
+                            ? mode.disabledReason ?? mode.label
+                            : mode.count === undefined
+                                ? mode.label
+                                : `${mode.label} (${mode.count})`}
                         onClick={() => props.onSelect(mode.id)}
-                    ><span className={'codicon codicon-' + mode.icon} /></button>
+                    ><span className={'codicon codicon-' + mode.icon}/></button>
                 );
             })}
             <button
@@ -92,7 +106,7 @@ export function RotaryModeSwitch<Id extends string>(props: {
                     : `${active.label} - the other modes are unavailable here`}
                 onClick={cycle}
             >
-                <span className={'codicon codicon-' + active.icon} />
+                <span className={'codicon codicon-' + active.icon}/>
             </button>
         </div>
     );

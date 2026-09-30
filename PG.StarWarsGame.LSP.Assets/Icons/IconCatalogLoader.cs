@@ -85,15 +85,12 @@ public static class IconCatalogLoader
             .SelectMany(layer => layer.Settings.SourceRoots
                 .Select(r => fileSystem.Path.Combine(layer.RootPath, r)))
             .ToList();
+        // Scanned, not decoded. The scan answers every question the catalog asks of this layer -
+        // which names exist, and which are missing from the mega texture - and a mod's source
+        // folders run to thousands of files, so the pixels wait until something wants one.
         var catalog = LooseIconCatalog.Scan(fileSystem, roots);
-        var loose = LooseIconDecoder.DecodeAll(fileSystem, catalog, out var unsupported);
 
-        foreach (var name in unsupported)
-            logger.LogWarning(
-                "Icon source '{Name}' could not be decoded; BMP sources are not supported and " +
-                "corrupt images are skipped.", name);
-
-        return new IconCatalog(workspace, loose, baseline.Icons);
+        return new IconCatalog(workspace, LooseIconStore.Over(fileSystem, catalog), baseline.Icons);
     }
 
 

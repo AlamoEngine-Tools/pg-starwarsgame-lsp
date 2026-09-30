@@ -1183,7 +1183,7 @@ public sealed class PreviewSceneBuilder(
         // Can a shot ever REACH this hardpoint? Only one shape makes it impossible: no Collision_Mesh
         // at all.
         //
-        // GameObjectClass::Take_Damage finds the hardpoint by NAME, an exact _stricmp against each
+        // The engine's damage path finds the hardpoint by NAME, an exact _stricmp against each
         // Collision_Mesh - but first replaces the name with the hardpoint's OWN value when the hit is
         // aimed at it, and in a second path taken from the attacker. The lookup
         // then compares a value with itself, so a Collision_Mesh the model lacks is still reachable

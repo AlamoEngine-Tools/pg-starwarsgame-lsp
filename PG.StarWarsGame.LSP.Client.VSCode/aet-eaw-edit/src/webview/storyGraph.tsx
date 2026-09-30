@@ -52,7 +52,7 @@ import {canvasEdgeStyle, type CanvasEdgeStyle, MUTED_EDGE_TOKEN} from './storyGr
 import {branchKey, type BranchKeyEntry} from './storyGraph/colourKey';
 import {ColourKeyFlyout} from './storyGraph/ColourKeyFlyout';
 import {FrameNotifier} from './storyGraph/frameNotifier';
-import {canReuseStoredLayout, layoutEntryKey, nodeLayoutKey} from './storyGraph/layoutReuse';
+import {canReuseStoredLayout, layoutEntryKey, newEventLayoutKey, nodeLayoutKey} from './storyGraph/layoutReuse';
 import {createLabelSizer, LINE_RATIO, wrapLabel} from './storyGraph/lodLabel';
 import {facetList} from './storyGraph/facets';
 import {PathFilterMenu} from './storyGraph/PathFilterMenu';
@@ -65,7 +65,7 @@ import {Extent, fitZoom} from './storyGraph/viewportFit';
 import {booleanParamLabel, paramLabel} from './storyGraph/paramLabels';
 import {paramRowSpecs} from './storyGraph/paramRows';
 import {StagedRenames} from './storyGraph/stagedRenames';
-import {readOnlyMessage, readOnlyOwnerOf, readOnlyThreadIndex} from './storyGraph/dependencyEdit';
+import {editModeBlockedBy, readOnlyMessage, readOnlyOwnerOf, readOnlyThreadIndex} from './storyGraph/dependencyEdit';
 import {optimisticEdit, PREVIEW_KINDS, STAGED_KINDS} from './staging';
 import {GRAPH_FILTER_DEBOUNCE_MS, useDebounced} from './loc/useDebounced';
 import {worstSeverity} from './loc/validateState';
@@ -2457,15 +2457,20 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const rect = container.getBoundingClientRect();
             return {x: (clientX - rect.left - x) / k, y: (clientY - rect.top - y) / k};
         },
+        // Both of these RESERVE a position for a node that does not exist yet, and patch() consumes
+        // it by nodeLayoutKey. They keyed on the thread's BASE NAME while that key moved onto the
+        // full threadUri, so nothing ever matched: every reservation was dropped and the node
+        // landed wherever placeNewNode guessed. Nothing failed loudly, because the fallback is a
+        // perfectly good position - just not the one asked for. Same function on both sides now.
         presetPosition(threadUri: string, eventName: string, position: { x: number; y: number }): void {
-            pendingDropPositions.set(`${baseName(threadUri)} ${eventName}`.toLowerCase(), position);
+            pendingDropPositions.set(newEventLayoutKey(threadUri, eventName), position);
         },
         carryPosition(oldNodeId: string, threadUri: string | null | undefined, newName: string): void {
             const view = area.nodeViews.get(oldNodeId);
             if (!view) {
                 return;
             }
-            pendingDropPositions.set(`${baseName(threadUri)} ${newName}`.toLowerCase(),
+            pendingDropPositions.set(newEventLayoutKey(threadUri, newName),
                 {x: view.position.x, y: view.position.y});
         },
         getEventNode(nodeId: string): {
@@ -5356,6 +5361,8 @@ function App(): React.JSX.Element {
     // every request the server would reject. View is implied - the panel wouldn't open without it.
     const [availableModes, setAvailableModes] = useState<{ edit: boolean; simulate: boolean }>(
         {edit: false, simulate: false});
+    /** Why Edit is disabled for the graph on screen, or null when it can be entered. */
+    const [editBlockedBy, setEditBlockedBy] = useState<string | null>(null);
     const [problems, setProblems] = useState<StoryDiagnosticDto[]>([]);
 
     /**
@@ -5484,7 +5491,7 @@ function App(): React.JSX.Element {
     const switchMode = useCallback((next: EditorMode) => {
         // A disabled mode is not offered by the switch, but guard here too - this is the single
         // funnel every mode change goes through, including the centre-button cycle.
-        if ((next === 'edit' && !availableModes.edit)
+        if ((next === 'edit' && (!availableModes.edit || editBlockedBy !== null))
             || (next === 'simulate' && !availableModes.simulate)) {
             return;
         }
@@ -5495,7 +5502,7 @@ function App(): React.JSX.Element {
             return;
         }
         doSwitchMode(next);
-    }, [mode, doSwitchMode, availableModes]);
+    }, [mode, doSwitchMode, availableModes, editBlockedBy]);
 
     const onCanvasDragOver = useCallback((e: DragEvent): void => {
         if (mode !== 'edit') {
@@ -5893,6 +5900,10 @@ function App(): React.JSX.Element {
         // be able to target a thread the current filter is hiding.
         setBranches(facetList(facets.branches, nodes.map(n => n.branch), filtersRef.current.branch));
         setThreads(facetList(facets.threads, nodes.map(n => n.threadUri), ''));
+        // A graph with nothing of this project's own in it cannot be edited at all, and the switch
+        // has to say so BEFORE anything is dragged onto the canvas - disabling the fields on each
+        // node still leaves the canvas taking drops.
+        setEditBlockedBy(editModeBlockedBy(nodes));
         if (!nodes.length) {
             setStatus('No events match the current filters.');
             return;
@@ -6355,9 +6366,15 @@ function App(): React.JSX.Element {
                             ) : null}
                             <RotaryModeSwitch
                                 mode={mode}
-                                modes={STORY_MODES.filter(
-                                    m => (m.id === 'edit' ? availableModes.edit
-                                        : m.id === 'simulate' ? availableModes.simulate : true))}
+                                modes={STORY_MODES
+                                    .filter(m => (m.id === 'edit' ? availableModes.edit
+                                        : m.id === 'simulate' ? availableModes.simulate : true))
+                                    // Edit is DISABLED on a graph whose every thread belongs to a
+                                    // referenced project. Not hidden, and not left clickable with
+                                    // the refusal arriving after the drop.
+                                    .map(m => (m.id === 'edit' && editBlockedBy !== null
+                                        ? {...m, disabled: true, disabledReason: editBlockedBy}
+                                        : m))}
                                 onSelect={switchMode}
                             />
                             <SeverityTag

@@ -17,6 +17,17 @@ public static class ProjectIndexLocator
         return GetAetswgDirectory(pgprojPath) + "/indices/" + stem + ".msgpack";
     }
 
+    /// <summary>
+    ///     Where this project's persisted model-bone catalog lives. A sibling of
+    ///     <c>indices/</c> rather than a file inside it, so the two are invalidated independently -
+    ///     an XML edit must not throw away a 25-second ALO extraction.
+    /// </summary>
+    public static string GetModelBonesFilePath(string pgprojPath)
+    {
+        var stem = GetStem(pgprojPath);
+        return GetAetswgDirectory(pgprojPath) + "/bones/" + stem + ".msgpack";
+    }
+
     private static string GetDirectory(string path)
     {
         var normalized = path.Replace('\\', '/');

@@ -39,7 +39,8 @@ public static class ProjectIndexSerializer
         }
     }
 
-    public static ProjectFileEntry ToEntry(string relativePath, string contentHash, DocumentIndex doc)
+    public static ProjectFileEntry ToEntry(
+        string relativePath, string contentHash, DocumentIndex doc, byte[]? parserState = null)
     {
         return new ProjectFileEntry
         {
@@ -54,7 +55,8 @@ public static class ProjectIndexSerializer
                     ? []
                     : doc.GroupMemberships.Select(SerializedDocumentGroupMembership.FromRuntime).ToArray(),
                 LayerRank = doc.LayerRank,
-                LayerName = doc.LayerName
+                LayerName = doc.LayerName,
+                ParserState = parserState ?? []
             }
         };
     }

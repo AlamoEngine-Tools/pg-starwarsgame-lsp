@@ -33,13 +33,40 @@ public static class EncyclopediaTextAlignment
 /// <param name="Scale">Multiplier the engine applies to the point size.</param>
 /// <param name="TextColor">Glyph colour.</param>
 /// <param name="Alignment">Resolved from the justify tags' presence.</param>
+/// <param name="WrapChars">
+///     How many CHARACTERS fit on one line, from this component's own <c>Size</c> X.
+///     <para>
+///         The engine wraps this text on a character count, comparing the line's length against
+///         this number - it measures no glyphs at all. That is why a mod can author a run of
+///         <c>=</c> that spans the card exactly and rely on it never breaking: they counted
+///         characters, and so does the game. The cut fires when a line REACHES the budget, so the
+///         longest line it can produce is one character short of it.
+///     </para>
+///     <para>
+///         Not to be confused with <see cref="EncyclopediaLayout.Width" />, which is the backdrop's
+///         geometry and has no bearing on where lines break. A mod that widens the card widens this
+///         separately - EaWX moves the card from 262 to 340 and the body budget from 41 to 56.
+///     </para>
+/// </param>
+/// <param name="FontUnits">
+///     The glyph height in CARD units - the same units <see cref="EncyclopediaLayout.Width" /> is
+///     given in, so a client may draw at any zoom and keep the proportions.
+///     <para>
+///         Derived from the target screen the way the game derives it, truncations included, rather
+///         than from a fitted multiplier on <paramref name="FontPointSize" />. See
+///         <see cref="EncyclopediaGlyphSize" /> for why a single multiplier cannot be right at two
+///         resolutions at once. <paramref name="Scale" /> is already applied.
+///     </para>
+/// </param>
 public sealed record EncyclopediaTextStyle(
     string Component,
     string FontName,
     double FontPointSize,
     double Scale,
     EncyclopediaRgba TextColor,
-    string Alignment
+    string Alignment,
+    int WrapChars,
+    double FontUnits
 );
 
 /// <summary>
@@ -99,5 +126,6 @@ public sealed record EncyclopediaLayout(
     EncyclopediaTextStyle Body,
     EncyclopediaTextStyle RightText,
     EncyclopediaTextStyle CenterText,
-    EncyclopediaTextStyle CostText
+    EncyclopediaTextStyle CostText,
+    EncyclopediaOffsets Offsets
 );

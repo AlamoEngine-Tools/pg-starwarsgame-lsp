@@ -18,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 /// <remarks>
 ///     <para>
 ///         Nearly every tag is case-insensitive, because the database mapper uppercases the key
-///         before matching. <c>StoryModeClass::Load_Plots</c> never reaches that mapper - it
+///         before matching. The engine's plot loader never reaches that mapper - it
 ///         compares with <c>std::operator==</c>, which is a memcmp.
 ///     </para>
 ///     <para>

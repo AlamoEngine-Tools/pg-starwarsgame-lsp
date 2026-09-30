@@ -25,7 +25,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 public static class CaseSensitiveTags
 {
     /// <summary>
-    ///     <c>StoryModeClass::Load_Plots</c> compares each key against these two
+    ///     The engine's plot loader compares each key against these two
     ///     literals with <c>std::operator==</c>, then passes <c>key == "Active_Plot"</c> straight to
     ///     <c>Load_Single_Plot</c> as its <c>is_active</c> argument.
     /// </summary>

@@ -102,7 +102,7 @@ public sealed class XmlDocumentFactProducer(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>GameObjectTypeClass::Get_Name_CRC</c> copies the name into a 128-byte buffer,
+    ///         The engine's name-CRC routine copies the name into a 128-byte buffer,
     ///         uppercases it and hashes that. The size check beside the copy is an assert and the
     ///         copy itself is a bare <c>strcpy</c>, so the bound is enforced in the build Petroglyph
     ///         tested with and nowhere else.

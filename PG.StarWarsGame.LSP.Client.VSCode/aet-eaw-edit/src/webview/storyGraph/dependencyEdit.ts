@@ -42,3 +42,35 @@ export function readOnlyOwnerOf(
 export function readOnlyMessage(owner: string): string {
     return `Read-only: '${owner}' is a referenced project. Edit this thread in '${owner}' itself`;
 }
+
+/**
+ * Why Edit mode cannot be entered for this graph, or null when it can.
+ *
+ * ANY read-only thread blocks it, not just a graph made entirely of them. A mixed graph is the
+ * worse case, not the easier one: the canvas takes drops wherever you aim them, a new event lands
+ * in whichever thread is nearest, and a prereq drawn to a referenced event writes to that event's
+ * file - so "some of this is editable" cannot be enforced by disabling controls on the nodes that
+ * are not.
+ *
+ * The honest place to say so is the MODE SWITCH, before anything is typed, dragged or dropped.
+ *
+ * Only nodes that HAVE a thread count. Junctions and portals are structural - drawn from the events
+ * around them and owning no file - so they neither block nor permit.
+ */
+export function editModeBlockedBy(nodes: readonly StoryGraphNodeDto[]): string | null {
+    const threaded = nodes.filter(n => n.threadUri);
+    const owners = [...new Set(
+        threaded.map(n => n.readOnlyOwner).filter((o): o is string => Boolean(o)))];
+
+    if (owners.length === 0) {
+        return null;
+    }
+
+    const named = owners.length === 1
+        ? `'${owners[0]}'`
+        : owners.map(o => `'${o}'`).join(' and ');
+    const all = threaded.every(n => n.readOnlyOwner);
+
+    return `${all ? 'Every thread here belongs' : 'Part of this graph belongs'} to ${named}, which `
+        + 'this workspace only references. Open the graph in that project to edit it.';
+}

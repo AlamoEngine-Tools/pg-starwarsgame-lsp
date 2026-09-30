@@ -260,6 +260,32 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.False(provider.Current.Diagnostics.WorkspaceOnStartup);
     }
 
+    // ── encyclopedia ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Same hazard as the diagnostics node above: the client can send this key forever and the
+    ///     card will keep drawing for 1920x1080 unless the server actually reads it.
+    /// </summary>
+    [Fact]
+    public void LoadFrom_EncyclopediaNode_IsRead()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { encyclopedia = new { screenWidth = 2560, screenHeight = 1440 } }));
+
+        Assert.Equal(2560, provider.Current.Encyclopedia.ScreenWidth);
+        Assert.Equal(1440, provider.Current.Encyclopedia.ScreenHeight);
+    }
+
+    [Fact]
+    public void LoadFrom_NoEncyclopediaNode_DrawsForTheCommonScreen()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { locale = "en" }));
+
+        Assert.Equal(1920, provider.Current.Encyclopedia.ScreenWidth);
+        Assert.Equal(1080, provider.Current.Encyclopedia.ScreenHeight);
+    }
+
     // ── feature flags ────────────────────────────────────────────────────────
 
     [Fact]

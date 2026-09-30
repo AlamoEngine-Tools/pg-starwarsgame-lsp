@@ -14,7 +14,7 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 ///         It was reported (issue #134) that the event also supports <c>Event_Param2</c>. It does
 ///         not, and the engine source settles it rather than leaving it to inference:
 ///         <c>StoryEvent.cpp</c> dispatches <c>Event_Param1..7</c> straight to
-///         <c>Set_Param(0..6)</c>, and <c>StoryEventElapsedClass::Set_Param</c> handles
+///         <c>Set_Param(0..6)</c>, and the elapsed event's parameter setter handles
 ///         <c>index == 0</c> only - it reads <c>TriggerTime</c> and returns, never calling the
 ///         base. Every other index is silently dropped.
 ///     </para>

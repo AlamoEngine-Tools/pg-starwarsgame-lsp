@@ -65,6 +65,24 @@ public sealed record BaselineIndex(
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    ///     Texture names carried INSIDE each shipped <c>.alo</c>, keyed the same way as
+    ///     <see cref="ModelBones" />.
+    /// </summary>
+    /// <remarks>
+    ///     A model's own skins are written in the binary, not in the XML, so validating them used
+    ///     to mean opening the model during validation. MEASURED 2026-09-30: that was the whole
+    ///     cost of a workspace diagnostics sweep - one prop file spent 17.2s of its 17.5s there.
+    ///     Captured offline instead, like <see cref="ModelBones" />, from the same scan.
+    ///     <para>
+    ///         An empty entry means "this model names no textures" and is a real answer; a MISSING
+    ///         entry means the catalog has never seen the model, and the caller must parse it
+    ///         rather than report its textures as absent.
+    ///     </para>
+    /// </remarks>
+    public ImmutableDictionary<string, ImmutableArray<string>> ModelTextures { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     ///     Full child-tag tree of each shipped GameObject, keyed case-insensitively by object id. Built
     ///     offline by the BaselineBuilder; consumed by the effective-object merge engine so that variants
     ///     (<c>Variant_Of_Existing_Type</c>) whose base is a shipped object can be resolved. Empty for

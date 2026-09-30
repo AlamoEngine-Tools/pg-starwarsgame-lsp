@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     <para>
 ///         Almost every tag is case-insensitive, because <c>DatabaseMapClass</c> uppercases the key
 ///         before matching it. The exceptions are tags with a hand-rolled parser, which brings its
-///         own rules: <c>StoryModeClass::Load_Plots</c> compares with <c>std::operator==</c>.
+///         own rules: the plot loader compares with <c>std::operator==</c>.
 ///     </para>
 ///     <para>
 ///         Carries the consequence rather than deriving it, because the two plot tags fail

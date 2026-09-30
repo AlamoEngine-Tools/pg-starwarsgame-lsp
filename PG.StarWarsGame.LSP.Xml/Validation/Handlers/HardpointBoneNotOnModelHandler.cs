@@ -41,7 +41,7 @@ public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<Hardp
             ];
 
         // Collision_Mesh says what the mismatch COSTS, because the obvious reading - nothing can hit
-        // the hardpoint - is wrong. GameObjectClass::Take_Damage replaces the name it looks a hardpoint
+        // the hardpoint - is wrong. The engine's damage path replaces the name it looks a hardpoint
         // up by with the hardpoint's OWN Collision_Mesh when a hit is aimed at it, and on land with the
         // nearest live targetable hardpoint's (the closest-hardpoint search, SUB_GAME_MODE_LAND); the exact
         // _stricmp then matches that value against itself. So aimed fire and land projectiles land: the

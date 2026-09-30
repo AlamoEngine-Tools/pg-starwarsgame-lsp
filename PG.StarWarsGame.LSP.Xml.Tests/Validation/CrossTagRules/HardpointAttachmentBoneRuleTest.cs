@@ -59,7 +59,7 @@ public sealed class HardpointAttachmentBoneRuleTest
     ///         only when BOTH are -1.
     ///     </para>
     ///     <para>
-    ///         That is the whole basis of the rule: <c>HardPointClass::Take_Damage</c>
+    ///         That is the whole basis of the rule: the hardpoint's own damage path
     ///         never consults a bone at all - it checks <c>Is_Destroyable()</c>
     ///         and health. A boneless hardpoint is indestructible because it has no world position
     ///         and so cannot be targeted, not because destruction reads the bone. Give it a fire

@@ -67,7 +67,25 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     public WorkspaceConfiguration? LastWorkspaceConfig { get; private set; }
     public IReadOnlyList<string>? LastWorkspaceRoots { get; private set; }
 
+    /// <inheritdoc />
+    public bool HasLoadedProjects { get; private set; }
+
     public async Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
+    {
+        try
+        {
+            await LoadCoreAsync(workspaceRoots, ct);
+        }
+        finally
+        {
+            // Whatever the outcome, including the two early exits below. "Finished and found no
+            // project" is as useful to a consumer as "finished and found one"; what none of them
+            // can act on is "still loading", which is what this separates out.
+            HasLoadedProjects = true;
+        }
+    }
+
+    private async Task LoadCoreAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
     {
         var roots = workspaceRoots.ToList();
         _lastRoots = roots;
@@ -106,7 +124,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         await _indexer.IndexDocumentsAsync(config, ct);
         _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories);
         _indexer.ApplyAssetCatalog(config.AssetRoots);
-        _indexer.ApplyModelBoneCatalog(config.AssetRoots);
+        _indexer.ApplyModelBoneCatalog(config);
         LastAssetRoots = config.AssetRoots;
 
         try

@@ -22,6 +22,11 @@ public sealed class EmptyAssetFileIndex : IAssetFileIndex
         return [];
     }
 
+    public IEnumerable<string> GetByFileName(string fileName)
+    {
+        return [];
+    }
+
     public bool IsPackedAsset(string normalisedPath)
     {
         return false;

@@ -36,6 +36,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private static readonly ImmutableArray<string> StoryParserTypes = ["StoryParser"];
 
     private readonly ILuaAnnotationRepository _annotationRepository;
+    private readonly IModelBoneCatalogCache _boneCache;
     private readonly IProjectIndexCache _cache;
     private readonly ILspConfigurationProvider _configProvider;
     private readonly IEaWXmlContext _eaWXmlContext;
@@ -55,8 +56,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         IStoryChainProblemStore storyChainProblems,
         ILspConfigurationProvider configProvider,
         IMegEntryReader megEntries,
+        IModelBoneCatalogCache boneCache,
         ILogger<WorkspaceIndexer> logger)
     {
+        _boneCache = boneCache;
         _fileHelper = fileHelper;
         _parsers = parsers;
         _indexService = indexService;
@@ -141,6 +144,13 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             ? await IndexByLayerAsync(config, ct, progress)
             : await IndexFlatAsync(config, ct, progress);
         _annotationRepository.RebuildIndex();
+        // Logged like every other catalog here, and worth its line: these come from PARSING, so a
+        // document served from a cached index contributes none unless its parser state was
+        // replayed. A warm start reporting far fewer files than a cold one is that replay failing.
+        var annotated = _annotationRepository.All;
+        _logger.LogInformation(
+            "Lua annotations: {Files} file(s) contributing {Annotations} annotation(s)",
+            annotated.Count, annotated.Values.Sum(a => a.Length));
         return count;
     }
 
@@ -229,32 +239,115 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     ///     catalog (workspace models override shipped ones of the same filename), and publishes the
     ///     merged map on the GameIndex for boneName completion.
     /// </summary>
-    public void ApplyModelBoneCatalog(IReadOnlyList<string> roots)
+    public void ApplyModelBoneCatalog(WorkspaceConfiguration config)
     {
-        var baseline = _indexService.Current.Baseline.ModelBones;
-        var merged = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
+        var baselineBones = _indexService.Current.Baseline.ModelBones;
+        var baselineTextures = _indexService.Current.Baseline.ModelTextures;
+
+        var mergedBones = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
             StringComparer.OrdinalIgnoreCase);
-        foreach (var (path, bones) in baseline)
-            merged[path] = bones;
+        foreach (var (path, bones) in baselineBones)
+            mergedBones[path] = bones;
+
+        var mergedTextures = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var (path, textures) in baselineTextures)
+            mergedTextures[path] = textures;
 
         var workspaceCount = 0;
-        foreach (var root in roots)
+        var reusedLayers = 0;
+
+        // Rank ASCENDING - dependencies first, root project last - so a leaf's own model of the
+        // same filename overwrites the dependency's, matching every other layered lookup. The old
+        // flat config.AssetRoots union was already deps-first; this preserves that order while
+        // making each layer separately cacheable.
+        foreach (var layer in LayersForBones(config))
         {
-            if (!_fileHelper.FileSystem.Directory.Exists(root)) continue;
-            var bonesByModel = BoneNameExtractor.Extract(_fileHelper.FileSystem, root);
-            foreach (var (path, bones) in bonesByModel)
+            var (models, reused) = ModelsForLayer(layer);
+            if (reused) reusedLayers++;
+
+            foreach (var (path, entry) in models)
             {
-                merged[path] = bones.ToImmutableArray();
+                mergedBones[path] = entry.Bones.ToImmutableArray();
+                // An empty texture list is recorded on purpose: it is the answer "this model names
+                // none", and it is what keeps the validator from reopening the file to find out.
+                mergedTextures[path] = entry.Textures.ToImmutableArray();
                 workspaceCount++;
             }
         }
 
         _logger.LogInformation(
-            "Model bone catalog: {Workspace} workspace model(s) merged with {Baseline} baseline model(s)",
-            workspaceCount, baseline.Count);
+            "Model catalog: {Workspace} workspace model(s) merged with {Baseline} baseline "
+            + "model(s); {Reused} layer(s) reused a snapshot; {Textures} model(s) with texture data",
+            workspaceCount, baselineBones.Count, reusedLayers, mergedTextures.Count);
 
-        _indexService.ApplyModelBones(merged.ToImmutable());
+        _indexService.ApplyModelBones(mergedBones.ToImmutable());
+        _indexService.ApplyModelTextures(mergedTextures.ToImmutable());
     }
+
+    /// <summary>
+    ///     The layers to extract bones from, dependencies first. Falls back to one synthetic layer
+    ///     over the flattened asset roots when the workspace resolved no projects (a heuristic
+    ///     scan), which cannot be cached because there is no <c>.pgproj</c> to store it beside.
+    /// </summary>
+    private static IReadOnlyList<ProjectLayer> LayersForBones(WorkspaceConfiguration config)
+    {
+        if (config.Layers.Count == 0)
+            return [new ProjectLayer(0, "(workspace)", [], [], [], config.AssetRoots, null)];
+
+        return config.Layers.OrderBy(l => l.Rank).ToArray();
+    }
+
+    /// <summary>
+    ///     One layer's models, from its persisted snapshot when the files on disk are unchanged,
+    ///     otherwise by extracting and writing a fresh snapshot.
+    /// </summary>
+    private (IReadOnlyDictionary<string, ModelCatalogEntry> Models, bool Reused) ModelsForLayer(
+        ProjectLayer layer)
+    {
+        var roots = layer.AssetRoots;
+        if (roots.Count == 0)
+            return (new Dictionary<string, ModelCatalogEntry>(), false);
+
+        // No pgproj means no place to keep a snapshot beside - extract every time, as before.
+        if (layer.ProjectPath is not { } pgprojPath)
+            return (ExtractModels(roots), false);
+
+        var fingerprint = ModelBoneFingerprint.Compute(_fileHelper, roots);
+        if (_boneCache.TryLoad(pgprojPath, fingerprint) is { } cached)
+            return (cached, true);
+
+        var extracted = ExtractModels(roots);
+        _boneCache.Save(pgprojPath, fingerprint, extracted);
+        return (extracted, false);
+    }
+
+    /// <summary>
+    ///     Bones and textures for every model under <paramref name="roots" />. A model that yields
+    ///     no bones is still recorded when it yields textures, and vice versa - the two reads fail
+    ///     independently, and a model whose skeleton will not load still has readable textures.
+    /// </summary>
+    private Dictionary<string, ModelCatalogEntry> ExtractModels(IReadOnlyList<string> roots)
+    {
+        var models = new Dictionary<string, ModelCatalogEntry>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var root in roots)
+        {
+            if (!_fileHelper.FileSystem.Directory.Exists(root)) continue;
+
+            foreach (var (path, names) in BoneNameExtractor.Extract(_fileHelper.FileSystem, root))
+                models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with { Bones = names };
+
+            foreach (var (path, textures) in BoneNameExtractor.ExtractTextures(_fileHelper.FileSystem, root))
+                models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with
+                {
+                    Textures = textures
+                };
+        }
+
+        return models;
+    }
+
 
     /// <summary>
     ///     Scans the workspace XML directories for every <see cref="EnumKind.DynamicXml" /> enum file
@@ -523,10 +616,20 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         if (!_configProvider.Current.Features.Story.Symbols)
             schemaFingerprint += ";story-symbols-off";
 
-        // (pgprojPath → overallHash) for writing dependency hashes into later layers' snapshots.
+        // (pgprojPath → overallHash), used to skip a redundant re-save of an unchanged snapshot.
         // Folded: a dependency is looked up here by the path a DIFFERENT project spelled in its
         // projectReferences, so the two sides only agree by luck under an ordinal comparison.
         var layerOverallHashes = new Dictionary<string, string>(DocumentUris.Comparer);
+
+        // What each layer's documents read from OUTSIDE their own layer. Computed here rather than
+        // per file: PreScanMetafiles has already run, so the file-type registry is complete, and
+        // the xml directory union is fixed for the scan.
+        var crossLayerFingerprints = layerFileLists.ToDictionary(
+            l => l.Layer,
+            l => CrossLayerInputFingerprint.Compute(
+                _fileTypeRegistry,
+                l.Files.Select(_fileHelper.PathToFileUri).ToArray(),
+                config.XmlDirectories));
 
         // (pgprojPath → OverallHash) of snapshots that survived dependency validation - when the
         // recomputed hash matches, the snapshot on disk is already current and is not re-saved.
@@ -554,21 +657,20 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                     snapshot = null;
                 }
 
-                // A dependency changed since this snapshot was built. Cached parses are not
-                // content-pure - symbol extraction depends on cross-layer inputs (file-type
-                // registrations from dependency metafiles) - so the layer's own file hashes cannot
-                // catch this; discard the whole snapshot and re-parse the layer.
-                if (snapshot is not null)
-                    foreach (var dep in snapshot.DependencyHashes)
-                        if (!layerOverallHashes.TryGetValue(dep.ProjectPath, out var currentHash)
-                            || currentHash != dep.OverallHash)
-                        {
-                            _logger.LogInformation(
-                                "Dependency '{Dep}' changed since layer '{Layer}' was cached; discarding its snapshot",
-                                dep.ProjectPath, layer.Name);
-                            snapshot = null;
-                            break;
-                        }
+                // Cached parses are not content-pure: what a document emits depends on inputs
+                // decided outside its own layer, so the layer's own file hashes cannot catch a
+                // change to those. The key names those inputs exactly - the file-type
+                // registrations for THIS layer's files, and the xml directory set - rather than
+                // asking the far coarser "did any dependency change at all", which discarded a
+                // whole dependent layer for one changed line in a shared core.
+                var crossLayer = crossLayerFingerprints[layer];
+                if (snapshot is not null && snapshot.CrossLayerFingerprint != crossLayer)
+                {
+                    _logger.LogInformation(
+                        "Cross-layer inputs changed since layer '{Layer}' was cached; discarding its snapshot",
+                        layer.Name);
+                    snapshot = null;
+                }
 
                 // Overall hash of the validated snapshot, for skipping the redundant re-save below.
                 if (snapshot is not null && pgprojPath is not null)
@@ -605,9 +707,17 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                     if (cacheHits is not null
                         && cacheHits.TryGetValue(relPath, out var cachedEntry)
                         && cachedEntry.ContentHash == hash)
+                    {
                         _indexService.InjectDocument(ProjectIndexSerializer.FromEntry(cachedEntry, uri));
+                        // Injecting skips the parser, so anything the parse publishes ELSEWHERE
+                        // never happened. Replay it, or a cached Lua file contributes none of its
+                        // annotations for the whole session.
+                        RestoreParserState(file, uri, cachedEntry.Document.ParserState);
+                    }
                     else
+                    {
                         await _indexService.UpdateDocumentAsync(uri, text, 0, token);
+                    }
 
                     var done = Interlocked.Increment(ref indexed);
                     progress?.Invoke(done, totalFiles);
@@ -640,19 +750,12 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 continue;
             }
 
-            var depHashes = config.Layers
-                .Select(l => (NormalizedPath: l.ProjectPath?.Replace('\\', '/'), Layer: l))
-                .Where(t => t.Layer.Rank < layer.Rank && t.NormalizedPath is not null
-                                                      && layerOverallHashes.ContainsKey(t.NormalizedPath!))
-                .Select(t => new SerializedDependencyHash
-                    { ProjectPath = t.NormalizedPath!, OverallHash = layerOverallHashes[t.NormalizedPath!] })
-                .ToArray();
-
             var snapshotFiles = entries
                 .Select(e =>
                 {
                     if (_indexService.Current.Documents.TryGetValue(e.AbsUri, out var doc))
-                        return ProjectIndexSerializer.ToEntry(e.RelPath, e.Hash, doc);
+                        return ProjectIndexSerializer.ToEntry(
+                            e.RelPath, e.Hash, doc, CaptureParserState(e.RelPath, e.AbsUri));
                     return null;
                 })
                 .Where(f => f is not null)
@@ -663,9 +766,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             {
                 SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
                 OverallHash = overallHash,
-                DependencyHashes = depHashes,
+                // Superseded by CrossLayerFingerprint; written empty so the Key stays append-only.
+                DependencyHashes = [],
                 Files = snapshotFiles,
-                SchemaFingerprint = schemaFingerprint
+                SchemaFingerprint = schemaFingerprint,
+                CrossLayerFingerprint = crossLayerFingerprints[layer]
             };
             _cache.Save(pgprojPath, newSnapshot);
             _cache.EnsureGitHygiene(pgprojPath);
@@ -673,6 +778,29 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
         return indexed;
+    }
+
+    /// <summary>
+    ///     The state the parser that handles this file published outside the document's own index,
+    ///     for persisting beside it. Empty for every parser that has none.
+    /// </summary>
+    private byte[]? CaptureParserState(string relPath, string absUri)
+    {
+        var parser = ParserFor(relPath);
+        return parser?.CaptureParserState(absUri);
+    }
+
+    /// <summary>Replays a cached parser state, if the owning parser has one to replay.</summary>
+    private void RestoreParserState(string file, string absUri, byte[] state)
+    {
+        if (state.Length == 0) return;
+        ParserFor(file)?.RestoreParserState(absUri, state);
+    }
+
+    private IGameDocumentParser? ParserFor(string path)
+    {
+        var ext = _fileHelper.FileSystem.Path.GetExtension(path);
+        return _parsers.FirstOrDefault(p => p.CanParse(ext));
     }
 
     // Collects files from xml directories (EaW-gated) and script roots (extension-gated).

@@ -25,6 +25,33 @@ public record LspConfiguration
     public LocalisationConfig Localisation { get; init; } = new();
     public FeatureFlags Features { get; init; } = new();
     public DiagnosticsConfig Diagnostics { get; init; } = new();
+    public EncyclopediaConfig Encyclopedia { get; init; } = new();
+}
+
+/// <summary>
+///     Settings for the encyclopedia popup preview.
+/// </summary>
+public record EncyclopediaConfig
+{
+    /// <summary>
+    ///     The screen the preview draws the popup for.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The game sizes this popup's glyphs from the screen it runs on, so a preview with no
+    ///         screen in mind cannot be faithful to any of them. These name the display the author
+    ///         wants the card to match - their own, usually - and 1920x1080 is the common case.
+    ///     </para>
+    ///     <para>
+    ///         Width and height do different jobs and are not interchangeable: the height sets the
+    ///         glyph size, the width converts it into the card's units. Only the exact pair
+    ///         800x600 also narrows the line budget.
+    ///     </para>
+    /// </remarks>
+    public int ScreenWidth { get; init; } = 1920;
+
+    /// <inheritdoc cref="ScreenWidth" />
+    public int ScreenHeight { get; init; } = 1080;
 }
 
 /// <summary>

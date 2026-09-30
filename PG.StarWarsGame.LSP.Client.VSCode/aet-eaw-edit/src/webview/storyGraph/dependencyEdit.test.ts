@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 import type {StoryGraphNodeDto} from '../../protocol/story';
-import {readOnlyMessage, readOnlyOwnerOf, readOnlyThreadIndex} from './dependencyEdit';
+import {editModeBlockedBy, readOnlyMessage, readOnlyOwnerOf, readOnlyThreadIndex} from './dependencyEdit';
 
 function node(id: string, threadUri: string | null, owner?: string | null): StoryGraphNodeDto {
     return {id, kind: 'Event', label: id, threadUri, reachable: true, readOnlyOwner: owner};
@@ -54,6 +54,57 @@ describe('readOnlyOwnerOf', () => {
 
         assert.equal(readOnlyOwnerOf(index, undefined), null);
         assert.equal(readOnlyOwnerOf(index, null), null);
+    });
+});
+
+describe('editModeBlockedBy', () => {
+    // The whole point, and the thing three rounds of per-node affordances did not deliver: a graph
+    // you cannot edit must not let you into Edit mode at all. Disabling the fields on each node
+    // still leaves the CANVAS taking drops, and the error arrives after the gesture.
+    it('blocks Edit when every thread belongs to a referenced project', () => {
+        const blocked = editModeBlockedBy([
+            node('a', 'file:///core/one.xml', 'EaWX Core'),
+            node('b', 'file:///core/two.xml', 'EaWX Core'),
+        ]);
+
+        assert.ok(blocked);
+        assert.match(blocked, /EaWX Core/);
+    });
+
+    it('names every owner when more than one referenced project is in play', () => {
+        const blocked = editModeBlockedBy([
+            node('a', 'file:///core/one.xml', 'EaWX Core'),
+            node('b', 'file:///fx/two.xml', 'EaWX Effects'),
+        ]);
+
+        assert.match(blocked ?? '', /EaWX Core/);
+        assert.match(blocked ?? '', /EaWX Effects/);
+    });
+
+    // A MIXED graph blocks too, and it is the worse case rather than the easier one: the canvas
+    // takes a drop wherever it is aimed, a new event lands in whichever thread is nearest, and a
+    // prereq drawn to a referenced event writes to THAT event's file. None of that can be enforced
+    // by disabling controls on the nodes that happen to be read-only.
+    it('blocks Edit when only PART of the graph is read-only', () => {
+        const blocked = editModeBlockedBy([
+            node('a', 'file:///core/one.xml', 'EaWX Core'),
+            node('b', 'file:///rev/two.xml', null),
+        ]);
+
+        assert.ok(blocked);
+        assert.match(blocked, /Part of this graph/);
+        assert.match(blocked, /EaWX Core/);
+    });
+
+    it('allows Edit for an ordinary single-project graph', () => {
+        assert.equal(editModeBlockedBy([node('a', 'file:///rev/one.xml', null)]), null);
+    });
+
+    // Junctions and portals are drawn from the events around them and own no file, so a graph of
+    // nothing but those says nothing either way - and must not be reported as read-only.
+    it('says nothing about a graph with no threads at all', () => {
+        assert.equal(editModeBlockedBy([node('a', null, null)]), null);
+        assert.equal(editModeBlockedBy([]), null);
     });
 });
 

@@ -16,7 +16,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 ///     <para>
 ///         Measured in the 2018 build. Every reader of the faction's weapon - the space battle set-up,
 ///         the debug map load and the command bar - tests <c>Get_Special_Weapon_Index() &gt;= 0</c>,
-///         and <c>GameModeClass::Add_Special_Weapon</c> also asserts the index is below
+///         and special-weapon registration also asserts the index is below
 ///         the special-weapon slot count, which returns 3. Outside that the weapon is not registered.
 ///         The index defaults to -1 in the type's constructor, so an object that never writes it fails.
 ///     </para>

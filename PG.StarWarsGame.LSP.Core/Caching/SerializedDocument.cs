@@ -15,4 +15,13 @@ public sealed class SerializedDocument
     [Key(3)] public SerializedDocumentGroupMembership[] GroupMemberships { get; set; } = [];
     [Key(4)] public int LayerRank { get; set; }
     [Key(5)] public string? LayerName { get; set; }
+
+    /// <summary>
+    ///     Opaque bytes from <see cref="Symbols.IGameDocumentParser.CaptureParserState" /> - what
+    ///     the parse published somewhere OTHER than this document's index, replayed on a cache hit
+    ///     so a document served from the snapshot is not silently missing those effects. Empty for
+    ///     every parser that has no such state, which is all of them but Lua.
+    /// </summary>
+    [Key(6)]
+    public byte[] ParserState { get; set; } = [];
 }

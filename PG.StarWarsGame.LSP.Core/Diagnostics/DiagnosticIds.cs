@@ -683,14 +683,14 @@ public static class DiagnosticIds
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>GameObjectClass::Take_Damage</c> finds a hardpoint by name, an exact
+    ///         The engine's damage path finds a hardpoint by name, an exact
     ///         <c>_stricmp</c> against each <c>Collision_Mesh</c>. An empty name fails the size check
     ///         before that lookup whether or not the hit was aimed, so the hardpoint
     ///         never dies and the all-destroyed branch - which counts by <c>Is_Destroyable</c> and never
     ///         asks whether a hardpoint was reachable - can never complete.
     ///     </para>
     ///     <para>
-    ///         A value the MODEL lacks is NOT this. <c>GameObjectClass::Take_Damage</c> replaces the name with the
+    ///         A value the MODEL lacks is NOT this. The engine's damage path replaces the name with the
     ///         hardpoint's own value when the hit is aimed at it, so aimed fire still lands. That case
     ///         once shared this id, as an error; it is reported by
     ///         <see cref="HardpointBoneNotOnModel" /> instead, as a warning. Not reported where the

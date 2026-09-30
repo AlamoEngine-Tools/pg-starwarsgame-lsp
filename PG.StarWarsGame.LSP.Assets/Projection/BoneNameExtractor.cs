@@ -76,6 +76,56 @@ public static class BoneNameExtractor
         return result;
     }
 
+    /// <summary>
+    ///     The texture names of every loose <c>.alo</c> under <paramref name="rootPath" />, keyed
+    ///     the same way as <see cref="Extract(IFileSystem,string)" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A separate walk rather than a second output of the bone pass, deliberately: the bone
+    ///         pass loads a model through the engine's ALO service to read its SKELETON, which needs
+    ///         a file-backed stream and is the expensive half, while textures come straight off the
+    ///         raw bytes. Fusing them would tie the two catalogs' failure modes together - a model
+    ///         whose skeleton will not load still has perfectly readable textures, and is exactly
+    ///         the kind of file a mod ships.
+    ///     </para>
+    ///     <para>
+    ///         Why it exists at all: these were parsed lazily during validation, which MEASURED as
+    ///         the entire cost of a workspace diagnostics sweep. See <see cref="ModelTextureNames" />.
+    ///     </para>
+    /// </remarks>
+    public static Dictionary<string, string[]> ExtractTextures(IFileSystem fileSystem, string rootPath)
+    {
+        var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(rootPath) || !fileSystem.Directory.Exists(rootPath))
+            return result;
+
+        var root = fileSystem.Path.GetFullPath(rootPath);
+
+        foreach (var file in fileSystem.Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            if (!fileSystem.Path.GetExtension(file).Equals(".alo", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string[] textures;
+            try
+            {
+                textures = ModelTextureNames.Read(fileSystem.File.ReadAllBytes(file)).ToArray();
+            }
+            catch
+            {
+                // Unreadable file - skip it, exactly as the bone pass does.
+                continue;
+            }
+
+            // An empty list is a REAL answer and is kept: "this model names no textures" is what
+            // stops the validator falling back to parsing the file again on every reference.
+            result[ModelBoneKey.From(file)] = textures;
+        }
+
+        return result;
+    }
+
     private static Func<string, IList<string>?> CreateDefaultBoneLoader(IFileSystem fileSystem)
     {
         var services = new ServiceCollection();

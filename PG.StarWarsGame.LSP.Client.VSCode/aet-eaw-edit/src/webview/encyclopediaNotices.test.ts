@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
     EncyclopediaTextStyle, GetEncyclopediaEntryResult,
 } from '../protocol/encyclopedia';
-import { encyclopediaNotices, noticeSeverity } from './encyclopediaNotices';
+import {encyclopediaNotices, noticeSeverity} from './encyclopediaNotices';
 
 function style(fontName: string): EncyclopediaTextStyle {
     return {
@@ -15,8 +15,10 @@ function style(fontName: string): EncyclopediaTextStyle {
         fontName,
         fontPointSize: 8,
         scale: 1,
-        textColor: { r: 192, g: 192, b: 192, a: 255 },
+        textColor: {r: 192, g: 192, b: 192, a: 255},
         alignment: 'left',
+        wrapChars: 41,
+        fontUnits: 8.533,
     };
 }
 
@@ -30,13 +32,15 @@ function makeEntry(over: Partial<GetEncyclopediaEntryResult> = {}): GetEncyclope
         goodAgainst: [],
         vulnerableTo: [],
         layout: {
+            // The values Empire at War ships, so a fixture reads like a stock card.
+            offsets: {population: 11, name: 68, cost: 258, iconX: 39, iconY: -12, classY: 5},
             width: 262,
             rowHeight: 14,
             offsetX: 5,
             offsetY: 2,
             iconScale: 0.75,
             abilityIconScale: 0.66,
-            backdropColor: { r: 21, g: 32, b: 73, a: 255 },
+            backdropColor: {r: 21, g: 32, b: 73, a: 255},
             backdropTextureName: 'E_BACKGROUND.TGA',
             factionFrameTextureNames: [],
             header: style('Arial'),
@@ -51,17 +55,17 @@ function makeEntry(over: Partial<GetEncyclopediaEntryResult> = {}): GetEncyclope
 
 describe('encyclopediaNotices', () => {
     it('reports nothing about a card that has nothing wrong with it', () => {
-        assert.deepEqual(encyclopediaNotices(makeEntry(), { multiplayer: false, factionSlot: 0 }), []);
+        assert.deepEqual(encyclopediaNotices(makeEntry(), {multiplayer: false, factionSlot: 0}), []);
     });
 
     it('reports nothing at all before an entry has arrived', () => {
-        assert.deepEqual(encyclopediaNotices(null, { multiplayer: false, factionSlot: 0 }), []);
+        assert.deepEqual(encyclopediaNotices(null, {multiplayer: false, factionSlot: 0}), []);
     });
 
     it('says nothing about an object that has no encyclopedia entry', () => {
         // There is no card, so every notice below would be about a card nobody is looking at.
-        const entry = makeEntry({ found: false });
-        assert.deepEqual(encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 }), []);
+        const entry = makeEntry({found: false});
+        assert.deepEqual(encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0}), []);
     });
 
     describe('substituted fonts', () => {
@@ -69,10 +73,10 @@ describe('encyclopediaNotices', () => {
             // The licence is ours to work around, not the modder's to fix - a permanent yellow
             // warning on nearly every card is one people learn to ignore.
             const entry = makeEntry({
-                layout: { ...makeEntry().layout, costText: style('EmpireAtWar-Bold') },
+                layout: {...makeEntry().layout, costText: style('EmpireAtWar-Bold')},
             });
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].severity, 'info');
             assert.match(notices[0].message, /EmpireAtWar-Bold/);
@@ -89,7 +93,7 @@ describe('encyclopediaNotices', () => {
                 },
             });
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].message.match(/EmpireAtWar-Bold/g)?.length, 1);
             assert.match(notices[0].message, /EmpireAtWar-Medium/);
@@ -97,19 +101,63 @@ describe('encyclopediaNotices', () => {
 
         it('says nothing when a mod re-fonts those rows to something we can draw', () => {
             const entry = makeEntry({
-                layout: { ...makeEntry().layout, costText: style('Verdana') },
+                layout: {...makeEntry().layout, costText: style('Verdana')},
             });
-            assert.deepEqual(encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 }), []);
+            assert.deepEqual(encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0}), []);
+        });
+
+        // The cost is formatted "$ %d" and the dollar sign only READS as the credits coin because
+        // that row is set in EmpireAtWar-Bold, where it is the currency glyph. Substituting the
+        // font turns a coin into a dollar sign, which is a wrong SYMBOL rather than a wrong
+        // typeface, so the card has to say so or the author sees a bug.
+        it('explains the dollar sign when the atlas has no coin to draw instead', () => {
+            const entry = makeEntry({
+                buildCost: 500,
+                layout: {...makeEntry().layout, costText: style('EmpireAtWar-Bold')},
+            });
+
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
+            const glyph = notices.find(n => n.message.includes('$'));
+
+            assert.ok(glyph, 'expected a notice about the currency glyph');
+            assert.equal(glyph.severity, 'info');
+        });
+
+        // With the coin cut from the atlas the card shows the right symbol, so there is nothing to
+        // apologise for - and a notice that fires when the output is correct is one people stop
+        // reading.
+        it('says nothing about the dollar sign when the coin was drawn', () => {
+            const entry = makeEntry({
+                buildCost: 500,
+                layout: {...makeEntry().layout, costText: style('EmpireAtWar-Bold')},
+                chrome: {
+                    background: null, topBar: null, topBarNoBlip: null, line: null,
+                    againstFrame: null, unitAgainst: null, factionFrames: [],
+                    credit: {dataUri: 'data:image/png;base64,AA', width: 19, height: 19},
+                },
+            });
+
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
+            assert.equal(notices.filter(n => n.message.includes('$')).length, 0);
+        });
+
+        it('says nothing about the dollar sign when the card draws no cost', () => {
+            const entry = makeEntry({
+                layout: {...makeEntry().layout, costText: style('EmpireAtWar-Bold')},
+            });
+
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
+            assert.equal(notices.filter(n => n.message.includes('$')).length, 0);
         });
     });
 
     describe('ship names', () => {
         it('warns when the wired-up name file is missing', () => {
             const entry = makeEntry({
-                shipNames: { sourcePath: 'Data\\Text\\Names.txt', fileFound: false, names: [] },
+                shipNames: {sourcePath: 'Data\\Text\\Names.txt', fileFound: false, names: []},
             });
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].severity, 'warning');
             assert.match(notices[0].message, /Names\.txt/);
@@ -118,10 +166,10 @@ describe('encyclopediaNotices', () => {
         it('warns separately when the file is there but no names came out of it', () => {
             // A different fault with a different fix: the encoding, not the path.
             const entry = makeEntry({
-                shipNames: { sourcePath: 'Data\\Text\\Names.txt', fileFound: true, names: [] },
+                shipNames: {sourcePath: 'Data\\Text\\Names.txt', fileFound: true, names: []},
             });
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].severity, 'warning');
             assert.match(notices[0].message, /UTF-16/);
@@ -136,7 +184,7 @@ describe('encyclopediaNotices', () => {
                 },
             });
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].severity, 'info');
             assert.match(notices[0].message, /individual name/);
@@ -149,10 +197,10 @@ describe('encyclopediaNotices', () => {
             // The card has fallen back to the class line, so "draws an individual name instead of
             // its class" would be flatly untrue. The empty-pool warning is the only thing to say.
             const entry = makeEntry({
-                shipNames: { sourcePath: 'Data\\Text\\Names.txt', fileFound: true, names: [] },
+                shipNames: {sourcePath: 'Data\\Text\\Names.txt', fileFound: true, names: []},
             });
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].severity, 'warning');
         });
@@ -163,16 +211,16 @@ describe('encyclopediaNotices', () => {
             factionFrames: over.map(f => ({
                 slot: f.slot,
                 textureName: `i_tooltip_frame_${f.slot}.tga`,
-                image: f.hasArt ? { dataUri: 'data:image/png;base64,AA', width: 4, height: 4 } : null,
+                image: f.hasArt ? {dataUri: 'data:image/png;base64,AA', width: 4, height: 4} : null,
             })),
         });
 
         it('warns about the SELECTED slot having no artwork', () => {
             const entry = makeEntry({
-                chrome: frames([{ slot: 0, hasArt: true }, { slot: 1, hasArt: false }]),
+                chrome: frames([{slot: 0, hasArt: true}, {slot: 1, hasArt: false}]),
             });
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 1 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 1});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].severity, 'warning');
             assert.match(notices[0].message, /i_tooltip_frame_1\.tga/);
@@ -181,27 +229,27 @@ describe('encyclopediaNotices', () => {
         it('stays quiet about a slot the user is not looking at', () => {
             // The card draws one frame; an unselected slot's missing art changes nothing on screen.
             const entry = makeEntry({
-                chrome: frames([{ slot: 0, hasArt: true }, { slot: 1, hasArt: false }]),
+                chrome: frames([{slot: 0, hasArt: true}, {slot: 1, hasArt: false}]),
             });
-            assert.deepEqual(encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 }), []);
+            assert.deepEqual(encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0}), []);
         });
     });
 
     describe('the multiplayer body', () => {
         it('notes that the object has none, but only once it was asked for', () => {
-            const entry = makeEntry({ usedMultiplayerBody: false });
+            const entry = makeEntry({usedMultiplayerBody: false});
 
-            assert.deepEqual(encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 }), []);
+            assert.deepEqual(encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0}), []);
 
-            const asked = encyclopediaNotices(entry, { multiplayer: true, factionSlot: 0 });
+            const asked = encyclopediaNotices(entry, {multiplayer: true, factionSlot: 0});
             assert.equal(asked.length, 1);
             assert.equal(asked[0].severity, 'info');
             assert.match(asked[0].message, /MP_Encyclopedia_Text/);
         });
 
         it('says nothing when the multiplayer body was actually used', () => {
-            const entry = makeEntry({ usedMultiplayerBody: true });
-            assert.deepEqual(encyclopediaNotices(entry, { multiplayer: true, factionSlot: 0 }), []);
+            const entry = makeEntry({usedMultiplayerBody: true});
+            assert.deepEqual(encyclopediaNotices(entry, {multiplayer: true, factionSlot: 0}), []);
         });
     });
 
@@ -217,9 +265,9 @@ describe('encyclopediaNotices', () => {
         });
 
         it('warns when the object names an icon nothing could supply', () => {
-            const entry = makeEntry({ icon: icon({ source: 'Fallback' }) });
+            const entry = makeEntry({icon: icon({source: 'Fallback'})});
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].severity, 'warning');
             assert.match(notices[0].message, /I_REBEL_CORVETTE\.TGA/);
@@ -227,28 +275,75 @@ describe('encyclopediaNotices', () => {
 
         it('warns when the icon is drawn but not yet repacked', () => {
             const entry = makeEntry({
-                icon: icon({ source: 'LooseSource', isMegaTextureStale: true }),
+                icon: icon({source: 'LooseSource', isMegaTextureStale: true}),
             });
 
-            const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
             assert.equal(notices.length, 1);
             assert.equal(notices[0].severity, 'warning');
             assert.match(notices[0].message, /mega texture/i);
         });
 
         it('says nothing about an icon that resolved normally', () => {
-            const entry = makeEntry({ icon: icon({}) });
-            assert.deepEqual(encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 }), []);
+            const entry = makeEntry({icon: icon({})});
+            assert.deepEqual(encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0}), []);
+        });
+    });
+
+    // Without this the card reports a missing icon and leaves the reader to guess why. The cause is
+    // a setting, not the art: the project ships no mega texture and declares no icons node, so
+    // nothing of its was ever looked at.
+    describe('projects that supply no icons', () => {
+        it('names them, and says what to add', () => {
+            const entry = makeEntry({projectsWithoutIcons: ['Revan\'s Revenge', 'EaWX Core']});
+
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
+
+            assert.equal(notices.length, 1);
+            assert.equal(notices[0].severity, 'warning');
+            assert.match(notices[0].message, /Revan's Revenge/);
+            assert.match(notices[0].message, /EaWX Core/);
+            assert.match(notices[0].message, /icons/);
+        });
+
+        it('says it once for the workspace, not once per project', () => {
+            const entry = makeEntry({
+                icon: {
+                    name: 'I_REBEL_CORVETTE.TGA',
+                    dataUri: 'data:image/png;base64,AA',
+                    source: 'Fallback',
+                    isMegaTextureStale: false,
+                    width: 50,
+                    height: 50,
+                },
+                projectsWithoutIcons: ['A', 'B', 'C'],
+            });
+
+            const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
+
+            // The dangling-icon warning plus exactly one configuration warning.
+            assert.equal(notices.length, 2);
+        });
+
+        it('stays quiet for a workspace that is set up', () => {
+            const entry = makeEntry({projectsWithoutIcons: []});
+            assert.deepEqual(encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0}), []);
+        });
+
+        // An older server sends no such field at all.
+        it('stays quiet when the server said nothing about it', () => {
+            const entry = makeEntry({});
+            assert.deepEqual(encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0}), []);
         });
     });
 
     it('puts warnings before notes, so the worst of it reads first', () => {
         const entry = makeEntry({
-            layout: { ...makeEntry().layout, costText: style('EmpireAtWar-Bold') },
-            shipNames: { sourcePath: 'Names.txt', fileFound: false, names: [] },
+            layout: {...makeEntry().layout, costText: style('EmpireAtWar-Bold')},
+            shipNames: {sourcePath: 'Names.txt', fileFound: false, names: []},
         });
 
-        const notices = encyclopediaNotices(entry, { multiplayer: false, factionSlot: 0 });
+        const notices = encyclopediaNotices(entry, {multiplayer: false, factionSlot: 0});
         assert.deepEqual(notices.map(n => n.severity), ['warning', 'info']);
     });
 });
@@ -259,13 +354,13 @@ describe('noticeSeverity', () => {
     });
 
     it('is info when only notes were raised', () => {
-        assert.equal(noticeSeverity([{ severity: 'info', message: 'x' }]), 'info');
+        assert.equal(noticeSeverity([{severity: 'info', message: 'x'}]), 'info');
     });
 
     it('takes the worst of a mixed list', () => {
         assert.equal(noticeSeverity([
-            { severity: 'info', message: 'x' },
-            { severity: 'warning', message: 'y' },
+            {severity: 'info', message: 'x'},
+            {severity: 'warning', message: 'y'},
         ]), 'warning');
     });
 });

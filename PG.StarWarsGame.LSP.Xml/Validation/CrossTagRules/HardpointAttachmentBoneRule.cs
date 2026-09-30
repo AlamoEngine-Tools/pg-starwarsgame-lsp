@@ -18,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///         Either bone will do, which is the engine's own condition:
 ///         the engine's world-position lookup asserts
 ///         <c>AttachmentBoneIndex &gt;= 0 || FireBoneAIndex &gt;= 0</c> and falls back to the fire
-///         bone. Destruction reads no bone at all - <c>HardPointClass::Take_Damage</c>
+///         bone. Destruction reads no bone at all - the hardpoint's own damage path
 ///         consults only <c>Is_Destroyable()</c> and health - so the failure is
 ///         about being targetable, not about destruction.
 ///     </para>
@@ -60,7 +60,7 @@ public sealed class HardpointAttachmentBoneRule : IXmlCrossTagRule
         // "AttachmentBoneIndex >= 0 || FireBoneAIndex >= 0" and falls back to the fire bone when the
         // attachment bone is absent. Its error fires only when BOTH are -1.
         //
-        // Destruction itself reads no bone - HardPointClass::Take_Damage checks
+        // Destruction itself reads no bone - the hardpoint's own damage path checks
         // Is_Destroyable() and health and nothing else. A boneless hardpoint is indestructible
         // because it cannot be positioned and so cannot be targeted, which a fire bone also fixes.
         if (HasValue(childrenByName, AttachmentBoneTag) || HasValue(childrenByName, FireBoneTag))

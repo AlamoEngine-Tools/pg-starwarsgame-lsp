@@ -53,6 +53,7 @@ public sealed record GameIndex(
         Localisation = original.Localisation;
         AssetFiles = original.AssetFiles;
         ModelBones = original.ModelBones;
+        ModelTextures = original.ModelTextures;
         WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
         WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
     }
@@ -104,6 +105,18 @@ public sealed record GameIndex(
     ///     <c>boneName</c> references against the model(s) referenced by sibling model tags.
     /// </summary>
     public ImmutableDictionary<string, ImmutableArray<string>> ModelBones { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     Merged (baseline ∪ workspace) catalog of the texture names each <c>.alo</c> carries
+    ///     INSIDE itself, keyed like <see cref="ModelBones" />.
+    /// </summary>
+    /// <remarks>
+    ///     An empty entry means "this model names no textures"; a MISSING entry means the catalog
+    ///     has never seen the model, and the caller must open it rather than report its textures
+    ///     as absent. Conflating the two would turn every unscanned model into a silent pass.
+    /// </remarks>
+    public ImmutableDictionary<string, ImmutableArray<string>> ModelTextures { get; init; } =
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

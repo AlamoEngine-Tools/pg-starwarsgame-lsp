@@ -23,6 +23,7 @@ public static class BaselineSerializer
             GroupMemberships = ToSerializedGroupMemberships(baseline.GroupMemberships),
             AssetFiles = baseline.AssetFiles.ToArray(),
             ModelBones = ToSerializedArray(baseline.ModelBones),
+            ModelTextures = ToSerializedArray(baseline.ModelTextures),
             ObjectTags = ToSerializedObjectTags(baseline.ObjectTags),
             SchemaVersion = SerializedBaseline.CurrentSchemaVersion
         };
@@ -64,12 +65,15 @@ public static class BaselineSerializer
         var assetFiles = dto.AssetFiles.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
         var modelBones = (dto.ModelBones ?? []).ToImmutableDictionary(
             e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
+        var modelTextures = (dto.ModelTextures ?? []).ToImmutableDictionary(
+            e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
         var objectTags = FromSerializedObjectTags(dto.ObjectTags ?? []);
         return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded, fileTypeMap)
         {
             GroupMemberships = groupMemberships,
             AssetFiles = assetFiles,
             ModelBones = modelBones,
+            ModelTextures = modelTextures,
             ObjectTags = objectTags
         };
     }

@@ -19,7 +19,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///         implements, and both vanilla weapons carry <c>SPECIAL_WEAPON</c>.
 ///     </para>
 ///     <para>
-///         Measured in the 2018 build: <c>GameModeClass::Add_Special_Weapon</c> registers the weapon
+///         Measured in the 2018 build: the engine registers the weapon
 ///         only if it behaves like <c>SPECIAL_WEAPON</c> or <c>LOBBING_SUPERWEAPON</c>, and otherwise
 ///         returns false without an assert - the weapon is never registered, so there is nothing to
 ///         fire. <see cref="SpecialWeaponIndexHandler" /> covers the index test on the same path.

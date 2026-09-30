@@ -107,6 +107,27 @@ export const ENCYCLOPEDIA_TEXT_ALIGNMENT = {
     right: 'right',
 } as const;
 
+/**
+ * Header positions from `GameConstants`, card-relative and in card units.
+ *
+ * Data rather than constants: a mod that moves the blip or the portrait by editing GameConstants
+ * moves them in the game, and the card drew the base game's places until these were read.
+ */
+export interface EncyclopediaOffsets {
+    /** The blip and its number, by CENTRE. */
+    population: number;
+    /** The name row, by LEFT edge - before the no-blip / no-portrait shifts. */
+    name: number;
+    /** The cost row. */
+    cost: number;
+    /** The portrait, by CENTRE - before the no-blip shift. */
+    iconX: number;
+    /** The portrait's vertical nudge; negative lifts it. */
+    iconY: number;
+    /** The class row's vertical offset. */
+    classY: number;
+}
+
 /** How one text row is drawn. `component` is the CommandBarComponent it came from. */
 export interface EncyclopediaTextStyle {
     component: string;
@@ -116,6 +137,23 @@ export interface EncyclopediaTextStyle {
     textColor: EncyclopediaRgba;
     /** See {@link ENCYCLOPEDIA_TEXT_ALIGNMENT}. */
     alignment: string;
+    /**
+     * How many CHARACTERS fit on one line, from this component's own `Size` X.
+     *
+     * The game wraps this text on a character count and measures no glyphs at all, which is how a
+     * mod can author a run of `=` that spans the card exactly and rely on it never breaking. Not
+     * the card's width: a mod widens the two separately, and EaWX does.
+     */
+    wrapChars: number;
+    /**
+     * Glyph height in CARD units - the same units `layout.width` uses, so the card can draw at any
+     * zoom and keep its proportions. `scale` is already applied.
+     *
+     * The game derives this from the screen it runs on (height sets the pixel size, width converts
+     * it to card units) and truncates to an integer twice on the way, so it is not a fixed multiple
+     * of `fontPointSize`. The server owns that arithmetic; the card just draws the number.
+     */
+    fontUnits: number;
 }
 
 /**
@@ -159,6 +197,13 @@ export interface EncyclopediaLayout {
     rightText: EncyclopediaTextStyle;
     centerText: EncyclopediaTextStyle;
     costText: EncyclopediaTextStyle;
+    /**
+     * Where the header's pieces sit, from `GameConstants` - card-relative, in card units.
+     *
+     * What a position means follows the row's justification: a left-justified row (name, class) is
+     * placed by its LEFT edge, an icon or centred row (portrait, blip) by its CENTRE.
+     */
+    offsets: EncyclopediaOffsets;
 }
 
 export interface GetEncyclopediaEntryResult {
@@ -192,6 +237,35 @@ export interface GetEncyclopediaEntryResult {
      * always holds the object's real class line - the panel picks and keeps its choice.
      */
     shipNames?: EncyclopediaShipNames | null;
+    /**
+     * Projects in this workspace that can supply no icons at all.
+     *
+     * Empty is the healthy case. A name here means that project ships no mega texture at the
+     * conventional path and declares no `icons` node, so every icon it owns falls through to the
+     * baked base game - which makes the card look like a rendering fault when the fix is a setting.
+     */
+    projectsWithoutIcons?: string[] | null;
+    /**
+     * What the object costs to build, drawn on the name row, or null when it declares none.
+     *
+     * Also decides that row's width: with no cost beside it the name gets eight more characters.
+     */
+    buildCost?: number | null;
+    /**
+     * Wrap budgets for the two rows that do not take theirs from their own component.
+     *
+     * Both share their row with something else and give up space for it: the name with the cost,
+     * the class line with the ability icons drawn on it.
+     */
+    rowBudgets?: EncyclopediaRowBudget | null;
+}
+
+/** @see GetEncyclopediaEntryResult.rowBudgets */
+export interface EncyclopediaRowBudget {
+    /** The name row: `encyclopedia_header_text`'s Size X, plus 8 when there is no cost. */
+    name: number;
+    /** The class row: 32, less 4 for each ability icon drawn on it. */
+    unitClass: number;
 }
 
 /**
@@ -246,6 +320,14 @@ export interface EncyclopediaChrome {
     againstFrame?: EncyclopediaImage | null;
     /** `E_UNIT_AGAINST`, a single slot inside that panel; 43x43 in the base game. */
     unitAgainst?: EncyclopediaImage | null;
+    /**
+     * The credits coin, drawn where the cost row's `$` would be.
+     *
+     * The game writes a literal `$` and sets that row in a font whose dollar glyph is the coin. The
+     * preview cannot use that font, so it substitutes this atlas entry - the same artwork, from the
+     * user's own install. Null when the atlas has no such entry, and the card then draws the `$`.
+     */
+    credit?: EncyclopediaImage | null;
     /**
      * The per-faction frames, one entry per slot `encyclopedia_back` declares. Always the full list,
      * art or no art, so the preview can offer every slot the mod defines.

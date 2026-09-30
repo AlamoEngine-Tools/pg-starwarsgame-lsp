@@ -46,9 +46,24 @@ public static class MegAssetCatalogBuilder
     ///     MTD files are skipped and no icon names are added from mega-texture atlases.
     /// </param>
     /// <param name="logger">Logger for collision warnings.</param>
+    /// <param name="extractTextures">
+    ///     Reads the texture names an open <c>.alo</c> carries inside itself. When
+    ///     <see langword="null" />, no texture catalog is built and the validator falls back to
+    ///     parsing each model on demand - which is what it did before, and what MEASURED as the
+    ///     entire cost of a workspace diagnostics sweep.
+    ///     <para>
+    ///         Opens the entry a SECOND time rather than sharing the bone pass's stream. That is
+    ///         deliberate: the bone path hands the ALO loader the original entry stream because the
+    ///         loader resolves the model's path from it, and a <c>MemoryStream</c> throws - a trap
+    ///         that once turned into a silently empty baseline. Threading a second reader through
+    ///         that sequence buys one open per model in an OFFLINE build and risks the same
+    ///         silence; textures come straight off the bytes and need none of it.
+    ///     </para>
+    /// </param>
     public static (
         ImmutableHashSet<string> assetFiles,
-        ImmutableDictionary<string, ImmutableArray<string>> modelBones
+        ImmutableDictionary<string, ImmutableArray<string>> modelBones,
+        ImmutableDictionary<string, ImmutableArray<string>> modelTextures
         ) Build(
             IEnumerable<(string megName, IEnumerable<string> entryPaths)> megEntries,
             IFileSystem looseFileSystem,
@@ -56,12 +71,14 @@ public static class MegAssetCatalogBuilder
             Func<string, Stream?> openEntry,
             Func<Stream, IReadOnlyList<string>> extractBones,
             Func<Stream, IEnumerable<string>>? extractMtdIcons,
-            ILogger logger)
+            ILogger logger,
+            Func<Stream, IReadOnlyList<string>>? extractTextures = null)
     {
         // Track source MEG for each normalised path - used for collision detection.
         var pathSource = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var assetBuilder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
         var bonesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+        var texturesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (megName, entryPaths) in megEntries)
         foreach (var rawPath in entryPaths)
@@ -87,7 +104,11 @@ public static class MegAssetCatalogBuilder
             assetBuilder.Add(normalized);
 
             if (ext.Equals(".alo", StringComparison.OrdinalIgnoreCase))
+            {
                 TryExtractBones(normalized, openEntry, extractBones, bonesBuilder);
+                if (extractTextures is not null)
+                    TryExtractTextures(normalized, openEntry, extractTextures, texturesBuilder);
+            }
         }
 
         // Merge loose files on top (workspace loose files may extend the MEG catalog).
@@ -121,6 +142,8 @@ public static class MegAssetCatalogBuilder
 
         return (assetBuilder.ToImmutable(),
             bonesBuilder.ToImmutableDictionary(
+                kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase),
+            texturesBuilder.ToImmutableDictionary(
                 kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase));
     }
 
@@ -189,6 +212,31 @@ public static class MegAssetCatalogBuilder
             var normalized = name.ToLowerInvariant().Trim();
             if (!string.IsNullOrEmpty(normalized))
                 assetBuilder.Add(normalized);
+        }
+    }
+
+    /// <summary>
+    ///     Records the textures a model names inside itself. Unlike the bone pass, an EMPTY list is
+    ///     kept: "this model names no textures" is a real answer, and it is what stops the
+    ///     validator parsing the file again on every reference to it.
+    /// </summary>
+    private static void TryExtractTextures(
+        string normalizedPath,
+        Func<string, Stream?> openEntry,
+        Func<Stream, IReadOnlyList<string>> extractTextures,
+        Dictionary<string, ImmutableArray<string>> texturesBuilder)
+    {
+        try
+        {
+            using var stream = openEntry(normalizedPath);
+            if (stream is null) return;
+            // Keyed by bare filename, like the bones: XML references models by name and the engine
+            // resolves them by name across the VFS.
+            texturesBuilder[ModelBoneKey.From(normalizedPath)] = extractTextures(stream).ToImmutableArray();
+        }
+        catch
+        {
+            // Corrupt or unsupported files must not abort the build.
         }
     }
 

@@ -368,7 +368,7 @@ public sealed class ModProjectReloadServiceTest
             AssetCatalogApplied = true;
         }
 
-        public void ApplyModelBoneCatalog(IReadOnlyList<string> roots)
+        public void ApplyModelBoneCatalog(WorkspaceConfiguration config)
         {
             BonesApplied = true;
         }
