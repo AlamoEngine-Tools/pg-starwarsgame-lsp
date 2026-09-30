@@ -307,98 +307,16 @@ One format per project. `"type": "DAT"` projects edit compiled `.dat` files dire
 
 ---
 
-## Commands
+## Commands and settings
 
-Command Palette (`Ctrl+Shift+P`). Commands of a flagged feature are greyed out until the flag is on; the extension's README lists each flag.
+The extension contributes 29 commands and 70 settings. Both are documented, with defaults and the
+feature flag each belongs to, in the extension's own README:
 
-| Command | Description |
-|---|---|
-| **EaWEdit: New Mod Project** | Creates a `.pgproj` and initial directories |
-| **EaWEdit: Reload Mod Project** | Re-reads the `.pgproj`, re-indexes |
-| **EaWEdit: Re-validate Workspace** | Re-runs diagnostics in every language |
-| **EaWEdit: Restart LSP Server** | Restarts the language server |
-| **EaWEdit: Show Effective Object (Variant Inheritance)** | Merged XML of a variant object |
-| **EaWEdit: Preview Model** / **Preview Assembled Unit** | A model by file name; the GameObject under the cursor, assembled |
-| **EaWEdit: Set Up Base Shader Sources** | Fetches the shader sources for the preview |
-| **EaWEdit: Preview Encyclopedia Popup** | Encyclopedia card of the GameObject under the cursor |
-| **EaWEdit: Open Story Graph** / **Refresh Story Navigator** | A faction's story graph; the campaign tree |
-| **EaWEdit: New Localisation Project** | Initialise from baseline, or import |
-| **EaWEdit: Set Localisation Project Format** | Writes `localisation.type` |
-| **EaWEdit: Open Localisation Editor** / **Open Localisation File as Text** / **Refresh Localisation Files** | Grid tab; text editor; re-read |
-| **EaWEdit: Convert Localisation File to Another Format** / **Export Localisation to DAT** | Format conversion; compiled `.dat` |
-| **EaWEdit: Open Credits Preview to the Side** / **Play Credits Crawl Full Screen** | Credits crawl |
-| **EaWEdit: Refresh Lua Scripts** / **Break in Script** / **Break in Thread** / **Refresh Script Threads** | Lua Scripts view actions in a debug session |
+- [Commands](PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#commands)
+- [Settings reference](PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#settings-reference)
+- [Feature flags](PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#feature-flags)
 
----
-
-## Settings reference
-
-### Language server
-
-| Setting | Default | Description |
-|---|---|---|
-| `aet-eaw-edit.lsp.enabled` | `false` | Enable the language server |
-| `aet-eaw-edit.lsp.executable` | _(empty)_ | Path to `PG.StarWarsGame.LSP.Server.exe` |
-| `aet-eaw-edit.lsp.locale` | `en` | Language of server messages (`en`, `de`, `fr`, `es`, `it`, `pl`, `ru`) |
-| `aet-eaw-edit.lsp.localisation.language` | `ENGLISH` | Game language for displayed localisation text |
-
-### Game installation and external tools
-
-Never searched for; used only once set.
-
-| Setting | Default | Description |
-|---|---|---|
-| `aet-eaw-edit.lsp.source.baseGameDirectory` | _(empty)_ | Empire at War install |
-| `aet-eaw-edit.lsp.source.expansionDirectory` | _(empty)_ | Forces of Corruption install |
-| `aet-eaw-edit.tools.aloViewerExecutable` | _(empty)_ | `AloViewer.exe` |
-| `aet-eaw-edit.tools.particleEditorExecutable` | _(empty)_ | `ParticleEditor.exe` |
-| `aet-eaw-edit.shaders.directory` | _(empty)_ | Base game shader sources (`.fx`) for the preview |
-| `aet-eaw-edit.shaders.sourceUrl` | _(empty)_ | Download location for *Set Up Base Shader Sources* |
-| `aet-eaw-edit.modVerify.enabled` | `false` | ModVerify integration |
-| `aet-eaw-edit.modVerify.executable` | _(empty)_ | ModVerify executable |
-
-### Schema
-
-| Setting | Default | Description |
-|---|---|---|
-| `aet-eaw-edit.lsp.schema.source` | `http` | `http` (GitHub) or `local` |
-| `aet-eaw-edit.lsp.schema.localPath` | _(empty)_ | Local `schema/eaw/` directory (source `local`) |
-
-### Baseline
-
-Snapshot of all vanilla game objects and localisation keys; powers reference validation and the Inherited toggle.
-
-| Setting | Default | Description |
-|---|---|---|
-| `aet-eaw-edit.lsp.source.baseline.type` | `http` | `http`, `local` or `none` |
-| `aet-eaw-edit.lsp.source.baseline.localPath` | _(empty)_ | Local baseline file (type `local`) |
-
-### Localisation editor
-
-| Setting | Default | Description |
-|---|---|---|
-| `aet-eaw-edit.localisation.format` | `format-dat` | Default format for new localisation projects (`format-dat`, `format-csv`, `format-xml`) |
-
-### Lua debugger
-
-Read only with `aet-eaw-edit.features.lua.debugger` on.
-
-| Setting | Default | Description |
-|---|---|---|
-| `aet-eaw-edit.game.executable` | _(empty)_ | Debug `StarWarsI.exe` for launch |
-| `aet-eaw-edit.game.arguments` | `[]` | Extra game arguments, before the mod chain |
-| `aet-eaw-edit.game.luaDebugHost` | `127.0.0.1` | Machine running the game (UDP) |
-| `aet-eaw-edit.game.luaDebugPort` | `1234` | Lua debug UDP port; first free port from 1234 upward |
-| `aet-eaw-edit.game.unsafeTableExpansion` | `false` | Expand tables in the Variables view; the game is reported to crash on long member text |
-
-### Feature flags
-
-All under `aet-eaw-edit.features.*`; work-in-progress features default to off. Full table with defaults in the extension's README.
-
-- `xml.*`, `lua.*` - editor features per language
-- `story.*`, `dialog.*` - story mode
-- `tools.localisation`, `tools.storyEditor`, `tools.storyEditing`, `tools.variants`, `tools.modelPreview`, `tools.encyclopedia` - tools
-- `lua.debugger` - the Lua debugger
+That file ships with the extension, so it is the copy that stays in step with what is installed.
 
 ---
 

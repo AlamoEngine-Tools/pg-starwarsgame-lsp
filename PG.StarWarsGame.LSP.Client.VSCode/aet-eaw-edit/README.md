@@ -455,6 +455,7 @@ Command Palette (`Ctrl+Shift+P`). Commands of a flagged feature are greyed out u
 | EaWEdit: Reload Mod Project | Re-reads the `.pgproj`, re-indexes | - |
 | EaWEdit: Re-validate Workspace | Re-runs diagnostics in every language | - |
 | EaWEdit: Restart LSP Server | Restarts the language server | - |
+| EaWEdit: Force LSP Startup | Runs the startup scan again when a session came up without one | - |
 | EaWEdit: Show Effective Object (Variant Inheritance) | Merged XML of a variant object | `tools.variants` |
 | EaWEdit: Preview Model | Opens a model by file name, without XML | `tools.modelPreview` |
 | EaWEdit: Preview Assembled Unit | Opens the GameObject under the cursor, assembled from the XML | `tools.modelPreview` |
@@ -555,6 +556,22 @@ Read only with `aet-eaw-edit.features.lua.debugger` on; a `launch.json` attribut
 | `aet-eaw-edit.game.luaDebugHost` | `127.0.0.1` | Machine running the game (UDP) |
 | `aet-eaw-edit.game.luaDebugPort` | `1234` | Lua debug UDP port; the game takes the first free port from 1234 upward |
 | `aet-eaw-edit.game.unsafeTableExpansion` | `false` | Expand tables in the Variables view; the game is reported to crash on member text of 255 bytes or more |
+
+### Diagnostics
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `aet-eaw-edit.diagnostics.workspaceOnStartup` | `false` | Diagnose every indexed file once the scan finishes, instead of only the files that are opened. Expensive - on the base game, 580 files, that is 18,281 diagnostics and 21.8 MiB the editor holds. Turn it on only when a session has started with no diagnostics at all |
+
+### Encyclopedia preview
+
+The game sizes the popup's glyphs from the display it runs on, and wraps its body text by character
+count rather than by measured width - so the card's proportions follow the screen it is drawn for.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `aet-eaw-edit.encyclopedia.screenWidth` | `1920` | Screen width, in pixels, the card is drawn for |
+| `aet-eaw-edit.encyclopedia.screenHeight` | `1080` | Screen height, in pixels; this is what sets the glyph size |
 
 ### Story simulation
 
