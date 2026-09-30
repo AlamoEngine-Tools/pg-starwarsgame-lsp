@@ -115,6 +115,53 @@ public sealed class StoryProtocolHandlersTest
     }
 
     [Fact]
+    public async Task GetStoryPlots_CarriesThePlayerFactionAndEachFactionsControl()
+    {
+        // Main_Campaign_Empire's shape: the Empire is played, the plot is the Rebel faction's and no
+        // AI drives it. A plot faction with no AI_Player_Control pair has no control at all.
+        var models = new StubModelService
+        {
+            Chain = new StoryCampaignChain("GC",
+            [
+                new StoryFactionManifest("Rebel", "M.xml"),
+                new StoryFactionManifest("Hutts", "M.xml")
+            ])
+            {
+                PlayerFaction = "Empire",
+                AiControl = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    { ["rebel"] = "None", ["Empire"] = "ScriptableHuman" }
+            }
+        };
+
+        var result = await new GetStoryPlotsHandler(models, Index(), Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal("Empire", campaign.PlayerFaction);
+        Assert.Equal([("Rebel", "None"), ("Hutts", null)],
+            campaign.Factions.Select(f => (f.Faction, f.Control)));
+    }
+
+    [Fact]
+    public async Task GetStoryPlots_CarriesTheCampaignDefinitionLocation()
+    {
+        const string campUri = "file:///ws/data/xml/campaigns.xml";
+        var campaignSym = new GameSymbol("GC", GameSymbolKind.XmlObject, "Campaign",
+            new FileOrigin(campUri, 5, 4), null);
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("GC", [campaignSym])
+        };
+
+        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index }, Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal(campUri, campaign.DefinitionUri);
+        Assert.Equal(5, campaign.DefinitionLine);
+    }
+
+    [Fact]
     public async Task GetStoryPlots_CampaignWithoutSet_HasNullSet()
     {
         var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
@@ -151,7 +198,8 @@ public sealed class StoryProtocolHandlersTest
             .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Null(result.Error);
-        var start = Assert.Single(result.Nodes, n => n.Label == "Start");
+        // The script state answering to Start carries the same label, so match the EVENT.
+        var start = Assert.Single(result.Nodes, n => n.Label == "Start" && n.Kind == "Event");
         Assert.Equal("Armed", start.Lifecycle);
         Assert.True(start.Reachable);
         var next = Assert.Single(result.Nodes, n => n.Label == "Next");
@@ -159,6 +207,32 @@ public sealed class StoryProtocolHandlersTest
         Assert.Contains(result.Edges, e => e.Kind == "Prereq");
         // The suspended thread's event reports Inactive.
         Assert.Equal("Inactive", Assert.Single(result.Nodes, n => n.Label == "Later").Lifecycle);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_Scope_GalacticIsTheDefault_UnknownBattleIsEmpty()
+    {
+        var handler = new GetStoryGraphHandler(Models(), Config());
+        var galactic = await handler.Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
+        var explicitGalactic =
+            await handler.Handle(new GetStoryGraphParams("GC", "Rebel", Scope: ""), CancellationToken.None);
+        var unknown = await handler.Handle(new GetStoryGraphParams("GC", "Rebel", Scope: "story_plots_nowhere.xml"),
+            CancellationToken.None);
+
+        Assert.Equal(galactic.Nodes.Select(n => n.Id), explicitGalactic.Nodes.Select(n => n.Id));
+        Assert.Null(unknown.Error);
+        Assert.Empty(unknown.Nodes);
+    }
+
+    [Fact]
+    public async Task GetStoryPlots_ListsTheFactionsBattles_NoneWhenNothingLinksATacticalPlot()
+    {
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var faction = Assert.Single(Assert.Single(result.Campaigns).Factions);
+        Assert.NotNull(faction.Battles);
+        Assert.Empty(faction.Battles);
     }
 
     [Fact]
@@ -215,6 +289,18 @@ public sealed class StoryProtocolHandlersTest
         Assert.NotNull(result.Threads);
         Assert.Contains(ThreadUri, result.Threads!);
         Assert.Contains(SuspendedUri, result.Threads!);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_ThreadFacet_ListsPlotFilesOnly_NeverAScript()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
+
+        // The script state is in the graph, so its uri would leak in if the facet read every node -
+        // and the picker would then offer a .lua file as the place for a new event.
+        Assert.Contains(result.Nodes, n => n.Kind == "LuaState");
+        Assert.Equal([ThreadUri, SuspendedUri], result.Threads!.Order(StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -421,7 +507,38 @@ public sealed class StoryProtocolHandlersTest
         var trigger = Assert.Single(result.RewardTypes, t => t.Name == "TRIGGER_EVENT");
         var param = Assert.Single(trigger.Params);
         Assert.Equal("StoryEventName", param.ReferenceType);
-        Assert.True(Assert.Single(result.EventTypes, t => t.Name == "STORY_UNTESTED").Untested);
+        // The slot's label travels with the schema; a slot without one ships null, never a stand-in.
+        Assert.Equal("Event", param.Label);
+        var enter = Assert.Single(result.EventTypes, t => t.Name == "STORY_ENTER");
+        Assert.Null(Assert.Single(enter.Params).Label);
+        // Notes travel whole rather than as one boolean: the editor has to tell an untested type
+        // from one the engine ignores, and until 2.0.0 the wire could only say "untested".
+        var untested = Assert.Single(
+            Assert.Single(result.EventTypes, t => t.Name == "STORY_UNTESTED").Notes);
+        Assert.Equal(nameof(SchemaNoteKind.Untested), untested.Kind);
+    }
+
+    // The kinds that say something is wrong have to survive the trip, or the story graph cannot
+    // show what it was told.
+    [Fact]
+    public async Task GetStorySchema_ShipsEveryNoteKind_WithItsTextAndValue()
+    {
+        var result = await new GetStorySchemaHandler(new ProtocolSchemaProvider(), Config())
+            .Handle(new GetStorySchemaParams(), CancellationToken.None);
+
+        var bugged = Assert.Single(result.EventTypes, t => t.Name == "STORY_BUGGED");
+
+        Assert.Collection(bugged.Notes,
+            n =>
+            {
+                Assert.Equal(nameof(SchemaNoteKind.BuggedInEngine), n.Kind);
+                Assert.Equal("The engine ignores this.", n.Text);
+            },
+            n =>
+            {
+                Assert.Equal(nameof(SchemaNoteKind.Since), n.Kind);
+                Assert.Equal("FoC 1.1", n.Value);
+            });
     }
 
     [Fact]
@@ -509,6 +626,44 @@ public sealed class StoryProtocolHandlersTest
                 CancellationToken.None);
 
         Assert.Single(result.Options);
+    }
+
+    [Fact]
+    public async Task GetStoryParamOptions_QueryMatchesAnywhereInTheName_PrefixMatchesFirst()
+    {
+        // The field filters what it holds by substring, so the server has to answer the same way:
+        // a prefix-only answer never fetched Mustafar for "ta" and left the list claiming no match.
+        var index = IndexWith(("Coruscant", "Planet"), ("Mustafar", "Planet"), ("Tatooine", "Planet"));
+
+        var result = await OptionsHandler(index)
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "event", "STORY_ENTER", 0, "ta"),
+                CancellationToken.None);
+
+        Assert.Equal(["Tatooine", "Mustafar"], result.Options.Select(o => o.Value));
+    }
+
+    [Fact]
+    public async Task GetStoryParamOptions_QueryMatchesAnywhereInCampaignNames()
+    {
+        var result = await OptionsHandler()
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "reward", "TRIGGER_EVENT", 0, "xt"),
+                CancellationToken.None);
+
+        Assert.Equal(["Next"], result.Options.Select(o => o.Value));
+    }
+
+    [Fact]
+    public async Task GetStoryParamOptions_DefaultLimitIs2000()
+    {
+        // Measured on eaw with the foc baseline: every slot but the object types holds at most 937
+        // candidates (SpeechEvent), and at the old 50 the list was cut short in 127 of 218 slots.
+        var index = IndexWith(Enumerable.Range(0, 2500).Select(i => ($"Planet_{i:D4}", "Planet")).ToArray());
+
+        var result = await OptionsHandler(index)
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "event", "STORY_ENTER", 0),
+                CancellationToken.None);
+
+        Assert.Equal(2000, result.Options.Count);
     }
 
     [Fact]
@@ -773,11 +928,14 @@ public sealed class StoryProtocolHandlersTest
             return Model.Threads.Any(t => t.DocumentUri == canonicalUri) ? [Model] : [];
         }
 
+        public StoryCampaignChain Chain { get; init; } =
+            new("GC", [new StoryFactionManifest("Rebel", "M.xml")]);
+
         public StoryChainScanResult GetChainResult()
         {
             return StoryChainScanResult.Empty with
             {
-                Campaigns = [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M.xml")])],
+                Campaigns = [Chain],
                 Manifests =
                 [
                     new StoryManifestContents("M.xml", ["Story_Act_I.xml"], ["Story_Act_II.xml"], ["Story_Lua"])
@@ -800,9 +958,26 @@ public sealed class StoryProtocolHandlersTest
             // span threads and survive both a branch filter and a plot-state filter to be right.
             var suspended = StoryThreadParser.Parse(
                 "<Story><Event Name=\"Later\"><Branch>Act2</Branch></Event></Story>", SuspendedUri);
+            // A script state answering to Start joins the graph as a LuaState node whose "thread"
+            // is the .lua uri - present so the thread facet can be shown to leave it out.
+            var machine = new LuaStoryMachine(LuaUri, "story_lua",
+            [
+                new LuaStoryState("Start", "State_Start", LuaStoryPhase.Empty, LuaStoryPhase.Empty, LuaStoryPhase.Empty)
+            ]);
             return new StoryCampaignModel("GC", "Rebel", [active, suspended],
                 new HashSet<string>(StringComparer.Ordinal) { SuspendedUri },
-                new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended]));
+                new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended], null, [machine]))
+            {
+                LuaScripts = ["Story_Lua"],
+                LuaMachines = [machine],
+                // What the assembler records: the manifest's entries, in its casing, to the
+                // documents they resolved to.
+                ThreadUriByFile = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Story_Act_I.xml"] = ThreadUri,
+                    ["Story_Act_II.xml"] = SuspendedUri
+                }
+            };
         }
     }
 
@@ -896,7 +1071,23 @@ public sealed class StoryProtocolHandlersTest
             [
                 new EnumValueDefinition { Name = "STORY_ELAPSED" },
                 new EnumValueDefinition { Name = "STORY_TRIGGER" },
-                new EnumValueDefinition { Name = "STORY_UNTESTED", Untested = true },
+                new EnumValueDefinition
+                {
+                    Name = "STORY_UNTESTED",
+                    Notes = [new SchemaNote(SchemaNoteKind.Untested, new Dictionary<string, string>())]
+                },
+                // Two kinds on one type, written in the wrong order on purpose: the wire must rank
+                // them, so a client showing a single badge shows the engine bug and not the version.
+                new EnumValueDefinition
+                {
+                    Name = "STORY_BUGGED",
+                    Notes =
+                    [
+                        new SchemaNote(SchemaNoteKind.Since, new Dictionary<string, string>(), "FoC 1.1"),
+                        new SchemaNote(SchemaNoteKind.BuggedInEngine,
+                            new Dictionary<string, string> { ["en"] = "The engine ignores this." })
+                    ]
+                },
                 new EnumValueDefinition
                 {
                     Name = "STORY_ENTER",
@@ -925,7 +1116,8 @@ public sealed class StoryProtocolHandlersTest
                         new ParamDefinition
                         {
                             Position = 0, ValueType = XmlValueType.NameReference,
-                            ReferenceTypeName = "StoryEventName"
+                            ReferenceTypeName = "StoryEventName",
+                            Label = new Dictionary<string, string> { ["en"] = "Event" }
                         }
                     ]
                 },

@@ -148,6 +148,7 @@ public sealed class LocalisationLayerMergeTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
         return (sp.GetRequiredService<ITranslationDatabaseFactory>(), sp.GetRequiredService<ILanguageService>());

@@ -6,4 +6,8 @@ namespace PG.StarWarsGame.LSP.Core.Schema;
 public sealed record MetafileDefinition(
     string Path,
     MetafileType MetafileType,
-    IReadOnlyList<string> Types);
+    IReadOnlyList<string> Types)
+{
+    /// <summary>What is worth saying about this metafile. See <see cref="SchemaNote" />.</summary>
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
+}

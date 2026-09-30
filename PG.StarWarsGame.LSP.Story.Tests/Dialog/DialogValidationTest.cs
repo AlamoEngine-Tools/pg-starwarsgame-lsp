@@ -42,7 +42,7 @@ public sealed class DialogValidationTest
         return new EnumValueDefinition
         {
             Name = name,
-            Untested = untested,
+            Notes = untested ? [new SchemaNote(SchemaNoteKind.Untested, new Dictionary<string, string>())] : [],
             Params = parameters.Length > 0 ? parameters : null
         };
     }

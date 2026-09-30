@@ -167,8 +167,8 @@ public sealed record PreviewInaccuracy(string Category, float Distance);
 /// <summary>A turret hardpoint's rest pose and how far it may swing.</summary>
 /// <param name="DeployedRotateExtentDegrees">
 ///     How far a unit turret swings while DEPLOYED, or null when the unit is never deployed.
-///     <c>TurretBehaviorClass::Adjust_Turret_Facing</c> reads the deployed pair in place of the normal one
-///     whenever <c>Is_Deployed</c>, so the swing opens with the shot.
+///     <c>Adjust_Turret_Facing</c> reads the deployed pair in place of the normal one
+///     whenever the is-deployed test, so the swing opens with the shot.
 /// </param>
 public sealed record PreviewTurret(
     float? RestAngle,
@@ -550,7 +550,7 @@ public sealed record PreviewDeathClone(
     ///     The CLONE's own <c>Scale_Factor</c>, or 1 - not the ship's.
     /// </summary>
     /// <remarks>
-    ///     A death clone is spawned as its own object, so <c>Update_Transform</c> draws it at its own
+    ///     A death clone is spawned as its own object, so the engine's transform update draws it at its own
     ///     scale and nothing relates it to the ship's. The two usually agree but often do not:
     ///     measured over 265 ship-to-clone pairs in <c>eaw/</c> and <c>foc/</c>, 206 declare the
     ///     same scale and 59 differ - the Millennium Falcon is 0.5 and its clone 1.0, the slave
@@ -874,9 +874,9 @@ public sealed record PreviewScene(
     /// <remarks>
     ///     <para>
     ///         THE BRIDGE BETWEEN TWO SPACES, and without it the preview mixes them.
-    ///         <c>GameObjectClass::Update_Transform</c> builds the object's world matrix from a
+    ///         the engine's transform update builds the object's world matrix from a
     ///         translation and three rotations with NO scale in it, then calls
-    ///         <c>Model-&gt;Set_Scale(Get_Scale_Factor(Type))</c> - so the scale lives on the MODEL
+    ///         <c>Model-&gt;the model-scale setter(the type's scale factor(Type))</c> - so the scale lives on the MODEL
     ///         alone. Geometry and bones are model units and reach the world multiplied by this;
     ///         positions, and therefore every range and distance the XML declares, are already
     ///         world units and are not.
@@ -893,7 +893,17 @@ public sealed record PreviewScene(
     ///         at odds with their own weapon ranges.
     ///     </para>
     /// </remarks>
-    float ScaleFactor = 1f)
+    float ScaleFactor = 1f,
+    /// <summary>
+    ///     The subject's <c>Icon_Name</c>, verbatim, or null for a bare model or an object that
+    ///     declares none.
+    /// </summary>
+    /// <remarks>
+    ///     Carried for the capture's file name. The large command-bar icon has no tag of its own: the
+    ///     engine formats <c>big_</c> + <c>Icon_Name</c> and falls back to the plain icon when that
+    ///     texture is missing, so the name is the whole link between a capture and its slot.
+    /// </remarks>
+    string? IconName = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

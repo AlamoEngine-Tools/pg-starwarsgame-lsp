@@ -67,6 +67,14 @@ public sealed class SchemaProviderProxy : LateBindingProxy<ISchemaProvider>, ISc
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => Inner.AllHardcodedSets;
     public IReadOnlyList<MetafileDefinition> AllMetafiles => Inner.AllMetafiles;
 
+    public IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories => Inner.AllScannedDirectories;
+    public IReadOnlyList<ObjectKindDefinition> AllKinds => Inner.AllKinds;
+
+    public ObjectKindDefinition? GetKind(string kindName)
+    {
+        return Inner.GetKind(kindName);
+    }
+
     protected override void OnConfigured(ISchemaProvider inner)
     {
         // Forward SchemaRefreshed from the real provider to our stored delegates.

@@ -15,6 +15,10 @@ public sealed class SchemaManifest
 
     public List<string> Tags { get; set; } = [];
     public List<string> Types { get; set; } = [];
+
+    /// <summary>Object kind files (<c>kinds.yaml</c>). Absent from a schema older than 1.1.0.</summary>
+    public List<string> Kinds { get; set; } = [];
+
     public List<string> Enums { get; set; } = [];
     public List<string> Hardcoded { get; set; } = [];
     public List<string> Meta { get; set; } = [];

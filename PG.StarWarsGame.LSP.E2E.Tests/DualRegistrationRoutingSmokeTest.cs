@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -216,59 +217,6 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
     // ── helpers ────────────────────────────────────────────────────────────────
 
     /// <summary>
-    ///     Returns the position of the first grandchild element - the first field tag
-    ///     inside the first type container - so tag-name completion hits a known context.
-    /// </summary>
-    private static (int line, int col) FindFirstGrandchildElementPosition(string[] lines)
-    {
-        var firstChildLine = -1;
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt <= 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            firstChildLine = i;
-            break;
-        }
-
-        if (firstChildLine < 0) return (1, 1);
-
-        for (var i = firstChildLine + 1; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt < 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            return (i, lt + 1);
-        }
-
-        return (1, 1);
-    }
-
-    /// <summary>
-    ///     Returns the 0-based (line, column) of the first character of <paramref name="value" />
-    ///     inside a call like <c>funcName("value")</c>.
-    /// </summary>
-    private static (int line, int col) FindLuaStringArgPosition(
-        string[] lines, string funcName, string value)
-    {
-        var marker = $"{funcName}(\"{value}\"";
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var idx = lines[i].IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) continue;
-            return (i, idx + funcName.Length + 2); // +2 for '(' and '"'
-        }
-
-        return (-1, -1);
-    }
-
-    /// <summary>
     ///     Returns the 0-based (line, column) immediately after <paramref name="identifier" />
     ///     in a call like <c>identifier(...)</c> - i.e. a position inside the identifier token
     ///     itself, so it classifies as a Lua identifier-completion context.
@@ -281,27 +229,6 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
             var idx = lines[i].IndexOf(marker, StringComparison.OrdinalIgnoreCase);
             if (idx < 0) continue;
             return (i, idx + identifier.Length);
-        }
-
-        return (-1, -1);
-    }
-
-    /// <summary>
-    ///     Returns the 0-based (line, column) of the first character of <paramref name="value" />
-    ///     inside an XML element body like <c>&lt;tagName&gt; value &lt;/tagName&gt;</c>.
-    /// </summary>
-    private static (int line, int col) FindXmlTagBodyValuePosition(
-        string[] lines, string tagName, string value)
-    {
-        var tagOpen = $"<{tagName}>";
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var tagIdx = lines[i].IndexOf(tagOpen, StringComparison.OrdinalIgnoreCase);
-            if (tagIdx < 0) continue;
-            var searchFrom = tagIdx + tagOpen.Length;
-            var valueIdx = lines[i].IndexOf(value, searchFrom, StringComparison.OrdinalIgnoreCase);
-            if (valueIdx < 0) continue;
-            return (i, valueIdx);
         }
 
         return (-1, -1);

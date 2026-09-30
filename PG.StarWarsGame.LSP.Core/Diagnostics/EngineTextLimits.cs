@@ -25,9 +25,8 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 public static class EngineTextLimits
 {
     /// <summary>
-    ///     A tag's value, copied into <c>strtok_string_buffer</c> by
-    ///     <c>DatabaseMapClass::Map_Data_Of_Type</c> - <c>DatabaseMap.cpp</c> line 5582,
-    ///     <c>CMP EAX, 0x2000</c>.
+    ///     A tag's value, copied into a fixed buffer when the engine maps it. Read from the
+    ///     comparison that guards the copy.
     /// </summary>
     /// <remarks>
     ///     Applies only to the value types listed in <see cref="CopiedToBuffer" /> - see
@@ -36,16 +35,14 @@ public static class EngineTextLimits
     public const int TagValue = 0x2000;
 
     /// <summary>
-    ///     A tag's NAME, uppercased into <c>uppercase_key_name</c> by
-    ///     <c>DatabaseMapClass::Map_DB_Data_To_Class</c> - <c>DatabaseMap.cpp</c> line 4563,
-    ///     <c>CMP EAX, 0x100</c>. Not reported today: a name that long resolves to no tag at all, so
-    ///     the unknown-tag rule reaches it first and says something more useful.
+    ///     A tag's NAME, uppercased into a fixed buffer when the engine maps it. Read from the
+    ///     comparison that guards the copy. Not reported today: a name that long resolves to no tag
+    ///     at all, so the unknown-tag rule reaches it first and says something more useful.
     /// </summary>
     public const int TagName = 0x100;
 
     /// <summary>
-    ///     An object's name, copied and uppercased for hashing by
-    ///     <c>GameObjectTypeClass::Get_Name_CRC</c> - <c>GameObjectType.cpp</c> line 2225.
+    ///     An object's name, copied and uppercased by the engine when it hashes the name.
     /// </summary>
     public const int ObjectName = 128;
 
@@ -61,12 +58,12 @@ public static class EngineTextLimits
     public const double WarnAtFraction = 0.9;
 
     /// <summary>
-    ///     The engine type codes whose case in <c>Map_Data_Of_Type</c> copies the value into
+    ///     The engine type codes whose case in the engine's tag-value mapper copies the value into
     ///     <c>strtok_string_buffer</c>, and which the <see cref="TagValue" /> limit therefore binds.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>Map_Data_Of_Type</c> is one switch on the type code -
+    ///         the engine's tag-value mapper is one switch on the type code -
     ///         <c>CMP 0x52; JA default; JMP [ECX*4 + 0xcbbed4]</c>, 83 entries - so the copy belongs
     ///         to individual CASES and not to the function. Mapping all 50
     ///         <c>strtok_string_buffer</c> assert sites through that jump table gives these codes:

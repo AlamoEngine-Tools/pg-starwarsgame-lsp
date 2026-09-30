@@ -3,9 +3,9 @@
 
 import * as vscode from 'vscode';
 
-import { GetEncyclopediaEntryResult } from './protocol';
-import { WebviewMessage, WebviewPanelHost } from './webviewPanelHost';
-import { pickShipName } from './shipNamePick';
+import {GetEncyclopediaEntryResult} from './protocol';
+import {WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
+import {pickShipName} from './shipNamePick';
 
 /**
  * The in-game encyclopedia popup for one GameObject, beside the editor.
@@ -50,7 +50,9 @@ export class EncyclopediaPanel extends WebviewPanelHost {
         });
 
         this.onDidDispose(() => {
-            if (EncyclopediaPanel._instance === this) { EncyclopediaPanel._instance = undefined; }
+            if (EncyclopediaPanel._instance === this) {
+                EncyclopediaPanel._instance = undefined;
+            }
         });
     }
 
@@ -68,7 +70,9 @@ export class EncyclopediaPanel extends WebviewPanelHost {
             this._multiplayer = msg.multiplayer === true;
             this._reload?.(this._multiplayer);
         }
-        if (msg.type === 'close') { this.dispose(); }
+        if (msg.type === 'close') {
+            this.dispose();
+        }
     }
 
     /**
@@ -96,6 +100,20 @@ export class EncyclopediaPanel extends WebviewPanelHost {
     /** Pushes a new entry into an open panel, and does nothing when there is none. */
     static update(entry: GetEncyclopediaEntryResult): void {
         EncyclopediaPanel._instance?._sendEntry(entry);
+    }
+
+    /**
+     * Re-fetches whatever the panel is showing, and does nothing when none is open.
+     *
+     * Everything on the card is resolved against the workspace index - the popup WIDTH above all,
+     * which a mod commonly changes. A panel opened while the workspace scan was still running was
+     * answered from the baseline alone and then kept that answer: measured on EaWX, vanilla's 262
+     * before the scan against the mod's own 340 after it. Nothing re-asked, so the card stayed
+     * vanilla for the whole session.
+     */
+    static refresh(): void {
+        const panel = EncyclopediaPanel._instance;
+        panel?._reload?.(panel._multiplayer);
     }
 
     static isOpen(): boolean {
@@ -138,19 +156,29 @@ export class EncyclopediaPanel extends WebviewPanelHost {
      */
     private _drawShipName(entry: GetEncyclopediaEntryResult): string | null {
         const names = entry.shipNames?.names ?? [];
-        if (names.length === 0) { return null; }
+        if (names.length === 0) {
+            return null;
+        }
 
         const kept = this._shipNames.get(entry.objectId);
         // Re-draw if the kept name is no longer in the pool - the author may have edited the file
         // out from under us, and showing a name their data no longer contains would be a lie.
-        if (kept !== undefined && names.includes(kept)) { return kept; }
+        if (kept !== undefined && names.includes(kept)) {
+            return kept;
+        }
 
         const drawn = pickShipName(names);
-        if (drawn !== null) { this._shipNames.set(entry.objectId, drawn); }
+        if (drawn !== null) {
+            this._shipNames.set(entry.objectId, drawn);
+        }
         return drawn;
     }
 
     private _send(payload: unknown): void {
-        if (this._ready) { this.post(payload); } else { this._pending = payload; }
+        if (this._ready) {
+            this.post(payload);
+        } else {
+            this._pending = payload;
+        }
     }
 }

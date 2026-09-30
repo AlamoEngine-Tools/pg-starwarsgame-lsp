@@ -21,9 +21,9 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.CrossTagRules;
 ///         engine complains about, because the ability then loads and does nothing at all.
 ///     </para>
 ///     <para>
-///         Attributed by the xref to each message: <c>HeroAssassinAbilityClass::Validate_Data</c>
-///         (<c>0100df66</c>), <c>BaseDestructionAbilityClass::Validate_Data</c> (<c>00ff6c6b</c>)
-///         and <c>NeutralizeHeroAbilityClass::Validate_Data</c> (<c>00f24027</c>). The third is
+///         Attributed by the xref to each message: the engine's load-time validation
+///        , the engine's load-time validation
+///         and the engine's load-time validation. The third is
 ///         labelled <c>Warning</c> by the engine where the other two say <c>Error</c>, though the
 ///         stated consequence is word for word the same.
 ///     </para>

@@ -55,13 +55,16 @@ public sealed class LuaDebugServiceExtensionsTest
         Assert.Same(fake, provider.GetRequiredService<TimeProvider>());
     }
 
+    // This used to assert the opposite: that the codec could NOT be resolved without the host's
+    // PG.Commons contribution. That contract is gone. As of the 4.1.4 packages a consumer cannot
+    // obtain an ICrc32HashingService at all - PetroglyphCommons.ContributeServices is empty and
+    // both the service and its CRC32 provider are internal - so the codec computes the checksum
+    // from System.IO.Hashing.Crc32, which is what PG.Commons wrapped anyway.
     [Fact]
-    public void AddLuaDebugServices_WithoutCommonsHashing_CodecCannotBeResolved()
+    public void AddLuaDebugServices_NeedsNoPetroglyphHashing_ToResolveTheCodec()
     {
-        // The host owns the one-time PG.Commons contribution; the debugger never registers it
-        // itself, because a second CRC-32 provider makes the hashing service refuse to start.
         var provider = new ServiceCollection().AddLuaDebugServices().BuildServiceProvider();
 
-        Assert.Throws<InvalidOperationException>(provider.GetRequiredService<IPgNetDatagramCodec>);
+        Assert.NotNull(provider.GetRequiredService<IPgNetDatagramCodec>());
     }
 }

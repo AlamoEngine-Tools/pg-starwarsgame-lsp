@@ -42,7 +42,7 @@ public abstract class ApplicableUnitRuleBase : EitherOrRequirementRuleBase
     }
 }
 
-/// <summary>Message <c>01552078</c> - the four owners that ask unconditionally.</summary>
+/// <summary>One engine message - the four owners that ask unconditionally.</summary>
 public sealed class CombatBonusApplicableUnitsRule : ApplicableUnitRuleBase
 {
     protected override IReadOnlyList<string> ElementNames =>
@@ -57,10 +57,10 @@ public sealed class CombatBonusApplicableUnitsRule : ApplicableUnitRuleBase
 }
 
 /// <summary>
-///     Message <c>01552078</c> again, for the one owner that asks conditionally.
+///     The same engine message again, for the one owner that asks conditionally.
 /// </summary>
 /// <remarks>
-///     <c>ForceHealingAbilityClass::Validate_Data</c> guards the check with
+///     the engine's load-time validation guards the check with
 ///     <c>0.0 &lt; HealRange</c>: an ability that heals at no range is never asked which units it
 ///     applies to. Its own rule rather than a flag on the shared one, because the gate is the whole
 ///     difference and burying it would make the other four look conditional too.
@@ -82,21 +82,21 @@ public sealed class ForceHealingApplicableUnitsRule : ApplicableUnitRuleBase
     }
 }
 
-/// <summary>Message <c>015510b8</c>, referenced by <c>AbsorbBlasterAbilityClass</c> alone.</summary>
+/// <summary>An engine message, referenced by <c>AbsorbBlasterAbilityClass</c> alone.</summary>
 public sealed class AbsorbBlasterApplicableUnitsRule : ApplicableUnitRuleBase
 {
     protected override IReadOnlyList<string> ElementNames => ["absorb_blaster_ability"];
     protected override string Consequence => "cannot absorb fire from any source";
 }
 
-/// <summary>Message <c>01555f40</c>, referenced by <c>RedirectBlasterAbilityClass</c> alone.</summary>
+/// <summary>An engine message, referenced by <c>RedirectBlasterAbilityClass</c> alone.</summary>
 public sealed class RedirectBlasterApplicableUnitsRule : ApplicableUnitRuleBase
 {
     protected override IReadOnlyList<string> ElementNames => ["redirect_blaster_ability"];
     protected override string Consequence => "cannot block or redirect fire";
 }
 
-/// <summary>Message <c>01551310</c> - 23 classes, the widest-reaching rule here.</summary>
+/// <summary>One engine message - 23 classes, the widest-reaching rule here.</summary>
 public sealed class AttackAbilityApplicableUnitsRule : ApplicableUnitRuleBase
 {
     protected override IReadOnlyList<string> ElementNames =>

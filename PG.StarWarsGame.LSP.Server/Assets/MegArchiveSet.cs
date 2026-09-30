@@ -29,8 +29,7 @@ namespace PG.StarWarsGame.LSP.Server.Assets;
 public sealed class MegArchiveSet(
     IFileSystem fileSystem,
     ILspConfigurationProvider config,
-    IMegFileService megFileService,
-    IMegFileExtractor megExtractor,
+    IMegService megFileService,
     ILogger<MegArchiveSet> logger) : IMegArchiveSet
 {
     private readonly Lock _gate = new();
@@ -55,7 +54,7 @@ public sealed class MegArchiveSet(
 
         try
         {
-            using var stream = megExtractor.GetData(location);
+            using var stream = location.GetData();
             using var buffer = new MemoryStream();
             stream.CopyTo(buffer);
             return buffer.ToArray();
@@ -85,7 +84,7 @@ public sealed class MegArchiveSet(
             foreach (var megPath in OrderedArchivePaths())
                 try
                 {
-                    var megFile = megFileService.Load(megPath);
+                    var megFile = megFileService.LoadFile(megPath);
                     foreach (var entry in megFile.Archive)
                         entries[MegAssetCatalogBuilder.NormalizeMegPath(entry.Path)] =
                             new MegDataEntryLocationReference(megFile, entry);

@@ -2,14 +2,32 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { StoryParamSchemaDto } from '../../protocol';
-import { booleanParamLabel, shortParamLabel } from './paramLabels';
+import {StoryParamSchemaDto} from '../../protocol';
+import {booleanParamLabel, paramLabel, shortParamLabel} from './paramLabels';
 
 function withDescription(description: string | null): StoryParamSchemaDto {
-    return { position: 0, valueType: 'string', optional: false, description };
+    return {position: 0, valueType: 'string', optional: false, description};
 }
+
+// The schema's label names the slot; the description is the sentence behind the tooltip and only
+// stands in when no label exists; the position is the last resort.
+describe('paramLabel', () => {
+    it('prefers the label over the description phrase', () => {
+        assert.equal(paramLabel({
+            ...withDescription('Planet(s). Multiple values = OR condition.'),
+            label: 'Planets'
+        }, 'Param 1'), 'Planets');
+    });
+
+    it('falls back to the description phrase, then to the generic name', () => {
+        assert.equal(paramLabel(withDescription('Attacker faction.'), 'Param 3'), 'Attacker faction');
+        assert.equal(paramLabel({...withDescription('Attacker faction.'), label: '  '}, 'Param 3'), 'Attacker faction');
+        assert.equal(paramLabel(withDescription(null), 'Param 3'), 'Param 3');
+        assert.equal(paramLabel(undefined, 'Reward 2'), 'Reward 2');
+    });
+});
 
 describe('shortParamLabel', () => {
     it('drops the trailing full stop', () => {

@@ -730,9 +730,9 @@ export interface PreviewScene {
     /**
      * The subject's uniform render scale - `Scale_Factor` - or 1 where it declares none.
      *
-     * **The bridge between two spaces.** `GameObjectClass::Update_Transform` builds the object's
+     * **The bridge between two spaces.** the engine's transform update builds the object's
      * world matrix from a translation and three rotations with NO scale in it, then calls
-     * `Model->Set_Scale(Get_Scale_Factor(Type))` - so the scale lives on the model alone. Geometry
+     * the engine scales the model by the type's scale factor - so the scale lives on the model alone. Geometry
      * and bones are MODEL units and reach the world multiplied by this; every range and distance
      * the XML declares is already in WORLD units and is not.
      *
@@ -741,6 +741,11 @@ export interface PreviewScene {
      * `Viewport.setModelScale`.
      */
     scaleFactor?: number | null;
+    /**
+     * The subject's `Icon_Name`, verbatim, or null for a bare model or an object that names none.
+     * A large capture is named `big_` + this, the name the engine looks the large icon up by.
+     */
+    iconName?: string | null;
     factions: PreviewFaction[];
     problems: PreviewProblem[];
     /** The cameras the subject's own model declares. Empty for the 87% that carry none. */

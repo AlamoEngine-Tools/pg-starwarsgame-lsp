@@ -70,6 +70,7 @@ public sealed class GetLanguagesHandlerTest
     private static GetLanguagesHandler BuildHandler(ILspConfigurationProvider? config = null)
     {
         var services = new ServiceCollection();
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
         return new GetLanguagesHandler(

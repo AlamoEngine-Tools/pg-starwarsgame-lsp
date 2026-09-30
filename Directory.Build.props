@@ -10,6 +10,21 @@
         <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     </PropertyGroup>
 
+    <!--
+        Warnings are errors in every production project. This lived in seven individual .csproj
+        files and was missing from the two newest - Server and BaselineBuilder - which is how a
+        VSTHRD002 sync-wait on the diagnostics path survived in Server. One declaration cannot be
+        forgotten by the next project.
+
+        Test projects are deliberately excluded: they carry warnings today (mostly CS8604 on
+        assertion helpers) and promoting those is separate work with no bearing on shipped code.
+        The PetroglyphTools and ModVerify projects sit outside this tree, so this file never
+        reaches them either way.
+    -->
+    <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+
     <PropertyGroup>
         <Version>0.3.0</Version>
         <Authors>Alamo Engine Tools and Contributors</Authors>

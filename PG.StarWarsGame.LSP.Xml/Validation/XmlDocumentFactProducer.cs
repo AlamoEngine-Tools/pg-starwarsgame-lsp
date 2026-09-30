@@ -31,6 +31,25 @@ public sealed class XmlDocumentFactProducer(
         var lineIndex = document.LineIndex;
 
         var fileTypes = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri));
+
+        // Asked of the registry's KEYS, not of the type list. A metafile whose contents the schema
+        // does not model yet registers with an empty type list, and an empty type list is what an
+        // unregistered file returns too - so testing the types reports a file the engine opens by a
+        // compiled-in name as read by nothing.
+        var isRegistered = fileTypeRegistry.IsRegistered(fileHelper.NormalizeUri(documentUri));
+        CollectUnregisteredFile(doc, !isRegistered, documentUri, facts);
+
+        // Registered, but the schema models nothing of what is inside it: the engine opens the file
+        // by a name compiled into it and we have not described its contents. Stop here, with the
+        // well-formedness facts already collected and nothing else.
+        //
+        // Continuing would walk the tags with no file type, so every name resolves through the
+        // global-tag fallback and picks up whatever unrelated type declares the same name. That is
+        // where guidialogs.xml's <Size> was being checked against a Float2 belonging to something
+        // else. Validating with the wrong rules is worse than not validating: the author gets
+        // errors they cannot act on, and learns to ignore the file.
+        if (isRegistered && fileTypes.IsEmpty) return facts;
+
         var isTypeContainerLevel = !fileTypes.IsEmpty &&
                                    fileTypes.Any(t => schema.GetObjectType(t)?.NameTag is not null);
 
@@ -70,7 +89,9 @@ public sealed class XmlDocumentFactProducer(
             var tag = schema.GetTag(node.Name);
             if (tag is null || tag.Notes.Count == 0) continue;
             if (NoteIsAmbiguous(node.Name)) continue;
-            facts.Add(new XmlNotesFact(documentUri, XmlUtility.GetLine(node), 0, 0, tag));
+            // The note is about the tag: mark its name, one past the bracket.
+            var (noteLine, noteColumn) = lineIndex.GetPosition(node.StreamPosition + 1);
+            facts.Add(new XmlNotesFact(documentUri, noteLine, noteColumn, node.Name.Length, tag));
         }
 
         return facts;
@@ -81,7 +102,7 @@ public sealed class XmlDocumentFactProducer(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>GameObjectTypeClass::Get_Name_CRC</c> copies the name into a 128-byte buffer,
+    ///         The engine's name-CRC routine copies the name into a 128-byte buffer,
     ///         uppercases it and hashes that. The size check beside the copy is an assert and the
     ///         copy itself is a bare <c>strcpy</c>, so the bound is enforced in the build Petroglyph
     ///         tested with and nowhere else.
@@ -163,10 +184,20 @@ public sealed class XmlDocumentFactProducer(
 
         return declarations
             .Where(d => d.Notes.Count > 0)
-            .Select(d => string.Join('', d.Notes.OrderBy(n => n.Key, StringComparer.Ordinal)
-                .Select(n => n.Key + '' + n.Value)))
+            .Select(d => string.Join('', d.Notes.Select(Fingerprint)))
             .Distinct(StringComparer.Ordinal)
             .Count() > 1;
+    }
+
+    // A note list compared by content. The list arrives ranked, so its order is already a function
+    // of the notes themselves and needs no sorting here; two same-kind notes written in a different
+    // order really are different content, and this says so.
+    private static string Fingerprint(SchemaNote note)
+    {
+        var text = string.Join('', note.Text
+            .OrderBy(t => t.Key, StringComparer.Ordinal)
+            .Select(t => t.Key + '' + t.Value));
+        return $"{note.Kind}{note.Value}{text}";
     }
 
     /// <summary>
@@ -180,6 +211,36 @@ public sealed class XmlDocumentFactProducer(
     ///     element children are considered, which is what keeps the 44 vanilla files whose
     ///     <c>Name=""</c> sits inside a comment block silent.
     /// </remarks>
+    /// <summary>
+    ///     Reports a file nothing registers, anchored on its root element.
+    ///     <para>
+    ///         The root element is the one node whose HAP position can be trusted - the per-node
+    ///         line and column are unreliable for NESTED elements, which is why every other fact
+    ///         here takes its position from the document's own offsets. Column 0 of line 0 would
+    ///         have put the squiggle on the XML declaration, which is not what is wrong.
+    ///     </para>
+    ///     <para>
+    ///         A document under a directory the engine WALKS is exempt: its files are read for
+    ///         sitting there, so no registry names them and none was ever meant to.
+    ///     </para>
+    /// </summary>
+    private void CollectUnregisteredFile(
+        HtmlDocument doc, bool hasNoFileType, string documentUri, List<XmlFact> facts)
+    {
+        if (!hasNoFileType) return;
+        if (schema.IsInScannedDirectory(documentUri)) return;
+
+        var rootNode = doc.DocumentNode.ChildNodes.FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
+        if (rootNode is null) return;
+
+        var slash = documentUri.LastIndexOf('/');
+        var fileName = slash < 0 ? documentUri : documentUri[(slash + 1)..];
+
+        // LinePosition points at the '<', so the name starts one past it.
+        facts.Add(new XmlUnregisteredFileFact(
+            documentUri, XmlUtility.GetLine(rootNode), rootNode.LinePosition + 1, rootNode.Name.Length, fileName));
+    }
+
     private void CollectUnnamedObjects(
         HtmlDocument doc, List<XmlFact> facts, LineOffsetIndex lineIndex, string documentUri)
     {
@@ -361,7 +422,7 @@ public sealed class XmlDocumentFactProducer(
                     context?.ObjectTypeName));
 
                 // The database mapper strcpy's this into a fixed stack buffer - but only for the
-                // value types whose case in Map_Data_Of_Type does that copy. It is one switch on
+                // value types whose case in the engine's tag-value mapper does that copy. It is one switch on
                 // the type code, so the check belongs to a CASE and not to the function: 50 of the
                 // 83 codes, every one a composite. A scalar or a single reference is read straight
                 // out of the node and never copied, so the limit does not bind it.

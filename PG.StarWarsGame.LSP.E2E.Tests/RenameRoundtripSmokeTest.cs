@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -257,11 +258,24 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
                 $"Rename-back expected ≥ 2 Lua files. Got: {string.Join(", ", backUris)}");
 
             // ── Apply rename-back, verify diagnostics are clean ───────────────
-            var diagBackTask = _fixture.WaitForDiagnosticsAsync(corvettesUri, TimeSpan.FromSeconds(15));
+            //
+            // Settle rather than take the next publish. The rename-back edits several files, each
+            // its own didChange, so the first publish back can be one computed against a
+            // half-applied edit - it names the old symbol, the author never sees it, and asserting
+            // on it fails the test for something that did not happen. The forward direction guards
+            // the same hazard with a predicate; a negative assertion cannot, so it waits for the
+            // diagnostics to stop moving and reads the ones the author is left with.
+            // The quiet window has to clear the slowest gap BETWEEN publishes, not the fast case:
+            // measured at 750ms this still caught an intermediate publish about once every three
+            // full-suite runs, where a dozen servers share the machine and a re-index can stall
+            // longer than that mid-edit.
+            var diagBackTask = _fixture.WaitForSettledDiagnosticsAsync(
+                corvettesUri, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30));
             await ApplyWorkspaceEditAsync(editBack, inMemory, versions);
             renamed = false;
 
             var diagsBack = await diagBackTask;
+            Assert.NotNull(diagsBack);
             var backMessages = diagsBack.Diagnostics?.Select(d => d.Message).ToList() ?? [];
 
             Assert.False(
@@ -384,24 +398,6 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
         }
 
         return string.Join('\n', lines);
-    }
-
-    /// <summary>
-    ///     Returns the 0-based (line, column) of the first character of <paramref name="value" />
-    ///     inside a call like <c>funcName("value")</c>.
-    /// </summary>
-    private static (int line, int col) FindLuaStringArgPosition(
-        string[] lines, string funcName, string value)
-    {
-        var marker = $"{funcName}(\"{value}\"";
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var idx = lines[i].IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) continue;
-            return (i, idx + funcName.Length + 2); // +2 for '(' and '"'
-        }
-
-        return (-1, -1);
     }
 
     /// <summary>

@@ -22,11 +22,36 @@ export interface StoryLuaScriptDto {
     uri?: string | null;
 }
 
+/**
+ * A tactical battle of the faction: its own graph, opened through `GetStoryGraph`'s `scope`.
+ * `rank` is the order in which the galactic story reaches it.
+ */
+export interface StoryBattleDto {
+    key: string;
+    label: string;
+    entryEventIds: string[];
+    rank: number;
+    /**
+     * The battle's plot files as its tactical manifest lists them, each with the document it
+     * resolved to. The faction's own thread list never carries these.
+     */
+    threads: StoryPlotThreadDto[];
+    /** The scripts the battle's tactical manifest attaches; the faction's own list never carries them. */
+    luaScripts?: StoryLuaScriptDto[] | null;
+}
+
 export interface StoryFactionDto {
     faction: string;
     manifestFile: string;
     threads: StoryPlotThreadDto[];
     luaScripts: StoryLuaScriptDto[];
+    /** Absent from an older server; treat as none. */
+    battles?: StoryBattleDto[] | null;
+    /**
+     * The faction's `AI_Player_Control` player type as written (`BasicEmpire`, `None`, `Human`, ...);
+     * null when the campaign has no pair for it.
+     */
+    control?: string | null;
 }
 
 /** `set` is the Campaign_Set this campaign belongs to; null when it declares none. */
@@ -34,6 +59,12 @@ export interface StoryCampaignDto {
     name: string;
     factions: StoryFactionDto[];
     set?: string | null;
+    /** `Starting_Active_Player` - the faction the human plays; null when the campaign names none. */
+    playerFaction?: string | null;
+    /** The document declaring the campaign; null when it is not openable (baseline or unindexed). */
+    definitionUri?: string | null;
+    /** 0-based line of the `<Campaign>` element in `definitionUri`. */
+    definitionLine?: number | null;
 }
 
 export interface GetStoryPlotsResult {
@@ -64,6 +95,18 @@ export interface StoryGraphNodeDto {
     perpetual?: boolean;
     storyDialog?: string | null;
     storyChapter?: number | null;
+    /** For a GalacticPortal node: the galactic event it stands for. */
+    portalTarget?: string | null;
+    /**
+     * The REFERENCED project that owns this node's thread, which makes it read-only here.
+     *
+     * A parent project is a library: inspect it, run it, do not edit it. The node is still shown -
+     * hiding it would hide half the graph - but its editing controls are disabled and name this
+     * owner, because an edit staged against it is refused at the command boundary. Per node, since
+     * a leaf commonly extends a graph it does not wholly own. Absent or null means editable, which
+     * is the unlayered case.
+     */
+    readOnlyOwner?: string | null;
 }
 
 export interface StoryGraphEdgeDto {
@@ -156,12 +199,25 @@ export interface StoryParamSchemaDto {
     optional: boolean;
     description?: string | null;
     enumValues?: string[] | null;
+    /** What the slot holds, in one to three words; absent for a slot nobody has named yet. */
+    label?: string | null;
+}
+
+/** One thing the schema says about a type. `kind` is a SchemaNoteKind name. */
+export interface StoryNoteDto {
+    kind: string;
+    text?: string | null;
+    value?: string | null;
 }
 
 export interface StoryTypeSchemaDto {
     name: string;
     description?: string | null;
-    untested: boolean;
+    /**
+     * Everything the schema says about this type, ranked worst first. Replaced a lone `untested`
+     * boolean in schema 2.0.0, which could not tell an unverified type from one the engine ignores.
+     */
+    notes: StoryNoteDto[];
     params: StoryParamSchemaDto[];
 }
 
@@ -223,6 +279,11 @@ export interface StoryLayoutEntryDto {
     eventName: string;
     x: number;
     y: number;
+    /**
+     * Set for a virtual node - a junction, a portal, a tactical stub, a script state - which the
+     * sidecar names by id; the thread and event are then empty. Absent for an event.
+     */
+    nodeId?: string | null;
 }
 
 export interface GetStoryLayoutResult {
@@ -257,6 +318,28 @@ export interface StorySimFlagDto {
 export interface StorySimNodeStateDto {
     nodeId: string;
     lifecycle: string;
+    /** How often the event fired since Start (a perpetual event counts every time). */
+    fireCount: number;
+    /** An armed clock or flag gate: "4/10 s", "FLAG_X 2 of 3"; null when the event has none. */
+    gateLabel?: string | null;
+    gateProgress?: number | null;
+}
+
+/**
+ * One trace transition. `from`/`to` are lifecycle names, both null for a step that is not a
+ * lifecycle change (a flag write, an owed completion, an ignored reward). `sourceNodeId` is the
+ * event whose firing caused this one - the edge to animate runs from it to `nodeId`. `seq` is the
+ * position in the whole trace; every request carries `sinceSeq` and gets only the steps after it.
+ */
+export interface StorySimStepDto {
+    tick: number;
+    seq: number;
+    nodeId: string;
+    from?: string | null;
+    to?: string | null;
+    sourceNodeId?: string | null;
+    cause: string;
+    detail?: string | null;
 }
 
 export interface StorySimInterventionDto {
@@ -265,16 +348,130 @@ export interface StorySimInterventionDto {
     eventName: string;
     eventType?: string | null;
     options: string[];
+    /** The world change kind that fires this event when its type reads the world. */
+    facet?: string | null;
+    /** A ready change built from the event's own parameters; null when the author must pick. */
+    suggested?: StorySimWorldChangeDto | null;
+    /**
+     * A tactical decision's battle: the one the panel is inside, or the one whose entry this
+     * listener follows. Absent when no battle can be named and the answer is a plain world change.
+     */
+    battleKey?: string | null;
+}
+
+/** One battle of the faction as the galactic session sees it: notStarted, running, won or lost. */
+export interface StorySimBattleDto {
+    key: string;
+    label: string;
+    status: string;
+    /** The battle session's own tick while it runs. */
+    tick: number;
+    /**
+     * The flags the battle's own rewards can write, with the value each would set - offered on the
+     * portal as picks when the battle is decided without being played.
+     */
+    writes?: StorySimFlagDto[] | null;
+}
+
+/** An author's change to the world; fields a kind does not read stay undefined. */
+export interface StorySimWorldChangeDto {
+    kind: string;
+    planet?: string | null;
+    unitType?: string | null;
+    faction?: string | null;
+    name?: string | null;
+    mode?: string | null;
+    amount?: number;
+    flags?: StorySimFlagDto[] | null;
+    nodeId?: string | null;
+}
+
+export interface StorySimPlanetDto {
+    name: string;
+    owner?: string | null;
+    revealed: boolean;
+    corrupted: boolean;
+    destroyed: boolean;
+}
+
+export interface StorySimUnitDto {
+    type: string;
+    owner: string;
+    planet: string;
+    count: number;
+}
+
+/** The fact table: seeded from the campaign, then written only by rewards and the author. */
+export interface StorySimWorldDto {
+    planets: StorySimPlanetDto[];
+    units: StorySimUnitDto[];
+    tech: StorySimFlagDto[];
+    credits: StorySimFlagDto[];
+    era?: string | null;
+    counters: StorySimFlagDto[];
+    objectives: string[];
 }
 
 export interface StorySimStateDto {
     running: boolean;
+    /** Ticks run so far; one tick is `clockStepSeconds` of story time. */
+    tick: number;
     clock: number;
+    clockStepSeconds: number;
     flags: StorySimFlagDto[];
     nodes: StorySimNodeStateDto[];
     interventions: StorySimInterventionDto[];
     luaNotifications: string[];
+    /** The last lines of the text log; the trace in `steps` is the complete record. */
     log: string[];
+    /** Steps with seq >= the request's sinceSeq. */
+    steps: StorySimStepDto[];
+    totalSteps: number;
+    breakpoints: string[];
+    breakOnGates: boolean;
+    /** The event whose breakpoint halted the last run, until the next command. */
+    haltedAt?: string | null;
+    world: StorySimWorldDto;
+    luaStates: StorySimLuaStateDto[];
+    /**
+     * How many things the clock alone can still change: armed timers, owed completions, script
+     * work. Zero means nothing more happens until the author answers a decision. Optional so an
+     * older server reads as "the clock may still run".
+     */
+    clockPending?: number;
+    /** Armed listeners the author ruled out for this run: no decision until reconsidered. */
+    ruledOut?: string[] | null;
+    /** The battle this session runs, as the plots feed keys it; absent or null at the galactic level. */
+    scope?: string | null;
+    /**
+     * Galactic only: the label of the battle whose session is up. The game freezes the galaxy
+     * during a tactical battle, so the galactic session takes no command while this is set.
+     */
+    pausedFor?: string | null;
+    /** Battle only: "won" or "lost" once resolved, after which the session takes no command. */
+    outcome?: string | null;
+    /** Galactic only: every battle of the faction in play order with its status. */
+    battles?: StorySimBattleDto[] | null;
+    /**
+     * Whether a speech or movie a reward starts is owed its completion on the next tick, the
+     * session's option at start. Off, the listener waits for the author or the engine's timeout.
+     */
+    assumeMediaCompletes?: boolean;
+}
+
+/** A campaign script's state machine: where it is, where it goes next, what it still owes. */
+export interface StorySimLuaStateDto {
+    scriptUri: string;
+    scriptName: string;
+    current?: string | null;
+    next?: string | null;
+    pending: StorySimLuaPendingDto[];
+}
+
+export interface StorySimLuaPendingDto {
+    id: string;
+    state: string;
+    dueClock: number;
 }
 
 export interface StorySimStateResult {
@@ -291,4 +488,6 @@ export interface StoryGraphChangedParams {
 export interface StorySimChangedParams {
     campaign: string;
     faction: string;
+    /** The session's scope: a battle key, or absent/null for the galactic session. */
+    scope?: string | null;
 }

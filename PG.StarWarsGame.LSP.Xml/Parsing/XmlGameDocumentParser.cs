@@ -36,6 +36,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
     private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
 
+    // The game compares the value with this word case-insensitively and removes the AI instead of
+    // creating one, so it names no AIPlayerType.
+    private const string HumanControlKeyword = "Human";
+
     private readonly ILspConfigurationProvider? _configProvider;
     private readonly IEaWXmlContext? _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
@@ -140,6 +144,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
         if (rootContainer is null) return symbols;
 
+        // Read off the schema per document rather than cached on this instance: the schema
+        // hot-reloads, and a kind added while the server runs must start being indexed.
+        var flagTags = ObjectKinds.FlagTagsUsedBy(_schema.AllKinds);
+
         // A SINGLETON type - no NameTag - has exactly one instance, so its type name is its id and
         // the root element itself is the object. Without this, everything in GameConstants that is
         // not enum-shaped (ShipNameTextFiles, the Encyclopedia_* geometry, the Corruption_*
@@ -176,7 +184,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var (variantBaseId, variantRef) = ResolveVariant(node, typeDef.TypeName, documentUri, lineIndex);
                 if (variantRef is not null) references.Add(variantRef);
                 symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
-                    new FileOrigin(documentUri, node.Line - 1, col), null, variantBaseId));
+                    new FileOrigin(documentUri, node.Line - 1, col), null, variantBaseId,
+                    CollectBehaviors(node), CollectFlags(node, flagTags)));
             }
         }
 
@@ -216,6 +225,37 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         }
 
         return (null, null);
+    }
+
+    /// <summary>
+    ///     The behaviour tokens an object element declares itself, or null when it declares none.
+    ///     Null rather than an empty array so the symbol stays the size it was for the great
+    ///     majority of objects, which carry no behaviour at all.
+    /// </summary>
+    private static string[]? CollectBehaviors(HtmlNode objectNode)
+    {
+        var tokens = ObjectBehaviors.FromTags(objectNode.ChildNodes
+            .Where(n => n.NodeType == HtmlNodeType.Element)
+            .Select(n => (n.Name, n.InnerText)));
+        return tokens.Length == 0 ? null : tokens;
+    }
+
+    /// <summary>
+    ///     The tracked boolean tags that are true on this object. Always a list, never null: the
+    ///     object WAS inspected, and a kind that tests a flag has to tell "has none" apart from
+    ///     "nobody looked", which is what a null means.
+    /// </summary>
+    private static string[] CollectFlags(HtmlNode objectNode, IReadOnlyCollection<string> flagTags)
+    {
+        if (flagTags.Count == 0) return [];
+
+        return objectNode.ChildNodes
+            .Where(n => n.NodeType == HtmlNodeType.Element
+                        && flagTags.Contains(n.Name, StringComparer.OrdinalIgnoreCase)
+                        && EngineBoolean.IsTrue(n.InnerText))
+            .Select(n => n.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static int? FindNameAttributeValueColumn(HtmlNode node, string nameTag, LineOffsetIndex lineIndex)
@@ -311,7 +351,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 if (tagDef.ValueType == XmlValueType.UnitSpawnTable)
                 {
                     if (HasChildElement(child)) continue;
-                    CollectUnitSpawnUnitReference(child, lineIndex, documentUri, references);
+                    CollectLeadingSlotReference(child, null, lineIndex, documentUri, references);
                     continue;
                 }
 
@@ -323,6 +363,18 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 {
                     if (HasChildElement(child)) continue;
                     CollectDeathCloneReferences(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
+                // (Planet, Number) on the per-faction reader - Corruption_Level_Override. Checked before
+                // the per-faction tuples below, which would emit slot 0 as a Faction. The planet
+                // resolves against the tag's own referenceType; a kind (null ObjectType) resolves by
+                // name and narrows by behaviour elsewhere.
+                if (tagDef.SemanticType == TagSemanticType.PlanetValuePair)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectLeadingSlotReference(child, tagDef.ObjectType?.TypeName, lineIndex, documentUri,
+                        references);
                     continue;
                 }
 
@@ -341,9 +393,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
-                // Campaign Markup_Filename "Faction, MarkupFile": only the leading faction is an
-                // indexable object; the GUI hint-markup file is not a workspace object, so slot 1 is
-                // intentionally left unmodelled (a reference to it would only be a false unresolved).
+                // Campaign Markup_Filename "Faction, MarkupName": only the leading faction is an
+                // indexable object; the markup is an AI galactic perception file under the AI tree,
+                // which is not indexed, so slot 1 is left unmodelled (a reference to it would only be
+                // a false unresolved).
                 if (tagDef.SemanticType == TagSemanticType.FactionMarkupPairList)
                 {
                     if (HasChildElement(child)) continue;
@@ -437,11 +490,11 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         }
     }
 
-    // Slot 0 of a UnitSpawnTable tuple ("StarViper_Squadron, 2") as a wildcard-typed game object
-    // reference. Only the unit half is an object; the count is validated by UnitSpawnTableHandler.
-    // ExpectedTypeName stays null so resolution is by name across any object type, matching the
-    // untyped lookup the handler used to perform.
-    private static void CollectUnitSpawnUnitReference(HtmlNode child,
+    // Slot 0 of an (object, number) tuple as a game object reference; the number is the handler's.
+    // UnitSpawnTable ("StarViper_Squadron, 2") passes no expected type, so resolution is by name
+    // across any object type, matching the untyped lookup its handler used to perform. A
+    // PlanetValuePair passes the tag's own type, or none when its referenceType is a kind.
+    private static void CollectLeadingSlotReference(HtmlNode child, string? expectedTypeName,
         LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
     {
         var innerText = child.InnerText;
@@ -456,7 +509,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         references.Add(new GameReference(
             token,
             GameSymbolKind.XmlObject,
-            null,
+            expectedTypeName,
             documentUri,
             line,
             column,
@@ -631,7 +684,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             if (slot > 1) break;
 
             var expectedType = slot == 0 ? "Faction" : tagDef.ObjectType?.TypeName;
-            slot++;
+            if (slot++ == 1 && string.Equals(token, HumanControlKeyword, StringComparison.OrdinalIgnoreCase))
+                continue;
 
             var (line, column, length) =
                 XmlUtility.GetInnerOffsetValuePosition(child, offset, token.Length, lineIndex);

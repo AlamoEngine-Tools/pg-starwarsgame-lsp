@@ -152,7 +152,7 @@ public sealed class PreviewUnitWeaponTest
     ///     the full angle the DTO carries is twice the authored number.
     /// </summary>
     /// <remarks>
-    ///     <c>WeaponBehaviorClass::Is_In_Cone_Of_Fire</c> tests
+    ///     the cone-of-fire test tests
     ///     <c>|yaw| &gt; Turret_Rotate_Extent_Degrees</c> WITHOUT halving it, while the hardpoint
     ///     path tests <c>|yaw| &gt; Fire_Cone_Width / 2.0</c>. Two conventions on one DTO field, so
     ///     the conversion has to happen here rather than at a consumer that cannot tell them apart.
@@ -172,7 +172,7 @@ public sealed class PreviewUnitWeaponTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Measured at <c>00a87243</c> and <c>00a87256</c>: <c>Turret_Rotate_Extent_Degrees</c>
+    ///         Measured: <c>Turret_Rotate_Extent_Degrees</c>
     ///         starts at 360.0 and <c>Turret_Elevate_Extent_Degrees</c> at 180.0, so both
     ///         comparisons are always true. 175 of the 291 objects with a <c>WEAPON</c> behaviour
     ///         set neither, which makes this the COMMON case rather than an edge.
@@ -227,8 +227,8 @@ public sealed class PreviewUnitWeaponTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>Calculate_Projectile_Facing</c> returns the object's own facing and returns TRUE
-    ///         before <c>Is_In_Cone_Of_Fire</c> is ever called, so the extents are not widened or
+    ///         the projectile-facing calculation returns the object's own facing and returns TRUE
+    ///         before the cone-of-fire test is ever called, so the extents are not widened or
     ///         narrowed - they are not consulted. Null says "no arc concept here", which is a
     ///         different statement from 360 ("unrestricted") and from 0 ("dead ahead only").
     ///     </para>
@@ -291,10 +291,10 @@ public sealed class PreviewUnitWeaponTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Measured: <c>GameObjectClass::Is_Deployed</c> needs the type's <c>Deploys</c> flag and
-    ///         the locomotor's answer, and only <c>WalkLocomotorBehaviorClass</c> ever answers yes. While
-    ///         it does, the shot (<c>Is_In_Cone_Of_Fire</c>), the swing (<c>Adjust_Turret_Facing</c>)
-    ///         and <c>Can_Point_At</c> all read <c>Deployed_Turret_*_Extent_Degrees</c> instead - whose
+    ///         Measured: the is-deployed test needs the type's <c>Deploys</c> flag and
+    ///         the locomotor's answer, and only the WALK locomotor behaviour ever answers yes. While
+    ///         it does, the shot (the cone-of-fire test), the swing (<c>Adjust_Turret_Facing</c>)
+    ///         and the aim test all read <c>Deployed_Turret_*_Extent_Degrees</c> instead - whose
     ///         constructor defaults are 360 and 180.
     ///     </para>
     ///     <para>

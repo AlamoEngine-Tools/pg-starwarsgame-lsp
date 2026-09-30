@@ -16,7 +16,7 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 ///         we compute differed from the game's for 99 tags.
 ///     </para>
 ///     <para>
-///         Measured in <c>DatabaseMapClass::Map_Data_Of_Type</c> (<c>00cb5e90</c>). A variant is
+///         Measured in the engine's tag-value mapper. A variant is
 ///         built by copying the whole base and re-parsing the variant's own XML on top with an
 ///         overlay flag; 17 type codes append with no reset on either path, so the variant's entries
 ///         are ADDED to the base's. Which code a tag carries is per OWNING TYPE, so the list comes
@@ -46,8 +46,8 @@ public sealed class EawSchemaVariantMergeModeTest
     /// <remarks>
     ///     <para>
     ///         <c>0x1e</c>, <c>0x35</c> and <c>0x3b</c> store into a
-    ///         <c>MultiNameReferenceClass</c>, whose <c>operator=</c> (<c>00cab970</c>) sets a
-    ///         <c>Replace</c> flag, and whose <c>Add_Name</c> (<c>00cab9a0</c>) clears the list when
+    ///         <c>MultiNameReferenceClass</c>, whose <c>operator=</c> sets a
+    ///         <c>Replace</c> flag, and whose <c>Add_Name</c> clears the list when
     ///         that flag is set and then clears the flag.
     ///     </para>
     ///     <para>

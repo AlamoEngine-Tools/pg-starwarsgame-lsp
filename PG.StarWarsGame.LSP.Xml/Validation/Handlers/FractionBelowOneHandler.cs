@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     A fraction in the half-open interval [0.0, 1.0) - zero allowed, one not.
 /// </summary>
 /// <remarks>
-///     <c>Error: (%s) Retreat_Loss_Mitigation must be &gt;= 0.0 and &lt; 1.0</c> (<c>0155659c</c>).
+///     <c>Error: (%s) Retreat_Loss_Mitigation must be &gt;= 0.0 and &lt; 1.0</c>.
 ///     These are proportions subtracted from something, so 1.0 would reduce it to nothing and the
 ///     engine refuses rather than let a total reduction pass as a fraction.
 /// </remarks>

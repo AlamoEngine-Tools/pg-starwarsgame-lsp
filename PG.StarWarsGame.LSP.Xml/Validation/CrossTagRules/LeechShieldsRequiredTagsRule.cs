@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///             Error: (%s) Beam_Bone_Name has
 ///             not been set.
 ///         </c>
-///         (<c>0155803c</c>), and the same for <c>Beam_Effect_Name</c>,
+///        , and the same for <c>Beam_Effect_Name</c>,
 ///         <c>Beam_Texture_Name</c>, <c>Beam_Frames</c>, <c>Beam_Width</c>,
 ///         <c>Damage_Multiplier</c> and <c>Shield_Damage_Per_Second</c>.
 ///     </para>

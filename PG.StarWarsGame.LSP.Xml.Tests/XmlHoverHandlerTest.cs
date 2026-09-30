@@ -107,10 +107,20 @@ public sealed class XmlHoverHandlerTest
         {
             Tag = name,
             ValueType = XmlValueType.Float,
-            Deprecated = deprecated,
-            AvailableSince = since,
+            Notes = Notes(deprecated, since),
             Description = desc
         };
+    }
+
+    // What used to be the `deprecated` and `availableSince` fields, now one list.
+    private static IReadOnlyList<SchemaNote> Notes(bool deprecated, string? since)
+    {
+        var notes = new List<SchemaNote>();
+        if (deprecated)
+            notes.Add(new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>()));
+        if (since is not null)
+            notes.Add(new SchemaNote(SchemaNoteKind.Since, new Dictionary<string, string>(), since));
+        return notes;
     }
 
     // ── null / miss cases ────────────────────────────────────────────────────
@@ -389,7 +399,11 @@ public sealed class XmlHoverHandlerTest
             Tag = "Old_Tag",
             ValueType = XmlValueType.Float,
             Description = new Dictionary<string, string> { ["en"] = "A tag." },
-            Notes = new Dictionary<string, string> { ["en"] = "Never used in vanilla." }
+            Notes =
+            [
+                new SchemaNote(SchemaNoteKind.Remark,
+                    new Dictionary<string, string> { ["en"] = "Never used in vanilla." })
+            ]
         };
 
         var result = await handler.Handle(At(1, 2), CancellationToken.None);

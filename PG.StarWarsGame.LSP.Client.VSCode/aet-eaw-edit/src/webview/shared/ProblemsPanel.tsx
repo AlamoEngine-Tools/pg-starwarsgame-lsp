@@ -10,8 +10,8 @@
 // rows: draggable from its top edge, a counted title, a close button, and remembering the height
 // it was dragged to. That had been written twice, down to the class names.
 
-import { useEdgeResize } from '../useEdgeResize';
-import { readPanelSize, writePanelSize } from './panelLayout';
+import {useEdgeResize} from '../useEdgeResize';
+import {readPanelSize, writePanelSize} from './panelLayout';
 
 /** What the panel needs to draw and work the view filter. */
 export interface ProblemFilterControl {
@@ -33,7 +33,6 @@ function filterTitle(filter: ProblemFilterControl): string {
         ? `Showing all problems. ${filter.hidden} are not in the current view.`
         : `Showing only problems in the current view. ${filter.hidden} hidden.`;
 }
-
 
 
 export function ProblemsPanel(props: {
@@ -58,12 +57,20 @@ export function ProblemsPanel(props: {
     // Closing and reopening the bar is not a request to forget how tall it was, and neither is
     // closing the tab: the size now outlives the window, keyed so the two panels never shove each
     // other around.
-    const { size: height, handleProps } = useEdgeResize(
-        readPanelSize(props.memoKey, props.defaultHeight), 60, 420, 'n',
-        value => { writePanelSize(props.memoKey, value); });
+    // Up to most of the window, not a fixed 420: a long trace or problem list is read here.
+    const maxHeight = Math.max(420, Math.round((typeof window === 'undefined' ? 0 : window.innerHeight) * 0.7));
+    const {size: height, handleProps} = useEdgeResize(
+        readPanelSize(props.memoKey, props.defaultHeight), 60, maxHeight, 'n',
+        value => {
+            writePanelSize(props.memoKey, value);
+        });
 
+    // The frame is a flex column and only the ROW LIST scrolls. With the frame itself scrolling,
+    // the resize handle (absolute, at the top) scrolled away with the content: measured on the
+    // simulation trace, the handle sat 6000 px above the viewport once the newest rows were in
+    // view, and the panel could not be dragged taller at all.
     return (
-        <div className={props.className} style={{ height }}>
+        <div className={props.className + ' panel-frame'} style={{height}}>
             <div className="resize-handle-n" title="Drag to resize" {...handleProps} />
             <div className="panel-bar">
                 <span className="panel-title">{props.title}</span>
@@ -85,7 +92,7 @@ export function ProblemsPanel(props: {
                     >
                         <span className={'codicon codicon-filter'
                             + (!props.filter.showingAll && props.filter.filterable
-                                ? '-filled' : '')} />
+                                ? '-filled' : '')}/>
                         {props.filter.hidden > 0 && !props.filter.showingAll
                             ? ` ${props.filter.hidden} hidden`
                             : ''}
@@ -93,7 +100,7 @@ export function ProblemsPanel(props: {
                 )}
 
                 <button className="panel-close" onClick={props.onClose} title="Close">
-                    <span className="codicon codicon-close" />
+                    <span className="codicon codicon-close"/>
                 </button>
             </div>
             {props.children}

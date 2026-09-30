@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -50,6 +51,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly IXmlDocumentFactProducer _documentProducer;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
+
+    /// <summary>
+    ///     How long one document may take to diagnose before it is worth naming in the log. Well
+    ///     above any healthy document (the median is a couple of milliseconds) so the line only
+    ///     appears for the handful that actually dominate a sweep.
+    /// </summary>
+    private const long SlowDocumentMs = 1000;
 
     private readonly ConcurrentDictionary<string, Dictionary<(int Line, int Char), string>> _fixCache = new();
     private readonly IXmlDiagnosticsHandlerRegistry _handlerRegistry;
@@ -221,31 +229,56 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         // parse and every request handler touching the same content.
         var parsed = _parseCache.GetOrParse(canonicalUri, text);
 
+        // Per-phase timing, reported only when a document turns out to be pathological. A handful
+        // of files dominate a workspace sweep - one 497 KB prop file measured 23.4s against a
+        // whole-workspace total of 83s, while a 4.2 MB Planets.xml was unremarkable - so the cost
+        // does not track size and cannot be guessed from the outside. Two Stopwatch reads per
+        // producer are nothing against the work they bracket, and without them the only visible
+        // symptom is a sweep that appears to hang at a different point every run.
+        var sw = Stopwatch.StartNew();
+        var timings = new List<(string Phase, long Ms)>();
+
+        void Phase(string name, Action work)
+        {
+            var at = sw.ElapsedMilliseconds;
+            work();
+            timings.Add((name, sw.ElapsedMilliseconds - at));
+        }
+
         var facts = new List<XmlFact>();
-        facts.AddRange(_documentProducer.Produce(parsed, uri));
-        facts.AddRange(_indexProducer.Produce(canonicalUri, index));
+        Phase("document", () => facts.AddRange(_documentProducer.Produce(parsed, uri)));
+        Phase("index", () => facts.AddRange(_indexProducer.Produce(canonicalUri, index)));
         if (_variantProducer is not null)
-            facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index));
+            Phase("variant", () => facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index)));
         if (_shadowProducer is not null)
-            facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index));
+            Phase("shadow", () => facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index)));
         if (_hardpointProducer is not null)
-            facts.AddRange(_hardpointProducer.Produce(canonicalUri, parsed, index));
+            Phase("hardpoint", () => facts.AddRange(_hardpointProducer.Produce(canonicalUri, parsed, index)));
         if (_damageStageProducer is not null)
-            facts.AddRange(_damageStageProducer.Produce(canonicalUri, parsed, index));
+            Phase("damageStage", () => facts.AddRange(_damageStageProducer.Produce(canonicalUri, parsed, index)));
         if (IsStoryParserDocument(uri))
-            facts.AddRange(_storyProducer.Produce(parsed, uri));
+            Phase("story", () => facts.AddRange(_storyProducer.Produce(parsed, uri)));
 
         var allDiags = new List<Diagnostic>();
-        foreach (var fact in facts)
-        foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
-            allDiags.Add(ToLspDiagnostic(fact, result));
+        Phase("dispatch", () =>
+        {
+            foreach (var fact in facts)
+            foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
+                allDiags.Add(ToLspDiagnostic(fact, result));
+        });
 
-        allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index));
-        allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed));
+        Phase("hardcodedRefs", () => allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index)));
+        Phase("damageTypeOrder", () => allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed)));
+
         if (_storyChainProblems is not null)
-            allDiags.AddRange(_storyChainProblems.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
+            Phase("storyChain",
+                () => allDiags.AddRange(
+                    _storyChainProblems.GetForDocument(canonicalUri).Select(ToLspDiagnostic)));
+
         if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
-            allDiags.AddRange(_storyGraphDiagnostics.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
+            Phase("storyGraph",
+                () => allDiags.AddRange(
+                    _storyGraphDiagnostics.GetForDocument(canonicalUri).Select(ToLspDiagnostic)));
 
         // Suppression is applied once, here, on the way out - after every producer, including the
         // ones that build Diagnostics directly and the story chain/graph sources. Filtering earlier
@@ -254,32 +287,115 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         // It happens in Collect rather than at publish time because Collect is also the on-demand
         // entry point (IXmlDiagnosticsCollector), and the story editor calls it with staged text
         // that is not what a publish-time lookup would find.
-        var scan = SuppressionCommentParser.Parse(parsed.Html, IsObjectNode);
+        SuppressionScan scan = null!;
+        Phase("suppressionScan", () => scan = SuppressionCommentParser.Parse(parsed.Html, IsObjectNode));
 
         // Complaints about the directives go through the same filter as everything else, so a user
         // who does not want them can suppress aetswg-013-* like any other group.
         allDiags.AddRange(scan.ProblemDiagnostics(parsed.Lines));
 
-        return FilterSuppressed(allDiags, scan.Ranges);
+        IReadOnlyList<Diagnostic> filtered = [];
+        Phase("filterSuppressed", () => filtered = FilterSuppressed(allDiags, scan.Ranges));
+
+        // Reported AFTER every phase, not after dispatch: the first cut of this stopped at
+        // dispatch and so could not see a document that was slow in the tail - which is exactly
+        // the shape of the residual left once model textures were cached.
+        if (sw.ElapsedMilliseconds >= SlowDocumentMs)
+            _logger.LogWarning(
+                "Slow diagnostics for {Uri}: {Total}ms over {Facts} fact(s) - {Breakdown}",
+                uri, sw.ElapsedMilliseconds, facts.Count,
+                string.Join(", ", timings.Where(t => t.Ms > 0).Select(t => $"{t.Phase} {t.Ms}ms")));
+
+        return filtered;
     }
 
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
     {
-        if (!DiagnosticsEnabled) return;
+        // Every early return below used to be silent, which is why "no diagnostics anywhere" was
+        // indistinguishable from "a handler that did not fire" and took a day of inference from
+        // timestamps. Whatever else is true, the log should be able to answer "did it publish?".
+        if (!DiagnosticsEnabled)
+        {
+            _logger.LogDebug("Revalidate workspace skipped: XML diagnostics are turned off");
+            return;
+        }
 
         ClearAllPublished();
         var index = _indexService.Current;
+        _logger.LogInformation("Revalidating {Count} indexed document(s)", index.Documents.Count);
+
+        // Timed by phase, because "the sweep stalls" is not actionable and the three candidates
+        // look identical from outside: reading a closed document's text (disk), analysing it
+        // (CPU), and handing the result to the transport (which can block on the client draining
+        // it - this sweep pushes tens of MiB). The totals below say which, and the slowest single
+        // document says whether it is spread evenly or is one pathological file.
+        var swTotal = Stopwatch.StartNew();
+        var swPhase = new Stopwatch();
+        long textTicks = 0, publishTicks = 0;
+        var done = 0;
+        var slowestTicks = 0L;
+        string? slowestUri = null;
+
         foreach (var uri in index.Documents.Keys)
-            await RevalidateDocumentAsync(uri, ct);
+        {
+            ct.ThrowIfCancellationRequested();
+
+            swPhase.Restart();
+            var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
+            textTicks += swPhase.ElapsedTicks;
+
+            if (text is null)
+            {
+                _logger.LogDebug("Revalidate {Uri} skipped: no text available", uri);
+                continue;
+            }
+
+            swPhase.Restart();
+            PublishForDocument(uri, text, index);
+            publishTicks += swPhase.ElapsedTicks;
+
+            if (swPhase.ElapsedTicks > slowestTicks)
+            {
+                slowestTicks = swPhase.ElapsedTicks;
+                slowestUri = uri;
+            }
+
+            // Progress, so a long sweep is visibly progressing rather than apparently hung. A rig
+            // watching the log cannot otherwise tell a stall from a finished run.
+            if (++done % 250 == 0)
+                _logger.LogInformation(
+                    "Revalidate progress: {Done}/{Total} document(s) after {Elapsed}ms",
+                    done, index.Documents.Count, swTotal.ElapsedMilliseconds);
+        }
+
+        _logger.LogInformation(
+            "Revalidate complete: {Done} document(s) in {Elapsed}ms "
+            + "(text {TextMs}ms, analyse+publish {PublishMs}ms); slowest '{SlowestUri}' at {SlowestMs}ms",
+            done, swTotal.ElapsedMilliseconds,
+            (long)TimeSpan.FromTicks(textTicks).TotalMilliseconds,
+            (long)TimeSpan.FromTicks(publishTicks).TotalMilliseconds,
+            slowestUri, (long)TimeSpan.FromTicks(slowestTicks).TotalMilliseconds);
+
+        await Task.CompletedTask;
     }
 
     public Task RevalidateDocumentAsync(string uri, CancellationToken ct)
     {
-        if (!DiagnosticsEnabled) return Task.CompletedTask;
+        if (!DiagnosticsEnabled)
+        {
+            _logger.LogDebug("Revalidate {Uri} skipped: XML diagnostics are turned off", uri);
+            return Task.CompletedTask;
+        }
 
         var index = _indexService.Current;
         var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
-        if (text is null) return Task.CompletedTask;
+        if (text is null)
+        {
+            // The text source holds what the client has opened plus what the indexer read. A miss
+            // here is the difference between "diagnosed and clean" and "never looked at".
+            _logger.LogDebug("Revalidate {Uri} skipped: no text available", uri);
+            return Task.CompletedTask;
+        }
 
         PublishForDocument(uri, text, index);
         return Task.CompletedTask;
@@ -317,7 +433,9 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     protected override void PublishForDocument(string uri, string text, GameIndex index)
     {
+        var sw = Stopwatch.StartNew();
         var allDiags = Collect(uri, text, index);
+        var collectMs = sw.ElapsedMilliseconds;
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
         var fixes = new Dictionary<(int, int), string>();
@@ -330,11 +448,25 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
         _fixCache[normalizedUri] = fixes;
 
+        _logger.LogDebug("Publishing {Count} diagnostic(s) for {Uri}", allDiags.Count, uri);
+
+        var atPublish = sw.ElapsedMilliseconds;
         Publish(new PublishDiagnosticsParams
         {
             Uri = DocumentUri.From(uri),
             Diagnostics = new Container<Diagnostic>(allDiags)
         });
+        var publishMs = sw.ElapsedMilliseconds - atPublish;
+
+        // The handoff to the transport, timed apart from the analysis. A sweep pushes tens of MiB
+        // at the client, and if it stops draining, the cost lands HERE - on whichever document
+        // happens to be in flight rather than on one that did anything expensive. That is the
+        // shape of the residual: seconds attributed to a 161-byte file, a different file each run.
+        if (publishMs >= SlowDocumentMs)
+            _logger.LogWarning(
+                "Slow publish for {Uri}: {Publish}ms handing {Count} diagnostic(s) to the transport "
+                + "(analysis was {Collect}ms)",
+                uri, publishMs, allDiags.Count, collectMs);
     }
 
     // Test convenience: parses the text itself; the publish path shares one ParsedXmlDocument.
@@ -479,7 +611,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                             v.Groups.Any(g => groups.Contains(g, StringComparer.OrdinalIgnoreCase)));
         var validNames = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         foreach (var value in applicableValues)
-            validNames[value.Name] = value.Deprecated;
+            validNames[value.Name] = value.Notes.Has(SchemaNoteKind.Deprecated);
 
         var innerText = child.InnerText;
         char[] separators = [',', ' ', '\t', '\r', '\n'];

@@ -343,6 +343,7 @@ public sealed class ConvertLocalisationFormatHandlerTest
 
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(fs);
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
 
@@ -358,7 +359,7 @@ public sealed class ConvertLocalisationFormatHandlerTest
             sp.GetRequiredService<IXmlTranslationImporter>(),
             sp.GetRequiredService<IPropertiesTranslationImporter>(),
             sp.GetRequiredService<IDatTranslationImporter>(),
-            sp.GetRequiredService<IDatFileService>(),
+            sp.GetRequiredService<IDatService>(),
             sp.GetRequiredService<ITranslationDatabaseFactory>(),
             sp.GetRequiredService<ILanguageService>(),
             new LocalisationFormatConverter(

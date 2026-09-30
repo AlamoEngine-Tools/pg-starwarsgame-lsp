@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///         These tags are multipliers the engine adds to 1.0, so -1.0 cancels the stat outright and
 ///         anything past it would invert its sign. The engine states the rule about nine of them,
 ///         e.g. <c>Error: (%s) Health_Bonus_Percentage cannot be -1.0 or less.</c>
-///         (<c>01552038</c>).
+///        .
 ///     </para>
 ///     <para>
 ///         The bound is exclusive - a value of exactly -1.0 is rejected - which is what separates

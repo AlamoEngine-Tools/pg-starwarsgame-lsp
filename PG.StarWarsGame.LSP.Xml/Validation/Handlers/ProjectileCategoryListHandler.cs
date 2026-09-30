@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// <remarks>
 ///     <para>
 ///         One tag carries this type: <c>Projectile_Types_Targeted</c> on
-///         <c>Laser_Defense_Ability</c> (engine code <c>0x51</c> at <c>017f5020</c>), the list of
+///         <c>Laser_Defense_Ability</c> (engine type code <c>0x51</c>), the list of
 ///         projectile categories a point-defence laser will shoot down.
 ///     </para>
 ///     <para>

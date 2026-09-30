@@ -19,7 +19,7 @@ describe('percentOf', () => {
 });
 
 describe('leashed with no destroyable hardpoints', () => {
-    // The guard that matters most. GameObjectClass::Service checks the hardpoint COUNT and the
+    // The guard that matters most. Service checks the hardpoint COUNT and the
     // destroyable count before it looks at the tag, so a fighter is never touched. Without that,
     // an empty hardpoint pool reads as 0% and would drag every hull down to the constraint.
     it('leaves a full hull alone', () => {
@@ -91,7 +91,7 @@ describe('leashed at the extremes of the constraint', () => {
     });
 
     // The hull is corrected FIRST and the hardpoint step reads the updated value, exactly as
-    // Service does before it calls Service_Hard_Points. At 0 the order is what makes them meet.
+    // Service does before it calls the per-frame hardpoint service. At 0 the order is what makes them meet.
     it('applies the hull correction before the hardpoint one', () => {
         const after = leashed(pool(100, 100), pool(400, 1000), 0, true);
 

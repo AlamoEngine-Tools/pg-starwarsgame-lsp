@@ -53,6 +53,7 @@ public sealed record GameIndex(
         Localisation = original.Localisation;
         AssetFiles = original.AssetFiles;
         ModelBones = original.ModelBones;
+        ModelTextures = original.ModelTextures;
         WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
         WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
     }
@@ -104,6 +105,18 @@ public sealed record GameIndex(
     ///     <c>boneName</c> references against the model(s) referenced by sibling model tags.
     /// </summary>
     public ImmutableDictionary<string, ImmutableArray<string>> ModelBones { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     Merged (baseline ∪ workspace) catalog of the texture names each <c>.alo</c> carries
+    ///     INSIDE itself, keyed like <see cref="ModelBones" />.
+    /// </summary>
+    /// <remarks>
+    ///     An empty entry means "this model names no textures"; a MISSING entry means the catalog
+    ///     has never seen the model, and the caller must open it rather than report its textures
+    ///     as absent. Conflating the two would turn every unscanned model into a silent pass.
+    /// </remarks>
+    public ImmutableDictionary<string, ImmutableArray<string>> ModelTextures { get; init; } =
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
@@ -242,6 +255,44 @@ public sealed record GameIndex(
 
         return builder.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.ToImmutableArray(),
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Every behaviour the object has as the engine reads it: its own when it declares any,
+    ///     otherwise its variant base's, walked up the chain. Case-insensitive, empty when nothing
+    ///     in the chain declares one.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Behaviour tags carry no variant mode, so they default to replace: declaring a list
+    ///         overrides the base's, and declaring none overrides nothing and leaves the base's
+    ///         standing. Measured over the shipped corpus - half the base chain and every faction
+    ///         leader read as behaviour-less without this walk, which would make them no kind at all.
+    ///     </para>
+    ///     <para>
+    ///         The chain is bounded rather than trusted. A variant loop is authorable, and it must
+    ///         cost a lookup rather than hang the server.
+    ///     </para>
+    /// </remarks>
+    public ImmutableHashSet<string> BehaviorsOf(GameSymbol symbol)
+    {
+        var current = symbol;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (true)
+        {
+            if (current.Behaviors is { Length: > 0 } own)
+                return own.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrEmpty(current.VariantBaseId) || !seen.Add(current.Id))
+                return ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+            var next = Resolve(current.VariantBaseId);
+            if (next is null)
+                return ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+            current = next;
+        }
     }
 
     public GameSymbol? Resolve(string id)

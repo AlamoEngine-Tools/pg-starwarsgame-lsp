@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// <remarks>
 ///     <para>
 ///         Two abilities can carry a tag of the same name under different bounds, and the engine
-///         states each one separately in its own <c>Validate_Data</c>. Keying on the name alone
+///         states each one separately in its own the engine's load-time validation. Keying on the name alone
 ///         gives one of the two owners the wrong rule, which is either a false positive or a miss.
 ///     </para>
 ///     <para>
@@ -26,9 +26,9 @@ public sealed class EawSchemaNumericRangeOptInTest
     ///     <c>Time_Reduction_Percentage</c> has two owners and two different rules.
     /// </summary>
     /// <remarks>
-    ///     <c>PoliticalTransitionBonusAbilityClass::Validate_Data</c> (<c>01016100</c>) tests
+    ///     the engine's load-time validation tests
     ///     <c>(x &lt; 0.0) || (x >= 1.0)</c> - floored AND capped. <c>ReduceProductionTimeAbility</c>
-    ///     (<c>010180b0</c>) tests only <c>1.0 &lt;= x</c>. Both carried the weaker
+    ///     tests only <c>1.0 &lt;= x</c>. Both carried the weaker
     ///     <c>below-one</c> until the two messages were traced to their owners, which let a negative
     ///     value through on the political ability.
     /// </remarks>
@@ -44,7 +44,7 @@ public sealed class EawSchemaNumericRangeOptInTest
     ///     <c>Duration_In_Secs</c> has three owners and only one of them states a bound.
     /// </summary>
     /// <remarks>
-    ///     <c>LeechShieldsAbilityClass::Validate_Data</c> (<c>01028000</c>) tests
+    ///     the engine's load-time validation tests
     ///     <c>Duration &lt; 1.0</c> and repairs to <c>1.0</c>, so the bound is inclusive.
     ///     <c>Sensor_Jamming_Ability</c> and <c>System_Spy_Ability</c> carry a tag of the same name
     ///     that no validator mentions, which is exactly why this opts in per owner.
@@ -62,8 +62,8 @@ public sealed class EawSchemaNumericRangeOptInTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>SlicerAbilityClass::Validate_Data</c> (<c>00f1e8b0</c>) calls
-    ///         <c>Get_Num_Control_Points</c> on each and complains below two, then CLEARS the curve
+    ///         the engine's load-time validation calls
+    ///         the control-point count on each and complains below two, then CLEARS the curve
     ///         and installs its own two points - so a one-point curve does not merely warn, it is
     ///         replaced by something the author never wrote.
     ///     </para>
@@ -86,7 +86,7 @@ public sealed class EawSchemaNumericRangeOptInTest
     }
 
     /// <summary>
-    ///     Both users of <c>Validate_Respawn_Times</c>, whose tags are named differently.
+    ///     Both users of the engine's respawn-list check, whose tags are named differently.
     /// </summary>
     /// <remarks>
     ///     The engine labels both pairs <c>Min_Respawn_Time_Per_Tech_Level</c> in its messages -
@@ -108,7 +108,7 @@ public sealed class EawSchemaNumericRangeOptInTest
     ///     The message says "cannot be less than -1.0" and the code agrees: -1.0 itself is legal.
     /// </summary>
     /// <remarks>
-    ///     <c>PlanetIncomeBonusAbilityClass::Validate_Data</c> (<c>01014820</c>) tests
+    ///     the engine's load-time validation tests
     ///     <c>x &lt;= -1.0 &amp;&amp; x != -1.0</c>, which is just <c>x &lt; -1.0</c>. That is a
     ///     different bound from the eight <c>*_Bonus_Percentage</c> tags, whose message is "cannot
     ///     be -1.0 or less" and which therefore reject -1.0. This tag carried
@@ -135,13 +135,13 @@ public sealed class EawSchemaNumericRangeOptInTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Two engine wordings, two comparisons. "cannot be less than zero" (<c>0155129c</c>,
-    ///         <c>015529f4</c>) is <c>x &lt;= 0.0 &amp;&amp; x != 0.0</c>, i.e. <c>x &lt; 0</c>;
-    ///         "must be greater than zero" (<c>015534a0</c>) is a plain <c>x &lt;= 0.0</c>, which
+    ///         Two engine wordings, two comparisons. "cannot be less than zero" is
+    ///         <c>x &lt;= 0.0 &amp;&amp; x != 0.0</c>, i.e. <c>x &lt; 0</c>;
+    ///         "must be greater than zero" is a plain <c>x &lt;= 0.0</c>, which
     ///         rejects zero as well.
     ///     </para>
     ///     <para>
-    ///         <c>ForceWhirlwindAbilityClass::Validate_Data</c> (<c>010086d0</c>) has both forms in
+    ///         the engine's load-time validation has both forms in
     ///         the same function - <c>Activation_Min_Range</c> the permissive one, two lines above
     ///         <c>Damage_Amount</c> the strict one - so the distinction is deliberate, not sloppy
     ///         wording. All ten owners carried the permissive rule, which let a zero-damage force
@@ -166,9 +166,9 @@ public sealed class EawSchemaNumericRangeOptInTest
     ///     <c>Damage_Bonus_Percentage</c> is floored at zero on one owner and at -1.0 on the other.
     /// </summary>
     /// <remarks>
-    ///     <c>FindWeaknessAbilityClass::Validate_Data</c> (<c>01004060</c>) tests
+    ///     the engine's load-time validation tests
     ///     <c>x &lt;= 0.0 &amp;&amp; x != 0.0</c> - a weakness that heals the target makes no sense,
-    ///     so nothing below zero. <c>CombatBonusAbility</c> (<c>00ffb810</c>) says "cannot be -1.0
+    ///     so nothing below zero. <c>CombatBonusAbility</c> says "cannot be -1.0
     ///     or less" and does allow a penalty. FindWeakness carried the CombatBonus rule, so
     ///     anything in (-1, 0) passed.
     /// </remarks>

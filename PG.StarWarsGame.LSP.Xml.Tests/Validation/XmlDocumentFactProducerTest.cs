@@ -192,6 +192,15 @@ public sealed class XmlDocumentFactProducerTest
         Assert.Single(facts.OfType<XmlNotesFact>());
     }
 
+    // The note is about the tag, so the hint marks the tag name - not column 0 of its line.
+    [Fact]
+    public void Tag_with_notes_marks_the_tag_name()
+    {
+        const string xml = "<Root>\n  <Notes_Tag>1.0</Notes_Tag>\n</Root>";
+        var f = Assert.Single(Build(new NotesTagSchemaProvider()).Produce(xml, Uri).OfType<XmlNotesFact>());
+        Assert.Equal((1, 3, 9), (f.Line, f.Column, f.Length));
+    }
+
     [Fact]
     public void Tag_without_notes_does_not_emit_XmlNotesFact()
     {
@@ -382,7 +391,7 @@ public sealed class XmlDocumentFactProducerTest
     ///     An object name the engine cannot hold.
     /// </summary>
     /// <remarks>
-    ///     <c>GameObjectTypeClass::Get_Name_CRC</c> (<c>GameObjectType.cpp</c> line 2225) copies the
+    ///     The engine's name-CRC routine copies the
     ///     name into a 128-byte buffer to uppercase and hash it, guarded by an assert and followed
     ///     by a bare <c>strcpy</c> - so the bound exists in the build Petroglyph tested with and not
     ///     in the one anyone plays. The longest shipped name is 76 characters.
@@ -623,7 +632,7 @@ public sealed class XmlDocumentFactProducerTest
     ///     exists only for that class, and there is no second derivation path in the engine. Every
     ///     other class parses its own tags and warns about what it does not recognise:
     ///     <c>
-    ///         HardPointDataClass::Parse_Database_Entry() - Unprocessed entry
+    ///         Parse_Database_Entry() - Unprocessed entry
     ///         'Variant_Of_Existing_Type'
     ///     </c>
     ///     . The object loads anyway, with the tag ignored.
@@ -769,7 +778,7 @@ file sealed class NotesTagSchemaProvider : ISchemaProvider
     private static readonly XmlTagDefinition NotesTag = new()
     {
         Tag = "Notes_Tag", ValueType = XmlValueType.Float, MultipleAllowed = false,
-        Notes = new Dictionary<string, string> { ["en"] = "A tag with notes" }
+        Notes = [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { ["en"] = "A tag with notes" })]
     };
 
     public XmlTagDefinition? GetTag(string tagName)

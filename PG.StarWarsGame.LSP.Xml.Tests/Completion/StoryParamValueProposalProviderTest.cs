@@ -82,6 +82,33 @@ public sealed class StoryParamValueProposalProviderTest
         return GameIndex.Empty with { Baseline = BaselineIndex.Empty with { Symbols = dict } };
     }
 
+    private static readonly ObjectKindDefinition PlanetKind = new()
+    {
+        Kind = "Planet", Behaviors = ["PLANET"]
+    };
+
+    private static ParamDefinition KindParam(ObjectKindDefinition kind,
+        XmlValueType valueType = XmlValueType.NameReference)
+    {
+        return new ParamDefinition
+        {
+            Position = 0,
+            ValueType = valueType,
+            ReferenceTypeName = kind.Kind,
+            Kind = kind
+        };
+    }
+
+    private static GameIndex IndexWithBehaviours(params (string id, string[] behaviors)[] symbols)
+    {
+        var ws = symbols.ToImmutableDictionary(
+            s => s.id,
+            s => ImmutableArray.Create(new GameSymbol(s.id, GameSymbolKind.XmlObject, "GameObjectType",
+                new UnknownOrigin("test"), null, null, s.behaviors)),
+            StringComparer.OrdinalIgnoreCase);
+        return GameIndex.Empty with { WorkspaceDefinitions = ws };
+    }
+
     private static GameIndex IndexWithWorkspaceSymbols(params (string id, string typeName)[] symbols)
     {
         var ws = symbols.ToImmutableDictionary(
@@ -156,13 +183,14 @@ public sealed class StoryParamValueProposalProviderTest
     public void GetProposals_NameReference_ReturnsMatchingBaselineSymbols()
     {
         var sut = new StoryParamValueProposalProvider();
-        var index = IndexWithSymbols(("Coruscant", "Planet"), ("Tatooine", "Planet"), ("Yavin_4", "StarBase"));
+        // Faction is a type of its own in the index; Planet is not (see the umbrella tests).
+        var index = IndexWithSymbols(("Rebel", "Faction"), ("Empire", "Faction"), ("Yavin_4", "StarBase"));
 
-        var proposals = sut.GetProposals(RefParam("Planet"), "", index);
+        var proposals = sut.GetProposals(RefParam("Faction"), "", index);
 
         var labels = proposals.Select(p => p.Label).ToList();
-        Assert.Contains("Coruscant", labels);
-        Assert.Contains("Tatooine", labels);
+        Assert.Contains("Rebel", labels);
+        Assert.Contains("Empire", labels);
         Assert.DoesNotContain("Yavin_4", labels);
     }
 
@@ -200,12 +228,12 @@ public sealed class StoryParamValueProposalProviderTest
     public void GetProposals_NameReference_FallsBackToRawReferenceTypeName()
     {
         var sut = new StoryParamValueProposalProvider();
-        var index = IndexWithSymbols(("Coruscant", "Planet"), ("X_Wing", "SpaceUnit"));
+        var index = IndexWithSymbols(("Rebel", "Faction"), ("X_Wing", "SpaceUnit"));
 
-        var proposals = sut.GetProposals(RawRefParam("Planet"), "", index);
+        var proposals = sut.GetProposals(RawRefParam("Faction"), "", index);
 
         Assert.Single(proposals);
-        Assert.Equal("Coruscant", proposals[0].Label);
+        Assert.Equal("Rebel", proposals[0].Label);
     }
 
     [Fact]
@@ -220,6 +248,67 @@ public sealed class StoryParamValueProposalProviderTest
         var labels = proposals.Select(p => p.Label).ToList();
         Assert.Contains("X_Wing", labels);
         Assert.Contains("Vader_Team", labels);
+    }
+
+    // A planet slot takes whatever the engine would accept as a planet: an object carrying the
+    // PLANET behaviour, whatever element it was declared with and whatever type the index gave it.
+    [Fact]
+    public void GetProposals_PlanetKind_ProposesOnlyObjectsWithThatBehaviour()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = IndexWithBehaviours(
+            ("Kashyyyk", ["PLANET", "PRODUCTION"]),
+            ("Kessel", ["PLANET"]),
+            ("X_Wing", ["DUMMY_STARSHIP"]));
+
+        var labels = sut.GetProposals(KindParam(PlanetKind), "", index).Select(p => p.Label).ToList();
+
+        Assert.Equal(["Kashyyyk", "Kessel"], labels.Order());
+    }
+
+    [Fact]
+    public void GetProposals_PlanetKind_StillFiltersByPrefix()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = IndexWithBehaviours(("Kashyyyk", ["PLANET"]), ("Kessel", ["PLANET"]));
+
+        var labels = sut.GetProposals(KindParam(PlanetKind), "Kas", index).Select(p => p.Label).ToList();
+
+        Assert.Equal(["Kashyyyk"], labels);
+    }
+
+    // A variant of a planet is a planet - it inherits the behaviour list it does not override.
+    [Fact]
+    public void GetProposals_PlanetKind_ProposesVariantsOfAPlanet()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = new[]
+                {
+                    new GameSymbol("Base_Planet", GameSymbolKind.XmlObject, "GameObjectType",
+                        new UnknownOrigin("test"), null, null, ["PLANET"]),
+                    new GameSymbol("Modded_Planet", GameSymbolKind.XmlObject, "GameObjectType",
+                        new UnknownOrigin("test"), null, "Base_Planet")
+                }
+                .ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
+                    StringComparer.OrdinalIgnoreCase)
+        };
+
+        var labels = sut.GetProposals(KindParam(PlanetKind), "Mod", index).Select(p => p.Label).ToList();
+
+        Assert.Equal(["Modded_Planet"], labels);
+    }
+
+    // Story symbols live in the same index and are never objects, so a kind slot must not offer
+    // them even when the predicate cannot be judged against them.
+    [Fact]
+    public void GetProposals_PlanetKind_ExcludesStorySymbols()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = IndexWithWorkspaceSymbols(("Open_Act_1", "StoryEvent"), ("Some_Flag", "StoryFlag"));
+
+        Assert.Empty(sut.GetProposals(KindParam(PlanetKind), "", index));
     }
 
     [Fact]

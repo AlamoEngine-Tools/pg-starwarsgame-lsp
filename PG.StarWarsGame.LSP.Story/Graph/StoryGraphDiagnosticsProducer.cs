@@ -29,6 +29,8 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 diagnostics.Add(At(problem.Range, problem.Message, problem.Kind switch
                 {
                     StoryGraphProblemKind.AmbiguousTarget => XmlDiagnosticSeverity.Warning,
+                    StoryGraphProblemKind.GenericNeverRaised => XmlDiagnosticSeverity.Warning,
+                    StoryGraphProblemKind.MissionLostAfterSummary => XmlDiagnosticSeverity.Warning,
                     _ => XmlDiagnosticSeverity.Error
                 }));
 

@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     An angle in degrees bounded to a full turn, inclusive at both ends.
 /// </summary>
 /// <remarks>
-///     <c>Error: (%s) Reaction_Arc_In_Degrees must be between 0 and 360.</c> (<c>01555e94</c>). An
+///     <c>Error: (%s) Reaction_Arc_In_Degrees must be between 0 and 360.</c>. An
 ///     arc is a width rather than a bearing, so 360 means "all round" and the engine does not wrap.
 /// </remarks>
 public sealed class AngleDegreesFullTurnHandler : NumericRangeHandlerBase

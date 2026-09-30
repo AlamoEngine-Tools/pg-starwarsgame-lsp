@@ -14,10 +14,8 @@ internal sealed class YamlTagEntry
     public List<string>? AllowedValues { get; set; }
     public string? SemanticType { get; set; }
     public object? ValueGroup { get; set; } // scalar string or YAML sequence - coerced in parser
-    public bool Deprecated { get; set; }
-    public string? AvailableSince { get; set; }
     public Dictionary<string, string> Description { get; set; } = [];
-    public Dictionary<string, string> Notes { get; set; } = [];
+    public List<YamlNote> Notes { get; set; } = [];
     public bool MultipleAllowed { get; set; }
     public string? VariantMode { get; set; }
     public YamlTagValidationOverride? ValidationOverride { get; set; }

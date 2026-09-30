@@ -39,20 +39,118 @@ public sealed record StoryRuntimeState
     public ImmutableHashSet<string> DisabledEvents { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.Ordinal);
 
+    /// <summary>
+    ///     Armed listeners the author ruled out for this run: they stay armed, as in the game, but
+    ///     are no decision until reconsidered. Firing one after all clears it.
+    /// </summary>
+    public ImmutableHashSet<string> RuledOut { get; init; } =
+        ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+
     public ImmutableHashSet<string> SuspendedThreads { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
 
     public ImmutableDictionary<string, int> Flags { get; init; } =
         ImmutableDictionary.Create<string, int>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    ///     The engine's per-event Active flag, tracked explicitly. Null means "not tracked": static
+    ///     analysis derives arming from the prereqs instead. The simulator tracks it because the
+    ///     engine arms by PUSH (a firing prereq re-evaluates its dependants) and a reset drops the
+    ///     flag until the next push - which a derived view cannot express.
+    /// </summary>
+    public ImmutableHashSet<string>? ArmedEvents { get; init; }
+
+    /// <summary>Virtual clock at which each event was last armed; STORY_ELAPSED counts from here.</summary>
+    public ImmutableDictionary<string, double> ArmedAt { get; init; } =
+        ImmutableDictionary.Create<string, double>(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     Game-side completions the simulator owes: a SPEECH or START_MOVIE reward was given and
+    ///     the matching STORY_SPEECH_DONE / STORY_MOVIE_DONE dispatch happens on the next command.
+    ///     Keyed "EVENT_TYPE|name" (upper-cased name, the engine compares upper-cased).
+    /// </summary>
+    public ImmutableHashSet<string> PendingCompletions { get; init; } =
+        ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The fact table the simulator's world changes and rewards write; empty for static analysis.</summary>
+    public Sim.StoryWorld World { get; init; } = Sim.StoryWorld.Empty;
+
+    /// <summary>
+    ///     Per-event dispatch counts for the counting types (a STORY_CONQUER with a count, the
+    ///     battle counters): the engine keeps these on the event object and resets them with it.
+    /// </summary>
+    public ImmutableDictionary<string, int> Hits { get; init; } =
+        ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
+
+    public StoryRuntimeState WithWorld(Sim.StoryWorld world)
+    {
+        return this with { World = world };
+    }
+
+    public StoryRuntimeState WithHit(string eventNodeId)
+    {
+        return this with { Hits = Hits.SetItem(eventNodeId, Hits.GetValueOrDefault(eventNodeId) + 1) };
+    }
+
+    public StoryRuntimeState WithoutHits(string eventNodeId)
+    {
+        return this with { Hits = Hits.Remove(eventNodeId) };
+    }
+
+    /// <summary>Each campaign script's PGStateMachine, keyed by script uri.</summary>
+    public ImmutableDictionary<string, Sim.LuaScriptState> Scripts { get; init; } =
+        ImmutableDictionary.Create<string, Sim.LuaScriptState>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Story_Event calls a script's threads will make once their sleeps are over.</summary>
+    public ImmutableList<Sim.LuaPendingEmission> PendingEmissions { get; init; } =
+        ImmutableList<Sim.LuaPendingEmission>.Empty;
+
+    public StoryRuntimeState WithScript(string scriptUri, Sim.LuaScriptState state)
+    {
+        return this with { Scripts = Scripts.SetItem(scriptUri, state) };
+    }
+
     public StoryRuntimeState WithFired(string eventNodeId)
     {
         return this with { FiredEvents = FiredEvents.Add(eventNodeId) };
     }
 
+    public StoryRuntimeState WithUnfired(string eventNodeId)
+    {
+        return this with { FiredEvents = FiredEvents.Remove(eventNodeId) };
+    }
+
     public StoryRuntimeState WithDisabled(string eventNodeId)
     {
         return this with { DisabledEvents = DisabledEvents.Add(eventNodeId) };
+    }
+
+    public StoryRuntimeState WithEnabled(string eventNodeId)
+    {
+        return this with { DisabledEvents = DisabledEvents.Remove(eventNodeId) };
+    }
+
+    public StoryRuntimeState WithArmed(string eventNodeId, double clock)
+    {
+        var armed = ArmedEvents ?? ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        return this with { ArmedEvents = armed.Add(eventNodeId), ArmedAt = ArmedAt.SetItem(eventNodeId, clock) };
+    }
+
+    public StoryRuntimeState WithUnarmed(string eventNodeId)
+    {
+        return ArmedEvents is null
+            ? this
+            : this with { ArmedEvents = ArmedEvents.Remove(eventNodeId), ArmedAt = ArmedAt.Remove(eventNodeId) };
+    }
+
+    public StoryRuntimeState WithCompletionPending(string key)
+    {
+        return this with { PendingCompletions = PendingCompletions.Add(key) };
+    }
+
+    public StoryRuntimeState WithoutCompletions(IEnumerable<string> keys)
+    {
+        return this with { PendingCompletions = PendingCompletions.Except(keys) };
     }
 
     public StoryRuntimeState WithSuspendedThread(string threadUri)
@@ -107,9 +205,9 @@ public sealed class StoryEvaluator
         if (state.FiredEvents.Contains(eventNodeId) && !node.Event!.Perpetual)
             return StoryEventLifecycle.Fired;
 
-        return PrereqsSatisfied(node.Event!, state)
-            ? StoryEventLifecycle.Armed
-            : StoryEventLifecycle.Waiting;
+        // Tracked arming (the simulator) is the engine's Active flag; the static view derives it.
+        var armed = state.ArmedEvents?.Contains(eventNodeId) ?? PrereqsSatisfied(node.Event!, state);
+        return armed ? StoryEventLifecycle.Armed : StoryEventLifecycle.Waiting;
     }
 
     /// <summary>

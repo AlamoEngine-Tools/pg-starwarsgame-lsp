@@ -15,65 +15,120 @@
 // a reconcile never reverts them.
 
 import {
-    CSSProperties, DragEvent, PointerEvent as ReactPointerEvent,
-    useCallback, useEffect, useMemo, useReducer, useRef, useState,
+    CSSProperties,
+    DragEvent,
+    PointerEvent as ReactPointerEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useReducer,
+    useRef,
+    useState,
 } from 'react';
+import {Combobox} from './shared/Combobox';
+import {ModalLayerContext} from './shared/Modal';
+import {SelectField} from './shared/SelectField';
 import {
-    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
-    rotarySwitchCss, stageChromeCss, stageFlyoutCss,
+    comboboxCss,
+    dockBodyCss,
+    dockChromeCss,
+    dockHeaderCss,
+    dockOverviewCss,
+    playerCss,
+    problemsPanelCss,
+    rightDockCss,
+    rotarySwitchCss,
+    stageChromeCss,
+    stageFlyoutCss,
 } from './shared/dockChrome';
-import { RotaryModeSwitch, type RotaryMode } from './shared/RotaryModeSwitch';
-import { RightDock } from './shared/RightDock';
-import { ProblemsPanel, type ProblemFilterControl } from './shared/ProblemsPanel';
-import { filterProblems, resolveProblemJump } from './shared/problemFilter';
-import { ARRANGE_OPTIONS } from './storyGraph/arrangeOptions';
-import { ClearFiltersButton } from './storyGraph/ClearFiltersButton';
-import { canvasEdgeStyle, MUTED_EDGE_TOKEN, type CanvasEdgeStyle } from './storyGraph/canvasEdgeStyle';
-import { branchKey, type BranchKeyEntry } from './storyGraph/colourKey';
-import { ColourKeyFlyout } from './storyGraph/ColourKeyFlyout';
-import { FrameNotifier } from './storyGraph/frameNotifier';
-import { canReuseStoredLayout } from './storyGraph/layoutReuse';
-import { createLabelSizer, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
-import { facetList } from './storyGraph/facets';
-import { PathFilterMenu } from './storyGraph/PathFilterMenu';
-import { type PathDirection } from './storyGraph/pathDirection';
-import { arrangePositions } from './storyGraph/modelArrange';
-import { lodShape } from './storyGraph/lodShape';
-import { needsFullMountForLayout, shouldShowOverview, shouldWindow } from './storyGraph/lodPolicy';
-import { Extent, fitZoom } from './storyGraph/viewportFit';
-import { booleanParamLabel, shortParamLabel } from './storyGraph/paramLabels';
-import { paramRowSpecs } from './storyGraph/paramRows';
-import { StagedRenames } from './storyGraph/stagedRenames';
-import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
-import { useEdgeResize } from './useEdgeResize';
-import { GRAPH_FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
-import { worstSeverity } from './loc/validateState';
-import { createRoot } from 'react-dom/client';
-import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
-import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
-import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
-import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
-import { Drag, Presets, ReactArea2D, ReactPlugin, RenderEmit } from 'rete-react-plugin';
-import styled, { createGlobalStyle } from 'styled-components';
+import {type RotaryMode, RotaryModeSwitch} from './shared/RotaryModeSwitch';
+import {RightDock} from './shared/RightDock';
+import {type ProblemFilterControl, ProblemsPanel} from './shared/ProblemsPanel';
+import {filterProblems, resolveProblemJump} from './shared/problemFilter';
+import {ARRANGE_OPTIONS} from './storyGraph/arrangeOptions';
+import {type Adjacent, FIRE_CAUSES, groupByTick, isFlowStep, isLifecycleStep, resolvePath} from './simPlayback';
+import {ClearFiltersButton} from './storyGraph/ClearFiltersButton';
+import {canvasEdgeStyle, type CanvasEdgeStyle, MUTED_EDGE_TOKEN} from './storyGraph/canvasEdgeStyle';
+import {branchKey, type BranchKeyEntry} from './storyGraph/colourKey';
+import {ColourKeyFlyout} from './storyGraph/ColourKeyFlyout';
+import {FrameNotifier} from './storyGraph/frameNotifier';
+import {canReuseStoredLayout, layoutEntryKey, newEventLayoutKey, nodeLayoutKey} from './storyGraph/layoutReuse';
+import {createLabelSizer, LINE_RATIO, wrapLabel} from './storyGraph/lodLabel';
+import {facetList} from './storyGraph/facets';
+import {PathFilterMenu} from './storyGraph/PathFilterMenu';
+import {noteBadge, type StoryNote} from './storyGraph/typeNotes';
+import {type PathDirection} from './storyGraph/pathDirection';
+import {arrangePositions} from './storyGraph/modelArrange';
+import {lodShape} from './storyGraph/lodShape';
+import {needsFullMountForLayout, shouldShowOverview, shouldWindow} from './storyGraph/lodPolicy';
+import {Extent, fitZoom} from './storyGraph/viewportFit';
+import {booleanParamLabel, paramLabel} from './storyGraph/paramLabels';
+import {paramRowSpecs} from './storyGraph/paramRows';
+import {StagedRenames} from './storyGraph/stagedRenames';
+import {editModeBlockedBy, readOnlyMessage, readOnlyOwnerOf, readOnlyThreadIndex} from './storyGraph/dependencyEdit';
+import {optimisticEdit, PREVIEW_KINDS, STAGED_KINDS} from './staging';
+import {GRAPH_FILTER_DEBOUNCE_MS, useDebounced} from './loc/useDebounced';
+import {worstSeverity} from './loc/validateState';
+import {createRoot} from 'react-dom/client';
+import {ClassicPreset, GetSchemes, NodeEditor} from 'rete';
+import {AreaExtensions, AreaPlugin} from 'rete-area-plugin';
+import {AutoArrangePlugin, Presets as ArrangePresets} from 'rete-auto-arrange-plugin';
+import {ConnectionPlugin, Presets as ConnectionPresets} from 'rete-connection-plugin';
+import {Drag, Presets, ReactArea2D, ReactPlugin, RenderEmit} from 'rete-react-plugin';
+import styled, {createGlobalStyle} from 'styled-components';
 
 import {
-    StoryDiagnosticDto, StoryGraphEdgeDto, StoryGraphNodeDto, StoryLayoutEntryDto,
-    StoryParamOptionDto, StoryParamSchemaDto, StorySimStateDto,
+    StoryDiagnosticDto,
+    StoryGraphEdgeDto,
+    StoryGraphNodeDto,
+    StoryLayoutEntryDto,
+    StoryParamOptionDto,
+    StoryParamSchemaDto,
+    StorySimBattleDto,
+    StorySimNodeStateDto,
+    StorySimStateDto,
+    StorySimStepDto,
 } from '../protocol';
-
-import { readPanelSize, writePanelSize } from './shared/panelLayout';
-import { initPanelLayout } from './shared/panelLayoutBridge';
-import { Button, IconButton } from './shared/Button';
-import { DockSection } from './shared/DockSection';
-import { colourResolver } from './shared/resolveColour';
-import { SeverityTag } from './shared/SeverityTag';
-import { tokensRootCss } from './shared/tokens';
+import {battleKeyOfNode} from '../storyBattles';
 import {
-    EDGE_KINDS, JUNCTION_TOKEN, LANE_PALETTE, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN,
-    branchColours, laneToken, type BranchColour,
+    DEFAULT_PACE,
+    galacticReturnNode,
+    hangingDecision,
+    paceIntervalMs,
+    selectionAnswered,
+    parsePace,
+    portalPickAction,
+    shouldResumeAfterAnswer,
+    type SimPace,
+} from './storyGraph/simModel';
+import {
+    type SimActions,
+    SimFlyout,
+    SimViewToggles,
+    SimInventory,
+    type SimLenses,
+    type SimSelection,
+    SimTransport,
+    TracePanel,
+} from './storyGraph/SimDock';
+import {initPanelLayout} from './shared/panelLayoutBridge';
+import {Button, IconButton} from './shared/Button';
+import {DockSection} from './shared/DockSection';
+import {colourResolver} from './shared/resolveColour';
+import {SeverityTag} from './shared/SeverityTag';
+import {tokensRootCss} from './shared/tokens';
+import {
+    type BranchColour,
+    branchColours,
+    EDGE_KINDS,
+    JUNCTION_TOKEN,
+    laneToken,
+    LIFECYCLE_TOKENS,
+    UNKNOWN_LIFECYCLE_TOKEN,
 } from './storyGraph/palette';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
+
 const vscode = acquireVsCodeApi();
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
@@ -92,7 +147,10 @@ initPanelLayout(vscode);
  * a value, because every filter always has a control showing it.
  */
 interface FilterState {
-    nameFilter: string; branch: string; lifecycle: string; reachableFrom: string;
+    nameFilter: string;
+    branch: string;
+    lifecycle: string;
+    reachableFrom: string;
     /** Which way `reachableFrom` reaches - see pathDirection. Only meaningful with an event to anchor it. */
     reachableDirection: PathDirection;
     /** Active_Plot or Suspended_Plot, as the faction manifest registers the thread. */
@@ -100,7 +158,73 @@ interface FilterState {
 }
 
 function sendSim(method: string, args?: Record<string, unknown>): void {
-    vscode.postMessage({ type: 'sim', method, args });
+    vscode.postMessage({type: 'sim', method, args});
+}
+
+/**
+ * The seq after the last trace step this panel has played. Every state-returning sim request
+ * carries it, so the response holds only the steps still to play; a stop or a rewind resets it.
+ */
+let simLastSeq = 0;
+
+function simRequest(method: string, args?: Record<string, unknown>): void {
+    sendSim(method, {sinceSeq: simLastSeq, ...(args ?? {})});
+}
+
+// The pace and the lenses are per-viewer conveniences, so they live in storage rather than in the
+// state document; a missing or broken store falls back to the defaults.
+const SIM_PACE_KEY = 'storyGraph.simPace';
+const SIM_LENS_KEY = 'storyGraph.simLenses';
+// The path taken is what a simulation view is FOR, so the active-path lens is on until the reader
+// takes it off; the flow tints and the script states are on for the same reason.
+const DEFAULT_LENSES: SimLenses = {activeOnly: true, hideFlow: false, hideLua: false};
+
+function readPace(): SimPace {
+    try {
+        return parsePace(localStorage.getItem(SIM_PACE_KEY));
+    } catch {
+        return DEFAULT_PACE;
+    }
+}
+
+function writePace(pace: SimPace): void {
+    try {
+        localStorage.setItem(SIM_PACE_KEY, JSON.stringify(pace));
+    } catch {
+        // Storage is a convenience; nothing to do without it.
+    }
+}
+
+function readLenses(): SimLenses {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(SIM_LENS_KEY) ?? '{}') as Partial<SimLenses>;
+        return {
+            activeOnly: parsed.activeOnly !== false,
+            hideFlow: parsed.hideFlow === true,
+            hideLua: parsed.hideLua === true,
+        };
+    } catch {
+        return DEFAULT_LENSES;
+    }
+}
+
+function writeLenses(lenses: SimLenses): void {
+    try {
+        localStorage.setItem(SIM_LENS_KEY, JSON.stringify(lenses));
+    } catch {
+        // Same.
+    }
+}
+
+/**
+ * The app's hook for a node picked on the canvas while simulating. Node views render through
+ * rete's portal pipeline, where App state is out of reach, so the pipe reaches the app the way
+ * `currentMode` does.
+ */
+let onSimNodePicked: ((nodeId: string) => void) | null = null;
+
+function prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
 
 /**
@@ -112,14 +236,16 @@ let optionRequestCounter = 0;
 const pendingOptionRequests = new Map<number, (options: StoryParamOptionDto[]) => void>();
 
 function fetchParamOptions(
-    side: 'event' | 'reward', typeName: string, position: number, prefix: string,
+    side: 'event' | 'reward', typeName: string, position: number, query: string,
 ): Promise<StoryParamOptionDto[]> {
     const requestId = ++optionRequestCounter;
     return new Promise(resolve => {
         pendingOptionRequests.set(requestId, resolve);
-        vscode.postMessage({ type: 'paramOptions', requestId, side, typeName, position, prefix });
+        vscode.postMessage({type: 'paramOptions', requestId, side, typeName, position, query});
         window.setTimeout(() => {
-            if (pendingOptionRequests.delete(requestId)) { resolve([]); }
+            if (pendingOptionRequests.delete(requestId)) {
+                resolve([]);
+            }
         }, 3000);
     });
 }
@@ -129,8 +255,8 @@ const EMPTY_FILTERS: FilterState = {
     reachableDirection: 'Downstream', plotState: '',
 };
 
-/** Event/reward type names flagged `untested` in the schema - set once, read during render. */
-const untestedTypes = new Set<string>();
+/** Event/reward type name → what the schema says about it - set once, read during render. */
+const typeNotes = new Map<string, StoryNote[]>();
 
 /** Event/reward type name → its param schema - set once from the 'schema' message; read by node bodies. */
 const eventTypeParams = new Map<string, StoryParamSchemaDto[]>();
@@ -169,7 +295,7 @@ function isSectionCollapsed(nodeId: string, section: NodeSection): boolean {
 }
 
 function toggleSection(nodeId: string, section: NodeSection): void {
-    const state = collapsedSections.get(nodeId) ?? { general: false, trigger: false, reward: false };
+    const state = collapsedSections.get(nodeId) ?? {general: false, trigger: false, reward: false};
     state[section] = !state[section];
     collapsedSections.set(nodeId, state);
     editorHandleRef?.refreshNode(nodeId); // re-measure + re-render just this node
@@ -223,14 +349,18 @@ function branchColor(branch: string): string {
  * replaces. `color-mix` derives the translucent tints from the theme's chart colour.
  */
 function branchGlowStyle(branch: string | null, withBorder: boolean): CSSProperties | undefined {
-    if (!branch) { return undefined; }
+    if (!branch) {
+        return undefined;
+    }
     const c = branchColor(branch);
     const tint = `color-mix(in srgb, ${c} 14%, transparent)`;
     const style: CSSProperties = {
         background: `linear-gradient(${tint}, ${tint}), var(--vscode-editorWidget-background)`,
         boxShadow: `0 0 8px 1px color-mix(in srgb, ${c} 45%, transparent)`,
     };
-    if (withBorder) { style.borderColor = `color-mix(in srgb, ${c} 75%, transparent)`; }
+    if (withBorder) {
+        style.borderColor = `color-mix(in srgb, ${c} 75%, transparent)`;
+    }
     return style;
 }
 
@@ -262,12 +392,18 @@ interface PaletteDrag {
     category: 'trigger' | 'reward' | 'tactical' | 'blank' | 'andJunction' | 'orJunction';
     type: string | null;
 }
+
 /** A pending create form: the dragged preset plus (if dropped on the canvas) its landing spot. */
-interface CreateRequest extends PaletteDrag { position: { x: number; y: number } | null; }
+interface CreateRequest extends PaletteDrag {
+    position: { x: number; y: number } | null;
+}
+
 const PALETTE_DRAG_MIME = 'application/x-story-palette';
 
 function baseName(uri: string | null | undefined): string {
-    if (!uri) { return ''; }
+    if (!uri) {
+        return '';
+    }
     const idx = uri.lastIndexOf('/');
     return idx < 0 ? uri : uri.slice(idx + 1);
 }
@@ -278,17 +414,25 @@ function baseName(uri: string | null | undefined): string {
  * to the extension (which owns confirmation dialogs and error toasts). View/Simulate never mutate.
  */
 function sendCommand(payload: Record<string, unknown>, confirm?: string, refreshDetail?: string): void {
+    // A thread that comes in through a referenced project is read-only here. The controls for one
+    // are disabled, so this only catches the gestures that have no control to disable - a wire
+    // dragged onto a node, a type dropped on one - and it catches them before anything is staged.
+    const owner = threadReadOnlyOwner(payload.threadUri as string | null | undefined);
+    if (owner) {
+        reportStatus(readOnlyMessage(owner));
+        return;
+    }
     if (currentMode === 'edit' && STAGED_KINDS.has(payload.kind as string)) {
         if (confirm) {
             // Destructive gesture: the extension owns the modal and the persisted "don't ask again"
             // preference, and replies with `confirmStageResult` telling us whether to stage.
-            vscode.postMessage({ type: 'confirmStage', payload, confirm });
+            vscode.postMessage({type: 'confirmStage', payload, confirm});
         } else {
             stageCommand(payload);
         }
         return;
     }
-    vscode.postMessage({ type: 'command', payload, confirm, refreshDetail });
+    vscode.postMessage({type: 'command', payload, confirm, refreshDetail});
 }
 
 // ── Rete setup ───────────────────────────────────────────────────────────────────────────────────
@@ -301,6 +445,14 @@ class StoryNode extends ClassicPreset.Node {
     dto: StoryGraphNodeDto;
     /** Branch name this node belongs to, for the sankey glow - null when unbranched. */
     branchGlow: string | null = null;
+    /** Simulation overlay: how often this event fired since Start; 0 hides the badge. */
+    simFireCount = 0;
+    /** Simulation overlay: an armed clock or flag gate's label and 0..1 progress; null hides the meter. */
+    simGate: { label: string; progress: number | null } | null = null;
+    /** Simulation overlay: the clock halts after this event fires. */
+    simBreakpoint = false;
+    /** A tactical stub's battle as the galactic simulation sees it; null outside Simulation. */
+    simBattle: { status: string; tick: number } | null = null;
 
     constructor(dto: StoryGraphNodeDto, hasInputs: boolean, hasOutputs: boolean) {
         super(dto.label);
@@ -317,7 +469,9 @@ class StoryNode extends ClassicPreset.Node {
         if (hasInputs || dto.kind === 'Event') {
             this.addInput('in', new ClassicPreset.Input(flowSocket, undefined, true));
         }
-        if (hasOutputs || dto.kind === 'Event') { this.addOutput('out', new ClassicPreset.Output(flowSocket)); }
+        if (hasOutputs || dto.kind === 'Event') {
+            this.addOutput('out', new ClassicPreset.Output(flowSocket));
+        }
         this.applyDto(dto);
     }
 
@@ -326,10 +480,13 @@ class StoryNode extends ClassicPreset.Node {
         this.dto = dto;
         this.label = dto.label;
         // Events carry their own branch; junctions are stamped separately (owner-inherited).
-        if (dto.kind === 'Event') { this.branchGlow = dto.branch ?? null; }
+        if (dto.kind === 'Event') {
+            this.branchGlow = dto.branch ?? null;
+        }
         if (dto.kind === 'AndJunction' || dto.kind === 'OrJunction'
             || dto.kind === 'StagingAnd' || dto.kind === 'StagingOr') {
-            this.width = 48; this.height = 48;
+            this.width = 48;
+            this.height = 48;
         } else if (dto.kind === 'Event') {
             this.width = EVENT_NODE_WIDTH;
             this.height = estimateEventNodeHeight(dto);
@@ -341,6 +498,12 @@ class StoryNode extends ClassicPreset.Node {
 }
 
 class StoryConnection extends ClassicPreset.Connection<StoryNode, StoryNode> {
+    /**
+     * Simulation overlay: 'active' while a step is flowing along this edge, 'spent' once it has,
+     * so the path the story took stays readable after the animation.
+     */
+    flow: 'idle' | 'active' | 'spent' = 'idle';
+
     /** <param name="branch">Branch this prereq edge feeds - drives the sankey-style glow.</param> */
     constructor(
         source: StoryNode, target: StoryNode, public readonly kind: string,
@@ -359,28 +522,60 @@ interface EditorHandle {
      * otherwise the graph is patched in place - the viewport and node positions stay put.
      */
     setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[],
-        full: boolean): Promise<void>;
+             full: boolean): Promise<void>;
+
     /** Overrides node lifecycles from the simulation (null restores the static analysis view). */
     applyLifecycles(byNodeId: ReadonlyMap<string, string> | null): void;
+
+    /** Paints the fire-count badges from the simulation state (null clears them). */
+    applyFireCounts(byNodeId: ReadonlyMap<string, number> | null): void;
+
+    /** Paints the gate meters and breakpoint marks from the simulation state (null clears them). */
+    applySimMarks(byNodeId: ReadonlyMap<string, StorySimNodeStateDto> | null, breakpoints: ReadonlySet<string>): void;
+
+    /** The galactic session's battle statuses onto the tactical stubs; null takes them off. */
+    applyBattles(battles: readonly StorySimBattleDto[] | null): void;
+
+    /** Recomputes the paths taken from the whole trace, without animating - for a graph rebuilt under a running simulation. */
+    applyFlow(steps: readonly StorySimStepDto[]): void;
+
+    /** The canvas lenses the overview has to honour as well as the mounted nodes. */
+    setSimLenses(lenses: SimLenses): void;
+
+    /**
+     * Plays a trace delta tick by tick: the edge from a step's source to its node flows for
+     * `tickMs`, then the node takes the step's lifecycle and the edge stays tinted. Zero ms
+     * applies everything at once (a fresh start, a rewind, reduced motion).
+     */
+    playSimSteps(steps: readonly StorySimStepDto[], tickMs: number): Promise<void>;
+
+    /** Clears every flow tint and fire badge (simulation stopped or rewound). */
+    resetSimVisuals(): void;
+
     fit(): void;
+
     /**
      * Recomputes the automatic layout for the current graph, discarding manual positions - the
      * new positions are persisted, so the arrangement survives re-renders and reopening.
      */
     autoArrange(): Promise<void>;
+
     /** Converts a browser client point (e.g. a drop event) to graph coordinates. */
     toGraphPosition(clientX: number, clientY: number): { x: number; y: number };
+
     /**
      * Remembers where a not-yet-created event should land once the server confirms it - used by
      * palette drag-and-drop, where the drop position is known well before the event exists.
      */
     presetPosition(threadUri: string, eventName: string, position: { x: number; y: number }): void;
+
     /**
      * Carries a renamed node's current position to its new name, so the renamed event (which gets a
      * new node id derived from its name) reappears exactly where it was instead of being re-placed
      * beside a neighbour. No-op if the old node isn't currently laid out.
      */
     carryPosition(oldNodeId: string, threadUri: string | null | undefined, newName: string): void;
+
     /**
      * Resolves an Event node's identity and current types from its id - used by the
      * drag-a-type-onto-a-node gesture, which only has a `data-node-id` DOM attribute to go on,
@@ -390,39 +585,58 @@ interface EditorHandle {
         threadUri: string | null; eventName: string;
         eventType: string | null; rewardType: string | null;
     } | null;
+
     /** Brings one node into view and flashes it - the problems list's jump-to. */
     centerNode(nodeId: string): void;
+
     /**
      * The thread file a new event dropped at `position` should belong to: the nearest existing
      * event node's thread, else the first thread. Null only when the campaign has no thread.
      */
     nearestEventThread(position: { x: number; y: number }, threads: string[]): string | null;
+
     /** Every current event node label - used to pick a unique default name for a new event. */
     eventLabels(): string[];
+
     /** The current viewport centre in graph coordinates - where a toolbar-created node lands. */
     viewportCentre(): { x: number; y: number };
+
     /** Node rects + the current viewport rect, all in graph coordinates, for the dock minimap. */
     getMinimap(): {
         nodes: { x: number; y: number; w: number; h: number }[];
         viewport: { x: number; y: number; w: number; h: number };
     };
+
     /** Pans the viewport so (graphX, graphY) sits at the centre - the minimap's click-to-navigate. */
     panTo(graphX: number, graphY: number): void;
+
     /** Whether the graph is in windowed/LOD mode (big graph): the LOD overview is drawn and only the
      * visible window mounts into rete. The overview stays up at all zoom levels so edges (and off-
      * window nodes) remain visible; real nodes overlay the window when zoomed in. */
     isWindowed(): boolean;
+
     /** Paints the LOD overview (all nodes as coloured rects + all edges as lines) into a screen-space
      * canvas sized to the viewport, using the current pan/zoom transform. No-op clear when not
      * windowed (a small graph is fully mounted, so the real nodes are the view). */
     drawLodTo(canvas: HTMLCanvasElement): void;
+
+    /**
+     * Paints the simulation's flow - the edges the story has run along - onto a screen-space
+     * canvas, when rete is not drawing the edges itself (a windowed graph, or any graph zoomed out
+     * to the overview). `phase` is elapsed milliseconds and drives the marching dash. Returns
+     * whether any flow exists, so the caller knows whether to keep animating.
+     */
+    drawFlowTo(canvas: HTMLCanvasElement, phase: number): boolean;
+
     /** Bounding boxes (graph coords) of Event nodes grouped by thread or chapter - the swimlanes. */
     getGroupBounds(by: 'thread' | 'chapter'): {
         key: string; title: string; x: number; y: number; w: number; h: number;
     }[];
+
     /** Paints the enabled swimlanes (thread solid, chapter dashed) into a screen-space canvas behind
      * the nodes, using the current pan/zoom transform. */
     drawSwimlanesTo(canvas: HTMLCanvasElement, showThread: boolean, showChapter: boolean): void;
+
     /**
      * Drops a local-only staging AND/OR-junction at the given position - no server round trip.
      * The user wires Event outputs into its input to accumulate prereq sources, then drags its
@@ -430,33 +644,40 @@ interface EditorHandle {
      * new prereq line per source (see the `connectioncreate` pipe).
      */
     createStagingJunction(position: { x: number; y: number }, kind: 'and' | 'or'): void;
+
     /** Discards an unattached staging junction (its own "×" button) - never sent to the server. */
     discardStagingJunction(nodeId: string): void;
+
     /**
      * Re-renders every node's body - needed on top of `applyLifecycles`' targeted updates because
      * switching Edit/View/Simulate mode changes an Event node's own layout (the blank "add a new
      * param" row appears/disappears, inputs enable/disable), not just its lifecycle border.
      */
     refreshMode(): void;
+
     /** Re-measures and re-renders one node - e.g. after its section collapse state changed. */
     refreshNode(nodeId: string): void;
+
     /**
      * Optimistically updates one Event node's dto and re-renders it - the Edit-mode staging path,
      * so a property change shows instantly without a server round trip. No-op for unknown ids.
      */
     patchEventNode(nodeId: string, update: (dto: StoryGraphNodeDto) => StoryGraphNodeDto): void;
+
     /**
      * Repaints only the given nodes (no re-measure - diagnostics don't change height). Used by the
      * diagnostics push so a validation refresh touches just the nodes whose markers changed,
      * instead of re-rendering every node like `refreshMode`.
      */
     repaintNodes(nodeIds: Iterable<string>): void;
+
     /**
      * Repaints everything drawn in a branch colour, after the campaign's branch list changed and so
      * moved branches to other slots. Nodes that stay alive through a patch would otherwise keep the
      * colour they were rendered with. Walks the whole graph, so it is for that change only.
      */
     repaintBranchColours(): void;
+
     destroy(): void;
 }
 
@@ -464,13 +685,26 @@ interface EditorHandle {
  * node body has no direct line to App's `setFilter`, so it goes through this bridge, the same
  * pattern `onGraphDesynced` already uses. */
 let onReachableFromRequested: (nodeId: string, direction: PathDirection) => void =
-    () => { /* replaced by App */ };
+    () => { /* replaced by App */
+    };
 
 /** The event the graph is filtered to and which way, so a node's menu can mark its own direction. */
-let currentReachable: { from: string; direction: PathDirection } = { from: '', direction: 'Downstream' };
+let currentReachable: { from: string; direction: PathDirection } = {from: '', direction: 'Downstream'};
+
+/**
+ * A portal pressed. On the galactic graph a battle's stand-in opens the battle's own panel; on a
+ * battle graph a galactic event's stand-in reveals the galactic panel centred on that event. Both
+ * are the extension's to do - a webview cannot open another - so they go out as messages, through
+ * the same bridge pattern as the path filter because a node body cannot reach App.
+ */
+let onOpenBattleRequested: (battleKey: string, label: string, simulate: boolean) => void = () => { /* replaced by App */
+};
+let onRevealGalacticRequested: (galacticNodeId: string) => void = () => { /* replaced by App */
+};
 
 /** A gesture locally changed the graph without a server command - re-fetch to reconcile. */
-let onGraphDesynced: () => void = () => { /* replaced by App */ };
+let onGraphDesynced: () => void = () => { /* replaced by App */
+};
 
 /** Notified (the minimap) when the viewport pans/zooms or a node moves. */
 const areaChanged = new FrameNotifier();
@@ -501,6 +735,27 @@ type EditorMode = 'view' | 'edit' | 'simulate';
  */
 let currentMode: EditorMode = 'view';
 
+/**
+ * Threads the current graph draws from a REFERENCED project, keyed to the project that owns them.
+ *
+ * Rebuilt from every graph push, beside the pipes rather than in React state for the same reason
+ * `currentMode` is: the rete pipes are created once, outside React, and have to consult it.
+ */
+let readOnlyThreads: ReadonlyMap<string, string> = new Map();
+
+/** The project blocking an edit to this thread, or null when the thread is this project's own. */
+function threadReadOnlyOwner(threadUri: string | null | undefined): string | null {
+    return readOnlyOwnerOf(readOnlyThreads, threadUri);
+}
+
+/**
+ * Set by App so the gesture handlers below - which live outside React, beside the rete pipes - can
+ * put a line in the status slot.
+ */
+let reportStatus: (message: string) => void = () => {
+    /* until App mounts there is no status slot to write to */
+};
+
 // ── Edit-mode staging ──────────────────────────────────────────────────────────────────────────
 //
 // In Edit mode, gestures don't round-trip per change (the old behaviour - sluggish even on a
@@ -513,10 +768,12 @@ let currentMode: EditorMode = 'view';
 const pendingCommands: Record<string, unknown>[] = [];
 
 /** App subscribes so the toolbar's Save/Validate buttons reflect the pending count. */
-let onPendingChanged: () => void = () => { /* replaced by App */ };
+let onPendingChanged: () => void = () => { /* replaced by App */
+};
 
 /** Set by App: asks the extension for a preview graph over the current pending queue. */
-let requestPreview: () => void = () => { /* replaced by App */ };
+let requestPreview: () => void = () => { /* replaced by App */
+};
 
 // See StagedRenames: a gesture reads the node's dto.label, which lags a staged rename until the
 // preview lands, so every staged command is retargeted through this to the event's latest name.
@@ -538,7 +795,9 @@ function stageCommand(payload: Record<string, unknown>): void {
     // Retarget to the event's latest staged name (dto.label may still show a pre-rename name).
     if (typeof payload.eventName === 'string') {
         const resolved = stagedRenames.resolve(payload.eventName);
-        if (resolved !== payload.eventName) { payload = { ...payload, eventName: resolved }; }
+        if (resolved !== payload.eventName) {
+            payload = {...payload, eventName: resolved};
+        }
     }
     if (payload.kind === 'renameEvent' && typeof payload.newName === 'string') {
         stagedRenames.record(payload.eventName as string, payload.newName);
@@ -550,14 +809,22 @@ function stageCommand(payload: Record<string, unknown>): void {
 
     // Structural gestures have no cheap local representation - let the server rebuild the graph from
     // the composed working copy (no disk write) and re-render from that.
-    if (PREVIEW_KINDS.has(payload.kind as string)) { schedulePreview(); }
+    if (PREVIEW_KINDS.has(payload.kind as string)) {
+        schedulePreview();
+    }
 }
 
 // Coalesce rapid structural gestures (e.g. a junction commit fires addPrereqGroup) into one preview.
 let previewTimer: ReturnType<typeof setTimeout> | null = null;
+
 function schedulePreview(): void {
-    if (previewTimer !== null) { clearTimeout(previewTimer); }
-    previewTimer = setTimeout(() => { previewTimer = null; requestPreview(); }, 40);
+    if (previewTimer !== null) {
+        clearTimeout(previewTimer);
+    }
+    previewTimer = setTimeout(() => {
+        previewTimer = null;
+        requestPreview();
+    }, 40);
 }
 
 /**
@@ -568,15 +835,21 @@ function schedulePreview(): void {
  * truth). Structural kinds are already baked into a preview graph, so their replay is a no-op.
  */
 function reapplyStagedCommands(): void {
-    for (const payload of pendingCommands) { applyOptimistic(payload); }
+    for (const payload of pendingCommands) {
+        applyOptimistic(payload);
+    }
 }
 
 /** Reflects a staged command in the local graph so Edit mode feels instant. */
 function applyOptimistic(payload: Record<string, unknown>): void {
     const handle = editorHandleRef;
-    if (!handle) { return; }
+    if (!handle) {
+        return;
+    }
     const edit = optimisticEdit(payload);
-    if (edit) { handle.patchEventNode(edit.nodeId, edit.apply); }
+    if (edit) {
+        handle.patchEventNode(edit.nodeId, edit.apply);
+    }
 }
 
 /** AND-junction node ids embed their owner event and group index: `{eventNodeId}#g{index}`. */
@@ -604,7 +877,9 @@ const LABEL_PAD = 4;
 // a neutral - they have no lifecycle, and the overview tells them apart by SHAPE instead (see
 // lodShape), which is what the mounted view already does.
 function lodToken(dto: StoryGraphNodeDto): string {
-    if (dto.kind !== 'Event') { return JUNCTION_TOKEN; }
+    if (dto.kind !== 'Event') {
+        return JUNCTION_TOKEN;
+    }
     return LIFECYCLE_TOKENS[dto.lifecycle as keyof typeof LIFECYCLE_TOKENS] ?? UNKNOWN_LIFECYCLE_TOKEN;
 }
 
@@ -623,7 +898,7 @@ function overviewToken(dto: StoryGraphNodeDto, branch: string | null): string {
 async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const editor = new NodeEditor<Schemes>();
     const area = new AreaPlugin<Schemes, AreaExtra>(container);
-    const render = new ReactPlugin<Schemes, AreaExtra>({ createRoot });
+    const render = new ReactPlugin<Schemes, AreaExtra>({createRoot});
     const arrange = new AutoArrangePlugin<Schemes>();
     const connection = new ConnectionPlugin<Schemes, AreaExtra>();
 
@@ -665,7 +940,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         andJunctionId.exec(id)?.[1] ?? (id.endsWith('#or') ? id.slice(0, -'#or'.length) : null);
 
     const branchOfNodeId = (id: string, branchByEvent: Map<string, string>): string | null => {
-        if (branchByEvent.has(id)) { return branchByEvent.get(id)!; }
+        if (branchByEvent.has(id)) {
+            return branchByEvent.get(id)!;
+        }
         const owner = junctionOwnerId(id);
         return owner ? branchByEvent.get(owner) ?? null : null;
     };
@@ -674,14 +951,20 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const edgeBranchFrom = (
         fromId: string, toId: string, kind: string, branchByEvent: Map<string, string>
     ): string | null => {
-        if (kind !== 'Prereq') { return null; }
+        if (kind !== 'Prereq') {
+            return null;
+        }
         return branchOfNodeId(toId, branchByEvent) ?? branchOfNodeId(fromId, branchByEvent);
     };
 
     /** Event id → branch, for a whole incoming graph - one build, reused for every node and edge. */
     const branchIndex = (nodes: StoryGraphNodeDto[]): Map<string, string> => {
         const map = new Map<string, string>();
-        for (const dto of nodes) { if (dto.kind === 'Event' && dto.branch) { map.set(dto.id, dto.branch); } }
+        for (const dto of nodes) {
+            if (dto.kind === 'Event' && dto.branch) {
+                map.set(dto.id, dto.branch);
+            }
+        }
         return map;
     };
 
@@ -745,7 +1028,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         const match = andJunctionId.exec(junction.id);
         const owner = match ? editor.getNode(match[1]) : undefined;
         return owner?.dto.kind === 'Event' && owner.dto.threadUri
-            ? { owner, groupIndex: Number(match![2]) }
+            ? {owner, groupIndex: Number(match![2])}
             : null;
     };
 
@@ -771,7 +1054,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // removable - the local removal is allowed to play out and a re-fetch restores it.
     editor.addPipe(context => {
         if (context.type === 'connectioncreate' && !applyingServerGraph) {
-            if (currentMode !== 'edit') { return undefined; }
+            if (currentMode !== 'edit') {
+                return undefined;
+            }
             const source = editor.getNode(context.data.source);
             const target = editor.getNode(context.data.target);
             if (source?.dto.kind === 'Event'
@@ -824,12 +1109,24 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             return undefined; // never materialise gesture connections locally
         }
         if (context.type === 'connectionremove' && !applyingServerGraph) {
-            if (currentMode !== 'edit') { return undefined; } // freeze: block the local removal too
+            if (currentMode !== 'edit') {
+                return undefined;
+            } // freeze: block the local removal too
             const removed = context.data as StoryConnection;
             const source = editor.getNode(removed.source);
             const target = editor.getNode(removed.target);
             if (target?.dto.kind === 'StagingAnd' || target?.dto.kind === 'StagingOr') {
                 return context; // discarding one accumulated source - nothing was ever sent for it
+            }
+            // The prereq lives in the TARGET's file (or, through a junction, in its owner's), so
+            // that is the thread this gesture would write. When a referenced project owns it, the
+            // removal is blocked here rather than in sendCommand - a local removal that plays out
+            // would take the edge off the canvas until the next refresh put it back.
+            const writeTarget = target?.dto.kind === 'AndJunction' ? junctionOwner(target)?.owner : target;
+            const blockedBy = threadReadOnlyOwner(writeTarget?.dto.threadUri);
+            if (blockedBy) {
+                reportStatus(readOnlyMessage(blockedBy));
+                return undefined;
             }
             const isPrereq = (removed.kind ?? 'Prereq') === 'Prereq';
             if (isPrereq && source?.dto.kind === 'Event'
@@ -865,7 +1162,15 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // has mounted. Minimap, swimlanes and save-layout read this (not area.nodeViews) so they stay
     // whole once node mounting is windowed. Synced by rebuildModel() after each full build/patch and
     // upserted per node on drag (the 'nodetranslated' pipe below).
-    interface ModelNode { dto: StoryGraphNodeDto; x: number; y: number; w: number; h: number; colorToken: string; }
+    interface ModelNode {
+        dto: StoryGraphNodeDto;
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+        colorToken: string;
+    }
+
     const graphModel = new Map<string, ModelNode>();
 
     const rebuildModel = (): void => {
@@ -887,25 +1192,33 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     ): { key: string; title: string; x: number; y: number; w: number; h: number }[] => {
         const groups = new Map<string, { title: string; minX: number; minY: number; maxX: number; maxY: number }>();
         for (const m of graphModel.values()) {
-            if (m.dto.kind !== 'Event') { continue; }
+            if (m.dto.kind !== 'Event') {
+                continue;
+            }
             let key: string;
             let title: string;
             if (by === 'thread') {
-                if (!m.dto.threadUri) { continue; }
+                if (!m.dto.threadUri) {
+                    continue;
+                }
                 key = m.dto.threadUri;
                 title = baseName(m.dto.threadUri);
             } else {
-                if (typeof m.dto.storyChapter !== 'number') { continue; }
+                if (typeof m.dto.storyChapter !== 'number') {
+                    continue;
+                }
                 key = String(m.dto.storyChapter);
                 title = `Chapter ${m.dto.storyChapter}`;
             }
             const x0 = m.x, y0 = m.y, x1 = m.x + m.w, y1 = m.y + m.h;
             const g = groups.get(key);
             if (g) {
-                g.minX = Math.min(g.minX, x0); g.minY = Math.min(g.minY, y0);
-                g.maxX = Math.max(g.maxX, x1); g.maxY = Math.max(g.maxY, y1);
+                g.minX = Math.min(g.minX, x0);
+                g.minY = Math.min(g.minY, y0);
+                g.maxX = Math.max(g.maxX, x1);
+                g.maxY = Math.max(g.maxY, y1);
             } else {
-                groups.set(key, { title, minX: x0, minY: y0, maxX: x1, maxY: y1 });
+                groups.set(key, {title, minX: x0, minY: y0, maxX: x1, maxY: y1});
             }
         }
         const pad = 24;
@@ -917,26 +1230,46 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     };
 
     const saveAllPositions = (): void => {
+        // Every node the panel showed, not only the events: a battle graph is a third portals,
+        // junctions and script states, and a saved arrangement that left them out re-placed them
+        // on every open. An event is named by thread and event, anything else by its id.
         const entries: StoryLayoutEntryDto[] = [];
         for (const m of graphModel.values()) {
-            if (m.dto.kind !== 'Event') { continue; }
-            entries.push({
-                threadUri: m.dto.threadUri ?? '',
-                eventName: m.dto.label,
-                x: m.x,
-                y: m.y,
-            });
+            if (m.dto.kind === 'StagingAnd' || m.dto.kind === 'StagingOr') {
+                continue; // client-only, gone once its output reaches an event
+            }
+            entries.push(m.dto.kind === 'Event'
+                ? {threadUri: m.dto.threadUri ?? '', eventName: m.dto.label, x: m.x, y: m.y}
+                : {threadUri: '', eventName: '', nodeId: m.dto.id, x: m.x, y: m.y});
         }
-        if (entries.length) { vscode.postMessage({ type: 'saveLayout', entries }); }
+        if (entries.length) {
+            vscode.postMessage({type: 'saveLayout', entries});
+        }
     };
 
     area.addPipe(context => {
         if (context.type === 'nodetranslate' && currentMode !== 'edit' && !applyingServerGraph) {
             return undefined; // freeze user-driven dragging outside Edit mode; auto-layout and
-                               // stored-position restores (during setGraph) still go through
+            // stored-position restores (during setGraph) still go through
         }
         if (context.type === 'nodedragged' && currentMode === 'edit') {
             saveAllPositions();
+        }
+        // In Simulation a pick opens the event's detail beside the dock - or, on a battle's
+        // portal, the battle's own decision: fight, auto-resolve, won or lost live there.
+        if (context.type === 'nodepicked' && currentMode === 'simulate') {
+            onSimNodePicked?.((context.data as { id: string }).id);
+        }
+        // In View a portal is a doorway: picking it goes through. Not in Edit, where a pick is the
+        // start of a drag and opening another panel under the pointer would steal the gesture.
+        if (context.type === 'nodepicked' && portalPickAction(currentMode) === 'open') {
+            const dto = editor.getNode((context.data as { id: string }).id)?.dto;
+            const battleKey = dto ? battleKeyOfNode(dto.id) : undefined;
+            if (dto?.kind === 'TacticalPlot' && battleKey) {
+                onOpenBattleRequested(battleKey, dto.label, false);
+            } else if (dto?.kind === 'GalacticPortal' && dto.portalTarget) {
+                onRevealGalacticRequested(dto.portalTarget);
+            }
         }
         // Keep the dock minimap in sync with pan/zoom and node moves (rAF-throttled).
         if (context.type === 'translated' || context.type === 'zoomed'
@@ -1002,28 +1335,32 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         for (const edge of edges) {
             if (edge.toId === dto.id) {
                 const view = area.nodeViews.get(edge.fromId);
-                if (view) { sources.push(view.position); }
+                if (view) {
+                    sources.push(view.position);
+                }
             } else if (edge.fromId === dto.id) {
                 const view = area.nodeViews.get(edge.toId);
-                if (view) { targets.push(view.position); }
+                if (view) {
+                    targets.push(view.position);
+                }
             }
         }
         if (sources.length && targets.length) {
             const s = average(sources);
             const t = average(targets);
-            return { x: (s.x + t.x) / 2, y: (s.y + t.y) / 2 };
+            return {x: (s.x + t.x) / 2, y: (s.y + t.y) / 2};
         }
         if (sources.length) {
             const s = average(sources);
-            return { x: s.x + 220, y: s.y };
+            return {x: s.x + 220, y: s.y};
         }
         if (targets.length) {
             const t = average(targets);
-            return { x: t.x - 220, y: t.y };
+            return {x: t.x - 220, y: t.y};
         }
-        const { k, x, y } = area.area.transform;
+        const {k, x, y} = area.area.transform;
         const rect = container.getBoundingClientRect();
-        return { x: (rect.width / 2 - x) / k, y: (rect.height / 2 - y) / k };
+        return {x: (rect.width / 2 - x) / k, y: (rect.height / 2 - y) / k};
     };
 
     // ── Level-of-detail (LOD) virtualization ──────────────────────────────────────────────────────
@@ -1036,13 +1373,52 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // while `windowed`; the minimap always reads the full graphModel, not this.
     const mountedIds = new Set<string>();
     const mountedConnKeys = new Set<string>();
+    /**
+     * Simulation flow per edge, keyed like a mounted connection, for EVERY edge of the graph. The
+     * rete connections only exist for a small graph's mounted window; a large campaign mounts none
+     * and the LOD canvas draws its edges - so the flow has to live beside the model, not on the
+     * connection objects, or a real campaign never shows a path taken. Measured on Underworld
+     * (2492 nodes): zero flow edges before this existed.
+     */
+    const flowByEdge = new Map<string, { edge: StoryGraphEdgeDto; state: 'active' | 'spent' }>();
+    /**
+     * The rest of the simulation's paint, likewise beside the model. The server owns the
+     * simulation; the view only paints its last state, and a node mounted after that state
+     * arrived (a zoom across the LOD threshold, a relayout, a filter) reads its paint from here
+     * rather than starting blank. Lifecycles need no map: they are written into the model's own
+     * dto objects, which the mounted nodes share.
+     */
+    const simFireCounts = new Map<string, number>();
+    const simMarks = new Map<string, StorySimNodeStateDto>();
+    // The galactic session's word on each battle, keyed by battle key: what a tactical stub shows.
+    const simBattles = new Map<string, StorySimBattleDto>();
+    let simBreakpoints: ReadonlySet<string> = new Set<string>();
+    let simRunning = false;
+    let lensActiveOnly = false;
+    const battleOf = (nodeId: string): { status: string; tick: number } | null => {
+        const key = battleKeyOfNode(nodeId);
+        const battle = key ? simBattles.get(key) : undefined;
+        return battle ? {status: battle.status, tick: battle.tick} : null;
+    };
+    const decorateFromSim = (node: StoryNode): void => {
+        node.simFireCount = simFireCounts.get(node.id) ?? 0;
+        const mark = simMarks.get(node.id);
+        node.simGate = mark?.gateLabel ? {label: mark.gateLabel, progress: mark.gateProgress ?? null} : null;
+        node.simBreakpoint = simBreakpoints.has(node.id);
+        node.simBattle = node.dto.kind === 'TacticalPlot' ? battleOf(node.id) : null;
+    };
+    const reached = (dto: StoryGraphNodeDto): boolean => dto.lifecycle === 'Fired' || dto.lifecycle === 'Armed';
 
     // A node's rete size, computed without mounting it (mirrors StoryNode.applyDto).
     const modelSizeFor = (dto: StoryGraphNodeDto): { w: number; h: number } => {
         if (dto.kind === 'AndJunction' || dto.kind === 'OrJunction'
-            || dto.kind === 'StagingAnd' || dto.kind === 'StagingOr') { return { w: 48, h: 48 }; }
-        if (dto.kind === 'Event') { return { w: EVENT_NODE_WIDTH, h: estimateEventNodeHeight(dto) }; }
-        return { w: Math.max(140, Math.min(dto.label.length, 30) * 6.5 + 32), h: 40 };
+            || dto.kind === 'StagingAnd' || dto.kind === 'StagingOr') {
+            return {w: 48, h: 48};
+        }
+        if (dto.kind === 'Event') {
+            return {w: EVENT_NODE_WIDTH, h: estimateEventNodeHeight(dto)};
+        }
+        return {w: Math.max(140, Math.min(dto.label.length, 30) * 6.5 + 32), h: 40};
     };
 
     // placeNewNode's midpoint logic, but reading positions from graphModel (nodes aren't mounted).
@@ -1052,12 +1428,31 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         const sources: { x: number; y: number }[] = [];
         const targets: { x: number; y: number }[] = [];
         for (const edge of edges) {
-            if (edge.toId === dto.id) { const m = graphModel.get(edge.fromId); if (m) { sources.push({ x: m.x, y: m.y }); } }
-            else if (edge.fromId === dto.id) { const m = graphModel.get(edge.toId); if (m) { targets.push({ x: m.x, y: m.y }); } }
+            if (edge.toId === dto.id) {
+                const m = graphModel.get(edge.fromId);
+                if (m) {
+                    sources.push({x: m.x, y: m.y});
+                }
+            } else if (edge.fromId === dto.id) {
+                const m = graphModel.get(edge.toId);
+                if (m) {
+                    targets.push({x: m.x, y: m.y});
+                }
+            }
         }
-        if (sources.length && targets.length) { const s = average(sources); const t = average(targets); return { x: (s.x + t.x) / 2, y: (s.y + t.y) / 2 }; }
-        if (sources.length) { const s = average(sources); return { x: s.x + 220, y: s.y }; }
-        if (targets.length) { const t = average(targets); return { x: t.x - 220, y: t.y }; }
+        if (sources.length && targets.length) {
+            const s = average(sources);
+            const t = average(targets);
+            return {x: (s.x + t.x) / 2, y: (s.y + t.y) / 2};
+        }
+        if (sources.length) {
+            const s = average(sources);
+            return {x: s.x + 220, y: s.y};
+        }
+        if (targets.length) {
+            const t = average(targets);
+            return {x: t.x - 220, y: t.y};
+        }
         return null;
     };
 
@@ -1066,7 +1461,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const buildModelFromLayout = (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): boolean => {
-        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [layoutEntryKey(e), e]));
         const events = nodes.filter(n => n.kind === 'Event');
         if (events.length === 0 || !canReuseStoredLayout(events.map(layoutKey), new Set(stored.keys()))) {
             return false;
@@ -1074,13 +1469,16 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         graphModel.clear();
         const branchByEvent = branchIndex(nodes);
         const colorFor = (dto: StoryGraphNodeDto): string => overviewToken(dto, branchOfNodeId(dto.id, branchByEvent));
-        for (const dto of events) {
-            // An event with no stored entry - newly added since the layout was written - is left
-            // for the placement pass below rather than discarding everyone else's positions.
-            const e = stored.get(layoutKey(dto));
-            if (e === undefined) { continue; }
-            const { w, h } = modelSizeFor(dto);
-            graphModel.set(dto.id, { dto, x: e.x, y: e.y, w, h, colorToken: colorFor(dto) });
+        for (const dto of nodes) {
+            // A node with no stored entry - added since the layout was written, or a junction from
+            // before junctions were saved - is left for the placement pass below rather than
+            // discarding everyone else's positions.
+            const e = stored.get(nodeLayoutKey(dto));
+            if (e === undefined) {
+                continue;
+            }
+            const {w, h} = modelSizeFor(dto);
+            graphModel.set(dto.id, {dto, x: e.x, y: e.y, w, h, colorToken: colorFor(dto)});
         }
         // Everything still unplaced - junctions, and events added since the layout was saved - sits
         // at the midpoint of its neighbours. Some connect only to OTHER unplaced nodes, so iterate
@@ -1091,18 +1489,32 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         for (let pass = 0; pass < 6; pass++) {
             let changed = false;
             for (const dto of junctions) {
-                if (graphModel.has(dto.id)) { continue; }
+                if (graphModel.has(dto.id)) {
+                    continue;
+                }
                 const pos = modelPlaceNode(dto, edges);
-                if (pos) { graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto) }); changed = true; }
+                if (pos) {
+                    graphModel.set(dto.id, {dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto)});
+                    changed = true;
+                }
             }
-            if (!changed) { break; }
+            if (!changed) {
+                break;
+            }
         }
         if (junctions.some(dto => !graphModel.has(dto.id))) {
             let cx = 0, cy = 0, n = 0;
-            for (const m of graphModel.values()) { cx += m.x + m.w / 2; cy += m.y + m.h / 2; n += 1; }
-            cx = n ? cx / n : 0; cy = n ? cy / n : 0;
+            for (const m of graphModel.values()) {
+                cx += m.x + m.w / 2;
+                cy += m.y + m.h / 2;
+                n += 1;
+            }
+            cx = n ? cx / n : 0;
+            cy = n ? cy / n : 0;
             for (const dto of junctions) {
-                if (!graphModel.has(dto.id)) { graphModel.set(dto.id, { dto, x: cx, y: cy, ...modelSizeFor(dto), colorToken: colorFor(dto) }); }
+                if (!graphModel.has(dto.id)) {
+                    graphModel.set(dto.id, {dto, x: cx, y: cy, ...modelSizeFor(dto), colorToken: colorFor(dto)});
+                }
             }
         }
         return true;
@@ -1111,17 +1523,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // Visible graph-coordinate rectangle, expanded by `margin` × its size so nodes just off-screen
     // are already mounted before they scroll in.
     const viewportRect = (margin: number): { minX: number; minY: number; maxX: number; maxY: number } => {
-        const { k, x, y } = area.area.transform;
+        const {k, x, y} = area.area.transform;
         const w = container.clientWidth, h = container.clientHeight;
         // An unmeasured container (or a zero zoom) would give a zero-area - or NaN - rectangle, and
         // then nothing is "in window" and the graph mounts nothing at all. Cull nothing instead:
         // mounting too much is a performance problem, mounting nothing looks like a broken editor.
         if (!(w > 0) || !(h > 0) || !(k > 0)) {
-            return { minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity };
+            return {minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity};
         }
         const minX = -x / k, minY = -y / k, maxX = (w - x) / k, maxY = (h - y) / k;
         const mx = (maxX - minX) * margin, my = (maxY - minY) * margin;
-        return { minX: minX - mx, minY: minY - my, maxX: maxX + mx, maxY: maxY + my };
+        return {minX: minX - mx, minY: minY - my, maxX: maxX + mx, maxY: maxY + my};
     };
 
     const inWindow = (m: ModelNode, r: { minX: number; minY: number; maxX: number; maxY: number }): boolean =>
@@ -1132,7 +1544,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // bypassed - this is view culling, not user editing.
     const mountNodes = async (ids: Iterable<string>): Promise<void> => {
         const fresh = [...ids].filter(id => !mountedIds.has(id) && graphModel.has(id));
-        if (fresh.length === 0) { return; }
+        if (fresh.length === 0) {
+            return;
+        }
         const wasApplying = applyingServerGraph;
         applyingServerGraph = true;
         try {
@@ -1143,6 +1557,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 const m = graphModel.get(id)!;
                 const node = new StoryNode(m.dto, hasIn.has(id), hasOut.has(id));
                 node.branchGlow = branchOfNodeId(id, branches);
+                decorateFromSim(node);
                 mountedIds.add(id);
                 return node;
             });
@@ -1156,14 +1571,23 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             if (!windowed) {
                 const conns: StoryConnection[] = [];
                 for (const edge of lastEdges) {
-                    if (!mountedIds.has(edge.fromId) || !mountedIds.has(edge.toId)) { continue; }
+                    if (!mountedIds.has(edge.fromId) || !mountedIds.has(edge.toId)) {
+                        continue;
+                    }
                     const key = connectionKey(edge.fromId, edge.toId, edge.kind);
-                    if (mountedConnKeys.has(key)) { continue; }
+                    if (mountedConnKeys.has(key)) {
+                        continue;
+                    }
                     const s = editor.getNode(edge.fromId), t = editor.getNode(edge.toId);
-                    if (!s || !t) { continue; }
+                    if (!s || !t) {
+                        continue;
+                    }
                     mountedConnKeys.add(key);
-                    conns.push(new StoryConnection(s, t, edge.kind,
-                        edgeBranchFrom(edge.fromId, edge.toId, edge.kind, branches)));
+                    const conn = new StoryConnection(s, t, edge.kind,
+                        edgeBranchFrom(edge.fromId, edge.toId, edge.kind, branches));
+                    // A connection mounted after the story ran along its edge still shows the path.
+                    conn.flow = flowByEdge.get(key)?.state ?? 'idle';
+                    conns.push(conn);
                 }
                 await Promise.all(conns.map(c => editor.addConnection(c)));
             }
@@ -1174,7 +1598,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
     const unmountNodes = async (ids: Iterable<string>): Promise<void> => {
         const present = [...ids].filter(id => mountedIds.has(id));
-        if (present.length === 0) { return; }
+        if (present.length === 0) {
+            return;
+        }
         const wasApplying = applyingServerGraph;
         applyingServerGraph = true;
         try {
@@ -1200,13 +1626,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             }
 
             await Promise.all(present.map(id => editor.removeNode(id)));
-            for (const id of present) { mountedIds.delete(id); }
+            for (const id of present) {
+                mountedIds.delete(id);
+            }
         } finally {
             applyingServerGraph = wasApplying;
         }
     };
 
-    const mountAllFromModel = async (): Promise<void> => { await mountNodes(graphModel.keys()); };
+    const mountAllFromModel = async (): Promise<void> => {
+        await mountNodes(graphModel.keys());
+    };
 
     // Reconcile the mounted set to the current viewport (windowed mode only): zoomed out past
     // K_DETAIL → unmount everything and show the overview; zoomed in → mount just the visible
@@ -1221,7 +1651,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
      * only decides whether the detailed view mounts the visible screenful or all of it.
      */
     const reconcileWindow = async (): Promise<void> => {
-        if (reconciling) { reconcilePending = true; return; }
+        if (reconciling) {
+            reconcilePending = true;
+            return;
+        }
         reconciling = true;
         try {
             do {
@@ -1229,18 +1662,32 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 if (shouldShowOverview(area.area.transform.k, K_DETAIL)) {
                     // Unmount even for a small graph: the overview canvas sits BEHIND the nodes, so
                     // leaving them mounted would draw both, with shrunken real nodes on top of it.
-                    if (mountedIds.size > 0) { await unmountNodes([...mountedIds]); }
+                    if (mountedIds.size > 0) {
+                        await unmountNodes([...mountedIds]);
+                    }
                     // Toggle the overview on. It re-renders on geometryChange, so fire that ONLY on the
                     // transition, never per frame - otherwise zooming rebuilds the whole SVG each frame.
-                    if (!lodActive) { lodActive = true; scheduleGeometryChanged(); }
+                    if (!lodActive) {
+                        lodActive = true;
+                        scheduleGeometryChanged();
+                    }
                 } else {
-                    if (lodActive) { lodActive = false; scheduleGeometryChanged(); }
+                    if (lodActive) {
+                        lodActive = false;
+                        scheduleGeometryChanged();
+                    }
                     const want = new Set<string>();
                     if (windowed) {
                         const r = viewportRect(0.5);
-                        for (const [id, m] of graphModel) { if (inWindow(m, r)) { want.add(id); } }
+                        for (const [id, m] of graphModel) {
+                            if (inWindow(m, r)) {
+                                want.add(id);
+                            }
+                        }
                     } else {
-                        for (const id of graphModel.keys()) { want.add(id); }
+                        for (const id of graphModel.keys()) {
+                            want.add(id);
+                        }
                     }
                     await unmountNodes([...mountedIds].filter(id => !want.has(id)));
                     await mountNodes([...want].filter(id => !mountedIds.has(id)));
@@ -1254,9 +1701,14 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
     let reconcileScheduled = false;
     const scheduleReconcile = (): void => {
-        if (reconcileScheduled) { return; }
+        if (reconcileScheduled) {
+            return;
+        }
         reconcileScheduled = true;
-        requestAnimationFrame(() => { reconcileScheduled = false; void reconcileWindow(); });
+        requestAnimationFrame(() => {
+            reconcileScheduled = false;
+            void reconcileWindow();
+        });
     };
 
     // Fit the viewport to the whole model (mirrors AreaExtensions.zoomAt, which needs mounted nodes).
@@ -1269,19 +1721,27 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
      * branch, mounting nothing.
      */
     const fitModel = async (): Promise<boolean> => {
-        if (graphModel.size === 0) { return false; }
+        if (graphModel.size === 0) {
+            return false;
+        }
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const m of graphModel.values()) {
-            minX = Math.min(minX, m.x); minY = Math.min(minY, m.y);
-            maxX = Math.max(maxX, m.x + m.w); maxY = Math.max(maxY, m.y + m.h);
+            minX = Math.min(minX, m.x);
+            minY = Math.min(minY, m.y);
+            maxX = Math.max(maxX, m.x + m.w);
+            maxY = Math.max(maxY, m.y + m.h);
         }
         const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
 
         const view = await measuredView();
-        if (view === null) { return false; }
+        if (view === null) {
+            return false;
+        }
 
-        const k = fitZoom(view, { width: maxX - minX, height: maxY - minY });
-        if (k === null) { return false; }
+        const k = fitZoom(view, {width: maxX - minX, height: maxY - minY});
+        if (k === null) {
+            return false;
+        }
 
         area.area.transform.x = view.width / 2 - cx * k;
         area.area.transform.y = view.height / 2 - cy * k;
@@ -1299,7 +1759,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const measuredView = async (): Promise<Extent | null> => {
         for (let frame = 0; frame < MEASURE_FRAME_BUDGET; frame++) {
             const width = container.clientWidth, height = container.clientHeight;
-            if (width > 0 && height > 0) { return { width, height }; }
+            if (width > 0 && height > 0) {
+                return {width, height};
+            }
             await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
         }
         return null;
@@ -1311,9 +1773,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const rebuildModelFromGraph = (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): void => {
-        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [layoutEntryKey(e), e]));
         const oldPos = new Map<string, { x: number; y: number }>();
-        for (const [id, m] of graphModel) { oldPos.set(id, { x: m.x, y: m.y }); }
+        for (const [id, m] of graphModel) {
+            oldPos.set(id, {x: m.x, y: m.y});
+        }
         graphModel.clear();
         const branchByEvent = branchIndex(nodes);
         const colorFor = (dto: StoryGraphNodeDto): string => overviewToken(dto, branchOfNodeId(dto.id, branchByEvent));
@@ -1321,40 +1785,63 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         let placedFromDrop = false;
         for (const dto of nodes) {
             const old = oldPos.get(dto.id);
-            const key = dto.kind === 'Event' ? layoutKey(dto) : null;
-            const s = key ? stored.get(key) : undefined;
-            const drop = key ? pendingDropPositions.get(key) : undefined;
+            const key = nodeLayoutKey(dto);
+            const s = stored.get(key);
+            const drop = dto.kind === 'Event' ? pendingDropPositions.get(key) : undefined;
             // A junction born from a staging-node commit lands where the staging node stood.
             const owner = dto.kind === 'AndJunction' ? andJunctionId.exec(dto.id)?.[1]
                 : dto.kind === 'OrJunction' && dto.id.endsWith('#or') ? dto.id.slice(0, -'#or'.length)
-                : undefined;
+                    : undefined;
             const je = owner ? pendingJunctionPositions.get(owner) : undefined;
-            const jpos = je?.kind === dto.kind ? { x: je.x, y: je.y } : undefined;
-            const pos = old ?? drop ?? jpos ?? (s ? { x: s.x, y: s.y } : null);
+            const jpos = je?.kind === dto.kind ? {x: je.x, y: je.y} : undefined;
+            const pos = old ?? drop ?? jpos ?? (s ? {x: s.x, y: s.y} : null);
             if (pos) {
-                graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto) });
-                if (drop && key) { pendingDropPositions.delete(key); placedFromDrop = true; }
-                if (jpos && owner) { pendingJunctionPositions.delete(owner); }
-            } else { rest.push(dto); } // new node with no known spot - placed below from its neighbours
+                graphModel.set(dto.id, {dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto)});
+                if (drop && key) {
+                    pendingDropPositions.delete(key);
+                    placedFromDrop = true;
+                }
+                if (jpos && owner) {
+                    pendingJunctionPositions.delete(owner);
+                }
+            } else {
+                rest.push(dto);
+            } // new node with no known spot - placed below from its neighbours
         }
         for (let pass = 0; pass < 6; pass++) {
             let changed = false;
             for (const dto of rest) {
-                if (graphModel.has(dto.id)) { continue; }
+                if (graphModel.has(dto.id)) {
+                    continue;
+                }
                 const pos = modelPlaceNode(dto, edges);
-                if (pos) { graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto) }); changed = true; }
+                if (pos) {
+                    graphModel.set(dto.id, {dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto)});
+                    changed = true;
+                }
             }
-            if (!changed) { break; }
+            if (!changed) {
+                break;
+            }
         }
         if (rest.some(dto => !graphModel.has(dto.id))) {
             let cx = 0, cy = 0, n = 0;
-            for (const m of graphModel.values()) { cx += m.x + m.w / 2; cy += m.y + m.h / 2; n += 1; }
-            cx = n ? cx / n : 0; cy = n ? cy / n : 0;
+            for (const m of graphModel.values()) {
+                cx += m.x + m.w / 2;
+                cy += m.y + m.h / 2;
+                n += 1;
+            }
+            cx = n ? cx / n : 0;
+            cy = n ? cy / n : 0;
             for (const dto of rest) {
-                if (!graphModel.has(dto.id)) { graphModel.set(dto.id, { dto, x: cx, y: cy, ...modelSizeFor(dto), colorToken: colorFor(dto) }); }
+                if (!graphModel.has(dto.id)) {
+                    graphModel.set(dto.id, {dto, x: cx, y: cy, ...modelSizeFor(dto), colorToken: colorFor(dto)});
+                }
             }
         }
-        if (placedFromDrop) { saveAllPositions(); } // persist the drop, like patch() does
+        if (placedFromDrop) {
+            saveAllPositions();
+        } // persist the drop, like patch() does
     };
 
     const windowedUpdate = async (
@@ -1386,7 +1873,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             await fitModel();
             windowed = shouldWindow(graphModel.size);
             await reconcileWindow();
-            if (!windowed && !lodActive) { rebuildModel(); }
+            if (!windowed && !lodActive) {
+                rebuildModel();
+            }
             scheduleGeometryChanged();
             scheduleAreaChanged();
             return;
@@ -1406,7 +1895,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
         graphModel.clear();
         for (const dto of nodes) {
-            const { w, h } = modelSizeFor(dto);
+            const {w, h} = modelSizeFor(dto);
             graphModel.set(dto.id, {
                 dto, x: 0, y: 0, w, h,
                 colorToken: overviewToken(dto, branchOfNodeId(dto.id, branches)),
@@ -1417,14 +1906,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         // it was handed real nodes.
         const positions = await arrangePositions(
             nodes.map(dto => {
-                const { w, h } = modelSizeFor(dto);
-                return { id: dto.id, width: w, height: h, hasIn: hasIn.has(dto.id), hasOut: hasOut.has(dto.id) };
+                const {w, h} = modelSizeFor(dto);
+                return {id: dto.id, width: w, height: h, hasIn: hasIn.has(dto.id), hasOut: hasOut.has(dto.id)};
             }),
-            edges.map((edge, index) => ({ id: `c${index}`, source: edge.fromId, target: edge.toId })));
+            edges.map((edge, index) => ({id: `c${index}`, source: edge.fromId, target: edge.toId})));
 
         for (const [id, at] of positions) {
             const m = graphModel.get(id);
-            if (m) { m.x = at.x; m.y = at.y; }
+            if (m) {
+                m.x = at.x;
+                m.y = at.y;
+            }
         }
 
         saveAllPositions(); // persist so the next open takes the fast path
@@ -1454,7 +1946,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
         // 1. Stale connections go first (their endpoints may be about to disappear).
         for (const connection of [...editor.getConnections()]) {
-            if (isLocal(connection.source) || isLocal(connection.target)) { continue; }
+            if (isLocal(connection.source) || isLocal(connection.target)) {
+                continue;
+            }
             if (!incomingConnections.has(connectionKey(connection.source, connection.target, connection.kind))) {
                 await editor.removeConnection(connection.id);
             }
@@ -1462,13 +1956,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
         // 2. Stale nodes.
         for (const node of [...editor.getNodes()]) {
-            if (isLocal(node.id)) { continue; }
-            if (!incoming.has(node.id)) { await editor.removeNode(node.id); }
+            if (isLocal(node.id)) {
+                continue;
+            }
+            if (!incoming.has(node.id)) {
+                await editor.removeNode(node.id);
+            }
         }
 
         // 3. Existing nodes update in place; nodes whose socket shape changed are rebuilt at
         //    their current position; genuinely new nodes appear beside a neighbour.
-        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [layoutEntryKey(e), e]));
         let placedPending = false;
         for (const dto of nodes) {
             const needsIn = hasIn.has(dto.id) || dto.kind === 'Event';
@@ -1479,40 +1977,53 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     const position = area.nodeViews.get(dto.id)?.position;
                     await editor.removeNode(dto.id);
                     const rebuilt = new StoryNode(dto, needsIn, needsOut);
+                    decorateFromSim(rebuilt);
                     await editor.addNode(rebuilt);
-                    if (position) { await area.translate(rebuilt.id, position); }
+                    if (position) {
+                        await area.translate(rebuilt.id, position);
+                    }
                 } else {
                     await remeasure(existing, dto);
                 }
             } else {
                 const node = new StoryNode(dto, needsIn, needsOut);
                 node.branchGlow = branchOfNodeId(dto.id, branches);
+                decorateFromSim(node);
                 await editor.addNode(node);
-                const key = dto.kind === 'Event' ? layoutKey(dto) : null;
-                const pending = key ? pendingDropPositions.get(key) : undefined;
-                if (pending && key) { pendingDropPositions.delete(key); placedPending = true; }
+                const key = nodeLayoutKey(dto);
+                const pending = dto.kind === 'Event' ? pendingDropPositions.get(key) : undefined;
+                if (pending) {
+                    pendingDropPositions.delete(key);
+                    placedPending = true;
+                }
                 // A junction born from a staging-node commit lands where the staging node stood.
                 const owner = dto.kind === 'AndJunction' ? andJunctionId.exec(dto.id)?.[1]
                     : dto.kind === 'OrJunction' && dto.id.endsWith('#or') ? dto.id.slice(0, -'#or'.length)
-                    : undefined;
+                        : undefined;
                 const pendingEntry = owner ? pendingJunctionPositions.get(owner) : undefined;
                 const junctionPending = pendingEntry?.kind === dto.kind
-                    ? { x: pendingEntry.x, y: pendingEntry.y }
+                    ? {x: pendingEntry.x, y: pendingEntry.y}
                     : undefined;
-                if (junctionPending && owner) { pendingJunctionPositions.delete(owner); }
-                const entry = key ? stored.get(key) : undefined;
+                if (junctionPending && owner) {
+                    pendingJunctionPositions.delete(owner);
+                }
+                const entry = stored.get(key);
                 await area.translate(node.id, pending ?? junctionPending ?? (entry
-                    ? { x: entry.x, y: entry.y }
+                    ? {x: entry.x, y: entry.y}
                     : placeNewNode(dto, edges.filter(e => e.fromId === dto.id || e.toId === dto.id))));
             }
         }
-        if (placedPending) { saveAllPositions(); }
+        if (placedPending) {
+            saveAllPositions();
+        }
 
         // 4. New connections.
         const present = new Set(editor.getConnections()
             .map(c => connectionKey(c.source, c.target, c.kind)));
         for (const edge of edges) {
-            if (present.has(connectionKey(edge.fromId, edge.toId, edge.kind))) { continue; }
+            if (present.has(connectionKey(edge.fromId, edge.toId, edge.kind))) {
+                continue;
+            }
             const source = editor.getNode(edge.fromId);
             const target = editor.getNode(edge.toId);
             if (source && target) {
@@ -1534,7 +2045,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         ): Promise<void> {
             const run = async (): Promise<void> => {
                 staticLifecycles.clear();
-                for (const dto of nodes) { staticLifecycles.set(dto.id, dto.lifecycle); }
+                for (const dto of nodes) {
+                    staticLifecycles.set(dto.id, dto.lifecycle);
+                }
+                readOnlyThreads = readOnlyThreadIndex(nodes);
                 applyingServerGraph = true;
                 try {
                     // patch() reconciles the FULL server graph against the mounted nodes - it assumes
@@ -1561,16 +2075,311 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             return result;
         },
         applyLifecycles(byNodeId: ReadonlyMap<string, string> | null): void {
+            // Into the MODEL first: every event's dto, mounted or not, so the overview colours from
+            // the same truth and a node mounted later carries it. The mounted nodes share these
+            // dto objects and only need repainting.
+            simRunning = byNodeId !== null;
+            const branches = branchIndex([...graphModel.values()].map(m => m.dto));
+            const changed = new Set<string>();
+            for (const m of graphModel.values()) {
+                if (m.dto.kind !== 'Event') {
+                    continue;
+                }
+                const next = byNodeId
+                    ? byNodeId.get(m.dto.id) ?? m.dto.lifecycle
+                    : staticLifecycles.get(m.dto.id);
+                if (next !== m.dto.lifecycle) {
+                    m.dto.lifecycle = next ?? null;
+                    m.colorToken = overviewToken(m.dto, branchOfNodeId(m.dto.id, branches));
+                    changed.add(m.dto.id);
+                }
+            }
             for (const node of editor.getNodes()) {
-                if (node.dto.kind !== 'Event') { continue; }
+                if (node.dto.kind !== 'Event') {
+                    continue;
+                }
+                // A mounted node the model does not know yet (mid-patch) is written directly.
                 const next = byNodeId
                     ? byNodeId.get(node.id) ?? node.dto.lifecycle
                     : staticLifecycles.get(node.id);
                 if (next !== node.dto.lifecycle) {
                     node.dto.lifecycle = next ?? null;
+                    changed.add(node.id);
+                }
+                if (changed.has(node.id)) {
                     void area.update('node', node.id);
                 }
             }
+            if (changed.size > 0 || !byNodeId) {
+                scheduleGeometryChanged();
+            }
+        },
+        applyFireCounts(byNodeId: ReadonlyMap<string, number> | null): void {
+            simFireCounts.clear();
+            if (byNodeId) {
+                for (const [id, count] of byNodeId) {
+                    if (count > 0) {
+                        simFireCounts.set(id, count);
+                    }
+                }
+            }
+            for (const node of editor.getNodes()) {
+                if (node.dto.kind !== 'Event') {
+                    continue;
+                }
+                const next = simFireCounts.get(node.id) ?? 0;
+                if (next !== node.simFireCount) {
+                    node.simFireCount = next;
+                    void area.update('node', node.id);
+                }
+            }
+        },
+        applySimMarks(byNodeId: ReadonlyMap<string, StorySimNodeStateDto> | null, breakpoints: ReadonlySet<string>): void {
+            simMarks.clear();
+            if (byNodeId) {
+                for (const [id, state] of byNodeId) {
+                    if (state.gateLabel) {
+                        simMarks.set(id, state);
+                    }
+                }
+            }
+            simBreakpoints = breakpoints;
+            for (const node of editor.getNodes()) {
+                if (node.dto.kind !== 'Event') {
+                    continue;
+                }
+                const state = simMarks.get(node.id);
+                const gate = state?.gateLabel ? {label: state.gateLabel, progress: state.gateProgress ?? null} : null;
+                const breakpoint = breakpoints.has(node.id);
+                const gateMoved = (gate?.label ?? null) !== (node.simGate?.label ?? null)
+                    || (gate?.progress ?? null) !== (node.simGate?.progress ?? null);
+                if (gateMoved || breakpoint !== node.simBreakpoint) {
+                    node.simGate = gate;
+                    node.simBreakpoint = breakpoint;
+                    void area.update('node', node.id);
+                }
+            }
+        },
+        applyBattles(battles: readonly StorySimBattleDto[] | null): void {
+            simBattles.clear();
+            for (const battle of battles ?? []) {
+                simBattles.set(battle.key, battle);
+            }
+            for (const node of editor.getNodes()) {
+                if (node.dto.kind !== 'TacticalPlot') {
+                    continue;
+                }
+                const next = battleOf(node.id);
+                if ((next?.status ?? null) !== (node.simBattle?.status ?? null)
+                    || (next?.tick ?? 0) !== (node.simBattle?.tick ?? 0)) {
+                    node.simBattle = next;
+                    void area.update('node', node.id);
+                }
+            }
+        },
+        applyFlow(steps: readonly StorySimStepDto[]): void {
+            // The paths taken, recomputed from the server's whole trace: what playSimSteps builds
+            // up tick by tick, without the animation, for a graph that was rebuilt underneath.
+            flowByEdge.clear();
+            const adjacency = new Map<string, Adjacent[]>();
+            const edgeByKey = new Map<string, StoryGraphEdgeDto>();
+            for (const edge of lastEdges) {
+                const key = connectionKey(edge.fromId, edge.toId, edge.kind);
+                edgeByKey.set(key, edge);
+                const list = adjacency.get(edge.fromId) ?? [];
+                list.push({to: edge.toId, connectionId: key});
+                adjacency.set(edge.fromId, list);
+            }
+            const passThrough = (id: string): boolean =>
+                (graphModel.get(id)?.dto ?? editor.getNode(id)?.dto)?.kind !== 'Event';
+            for (const step of steps) {
+                if (!isFlowStep(step)) {
+                    continue;
+                }
+                for (const key of resolvePath(step.sourceNodeId!, step.nodeId, adjacency, passThrough)) {
+                    const edge = edgeByKey.get(key);
+                    if (edge) {
+                        flowByEdge.set(key, {edge, state: 'spent'});
+                    }
+                }
+            }
+            for (const conn of editor.getConnections()) {
+                const state = flowByEdge.get(connectionKey(conn.source, conn.target, conn.kind))?.state ?? 'idle';
+                if (conn.flow !== state) {
+                    conn.flow = state;
+                    void area.update('connection', conn.id);
+                }
+            }
+            scheduleGeometryChanged();
+        },
+        setSimLenses(lenses: SimLenses): void {
+            if (lensActiveOnly !== lenses.activeOnly) {
+                lensActiveOnly = lenses.activeOnly;
+                scheduleGeometryChanged();
+            }
+        },
+        async playSimSteps(steps: readonly StorySimStepDto[], tickMs: number): Promise<void> {
+            // Adjacency over the MODEL's edges, not the mounted connections: a windowed graph
+            // mounts none, and the path the story took must exist whether or not it is on screen.
+            const adjacency = new Map<string, Adjacent[]>();
+            const edgeByKey = new Map<string, StoryGraphEdgeDto>();
+            for (const edge of lastEdges) {
+                const key = connectionKey(edge.fromId, edge.toId, edge.kind);
+                edgeByKey.set(key, edge);
+                const list = adjacency.get(edge.fromId) ?? [];
+                list.push({to: edge.toId, connectionId: key});
+                adjacency.set(edge.fromId, list);
+            }
+            const connByKey = new Map<string, StoryConnection>();
+            for (const conn of editor.getConnections()) {
+                connByKey.set(connectionKey(conn.source, conn.target, conn.kind), conn);
+            }
+            const passThrough = (id: string): boolean =>
+                (graphModel.get(id)?.dto ?? editor.getNode(id)?.dto)?.kind !== 'Event';
+            const setFlow = (key: string, state: 'active' | 'spent'): void => {
+                const edge = edgeByKey.get(key);
+                if (!edge) {
+                    return;
+                }
+                flowByEdge.set(key, {edge, state});
+                const conn = connByKey.get(key);
+                if (conn && conn.flow !== state) {
+                    conn.flow = state;
+                    void area.update('connection', conn.id);
+                }
+            };
+            for (const group of groupByTick(steps)) {
+                const active: string[] = [];
+                for (const step of group) {
+                    if (!isFlowStep(step)) {
+                        continue;
+                    }
+                    for (const key of resolvePath(step.sourceNodeId!, step.nodeId, adjacency, passThrough)) {
+                        if (flowByEdge.get(key)?.state === 'active') {
+                            continue;
+                        }
+                        setFlow(key, 'active');
+                        active.push(key);
+                    }
+                }
+                if (active.length > 0) {
+                    scheduleGeometryChanged(); // the flow canvas repaints on this
+                }
+                if (tickMs > 0 && active.length > 0) {
+                    await new Promise<void>(resolve => setTimeout(resolve, tickMs));
+                }
+                for (const step of group) {
+                    const node = editor.getNode(step.nodeId);
+                    if (!node) {
+                        continue;
+                    }
+                    let dirty = false;
+                    if (isLifecycleStep(step) && node.dto.lifecycle !== step.to) {
+                        node.dto.lifecycle = step.to ?? null;
+                        dirty = true;
+                    }
+                    if (step.to === 'Fired' && FIRE_CAUSES.has(step.cause)) {
+                        node.simFireCount += 1;
+                        dirty = true;
+                    }
+                    if (dirty) {
+                        void area.update('node', node.id);
+                    }
+                }
+                for (const key of active) {
+                    setFlow(key, 'spent');
+                }
+                if (active.length > 0) {
+                    scheduleGeometryChanged();
+                }
+            }
+        },
+        resetSimVisuals(): void {
+            flowByEdge.clear();
+            simFireCounts.clear();
+            simMarks.clear();
+            simBreakpoints = new Set<string>();
+            simRunning = false;
+            scheduleGeometryChanged();
+            for (const conn of editor.getConnections()) {
+                if (conn.flow === 'idle') {
+                    continue;
+                }
+                conn.flow = 'idle';
+                void area.update('connection', conn.id);
+            }
+            for (const node of editor.getNodes()) {
+                if (node.simFireCount === 0 && node.simGate === null && !node.simBreakpoint) {
+                    continue;
+                }
+                node.simFireCount = 0;
+                node.simGate = null;
+                node.simBreakpoint = false;
+                void area.update('node', node.id);
+            }
+        },
+        drawFlowTo(canvas: HTMLCanvasElement, phase: number): boolean {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return false;
+            }
+            const w = container.clientWidth, h = container.clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            // Rete's own connections carry the flow while they are the ones drawing the edges; the
+            // canvas takes over exactly when the LOD overview does (same rule as drawLodTo).
+            if (flowByEdge.size === 0 || (!windowed && !lodActive)) {
+                return flowByEdge.size > 0;
+            }
+            const {k, x, y} = area.area.transform;
+            const bezier = k >= K_LABEL;
+            const colour = colourResolver(container);
+            ctx.strokeStyle = colour(LIFECYCLE_TOKENS.Fired);
+            ctx.lineCap = 'round';
+            // Spent edges keep a slow march so the path taken stays alive; the active edge - the
+            // step in flight - runs fast and heavy, the same two speeds the SVG connections use.
+            for (const state of ['spent', 'active'] as const) {
+                const isActive = state === 'active';
+                ctx.lineWidth = isActive ? 3 : 2;
+                ctx.globalAlpha = isActive ? 1 : 0.85;
+                ctx.setLineDash(isActive ? [10, 4] : [6, 8]);
+                ctx.lineDashOffset = -(phase * (isActive ? 0.056 : 0.012)) % 1000;
+                ctx.beginPath();
+                let any = false;
+                for (const {edge, state: s} of flowByEdge.values()) {
+                    if (s !== state) {
+                        continue;
+                    }
+                    const a = graphModel.get(edge.fromId), b = graphModel.get(edge.toId);
+                    if (!a || !b) {
+                        continue;
+                    }
+                    const x1 = (a.x + a.w) * k + x, y1 = (a.y + a.h / 2) * k + y;
+                    const x2 = b.x * k + x, y2 = (b.y + b.h / 2) * k + y;
+                    if ((x1 < 0 && x2 < 0) || (x1 > w && x2 > w) || (y1 < 0 && y2 < 0) || (y1 > h && y2 > h)) {
+                        continue;
+                    }
+                    any = true;
+                    ctx.moveTo(x1, y1);
+                    if (bezier) {
+                        const dx = Math.max(20, Math.abs(x2 - x1) * 0.4);
+                        ctx.bezierCurveTo(x1 + dx, y1, x2 - dx, y2, x2, y2);
+                    } else {
+                        ctx.lineTo(x2, y2);
+                    }
+                }
+                if (any) {
+                    ctx.stroke();
+                }
+            }
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+            return true;
         },
         fit(): void {
             // Fit the whole MODEL whenever the mounted set is not the whole graph - which is any
@@ -1579,8 +2388,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             // alone left `zoomAt` fitting an empty node list on a small graph, which fits nothing.
             const mounted = editor.getNodes();
 
-            if (windowed || mounted.length === 0) { void fitModel(); }
-            else { void AreaExtensions.zoomAt(area, mounted); }
+            if (windowed || mounted.length === 0) {
+                void fitModel();
+            } else {
+                void AreaExtensions.zoomAt(area, mounted);
+            }
         },
         autoArrange(): Promise<void> {
             const run = async (): Promise<void> => {
@@ -1612,7 +2424,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                         // first (windowed is already false here, so mountNodes adds them).
                         await mountAllFromModel();
                     }
-                    await arrange.layout({ options: ARRANGE_OPTIONS });
+                    await arrange.layout({options: ARRANGE_OPTIONS});
                     rebuildModel();      // capture the recomputed layout into the model
                     saveAllPositions();  // ...and persist it (replaces the saved one)
                 } finally {
@@ -1630,7 +2442,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     // A graph mounted only for the layout is still carrying whatever the zoom says
                     // it should not: settle it here rather than waiting on the 'zoomed' pipe, so
                     // the overview and the mounted nodes are never both up when this returns.
-                    if (needsMount) { await reconcileWindow(); }
+                    if (needsMount) {
+                        await reconcileWindow();
+                    }
                 }
             };
             // Same serialization as setGraph - arranging mid-patch would interleave mutations.
@@ -1639,25 +2453,34 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             return result;
         },
         toGraphPosition(clientX: number, clientY: number): { x: number; y: number } {
-            const { k, x, y } = area.area.transform;
+            const {k, x, y} = area.area.transform;
             const rect = container.getBoundingClientRect();
-            return { x: (clientX - rect.left - x) / k, y: (clientY - rect.top - y) / k };
+            return {x: (clientX - rect.left - x) / k, y: (clientY - rect.top - y) / k};
         },
+        // Both of these RESERVE a position for a node that does not exist yet, and patch() consumes
+        // it by nodeLayoutKey. They keyed on the thread's BASE NAME while that key moved onto the
+        // full threadUri, so nothing ever matched: every reservation was dropped and the node
+        // landed wherever placeNewNode guessed. Nothing failed loudly, because the fallback is a
+        // perfectly good position - just not the one asked for. Same function on both sides now.
         presetPosition(threadUri: string, eventName: string, position: { x: number; y: number }): void {
-            pendingDropPositions.set(`${baseName(threadUri)} ${eventName}`.toLowerCase(), position);
+            pendingDropPositions.set(newEventLayoutKey(threadUri, eventName), position);
         },
         carryPosition(oldNodeId: string, threadUri: string | null | undefined, newName: string): void {
             const view = area.nodeViews.get(oldNodeId);
-            if (!view) { return; }
-            pendingDropPositions.set(`${baseName(threadUri)} ${newName}`.toLowerCase(),
-                { x: view.position.x, y: view.position.y });
+            if (!view) {
+                return;
+            }
+            pendingDropPositions.set(newEventLayoutKey(threadUri, newName),
+                {x: view.position.x, y: view.position.y});
         },
         getEventNode(nodeId: string): {
             threadUri: string | null; eventName: string;
             eventType: string | null; rewardType: string | null;
         } | null {
             const node = editor.getNode(nodeId);
-            if (!node || node.dto.kind !== 'Event') { return null; }
+            if (!node || node.dto.kind !== 'Event') {
+                return null;
+            }
             return {
                 threadUri: node.dto.threadUri ?? null,
                 eventName: node.dto.label,
@@ -1697,7 +2520,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             // Not mounted. Centre the viewport on its model position at a zoom past K_DETAIL so the
             // reconcile mounts it, then flash once it exists.
             const m = graphModel.get(nodeId);
-            if (!m) { return; }
+            if (!m) {
+                return;
+            }
             const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
             const w = container.clientWidth, h = container.clientHeight;
             const k = Math.max(area.area.transform.k, K_DETAIL + 0.15);
@@ -1709,13 +2534,20 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             let best: string | null = null;
             let bestDist = Infinity;
             for (const node of editor.getNodes()) {
-                if (node.dto.kind !== 'Event' || !node.dto.threadUri) { continue; }
+                if (node.dto.kind !== 'Event' || !node.dto.threadUri) {
+                    continue;
+                }
                 const view = area.nodeViews.get(node.id);
-                if (!view) { continue; }
+                if (!view) {
+                    continue;
+                }
                 const dx = view.position.x + node.width / 2 - position.x;
                 const dy = view.position.y + node.height / 2 - position.y;
                 const dist = dx * dx + dy * dy;
-                if (dist < bestDist) { bestDist = dist; best = node.dto.threadUri; }
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = node.dto.threadUri;
+                }
             }
             return best ?? threads[0] ?? null;
         },
@@ -1723,27 +2555,31 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             return editor.getNodes().filter(n => n.dto.kind === 'Event').map(n => n.dto.label);
         },
         viewportCentre(): { x: number; y: number } {
-            const { k, x, y } = area.area.transform;
+            const {k, x, y} = area.area.transform;
             const rect = container.getBoundingClientRect();
-            return { x: (rect.width / 2 - x) / k, y: (rect.height / 2 - y) / k };
+            return {x: (rect.width / 2 - x) / k, y: (rect.height / 2 - y) / k};
         },
         getMinimap() {
-            const nodes = [...graphModel.values()].map(m => ({ x: m.x, y: m.y, w: m.w, h: m.h }));
-            const { k, x, y } = area.area.transform;
+            const nodes = [...graphModel.values()].map(m => ({x: m.x, y: m.y, w: m.w, h: m.h}));
+            const {k, x, y} = area.area.transform;
             const rect = container.getBoundingClientRect();
             // Visible canvas mapped back into graph coordinates (screen (0,0) → graph (-x/k, -y/k)).
-            const viewport = { x: -x / k, y: -y / k, w: rect.width / k, h: rect.height / k };
-            return { nodes, viewport };
+            const viewport = {x: -x / k, y: -y / k, w: rect.width / k, h: rect.height / k};
+            return {nodes, viewport};
         },
         panTo(graphX: number, graphY: number): void {
-            const { k } = area.area.transform;
+            const {k} = area.area.transform;
             const rect = container.getBoundingClientRect();
             void area.area.translate(rect.width / 2 - graphX * k, rect.height / 2 - graphY * k);
         },
-        isWindowed(): boolean { return windowed; },
+        isWindowed(): boolean {
+            return windowed;
+        },
         drawLodTo(canvas: HTMLCanvasElement): void {
             const ctx = canvas.getContext('2d');
-            if (!ctx) { return; }
+            if (!ctx) {
+                return;
+            }
             // Once per frame, never per node: it reads the computed style, and the whole point of
             // this overview is that a large campaign stays cheap to draw. Per frame rather than
             // cached across frames is what lets a theme switch land without anything listening.
@@ -1761,8 +2597,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             // showing the overview instead of real nodes. This used to test `windowed` alone, on
             // the assumption that a small graph is always fully mounted - no longer true now that
             // zooming out unmounts one, which left a blank canvas rather than an overview.
-            if (!windowed && !lodActive) { return; }
-            const { k, x, y } = area.area.transform;
+            if (!windowed && !lodActive) {
+                return;
+            }
+            const {k, x, y} = area.area.transform;
             // Edges: culled to the viewport, and cheap straight lines when zoomed out but socket-
             // anchored beziers once zoomed in (where the curve actually reads). Both go output (right)
             // → input (left) to match the left-to-right layout. Drawn for ALL edges (windowed mode
@@ -1776,22 +2614,33 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             for (const e of lastEdges) {
                 const style = canvasEdgeStyle(e.kind, edgeBranchFrom(e.fromId, e.toId, e.kind, branches), branchColourOf);
                 const bucket = buckets.get(style.key);
-                if (bucket) { bucket.edges.push(e); } else { buckets.set(style.key, { style, edges: [e] }); }
+                if (bucket) {
+                    bucket.edges.push(e);
+                } else {
+                    buckets.set(style.key, {style, edges: [e]});
+                }
             }
-            for (const { style, edges: bucketEdges } of buckets.values()) {
+            // The active-path lens: while a simulation runs, everything the story has not run
+            // along recedes and the flow canvas draws the paths taken over it.
+            const dimUnreached = simRunning && lensActiveOnly;
+            for (const {style, edges: bucketEdges} of buckets.values()) {
                 const plain = style.token === MUTED_EDGE_TOKEN;
-                ctx.globalAlpha = plain ? 0.4 : 0.85;
+                ctx.globalAlpha = dimUnreached ? 0.15 : plain ? 0.4 : 0.85;
                 ctx.strokeStyle = colour(style.token);
                 ctx.lineWidth = plain ? 1 : 1.5;
                 ctx.setLineDash(style.dash as number[]);
                 ctx.beginPath();
                 for (const e of bucketEdges) {
                     const a = graphModel.get(e.fromId), b = graphModel.get(e.toId);
-                    if (!a || !b) { continue; }
+                    if (!a || !b) {
+                        continue;
+                    }
                     const x1 = (a.x + a.w) * k + x, y1 = (a.y + a.h / 2) * k + y;
                     const x2 = b.x * k + x, y2 = (b.y + b.h / 2) * k + y;
                     if ((x1 < 0 && x2 < 0) || (x1 > w && x2 > w)
-                        || (y1 < 0 && y2 < 0) || (y1 > h && y2 > h)) { continue; } // fully off one side
+                        || (y1 < 0 && y2 < 0) || (y1 > h && y2 > h)) {
+                        continue;
+                    } // fully off one side
                     ctx.moveTo(x1, y1);
                     if (bezier) {
                         const dx = Math.max(20, Math.abs(x2 - x1) * 0.4);
@@ -1827,8 +2676,12 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 // truncated them. See createLabelSizer.
                 let longest = '';
                 for (const m of graphModel.values()) {
-                    if (m.dto.kind !== 'Event') { continue; }
-                    if (m.dto.label.length > longest.length) { longest = m.dto.label; }
+                    if (m.dto.kind !== 'Event') {
+                        continue;
+                    }
+                    if (m.dto.label.length > longest.length) {
+                        longest = m.dto.label;
+                    }
                 }
                 sizeFor = createLabelSizer(longest, advancePerPx,
                     Math.min(13, Math.max(8, Math.round(k * 55))));
@@ -1838,19 +2691,30 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 // A mounted node draws itself; its stand-in rect would only sit behind it. For most
                 // nodes that is merely wasted paint, but a junction's box is transparent (the
                 // diamond is its shape), so the rect showed through as a coloured square around it.
-                if (mountedIds.has(m.dto.id)) { continue; }
+                if (mountedIds.has(m.dto.id)) {
+                    continue;
+                }
 
                 const sx = m.x * k + x, sy = m.y * k + y, sw = m.w * k, sh = m.h * k;
-                if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
+                if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) {
+                    continue;
+                }
                 const color = colour(m.colorToken);
+                // Same dimming the mounted node gets from the lens class, so crossing the LOD
+                // threshold does not brighten what the detail view greys out.
+                const dim = dimUnreached && m.dto.kind === 'Event' && !reached(m.dto) ? 0.25 : 1;
                 // A junction keeps the silhouette it has when mounted - a circle for AND, a
                 // rotated square for OR - so structure stays readable zoomed out instead of
                 // becoming another rectangle. Rects keep the cheap path: fillRect/strokeRect are
                 // measurably faster than a path, and they are the overwhelming majority.
                 const shape = lodShape(m.dto.kind);
                 if (shape === 'rect') {
-                    ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
-                    ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+                    ctx.globalAlpha = 0.28 * dim;
+                    ctx.fillStyle = color;
+                    ctx.fillRect(sx, sy, sw, sh);
+                    ctx.globalAlpha = 0.9 * dim;
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1.5;
                     ctx.strokeRect(sx, sy, sw, sh);
                 } else {
                     const cx = sx + sw / 2, cy = sy + sh / 2;
@@ -1867,13 +2731,18 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                         ctx.lineTo(cx - rx, cy);
                         ctx.closePath();
                     }
-                    ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fill();
-                    ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+                    ctx.globalAlpha = 0.28 * dim;
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.globalAlpha = 0.9 * dim;
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
                 }
                 if (showLabels && sizeFor !== null && m.dto.kind === 'Event' && sw > 30) {
-                    ctx.globalAlpha = 1;
+                    ctx.globalAlpha = dim;
                     ctx.fillStyle = labelColor;
-                    const { fontPx, maxLines } = sizeFor(
+                    const {fontPx, maxLines} = sizeFor(
                         Math.max(0, sw - LABEL_PAD * 2), Math.max(0, sh - LABEL_PAD * 2));
                     // Only when it actually changes: parsing the font shorthand per node is the
                     // cost that made one size per frame attractive, and nodes of a size cluster.
@@ -1896,10 +2765,14 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             }
             ctx.globalAlpha = 1;
         },
-        getGroupBounds(by: 'thread' | 'chapter') { return computeGroupBounds(by); },
+        getGroupBounds(by: 'thread' | 'chapter') {
+            return computeGroupBounds(by);
+        },
         drawSwimlanesTo(canvas: HTMLCanvasElement, showThread: boolean, showChapter: boolean): void {
             const ctx = canvas.getContext('2d');
-            if (!ctx) { return; }
+            if (!ctx) {
+                return;
+            }
             // One read for the frame, as in drawLodTo. There are far fewer lanes than nodes, but
             // the resolver also memoises, so a lane repeating a hue costs nothing after the first.
             const colour = colourResolver(container);
@@ -1911,27 +2784,38 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             }
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.clearRect(0, 0, w, h);
-            const { k, x, y } = area.area.transform;
+            const {k, x, y} = area.area.transform;
             const drawLanes = (by: 'thread' | 'chapter', dashed: boolean): void => {
                 ctx.font = 'bold 11px sans-serif';
                 ctx.textBaseline = 'top';
                 for (const g of computeGroupBounds(by)) {
                     const sx = g.x * k + x, sy = g.y * k + y, sw = g.w * k, sh = g.h * k;
-                    if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
+                    if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) {
+                        continue;
+                    }
                     const color = colour(laneToken(by + ':' + g.key));
-                    ctx.globalAlpha = 0.07; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
-                    ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+                    ctx.globalAlpha = 0.07;
+                    ctx.fillStyle = color;
+                    ctx.fillRect(sx, sy, sw, sh);
+                    ctx.globalAlpha = 0.9;
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1.5;
                     ctx.setLineDash(dashed ? [8, 4] : []);
                     ctx.strokeRect(sx, sy, sw, sh);
                     ctx.setLineDash([]);
-                    ctx.globalAlpha = 0.85; ctx.fillStyle = color;
+                    ctx.globalAlpha = 0.85;
+                    ctx.fillStyle = color;
                     ctx.textAlign = dashed ? 'right' : 'left'; // chapter labels on the right, thread on the left
                     ctx.fillText(g.title, dashed ? sx + sw - 5 : sx + 6, sy + 4);
                 }
                 ctx.textAlign = 'left';
             };
-            if (showThread) { drawLanes('thread', false); }
-            if (showChapter) { drawLanes('chapter', true); }
+            if (showThread) {
+                drawLanes('thread', false);
+            }
+            if (showChapter) {
+                drawLanes('chapter', true);
+            }
             ctx.globalAlpha = 1;
             ctx.setLineDash([]);
         },
@@ -1952,13 +2836,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         },
         refreshMode(): void {
             for (const node of editor.getNodes()) {
-                if (node.dto.kind !== 'Event') { continue; }
+                if (node.dto.kind !== 'Event') {
+                    continue;
+                }
                 void remeasure(node); // recomputes height (readOnly changes row count)
             }
         },
         refreshNode(nodeId: string): void {
             const node = editor.getNode(nodeId);
-            if (!node) { return; }
+            if (!node) {
+                return;
+            }
             void remeasure(node);
         },
         patchEventNode(nodeId: string, update: (dto: StoryGraphNodeDto) => StoryGraphNodeDto): void {
@@ -1979,7 +2867,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         },
         repaintNodes(nodeIds: Iterable<string>): void {
             for (const id of nodeIds) {
-                if (editor.getNode(id)) { void area.update('node', id); }
+                if (editor.getNode(id)) {
+                    void area.update('node', id);
+                }
             }
         },
         repaintBranchColours(): void {
@@ -1988,10 +2878,14 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 m.colorToken = overviewToken(m.dto, branchOfNodeId(m.dto.id, branches));
             }
             for (const node of editor.getNodes()) {
-                if (node.branchGlow) { void area.update('node', node.id); }
+                if (node.branchGlow) {
+                    void area.update('node', node.id);
+                }
             }
             for (const connection of editor.getConnections()) {
-                if (connection.branch) { void area.update('connection', connection.id); }
+                if (connection.branch) {
+                    void area.update('connection', connection.id);
+                }
             }
             // The overview reads colorToken in its draw pass.
             scheduleAreaChanged();
@@ -2009,7 +2903,8 @@ const VIRTUAL_DESCRIPTIONS: Record<string, string> = {
     AndJunction: 'AND junction - every input on this prereq line must fire.',
     OrJunction: 'OR junction - any one prereq line arms the event.',
     Portal: 'Portal - stands in for a cross-file target event.',
-    TacticalPlot: 'Tactical plot manifest attached to this campaign.',
+    TacticalPlot: 'Battle - opens its own graph',
+    GalacticPortal: 'Galactic event - opens the campaign graph on it',
     StagingAnd: 'Not yet attached - wire event outputs into this, then drag its output onto the '
         + "event that should require all of them together. Nothing is saved until then.",
     StagingOr: 'Not yet attached - wire event outputs into this, then drag its output onto the '
@@ -2034,6 +2929,7 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     /* The OR node's box is transparent - the rotated inner square is its shape - so outlining the
        box draws a rectangle around a diamond. Outline the diamond instead: an outline on a rotated
        element rotates with it. */
+
     ${p => p.selected ? `
         &:not(.k-OrJunction):not(.k-StagingOr) {
             outline: 2px solid var(--vscode-focusBorder);
@@ -2044,7 +2940,6 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
             outline-offset: 2px;
         }
     ` : ''}
-
     .title {
         font-size: var(--font-size-12);
         font-family: var(--vscode-font-family);
@@ -2054,23 +2949,31 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         white-space: nowrap;
     }
 
-    &.unreachable { opacity: 0.4; }
+    &.unreachable {
+        opacity: 0.4;
+    }
 
     &.k-AndJunction, &.k-OrJunction, &.k-StagingAnd, &.k-StagingOr {
         padding: 0;
         align-items: center;
         justify-content: center;
     }
-    &.k-AndJunction, &.k-StagingAnd { border-radius: 50%; }
+
+    &.k-AndJunction, &.k-StagingAnd {
+        border-radius: 50%;
+    }
+
     /* The diamond is an inner rotated square, NOT a transform on the node box itself: rete reads
        socket positions from offsetLeft/offsetTop, which ignore CSS transforms, so a rotated box
        leaves the sockets visually at the diamond's upper-left/lower-right edges while the edges
        anchor elsewhere. The box stays unrotated (sockets sit at its true left/right middle = the
        diamond's corners); only the decorative inner square rotates. */
+
     &.k-OrJunction, &.k-StagingOr {
         border: none;
         background: transparent;
     }
+
     .diamond {
         position: absolute;
         inset: 15%;
@@ -2079,15 +2982,34 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         border-radius: var(--radius-3);
         background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
     }
-    &.k-OrJunction .title, &.k-StagingOr .title { position: relative; z-index: 1; }
-    &.k-Portal, &.k-TacticalPlot {
+
+    &.k-OrJunction .title, &.k-StagingOr .title {
+        position: relative;
+        z-index: 1;
+    }
+
+    &.k-Portal, &.k-TacticalPlot, &.k-GalacticPortal {
         border-style: dashed;
         border-radius: var(--radius-6);
     }
+
+    /* A portal to another panel is a doorway, so it takes the pointer that says so. */
+
+    &.k-TacticalPlot, &.k-GalacticPortal {
+        cursor: pointer;
+    }
+
     /* Dashed = "not yet attached", same visual language as Portal/TacticalPlot's "not fully
        resolved" - nothing about a staging junction is saved until its output reaches an event. */
-    &.k-StagingAnd { border-style: dashed; }
-    &.k-StagingOr .diamond { border-style: dashed; }
+
+    &.k-StagingAnd {
+        border-style: dashed;
+    }
+
+    &.k-StagingOr .diamond {
+        border-style: dashed;
+    }
+
     .discard {
         position: absolute;
         top: -8px;
@@ -2104,7 +3026,11 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         font-size: var(--font-size-10);
         padding: 0;
     }
-    .discard:hover { color: var(--vscode-errorForeground, #f44); }
+
+    .discard:hover {
+        color: var(--vscode-errorForeground, #f44);
+    }
+
     .jump {
         position: absolute;
         bottom: -8px;
@@ -2121,16 +3047,51 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         font-size: var(--font-size-10);
         padding: 0;
     }
-    .jump:hover { color: var(--vscode-focusBorder); }
+
+    .jump:hover {
+        color: var(--vscode-focusBorder);
+    }
+
+    /* The way back sits on the side the galaxy is on: a battle's portals point left, to the
+       galactic level, the way the tactical stub's arrow points right, into the battle. */
+
+    .jump.back {
+        right: auto;
+        left: -8px;
+    }
 
     /* top uses calc(50% - 7px), not transform: translateY(-50%) - rete positions connection
        endpoints from offsetTop/offsetLeft (rete-render-utils' getElementCenter), which does not
        reflect CSS transforms, so a translateY-centered socket draws edges anchored below it. */
-    .input-socket  { position: absolute; left: -7px;  top: calc(50% - 7px); }
-    .output-socket { position: absolute; right: -7px; top: calc(50% - 7px); }
+
+    .input-socket {
+        position: absolute;
+        left: -7px;
+        top: calc(50% - 7px);
+    }
+
+    .output-socket {
+        position: absolute;
+        right: -7px;
+        top: calc(50% - 7px);
+    }
 `;
 
-const { RefSocket } = Presets.classic;
+const {RefSocket} = Presets.classic;
+
+/** What a tactical stub says about its battle while the galaxy simulates: not started, running with its own tick, won or lost. */
+function battleStatusText(battle: { status: string; tick: number }): string {
+    switch (battle.status) {
+        case 'running':
+            return `Running - t${battle.tick}`;
+        case 'won':
+            return 'Won';
+        case 'lost':
+            return 'Lost';
+        default:
+            return 'Not started';
+    }
+}
 
 function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     const dto = props.data.dto;
@@ -2142,7 +3103,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
     ].filter(c => c).join(' ');
     const title = dto.kind === 'AndJunction' ? 'AND'
         : dto.kind === 'OrJunction' || dto.kind === 'StagingOr' ? 'OR'
-        : dto.label;
+            : dto.label;
     // Glow only the solid AND junctions; the OR box is transparent (the diamond carries its
     // shape), so a background tint there would show as an odd square - its edges glow instead.
     const glow = dto.kind === 'AndJunction'
@@ -2159,22 +3120,37 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
             data-testid="node"
             data-node-id={dto.id}
         >
-            {dto.kind === 'OrJunction' || dto.kind === 'StagingOr' ? <div className="diamond" /> : null}
+            {dto.kind === 'OrJunction' || dto.kind === 'StagingOr' ? <div className="diamond"/> : null}
             <div className="title">{title}</div>
             {(dto.kind === 'StagingAnd' || dto.kind === 'StagingOr') && currentMode === 'edit' ? (
                 <Drag.NoDrag>
                     <button
                         className="discard" title="Discard - nothing was saved"
                         onClick={() => editorHandleRef?.discardStagingJunction(dto.id)}
-                    ><span className="codicon codicon-close" /></button>
+                    ><span className="codicon codicon-close"/></button>
                 </Drag.NoDrag>
             ) : null}
-            {dto.kind === 'TacticalPlot' && output ? (
+            {dto.kind === 'TacticalPlot' && battleKeyOfNode(dto.id) ? (
                 <Drag.NoDrag>
                     <button
-                        className="jump" title="Jump to this battle's own story"
-                        onClick={() => onReachableFromRequested(dto.id, 'Downstream')}
-                    ><span className="codicon codicon-arrow-right" /></button>
+                        className="jump"
+                        title={currentMode === 'simulate' ? "Open this battle's graph in Simulation" : "Open this battle's graph"}
+                        onClick={() => onOpenBattleRequested(battleKeyOfNode(dto.id)!, dto.label, currentMode === 'simulate')}
+                    ><span className="codicon codicon-arrow-right"/></button>
+                </Drag.NoDrag>
+            ) : null}
+            {dto.kind === 'TacticalPlot' && props.data.simBattle ? (
+                <span className={'sim-battle-status ' + props.data.simBattle.status}
+                      title={battleStatusText(props.data.simBattle)}>
+                    {battleStatusText(props.data.simBattle)}
+                </span>
+            ) : null}
+            {dto.kind === 'GalacticPortal' && dto.portalTarget ? (
+                <Drag.NoDrag>
+                    <button
+                        className="jump back" title="Open the campaign graph on this event"
+                        onClick={() => onRevealGalacticRequested(dto.portalTarget!)}
+                    ><span className="codicon codicon-arrow-left"/></button>
                 </Drag.NoDrag>
             ) : null}
             {input ? (
@@ -2195,8 +3171,8 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
 
 function StoryNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     return props.data.dto.kind === 'Event'
-        ? <EventNodeView data={props.data} emit={props.emit} />
-        : <VirtualNodeView data={props.data} emit={props.emit} />;
+        ? <EventNodeView data={props.data} emit={props.emit}/>
+        : <VirtualNodeView data={props.data} emit={props.emit}/>;
 }
 
 /**
@@ -2219,18 +3195,107 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     flex-direction: column;
     padding: var(--space-4) var(--space-8) var(--space-6);
     font-size: var(--font-size-11);
+    /* Simulation overlay: fire count, top-right, outside the border so it never covers the name. */
+
+    .fire-badge {
+        position: absolute;
+        top: -9px;
+        right: -6px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 9px;
+        box-sizing: border-box;
+        background: var(--lifecycle-fired, var(--vscode-badge-background));
+        color: var(--vscode-badge-foreground, #fff);
+        font-size: var(--font-size-10, 10px);
+        font-weight: bold;
+        line-height: 18px;
+        text-align: center;
+        pointer-events: none;
+    }
+
+    /* Simulation overlay: an armed clock or flag gate as a meter along the bottom edge, filling
+       as the gate closes. A flag gate with no measurable progress draws the label only. */
+
+    .gate-meter {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -1px;
+        height: 4px;
+        background: color-mix(in srgb, var(--lifecycle-armed, #e2b93d) 30%, transparent);
+        border-radius: 0 0 var(--radius-6) var(--radius-6);
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    .gate-meter > span {
+        display: block;
+        height: 100%;
+        background: var(--lifecycle-armed, #e2b93d);
+    }
+
+    .gate-label {
+        position: absolute;
+        right: var(--space-4);
+        bottom: var(--space-4);
+        font-size: var(--font-size-10, 10px);
+        color: var(--vscode-descriptionForeground);
+        pointer-events: none;
+    }
+
+    /* Simulation overlay: a breakpoint as the editor's own red dot, in the gutter position - the
+       top-left corner, outside the border like the fire badge opposite. */
+
+    .bp-mark {
+        position: absolute;
+        top: -7px;
+        left: -7px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--vscode-debugIcon-breakpointForeground, #e51400);
+        border: 2px solid var(--vscode-editorWidget-background, #202020);
+        box-sizing: border-box;
+        pointer-events: none;
+    }
+
     font-family: var(--vscode-font-family);
     cursor: default;
-    ${p => p.selected ? 'outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px;' : ''}
 
-    /* Generated from LIFECYCLE_TOKENS, which the colour key swatches and the overview rects also read.
-       These four rules, those swatches and a hex mirror for the canvas used to be three separate
-       copies of one mapping, kept in step by hand. */
+    ${p => p.selected ? 'outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px;' : ''}
+        /* Generated from LIFECYCLE_TOKENS, which the colour key swatches and the overview rects also read.
+           These four rules, those swatches and a hex mirror for the canvas used to be three separate
+           copies of one mapping, kept in step by hand. */
     ${Object.entries(LIFECYCLE_TOKENS)
         .map(([lifecycle, token]) => `&.lc-${lifecycle} { border-color: var(${token}); }`)
         .join('\n    ')}
-    &.unreachable { opacity: 0.5; }
-    &.untested    { border-style: dashed; }
+    &.unreachable {
+        opacity: 0.5;
+    }
+
+    /* Nobody has verified this type against the game. The dashed border predates the note model
+       and readers already know it, so it stayed. */
+
+    &.untested {
+        border-style: dashed;
+    }
+
+    /* The engine accepts this type and then ignores it, or does the wrong thing with it. Louder
+       than untested, because the node is not merely unverified - it does not work. */
+
+    &.note-bugged {
+        border-color: var(--vscode-editorError-foreground);
+        border-style: dashed;
+    }
+
+    /* Still works, something replaced it. Struck through the way the editor marks a deprecated
+       symbol anywhere else, rather than inventing a second vocabulary for the same idea. */
+
+    &.note-deprecated .title {
+        text-decoration: line-through;
+    }
 
     .header {
         display: flex;
@@ -2241,15 +3306,21 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         border-bottom: var(--space-1) solid var(--vscode-panel-border);
         margin-bottom: var(--space-2);
     }
+
     /* Same Drag.NoDrag wrapper-span problem as .row > span: the wrappers are plain inline spans,
        so a long title never shrinks and pushes the icon buttons out of the node. The first span
        wraps the title (flexes and shrinks); the rest wrap icon buttons (keep natural size). */
+
     .header > span {
         flex-shrink: 0;
         display: flex;
         min-width: 0;
     }
-    .header > span:first-of-type { flex: 1; }
+
+    .header > span:first-of-type {
+        flex: 1;
+    }
+
     .header .title, .header input.title-edit {
         flex: 1;
         min-width: 0;
@@ -2258,8 +3329,13 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
     /* The title is the node's drag handle - grab it to move the node (rename is the ✎ button). */
-    .header .title { cursor: move; }
+
+    .header .title {
+        cursor: move;
+    }
+
     .header input.title-edit {
         background: var(--vscode-input-background);
         color: var(--vscode-input-foreground);
@@ -2268,6 +3344,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         font-family: inherit;
         padding: 0 var(--space-2);
     }
+
     .header button {
         flex-shrink: 0;
         background: transparent;
@@ -2278,8 +3355,14 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         font-size: var(--font-size-11);
         line-height: 1.6;
     }
-    .header button:hover { color: var(--vscode-editor-foreground); }
-    .header button.danger:hover { color: var(--vscode-errorForeground, #f44); }
+
+    .header button:hover {
+        color: var(--vscode-editor-foreground);
+    }
+
+    .header button.danger:hover {
+        color: var(--vscode-errorForeground, #f44);
+    }
 
     .row {
         display: flex;
@@ -2288,6 +3371,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         height: ${EVENT_ROW_H}px;
         flex-shrink: 0;
     }
+
     .row label {
         width: 72px;
         flex-shrink: 0;
@@ -2296,10 +3380,12 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
     .row.section-head {
         border-top: var(--space-1) solid var(--vscode-panel-border);
         margin-top: var(--space-2);
     }
+
     .section-toggle {
         flex: 1;
         min-width: 0;
@@ -2314,14 +3400,20 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    .section-toggle:hover { color: var(--vscode-editor-foreground); }
+
+    .section-toggle:hover {
+        color: var(--vscode-editor-foreground);
+    }
+
     /* Drag.NoDrag's own wrapper is an unstyleable <span> - flex it via the child combinator so the
        control it wraps still fills the row like every other field. */
+
     .row > span {
         flex: 1;
         min-width: 0;
         display: flex;
     }
+
     .row select, .row input[type=text] {
         flex: 1;
         min-width: 0;
@@ -2332,25 +3424,74 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         border: var(--space-1) solid var(--vscode-input-border, transparent);
         padding: 0 var(--space-2);
     }
-    .row input[type=checkbox] { margin: 0; }
-    .row input.missing, .row select.missing { border-color: var(--vscode-errorForeground, #f44); }
+
+    .row input[type=checkbox] {
+        margin: 0;
+    }
+
+    .row input.missing, .row select.missing {
+        border-color: var(--vscode-errorForeground, #f44);
+    }
+
     .row input.diag-error, .row select.diag-error {
         border-color: var(--vscode-errorForeground, #f44);
         outline: var(--space-1) solid var(--vscode-errorForeground, #f44);
     }
+
     .row input.diag-warning, .row select.diag-warning {
         border-color: var(--vscode-charts-yellow, #cca700);
         outline: var(--space-1) solid var(--vscode-charts-yellow, #cca700);
     }
-    .row input:disabled, .row select:disabled { opacity: 0.7; }
-    /* NoDrag wrappers around a row's buttons must not flex like the input wrappers. */
-    .row > span:has(> button) { flex: 0 0 auto; }
 
-    .row > span > .type-chip, .row > .type-empty, .row > span > .type-empty { flex: 1; min-width: 0; }
-    .row button.chip-remove:hover { color: var(--vscode-errorForeground, #f44); }
-    .header .diag-badge { flex-shrink: 0; cursor: help; }
+    .row input:disabled, .row select:disabled {
+        opacity: 0.7;
+    }
+
+    /* NoDrag wrappers around a row's buttons must not flex like the input wrappers. */
+
+    .row > span:has(> button) {
+        flex: 0 0 auto;
+    }
+
+    .row > span > .type-chip, .row > .type-empty, .row > span > .type-empty {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .row button.chip-remove:hover {
+        color: var(--vscode-errorForeground, #f44);
+    }
+
+    .header .diag-badge {
+        flex-shrink: 0;
+        cursor: help;
+    }
+
+    /* Names the referenced project that owns this thread, next to the controls it disables. It
+       reads as state rather than as a warning - nothing is wrong, the edit just belongs elsewhere -
+       so it takes the muted foreground, not an error colour. */
+
+    .header .ro-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        flex-shrink: 0;
+        min-width: 0;
+        max-width: 40%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--font-size-10);
+        color: var(--vscode-descriptionForeground, #9d9d9d);
+        cursor: help;
+    }
+
     /* Boolean rows lead with the checkbox; the label text takes the rest of the row. */
-    .row > span:has(> input[type=checkbox]) { flex: 0 0 auto; }
+
+    .row > span:has(> input[type=checkbox]) {
+        flex: 0 0 auto;
+    }
+
     .row .bool-label {
         flex: 1;
         min-width: 0;
@@ -2358,6 +3499,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
     .row button.goto {
         flex-shrink: 0;
         background: transparent;
@@ -2367,11 +3509,24 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         padding: 0 var(--space-2);
         font-size: var(--font-size-11);
     }
-    .row button.goto:hover { color: var(--vscode-focusBorder); }
+
+    .row button.goto:hover {
+        color: var(--vscode-focusBorder);
+    }
 
     /* same socket-offset rule as NodeBox - see the comment there for why calc(), not transform. */
-    .input-socket  { position: absolute; left: -7px;  top: calc(50% - 7px); }
-    .output-socket { position: absolute; right: -7px; top: calc(50% - 7px); }
+
+    .input-socket {
+        position: absolute;
+        left: -7px;
+        top: calc(50% - 7px);
+    }
+
+    .output-socket {
+        position: absolute;
+        right: -7px;
+        top: calc(50% - 7px);
+    }
 `;
 
 /**
@@ -2387,59 +3542,49 @@ function BlurCommitInput(props: {
 }): React.JSX.Element {
     const [value, setValue] = useState(props.value);
     const focused = useRef(false);
-    useEffect(() => { if (!focused.current) { setValue(props.value); } }, [props.value]);
+    useEffect(() => {
+        if (!focused.current) {
+            setValue(props.value);
+        }
+    }, [props.value]);
     return (
         <input
             type="text" className={props.className} value={value} disabled={props.disabled}
             placeholder={props.placeholder}
-            onFocus={() => { focused.current = true; }}
+            onFocus={() => {
+                focused.current = true;
+            }}
             onChange={e => setValue(e.target.value)}
             onBlur={() => {
                 focused.current = false;
-                if (value !== props.value) { props.onCommit(value); }
+                if (value !== props.value) {
+                    props.onCommit(value);
+                }
             }}
         />
     );
 }
 
 /**
- * A reference-typed value input: commits on blur like `BlurCommitInput`, plus a debounced
- * suggestion dropdown fed by the server (aet/getStoryParamOptions via the extension). Picking a
- * suggestion commits immediately - `onMouseDown` + `preventDefault` so the input never blurs
- * mid-pick (a blur would commit the half-typed prefix first). `lastSent` guards the follow-up
- * blur from re-committing the same value while the server round trip is still in flight.
+ * A reference-typed value input: commits on blur like `BlurCommitInput`, over the shared
+ * `Combobox` fed by the server (aet/getStoryParamOptions via the extension). The list opens with
+ * every option rather than only the current value; picking one commits at once. `lastSent` guards
+ * the follow-up blur from re-committing the same value while the server round trip is in flight.
  */
 function RefValueInput(props: {
     value: string; disabled: boolean; onCommit: (v: string) => void;
-    fetchOptions: (prefix: string) => Promise<StoryParamOptionDto[]>;
-    onInput?: (v: string) => void;
+    fetchOptions: (query: string) => Promise<StoryParamOptionDto[]>;
     placeholder?: string; className?: string;
 }): React.JSX.Element {
     const [value, setValue] = useState(props.value);
-    const [options, setOptions] = useState<StoryParamOptionDto[]>([]);
-    const [open, setOpen] = useState(false);
     const focused = useRef(false);
-    const fetchSeq = useRef(0);
     const lastSent = useRef<string | null>(null);
-    const debounce = useRef<number | undefined>(undefined);
     useEffect(() => {
         lastSent.current = null;
-        if (!focused.current) { setValue(props.value); }
+        if (!focused.current) {
+            setValue(props.value);
+        }
     }, [props.value]);
-    useEffect(() => () => window.clearTimeout(debounce.current), []);
-
-    const query = (prefix: string): void => {
-        const seq = ++fetchSeq.current;
-        window.clearTimeout(debounce.current);
-        debounce.current = window.setTimeout(() => {
-            void props.fetchOptions(prefix).then(fetched => {
-                // Stale replies (an older prefix) and replies landing after focus left are dropped.
-                if (seq !== fetchSeq.current || !focused.current) { return; }
-                setOptions(fetched);
-                setOpen(fetched.length > 0);
-            });
-        }, 150);
-    };
 
     const commit = (v: string): void => {
         if (v !== props.value && v !== lastSent.current) {
@@ -2449,44 +3594,21 @@ function RefValueInput(props: {
     };
 
     return (
-        <div className="suggest">
-            <input
-                type="text" className={props.className} value={value} disabled={props.disabled}
-                placeholder={props.placeholder}
-                onFocus={() => { focused.current = true; query(value); }}
-                onChange={e => {
-                    setValue(e.target.value);
-                    props.onInput?.(e.target.value);
-                    query(e.target.value);
-                }}
-                onBlur={() => {
-                    focused.current = false;
-                    setOpen(false);
-                    commit(value);
-                }}
-                onKeyDown={e => {
-                    if (e.key === 'Escape') { setOpen(false); }
-                    if (e.key === 'Enter') { setOpen(false); commit(value); }
-                }}
-            />
-            {open && !props.disabled ? (
-                <div className="suggest-list">
-                    {options.map(option => (
-                        <div
-                            key={option.value} className="suggest-item"
-                            title={option.detail ?? undefined}
-                            onMouseDown={e => {
-                                e.preventDefault(); // keep the input focused - no blur-commit race
-                                setValue(option.value);
-                                props.onInput?.(option.value);
-                                setOpen(false);
-                                commit(option.value);
-                            }}
-                        >{option.value}</div>
-                    ))}
-                </div>
-            ) : null}
-        </div>
+        <Combobox
+            className={props.className} value={value} disabled={props.disabled}
+            placeholder={props.placeholder}
+            fetchOptions={props.fetchOptions}
+            onFocus={() => {
+                focused.current = true;
+            }}
+            onChange={setValue}
+            onPick={commit}
+            onEnter={commit}
+            onBlur={v => {
+                focused.current = false;
+                commit(v);
+            }}
+        />
     );
 }
 
@@ -2513,14 +3635,15 @@ function EventParamRows(props: {
     const label = props.kind === 'event' ? 'Param' : 'Reward';
     const schemaByPosition = new Map(props.schema.map(s => [s.position, s]));
     const diagnostics = nodeDiagnostics.get(props.nodeId) ?? [];
-    // "Planet", "Attacker faction", … from the schema description; "Param N" when it has none.
+    // The schema's label ("Planets", "Flash id"), else the first phrase of its description, else
+    // "Param N". The description is the tooltip.
     const rowLabel = (position: number): string =>
-        shortParamLabel(schemaByPosition.get(position)) ?? `${label} ${position + 1}`;
+        paramLabel(schemaByPosition.get(position), `${label} ${position + 1}`);
 
     const commit = (position: number, value: string): void => {
         sendCommand({
             kind: 'setParams', threadUri: props.threadUri, eventName: props.eventName,
-            paramKind: props.kind, params: [{ position, value: value || null }],
+            paramKind: props.kind, params: [{position, value: value || null}],
         });
     };
 
@@ -2561,7 +3684,7 @@ function EventParamRows(props: {
                                 />
                             </Drag.NoDrag>
                             <span className="bool-label" title={title}>
-                                {booleanParamLabel(schemaParam?.description) ?? rowLabel(row.position)}
+                                {schemaParam?.label ?? booleanParamLabel(schemaParam?.description) ?? rowLabel(row.position)}
                             </span>
                         </div>
                     );
@@ -2588,8 +3711,8 @@ function EventParamRows(props: {
                                     value={row.value} disabled={props.readOnly}
                                     placeholder={row.missing ? 'required' : optionalUnset ? '(optional)' : undefined}
                                     onCommit={v => commit(row.position, v)}
-                                    fetchOptions={prefix =>
-                                        fetchParamOptions(props.kind, typeName, row.position, prefix)}
+                                    fetchOptions={query =>
+                                        fetchParamOptions(props.kind, typeName, row.position, query)}
                                 />
                             ) : (
                                 <BlurCommitInput
@@ -2608,7 +3731,7 @@ function EventParamRows(props: {
                                     onClick={() => vscode.postMessage({
                                         type: 'resolveRef', value: firstToken, referenceType,
                                     })}
-                                ><span className="codicon codicon-go-to-file" /></button>
+                                ><span className="codicon codicon-go-to-file"/></button>
                             </Drag.NoDrag>
                         ) : null}
                     </div>
@@ -2637,7 +3760,7 @@ function SectionHead(props: {
                     title={collapsed ? `Expand the ${label.toLowerCase()} section` : `Collapse the ${label.toLowerCase()} section`}
                     onClick={() => toggleSection(props.nodeId, props.section)}
                 >
-                    <span className={`codicon codicon-chevron-${collapsed ? 'right' : 'down'}`} /> {label}
+                    <span className={`codicon codicon-chevron-${collapsed ? 'right' : 'down'}`}/> {label}
                     {collapsed && props.summary ? ` - ${props.summary}` : ''}
                 </span>
             </Drag.NoDrag>
@@ -2687,9 +3810,9 @@ function TypeRow(props: {
                                 className="goto chip-remove"
                                 title={`Remove this ${props.kind} and its parameters`}
                                 onClick={() => sendCommand(
-                                    { kind: clearKind, threadUri: props.threadUri, eventName: props.eventName },
+                                    {kind: clearKind, threadUri: props.threadUri, eventName: props.eventName},
                                     `Remove ${props.kind} '${props.typeName}' and its parameters from '${props.eventName}'?`)}
-                            ><span className="codicon codicon-close" /></button>
+                            ><span className="codicon codicon-close"/></button>
                         </Drag.NoDrag>
                     )}
                 </>
@@ -2706,12 +3829,15 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): R
     const dto = props.data.dto;
     const input = props.data.inputs['in'];
     const output = props.data.outputs['out'];
-    const readOnly = currentMode !== 'edit';
-    const untested = untestedTypes.has(dto.eventType ?? '') || untestedTypes.has(dto.rewardType ?? '');
+    // Edit mode is the first gate; owning the thread is the second. A thread drawn from a
+    // referenced project stays visible - hiding it would hide half the graph - and reads like a
+    // node in View mode, with the owner named on the mark beside its title.
+    const readOnly = currentMode !== 'edit' || Boolean(dto.readOnlyOwner);
+    const badge = noteBadge(typeNotes.get(dto.eventType ?? '') ?? typeNotes.get(dto.rewardType ?? ''));
     const classes = [
         'lc-' + (dto.lifecycle ?? 'Inactive'),
         dto.reachable ? '' : 'unreachable',
-        untested ? 'untested' : '',
+        badge?.className ?? '',
     ].filter(c => c).join(' ');
     return (
         <EventBody
@@ -2723,8 +3849,29 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): R
             data-testid="node"
             data-node-id={dto.id}
             data-branch={props.data.branchGlow ?? undefined}
+            // The border says something is wrong with this type; the tooltip says what. A remark
+            // gets one of these without changing how the node looks.
+            title={badge?.title}
         >
-            <EventForm dto={dto} readOnly={readOnly} />
+            <EventForm dto={dto} readOnly={readOnly}/>
+            {props.data.simFireCount > 0 ? (
+                <span className="fire-badge" title={'Fired ' + props.data.simFireCount + 'x'}>
+                    {props.data.simFireCount}
+                </span>
+            ) : null}
+            {props.data.simGate ? (
+                <>
+                    {props.data.simGate.progress !== null ? (
+                        <span className="gate-meter" title={props.data.simGate.label}>
+                            <span
+                                style={{width: `${Math.round(Math.min(1, Math.max(0, props.data.simGate.progress)) * 100)}%`}}/>
+                        </span>
+                    ) : null}
+                    <span className="gate-label">{props.data.simGate.label}</span>
+                </>
+            ) : null}
+            {props.data.simBreakpoint ?
+                <span className="bp-mark" title="Breakpoint - the clock halts after this fires"/> : null}
             {input ? (
                 <RefSocket
                     name="input-socket" side="input" socketKey="in"
@@ -2775,7 +3922,7 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
             // Renaming re-keys the node id (it's derived from the name), so carry its current spot
             // to the new name - otherwise the renamed node re-materialises beside a neighbour.
             editorHandleRef?.carryPosition(dto.id, dto.threadUri, next);
-            sendCommand({ kind: 'renameEvent', eventName: dto.label, newName: next });
+            sendCommand({kind: 'renameEvent', eventName: dto.label, newName: next});
         }
     };
 
@@ -2786,7 +3933,10 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
     useEffect(() => {
         if (editingTitle && !readOnly) {
             const el = inputRef.current;
-            if (el) { el.focus(); el.select(); }
+            if (el) {
+                el.focus();
+                el.select();
+            }
         }
     }, [editingTitle, readOnly]);
 
@@ -2816,8 +3966,12 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                                 defaultValue={renameDrafts.get(dto.id) ?? dto.label}
                                 onChange={e => renameDrafts.set(dto.id, e.target.value)}
                                 onKeyDown={e => {
-                                    if (e.key === 'Enter') { commitTitle(); }
-                                    if (e.key === 'Escape') { cancelRename(); }
+                                    if (e.key === 'Enter') {
+                                        commitTitle();
+                                    }
+                                    if (e.key === 'Escape') {
+                                        cancelRename();
+                                    }
                                 }}
                             />
                         </Drag.NoDrag>
@@ -2828,14 +3982,20 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                         <Drag.NoDrag>
                             <button
                                 className="rename-ok" title="Apply rename (Enter)"
-                                onMouseDown={e => { e.preventDefault(); commitTitle(); }}
-                            ><span className="codicon codicon-check" /></button>
+                                onMouseDown={e => {
+                                    e.preventDefault();
+                                    commitTitle();
+                                }}
+                            ><span className="codicon codicon-check"/></button>
                         </Drag.NoDrag>
                         <Drag.NoDrag>
                             <button
                                 title="Cancel (Esc)"
-                                onMouseDown={e => { e.preventDefault(); cancelRename(); }}
-                            ><span className="codicon codicon-close" /></button>
+                                onMouseDown={e => {
+                                    e.preventDefault();
+                                    cancelRename();
+                                }}
+                            ><span className="codicon codicon-close"/></button>
                         </Drag.NoDrag>
                     </>
                 ) : (
@@ -2846,9 +4006,17 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                     // click; that's why rename is a dedicated NoDrag button.)
                     <span className="title" title={`${dto.label} - drag to move`}>{dto.label}</span>
                 )}
+                {/* The controls below are disabled for a referenced project's thread, so the reader
+                    needs to be told which project owns it - otherwise the node just looks inert. */}
+                {dto.readOnlyOwner ? (
+                    <span className="ro-badge" title={readOnlyMessage(dto.readOnlyOwner)}>
+                        <span className="codicon codicon-lock"/>{dto.readOnlyOwner}
+                    </span>
+                ) : null}
                 {readOnly || editingTitle ? null : (
                     <Drag.NoDrag>
-                        <button title="Rename this event" onClick={openRename}><span className="codicon codicon-edit" /></button>
+                        <button title="Rename this event" onClick={openRename}><span className="codicon codicon-edit"/>
+                        </button>
                     </Drag.NoDrag>
                 )}
                 {(nodeDiagnostics.get(dto.id)?.length ?? 0) > 0 ? (
@@ -2856,13 +4024,17 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                         className={'diag-badge ' + (nodeDiagnostics.get(dto.id)!.some(d => d.severity === 'error')
                             ? 'diag-error' : 'diag-warning')}
                         title={nodeDiagnostics.get(dto.id)!.map(d => d.message).join('\n')}
-                    ><span className="codicon codicon-warning" />{nodeDiagnostics.get(dto.id)!.length}</span>
+                    ><span className="codicon codicon-warning"/>{nodeDiagnostics.get(dto.id)!.length}</span>
                 ) : null}
                 <Drag.NoDrag>
                     <button
                         title="Open in XML"
-                        onClick={() => vscode.postMessage({ type: 'openXml', threadUri: dto.threadUri, line: dto.line ?? 0 })}
-                    ><span className="codicon codicon-go-to-file" /></button>
+                        onClick={() => vscode.postMessage({
+                            type: 'openXml',
+                            threadUri: dto.threadUri,
+                            line: dto.line ?? 0
+                        })}
+                    ><span className="codicon codicon-go-to-file"/></button>
                 </Drag.NoDrag>
                 <Drag.NoDrag>
                     {/* Three directions behind one icon: what leads here, the whole path, what
@@ -2877,14 +4049,14 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                         <button
                             className="danger" title="Delete this event"
                             onClick={() => sendCommand(
-                                { kind: 'deleteEvent', threadUri: dto.threadUri, eventName: dto.label },
+                                {kind: 'deleteEvent', threadUri: dto.threadUri, eventName: dto.label},
                                 `Delete story event '${dto.label}'?`)}
-                        ><span className="codicon codicon-trash" /></button>
+                        ><span className="codicon codicon-trash"/></button>
                     </Drag.NoDrag>
                 )}
             </div>
 
-            <SectionHead nodeId={dto.id} section="general" summary={dto.branch ?? null} />
+            <SectionHead nodeId={dto.id} section="general" summary={dto.branch ?? null}/>
             {isSectionCollapsed(dto.id, 'general') ? null : (
                 <>
                     <div className="row">
@@ -2924,7 +4096,7 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                 </>
             )}
 
-            <SectionHead nodeId={dto.id} section="trigger" summary={dto.eventType ?? null} />
+            <SectionHead nodeId={dto.id} section="trigger" summary={dto.eventType ?? null}/>
             {isSectionCollapsed(dto.id, 'trigger') ? null : (
                 <>
                     <TypeRow
@@ -2939,7 +4111,7 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                 </>
             )}
 
-            <SectionHead nodeId={dto.id} section="reward" summary={dto.rewardType ?? null} />
+            <SectionHead nodeId={dto.id} section="reward" summary={dto.rewardType ?? null}/>
             {isSectionCollapsed(dto.id, 'reward') ? null : (
                 <>
                     <TypeRow
@@ -2970,26 +4142,65 @@ const ConnSvg = styled.svg`
         stroke: var(--vscode-charts-foreground, #999);
         marker-end: url(#story-arrow);
     }
+
     /* Generated from EDGE_KINDS, which the colour key swatches read too - a swatch and the edge it
        describes cannot drift apart if both come from the one list. TacticalEntry deliberately
        shares Tactical's presentation: it is the same relation seen from the stub side. */
+
     ${EDGE_KINDS.filter(k => k.kind !== 'Prereq').map(k => {
         const selector = k.kind === 'Tactical' ? '&.k-Tactical path, &.k-TacticalEntry path' : `&.k-${k.kind} path`;
         return `${selector} { stroke: var(${k.token}); ${k.dash ? `stroke-dasharray: ${k.dash};` : ''} }`;
     }).join('\n    ')}
-    /* Sankey glow underlay: a fat translucent stroke UNDER the crisp edge. A plain wide path is
-       far cheaper than an SVG filter (drop-shadow was the main pan/zoom perf sink on big
-       campaigns) and still reads as a coloured halo. No arrowhead on the underlay. */
+        /* Sankey glow underlay: a fat translucent stroke UNDER the crisp edge. A plain wide path is
+           far cheaper than an SVG filter (drop-shadow was the main pan/zoom perf sink on big
+           campaigns) and still reads as a coloured halo. No arrowhead on the underlay. */
     path.glow-underlay {
         stroke-width: 7px;
         marker-end: none;
         stroke-linecap: round;
     }
+
+    /* Simulation flow: a step travelling along the edge is a marching dash in the fired colour;
+       once it has passed, the edge keeps that colour at lower weight so the path the story took
+       stays readable. The marching dash is motion, so reduced-motion viewers get the colour only. */
+    @keyframes story-flow {
+        to {
+            stroke-dashoffset: -28px;
+        }
+    }
+
+    &.flow-active path:not(.glow-underlay) {
+        stroke: var(--lifecycle-fired, var(--vscode-testing-iconPassed, #73c991));
+        stroke-width: 3px;
+        stroke-dasharray: 10 4;
+        animation: story-flow 0.5s linear infinite;
+    }
+
+    /* The path taken keeps moving, slowly: the maintainer's spec is a flow view, and a still
+       tint reads as a colour key rather than as something that ran. Same dash the LOD flow
+       canvas draws, so a graph looks the same whether rete or the canvas holds its edges. */
+
+    &.flow-spent path:not(.glow-underlay) {
+        stroke: var(--lifecycle-fired, var(--vscode-testing-iconPassed, #73c991));
+        stroke-width: 2.5px;
+        stroke-dasharray: 6 8;
+        animation: story-flow 2.4s linear infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        &.flow-active path:not(.glow-underlay),
+        &.flow-spent path:not(.glow-underlay) {
+            animation: none;
+            stroke-dasharray: none;
+        }
+    }
 `;
 
 function StoryConnectionView(props: { data: StoryConnection }): React.JSX.Element | null {
-    const { path } = Presets.classic.useConnection();
-    if (!path) { return null; }
+    const {path} = Presets.classic.useConnection();
+    if (!path) {
+        return null;
+    }
     // Sankey-style branch glow: prereq edges feeding a branch carry its hue, so a branch's flow
     // reads as one coloured strand even where it crosses other paths.
     // `?? null` matters: the connection plugin's transient drag pseudo-connection is a plain
@@ -2998,14 +4209,15 @@ function StoryConnectionView(props: { data: StoryConnection }): React.JSX.Elemen
     const branch = props.data.branch ?? null;
     const c = branch !== null ? branchColor(branch) : null;
     return (
-        <ConnSvg className={'k-' + (props.data.kind ?? '')} data-testid="connection">
+        <ConnSvg className={'k-' + (props.data.kind ?? '') + ' flow-' + (props.data.flow ?? 'idle')}
+                 data-testid="connection">
             {c !== null ? (
                 <path className="glow-underlay" d={path}
-                    style={{ stroke: `color-mix(in srgb, ${c} 40%, transparent)` }} />
+                      style={{stroke: `color-mix(in srgb, ${c} 40%, transparent)`}}/>
             ) : null}
             <path
                 d={path}
-                style={c !== null ? { stroke: c, strokeWidth: 2.5 } : undefined}
+                style={c !== null ? {stroke: c, strokeWidth: 2.5} : undefined}
             />
         </ConnSvg>
     );
@@ -3019,11 +4231,13 @@ const SocketDot = styled.div`
     opacity: 0.55;
     cursor: crosshair;
 
-    &:hover { opacity: 1; }
+    &:hover {
+        opacity: 1;
+    }
 `;
 
 function StorySocketView(): React.JSX.Element {
-    return <SocketDot data-testid="socket" />;
+    return <SocketDot data-testid="socket"/>;
 }
 
 // ── App chrome ───────────────────────────────────────────────────────────────────────────────────
@@ -3032,8 +4246,12 @@ const GlobalStyle = createGlobalStyle`
     /* The rules below style html, body and #root - the Shell's ANCESTORS - so they cannot inherit
        the layer the Shell carries. Declared at the root, it reaches both them and the Shell. */
     ${tokensRootCss}
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root {
         height: 100%;
         overflow: hidden;
@@ -3050,14 +4268,16 @@ const GlobalStyle = createGlobalStyle`
         user-select: none;
         -webkit-user-select: none;
     }
+
     /* Text entry needs a caret and selection to be usable at all. */
     input, textarea {
         user-select: text;
         -webkit-user-select: text;
     }
+
     /* Diagnostic messages and sim log lines are worth copying out, and neither panel has a drag
        gesture of its own, so a selection there can't strand one. */
-    .problem-msg, .sim-log-line {
+    .problem-msg {
         user-select: text;
         -webkit-user-select: text;
     }
@@ -3065,62 +4285,48 @@ const GlobalStyle = createGlobalStyle`
     /* Jump-to-node flash: a bright pulsing ring so a diagnostic's culprit node is unmistakable in
        a large graph. The animated box-shadow transiently overrides a node's branch-glow shadow. */
     @keyframes story-flash {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+        }
         20%, 60% {
             box-shadow: 0 0 0 4px var(--vscode-focusBorder, #3794ff),
-                        0 0 18px 6px var(--vscode-focusBorder, #3794ff);
+            0 0 18px 6px var(--vscode-focusBorder, #3794ff);
         }
     }
+
     .story-flash {
         animation: story-flash 0.8s ease-in-out 2;
         border-radius: var(--radius-6);
         z-index: 5;
     }
+
     /* Same reason as the selection outline: on an OR node the ring belongs to the diamond, not to
        the transparent box around it. */
-    .story-flash.k-OrJunction, .story-flash.k-StagingOr { animation: none; }
+    .story-flash.k-OrJunction, .story-flash.k-StagingOr {
+        animation: none;
+    }
+
     .story-flash.k-OrJunction .diamond, .story-flash.k-StagingOr .diamond {
         animation: story-flash 0.8s ease-in-out 2;
     }
 
-    /* Server-backed suggestion dropdown (RefValueInput) - global because it renders both inside
-       Event node bodies and in the toolbar's create forms. */
-    .suggest {
-        position: relative;
-        flex: 1;
-        min-width: 0;
-        display: flex;
-    }
-    .suggest input { width: 100%; min-width: 0; }
-    .suggest-list {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        max-height: 160px;
-        overflow-y: auto;
-        z-index: 30;
-        background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-        border: var(--space-1) solid var(--vscode-focusBorder);
-        font-size: var(--font-size-11);
-    }
-    .suggest-item {
-        padding: var(--space-2) var(--space-6);
-        cursor: pointer;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .suggest-item:hover { background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.2)); }
-
-    /* Diagnostic severity accents - node header badges and the problems list. */
+    /* The shared Combobox - global because it renders inside Event node bodies, the toolbar's
+       create forms and the simulator's dialogs. */
+    ${comboboxCss}
+        /* Diagnostic severity accents - node header badges and the problems list. */
     .diag-badge {
         font-size: var(--font-size-10);
         font-weight: bold;
         padding: 0 var(--space-2);
     }
-    .diag-badge.diag-error { color: var(--vscode-errorForeground, #f44); }
-    .diag-badge.diag-warning { color: var(--vscode-charts-yellow, #cca700); }
+
+    .diag-badge.diag-error {
+        color: var(--vscode-errorForeground, #f44);
+    }
+
+    .diag-badge.diag-warning {
+        color: var(--vscode-charts-yellow, #cca700);
+    }
 
     /* Immutable-type chips - used in node bodies and the toolbar's create form. In a node body the
        chip is tinted by its trigger/reward family colour (stepColor/fadedBg, set inline) and leads
@@ -3138,8 +4344,19 @@ const GlobalStyle = createGlobalStyle`
            editor foreground and read as near-black on the theme's (often blue) badge colour. */
         color: var(--vscode-badge-foreground, var(--vscode-editor-foreground));
     }
-    .type-chip .codicon { font-size: var(--icon-size-12); flex-shrink: 0; }
-    .type-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .type-chip .codicon {
+        font-size: var(--icon-size-12);
+        flex-shrink: 0;
+    }
+
+    .type-chip-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     .type-empty {
         padding: var(--space-1) var(--space-6);
         border: var(--space-1) dashed var(--vscode-panel-border);
@@ -3171,6 +4388,7 @@ const Shell = styled.div`
         border-bottom: var(--space-1) solid var(--vscode-panel-border);
         flex-shrink: 0;
     }
+
     select, input[type=text] {
         background: var(--vscode-input-background);
         color: var(--vscode-input-foreground);
@@ -3181,8 +4399,15 @@ const Shell = styled.div`
         outline: none;
         min-width: 0;
     }
-    input[type=text] { flex: 1; }
-    input[type=text]:focus, select:focus { border-color: var(--vscode-focusBorder); }
+
+    input[type=text] {
+        flex: 1;
+    }
+
+    input[type=text]:focus, select:focus {
+        border-color: var(--vscode-focusBorder);
+    }
+
     button {
         background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
         color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
@@ -3194,12 +4419,19 @@ const Shell = styled.div`
         white-space: nowrap;
         flex-shrink: 0;
     }
-    button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground)); }
+
+    button:hover {
+        background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+    }
+
     button.primary {
         background: var(--vscode-button-background);
         color: var(--vscode-button-foreground);
     }
-    button.danger { color: var(--vscode-errorForeground, #f44); }
+
+    button.danger {
+        color: var(--vscode-errorForeground, #f44);
+    }
 
     .mode-switch {
         display: flex;
@@ -3208,22 +4440,48 @@ const Shell = styled.div`
         border-radius: var(--radius-3);
         overflow: hidden;
     }
+
     .mode-switch button {
         border-radius: 0;
     }
+
     .mode-switch button + button {
         border-left: var(--space-1) solid var(--vscode-panel-border);
     }
 
-    .body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+    .body {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+        min-height: 0;
+    }
+
     /* The canvas column: the graph, with the bottom panels under it. They sit INSIDE this column so
        they border the dock rather than running underneath it - the dock is full height, the same
        arrangement the localisation editors use (.grid-column there).
        min-height: 0 is load-bearing - without it the canvas refuses to shrink below its content and
        pushes the panels off the bottom. */
-    .canvas-column { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-    .canvas-area { flex: 1; position: relative; overflow: hidden; min-height: 0; }
-    .canvas { position: absolute; inset: 0; z-index: 1; }
+
+    .canvas-column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+    }
+
+    .canvas-area {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .canvas {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+    }
 
     /* Zero-size anchor at the graph origin inside rete's transformed content holder: its absolutely
        positioned children are therefore laid out in graph coordinates and inherit pan/zoom.
@@ -3233,11 +4491,24 @@ const Shell = styled.div`
        edges. The holder's will-change:transform makes it a stacking context, so the negative
        index stays contained here. */
     /* Swimlanes: a screen-space canvas behind the nodes and behind the LOD canvas (see SwimlaneCanvas). */
-    .swimlane-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+
+    .swimlane-canvas {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+    }
 
     /* LOD overview: a screen-space canvas behind the nodes (z-index below .canvas), redrawn on
        pan/zoom. See the LodOverview component. */
-    .lod-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+
+    .lod-canvas {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+    }
+
     .status {
         position: absolute;
         inset: 0;
@@ -3250,25 +4521,61 @@ const Shell = styled.div`
     }
 
     /* ── Right dock ─────────────────────────────────────────────────────── */
+
     ${rightDockCss}
     ${dockHeaderCss}
-    /* Tall enough for the rotary mode dial, which is this editor's alone. */
-    .dock-header { min-height: 78px; }
+        /* Tall enough for the rotary mode dial, which is this editor's alone. */
+    .dock-header {
+        min-height: 78px;
+    }
+
     ${dockBodyCss}
     ${dockOverviewCss}
-    /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
-    /* Tools on the left set the left gap; mirror it on the right, minimap flexes to fill between. */
-    .overview-mid { display: flex; align-items: center; gap: var(--space-8); padding-right: var(--space-8); }
-    .overview-tools { display: flex; flex-direction: column; gap: var(--space-4); flex-shrink: 0; }
-    .filters-below { display: flex; flex-direction: column; gap: var(--space-4); }
-    .filters-below select { width: 100%; }
+        /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
+        /* Tools on the left set the left gap; mirror it on the right, minimap flexes to fill between. */
+    .overview-mid {
+        display: flex;
+        align-items: center;
+        gap: var(--space-8);
+        padding-right: var(--space-8);
+    }
+
+    .overview-tools {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        flex-shrink: 0;
+    }
+
+    .filters-below {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .filters-below .select-field {
+        display: flex;
+        width: 100%;
+    }
 
     /* Codicons inherit their button's colour (never coloured individually) and scale per context. */
-    .codicon { font-size: var(--icon-size-16); vertical-align: middle; }
-    .overview-tools .codicon { font-size: var(--icon-size-16); }
-    .rotary-center .codicon { font-size: var(--icon-size-22); }
-    .rotary-pos .codicon { font-size: var(--icon-size-14); }
-    .sim-head .codicon { font-size: var(--icon-size-14); vertical-align: -1px; }
+
+    .codicon {
+        font-size: var(--icon-size-16);
+        vertical-align: middle;
+    }
+
+    .overview-tools .codicon {
+        font-size: var(--icon-size-16);
+    }
+
+    .rotary-center .codicon {
+        font-size: var(--icon-size-22);
+    }
+
+    .rotary-pos .codicon {
+        font-size: var(--icon-size-14);
+    }
 
     .resize-handle-w {
         position: absolute;
@@ -3279,36 +4586,62 @@ const Shell = styled.div`
         cursor: ew-resize;
         z-index: 2;
     }
+
     .resize-handle-w:hover, .resize-handle-w:active {
         background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
     }
 
     /* ── Palette (dock content, Edit mode) ─────────────────────────────── */
-    .palette-scroll { min-width: 0; }
-    .palette-scroll .dock-search { margin-bottom: var(--space-8); }
+
+    .palette-scroll {
+        min-width: 0;
+    }
+
+    .palette-scroll .dock-search {
+        margin-bottom: var(--space-8);
+    }
+
     .palette-new {
         padding-bottom: var(--space-12);
         border-bottom: var(--space-1) solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
     }
+
     /* The .toggle variant lived here: a third hand-rolled folding heading, on a div with an
        onClick, so it could not be reached by keyboard at all. DockSection carries the cursor, the
        hover and a real button. */
     /* Colour family: just a gap between groups - no box (the tile tint is the grouping). */
-    .tile-family { margin-bottom: var(--space-6); }
+
+    .tile-family {
+        margin-bottom: var(--space-6);
+    }
+
     /* Geometry comes from the shared dock chrome, so a palette tile is the same object as a tile in
        the localisation docks. Only the colour is this editor's own: tiles are tinted by type family,
        which is what makes the palette scannable. */
+
     .palette-tile {
         border-style: solid;
         border-width: var(--space-1);
         cursor: grab;
     }
-    .palette-tile:hover { outline: var(--space-1) solid var(--vscode-focusBorder); }
 
-    .palette-empty { font-size: var(--font-size-11); color: var(--vscode-descriptionForeground); }
+    .palette-tile:hover {
+        outline: var(--space-1) solid var(--vscode-focusBorder);
+    }
+
+    .palette-empty {
+        font-size: var(--font-size-11);
+        color: var(--vscode-descriptionForeground);
+    }
 
     /* ── Minimap (dock overview) ───────────────────────────────────────── */
-    .minimap-wrap { flex: 1; min-width: 0; display: flex; }
+
+    .minimap-wrap {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+    }
+
     .minimap {
         display: block;
         border: var(--space-1) solid var(--vscode-panel-border);
@@ -3316,12 +4649,22 @@ const Shell = styled.div`
         background: var(--vscode-editor-background);
         cursor: crosshair;
     }
+
     .minimap.minimap-empty {
-        flex: 1; height: 118px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: var(--font-size-11); color: var(--vscode-descriptionForeground);
+        flex: 1;
+        height: 118px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--font-size-11);
+        color: var(--vscode-descriptionForeground);
     }
-    .minimap .mm-node { fill: var(--vscode-descriptionForeground); opacity: 0.55; }
+
+    .minimap .mm-node {
+        fill: var(--vscode-descriptionForeground);
+        opacity: 0.55;
+    }
+
     .minimap .mm-view {
         fill: var(--vscode-focusBorder);
         fill-opacity: 0.12;
@@ -3329,46 +4672,495 @@ const Shell = styled.div`
         stroke-width: 1;
     }
 
-    /* ── Simulation controls (dock content, Simulation mode) ───────────── */
-    .sim-controls { display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-12); }
-    .sim-section { min-width: 0; }
-    .sim-head { font-weight: bold; margin-bottom: var(--space-2); }
+    /* ── Simulation (storyGraph/SimDock) ───────────────────────────────── */
 
-    /* ── Bottom panels (full width) ────────────────────────────────────── */
-    ${problemsPanelCss}
-    .bottom-panels { flex-shrink: 0; display: flex; flex-direction: column; }
-    /* The simulation log shares the problems bar's title row, so its bar stays sticky over a long
-       scrolling log. The paddings are this editor's own measured values, kept deliberately: the
-       shared block carries the localisation grids' 2px/6px, and the two differ by a pixel or two
-       from a calibration that was done here. */
-    .panel-bar {
+    /* The player's status readout, in the slot the preview's player gives its scrubber: dock-wide,
+       the state at the left and the tick and clock at the right. A button when there is something
+       to open or to play, a plain span when there is only the state to read. */
+
+    .sim-status {
+        display: flex;
+        align-items: center;
+        gap: var(--space-6);
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 28px;
+        padding: var(--space-4) var(--space-8);
+        border-radius: var(--radius-6);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        background: transparent;
+        color: var(--vscode-descriptionForeground);
+        font: inherit;
+        font-size: var(--font-size-12);
+        text-align: left;
+    }
+
+    button.sim-status {
+        cursor: pointer;
+    }
+
+    button.sim-status:hover {
+        background: var(--vscode-toolbar-hoverBackground);
+    }
+
+    .sim-status-text {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sim-status-time {
+        flex: none;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sim-status.owed {
+        border-color: var(--lifecycle-armed, #e2b93d);
+        color: var(--vscode-foreground);
+    }
+
+    .sim-status.halted {
+        border-color: var(--vscode-debugIcon-breakpointForeground, #e51400);
+        color: var(--vscode-foreground);
+    }
+
+    /* Running is the one state that has to be legible at a glance from across the dock: the
+       fired colour on the border and a live dot. Paused keeps the quiet default look. */
+
+    .sim-status.running {
+        border-color: var(--lifecycle-fired, #73c991);
+        color: var(--vscode-foreground);
+    }
+
+    /* The galaxy standing still for a battle, and a battle that has ended. */
+
+    .sim-status.battle {
+        border-color: var(--vscode-focusBorder);
+        color: var(--vscode-foreground);
+    }
+
+    .sim-status.resolved.won {
+        border-color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-status.resolved.lost,
+    .sim-status.lost {
+        border-color: var(--vscode-errorForeground);
+        color: var(--vscode-foreground);
+    }
+
+    /* What the server last refused: the reason play stopped, under the readout until the next
+       state. */
+
+    .sim-notice {
+        color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+        font-size: var(--font-size-11);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* The portal's picks: the flags a battle could write, chosen before it is decided unplayed. */
+
+    .sim-picks {
+        margin: var(--space-1) 0;
+    }
+
+    .sim-pick-row {
+        cursor: pointer;
+    }
+
+    .sim-pick-row input[type="checkbox"] {
+        margin: 0 var(--space-1) 0 0;
+    }
+
+    .sim-status-dot {
+        flex: none;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--lifecycle-fired, #73c991);
+        animation: sim-live 1.2s ease-in-out infinite;
+    }
+
+    @keyframes sim-live {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.25;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .sim-status-dot {
+            animation: none;
+        }
+    }
+
+    .sim-row.add {
+        color: var(--vscode-descriptionForeground);
+    }
+
+    /* Content: inventories. A row is a button - it opens its detail beside the dock - and reads
+       the name at the left and the value at the right, ellipsised, one line. */
+
+    .sim-inventory {
+        display: flex;
+        flex-direction: column;
+        font-size: var(--font-size-12);
+    }
+
+    .sim-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+    }
+
+    .sim-group-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        font-size: var(--font-size-smaller);
+        color: var(--vscode-descriptionForeground);
+        padding: var(--space-2) 0 0;
+    }
+
+    .sim-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        min-width: 0;
+        width: 100%;
+        padding: var(--space-2) var(--space-4);
+        border: none;
+        border-radius: var(--radius-3);
+        background: transparent;
+        color: var(--vscode-foreground);
+        font: inherit;
+        text-align: left;
+        box-sizing: border-box;
+    }
+
+    button.sim-row {
+        cursor: pointer;
+    }
+
+    button.sim-row:hover, .sim-row.decision:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
+    .sim-row.selected {
+        background: var(--vscode-list-activeSelectionBackground);
+        color: var(--vscode-list-activeSelectionForeground);
+    }
+
+    .sim-row.gone {
+        text-decoration: line-through;
+        opacity: 0.6;
+    }
+
+    .sim-row-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sim-row-value {
+        flex: none;
+        max-width: 45%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--vscode-descriptionForeground);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sim-row.selected .sim-row-value {
+        color: inherit;
+    }
+
+    /* A decision row is two controls: the row opens the choices, the check applies the one the
+       event itself supplies. */
+
+    .sim-row.decision {
+        padding: 0;
+    }
+
+    .sim-row-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        padding: var(--space-2) var(--space-4);
+        border: none;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .sim-planet-list {
+        display: flex;
+        flex-direction: column;
+        max-height: 180px;
+        overflow-y: auto;
+    }
+
+    .link {
+        border: none;
+        background: transparent;
+        color: var(--vscode-textLink-foreground);
+        padding: 0;
+        font: inherit;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .link:hover {
+        text-decoration: underline;
+    }
+
+    .link.fired {
+        color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-answer {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .sim-answer.active {
+        border-color: var(--vscode-focusBorder);
+    }
+
+    .sim-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+    }
+
+    .sim-pick {
+        padding: var(--space-1) var(--space-6);
+        font-size: var(--font-size-smaller);
+    }
+
+    .sim-arm-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-4);
+        padding: var(--space-2) 0;
+    }
+
+    .sim-arm-line.satisfied {
+        color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-arm-member {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
+    }
+
+    .sim-arm-or, .sim-arm-and {
+        color: var(--vscode-descriptionForeground);
+        font-size: var(--font-size-smaller);
+        text-transform: uppercase;
+    }
+
+    .sim-row-value.lc-Fired {
+        color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-row-value.lc-Armed {
+        color: var(--lifecycle-armed, #e2b93d);
+    }
+
+    .sim-row-value.lc-Disabled {
+        color: var(--lifecycle-disabled, #f14c4c);
+    }
+
+    /* Foot: the transport is the shared player - the status readout in the scrubber's slot, the
+       speed one slider under it. Break on gates takes the far end of the transport row, where a
+       player keeps its record button. */
+
+    ${playerCss}
+    .sim-transport .sim-break-gates {
+        margin-left: auto;
+    }
+
+    /* The view toggles' plate: the canvas's top-left corner, the colour key's opposite. */
+
+    .lens-corner {
+        left: 8px;
+        top: 8px;
+    }
+
+    /* Lenses. Each hides one thing; a node that is not an Event has no lifecycle class and is
+       left alone by the path lens. */
+
+    &.lens-active-only [data-testid="node"].lc-Waiting,
+    &.lens-active-only [data-testid="node"].lc-Inactive,
+    &.lens-active-only [data-testid="node"].lc-Disabled,
+    &.lens-active-only [data-testid="connection"].flow-idle {
+        opacity: 0.22;
+    }
+
+    /* Armed is not passed either: it waits for the story to reach it. Lighter than the waiting
+       tier, since it is in play, but never as strong as a node the story has run through - so
+       the path taken reads at a glance. */
+
+    &.lens-active-only [data-testid="node"].lc-Armed {
+        opacity: 0.6;
+    }
+
+    &.lens-hide-flow [data-testid="connection"].flow-active path:not(.glow-underlay),
+    &.lens-hide-flow [data-testid="connection"].flow-spent path:not(.glow-underlay) {
+        stroke: revert-layer;
+        stroke-width: revert-layer;
+        stroke-dasharray: revert-layer;
+        animation: none;
+    }
+
+    &.lens-hide-lua [data-testid="node"].k-LuaState,
+    &.lens-hide-lua [data-testid="connection"].k-LuaLink {
+        display: none;
+    }
+
+    /* Trace: the problems bar's frame, with a filter row pinned under the title. */
+
+    .sim-trace {
+        position: relative;
+        overflow-y: auto;
+        border-top: var(--space-1) solid var(--vscode-panel-border);
+        background: var(--vscode-sideBar-background);
+        flex-shrink: 0;
+        font-size: var(--font-size-11);
+        padding: 0 var(--space-4) var(--space-2);
+    }
+
+    .sim-trace-tools {
         position: sticky;
         top: 0;
+        z-index: 1;
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
+        padding: var(--space-2) 0;
+        background: var(--vscode-sideBar-background);
+    }
+
+    .sim-trace-tools input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sim-trace-row {
+        display: grid;
+        grid-template-columns: 36px minmax(80px, 1.2fr) 70px minmax(60px, 0.8fr) minmax(60px, 0.8fr) 2fr;
+        gap: var(--space-6);
+        align-items: center;
+        padding: var(--space-1) var(--space-4);
+        border-radius: var(--radius-3);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sim-trace-row > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    .sim-trace-row.clickable {
+        cursor: pointer;
+    }
+
+    .sim-trace-row.clickable:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
+    .sim-trace-row.muted {
+        display: block;
+        color: var(--vscode-descriptionForeground);
+        font-style: italic;
+    }
+
+    .sim-trace-tick {
+        color: var(--vscode-descriptionForeground);
+    }
+
+    .sim-trace-cause {
+        color: var(--vscode-descriptionForeground);
+    }
+
+    .sim-trace-row.cause-trigger .sim-trace-node, .sim-trace-row.cause-prereq .sim-trace-node,
+    .sim-trace-row.cause-poll .sim-trace-node, .sim-trace-row.cause-world .sim-trace-node,
+    .sim-trace-row.cause-lua .sim-trace-node, .sim-trace-row.cause-manual .sim-trace-node {
+        color: var(--lifecycle-fired, #73c991);
+    }
+
+    .sim-trace-row.cause-breakpoint {
+        color: var(--vscode-debugIcon-breakpointForeground, #e51400);
+    }
+
+    .sim-trace-row.cause-ignored {
+        opacity: 0.6;
+    }
+
+    .sim-trace-detail {
+        color: var(--vscode-descriptionForeground);
+    }
+
+    @media (max-width: 700px) {
+        .sim-trace-row {
+            grid-template-columns: 36px 1fr 70px;
+        }
+
+        .sim-trace-change, .sim-trace-via, .sim-trace-detail {
+            display: none;
+        }
+    }
+
+    .sim-head {
+        font-weight: bold;
+        margin-bottom: var(--space-2);
+    }
+
+    /* ── Bottom panels (full width) ────────────────────────────────────── */
+
+    ${problemsPanelCss}
+    .bottom-panels {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* The trace shares the problems bar's title row, so its bar stays sticky over a long
+       scrolling list. The paddings are this editor's own measured values, kept deliberately: the
+       shared block carries the localisation grids' 2px/6px, and the two differ by a pixel or two
+       from a calibration that was done here. */
+
+    /* No stacking of its own: the resize handle overlaps the bar's top edge and has to win. With
+       the frame a flex column and the row list the scroller, the bar no longer needs to stick. */
+
+    .panel-bar {
         background: var(--vscode-sideBar-background);
         padding: var(--space-1) var(--space-4) var(--space-2);
     }
-    .problem-row { padding: var(--space-1) var(--space-4); }
-    .sim-log-panel {
-        position: relative;
-        overflow-y: auto;
-        padding: var(--space-4) var(--space-8);
-        background: var(--vscode-sideBar-background);
-        border-top: var(--space-1) solid var(--vscode-panel-border);
-        font-size: var(--font-size-11);
-        color: var(--vscode-descriptionForeground);
+
+    .problem-row {
+        padding: var(--space-1) var(--space-4);
     }
-    .sim-row { display: flex; gap: var(--space-4); align-items: center; margin: var(--space-2) 0; }
-    .sim-row input[type=text] { width: 90px; flex: none; }
-    .sim-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
-    .sim-kind {
-        font-size: var(--font-size-10);
-        padding: 0 var(--space-4);
-        border-radius: var(--radius-3);
-        border: var(--space-1) solid var(--vscode-panel-border);
-        color: var(--vscode-descriptionForeground);
-    }
-    .sim-kind.k-lua      { border-color: var(--vscode-charts-blue, #3794ff); }
-    .sim-kind.k-tactical { border-color: var(--vscode-charts-yellow, #cca700); }
 
     .problems {
         position: relative;
@@ -3379,6 +5171,7 @@ const Shell = styled.div`
         font-size: var(--font-size-12);
         padding: var(--space-2) var(--space-4);
     }
+
     .problem-node {
         flex-shrink: 0;
         max-width: 180px;
@@ -3387,6 +5180,7 @@ const Shell = styled.div`
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
     .problem-row button {
         background: transparent;
         border: none;
@@ -3395,13 +5189,22 @@ const Shell = styled.div`
         padding: 0 var(--space-2);
         flex-shrink: 0;
     }
-    .problem-row button:hover { background: transparent; color: var(--vscode-editor-foreground); }
+
+    .problem-row button:hover {
+        background: transparent;
+        color: var(--vscode-editor-foreground);
+    }
 
     /* The colour key's corner plate - bottom right, where the legend strip used to end. */
-    .key-corner { right: 8px; bottom: 8px; }
+
+    .key-corner {
+        right: 8px;
+        bottom: 8px;
+    }
 
     /* The colour key (storyGraph/ColourKeyFlyout). One row per swatch, the swatch in a fixed-width
        cell so every label starts at the same x whether it follows a box, a stroke or a shape. */
+
     .colour-key .key-list {
         list-style: none;
         margin: 0;
@@ -3410,36 +5213,59 @@ const Shell = styled.div`
         flex-direction: column;
         gap: var(--space-6);
     }
+
     .colour-key .key-list li {
         display: grid;
         grid-template-columns: 22px 1fr;
         align-items: center;
         column-gap: var(--space-8);
     }
-    .colour-key .key-label { min-width: 0; overflow-wrap: anywhere; }
+
+    .colour-key .key-label {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
     /* Under its label, not beside it: a branch name can be long. */
+
     .colour-key .key-shared {
         grid-column: 2;
         color: var(--vscode-descriptionForeground);
         font-size: var(--font-size-11);
     }
+
     .colour-key .swatch {
         display: inline-block;
-        width: 10px; height: 10px;
+        width: 10px;
+        height: 10px;
         border-radius: var(--radius-3);
         border: 2px solid;
         justify-self: center;
     }
+
     /* The overview draws a node as a filled rect with a stroke, so a branch swatch is one too. */
-    .colour-key .branch-swatch { width: 14px; height: 10px; border-width: 1.5px; }
+
+    .colour-key .branch-swatch {
+        width: 14px;
+        height: 10px;
+        border-width: 1.5px;
+    }
+
     /* A real stroke rather than a bordered box: the dash pattern is part of what an edge kind
        means, and a square cannot show it. */
-    .colour-key .edge-swatch { justify-self: center; }
-    .colour-key .shape-circle, .colour-key .shape-diamond { justify-self: center; }
+
+    .colour-key .edge-swatch {
+        justify-self: center;
+    }
+
+    .colour-key .shape-circle, .colour-key .shape-diamond {
+        justify-self: center;
+    }
 
     /* The AND/OR socket shapes, drawn rather than typed. They stand for the shapes the graph
        renders, so they are figures and not text - and the house rule keeps user-facing strings
        ASCII, which a box-drawing character is not. */
+
     .shape-circle, .shape-diamond {
         display: inline-block;
         width: 9px;
@@ -3447,8 +5273,14 @@ const Shell = styled.div`
         border: 1.5px solid currentColor;
         vertical-align: -1px;
     }
-    .shape-circle { border-radius: 50%; }
-    .shape-diamond { transform: rotate(45deg); }
+
+    .shape-circle {
+        border-radius: 50%;
+    }
+
+    .shape-diamond {
+        transform: rotate(45deg);
+    }
 `;
 
 const LIFECYCLES = ['Inactive', 'Waiting', 'Armed', 'Fired', 'Disabled'];
@@ -3464,14 +5296,14 @@ const PLOT_STATES = ['Active', 'Suspended'];
 function App(): React.JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorHandle | null>(null);
-    const filtersRef = useRef<FilterState>({ ...EMPTY_FILTERS });
+    const filtersRef = useRef<FilterState>({...EMPTY_FILTERS});
     // User-driven fetches (filter changes) re-layout; edit-driven refreshes patch in place.
     const fullRenderRef = useRef(true);
     const pendingGraphRef = useRef<{
         nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntryDto[]; full: boolean;
     } | null>(null);
 
-    const [filters, setFiltersState] = useState<FilterState>({ ...EMPTY_FILTERS });
+    const [filters, setFiltersState] = useState<FilterState>({...EMPTY_FILTERS});
     // What the filter box shows, ahead of what has been applied. Every applied pattern costs a server
     // request and a full rebuild, so a typed word must ask once, at the end of it (#131).
     const [nameDraft, setNameDraft] = useState('');
@@ -3484,18 +5316,53 @@ function App(): React.JSX.Element {
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
     const [status, setStatus] = useState<string | null>('Loading story graph...');
+    // The gesture handlers live outside React, beside the rete pipes, and a refused gesture has to
+    // reach this same slot. setStatus is stable, so one assignment covers the panel's life.
+    reportStatus = setStatus;
     // True while a full rebuild's auto-arrange is in flight, so the canvas stays covered instead
     // of flashing the pre-layout node stack (every node starts at the same spot) before it settles.
     const [layouting, setLayouting] = useState(false);
     const [createRequest, setCreateRequest] = useState<CreateRequest | null>(null);
     const [simState, setSimState] = useState<StorySimStateDto | null>(null);
     const simRef = useRef<StorySimStateDto | null>(null);
+    // Playback: step deltas are played in order on one promise chain; the transport's timer only
+    // sends the next tick once the previous response has landed (inFlight), and a halt or a
+    // decision stops it.
+    const playQueueRef = useRef<Promise<void>>(Promise.resolve());
+    const [pace, setPaceState] = useState<SimPace>(() => readPace());
+    const paceRef = useRef(pace);
+    const [playing, setPlaying] = useState(false);
+    const playingRef = useRef(false);
+    // Auto-resume: whether the setting is on, whether the last pause was the clock waiting on the
+    // author rather than the reader pressing pause, and whether the state now arriving answers
+    // something - the three things that decide if play picks itself up again.
+    const autoResumeRef = useRef(true);
+    const pausedForWaitRef = useRef(false);
+    // What the server last refused, shown beside the chip until the next state arrives.
+    const [simNotice, setSimNotice] = useState<string | null>(null);
+    // Whether this battle panel already handed the reader back to the galaxy for its outcome.
+    const resolvedOnceRef = useRef(false);
+    // The decision the last state hung on, so it opens once when it becomes that and not per tick.
+    const hangRef = useRef<string | null>(null);
+    const answeredRef = useRef(false);
+    const inFlightRef = useRef<number | null>(null);
+    const setPace = useCallback((next: SimPace) => {
+        paceRef.current = next;
+        setPaceState(next);
+        writePace(next);
+    }, []);
+    const setPlayingBoth = useCallback((next: boolean) => {
+        playingRef.current = next;
+        setPlaying(next);
+    }, []);
     const [mode, setMode] = useState<EditorMode>('view');
     // Which modes the flags permit. Both default off, matching the extension's own fallbacks, so a
     // panel that somehow never receives the message stays read-only rather than offering modes whose
     // every request the server would reject. View is implied - the panel wouldn't open without it.
     const [availableModes, setAvailableModes] = useState<{ edit: boolean; simulate: boolean }>(
-        { edit: false, simulate: false });
+        {edit: false, simulate: false});
+    /** Why Edit is disabled for the graph on screen, or null when it can be entered. */
+    const [editBlockedBy, setEditBlockedBy] = useState<string | null>(null);
     const [problems, setProblems] = useState<StoryDiagnosticDto[]>([]);
 
     /**
@@ -3520,17 +5387,58 @@ function App(): React.JSX.Element {
     /** The reader has asked to see the findings the view filter holds back. */
     const [showAllProblems, setShowAllProblems] = useState(false);
     const [showProblems, setShowProblems] = useState(false);
-    const [showSimLog, setShowSimLog] = useState(true);
+    const [showTrace, setShowTrace] = useState(true);
+    const [simSteps, setSimSteps] = useState<StorySimStepDto[]>([]);
+    // Mirrors for the paint after a graph rebuild, which runs from a promise chain rather than a
+    // render: the accumulated trace and the overlay routine itself.
+    const simStepsRef = useRef<StorySimStepDto[]>([]);
+    const applySimOverlayRef = useRef<((state: StorySimStateDto | null, replay?: boolean) => void) | null>(null);
+    // What the simulation's detail dialog shows, and which lenses the canvas wears.
+    const [simSelection, setSimSelection] = useState<SimSelection | null>(null);
+    // Mirror for the overlay routine, which decides whether a wait already has its decision open.
+    const simSelectionRef = useRef<SimSelection | null>(null);
+    simSelectionRef.current = simSelection;
+    const [simLenses, setSimLensesState] = useState<SimLenses>(() => readLenses());
+    const setSimLenses = useCallback((next: SimLenses) => {
+        setSimLensesState(next);
+        writeLenses(next);
+    }, []);
+    const simLensesRef = useRef(simLenses);
+    simLensesRef.current = simLenses;
+    // The overview honours the lenses too, so a zoom across the LOD threshold changes nothing.
+    useEffect(() => {
+        editorRef.current?.setSimLenses(simLenses);
+    }, [simLenses]);
+    // The graph as the server sent it, for the event dialog's arming lines and the trace's node names.
+    // Refs rather than state: the graph changes rarely and the canvas already re-renders on it.
+    const simGraphRef = useRef<{ nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[] }>({nodes: [], edges: []});
+    const [simGraphVersion, setSimGraphVersion] = useState(0);
+    const labelOf = useCallback((id: string): string | undefined =>
+        simGraphRef.current.nodes.find(n => n.id === id)?.label, []);
     // Whether the current (possibly staged) state has been validated since it last changed.
     const [validated, setValidated] = useState(false);
     // Swimlane overlays, toggled independently (persisted per-workspace via WorkspaceSettings).
     const [showThreadLanes, setShowThreadLanes] = useState(false);
     const [showChapterLanes, setShowChapterLanes] = useState(false);
+    /**
+     * The battle this panel shows, or null at the galactic level. Told by the extension with every
+     * graph, since the panel is one scope for its whole life; it decides what a thread lane means.
+     */
+    const [scope, setScope] = useState<string | null>(null);
+    /**
+     * Whether the last graph has finished mounting. A centre request that arrives mid-build parks
+     * in {@link pendingJumpRef} for {@link runSetGraph} to spend; one that arrives after can go
+     * straight to the editor.
+     */
+    const graphSettledRef = useRef(true);
     // Count of unsaved staged edits - drives the Save button's enabled/dirty state.
     const [pendingCount, setPendingCount] = useState(0);
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => { currentMode = mode; editorRef.current?.refreshMode(); }, [mode]);
+    useEffect(() => {
+        currentMode = mode;
+        editorRef.current?.refreshMode();
+    }, [mode]);
 
     useEffect(() => {
         onPendingChanged = () => {
@@ -3538,19 +5446,24 @@ function App(): React.JSX.Element {
             setValidated(false); // the staged set changed → the last validation is stale
             // Mirror the queue to the extension so it can offer to save if the tab is closed while
             // dirty (a disposed webview can't prompt - the panel owns that).
-            vscode.postMessage({ type: 'pendingSync', commands: [...pendingCommands] });
+            vscode.postMessage({type: 'pendingSync', commands: [...pendingCommands]});
         };
-        return () => { onPendingChanged = () => { /* detached on unmount */ }; };
+        return () => {
+            onPendingChanged = () => { /* detached on unmount */
+            };
+        };
     }, []);
 
     const saveEdits = useCallback(() => {
-        if (!hasPendingChanges()) { return; }
+        if (!hasPendingChanges()) {
+            return;
+        }
         setSaving(true);
-        vscode.postMessage({ type: 'saveBatch', commands: [...pendingCommands] });
+        vscode.postMessage({type: 'saveBatch', commands: [...pendingCommands]});
     }, []);
 
     const validateEdits = useCallback(() => {
-        vscode.postMessage({ type: 'validateBatch', commands: [...pendingCommands] });
+        vscode.postMessage({type: 'validateBatch', commands: [...pendingCommands]});
     }, []);
 
     // When a Save is triggered by leaving Edit with unsaved changes, the mode switch waits for the
@@ -3560,30 +5473,41 @@ function App(): React.JSX.Element {
     const doSwitchMode = useCallback((next: EditorMode) => {
         setMode(next);
         if (next === 'simulate') {
-            setShowSimLog(true); // re-show the log each time simulation is entered
-            if (!simRef.current?.running) { sendSim('start'); }
+            setShowTrace(true); // re-show the trace each time simulation is entered
+            if (!simRef.current?.running) {
+                simLastSeq = 0;
+                sendSim('start');
+            }
         } else if (simRef.current?.running) {
+            setPlayingBoth(false);
+            setSimSelection(null);
             sendSim('stop');
         }
-        if (next !== 'edit') { setCreateRequest(null); }
+        if (next !== 'edit') {
+            setCreateRequest(null);
+        }
     }, []);
 
     const switchMode = useCallback((next: EditorMode) => {
         // A disabled mode is not offered by the switch, but guard here too - this is the single
         // funnel every mode change goes through, including the centre-button cycle.
-        if ((next === 'edit' && !availableModes.edit)
-            || (next === 'simulate' && !availableModes.simulate)) { return; }
+        if ((next === 'edit' && (!availableModes.edit || editBlockedBy !== null))
+            || (next === 'simulate' && !availableModes.simulate)) {
+            return;
+        }
         // Leaving Edit with unsaved staged changes → ask (the panel shows the modal and replies with
         // 'dirtyExitChoice'); the switch happens then. Simulate/View therefore run on committed text.
         if (mode === 'edit' && next !== 'edit' && hasPendingChanges()) {
-            vscode.postMessage({ type: 'confirmDirtyExit', next });
+            vscode.postMessage({type: 'confirmDirtyExit', next});
             return;
         }
         doSwitchMode(next);
-    }, [mode, doSwitchMode, availableModes]);
+    }, [mode, doSwitchMode, availableModes, editBlockedBy]);
 
     const onCanvasDragOver = useCallback((e: DragEvent): void => {
-        if (mode !== 'edit') { return; }
+        if (mode !== 'edit') {
+            return;
+        }
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
     }, [mode]);
@@ -3598,25 +5522,40 @@ function App(): React.JSX.Element {
         position: { x: number; y: number }, eventType: string | null,
     ): void => {
         const handle = editorRef.current;
-        if (!handle) { return; }
+        if (!handle) {
+            return;
+        }
         const thread = handle.nearestEventThread(position, threads);
         if (!thread) {
             setStatus('This campaign has no thread file to add events to - create a thread first.');
             return;
         }
+        // The landing thread is picked by proximity, so a drop near a referenced project's events
+        // lands in a file this workspace cannot write. Say so here rather than at Save.
+        const owner = threadReadOnlyOwner(thread);
+        if (owner) {
+            setStatus(`${readOnlyMessage(owner)}. Drop the event beside this project's own events`);
+            return;
+        }
         const taken = new Set(handle.eventLabels());
         let name = 'New_Event';
-        for (let i = 2; taken.has(name); i++) { name = `New_Event_${i}`; }
+        for (let i = 2; taken.has(name); i++) {
+            name = `New_Event_${i}`;
+        }
         handle.presetPosition(thread, name, position);
         // Open the new node's rename box as soon as it materialises - drop then type the name.
         pendingAutoRename.add(autoRenameKey(thread, name));
-        sendCommand({ kind: 'createEvent', threadUri: thread, newName: name, eventType: eventType || null });
+        sendCommand({kind: 'createEvent', threadUri: thread, newName: name, eventType: eventType || null});
     }, [threads]);
 
     const onCanvasDrop = useCallback((e: DragEvent): void => {
-        if (mode !== 'edit') { return; }
+        if (mode !== 'edit') {
+            return;
+        }
         const raw = e.dataTransfer.getData(PALETTE_DRAG_MIME);
-        if (!raw) { return; }
+        if (!raw) {
+            return;
+        }
         e.preventDefault();
         const drag = JSON.parse(raw) as PaletteDrag;
         // Types attach by dropping onto a node (data-node-id lookup, not geometry) - and only
@@ -3655,53 +5594,301 @@ function App(): React.JSX.Element {
             return;
         }
         const position = editorRef.current?.toGraphPosition(e.clientX, e.clientY) ?? null;
-        if (!position) { return; }
+        if (!position) {
+            return;
+        }
         // Land/space tactical triggers still need the dedicated manifest-file form (their plot
         // file is mandatory and can't be filled in-node later); everything else drops as an
         // editable node straight onto the canvas - no toolbar form.
         if (drag.type && TACTICAL_EVENT_TYPES.has(drag.type)) {
-            setCreateRequest({ ...drag, category: 'tactical', position });
+            setCreateRequest({...drag, category: 'tactical', position});
             return;
         }
         createEventAt(position, drag.category === 'trigger' ? drag.type : null);
     }, [mode, createEventAt]);
 
-    const applySimOverlay = useCallback((state: StorySimStateDto | null) => {
+    /**
+     * A fresh state from the server. `replay` plays the delta steps before painting the final
+     * state; a re-render of the graph passes false and only repaints, since those steps were
+     * played already.
+     */
+    const applySimOverlay = useCallback((state: StorySimStateDto | null, replay = true) => {
         simRef.current = state;
         setSimState(state);
+        inFlightRef.current = null;
+        setSimNotice(null);
+        // A battle that has resolved takes no more ticks: play stops here rather than being
+        // refused once per interval - and the moment the outcome lands, the galaxy takes the
+        // reader back on the event the story goes on from, as the game returns to the galactic map.
+        if (state?.outcome) {
+            setPlayingBoth(false);
+            if (state.scope && !resolvedOnceRef.current) {
+                resolvedOnceRef.current = true;
+                const target = galacticReturnNode(simGraphRef.current.nodes, simGraphRef.current.edges, state.outcome);
+                if (target) {
+                    vscode.postMessage({type: 'revealScope', nodeId: target});
+                }
+            }
+        } else {
+            resolvedOnceRef.current = false;
+        }
         const handle = editorRef.current;
-        if (!handle) { return; }
-        handle.applyLifecycles(state?.running
-            ? new Map(state.nodes.map(n => [n.nodeId, n.lifecycle]))
-            : null);
+        if (!state?.running) {
+            simLastSeq = 0;
+            setPlayingBoth(false);
+            setSimSteps([]);
+            simStepsRef.current = [];
+            setSimSelection(null);
+            handle?.resetSimVisuals();
+            handle?.applyLifecycles(null);
+            handle?.applyFireCounts(null);
+            handle?.applyBattles(null);
+            return;
+        }
+        const lifecycles = new Map(state.nodes.map(n => [n.nodeId, n.lifecycle]));
+        const fireCounts = new Map(state.nodes.map(n => [n.nodeId, n.fireCount]));
+        const nodeStates = new Map(state.nodes.map(n => [n.nodeId, n]));
+        const breakpoints = new Set(state.breakpoints);
+        // Every state, not only a rebuild: the lens effect can run before the editor exists, and
+        // the overview must dim from the first state on. Measured: without this the zoomed-out
+        // view drew every unreached event at full strength while the detail view greyed it.
+        handle?.setSimLenses(simLensesRef.current);
+        // Play pauses itself only where the clock cannot go on: a breakpoint, or nothing left for
+        // the clock alone to change. Not on a new decision - on a real campaign one arms nearly
+        // every tick (measured on Underworld: play stopped after each tick and read as broken),
+        // and stopping there is what run-to-decision is for.
+        const waiting = state.interventions.length > 0 && (state.clockPending ?? 1) === 0;
+        // The decision the story hangs on (simModel.hangingDecision): a pending or starting battle
+        // whatever the clock still owes, else - once the clock has nothing left - the decision
+        // armed last. It opens beside the dock with its node in view the moment it becomes that
+        // decision, and not again while it stays so: a dialog the reader closed stays closed until
+        // the story hangs on something else.
+        // A decision's dialog closes once the decision is answered - by its own answer, or by a
+        // battle's outcome landing - rather than staying up with nothing left to answer.
+        if (simSelectionRef.current && selectionAnswered(simSelectionRef.current, state)) {
+            setSimSelection(null);
+        }
+        const battleDecision = state.interventions.find(i => i.kind === 'battle');
+        const hang = battleDecision ?? (waiting ? hangingDecision(state.interventions, simStepsRef.current) : null);
+        const hangId = hang?.nodeId ?? null;
+        if (hangId && hangId !== hangRef.current) {
+            const current = simSelectionRef.current;
+            if (!(current?.kind === 'decision' && current.nodeId === hangId)) {
+                setSimSelection({kind: 'decision', nodeId: hangId});
+                editorRef.current?.centerNode(hangId);
+            }
+        }
+        hangRef.current = hangId;
+        if (state.haltedAt || waiting) {
+            // Remember that it was the wait, not the reader, that stopped play: an answer resumes it.
+            if (playingRef.current && !state.haltedAt) {
+                pausedForWaitRef.current = true;
+            }
+            setPlayingBoth(false);
+        } else if (answeredRef.current && shouldResumeAfterAnswer({
+            autoResume: autoResumeRef.current, pausedForWait: pausedForWaitRef.current,
+            stillWaiting: waiting, halted: !!state.haltedAt,
+        })) {
+            pausedForWaitRef.current = false;
+            setPlayingBoth(true);
+        }
+        answeredRef.current = false;
+        if (!handle) {
+            simLastSeq = state.totalSteps;
+            return;
+        }
+        // The battles' standing is the galactic session's word, whole every time.
+        handle.applyBattles(state.battles ?? null);
+        if (!replay) {
+            // The graph was rebuilt under the simulation: paint everything the server's state says,
+            // paths taken included, from the whole trace seen so far.
+            handle.setSimLenses(simLensesRef.current);
+            handle.applyLifecycles(lifecycles);
+            handle.applyFireCounts(fireCounts);
+            handle.applySimMarks(nodeStates, breakpoints);
+            handle.applyFlow(simStepsRef.current);
+            return;
+        }
+        // A rewind (seek, restart) hands back the trace from the top: repaint from nothing.
+        const rewind = state.totalSteps < simLastSeq || state.steps.some(s => s.seq < simLastSeq);
+        const fresh = simLastSeq === 0;
+        const delta = rewind ? state.steps : state.steps.filter(s => s.seq >= simLastSeq);
+        simLastSeq = state.totalSteps;
+        // The trace panel shows the whole record; each response carries only the steps after the
+        // last one played, so they accumulate here and a rewind starts the record over.
+        setSimSteps(prev => {
+            const next = rewind || fresh ? [...state.steps] : [...prev, ...delta];
+            simStepsRef.current = next;
+            return next;
+        });
+        const tickMs = fresh || rewind || prefersReducedMotion()
+            ? 0
+            : Math.min(600, paceIntervalMs(paceRef.current) * 0.6);
+        playQueueRef.current = playQueueRef.current
+            .then(() => {
+                if (rewind) {
+                    handle.resetSimVisuals();
+                }
+                return handle.playSimSteps(delta, tickMs);
+            })
+            .then(() => {
+                // The state is authoritative; playback only staged the way there.
+                handle.applyLifecycles(lifecycles);
+                handle.applyFireCounts(fireCounts);
+                handle.applySimMarks(nodeStates, breakpoints);
+            })
+            .catch(() => undefined);
+    }, []);
+    applySimOverlayRef.current = applySimOverlay;
+
+    // The transport timer: while playing in pulse or custom pace, request one tick per interval,
+    // never more than one in flight. A response that never comes (an error dialog took it)
+    // releases the slot after a few seconds so the timer cannot wedge.
+    useEffect(() => {
+        if (!playing || pace.mode === 'step') {
+            return;
+        }
+        const requestTick = (): void => {
+            const now = Date.now();
+            if (inFlightRef.current !== null && now - inFlightRef.current < 5000) {
+                return;
+            }
+            inFlightRef.current = now;
+            simRequest('tick', {count: 1});
+        };
+        requestTick();
+        const id = setInterval(requestTick, paceIntervalMs(pace));
+        return () => clearInterval(id);
+    }, [playing, pace]);
+
+    // Every request the dock can make. Built once: the callbacks read refs, so a re-render of the
+    // dock never has to wait for a new object.
+    const simActions = useMemo<SimActions>(() => ({
+        playPause: () => {
+            if (paceRef.current.mode === 'step') {
+                simRequest('tick', {count: 1});
+                return;
+            }
+            setPlayingBoth(!playingRef.current);
+        },
+        tick: () => {
+            setPlayingBoth(false);
+            simRequest('tick', {count: 1});
+        },
+        back: () => {
+            setPlayingBoth(false);
+            const tick = simRef.current?.tick ?? 0;
+            if (tick > 0) {
+                sendSim('seek', {tick: tick - 1});
+            }
+        },
+        restart: () => {
+            setPlayingBoth(false);
+            sendSim('seek', {tick: 0});
+        },
+        runToDecision: () => {
+            setPlayingBoth(false);
+            simRequest('runToDecision');
+        },
+        satisfy: nodeId => {
+            answeredRef.current = true;
+            simRequest('satisfyTrigger', {nodeId});
+        },
+        // Ruling a listener out answers the wait as much as firing it does; reconsidering does not.
+        ruleOut: (nodeId, ruledOut) => {
+            if (ruledOut) {
+                answeredRef.current = true;
+            }
+            simRequest('ruleOut', {nodeId, ruledOut});
+        },
+        world: change => {
+            answeredRef.current = true;
+            simRequest('world', {change});
+        },
+        // The battle's own panel, straight into Simulation when the reader is entering it; the
+        // resolution names the battle, and the answer is this panel's own scope.
+        openBattle: (battleKey, label, simulate) =>
+            vscode.postMessage({type: 'openScope', scope: battleKey, label, simulate}),
+        resolveBattle: (battleKey, won, picks) => {
+            answeredRef.current = true;
+            simRequest('resolveBattle', {
+                battle: battleKey, won, flags: picks?.length ? [...picks] : undefined,
+            });
+        },
+        retryBattle: battleKey => {
+            simRequest('retryBattle', {battle: battleKey});
+        },
+        luaNotify: id => {
+            answeredRef.current = true;
+            simRequest('luaNotify', {id});
+        },
+        setFlag: (flag, value) => {
+            answeredRef.current = true;
+            simRequest('setFlag', {flag, value});
+        },
+        setBreakpoints: (nodeIds, onConditionalGates) => sendSim('breakpoints', {nodeIds, onConditionalGates}),
+        centerNode: nodeId => editorRef.current?.centerNode(nodeId),
+        copy: text => vscode.postMessage({type: 'copy', text}),
+    }), []);
+
+    // A node picked on the canvas while simulating opens its detail beside the dock.
+    useEffect(() => {
+        onSimNodePicked = nodeId => {
+            const kind = simGraphRef.current.nodes.find(n => n.id === nodeId)?.kind;
+            const battleKey = battleKeyOfNode(nodeId);
+            if (kind === 'Event') {
+                setSimSelection({kind: 'node', nodeId});
+            } else if (kind === 'TacticalPlot' && battleKey) {
+                setSimSelection({kind: 'battle', key: battleKey});
+            }
+        };
+        return () => {
+            onSimNodePicked = null;
+        };
     }, []);
 
     const fetchGraph = useCallback((next: FilterState) => {
         filtersRef.current = next;
         // Node bodies render through rete's portal pipeline, where App state is out of reach, so the
         // active filter reaches their menus the way `currentMode` does.
-        currentReachable = { from: next.reachableFrom, direction: next.reachableDirection };
+        currentReachable = {from: next.reachableFrom, direction: next.reachableDirection};
         setFiltersState(next);
         fullRenderRef.current = true;
-        vscode.postMessage({ type: 'fetch', filters: next });
+        vscode.postMessage({type: 'fetch', filters: next});
     }, []);
 
     /** Runs setGraph, keeping the canvas covered for the duration of a full rebuild's auto-arrange. */
     const runSetGraph = useCallback((handle: EditorHandle, g: {
         nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntryDto[]; full: boolean;
     }) => {
-        if (g.full) { setLayouting(true); }
+        if (g.full) {
+            setLayouting(true);
+        }
+        graphSettledRef.current = false;
         // Re-apply staged edits once the (re)built graph settles, so a reconcile never reverts them.
         const done = handle.setGraph(g.nodes, g.edges, g.layout, g.full)
             .then(() => reapplyStagedCommands())
             .then(() => {
-                // A jump parked by a problem click, now that its node is mounted and centreable.
+                // A running simulation is painted over the settled graph, not over the one that
+                // was there when its last state arrived - a filter or relayout replaces the nodes.
+                if (simRef.current?.running) {
+                    applySimOverlayRef.current?.(simRef.current, false);
+                }
+            })
+            .then(() => {
+                graphSettledRef.current = true;
+                // A jump parked by a problem click or a portal, now that its node is mounted and
+                // centreable.
                 const queued = pendingJumpRef.current;
-                if (queued === null) { return; }
+                if (queued === null) {
+                    return;
+                }
                 pendingJumpRef.current = null;
                 handle.centerNode(queued);
             });
-        if (g.full) { void done.finally(() => setLayouting(false)); }
+        if (g.full) {
+            void done.finally(() => setLayouting(false));
+        }
     }, []);
 
     const applyGraph = useCallback((
@@ -3713,6 +5900,10 @@ function App(): React.JSX.Element {
         // be able to target a thread the current filter is hiding.
         setBranches(facetList(facets.branches, nodes.map(n => n.branch), filtersRef.current.branch));
         setThreads(facetList(facets.threads, nodes.map(n => n.threadUri), ''));
+        // A graph with nothing of this project's own in it cannot be edited at all, and the switch
+        // has to say so BEFORE anything is dragged onto the canvas - disabling the fields on each
+        // node still leaves the canvas taking drops.
+        setEditBlockedBy(editModeBlockedBy(nodes));
         if (!nodes.length) {
             setStatus('No events match the current filters.');
             return;
@@ -3721,19 +5912,23 @@ function App(): React.JSX.Element {
         const handle = editorRef.current;
         if (handle) {
             pendingGraphRef.current = null;
-            runSetGraph(handle, { nodes, edges, layout, full });
+            runSetGraph(handle, {nodes, edges, layout, full});
         } else {
-            pendingGraphRef.current = { nodes, edges, layout, full };
+            pendingGraphRef.current = {nodes, edges, layout, full};
         }
     }, [runSetGraph]);
 
     useEffect(() => {
         onGraphDesynced = () => {
             // Re-fetch with the current filters; the incremental patch restores the view.
-            vscode.postMessage({ type: 'fetch', filters: filtersRef.current });
+            vscode.postMessage({type: 'fetch', filters: filtersRef.current});
         };
         onReachableFromRequested = (id, direction) =>
-            setFilter({ reachableFrom: id, reachableDirection: direction });
+            setFilter({reachableFrom: id, reachableDirection: direction});
+        onOpenBattleRequested = (battleKey, label, simulate) =>
+            vscode.postMessage({type: 'openScope', scope: battleKey, label, simulate});
+        onRevealGalacticRequested = galacticNodeId =>
+            vscode.postMessage({type: 'revealScope', nodeId: galacticNodeId});
         requestPreview = () => vscode.postMessage({
             type: 'previewGraph', commands: [...pendingCommands], filters: filtersRef.current,
         });
@@ -3742,9 +5937,11 @@ function App(): React.JSX.Element {
             const msg = event.data as { type: string; [key: string]: unknown };
             switch (msg.type) {
                 case 'schema': {
-                    untestedTypes.clear();
-                    for (const name of (msg.untestedEventTypes as string[] | undefined) ?? []) { untestedTypes.add(name); }
-                    for (const name of (msg.untestedRewardTypes as string[] | undefined) ?? []) { untestedTypes.add(name); }
+                    typeNotes.clear();
+                    for (const [name, notes] of Object.entries(
+                        (msg.typeNotes as Record<string, StoryNote[]> | undefined) ?? {})) {
+                        typeNotes.set(name, notes);
+                    }
                     setEventTypes((msg.eventTypes as string[] | undefined) ?? []);
                     setRewardTypes((msg.rewardTypes as string[] | undefined) ?? []);
                     // EventNodeView is rendered by rete's own portal pipeline, not as an App
@@ -3768,8 +5965,11 @@ function App(): React.JSX.Element {
                     // so the viewport and node positions stay put - and must not consume a pending
                     // full render queued by a real fetch/filter change.
                     const full = msg.preview ? false : fullRenderRef.current;
-                    if (!msg.preview) { fullRenderRef.current = false; }
+                    if (!msg.preview) {
+                        fullRenderRef.current = false;
+                    }
                     const graphNodes = (msg.nodes as StoryGraphNodeDto[] | undefined) ?? [];
+                    setScope(typeof msg.scope === 'string' && msg.scope ? msg.scope : null);
                     // Big campaigns render hundreds of full form nodes - collapse the Trigger and
                     // Reward sections by default past a threshold so first paint (and every later
                     // measure) touches far less DOM. Only seeds nodes with no explicit choice yet,
@@ -3778,11 +5978,16 @@ function App(): React.JSX.Element {
                     if (graphNodes.length > LARGE_GRAPH_NODE_COUNT) {
                         for (const dto of graphNodes) {
                             if (dto.kind === 'Event' && !collapsedSections.has(dto.id)) {
-                                collapsedSections.set(dto.id, { general: false, trigger: true, reward: true });
+                                collapsedSections.set(dto.id, {general: false, trigger: true, reward: true});
                             }
                         }
                     }
                     setGraphNodeIds(new Set(graphNodes.map(n => n.id)));
+                    simGraphRef.current = {
+                        nodes: graphNodes,
+                        edges: (msg.edges as StoryGraphEdgeDto[] | undefined) ?? []
+                    };
+                    setSimGraphVersion(v => v + 1);
                     // Colours follow the CAMPAIGN's branches, so a filter leaves them alone. Set
                     // before the graph is applied: the build reads the assignment as it goes.
                     const campaignBranches = facetList(
@@ -3805,21 +6010,70 @@ function App(): React.JSX.Element {
                         });
                     // A full build repaints everything anyway; a patch keeps nodes that were
                     // rendered in the old slots.
-                    if (coloursMoved && !full) { editorRef.current?.repaintBranchColours(); }
+                    if (coloursMoved && !full) {
+                        editorRef.current?.repaintBranchColours();
+                    }
                     // A running simulation keeps painting its lifecycles over fresh renders.
-                    if (simRef.current?.running) { applySimOverlay(simRef.current); }
+                    if (simRef.current?.running) {
+                        applySimOverlay(simRef.current, false);
+                    }
                     break;
                 }
                 case 'simState':
                     applySimOverlay((msg.state as StorySimStateDto | null) ?? null);
                     break;
-                case 'simChanged':
-                    sendSim('getState');
+                case 'simError':
+                    // The server refused the command: the slot is free, play stops - the next
+                    // tick would be refused the same way - and the dock says why until the next
+                    // state arrives.
+                    inFlightRef.current = null;
+                    setPlayingBoth(false);
+                    setSimNotice(String(msg.message ?? ''));
                     break;
+                case 'simChanged':
+                    simRequest('getState');
+                    break;
+                case 'enterMode':
+                    // A battle entered from the galactic simulation opens into its own session.
+                    if (msg.mode === 'simulate' || msg.mode === 'edit' || msg.mode === 'view') {
+                        doSwitchMode(msg.mode);
+                    }
+                    break;
+                case 'centerNode': {
+                    // A portal's landing spot. Outside the current filter the node was never sent,
+                    // so the filter goes and the jump waits for the fuller graph; mid-build it waits
+                    // for the nodes to mount; otherwise it goes straight to the editor.
+                    const id = String(msg.nodeId ?? '');
+                    if (!id) {
+                        break;
+                    }
+                    const inView = new Set(simGraphRef.current.nodes.map(n => n.id));
+                    if (resolveProblemJump(id, inView) === 'unfilter') {
+                        pendingJumpRef.current = id;
+                        setNameDraft('');
+                        fetchGraph({...EMPTY_FILTERS});
+                    } else if (!graphSettledRef.current) {
+                        pendingJumpRef.current = id;
+                    } else {
+                        editorRef.current?.centerNode(id);
+                    }
+                    break;
+                }
                 case 'paramOptions': {
-                    const resolve = pendingOptionRequests.get(msg.requestId as number);
-                    if (resolve) {
-                        pendingOptionRequests.delete(msg.requestId as number);
+                    // The id is taken as a NUMBER before it is used as a key, and the value is
+                    // checked to be callable before it is called. Neither is theatre: the id
+                    // arrives over the message channel, and a Map lookup on an arbitrary key is
+                    // how a value of the wrong shape would reach a call position. The map only
+                    // ever holds resolvers we put there, so this costs nothing and removes the
+                    // question - see the js/unvalidated-dynamic-method-call alert.
+                    const requestId = typeof msg.requestId === 'number' ? msg.requestId : null;
+                    if (requestId === null) {
+                        break;
+                    }
+
+                    const resolve = pendingOptionRequests.get(requestId);
+                    if (typeof resolve === 'function') {
+                        pendingOptionRequests.delete(requestId);
                         resolve((msg.options as StoryParamOptionDto[] | undefined) ?? []);
                     }
                     break;
@@ -3832,7 +6086,9 @@ function App(): React.JSX.Element {
                     const affected = new Set<string>(nodeDiagnostics.keys());
                     nodeDiagnostics.clear();
                     for (const d of diags) {
-                        if (!d.nodeId) { continue; }
+                        if (!d.nodeId) {
+                            continue;
+                        }
                         const list = nodeDiagnostics.get(d.nodeId) ?? [];
                         list.push(d);
                         nodeDiagnostics.set(d.nodeId, list);
@@ -3847,17 +6103,22 @@ function App(): React.JSX.Element {
                     break;
                 }
                 case 'invalidate':
-                    vscode.postMessage({ type: 'fetch', filters: filtersRef.current });
+                    vscode.postMessage({type: 'fetch', filters: filtersRef.current});
                     break;
                 case 'workspaceSettings':
                     setShowThreadLanes(msg.showThreadLanes === true);
                     setShowChapterLanes(msg.showChapterLanes === true);
                     break;
                 case 'availableModes':
-                    setAvailableModes({ edit: msg.edit === true, simulate: msg.simulate === true });
+                    setAvailableModes({edit: msg.edit === true, simulate: msg.simulate === true});
+                    break;
+                case 'simSettings':
+                    autoResumeRef.current = msg.autoResume !== false;
                     break;
                 case 'confirmStageResult':
-                    if (msg.proceed) { stageCommand(msg.payload as Record<string, unknown>); }
+                    if (msg.proceed) {
+                        stageCommand(msg.payload as Record<string, unknown>);
+                    }
                     break;
                 case 'saveResult':
                     setSaving(false);
@@ -3882,7 +6143,7 @@ function App(): React.JSX.Element {
                     } else if (msg.choice === 'discard') {
                         clearPendingCommands();
                         // Staged edits were local-only - re-fetch to drop them and show committed state.
-                        vscode.postMessage({ type: 'fetch', filters: filtersRef.current });
+                        vscode.postMessage({type: 'fetch', filters: filtersRef.current});
                         doSwitchMode(next);
                     }
                     // 'cancel' → stay in Edit with the queue intact
@@ -3894,17 +6155,22 @@ function App(): React.JSX.Element {
             }
         };
         window.addEventListener('message', onMessage);
-        vscode.postMessage({ type: 'ready' });
+        vscode.postMessage({type: 'ready'});
         return () => window.removeEventListener('message', onMessage);
     }, [applyGraph, applySimOverlay, doSwitchMode, saveEdits]);
 
     useEffect(() => {
         const container = containerRef.current;
-        if (!container) { return; }
+        if (!container) {
+            return;
+        }
         let disposed = false;
         let handle: EditorHandle | null = null;
         void createEditor(container).then(created => {
-            if (disposed) { created.destroy(); return; }
+            if (disposed) {
+                created.destroy();
+                return;
+            }
             handle = created;
             editorRef.current = created;
             editorHandleRef = created;
@@ -3922,27 +6188,29 @@ function App(): React.JSX.Element {
         };
     }, [runSetGraph]);
 
-    const setFilter = (patch: Partial<FilterState>): void => fetchGraph({ ...filtersRef.current, ...patch });
+    const setFilter = (patch: Partial<FilterState>): void => fetchGraph({...filtersRef.current, ...patch});
 
     // Applies the typed filter once it has settled. Guarded against re-applying what is already the
     // active filter, which is what `clearFilters` and the first render would otherwise do.
     const settledName = useDebounced(nameDraft, GRAPH_FILTER_DEBOUNCE_MS);
     useEffect(() => {
-        if (settledName === filtersRef.current.nameFilter) { return; }
+        if (settledName === filtersRef.current.nameFilter) {
+            return;
+        }
         // setFilter reads the filter REF rather than state, so the settled text is the only dependency.
-        setFilter({ nameFilter: settledName });
+        setFilter({nameFilter: settledName});
     }, [settledName]);
 
     const clearFilters = (): void => {
         setNameDraft('');
-        fetchGraph({ ...EMPTY_FILTERS });
+        fetchGraph({...EMPTY_FILTERS});
     };
     const toggleLane = (which: 'thread' | 'chapter'): void => {
         const nextThread = which === 'thread' ? !showThreadLanes : showThreadLanes;
         const nextChapter = which === 'chapter' ? !showChapterLanes : showChapterLanes;
         setShowThreadLanes(nextThread);
         setShowChapterLanes(nextChapter);
-        vscode.postMessage({ type: 'setLanePref', showThreadLanes: nextThread, showChapterLanes: nextChapter });
+        vscode.postMessage({type: 'setLanePref', showThreadLanes: nextThread, showChapterLanes: nextChapter});
     };
 
     // Validate button reads out validation health (codicon name; coloured via sev-* class):
@@ -3969,218 +6237,298 @@ function App(): React.JSX.Element {
     // The badge follows what is ON SCREEN, so it agrees with the table under it. What stops that
     // reading as all-clear over a hidden error is the panel's own "n of m" and its filter chip.
     const severity = !validated ? 'unvalidated' : worstSeverity(problemView.shown);
+    const [modalLayer, setModalLayer] = useState<HTMLElement | null>(null);
 
     return (
-        <Shell>
-            <GlobalStyle />
-            <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
-                <defs>
-                    <marker id="story-arrow" viewBox="0 0 10 10" refX="9" refY="5"
-                        markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--vscode-charts-foreground, #999)" />
-                    </marker>
-                </defs>
-            </svg>
-            {createRequest && createRequest.category === 'tactical' && mode === 'edit' ? (
-                <TacticalCreateBar
-                    key={`tactical:${createRequest.type ?? ''}`}
-                    threads={threads}
-                    initialType={createRequest.type}
-                    onCreate={(threadUri, newName, value, file) => {
-                        if (createRequest.position) {
-                            editorRef.current?.presetPosition(threadUri, newName, createRequest.position);
-                        }
-                        sendCommand({ kind: 'createTacticalAttachment', threadUri, newName, value, file });
-                        setCreateRequest(null);
-                    }}
-                    onClose={() => setCreateRequest(null)}
-                />
-            ) : null}
-            <div className="body">
-                <div className="canvas-column">
-                <div className="canvas-area">
-                    {/* Screen-space canvases behind the nodes (.canvas is z-index 1), redrawn on pan/zoom. */}
-                    <SwimlaneCanvas
-                        getHandle={() => editorRef.current}
-                        showThread={showThreadLanes} showChapter={showChapterLanes}
+        <ModalLayerContext.Provider value={modalLayer}>
+            <Shell className={mode === 'simulate' ? [
+                simLenses.activeOnly ? 'lens-active-only' : '',
+                simLenses.hideFlow ? 'lens-hide-flow' : '',
+                simLenses.hideLua ? 'lens-hide-lua' : '',
+            ].filter(c => c).join(' ') : undefined}>
+                <GlobalStyle/>
+                <svg width="0" height="0" style={{position: 'absolute'}} aria-hidden="true">
+                    <defs>
+                        <marker id="story-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--vscode-charts-foreground, #999)"/>
+                        </marker>
+                    </defs>
+                </svg>
+                {createRequest && createRequest.category === 'tactical' && mode === 'edit' ? (
+                    <TacticalCreateBar
+                        key={`tactical:${createRequest.type ?? ''}`}
+                        threads={threads}
+                        initialType={createRequest.type}
+                        onCreate={(threadUri, newName, value, file) => {
+                            if (createRequest.position) {
+                                editorRef.current?.presetPosition(threadUri, newName, createRequest.position);
+                            }
+                            sendCommand({kind: 'createTacticalAttachment', threadUri, newName, value, file});
+                            setCreateRequest(null);
+                        }}
+                        onClose={() => setCreateRequest(null)}
                     />
-                    <LodOverview getHandle={() => editorRef.current} />
-                    <div
-                        className="canvas" ref={containerRef}
-                        onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
-                    />
-                    {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
-                    {/* The colour key, on a corner plate like the preview's stage controls. After
-                        the status cover, so the key can still be opened while a layout runs. */}
-                    <div className="stage-chrome key-corner">
-                        <IconButton
-                            icon="details"
-                            title="Colour key"
-                            className={colourKeyOpen ? 'active' : undefined}
-                            expanded={colourKeyOpen}
-                            onClick={() => setColourKeyOpen(open => !open)}
-                        />
-                    </div>
-                    {colourKeyOpen ? (
-                        <ColourKeyFlyout branches={branchEntries} onClose={() => setColourKeyOpen(false)} />
-                    ) : null}
-                </div>
-                <div className="bottom-panels">
-                    {showProblems && problems.length ? (
-                        <ProblemsBar
-                            problems={problemView.shown}
-                            label={problemView.label}
-                            filter={{
-                                hidden: problemView.hidden,
-                                showingAll: showAllProblems,
-                                filterable: problemView.filterable,
-                                onToggle: () => setShowAllProblems(open => !open),
-                            }}
-                            onJump={id => {
-                                // Centring on a node the server filtered out is a no-op, so a
-                                // problem from outside the view clears the filter and jumps when
-                                // the fuller graph lands.
-                                if (resolveProblemJump(id, graphNodeIds) === 'unfilter') {
-                                    pendingJumpRef.current = id;
-                                    clearFilters();
-                                    return;
-                                }
-                                editorRef.current?.centerNode(id);
-                            }}
-                            onClose={() => setShowProblems(false)}
-                        />
-                    ) : null}
-                    {simState?.running && showSimLog ? (
-                        <SimLog state={simState} onClose={() => setShowSimLog(false)} />
-                    ) : null}
-                </div>
-                </div>
-                <RightDock
-                    memoKey="storyGraph.dock"
-                    initialWidth={300}
-                    minWidth={210}
-                    maxWidth={520}
-                    header={<>
-                        {mode === 'edit' ? (
-                            <IconButton
-                                icon="save"
-                                className={'header-left' + (pendingCount > 0 ? ' active' : '')}
-                                title="Save - write all staged changes to the XML files"
-                                badge={pendingCount > 0 ? ` ${pendingCount}` : ''}
-                                disabled={pendingCount === 0 || saving}
-                                disabledReason={saving
-                                    ? 'Save - writing the staged changes now'
-                                    : 'Save - nothing is staged'}
-                                onClick={saveEdits}
+                ) : null}
+                <div className="body">
+                    <div className="canvas-column">
+                        <div className="canvas-area">
+                            {/* Screen-space canvases behind the nodes (.canvas is z-index 1), redrawn on pan/zoom. */}
+                            <SwimlaneCanvas
+                                getHandle={() => editorRef.current}
+                                showThread={showThreadLanes && scope === null} showChapter={showChapterLanes}
                             />
-                        ) : null}
-                        <RotaryModeSwitch
-                            mode={mode}
-                            modes={STORY_MODES.filter(
-                                m => (m.id === 'edit' ? availableModes.edit
-                                    : m.id === 'simulate' ? availableModes.simulate : true))}
-                            onSelect={switchMode}
-                        />
-                        <SeverityTag
-                            severity={severity}
-                            count={problems.length}
-                            title="Validate - check the story for problems (opens the panel below)"
-                            onClick={() => { validateEdits(); }}
-                        />
-                    </>}
-                    content={<>
-                        {mode === 'edit'
-                            ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes} /> : null}
-                        {mode === 'simulate' && simState?.running ? <SimControls state={simState} /> : null}
-                        {mode === 'simulate' && !simState?.running
-                            ? <div className="dock-hint">Starting simulation...</div> : null}
-                        {mode === 'view'
-                            ? <div className="dock-hint">Read-only. Switch to Edit to change the story,
-                                or Simulation to run it forward.</div> : null}
-                    </>}
-                    overview={<>
-                        <div className="dock-search">
-                            <div className="dock-section-title">Filter</div>
-                            <div className="search-field">
-                                {/* The box shows what was typed at once; only the APPLIED filter waits -
-                                    each one costs a server request and a full rebuild (#131). */}
-                                <input
-                                    type="text" placeholder="Filter event names..." value={nameDraft}
-                                    onChange={e => setNameDraft(e.target.value)}
+                            <LodOverview getHandle={() => editorRef.current}/>
+                            <FlowOverlay getHandle={() => editorRef.current} hidden={simLenses.hideFlow}/>
+                            <div
+                                className="canvas" ref={containerRef}
+                                onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
+                            />
+                            {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
+                            {/* The colour key, on a corner plate like the preview's stage controls. After
+                        the status cover, so the key can still be opened while a layout runs. */}
+                            <div className="stage-chrome key-corner">
+                                <IconButton
+                                    icon="details"
+                                    title="Colour key"
+                                    className={colourKeyOpen ? 'active' : undefined}
+                                    expanded={colourKeyOpen}
+                                    onClick={() => setColourKeyOpen(open => !open)}
                                 />
                             </div>
-                        </div>
-                        <div className="overview-mid">
-                            <div className="overview-tools">
-                                {/* The draft, so the button wakes with the first letter rather than with
-                                    the fetch it is waiting on. */}
-                                <ClearFiltersButton
-                                    filters={{ ...filters, nameFilter: nameDraft }}
-                                    onClear={clearFilters}
+                            {colourKeyOpen ? (
+                                <ColourKeyFlyout branches={branchEntries} onClose={() => setColourKeyOpen(false)}/>
+                            ) : null}
+                            {/* The simulation's view toggles, top-left, where the preview keeps its own. */}
+                            {mode === 'simulate' && simState?.running ? (
+                                <SimViewToggles
+                                    lenses={simLenses} traceOpen={showTrace}
+                                    setLenses={setSimLenses} setTraceOpen={setShowTrace}
                                 />
-                                <IconButton
-                                    icon="arrange"
-                                    onClick={() => {
-                                        const handle = editorRef.current;
-                                        if (!handle) { return; }
-                                        setLayouting(true);
-                                        // Let the overlay paint before the (heavy, synchronous) arrange
-                                        // starts, so a big graph's multi-second freeze is covered by it.
-                                        requestAnimationFrame(() => requestAnimationFrame(() => {
-                                            void handle.autoArrange().finally(() => setLayouting(false));
-                                        }));
+                            ) : null}
+                            {/* A simulation row's detail, beside the dock rather than unfolded inside it. */}
+                            {mode === 'simulate' && simState?.running && simSelection ? (
+                                <SimFlyout
+                                    key={simGraphVersion}
+                                    state={simState}
+                                    selection={simSelection}
+                                    graph={simGraphRef.current}
+                                    labelOf={labelOf}
+                                    actions={simActions}
+                                    onSelect={setSimSelection}
+                                    onClose={() => setSimSelection(null)}
+                                />
+                            ) : null}
+                        </div>
+                        <div className="bottom-panels">
+                            {showProblems && problems.length ? (
+                                <ProblemsBar
+                                    problems={problemView.shown}
+                                    label={problemView.label}
+                                    filter={{
+                                        hidden: problemView.hidden,
+                                        showingAll: showAllProblems,
+                                        filterable: problemView.filterable,
+                                        onToggle: () => setShowAllProblems(open => !open),
                                     }}
-                                    title="Arrange - recompute the automatic layout"
+                                    onJump={id => {
+                                        // Centring on a node the server filtered out is a no-op, so a
+                                        // problem from outside the view clears the filter and jumps when
+                                        // the fuller graph lands.
+                                        if (resolveProblemJump(id, graphNodeIds) === 'unfilter') {
+                                            pendingJumpRef.current = id;
+                                            clearFilters();
+                                            return;
+                                        }
+                                        editorRef.current?.centerNode(id);
+                                    }}
+                                    onClose={() => setShowProblems(false)}
                                 />
-                                <IconButton
-                                    icon="frame"
-                                    title="Fit graph to view"
-                                    onClick={() => editorRef.current?.fit()}
+                            ) : null}
+                            {mode === 'simulate' && simState?.running && showTrace ? (
+                                <TracePanel
+                                    state={simState}
+                                    steps={simSteps}
+                                    labelOf={labelOf}
+                                    actions={simActions}
+                                    onClose={() => setShowTrace(false)}
                                 />
+                            ) : null}
+                        </div>
+                    </div>
+                    <RightDock
+                        memoKey="storyGraph.dock"
+                        initialWidth={300}
+                        minWidth={210}
+                        maxWidth={520}
+                        header={<>
+                            {mode === 'edit' ? (
                                 <IconButton
-                                    icon="threadLanes"
-                                    className={showThreadLanes ? 'active' : undefined}
-                                    pressed={showThreadLanes}
-                                    title="Toggle thread lanes"
-                                    onClick={() => toggleLane('thread')}
+                                    icon="save"
+                                    className={'header-left' + (pendingCount > 0 ? ' active' : '')}
+                                    title="Save - write all staged changes to the XML files"
+                                    badge={pendingCount > 0 ? ` ${pendingCount}` : ''}
+                                    disabled={pendingCount === 0 || saving}
+                                    disabledReason={saving
+                                        ? 'Save - writing the staged changes now'
+                                        : 'Save - nothing is staged'}
+                                    onClick={saveEdits}
                                 />
-                                <IconButton
-                                    icon="chapterLanes"
-                                    className={showChapterLanes ? 'active' : undefined}
-                                    pressed={showChapterLanes}
-                                    title="Toggle chapter lanes"
-                                    onClick={() => toggleLane('chapter')}
+                            ) : null}
+                            <RotaryModeSwitch
+                                mode={mode}
+                                modes={STORY_MODES
+                                    .filter(m => (m.id === 'edit' ? availableModes.edit
+                                        : m.id === 'simulate' ? availableModes.simulate : true))
+                                    // Edit is DISABLED on a graph whose every thread belongs to a
+                                    // referenced project. Not hidden, and not left clickable with
+                                    // the refusal arriving after the drop.
+                                    .map(m => (m.id === 'edit' && editBlockedBy !== null
+                                        ? {...m, disabled: true, disabledReason: editBlockedBy}
+                                        : m))}
+                                onSelect={switchMode}
+                            />
+                            <SeverityTag
+                                severity={severity}
+                                count={problems.length}
+                                title="Validate - check the story for problems (opens the panel below)"
+                                onClick={() => {
+                                    validateEdits();
+                                }}
+                            />
+                        </>}
+                        content={<>
+                            {mode === 'edit'
+                                ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes}/> : null}
+                            {mode === 'simulate' && simState?.running ? (
+                                <SimInventory
+                                    state={simState}
+                                    selection={simSelection}
+                                    labelOf={labelOf}
+                                    actions={simActions}
+                                    onSelect={setSimSelection}
+                                />
+                            ) : null}
+                            {mode === 'simulate' && !simState?.running
+                                ? <div className="dock-hint">Starting simulation...</div> : null}
+                            {mode === 'view'
+                                ? <div className="dock-hint">Read-only. Switch to Edit to change the story,
+                                    or Simulation to run it forward.</div> : null}
+                        </>}
+                        overview={<>
+                            {/* In Simulation the foot is the tick transport - the preview's player with
+                            ticks for frames - above the view controls every mode has. */}
+                            {mode === 'simulate' && simState?.running ? (
+                                <SimTransport
+                                    state={simState}
+                                    pace={pace}
+                                    playing={playing}
+                                    setPace={setPace}
+                                    actions={simActions}
+                                    labelOf={labelOf}
+                                    notice={simNotice}
+                                    onSelect={selection => {
+                                        setSimSelection(selection);
+                                        // The readout names an event; show it too, as a row press does.
+                                        if (selection.kind === 'node' || selection.kind === 'decision') {
+                                            simActions.centerNode(selection.nodeId);
+                                        }
+                                    }}
+                                />
+                            ) : null}
+                            <div className="dock-search">
+                                <div className="dock-section-title">Filter</div>
+                                <div className="search-field">
+                                    {/* The box shows what was typed at once; only the APPLIED filter waits -
+                                    each one costs a server request and a full rebuild (#131). */}
+                                    <input
+                                        type="text" placeholder="Filter event names..." value={nameDraft}
+                                        onChange={e => setNameDraft(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <div className="overview-mid">
+                                <div className="overview-tools">
+                                    {/* The draft, so the button wakes with the first letter rather than with
+                                    the fetch it is waiting on. */}
+                                    <ClearFiltersButton
+                                        filters={{...filters, nameFilter: nameDraft}}
+                                        onClear={clearFilters}
+                                    />
+                                    <IconButton
+                                        icon="arrange"
+                                        onClick={() => {
+                                            const handle = editorRef.current;
+                                            if (!handle) {
+                                                return;
+                                            }
+                                            setLayouting(true);
+                                            // Let the overlay paint before the (heavy, synchronous) arrange
+                                            // starts, so a big graph's multi-second freeze is covered by it.
+                                            requestAnimationFrame(() => requestAnimationFrame(() => {
+                                                void handle.autoArrange().finally(() => setLayouting(false));
+                                            }));
+                                        }}
+                                        title="Arrange - recompute the automatic layout"
+                                    />
+                                    <IconButton
+                                        icon="frame"
+                                        title="Fit graph to view"
+                                        onClick={() => editorRef.current?.fit()}
+                                    />
+                                    <IconButton
+                                        icon="threadLanes"
+                                        className={showThreadLanes && scope === null ? 'active' : undefined}
+                                        pressed={showThreadLanes && scope === null}
+                                        title="Toggle thread lanes"
+                                        disabled={scope !== null}
+                                        disabledReason="Thread lanes - galactic graph only"
+                                        onClick={() => toggleLane('thread')}
+                                    />
+                                    <IconButton
+                                        icon="chapterLanes"
+                                        className={showChapterLanes ? 'active' : undefined}
+                                        pressed={showChapterLanes}
+                                        title="Toggle chapter lanes"
+                                        onClick={() => toggleLane('chapter')}
+                                    />
+                                </div>
+                                <Minimap getHandle={() => editorRef.current}/>
+                            </div>
+                            <div className="filters-below">
+                                <SelectField
+                                    value={filters.branch} ariaLabel="Branch" title="Branch" icon="search"
+                                    options={[{value: '', label: 'All branches'}, ...branches.map(b => ({value: b}))]}
+                                    onChange={branch => setFilter({branch})}
+                                />
+                                <SelectField
+                                    value={filters.lifecycle} ariaLabel="Lifecycle" title="Lifecycle" icon="search"
+                                    options={[{
+                                        value: '',
+                                        label: 'Any lifecycle'
+                                    }, ...LIFECYCLES.map(l => ({value: l}))]}
+                                    onChange={lifecycle => setFilter({lifecycle})}
+                                />
+                                <SelectField
+                                    value={filters.plotState} ariaLabel="Plot state" icon="search"
+                                    title="Plot state - how this faction's manifest registers the thread an event lives in"
+                                    options={[{
+                                        value: '',
+                                        label: 'Any plot state'
+                                    }, ...PLOT_STATES.map(p => ({value: p}))]}
+                                    onChange={plotState => setFilter({plotState})}
                                 />
                             </div>
-                            <Minimap getHandle={() => editorRef.current} />
-                        </div>
-                        <div className="filters-below">
-                            <select value={filters.branch} onChange={e => setFilter({ branch: e.target.value })} title="Branch">
-                                <option value="">All branches</option>
-                                {branches.map(b => <option key={b} value={b}>{b}</option>)}
-                            </select>
-                            <select value={filters.lifecycle} onChange={e => setFilter({ lifecycle: e.target.value })} title="Lifecycle">
-                                <option value="">Any lifecycle</option>
-                                {LIFECYCLES.map(l => <option key={l} value={l}>{l}</option>)}
-                            </select>
-                            <select
-                                value={filters.plotState}
-                                onChange={e => setFilter({ plotState: e.target.value })}
-                                title="Plot state - how this faction's manifest registers the thread an event lives in"
-                            >
-                                <option value="">Any plot state</option>
-                                {PLOT_STATES.map(p => <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                    </>}
-                />
-            </div>
-        </Shell>
+                        </>}
+                    />
+                </div>
+                {/* Last in the shell, so a modal opened from inside a panel with its own stacking
+                    context (the canvas area, the dock) still covers the whole view. */}
+                <div className="modal-layer" ref={setModalLayer}/>
+            </Shell>
+        </ModalLayerContext.Provider>
     );
 }
-
-/** The sim log opens this tall until the reader drags it somewhere else. */
-const SIM_LOG_DEFAULT_HEIGHT = 140;
 
 /**
  * Pointer-capture drag resizing for one panel edge. `axis` maps pointer movement to growth:
@@ -4213,127 +6561,34 @@ function ProblemsBar(props: {
             filter={props.filter}
             onClose={props.onClose}
         >
-            {props.problems.map((problem, i) => (
-                <div
-                    className={'problem-row' + (problem.nodeId ? ' clickable' : '')}
-                    key={i}
-                    title={problem.nodeId ? 'Click to show this node in the graph' : undefined}
-                    onClick={problem.nodeId ? () => props.onJump(problem.nodeId!) : undefined}
-                >
+            <div className="problem-list">
+                {props.problems.map((problem, i) => (
+                    <div
+                        className={'problem-row' + (problem.nodeId ? ' clickable' : '')}
+                        key={i}
+                        title={problem.nodeId ? 'Click to show this node in the graph' : undefined}
+                        onClick={problem.nodeId ? () => props.onJump(problem.nodeId!) : undefined}
+                    >
                     <span className={'diag-badge diag-' + (problem.severity === 'error' ? 'error' : 'warning')}>
-                        <span className={'codicon codicon-' + (problem.severity === 'error' ? 'error' : 'warning')} />
+                        <span className={'codicon codicon-' + (problem.severity === 'error' ? 'error' : 'warning')}/>
                     </span>
-                    <span className="problem-node" title={problem.nodeId ?? problem.uri}>
+                        <span className="problem-node" title={problem.nodeId ?? problem.uri}>
                         {problem.nodeId
                             ? problem.nodeId.slice(problem.nodeId.indexOf('#') + 1)
                             : baseName(problem.uri)}
                     </span>
-                    <span className="problem-msg" title={problem.message}>{problem.message}</span>
-                    <button
-                        onClick={e => {
-                            e.stopPropagation(); // the XML button must not also trigger the row's jump
-                            vscode.postMessage({ type: 'openXml', threadUri: problem.uri, line: problem.line });
-                        }}
-                        title="Open in XML"
-                    ><span className="codicon codicon-go-to-file" /></button>
-                </div>
-            ))}
+                        <span className="problem-msg" title={problem.message}>{problem.message}</span>
+                        <button
+                            onClick={e => {
+                                e.stopPropagation(); // the XML button must not also trigger the row's jump
+                                vscode.postMessage({type: 'openXml', threadUri: problem.uri, line: problem.line});
+                            }}
+                            title="Open in XML"
+                        ><span className="codicon codicon-go-to-file"/></button>
+                    </div>
+                ))}
+            </div>
         </ProblemsPanel>
-    );
-}
-
-/** The running simulation: clock, flag inspector, intervention queue, and the step log. */
-/** The simulation driver controls - clock, flags, and pending interventions - stacked for the dock. */
-function SimControls(props: { state: StorySimStateDto }): React.JSX.Element {
-    const state = props.state;
-    const [advanceBy, setAdvanceBy] = useState('10');
-    const [flagName, setFlagName] = useState('');
-
-    return (
-        <div className="sim-controls">
-            <div className="sim-section">
-                <div className="sim-head"><span className="codicon codicon-watch" /> Clock - {state.clock.toFixed(0)}s</div>
-                <div className="sim-row">
-                    <input type="text" value={advanceBy} onChange={e => setAdvanceBy(e.target.value)} title="Seconds" />
-                    <button onClick={() => {
-                        const seconds = Number(advanceBy);
-                        if (seconds > 0) { sendSim('advanceClock', { seconds }); }
-                    }} title="Advance the virtual clock">Advance</button>
-                </div>
-            </div>
-            <div className="sim-section">
-                <div className="sim-head">Flags</div>
-                {state.flags.map(f => (
-                    <div className="sim-row" key={f.name}>
-                        <span className="sim-name" title={f.name}>{f.name}</span>
-                        <button onClick={() => sendSim('setFlag', { flag: f.name, value: f.value !== 0 ? 0 : 1 })}
-                            title={`Toggle ${f.name}`}>
-                            {f.value !== 0 ? '1 to 0' : '0 to 1'}
-                        </button>
-                    </div>
-                ))}
-                <div className="sim-row">
-                    <input
-                        type="text" placeholder="Set flag..." value={flagName}
-                        onChange={e => setFlagName(e.target.value)}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' && flagName.trim()) {
-                                sendSim('setFlag', { flag: flagName.trim(), value: 1 });
-                                setFlagName('');
-                            }
-                        }}
-                    />
-                </div>
-            </div>
-            <div className="sim-section">
-                <div className="sim-head">Waiting on</div>
-                {state.interventions.length === 0 ? <div className="sim-row">nothing - story exhausted</div> : null}
-                {state.interventions.map(i => (
-                    <div className="sim-row" key={i.nodeId}>
-                        <span className={'sim-kind k-' + i.kind}>{i.kind}</span>
-                        <span className="sim-name" title={`${i.eventName} (${i.eventType ?? '?'})`}>{i.eventName}</span>
-                        {i.kind === 'lua' && i.options.length
-                            ? i.options.map(o => (
-                                <button key={o} title={`Story_Event("${o}")`}
-                                    onClick={() => sendSim('luaNotify', { id: o })}>{o}</button>
-                            ))
-                            : <button title="Fire this event's trigger"
-                                onClick={() => sendSim('satisfyTrigger', { nodeId: i.nodeId })}>Fire</button>}
-                    </div>
-                ))}
-                {state.luaNotifications.length ? (
-                    <div className="sim-row">
-                        <select
-                            value=""
-                            title="Simulate a Lua Story_Event call"
-                            onChange={e => { if (e.target.value) { sendSim('luaNotify', { id: e.target.value }); } }}
-                        >
-                            <option value="">Lua Story_Event...</option>
-                            {state.luaNotifications.map(id => <option key={id} value={id}>{id}</option>)}
-                        </select>
-                    </div>
-                ) : null}
-            </div>
-        </div>
-    );
-}
-
-/** The simulation step log - full-width bottom panel (VS Code-style), resizable by its top edge. */
-function SimLog(props: { state: StorySimStateDto; onClose: () => void }): React.JSX.Element {
-    const { size: height, handleProps } = useEdgeResize(
-        readPanelSize('storyGraph.simLog', SIM_LOG_DEFAULT_HEIGHT), 60, 320, 'n',
-        v => { writePanelSize('storyGraph.simLog', v); });
-    return (
-        <div className="sim-log-panel" style={{ height }}>
-            <div className="resize-handle-n" title="Drag to resize" {...handleProps} />
-            <div className="panel-bar">
-                <span className="panel-title">Simulation log</span>
-                <button className="panel-close" onClick={props.onClose} title="Close"><span className="codicon codicon-close" /></button>
-            </div>
-            {props.state.log.slice(-100).map((line, i) => (
-                <div className="sim-log-line" key={i}>{line}</div>
-            ))}
-        </div>
     );
 }
 
@@ -4344,9 +6599,9 @@ function SimLog(props: { state: StorySimStateDto; onClose: () => void }): React.
  * here, and every request it makes would be refused server-side.
  */
 const STORY_MODES: RotaryMode<EditorMode>[] = [
-    { id: 'view', icon: 'eye', label: 'View', angle: 210 },
-    { id: 'edit', icon: 'edit', label: 'Edit', angle: 270 },
-    { id: 'simulate', icon: 'play', label: 'Simulation', angle: 330 },
+    {id: 'view', icon: 'eye', label: 'View', angle: 210},
+    {id: 'edit', icon: 'edit', label: 'Edit', angle: 270},
+    {id: 'simulate', icon: 'play', label: 'Simulation', angle: 330},
 ];
 
 const MINIMAP_H = 118;
@@ -4365,7 +6620,9 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Ele
     useEffect(() => subscribeAreaChange(() => force()), []);
     useEffect(() => {
         const el = wrapRef.current;
-        if (!el) { return; }
+        if (!el) {
+            return;
+        }
         const measure = (): void => setWidth(Math.max(60, Math.round(el.clientWidth)));
         measure();
         const observer = new ResizeObserver(measure);
@@ -4387,11 +6644,16 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Ele
         // still drawn, just clipped to the node extent.
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const r of data.nodes) {
-            minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
-            maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.h);
+            minX = Math.min(minX, r.x);
+            minY = Math.min(minY, r.y);
+            maxX = Math.max(maxX, r.x + r.w);
+            maxY = Math.max(maxY, r.y + r.h);
         }
         const pad = 60;
-        minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+        minX -= pad;
+        minY -= pad;
+        maxX += pad;
+        maxY += pad;
         const scale = Math.min(width / (maxX - minX), MINIMAP_H / (maxY - minY));
         // Centre the drawing in the (usually wider) box so it isn't jammed to the top-left.
         const offX = (width - (maxX - minX) * scale) / 2;
@@ -4406,14 +6668,24 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Ele
         inner = (
             <svg
                 className="minimap" width={width} height={MINIMAP_H}
-                onPointerDown={e => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); panFromEvent(e); }}
-                onPointerMove={e => { if (dragging.current) { panFromEvent(e); } }}
-                onPointerUp={() => { dragging.current = false; }}
+                onPointerDown={e => {
+                    dragging.current = true;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    panFromEvent(e);
+                }}
+                onPointerMove={e => {
+                    if (dragging.current) {
+                        panFromEvent(e);
+                    }
+                }}
+                onPointerUp={() => {
+                    dragging.current = false;
+                }}
             >
                 <title>Overview - click or drag to navigate</title>
                 {data.nodes.map((n, i) => (
                     <rect key={i} className="mm-node"
-                        x={sx(n.x)} y={sy(n.y)} width={n.w * scale} height={n.h * scale} rx={1} />
+                          x={sx(n.x)} y={sy(n.y)} width={n.w * scale} height={n.h * scale} rx={1}/>
                 ))}
                 {/* Clamped to the drawn extent so a zoomed-out viewport (which can be many times
                     the graph's size) still reads as a bordered box hugging the edges, rather than
@@ -4425,13 +6697,14 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Ele
                     const vy1 = Math.min(data.viewport.y + data.viewport.h, maxY);
                     return (
                         <rect className="mm-view"
-                            x={sx(vx0)} y={sy(vy0)}
-                            width={Math.max(0, (vx1 - vx0) * scale)}
-                            height={Math.max(0, (vy1 - vy0) * scale)} />
+                              x={sx(vx0)} y={sy(vy0)}
+                              width={Math.max(0, (vx1 - vx0) * scale)}
+                              height={Math.max(0, (vy1 - vy0) * scale)}/>
                     );
                 })()}
             </svg>
-        );
+        )
+        ;
     }
     return <div className="minimap-wrap" ref={wrapRef}>{inner}</div>;
 }
@@ -4444,7 +6717,9 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Ele
  * is in LOD mode (large + zoomed out); zooming past K_DETAIL mounts the real nodes and this returns
  * null. This is what makes opening a large campaign instant - nothing is mounted into rete.
  */
-function LodOverview(props: { getHandle: () => EditorHandle | null }): React.JSX.Element {
+function LodOverview(props: {
+    getHandle: () => EditorHandle | null
+}): React.JSX.Element {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // A screen-space canvas sitting behind the nodes (z-index below .canvas). Redrawing a few
     // thousand rects/lines imperatively is ~1-2ms, so pan/zoom stays smooth - unlike an SVG in the
@@ -4453,19 +6728,81 @@ function LodOverview(props: { getHandle: () => EditorHandle | null }): React.JSX
     useEffect(() => {
         let raf = 0;
         const draw = (): void => {
-            if (raf) { return; }
+            if (raf) {
+                return;
+            }
             raf = requestAnimationFrame(() => {
                 raf = 0;
                 const c = canvasRef.current;
-                if (c) { props.getHandle()?.drawLodTo(c); }
+                if (c) {
+                    props.getHandle()?.drawLodTo(c);
+                }
             });
         };
         draw();
         const unA = subscribeAreaChange(draw);
         const unG = subscribeGeometryChange(draw);
-        return () => { if (raf) { cancelAnimationFrame(raf); } unA(); unG(); };
+        return () => {
+            if (raf) {
+                cancelAnimationFrame(raf);
+            }
+            unA();
+            unG();
+        };
     }, [props]);
-    return <canvas ref={canvasRef} className="lod-canvas" />;
+    return <canvas ref={canvasRef} className="lod-canvas"/>;
+}
+
+/**
+ * The simulation's flow on a screen-space canvas over the LOD overview: the edges the story ran
+ * along, as a marching dash that keeps moving. Animates only while there is flow to show and the
+ * viewer has not asked for reduced motion; then it is one static paint per change. Hidden by the
+ * flow lens. Rete's SVG connections carry the same animation for a small, fully mounted graph, so
+ * the handle paints here only when the overview is the thing drawing the edges.
+ */
+function FlowOverlay(props: {
+    getHandle: () => EditorHandle | null;
+    hidden: boolean
+}): React.JSX.Element {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const {hidden} = props;
+    useEffect(() => {
+        let raf = 0;
+        const started = performance.now();
+        const reduced = prefersReducedMotion();
+        const frame = (): void => {
+            raf = 0;
+            const c = canvasRef.current;
+            const handle = props.getHandle();
+            if (!c || !handle) {
+                return;
+            }
+            if (hidden) {
+                c.getContext('2d')?.clearRect(0, 0, c.width, c.height);
+                return;
+            }
+            const hasFlow = handle.drawFlowTo(c, reduced ? 0 : performance.now() - started);
+            if (hasFlow && !reduced) {
+                raf = requestAnimationFrame(frame);
+            }
+        };
+        const kick = (): void => {
+            if (!raf) {
+                raf = requestAnimationFrame(frame);
+            }
+        };
+        kick();
+        const unA = subscribeAreaChange(kick);
+        const unG = subscribeGeometryChange(kick);
+        return () => {
+            if (raf) {
+                cancelAnimationFrame(raf);
+            }
+            unA();
+            unG();
+        };
+    }, [props, hidden]);
+    return <canvas ref={canvasRef} className="lod-canvas flow-canvas"/>;
 }
 
 /**
@@ -4474,34 +6811,58 @@ function LodOverview(props: { getHandle: () => EditorHandle | null }): React.JSX
  * holder divs the swimlanes used to be, which re-rasterised (and stuttered) on every zoom frame.
  */
 function SwimlaneCanvas(props: {
-    getHandle: () => EditorHandle | null; showThread: boolean; showChapter: boolean;
+    getHandle: () => EditorHandle | null;
+    showThread: boolean;
+    showChapter: boolean;
 }): React.JSX.Element {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { showThread, showChapter } = props;
+    const {showThread, showChapter} = props;
     useEffect(() => {
         let raf = 0;
         const draw = (): void => {
-            if (raf) { return; }
+            if (raf) {
+                return;
+            }
             raf = requestAnimationFrame(() => {
                 raf = 0;
                 const c = canvasRef.current;
-                if (c) { props.getHandle()?.drawSwimlanesTo(c, showThread, showChapter); }
+                if (c) {
+                    props.getHandle()?.drawSwimlanesTo(c, showThread, showChapter);
+                }
             });
         };
         draw();
         const unA = subscribeAreaChange(draw);
         const unG = subscribeGeometryChange(draw);
-        return () => { if (raf) { cancelAnimationFrame(raf); } unA(); unG(); };
+        return () => {
+            if (raf) {
+                cancelAnimationFrame(raf);
+            }
+            unA();
+            unG();
+        };
     }, [props, showThread, showChapter]);
-    return <canvas ref={canvasRef} className="swimlane-canvas" />;
+    return <canvas ref={canvasRef} className="swimlane-canvas"/>;
 }
 
 /** Wires the palette's Tactical category to `createTacticalAttachment` - no other UI reaches it. */
 function TacticalCreateBar(props: {
     threads: string[];
     initialType: string | null;
-    onCreate(threadUri: string, newName: string, value: 'land' | 'space', file: string): void;
-    onClose(): void;
+    onCreate(threadUri
+             :
+             string, newName
+             :
+             string, value
+             :
+                 'land' | 'space', file
+             :
+             string
+    ):
+        void;
+    onClose()
+        :
+        void;
 }): React.JSX.Element {
     const [name, setName] = useState('New_Tactical_Link');
     const [thread, setThread] = useState(props.threads[0] ?? '');
@@ -4510,7 +6871,9 @@ function TacticalCreateBar(props: {
     const [file, setFile] = useState('');
 
     const create = (): void => {
-        if (!name.trim() || !thread || !file.trim()) { return; }
+        if (!name.trim() || !thread || !file.trim()) {
+            return;
+        }
         props.onCreate(thread, name.trim(), value, file.trim());
     };
 
@@ -4518,7 +6881,11 @@ function TacticalCreateBar(props: {
         <div className="toolbar">
             <span>New tactical link:</span>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { create(); } }} />
+                   onKeyDown={e => {
+                       if (e.key === 'Enter') {
+                           create();
+                       }
+                   }}/>
             <select value={value} onChange={e => setValue(e.target.value as 'land' | 'space')} title="Battle type">
                 <option value="land">Land</option>
                 <option value="space">Space</option>
@@ -4526,7 +6893,11 @@ function TacticalCreateBar(props: {
             <input
                 type="text" placeholder="Tactical plot manifest file..." value={file}
                 onChange={e => setFile(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { create(); } }}
+                onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                        create();
+                    }
+                }}
             />
             <select value={thread} onChange={e => setThread(e.target.value)} title="Thread file">
                 {props.threads.length === 0 ? <option value="">(no thread files)</option> : null}
@@ -4559,14 +6930,28 @@ function TacticalCreateBar(props: {
  * media purple, timing yellow - not an exact taxonomy.
  */
 function stepColor(category: string, name: string | null): string {
-    if (category === 'blank') { return 'var(--vscode-charts-foreground, #bbb)'; }
-    if (category === 'andJunction' || category === 'orJunction') { return 'var(--vscode-charts-purple, #b180d7)'; }
+    if (category === 'blank') {
+        return 'var(--vscode-charts-foreground, #bbb)';
+    }
+    if (category === 'andJunction' || category === 'orJunction') {
+        return 'var(--vscode-charts-purple, #b180d7)';
+    }
     const n = (name ?? '').toUpperCase();
-    if (/FLAG/.test(n)) { return 'var(--vscode-charts-orange, #d18616)'; }
-    if (/TACTICAL|VICTORY|MISSION|LAND|SPACE|BATTLE|CONQUER|BOMBARD/.test(n)) { return 'var(--vscode-charts-red, #f14c4c)'; }
-    if (/DIALOG|SPEECH|NOTIF|MOVIE|SOUND|MUSIC|CAMERA|SUBTITLE|TEXT/.test(n)) { return 'var(--vscode-charts-purple, #b180d7)'; }
-    if (/ELAPSED|TIME|TIMER|CLOCK/.test(n)) { return 'var(--vscode-charts-yellow, #cca700)'; }
-    if (/TRIGGER|RESET|DISABLE|ACTIVATE|ENABLE|EVENT|PLOT|ELEMENT/.test(n)) { return 'var(--vscode-charts-blue, #3794ff)'; }
+    if (/FLAG/.test(n)) {
+        return 'var(--vscode-charts-orange, #d18616)';
+    }
+    if (/TACTICAL|VICTORY|MISSION|LAND|SPACE|BATTLE|CONQUER|BOMBARD/.test(n)) {
+        return 'var(--vscode-charts-red, #f14c4c)';
+    }
+    if (/DIALOG|SPEECH|NOTIF|MOVIE|SOUND|MUSIC|CAMERA|SUBTITLE|TEXT/.test(n)) {
+        return 'var(--vscode-charts-purple, #b180d7)';
+    }
+    if (/ELAPSED|TIME|TIMER|CLOCK/.test(n)) {
+        return 'var(--vscode-charts-yellow, #cca700)';
+    }
+    if (/TRIGGER|RESET|DISABLE|ACTIVATE|ENABLE|EVENT|PLOT|ELEMENT/.test(n)) {
+        return 'var(--vscode-charts-blue, #3794ff)';
+    }
     return category === 'reward' ? 'var(--vscode-charts-green, #89d185)' : 'var(--vscode-charts-blue, #3794ff)';
 }
 
@@ -4575,10 +6960,13 @@ function fadedBg(color: string): string {
     return `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
 }
 
-function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): React.JSX.Element {
+function NodePalette(props: {
+    eventTypes: string[];
+    rewardTypes: string[]
+}): React.JSX.Element {
     const [search, setSearch] = useState('');
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
-    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ Rewards: true });
+    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({Rewards: true});
     const q = search.trim().toLowerCase();
     const matches = (name: string): boolean => q === '' || name.toLowerCase().includes(q);
 
@@ -4603,7 +6991,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): Re
         return (
             <div
                 key={key} className="dock-tile palette-tile" draggable
-                style={{ background: fadedBg(color), borderColor: color }}
+                style={{background: fadedBg(color), borderColor: color}}
                 onDragStart={e => onDragStart(e, drag)}
                 title={`${label}\n${hint}`}
             >
@@ -4620,13 +7008,19 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): Re
     const typeGroup = (
         label: string, category: 'trigger' | 'reward', items: string[], hint: string
     ): React.JSX.Element | null => {
-        if (!items.length) { return null; }
+        if (!items.length) {
+            return null;
+        }
         const isCollapsed = q === '' && collapsed[label];
         const families = new Map<string, string[]>();
         for (const t of items) {
             const c = stepColor(category, t);
             const list = families.get(c);
-            if (list) { list.push(t); } else { families.set(c, [t]); }
+            if (list) {
+                list.push(t);
+            } else {
+                families.set(c, [t]);
+            }
         }
         return (
             <DockSection
@@ -4634,12 +7028,12 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): Re
                 title={label}
                 count={items.length}
                 collapsed={isCollapsed}
-                onToggle={() => setCollapsed(c => ({ ...c, [label]: !c[label] }))}
+                onToggle={() => setCollapsed(c => ({...c, [label]: !c[label]}))}
             >
                 {[...families.entries()].map(([color, names]) => (
                     <div key={color} className="tile-family">
                         <div className="tile-grid">
-                            {names.map(t => tile(t, null, t, { category, type: t }, hint))}
+                            {names.map(t => tile(t, null, t, {category, type: t}, hint))}
                         </div>
                     </div>
                 ))}
@@ -4660,14 +7054,14 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): Re
             {showBlank || showAndJunction || showOrJunction ? (
                 <div className="dock-section palette-new">
                     <div className="tile-grid">
-                        {showBlank ? tile('blank', <span className="codicon codicon-add" />, 'New event',
-                            { category: 'blank', type: null },
+                        {showBlank ? tile('blank', <span className="codicon codicon-add"/>, 'New event',
+                            {category: 'blank', type: null},
                             'Drag onto the canvas to create a new untyped event, then edit it in place') : null}
-                        {showAndJunction ? tile('and', <span className="junction-glyph shape-circle" />, 'AND',
-                            { category: 'andJunction', type: null },
+                        {showAndJunction ? tile('and', <span className="junction-glyph shape-circle"/>, 'AND',
+                            {category: 'andJunction', type: null},
                             'Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together') : null}
-                        {showOrJunction ? tile('or', <span className="junction-glyph shape-diamond" />, 'OR',
-                            { category: 'orJunction', type: null },
+                        {showOrJunction ? tile('or', <span className="junction-glyph shape-diamond"/>, 'OR',
+                            {category: 'orJunction', type: null},
                             'Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm') : null}
                     </div>
                 </div>
@@ -4683,5 +7077,5 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): Re
 
 const rootElement = document.getElementById('root');
 if (rootElement) {
-    createRoot(rootElement).render(<App />);
+    createRoot(rootElement).render(<App/>);
 }

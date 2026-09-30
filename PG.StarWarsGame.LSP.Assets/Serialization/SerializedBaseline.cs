@@ -20,7 +20,10 @@ public sealed class SerializedBaseline
     //     carry the wrong keys and must regenerate or every model reads as bones-unavailable.
     // v4: `.ala` added to the asset catalogue, so a model can be asked which animations exist for
     //     it. An older cache simply has none and every model would read as having no clips.
-    public const int CurrentSchemaVersion = 4;
+    // v5: ModelTextures added - the texture names inside each shipped .alo. An older baseline has
+    //     none, and an absent entry means "never scanned", so every shipped model would be parsed
+    //     during validation exactly as before rather than answered from the catalog.
+    public const int CurrentSchemaVersion = 5;
 
     [Key(0)] public GameSymbol[] Symbols { get; set; } = [];
     [Key(1)] public long BuiltAtMs { get; set; }
@@ -33,4 +36,8 @@ public sealed class SerializedBaseline
     [Key(8)] public SerializedEnumValues[] ModelBones { get; set; } = [];
     [Key(9)] public SerializedObjectTags[] ObjectTags { get; set; } = [];
     [Key(10)] public int SchemaVersion { get; set; }
+
+    /// <summary>Texture names inside each shipped model, keyed like <see cref="ModelBones" />.</summary>
+    [Key(11)]
+    public SerializedEnumValues[] ModelTextures { get; set; } = [];
 }

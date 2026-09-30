@@ -57,7 +57,7 @@ public static partial class ModelAnimationClips
 
     /// <summary>
     ///     How many takes of <paramref name="animationType" /> the clips hold - what
-    ///     <c>ModelAnimsListClass::Get_Total_Animations_Of_Type</c> answers for the model.
+    ///     the animation-count lookup answers for the model.
     /// </summary>
     /// <param name="clipNames">The model's clips, as <see cref="For" /> lists them.</param>
     /// <param name="modelReference">The model they belong to.</param>

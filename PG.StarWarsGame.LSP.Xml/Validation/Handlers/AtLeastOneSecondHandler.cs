@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     A duration the engine will not run shorter than one second.
 /// </summary>
 /// <remarks>
-///     <c>LeechShieldsAbilityClass::Validate_Data</c> (<c>01028000</c>) tests
+///     the engine's load-time validation tests
 ///     <c>Duration &lt;= 1.0 &amp;&amp; Duration != 1.0</c>, which is <c>Duration &lt; 1.0</c>, and
 ///     then assigns <c>Duration = 1.0</c>. The bound is therefore INCLUSIVE and the repair value is
 ///     the bound itself - a half-second leech runs for a full second and the file still says half.

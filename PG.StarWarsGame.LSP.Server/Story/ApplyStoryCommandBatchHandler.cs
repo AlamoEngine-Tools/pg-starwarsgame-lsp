@@ -43,6 +43,14 @@ public sealed class ApplyStoryCommandBatchHandler(
         if (StoryEditingFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false, Error: rejection));
 
+        // Checked before anything is composed, and over EVERY command: a batch is applied as one
+        // edit, so one command touching a referenced project has to stop the whole batch rather
+        // than leave it half applied.
+        foreach (var command in request.Commands)
+            if (DependencyOwnership.Rejection(reloadService.LastWorkspaceConfig, command.ThreadUri)
+                is { } notOurs)
+                return Task.FromResult(new ApplyStoryCommandBatchResult(false, Error: notOurs));
+
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false,

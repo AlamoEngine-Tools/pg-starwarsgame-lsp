@@ -15,8 +15,8 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// <remarks>
 ///     <para>
 ///         Measured in the 2018 build. Movement closes to <c>Targeting_Max_Attack_Distance</c> plus the
-///         target's size (<c>MovementCoordinatorClass::Compute_Targeting_Approach_Distance</c>), while
-///         <c>HardPointClass::Attempt_Fire_At_Target</c> refuses a shot beyond the hardpoint's own
+///         target's size (the targeting approach-distance calculation), while
+///         <c>Attempt_Fire_At_Target</c> refuses a shot beyond the hardpoint's own
 ///         <c>Fire_Range_Distance</c> plus the target's soft radius. Set the first above the second and
 ///         the unit can stop where no hardpoint fires. <c>Fire_Range_Distance</c> defaults to 0.
 ///     </para>

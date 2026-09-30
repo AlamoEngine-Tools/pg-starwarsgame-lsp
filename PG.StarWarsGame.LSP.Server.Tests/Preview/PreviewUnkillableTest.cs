@@ -14,10 +14,10 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// <remarks>
 ///     <para>
 ///         Damage finds its hardpoint by NAME, an exact <c>_stricmp</c> against each hardpoint's
-///         <c>Collision_Mesh</c> - but <c>Take_Damage</c> replaces the name with the hardpoint's own
+///         <c>Collision_Mesh</c> - but the engine's damage path replaces the name with the hardpoint's own
 ///         value when the hit is aimed at it, so a value the model lacks is still reachable by aimed
 ///         fire. What is NOT reachable is a destroyable hardpoint with no <c>Collision_Mesh</c> at
-///         all: the empty name fails the size check before the lookup (<c>00973ad9</c>), aimed or
+///         all: the empty name fails the size check before the lookup, aimed or
 ///         not. Because the all-destroyed branch counts by <c>Is_Destroyable</c> and never asks
 ///         whether a hardpoint was reachable, one such hardpoint blocks that branch forever.
 ///     </para>
@@ -40,9 +40,9 @@ public sealed class PreviewUnkillableTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>GameObjectClass::Take_Damage</c> replaces the name it looks a hardpoint up by with
+    ///         The engine's damage path replaces the name it looks a hardpoint up by with
     ///         the hardpoint's OWN <c>Collision_Mesh</c> when the hit is aimed at that hardpoint
-    ///         (<c>0097386a</c>), and in a second path taken from the attacker (<c>009738cc</c>). The
+    ///        , and in a second path taken from the attacker. The
     ///         exact <c>_stricmp</c> then compares the value with itself and matches whether or not the
     ///         model has it, so aimed fire lands. The Gargantuan proves it in the shipped data: all
     ///         eight hardpoints write <c>..._COL</c> or <c>..._COLL</c> against models carrying

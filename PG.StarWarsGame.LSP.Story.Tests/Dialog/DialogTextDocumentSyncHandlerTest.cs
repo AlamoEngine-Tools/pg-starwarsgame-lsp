@@ -41,6 +41,19 @@ public sealed class DialogTextDocumentSyncHandlerTest
         };
     }
 
+    // OmniSharp asks every sync handler what a document is and routes the open to the handler
+    // whose selector matches the answer it takes. Answering "plaintext" for every URI sent XML
+    // opens here on some server starts, where the .txt guard dropped them unindexed.
+    [Theory]
+    [InlineData("file:///d%3A/mod/data/text/dialog.txt", "plaintext")]
+    [InlineData("file:///d%3A/mod/data/xml/story_plot.xml", "xml")]
+    [InlineData("file:///d%3A/mod/data/scripts/story/plot.lua", "lua")]
+    public void GetTextDocumentAttributes_AnswersByExtension_NotByOwner(string uri, string language)
+    {
+        var (handler, _, _) = Build();
+        Assert.Equal(language, handler.GetTextDocumentAttributes(DocumentUri.From(uri)).LanguageId);
+    }
+
     [Fact]
     public async Task DidOpen_InScopeTxt_TracksAndRevalidates()
     {

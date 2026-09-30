@@ -79,7 +79,7 @@ public sealed class ServerConfiguratorRegistrationTest
     {
         using var provider = BuildProvider();
 
-        Assert.NotNull(provider.GetRequiredService<IMtdFileService>());
+        Assert.NotNull(provider.GetRequiredService<IMtdService>());
     }
 
     // A provider registered twice would hand HashingService two claimants for the same key.
@@ -106,7 +106,7 @@ public sealed class ServerConfiguratorRegistrationTest
     {
         using var provider = BuildProvider();
 
-        Assert.NotNull(provider.GetRequiredService<IMegFileService>());
+        Assert.NotNull(provider.GetRequiredService<IMegService>());
     }
 
     /// <summary>

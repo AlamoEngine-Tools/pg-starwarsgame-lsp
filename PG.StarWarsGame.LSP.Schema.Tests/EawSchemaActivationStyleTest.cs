@@ -10,8 +10,8 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The shape, from <c>ReduceProductionTimeAbilityClass::Validate_Data</c>
-///         (<c>010180b0</c>):
+///         The shape, from the engine's load-time validation
+///        :
 ///         <c>
 ///             if (style != 3) { Message_Popup("The only currently supported
 ///             Activation_Style is Galactic_Automatic."); style = 3; }
@@ -37,7 +37,7 @@ public sealed class EawSchemaActivationStyleTest
     [InlineData("GalacticSabotageAbility.yaml", "GROUND_ACTIVATED")]
     [InlineData("BlackMarketAbility.yaml", "GROUND_ACTIVATED")]
     [InlineData("SlicerAbility.yaml", "GROUND_ACTIVATED")]
-    // These two declare NO tags of their own - both Map_Derived_Class_Member bodies are empty - so
+    // These two declare NO tags of their own - both the derived-class tag map bodies are empty - so
     // their files exist purely to narrow this one inherited tag. Neither ability appears in the
     // shipped corpus.
     [InlineData("HackSuperWeaponAbility.yaml", "GROUND_ACTIVATED")]
@@ -56,8 +56,8 @@ public sealed class EawSchemaActivationStyleTest
     /// <remarks>
     ///     None appears anywhere in the shipped corpus. The first two are in the enum on the
     ///     strength of the engine naming them as an ability class's supported style; the third,
-    ///     <c>GLOBAL_AUTOMATIC</c>, is the twelfth case in <c>SpecialAbilityClass::Validate_Data</c>
-    ///     (<c>00c1f7a0</c>) and sits in the arm that refuses <c>Causes_Despawn</c>. Without them,
+    ///     <c>GLOBAL_AUTOMATIC</c>, is the twelfth case in the engine's load-time validation
+    ///     and sits in the arm that refuses <c>Causes_Despawn</c>. Without them,
     ///     writing what the engine handles reads as an unknown enum member.
     /// </remarks>
     [Theory]

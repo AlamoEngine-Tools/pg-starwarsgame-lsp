@@ -5,7 +5,7 @@
 // Petroglyph's sources.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
     buildFragmentShader, buildVertexShader, declareUniforms, findEntry, findStructs,
@@ -380,7 +380,7 @@ describe('declareUniforms, on a texture with both a semantic and an annotation',
 
 describe('the vertex packing helpers', () => {
     // The RSkin vertex formats store UVs and normals as SCALED SHORTS, and the shaders divide them
-    // back down - `Unpack_UV` by 4096, `Unpack_Normal` by 16384. Our exporter decodes them when it
+    // back down - the UV helper by 4096, the normal helper by 16384. Our exporter decodes them when it
     // reads the ALO, so the attribute arriving here is already unpacked and the division is applied
     // to a correct value: every vertex ends up sampling a single texel and the model draws flat.
     it('neutralises Unpack_UV, because the exporter already decoded the UVs', () => {

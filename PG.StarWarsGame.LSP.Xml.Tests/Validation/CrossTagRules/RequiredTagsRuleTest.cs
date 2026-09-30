@@ -17,8 +17,8 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.CrossTagRules;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>You must specify a Bomb_Type. Defaulting to "Demolition_Bomb".</c> (<c>01552660</c>)
-///         and <c>You must specify an Attack_Animation!</c> (<c>0155122c</c>). Each owner was
+///         <c>You must specify a Bomb_Type. Defaulting to "Demolition_Bomb".</c>
+///         and <c>You must specify an Attack_Animation!</c>. Each owner was
 ///         attributed by the xref to the string rather than by where our schema carries the tag,
 ///         and the two answers differ - which is the whole point of these tests.
 ///     </para>
@@ -34,9 +34,9 @@ public sealed class RequiredTagsRuleTest
     private const string Uri = "file:///abilities/Abilities.xml";
 
     /// <summary>
-    ///     The three classes whose <c>Validate_Data</c> references the Attack_Animation string:
-    ///     ArcSweepAttackAbilityClass (00ff5e4b), GenericAttackAbilityClass (0100a95b) and
-    ///     EatAttackAbilityClass (0100046b).
+    ///     The three classes whose the engine's load-time validation references the Attack_Animation string:
+    ///     ArcSweepAttackAbilityClass, GenericAttackAbilityClass and
+    ///     EatAttackAbilityClass.
     /// </summary>
     public static TheoryData<string, string> AttackAbilities => new()
     {
@@ -96,7 +96,7 @@ public sealed class RequiredTagsRuleTest
     /// <summary>
     ///     The scoping case, and the reason the owner was taken from the xref rather than from our
     ///     own schema: <c>Bomb_Type</c> is declared on three ability types, and only
-    ///     <c>DemolitionAbilityClass::Validate_Data</c> demands it. Both of these ship in FoC
+    ///     the engine's load-time validation demands it. Both of these ship in FoC
     ///     (<c>Units_space_rebel_mc30_frigate.xml</c>, <c>Minor_heroes_expansion.xml</c>) and both
     ///     set the tag, so this guards a rule that would be silent on vanilla either way.
     /// </summary>
@@ -136,13 +136,13 @@ public sealed class RequiredTagsRuleTest
     /// <remarks>
     ///     <para>
     ///         <c>HardPointDataClass</c>'s constructor leaves <c>FireConeWidth</c> and
-    ///         <c>FireConeHeight</c> at <c>0.0</c>, and <c>Can_Weapon_Point_At</c> asserts both are
-    ///         <c>&gt; 0</c> (<c>HardPoint.cpp:0x741</c> and <c>:0x742</c>) before it does anything
+    ///         <c>FireConeHeight</c> at <c>0.0</c>, and the weapon-aim test asserts both are
+    ///         <c>&gt; 0</c> before it does anything
     ///         else. A weapon hardpoint that declares neither can therefore point at nothing.
     ///     </para>
     ///     <para>
     ///         Gated on the hardpoint's <c>Type</c>, because the asserts sit behind
-    ///         <c>Is_Weapon()</c>: a shield generator or an engine has no business declaring a cone.
+    ///         the is-a-weapon test: a shield generator or an engine has no business declaring a cone.
     ///     </para>
     ///     <para>
     ///         Measured: 439 <c>HARD_POINT_WEAPON_*</c> definitions across the two trees, ONE of
@@ -185,7 +185,7 @@ public sealed class RequiredTagsRuleTest
     }
 
     /// <summary>
-    ///     The gate: the asserts sit behind <c>Is_Weapon()</c>, so a hardpoint that is not one is
+    ///     The gate: the asserts sit behind the is-a-weapon test, so a hardpoint that is not one is
     ///     not this rule's business however little it declares.
     /// </summary>
     [Theory]

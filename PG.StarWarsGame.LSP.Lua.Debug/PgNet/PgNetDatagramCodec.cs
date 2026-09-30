@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Buffers.Binary;
-using PG.Commons.Hashing;
+using System.IO.Hashing;
 
 namespace PG.StarWarsGame.LSP.Lua.Debug.PgNet;
 
@@ -16,12 +16,16 @@ public sealed class PgNetDatagramCodec : IPgNetDatagramCodec
     /// <summary>The CRC plus a body of at least one byte for the 25-bit header.</summary>
     private const int MinimumLength = CrcBytes + 4;
 
-    private readonly ICrc32HashingService _hashing;
-
-    public PgNetDatagramCodec(ICrc32HashingService hashing)
-    {
-        _hashing = hashing;
-    }
+    // The checksum is computed here rather than through PG.Commons' ICrc32HashingService.
+    //
+    // As of the 4.1.4 packages there is no way for a consumer to obtain one: PetroglyphCommons's
+    // ContributeServices is an empty method, and both Crc32HashingService and its CRC32
+    // IHashAlgorithmProvider are internal, visible only to that repository's own test projects.
+    //
+    // Nothing about the datagram changes. PG.Commons' provider is a thin wrapper over
+    // System.IO.Hashing.Crc32, and its Crc32 struct reads those four bytes little-endian into the
+    // same uint that HashToUInt32 returns - so this is the identical value written the identical
+    // way, with one fewer service to resolve.
 
     public byte[] Encode(PgNetPacket packet)
     {
@@ -36,7 +40,7 @@ public sealed class PgNetDatagramCodec : IPgNetDatagramCodec
         var body = writer.ToArray();
         var datagram = new byte[CrcBytes + body.Length];
         body.CopyTo(datagram, CrcBytes);
-        BinaryPrimitives.WriteUInt32LittleEndian(datagram, (uint)_hashing.GetCrc32(body));
+        BinaryPrimitives.WriteUInt32LittleEndian(datagram, Crc32.HashToUInt32(body));
         return datagram;
     }
 
@@ -47,7 +51,7 @@ public sealed class PgNetDatagramCodec : IPgNetDatagramCodec
 
         var body = datagram[CrcBytes..].ToArray();
         var stored = BinaryPrimitives.ReadUInt32LittleEndian(datagram);
-        var actual = (uint)_hashing.GetCrc32(body);
+        var actual = Crc32.HashToUInt32(body);
         if (validateCrc && stored != actual)
             throw new PgNetCrcException(stored, actual);
 

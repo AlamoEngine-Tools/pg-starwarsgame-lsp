@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Six of these, each stated in one ability class's <c>Validate_Data</c> as "If you set A
+///         Six of these, each stated in one ability class's the engine's load-time validation as "If you set A
 ///         to true you must also set B". The engine does not refuse the object - it REPAIRS it,
 ///         turning the missing flag on or forcing the missing duration to a default - so the
 ///         ability runs under settings the author never wrote and nothing on screen says so.

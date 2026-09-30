@@ -9,10 +9,10 @@
 // which matters, because most of these describe a fault in the MOD's data and the whole value of
 // saying so is naming the fix.
 
-import { GetEncyclopediaEntryResult } from '../protocol/encyclopedia';
-import { isSubstitutedFont } from './encyclopediaFonts';
-import { worstSeverity } from './loc/validateState';
-import { ValidationState } from './loc/useLocPanel';
+import {GetEncyclopediaEntryResult} from '../protocol/encyclopedia';
+import {isSubstitutedFont} from './encyclopediaFonts';
+import {worstSeverity} from './loc/validateState';
+import {ValidationState} from './loc/useLocPanel';
 
 export interface EncyclopediaNotice {
     /**
@@ -28,7 +28,7 @@ export interface EncyclopediaNotice {
 }
 
 /** Warnings first: the worst of it should read first, whatever order it was collected in. */
-const RANK: Record<EncyclopediaNotice['severity'], number> = { warning: 0, info: 1 };
+const RANK: Record<EncyclopediaNotice['severity'], number> = {warning: 0, info: 1};
 
 /**
  * What the preview has to report about `entry`, given how the panel is currently set up.
@@ -42,7 +42,9 @@ export function encyclopediaNotices(
     view: { multiplayer: boolean; factionSlot: number },
 ): EncyclopediaNotice[] {
     // Nothing is drawn for an object with no entry, so there is nothing to report about it.
-    if (entry === null || !entry.found) { return []; }
+    if (entry === null || !entry.found) {
+        return [];
+    }
 
     const notices: EncyclopediaNotice[] = [];
 
@@ -63,6 +65,20 @@ export function encyclopediaNotices(
                     + 'mega texture. Rebuild the MTD, or the game will not show it.',
             });
         }
+    }
+
+    // Once for the workspace, not once per project: this is a single missing setting, and the
+    // reader wants the list in one sentence rather than the same sentence three times. It is said
+    // whether or not THIS card's icon is missing, because it explains every icon on it - the
+    // chrome, the portrait and the ability slots all come from the same empty catalog.
+    const gaps = entry.projectsWithoutIcons ?? [];
+    if (gaps.length > 0) {
+        notices.push({
+            severity: 'warning',
+            message: `No icon sources configured for ${gaps.join(', ')} - every icon falls back to `
+                + 'the base game. Add an "icons" node naming the source folders to each project '
+                + 'file, or build the mega texture.',
+        });
     }
 
     const ships = entry.shipNames;
@@ -112,6 +128,25 @@ export function encyclopediaNotices(
         });
     }
 
+    // A consequence of the substitution above, but worth its own sentence: the cost is formatted
+    // "$ %d" and that dollar sign is the CREDITS COIN in EmpireAtWar-Bold. Substituting the font
+    // turns a coin into a dollar sign - a wrong symbol rather than a wrong typeface - which reads
+    // as a bug in the card unless it is named.
+    //
+    // Said only when the card actually falls back to the "$". When the coin was cut from the atlas
+    // the symbol on screen is the right one, and a notice that fires on correct output is one
+    // people learn to skip.
+    if (entry.buildCost !== null && entry.buildCost !== undefined && entry.buildCost > 0
+        && !entry.chrome?.credit
+        && isSubstitutedFont(entry.layout.costText.fontName)) {
+        notices.push({
+            severity: 'info',
+            message: 'The cost reads "$" because the game writes a literal dollar sign there and '
+                + 'draws it with a font whose dollar glyph is the credits symbol. In game it is a '
+                + 'coin.',
+        });
+    }
+
     if (view.multiplayer && !entry.usedMultiplayerBody) {
         notices.push({
             severity: 'info',
@@ -141,7 +176,7 @@ export function noticeSeverity(notices: readonly EncyclopediaNotice[]): Validati
  * installed should say nothing at all.
  */
 function substitutedFonts(entry: GetEncyclopediaEntryResult): string[] {
-    const { header, body, rightText, centerText, costText } = entry.layout;
+    const {header, body, rightText, centerText, costText} = entry.layout;
     return [...new Set(
         [header, body, rightText, centerText, costText]
             .map(s => s.fontName)

@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -27,6 +28,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly IClientRefreshNotifier? _refresh;
     private readonly IProjectConfigurationResolver _resolver;
 
+    private readonly IIconCatalogProvider? _icons;
     private List<string>? _lastRoots;
 
     // refresh is optional so the many minimal test setups can omit it; production always wires it.
@@ -42,7 +44,12 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         IUserNotifier notifier,
         ILogger<ModProjectReloadService> logger,
         IClientRefreshNotifier? refresh = null,
-        PgprojMigrationOffer? migrationOffer = null)
+        PgprojMigrationOffer? migrationOffer = null,
+        // Optional for the same reason as refresh: the minimal test setups omit it. Production
+        // wires it, and without it a catalog built before the projects resolved - by any preview
+        // restored while the window was opening - answers with baseline icons for the whole
+        // session, because nothing else ever drops it.
+        IIconCatalogProvider? icons = null)
     {
         _resolver = resolver;
         _indexer = indexer;
@@ -53,13 +60,32 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         _logger = logger;
         _refresh = refresh;
         _migrationOffer = migrationOffer;
+        _icons = icons;
     }
 
     public IReadOnlyList<string>? LastAssetRoots { get; private set; }
     public WorkspaceConfiguration? LastWorkspaceConfig { get; private set; }
     public IReadOnlyList<string>? LastWorkspaceRoots { get; private set; }
 
+    /// <inheritdoc />
+    public bool HasLoadedProjects { get; private set; }
+
     public async Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
+    {
+        try
+        {
+            await LoadCoreAsync(workspaceRoots, ct);
+        }
+        finally
+        {
+            // Whatever the outcome, including the two early exits below. "Finished and found no
+            // project" is as useful to a consumer as "finished and found one"; what none of them
+            // can act on is "still loading", which is what this separates out.
+            HasLoadedProjects = true;
+        }
+    }
+
+    private async Task LoadCoreAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
     {
         var roots = workspaceRoots.ToList();
         _lastRoots = roots;
@@ -85,6 +111,12 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         }
 
         LastWorkspaceConfig = config;
+        // The icon catalog is keyed on the project roots it was built from and cached, so one built
+        // before this point - by any preview that asked for an icon while the scan was still
+        // running - was built from the fallback workspace root with no layers at all and would
+        // answer with baseline icons for the rest of the session. Dropping it here is what makes
+        // the workspace's own icons appear once the projects are known.
+        _icons?.Invalidate();
         // Publish layer precedence before indexing so each document is stamped with its rank
         // (indexing itself stays parallel - correctness comes from the rank, not insertion order).
         _layerMap.SetLayers(config.Layers);
@@ -92,7 +124,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         await _indexer.IndexDocumentsAsync(config, ct);
         _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories);
         _indexer.ApplyAssetCatalog(config.AssetRoots);
-        _indexer.ApplyModelBoneCatalog(config.AssetRoots);
+        _indexer.ApplyModelBoneCatalog(config);
         LastAssetRoots = config.AssetRoots;
 
         try
@@ -104,10 +136,11 @@ public sealed class ModProjectReloadService : IModProjectReloadService
             _logger.LogError(ex, "Workspace localisation load failed.");
         }
 
-        // Last, and only once the workspace works: a project brought forward while loading has
-        // already been read as its current shape, so the question is whether to write that down -
-        // which is worth asking after the editor is usable, not in the middle of making it so.
-        if (_migrationOffer is not null) await _migrationOffer.OfferPendingAsync(ct);
+        // No migration offer here, on purpose. A project brought forward while loading has already
+        // been read as its current shape; whether to write that down is a QUESTION, and this method
+        // is awaited by the startup pipeline before it opens the gate. Asked from here it stopped
+        // the whole server until the user answered. The startup path asks once the gate is open;
+        // ReloadAsync asks after the reload. Anything still queued waits for the next of those.
     }
 
     public async Task ReloadAsync(CancellationToken ct)
@@ -127,6 +160,11 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         {
             _logger.LogError(ex, "Mod project reload failed.");
         }
+
+        // After the reload rather than inside the load: the question is the same one startup asks,
+        // and it must not hold the index path open while the user reads a diff. A reload has no
+        // gate in front of it, so this is simply the first moment the workspace is settled again.
+        if (_migrationOffer is not null) await _migrationOffer.OfferPendingAsync(ct);
     }
 
     public async Task ReloadLocalisationAsync(CancellationToken ct)

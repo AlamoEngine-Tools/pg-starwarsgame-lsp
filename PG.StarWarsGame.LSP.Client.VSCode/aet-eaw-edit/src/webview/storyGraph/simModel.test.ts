@@ -1,0 +1,314 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+import assert from 'node:assert/strict';
+import {galacticReturnNode, hangingDecision, portalPickAction, shouldResumeAfterAnswer} from './simModel';
+
+// The decision that opens by itself: the battle, else the one armed last (the chain's next step),
+// else the first listed - never a listener armed at plot load ahead of the step that just came up.
+describe('hangingDecision', () => {
+    const decision = (nodeId: string, kind = 'manual', facet: string | null = 'generic') =>
+        ({kind, nodeId, eventName: nodeId, eventType: null, options: [], facet, suggested: null}) as never;
+    const armed = (nodeId: string, tick: number) =>
+        ({tick, seq: tick, nodeId, from: 'Waiting', to: 'Armed', sourceNodeId: null, cause: 'prereq', detail: null});
+    const atLoad = decision('g#continue');
+    const nextStep = decision('g#speech_done', 'manual', null);
+
+    it('picks the decision armed last over one armed at load', () => {
+        const steps = [armed('g#continue', 0), armed('g#speech_done', 7)];
+        assert.equal(hangingDecision([atLoad, nextStep], steps)?.nodeId, 'g#speech_done');
+    });
+
+    it('puts a battle first, falls back to the dock order without a trace, and is null when nothing waits', () => {
+        const battle = decision('tactical#m1', 'battle', null);
+        assert.equal(hangingDecision([atLoad, battle, nextStep], [armed('g#speech_done', 7)])?.nodeId, 'tactical#m1');
+        assert.equal(hangingDecision([nextStep, atLoad], [])?.nodeId, 'g#continue');
+        assert.equal(hangingDecision([], [armed('g#continue', 0)]), null);
+    });
+});
+
+// A battle resolved inside its own panel hands the reader back to the galaxy on the event the
+// story goes on from: the exit portal for the outcome, else any exit portal, else the entry.
+describe('galacticReturnNode', () => {
+    const portal = (id: string, target: string, eventType: string | null = null) =>
+        ({id, kind: 'GalacticPortal', label: target, portalTarget: target, eventType}) as never;
+    const nodes = [
+        portal('p#link', 'g#link'),
+        portal('p#returned', 'g#returned', 'STORY_GENERIC'),
+        portal('p#win', 'g#win', 'STORY_VICTORY'),
+        portal('p#lost', 'g#lost', 'STORY_MISSION_LOST'),
+        {id: 'e#ambush', kind: 'Event', label: 'Ambush'} as never,
+    ];
+    const edges = [
+        {fromId: 'p#link', toId: 'p#returned', kind: 'Tactical', label: 'outcome'},
+        {fromId: 'p#link', toId: 'p#win', kind: 'Tactical', label: 'outcome'},
+        {fromId: 'p#link', toId: 'p#lost', kind: 'Tactical', label: 'outcome'},
+        {fromId: 'p#link', toId: 'e#ambush', kind: 'TacticalEntry', label: null},
+    ];
+
+    it('prefers the outcome listener that matches the result', () => {
+        assert.equal(galacticReturnNode(nodes, edges, 'won'), 'g#win');
+        assert.equal(galacticReturnNode(nodes, edges, 'lost'), 'g#lost');
+    });
+
+    it('falls back to the summary listener, never to the other outcome, then to the entry', () => {
+        // The tutorial's shape: no galactic victory listener, the win is a flag read behind the
+        // summary listener, and the loss listener sits beside it.
+        const noWin = nodes.filter(n => (n as { id: string }).id !== 'p#win');
+        assert.equal(galacticReturnNode(noWin, edges, 'won'), 'g#returned');
+        const lossOnly = nodes.filter(n => !['p#win', 'p#returned'].includes((n as { id: string }).id));
+        assert.equal(galacticReturnNode(lossOnly, edges, 'won'), 'g#link');
+        assert.equal(galacticReturnNode([portal('p#link', 'g#link')], [], 'won'), 'g#link');
+        assert.equal(galacticReturnNode([], [], 'won'), null);
+    });
+});
+
+// A pick on a battle's portal: in Simulation it selects the battle's decision beside the dock -
+// the picker, not the other panel; in View it goes through to the battle's graph; in Edit a pick
+// starts a drag and does nothing else. The jump arrow always opens the graph, into Simulation
+// while the galaxy simulates.
+describe('portalPickAction', () => {
+    it('selects in Simulation, opens in View, does nothing in Edit', () => {
+        assert.equal(portalPickAction('simulate'), 'select');
+        assert.equal(portalPickAction('view'), 'open');
+        assert.equal(portalPickAction('edit'), 'none');
+    });
+});
+
+describe('shouldResumeAfterAnswer', () => {
+    const base = {autoResume: true, pausedForWait: true, stillWaiting: false, halted: false};
+
+    it('resumes when play paused itself for a decision that is now answered', () => {
+        assert.equal(shouldResumeAfterAnswer(base), true);
+    });
+
+    it('stays paused when the setting is off, play was never on, a breakpoint holds, or another decision waits', () => {
+        assert.equal(shouldResumeAfterAnswer({...base, autoResume: false}), false);
+        assert.equal(shouldResumeAfterAnswer({...base, pausedForWait: false}), false);
+        assert.equal(shouldResumeAfterAnswer({...base, halted: true}), false);
+        assert.equal(shouldResumeAfterAnswer({...base, stillWaiting: true}), false);
+    });
+});
+import {describe, it} from 'node:test';
+
+import {
+    StoryGraphEdgeDto,
+    StoryGraphNodeDto,
+    StorySimInterventionDto,
+    StorySimStateDto,
+    StorySimStepDto,
+    StorySimWorldDto
+} from '../../protocol/story';
+import {
+    armingLines, DEFAULT_PACE, filterTrace, groupDecisions, labelFor, paceIntervalMs, parsePace, pickerCandidates,
+    retryableBattle, selectionAnswered, SPEED_STOPS, speedLabel, speedStopOf, traceRows,
+} from './simModel';
+
+function intervention(name: string, kind: string, facet: string | null, options: string[] = []): StorySimInterventionDto {
+    return {
+        kind,
+        nodeId: 'file:///a.xml#' + name.toLowerCase(),
+        eventName: name,
+        eventType: null,
+        options,
+        facet,
+        suggested: null
+    };
+}
+
+describe('groupDecisions', () => {
+    it('groups by answer kind in a fixed order and keeps wire order inside a group', () => {
+        const groups = groupDecisions([
+            intervention('Fire', 'manual', null),
+            intervention('Talk', 'lua', null, ['ID']),
+            intervention('Kuat', 'manual', 'capturePlanet', ['Kuat']),
+            intervention('Win', 'tactical', 'battleWon'),
+            intervention('Hoth', 'manual', 'capturePlanet', ['Hoth']),
+        ]);
+
+        assert.deepEqual(groups.map(g => [g.kind, g.items.map(i => i.eventName)]),
+            [['world', ['Kuat', 'Hoth']], ['tactical', ['Win']], ['lua', ['Talk']], ['assume', ['Fire']]]);
+    });
+});
+
+describe('trace rows', () => {
+    const labelOf = (id: string): string | undefined => ({'x#a': 'Alpha', 'x#b': 'Beta'})[id];
+    const steps: StorySimStepDto[] = [
+        {tick: 0, seq: 0, nodeId: 'x#a', from: 'Waiting', to: 'Armed', sourceNodeId: null, cause: 'load', detail: null},
+        {
+            tick: 1,
+            seq: 1,
+            nodeId: 'x#b',
+            from: 'Waiting',
+            to: 'Fired',
+            sourceNodeId: 'x#a',
+            cause: 'prereq',
+            detail: null
+        },
+        {
+            tick: 1,
+            seq: 2,
+            nodeId: 'file:///s.lua#lua#act_i',
+            from: null,
+            to: null,
+            sourceNodeId: 'x#b',
+            cause: 'luaEnter',
+            detail: 'entered'
+        },
+    ];
+
+    it('names nodes by label, and a script state by its name after the marker', () => {
+        const rows = traceRows(steps, labelOf);
+        assert.deepEqual(rows.map(r => r.node), ['Alpha', 'Beta', 'act_i']);
+        assert.deepEqual(rows.map(r => r.via), [null, 'Alpha', 'Beta']);
+    });
+
+    it('filters by substring and by tick', () => {
+        const rows = traceRows(steps, labelOf);
+        assert.deepEqual(filterTrace(rows, 'beta').map(r => r.seq), [1, 2]);
+        assert.deepEqual(filterTrace(rows, 'T1').map(r => r.seq), [1, 2]);
+        assert.deepEqual(filterTrace(rows, 'luaenter').map(r => r.seq), [2]);
+        assert.equal(filterTrace(rows, '   ').length, 3);
+    });
+
+    it('falls back to the id tail for an unknown node', () => {
+        assert.equal(labelFor('file:///t.xml#some_event', () => undefined), 'some_event');
+    });
+});
+
+describe('armingLines', () => {
+    const node = (id: string, kind: string): StoryGraphNodeDto =>
+        ({
+            id,
+            kind,
+            label: id.toUpperCase(),
+            threadUri: null,
+            line: null,
+            eventType: null,
+            rewardType: null,
+            branch: null,
+            lifecycle: null,
+            reachable: true
+        }) as unknown as StoryGraphNodeDto;
+    const edge = (fromId: string, toId: string, kind = 'Prereq'): StoryGraphEdgeDto => ({
+        fromId,
+        toId,
+        kind,
+        label: null
+    });
+    const nodes = [node('a', 'Event'), node('b', 'Event'), node('c', 'Event'), node('t', 'Event'), node('t#g0', 'AndJunction'), node('t#or', 'OrJunction')];
+    const edges = [edge('a', 't#g0'), edge('b', 't#g0'), edge('t#g0', 't#or'), edge('c', 't#or'), edge('t#or', 't')];
+
+    it('reads OR of AND lines through the junctions with each member fired state', () => {
+        const lines = armingLines('t', nodes, edges, id => (id === 'a' ? 'Fired' : 'Armed'));
+
+        assert.deepEqual(lines.map(l => [l.satisfied, l.members.map(m => m.nodeId + (m.fired ? '*' : ''))]),
+            [[false, ['a*', 'b']], [false, ['c']]]);
+    });
+
+    it('is empty for a root and satisfied when a line is all fired', () => {
+        assert.deepEqual(armingLines('a', nodes, edges, () => 'Armed'), []);
+        const lines = armingLines('t', nodes, edges, id => (id === 'c' ? 'Fired' : 'Waiting'));
+        assert.deepEqual(lines.map(l => l.satisfied), [false, true]);
+    });
+});
+
+describe('pickerCandidates', () => {
+    const world: StorySimWorldDto = {
+        planets: [{name: 'Kuat', owner: 'Empire', revealed: true, corrupted: false, destroyed: false},
+            {name: 'Hoth', owner: 'Rebel', revealed: true, corrupted: false, destroyed: false}],
+        units: [{type: 'TIE', owner: 'Empire', planet: 'Kuat', count: 2}, {
+            type: 'X_Wing',
+            owner: 'Rebel',
+            planet: 'Hoth',
+            count: 1
+        }],
+        tech: [], credits: [], era: null, counters: [], objectives: [],
+    };
+
+    it('lists the event candidates first, else the planets the faction does not hold', () => {
+        assert.deepEqual(pickerCandidates('capturePlanet', ['Corellia'], world, 'Rebel').preferred, ['Corellia']);
+        const open = pickerCandidates('capturePlanet', [], world, 'Rebel');
+        assert.deepEqual(open.preferred, ['Kuat']);
+        assert.deepEqual(open.all, ['Kuat', 'Hoth']);
+    });
+
+    it('lists someone elses unit types for a destroy and every type otherwise', () => {
+        assert.deepEqual(pickerCandidates('destroyUnit', [], world, 'Rebel').preferred, ['TIE']);
+        assert.deepEqual(pickerCandidates('buildUnit', [], world, 'Rebel').preferred, ['TIE', 'X_Wing']);
+        assert.equal(pickerCandidates('setTech', [], world, 'Rebel').kind, 'none');
+    });
+});
+
+describe('pace', () => {
+    it('parses a stored pace and falls back on garbage', () => {
+        assert.deepEqual(parsePace('{"mode":"custom","ticksPerSecond":8}'), {mode: 'custom', ticksPerSecond: 8});
+        assert.deepEqual(parsePace('{"mode":"step","ticksPerSecond":4}'), {mode: 'step', ticksPerSecond: 4});
+        assert.deepEqual(parsePace('{"mode":"fast"}'), DEFAULT_PACE);
+        assert.deepEqual(parsePace('nonsense'), DEFAULT_PACE);
+        assert.equal(paceIntervalMs({mode: 'custom', ticksPerSecond: 4}), 250);
+    });
+
+    /** Pulse and custom at 1/s ran the same 1000 ms interval: one stop, not two controls. */
+    it('folds a stored pulse into 1 tick per second', () => {
+        assert.deepEqual(parsePace('{"mode":"pulse","ticksPerSecond":4}'), {mode: 'custom', ticksPerSecond: 1});
+    });
+
+    it('moves a stored rate between stops to the nearest stop', () => {
+        assert.equal(parsePace('{"mode":"custom","ticksPerSecond":5}').ticksPerSecond, 4);
+        assert.equal(parsePace('{"mode":"custom","ticksPerSecond":20}').ticksPerSecond, 15);
+        assert.equal(parsePace('{"mode":"custom","ticksPerSecond":29}').ticksPerSecond, 30);
+    });
+});
+
+describe('selectionAnswered', () => {
+    const state = {interventions: [{nodeId: 'a#open'}]} as unknown as StorySimStateDto;
+
+    /**
+     * A decision's dialog closes once the decision is answered: the battle's decision, opened by
+     * the wait, stayed up after the loss resolved it and read only "Answered".
+     */
+    it('is answered once the decision is no longer owed', () => {
+        assert.equal(selectionAnswered({kind: 'decision', nodeId: 'a#gone'}, state), true);
+        assert.equal(selectionAnswered({kind: 'decision', nodeId: 'a#open'}, state), false);
+    });
+
+    it('never calls anything but a decision answered', () => {
+        assert.equal(selectionAnswered({kind: 'node', nodeId: 'a#gone'}, state), false);
+    });
+});
+
+describe('retryableBattle', () => {
+    const galaxy = (overrides: Record<string, unknown>) => ({
+        scope: null, interventions: [], clockPending: 0,
+        battles: [{key: 'm01', label: 'M01', status: 'lost', tick: 0}], ...overrides,
+    }) as unknown as StorySimStateDto;
+
+    /**
+     * Where the game shows its retry dialog: a battle lost and the galaxy with nothing left to do.
+     * The tutorial's own failure branch arms too late to hear the loss, so this is the only way on.
+     */
+    it('offers the lost battle when the galaxy has nothing left to do', () => {
+        assert.equal(retryableBattle(galaxy({})), 'm01');
+    });
+
+    it('offers nothing while the story still moves, inside a battle, or with no loss', () => {
+        assert.equal(retryableBattle(galaxy({clockPending: 2})), null);
+        assert.equal(retryableBattle(galaxy({interventions: [{nodeId: 'a#x'}]})), null);
+        assert.equal(retryableBattle(galaxy({scope: 'm01'})), null);
+        assert.equal(retryableBattle(galaxy({battles: [{key: 'm01', label: 'M01', status: 'won', tick: 0}]})), null);
+    });
+});
+
+describe('speed stops', () => {
+    it('is one ordered axis: step first, then ticks per second', () => {
+        assert.deepEqual(SPEED_STOPS.map(p => speedLabel(p)),
+            ['Step', '1/s', '2/s', '4/s', '8/s', '15/s', '30/s']);
+    });
+
+    it('finds the stop a pace sits on', () => {
+        assert.equal(speedStopOf({mode: 'step', ticksPerSecond: 8}), 0);
+        assert.equal(speedStopOf({mode: 'custom', ticksPerSecond: 1}), 1);
+        assert.equal(speedStopOf({mode: 'custom', ticksPerSecond: 30}), 6);
+    });
+});

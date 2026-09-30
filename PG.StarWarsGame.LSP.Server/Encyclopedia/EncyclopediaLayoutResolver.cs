@@ -47,22 +47,54 @@ public sealed class EncyclopediaLayoutResolver
         new EncyclopediaRgba(255, 255, 255, 128),
         "e_background.tga",
         DefaultFactionFrames,
+        // The trailing number on each row is the line's CHARACTER budget, from that component's own
+        // Size X. The shipped body says 41 beside a stale "42 14" comment; 41 is what reproduces
+        // the shipped wrap of Luke Skywalker's biography, whose second line lands on exactly 40.
+        // The last two numbers on each row are the line's CHARACTER budget and the glyph height in
+        // card units. Every resolved style recomputes the second for the target screen; the value
+        // here is the default screen's, so a caller holding these defaults alone still has a
+        // drawable size rather than a zero.
         new EncyclopediaTextStyle(HeaderComponent, "Arial Bold", 7d, 1.0d,
-            new EncyclopediaRgba(255, 255, 255, 255), EncyclopediaTextAlignment.Left),
+            new EncyclopediaRgba(255, 255, 255, 255), EncyclopediaTextAlignment.Left, 23,
+            DefaultUnits(7d, 1.0d)),
         new EncyclopediaTextStyle(BodyComponent, "Arial", 7d, 1.0d,
-            new EncyclopediaRgba(192, 192, 192, 200), EncyclopediaTextAlignment.Left),
+            new EncyclopediaRgba(192, 192, 192, 200), EncyclopediaTextAlignment.Left, 41,
+            DefaultUnits(7d, 1.0d)),
         new EncyclopediaTextStyle(RightComponent, "Arial", 7d, 1.0d,
-            new EncyclopediaRgba(192, 192, 192, 255), EncyclopediaTextAlignment.Right),
+            new EncyclopediaRgba(192, 192, 192, 255), EncyclopediaTextAlignment.Right, 42,
+            DefaultUnits(7d, 1.0d)),
         new EncyclopediaTextStyle(CenterComponent, "Arial", 7d, 1.0d,
-            new EncyclopediaRgba(255, 255, 255, 255), EncyclopediaTextAlignment.Center),
+            new EncyclopediaRgba(255, 255, 255, 255), EncyclopediaTextAlignment.Center, 42,
+            DefaultUnits(7d, 1.0d)),
         new EncyclopediaTextStyle(CostComponent, "EmpireAtWar-Bold", 7d, 1.0d,
-            new EncyclopediaRgba(192, 192, 192, 255), EncyclopediaTextAlignment.Right));
+            new EncyclopediaRgba(192, 192, 192, 255), EncyclopediaTextAlignment.Right, 42,
+            DefaultUnits(7d, 1.0d)),
+        EncyclopediaOffsets.Shipped);
+
+    private static double DefaultUnits(double pointSize, double scale)
+    {
+        return EncyclopediaGlyphSize.Units(pointSize, scale,
+            EncyclopediaGlyphSize.DefaultScreenWidth, EncyclopediaGlyphSize.DefaultScreenHeight);
+    }
 
     private readonly EffectiveObjectResolver _resolver;
+    private readonly int _screenHeight;
+    private readonly int _screenWidth;
 
-    public EncyclopediaLayoutResolver(EffectiveObjectResolver resolver)
+    /// <param name="screenWidth">
+    ///     The screen the card is drawn for. The game sizes this popup's glyphs from the display it
+    ///     runs on, so the preview has to be told which one to be faithful to; the defaults are the
+    ///     common case.
+    /// </param>
+    /// <param name="screenHeight"><inheritdoc cref="screenWidth" /></param>
+    public EncyclopediaLayoutResolver(
+        EffectiveObjectResolver resolver,
+        int screenWidth = EncyclopediaGlyphSize.DefaultScreenWidth,
+        int screenHeight = EncyclopediaGlyphSize.DefaultScreenHeight)
     {
         _resolver = resolver;
+        _screenWidth = screenWidth;
+        _screenHeight = screenHeight;
     }
 
     public EncyclopediaLayout Resolve()
@@ -90,7 +122,34 @@ public sealed class EncyclopediaLayoutResolver
             Style(BodyComponent, Defaults.Body),
             Style(RightComponent, Defaults.RightText),
             Style(CenterComponent, Defaults.CenterText),
-            Style(CostComponent, Defaults.CostText));
+            Style(CostComponent, Defaults.CostText),
+            Offsets());
+    }
+
+    /// <summary>
+    ///     Where the header's pieces sit. These live on <c>GameConstants</c> rather than on the
+    ///     components, so they are read from the object the same way everything else here is - a mod
+    ///     that moves the blip or the portrait moves them in the preview too.
+    /// </summary>
+    private EncyclopediaOffsets Offsets()
+    {
+        var tags = TagsOf(EncyclopediaTags.GameConstantsId);
+        var shipped = EncyclopediaOffsets.Shipped;
+
+        return new EncyclopediaOffsets(
+            Whole(tags, "Encyclopedia_Population_Offset", shipped.Population),
+            Whole(tags, "Encyclopedia_Name_Offset", shipped.Name),
+            Whole(tags, "Encyclopedia_Cost_Offset", shipped.Cost),
+            Whole(tags, "Encyclopedia_Icon_X_Offset", shipped.IconX),
+            Whole(tags, "Encyclopedia_Icon_Y_Offset", shipped.IconY),
+            Whole(tags, "Encyclopedia_Class_Y_Offset", shipped.ClassY));
+    }
+
+    /// <summary>A whole-unit offset, falling back per tag like everything else in this resolver.</summary>
+    private static int Whole(IReadOnlyDictionary<string, string> tags, string tagName, int fallback)
+    {
+        var value = Number(tags, tagName);
+        return value is null || double.IsNaN(value.Value) ? fallback : (int)value.Value;
     }
 
     private IReadOnlyDictionary<string, string> TagsOf(string componentId)
@@ -111,13 +170,23 @@ public sealed class EncyclopediaLayoutResolver
     {
         var tags = TagsOf(componentId);
 
+        // Size X is the line's character budget. Truncated rather than rounded: it is a count, and
+        // the engine reads it as an integer. Size Y is the row height, which the card takes from
+        // the backdrop instead, so it is deliberately not read here.
+        var budget = Pair(tags, "Size", double.NaN, double.NaN).X;
+        var pointSize = Number(tags, "Font_Point_Size") ?? fallback.FontPointSize;
+        var scale = Number(tags, "Scale") ?? fallback.Scale;
+        var declaredBudget = double.IsNaN(budget) ? fallback.WrapChars : (int)budget;
+
         return new EncyclopediaTextStyle(
             componentId,
             Text(tags, "Font_Name") ?? fallback.FontName,
-            Number(tags, "Font_Point_Size") ?? fallback.FontPointSize,
-            Number(tags, "Scale") ?? fallback.Scale,
+            pointSize,
+            scale,
             Colour(tags, "Text_Color", fallback.TextColor),
-            Alignment(tags, fallback.Alignment));
+            Alignment(tags, fallback.Alignment),
+            EncyclopediaGlyphSize.WrapBudget(declaredBudget, _screenWidth, _screenHeight),
+            EncyclopediaGlyphSize.Units(pointSize, scale, _screenWidth, _screenHeight));
     }
 
     /// <summary>

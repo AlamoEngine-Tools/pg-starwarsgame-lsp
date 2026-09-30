@@ -8,23 +8,25 @@
 // component owns a canvas and calls into this; nothing here knows React exists.
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 
 import {
     clipPlanes, frameSphere, DEFAULT_AZIMUTH_DEGREES, DEFAULT_ELEVATION_DEGREES,
     type BoundingSphere,
 } from './framing';
-import type { AlamoParticleContent, PreviewSpinAway } from '../../protocol/modelPreview';
-import { spinAwayPose } from './spinAway';
-import type { NormalisedColour } from './colour';
-import { attachmentProblem, type AttachmentRequest } from './attachments';
-import { drawnConeRange, fireConeOutline, fireConeSurface, hullFrameBasis } from './fireArc';
-import type { FxMaterialState } from './fx/renderState';
-import { costByLevel, definedLevels, proxyVisibleAt, type DefinedLevels, type LevelCost,
-    type LevelTagged } from './levels';
-import { AlamoMaterial } from './alamoMaterial';
-import type { TranslatedEffect } from './fx/effect';
+import type {AlamoParticleContent, PreviewSpinAway} from '../../protocol/modelPreview';
+import {spinAwayPose} from './spinAway';
+import type {NormalisedColour} from './colour';
+import {attachmentProblem, type AttachmentRequest} from './attachments';
+import {drawnConeRange, fireConeOutline, fireConeSurface, hullFrameBasis} from './fireArc';
+import type {FxMaterialState} from './fx/renderState';
+import {
+    costByLevel, definedLevels, proxyVisibleAt, type DefinedLevels, type LevelCost,
+    type LevelTagged
+} from './levels';
+import {AlamoMaterial} from './alamoMaterial';
+import type {TranslatedEffect} from './fx/effect';
 import {
     engineLight, sphericalHarmonics, type AlamoFrame, type ProbeLight,
 } from './fx/uniforms';
@@ -40,46 +42,47 @@ import {
 import {
     cancelRootCorrection, outermostRoots, splitGeometryFromBone, stampTreeKeys, treeKeyOf,
 } from './boneNodes';
-import { meshDrawn, setMeshDrawn } from './meshVisibility';
-import { boneRowId, effectPlacement, meshPlacement, type TreeItem } from './previewTree';
-import { healthColour, reticleSizePx, type ReticleMark } from './reticles';
-import { breakoffLifetime, breakoffPose, type BreakoffAnchor } from './breakoff';
-import type { PreviewBreakoffProp } from '../../protocol/modelPreview';
-import { sweepAngles } from './deathClone';
-import type { PreviewTurret } from '../../protocol/modelPreview';
+import {captureFrame} from './capture';
+import {meshDrawn, setMeshDrawn} from './meshVisibility';
+import {boneRowId, effectPlacement, meshPlacement, type TreeItem} from './previewTree';
+import {healthColour, reticleSizePx, type ReticleMark} from './reticles';
+import {breakoffLifetime, breakoffPose, type BreakoffAnchor} from './breakoff';
+import type {PreviewBreakoffProp} from '../../protocol/modelPreview';
+import {sweepAngles} from './deathClone';
+import type {PreviewTurret} from '../../protocol/modelPreview';
 import {
     TURRET_AT_REST, dragToAim, type TurretAim, type TurretAxis, type TurretAxisRange,
     type TurretHandle,
 } from './turretHandles';
-import { knobPoint, stopTicks, trackRadius, trackSegments } from './turretTrack';
-import { type Inspection } from './inspector';
-import { emissionMeshFor } from './emissionSource';
-import { billboardLocalRotation, billboardRotation, billboardTypeOf } from './billboards';
-import { hiddenAt, visibilityTracks, type VisibilityTrack } from './boneVisibility';
-import { skinHiddenByClip } from './skinVisibility';
-import { drawnBounds } from './modelBounds';
-import { HeatPass } from './heatPass';
-import { BloomPass } from './bloomPass';
-import { ShadowVolumePass } from './shadowVolumePass';
+import {knobPoint, stopTicks, trackRadius, trackSegments} from './turretTrack';
+import {type Inspection} from './inspector';
+import {emissionMeshFor} from './emissionSource';
+import {billboardLocalRotation, billboardRotation, billboardTypeOf} from './billboards';
+import {hiddenAt, visibilityTracks, type VisibilityTrack} from './boneVisibility';
+import {skinHiddenByClip} from './skinVisibility';
+import {drawnBounds} from './modelBounds';
+import {HeatPass} from './heatPass';
+import {BloomPass} from './bloomPass';
+import {ShadowVolumePass} from './shadowVolumePass';
 import {
     applyBaseMapColourSpace, applyBlend, applyColourScale, applyDepth, shadowCatcherOpacity,
 } from './materialState';
-import { resolveBoneId, type BoneId } from './boneIds';
-import { type AbilityOwnership } from './abilityRows';
-import { listedInModelTree, type ParticleOrigin } from './particleScene';
+import {resolveBoneId, type BoneId} from './boneIds';
+import {type AbilityOwnership} from './abilityRows';
+import {listedInModelTree, type ParticleOrigin} from './particleScene';
 import {
     damageMeshFacts, deathClip, effectFacts as effectRowFacts, resolveRow, restingClip, subtreeFacts,
     type OverrideChange, type Resolution, type RowFacts, type RowOverride,
 } from './visibility';
-import { boxRoots, boxTargetFor, rowsInBox } from './selectionBox';
-import { type Vector3 as Vector3Like } from './lighting';
-import { skyGradient, starPositions } from './backdrop';
-import { GROUND_TEXTURE_SIZE, concreteNoise } from './groundTexture';
-import { missingTexture } from './missingTexture';
+import {boxRoots, boxTargetFor, rowsInBox} from './selectionBox';
+import {type Vector3 as Vector3Like} from './lighting';
+import {skyGradient, starPositions} from './backdrop';
+import {GROUND_TEXTURE_SIZE, concreteNoise} from './groundTexture';
+import {missingTexture} from './missingTexture';
 import {
     DEFAULT_LIGHTS, DEFAULT_VIEWER_SETTINGS, type BackgroundKind, type LightRig, type Wind,
 } from './viewerSettings';
-import { HEAT_LAYER, ParticleSystemInstance } from './particleRenderer';
+import {HEAT_LAYER, ParticleSystemInstance} from './particleRenderer';
 
 /**
  * The firing-arc gizmo's look.
@@ -430,10 +433,10 @@ const ELEVATION_AXIS = new THREE.Vector3(0, 1, 0);
 export type PresetView = 'front' | 'side' | 'top' | 'threeQuarter';
 
 const PRESETS: Record<PresetView, { azimuth: number; elevation: number }> = {
-    front: { azimuth: 0, elevation: 0 },
-    side: { azimuth: 90, elevation: 0 },
-    top: { azimuth: 0, elevation: 89.9 },
-    threeQuarter: { azimuth: DEFAULT_AZIMUTH_DEGREES, elevation: DEFAULT_ELEVATION_DEGREES },
+    front: {azimuth: 0, elevation: 0},
+    side: {azimuth: 90, elevation: 0},
+    top: {azimuth: 0, elevation: 89.9},
+    threeQuarter: {azimuth: DEFAULT_AZIMUTH_DEGREES, elevation: DEFAULT_ELEVATION_DEGREES},
 };
 
 /** One loaded part, kept so it can be hidden, re-tinted or removed without a reload. */
@@ -622,7 +625,7 @@ export const BREAKOFF_ATTACHMENT = 'wreck:';
 
 /** A three vector as the plain shape the wire and the arithmetic use. */
 function vectorOf(at: THREE.Vector3): { x: number; y: number; z: number } {
-    return { x: at.x, y: at.y, z: at.z };
+    return {x: at.x, y: at.y, z: at.z};
 }
 
 /** Reused so a tick of reticle projection allocates nothing at all. */
@@ -709,7 +712,7 @@ export class PreviewViewport {
     private rig: LightRig = DEFAULT_LIGHTS;
 
     /** The wind as a vector in the space the particles are simulated in. */
-    private windVector: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+    private windVector: { x: number; y: number; z: number } = {x: 0, y: 0, z: 0};
 
     /** The same wind in the terms the foliage shaders read it: a heading and a speed. */
     private wind: Wind = DEFAULT_VIEWER_SETTINGS.wind;
@@ -729,8 +732,8 @@ export class PreviewViewport {
      * The subject's GEOMETRY, carrying the object's `Scale_Factor`.
      *
      * Between `modelRoot` and the parts rather than on `modelRoot` itself, and the split is the
-     * engine's own. `GameObjectClass::Update_Transform` puts no scale in the object's world matrix
-     * and then calls `Model->Set_Scale`, so the scale belongs to the MODEL: geometry and bones are
+     * engine's own. the engine's transform update puts no scale in the object's world matrix
+     * and then calls `Model->the model-scale setter`, so the scale belongs to the MODEL: geometry and bones are
      * model units and reach the world multiplied by it, while positions - and every range the XML
      * declares - are already world units.
      *
@@ -817,8 +820,8 @@ export class PreviewViewport {
     /**
      * The light probe the translated shaders read, kept in step with the rig.
      *
-     * ALL of their diffuse lighting, not an ambient on top of it - `MeshAlpha.fx:53` sets the whole
-     * vertex colour from `Sph_Compute_Diffuse_Light_All` and has no N.L anywhere. So the sun and
+     * ALL of their diffuse lighting, not an ambient on top of it - `MeshAlpha.fx` sets the whole
+     * vertex colour from the spherical-harmonic probe and has no N.L anywhere. So the sun and
      * both fills go in here or they do not reach a Game-mode surface at all, which is what a flat
      * probe built from the ambient alone was doing: 0.1 grey over the entire model, unshaded.
      *
@@ -1250,18 +1253,20 @@ export class PreviewViewport {
         // you can click, and the point of the skeleton view is reaching the bones.
         this.joints = new THREE.Points(
             new THREE.BufferGeometry(),
-            new THREE.PointsMaterial({ size: 7, sizeAttenuation: false, depthTest: false }));
+            new THREE.PointsMaterial({size: 7, sizeAttenuation: false, depthTest: false}));
         this.jointLines = new THREE.LineSegments(
             new THREE.BufferGeometry(),
-            new THREE.LineBasicMaterial({ color: 0x6fb3ff, depthTest: false, transparent: true,
-                opacity: 0.7 }));
+            new THREE.LineBasicMaterial({
+                color: 0x6fb3ff, depthTest: false, transparent: true,
+                opacity: 0.7
+            }));
 
         // Amber rather than the skeleton's blue: the two are shown together, and a selection has
         // to be tellable from a joint at a glance. Drawn through the model on purpose - a box only
         // visible when the thing it points at is already in front is no help finding it.
         this.selectionBoxes = new THREE.LineSegments(
             new THREE.BufferGeometry(),
-            new THREE.LineBasicMaterial({ color: 0xffb347, depthTest: false }));
+            new THREE.LineBasicMaterial({color: 0xffb347, depthTest: false}));
         this.selectionBoxes.renderOrder = 999;
         this.selectionBoxes.frustumCulled = false;
         this.selectionBoxes.visible = false;
@@ -1273,7 +1278,7 @@ export class PreviewViewport {
         // for X/Y/Z, the convention every 3D tool shares.
         this.boneAxes = new THREE.LineSegments(
             new THREE.BufferGeometry(),
-            new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false }));
+            new THREE.LineBasicMaterial({vertexColors: true, depthTest: false}));
         this.boneAxes.renderOrder = 1000;
         this.boneAxes.frustumCulled = false;
         this.boneAxes.visible = false;
@@ -1289,7 +1294,7 @@ export class PreviewViewport {
 
         // CAPTURE phase, so a grabbed turret knob is claimed before `OrbitControls` - registered on
         // this canvas above - can start an orbit. See the grab branch of `onPointerDown`.
-        canvas.addEventListener('pointerdown', this.onPointerDown, { capture: true });
+        canvas.addEventListener('pointerdown', this.onPointerDown, {capture: true});
         canvas.addEventListener('pointermove', this.onPointerMove);
         // On the WINDOW, not the canvas: a drag that leaves the canvas must still end, and a
         // release outside it is the ordinary way a fast drag finishes.
@@ -1516,7 +1521,7 @@ export class PreviewViewport {
      * `affectedByWind`, which take it into their initial speed at birth.
      */
     setWind(headingDegrees: number, speed: number): void {
-        this.wind = { heading: headingDegrees, speed };
+        this.wind = {heading: headingDegrees, speed};
         const heading = (headingDegrees * Math.PI) / 180;
 
         this.windVector = {
@@ -1736,7 +1741,7 @@ export class PreviewViewport {
         // replaces did not - see `stampTreeKeys`.
         stampTreeKeys(root, bonesByIndex, id);
 
-        this.parts.set(id, { id, root, bones, bonesByIndex, subjectId });
+        this.parts.set(id, {id, root, bones, bonesByIndex, subjectId});
 
         // Its own file's word, because the row chain will never speak for it - see
         // `LoadedPart.subjectId`. Debris needs exactly this too: outside the chain, nothing else
@@ -1928,7 +1933,7 @@ export class PreviewViewport {
         }
 
         this.attachRequests.set(`${partId} / ${bone ?? ''} / ${boneIndex ?? ''}`,
-            { partId, bone, boneIndex });
+            {partId, bone, boneIndex});
     }
 
     /**
@@ -1950,7 +1955,7 @@ export class PreviewViewport {
                     ? false
                     : (request.boneIndex !== undefined
                         && parent.bonesByIndex.has(request.boneIndex))
-                        || parent.bones.has(request.bone.toLowerCase()),
+                    || parent.bones.has(request.bone.toLowerCase()),
             };
 
             const problem = attachmentProblem(request, found);
@@ -2019,7 +2024,7 @@ export class PreviewViewport {
                 translated.setColorization(this.colorization);
             }
 
-            translated.userData = { spec, extras };
+            translated.userData = {spec, extras};
             mesh.material = translated;
             return;
         }
@@ -2048,7 +2053,7 @@ export class PreviewViewport {
             })
             // White, not UNTINTED: nothing is going to light this, so any grey here just dims the
             // texture the effect meant to show at full strength.
-            : new THREE.MeshBasicMaterial({ ...shared, color: 0xffffff });
+            : new THREE.MeshBasicMaterial({...shared, color: 0xffffff});
 
         // The archetype's own blend and depth, through the single place that knows how each one is
         // expressed in three. An additive ARCHETYPE means the engine's ONE, ONE - the same thing
@@ -2059,7 +2064,7 @@ export class PreviewViewport {
             depthTest: true, depthWrite: spec.depthWrite, depthFunc: 'lessEqual',
         });
 
-        material.userData = { spec, extras };
+        material.userData = {spec, extras};
         this.tint(material);
         mesh.material = material;
 
@@ -2096,7 +2101,7 @@ export class PreviewViewport {
         // the Nebulon-B's `COLLISION` draws in the shadow volume's cyan.
         const volume = spec.archetype === 'shadow-volume';
         const colour = debugColour(extras)
-            ?? (volume ? { r: 0, g: 1, b: 1, a: 1 } : { r: 0, g: 0, b: 1, a: 1 });
+            ?? (volume ? {r: 0, g: 1, b: 1, a: 1} : {r: 0, g: 0, b: 1, a: 1});
 
         const material = new THREE.MeshBasicMaterial({
             color: new THREE.Color(colour.r, colour.g, colour.b),
@@ -2110,7 +2115,7 @@ export class PreviewViewport {
             side: THREE.FrontSide,
         });
 
-        material.userData = { spec, extras };
+        material.userData = {spec, extras};
         return material;
     }
 
@@ -2166,7 +2171,7 @@ export class PreviewViewport {
             return;
         }
 
-        const colorization = { value: new THREE.Color(1, 1, 1) };
+        const colorization = {value: new THREE.Color(1, 1, 1)};
         data.colorization = colorization;
 
         material.onBeforeCompile = shader => {
@@ -2353,7 +2358,7 @@ export class PreviewViewport {
             }
         });
 
-        return { translated, total };
+        return {translated, total};
     }
 
     /**
@@ -2369,7 +2374,7 @@ export class PreviewViewport {
         this.modelRoot.traverse(node => {
             if (node instanceof THREE.Mesh && node.material instanceof AlamoMaterial
                 && node.visible) {
-                materials.push({ mesh: node, material: node.material });
+                materials.push({mesh: node, material: node.material});
             }
         });
 
@@ -2384,7 +2389,7 @@ export class PreviewViewport {
         const viewProjection = new THREE.Matrix4().multiplyMatrices(projection, view);
         const eyeWorld = this.camera.getWorldPosition(new THREE.Vector3());
 
-        for (const { mesh, material } of materials) {
+        for (const {mesh, material} of materials) {
             material.updateFrame(this.frameFor(mesh, view, projection, viewProjection, eyeWorld));
         }
     }
@@ -2441,7 +2446,7 @@ export class PreviewViewport {
                 worldView: worldView.elements,
                 worldViewInverse: new THREE.Matrix4().copy(worldView).invert().elements,
                 worldViewProjection:
-                    new THREE.Matrix4().multiplyMatrices(viewProjection, world).elements,
+                new THREE.Matrix4().multiplyMatrices(viewProjection, world).elements,
                 view: view.elements,
                 viewInverse: this.camera.matrixWorld.elements,
                 viewProjection: viewProjection.elements,
@@ -2563,7 +2568,7 @@ export class PreviewViewport {
             const shader = (mesh.userData.alamo as MaterialExtras | undefined)?.alamoShader
                 ?? 'a shader';
 
-            for (const { sampler, file } of mesh.material.unboundSamplers()) {
+            for (const {sampler, file} of mesh.material.unboundSamplers()) {
                 problems.add(`${shader}: Sampler '${sampler}' is still waiting for '${file}'.`);
             }
             for (const sampler of mesh.material.unnamedSamplers) {
@@ -2937,10 +2942,10 @@ export class PreviewViewport {
             // Which frame the arc is measured in is the engine's choice, not ours, and the two
             // firing paths disagree:
             //
-            //   bone - HardPointClass::Can_Weapon_Point_At measures in the hardpoint's OWN
+            //   bone - the weapon-aim test measures in the hardpoint's OWN
             //          coordinate system, so the bone's rotation IS the aim and parenting to it is
             //          exactly right.
-            //   hull - WeaponBehaviorClass::Is_In_Cone_Of_Fire reads the muzzle matrix for its
+            //   hull - the cone-of-fire test reads the muzzle matrix for its
             //          TRANSLATION and then discards the rotation, rebuilding the frame from
             //          owner->Get_Facing(). The arc starts at the bone and points where the HULL
             //          points, so a rotated MuzzleA must not carry it round.
@@ -2969,7 +2974,7 @@ export class PreviewViewport {
 
                 // The position above is only the starting point; `followHullArcs` keeps it on the
                 // muzzle once a clip starts moving the bone.
-                this.hullArcs.push({ mesh, muzzle: boneNode });
+                this.hullArcs.push({mesh, muzzle: boneNode});
             }
 
             mesh.visible = this.arcsVisible;
@@ -3060,7 +3065,7 @@ export class PreviewViewport {
 
         this.modelRoot.updateWorldMatrix(true, false);
 
-        for (const { mesh, muzzle } of this.hullArcs) {
+        for (const {mesh, muzzle} of this.hullArcs) {
             // Fresh, because the mixer has moved the bone but world matrices are only recomputed at
             // render time.
             muzzle.updateWorldMatrix(true, false);
@@ -3144,7 +3149,7 @@ export class PreviewViewport {
      * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest.
      *
      * Two axes and no third: the engine has no roll on a turret -
-     * `Calculate_Desired_Turret_Angle` returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
+     * the turret-angle calculation returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
      *
      * Each track spans only what the engine allows, so the stop is visible before it is reached.
      * Which turrets these are is {@link turretHandles}' decision, off the arc toggle, and not this
@@ -3290,7 +3295,7 @@ export class PreviewViewport {
         anchor.add(track);
         (bone.parent ?? bone).add(anchor);
 
-        const parts = { anchor, bone, followsYaw, track, stops, knob, radius, range };
+        const parts = {anchor, bone, followsYaw, track, stops, knob, radius, range};
         this.placeTurretAnchor(parts);
 
         return parts;
@@ -3330,7 +3335,7 @@ export class PreviewViewport {
      * barrel's own rotation - does not.
      */
     private placeTurretAnchor(parts: TurretHandleParts): void {
-        const { anchor, bone } = parts;
+        const {anchor, bone} = parts;
         const rest = this.sweepRest.get(bone) ?? bone.quaternion;
 
         anchor.position.copy(bone.position);
@@ -3550,7 +3555,7 @@ export class PreviewViewport {
 
         const root = await this.addPart(wreckId, glbBase64, undefined, undefined, {
             subjectId: wreckId,
-            pose: { position: origin, quaternion: facing },
+            pose: {position: origin, quaternion: facing},
         });
 
         this.breakoffs.push({
@@ -3715,7 +3720,7 @@ export class PreviewViewport {
             quaternion: part.root.quaternion.clone(),
         };
 
-        this.spinAway = { partId, spin, elapsed: 0, onDone };
+        this.spinAway = {partId, spin, elapsed: 0, onDone};
     }
 
     /** Puts the wreck back where it started, whether it is still flying or already exploded. */
@@ -3914,7 +3919,7 @@ export class PreviewViewport {
         // Always the Gameplay lens's. A one-shot IS an event - a hardpoint blowing up - and an
         // event is never something the model declares.
         this.addParticleSystem(
-            id, system, { origin: 'gameplay', attachToPartId, attachBone, scaleFactor, at });
+            id, system, {origin: 'gameplay', attachToPartId, attachBone, scaleFactor, at});
         this.transient.add(id);
     }
 
@@ -3983,7 +3988,7 @@ export class PreviewViewport {
 
             const extras = node.userData.alamo as MaterialExtras | undefined;
             if (extras !== undefined) {
-                meshes.push({ extras, triangles: triangleCount(node.geometry) });
+                meshes.push({extras, triangles: triangleCount(node.geometry)});
             }
         });
 
@@ -4211,7 +4216,11 @@ export class PreviewViewport {
                     : id => this.restingVisibilityOf(id));
 
                 if (asked === true) {
-                    if (playing) { facts.animated = false; } else { facts.resting = false; }
+                    if (playing) {
+                        facts.animated = false;
+                    } else {
+                        facts.resting = false;
+                    }
                 }
             }
         }
@@ -4264,7 +4273,7 @@ export class PreviewViewport {
 
             // The one master anyone legitimately keeps switched off while watching a clip: effects
             // are what obstructs the view of the thing being checked.
-            masters: [{ id: 'effects', on: this.particlesVisible }],
+            masters: [{id: 'effects', on: this.particlesVisible}],
             inFile: entry?.gateVisible ?? true,
 
             // The cloak, in the same chain that swaps the meshes. A cloaked unit shows its stealth
@@ -4483,7 +4492,7 @@ export class PreviewViewport {
             const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
 
             const placement = meshPlacement(owner, roots,
-                { bone: boneName(owner), mesh: extras.alamoMesh ?? mesh.name });
+                {bone: boneName(owner), mesh: extras.alamoMesh ?? mesh.name});
 
             // A bone carrying two meshes keeps the first as its own row; the second stays a child
             // rather than being dropped.
@@ -4507,7 +4516,7 @@ export class PreviewViewport {
 
             const owner = ownerOf(anchorNodeOf(entry));
             const placement = effectPlacement(owner, roots,
-                { bone: boneName(owner), effect: entry.system.name });
+                {bone: boneName(owner), effect: entry.system.name});
 
             if ('merge' in placement && !effectByBone.has(placement.merge)) {
                 effectByBone.set(placement.merge, systemId);
@@ -4535,8 +4544,8 @@ export class PreviewViewport {
             // marker mesh the file hides, and the effect itself - and the panel describes each.
             this.inspectSources.set(boneId(bone.index), {
                 boneIndex: bone.index,
-                ...(mesh === undefined ? {} : { mesh }),
-                ...(effect === undefined ? {} : { systemId: effect }),
+                ...(mesh === undefined ? {} : {mesh}),
+                ...(effect === undefined ? {} : {systemId: effect}),
             });
 
             // Merged: ONE row for a bone, the mesh that shares its name and the effect that shares
@@ -4554,8 +4563,8 @@ export class PreviewViewport {
 
             this.claimRow(boneId(bone.index), name, parentId, {
                 boneIndex: bone.index,
-                ...(mesh === undefined ? {} : { mesh }),
-                ...(effect === undefined ? {} : { particleId: effect }),
+                ...(mesh === undefined ? {} : {mesh}),
+                ...(effect === undefined ? {} : {particleId: effect}),
             });
 
             items.push({
@@ -4567,16 +4576,16 @@ export class PreviewViewport {
                 parentId,
                 visible: details?.visible ?? bone.visible,
                 gatedOff: details?.gatedOff ?? false,
-                ...(effect === undefined ? {} : { systemId: effect }),
+                ...(effect === undefined ? {} : {systemId: effect}),
             });
         }
 
-        for (const { mesh, owner } of extraMeshes) {
+        for (const {mesh, owner} of extraMeshes) {
             const details = meshItem(mesh);
             // `ownerBone`, not `boneIndex`: this row is the MESH. The bone it rides has a row of its
             // own, and describing it here too would say it twice.
-            this.inspectSources.set(`mesh:${treeKeyOf(mesh)}`, { mesh, ownerBone: owner });
-            this.claimRow(`mesh:${treeKeyOf(mesh)}`, details.name, boneId(owner), { mesh });
+            this.inspectSources.set(`mesh:${treeKeyOf(mesh)}`, {mesh, ownerBone: owner});
+            this.claimRow(`mesh:${treeKeyOf(mesh)}`, details.name, boneId(owner), {mesh});
 
             items.push({
                 id: `mesh:${treeKeyOf(mesh)}`,
@@ -4609,9 +4618,9 @@ export class PreviewViewport {
                 continue;
             }
 
-            this.inspectSources.set(`particle:${systemId}`, { systemId });
+            this.inspectSources.set(`particle:${systemId}`, {systemId});
             this.claimRow(`particle:${systemId}`, entry.system.name,
-                boneId(owner), { particleId: systemId });
+                boneId(owner), {particleId: systemId});
 
             items.push({
                 id: `particle:${systemId}`,
@@ -4806,7 +4815,7 @@ export class PreviewViewport {
      */
     setItemsVisible(ids: readonly string[], visible: boolean): void {
         this.applyRowOverrides(
-            ids.map(row => ({ row, override: visible ? 'shown' as const : 'hidden' as const })));
+            ids.map(row => ({row, override: visible ? 'shown' as const : 'hidden' as const})));
     }
 
     /**
@@ -4817,7 +4826,7 @@ export class PreviewViewport {
      * while standing for a mesh wrote one and reported the other.
      */
     applyRowOverrides(changes: readonly OverrideChange[]): void {
-        for (const { row, override } of changes) {
+        for (const {row, override} of changes) {
             if (override === null) {
                 this.rowOverrides.delete(row);
             } else {
@@ -4830,7 +4839,7 @@ export class PreviewViewport {
 
     /** What the reader has said about each row, for carrying across a reopen. */
     rowOverrideEntries(): { row: string; override: RowOverride }[] {
-        return [...this.rowOverrides].map(([row, override]) => ({ row, override }));
+        return [...this.rowOverrides].map(([row, override]) => ({row, override}));
     }
 
     /**
@@ -4886,7 +4895,7 @@ export class PreviewViewport {
         }
 
         // One re-resolve at the end, not one per row.
-        this.applyRowOverrides(carrying.map(row => ({ row, override: null })));
+        this.applyRowOverrides(carrying.map(row => ({row, override: null})));
     }
 
     /**
@@ -4959,7 +4968,7 @@ export class PreviewViewport {
 
     /** Where the camera stands now, for saving the current shot as a preset. */
     get cameraPosition(): Vector3Like {
-        return { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z };
+        return {x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z};
     }
 
     /** The bounding sphere a preset is resolved against, so the caller sizes the shot correctly. */
@@ -4969,7 +4978,7 @@ export class PreviewViewport {
 
     frameAll(preset: PresetView = 'threeQuarter'): void {
         const sphere = this.boundingSphere();
-        const { azimuth, elevation } = PRESETS[preset];
+        const {azimuth, elevation} = PRESETS[preset];
         const aspect = this.camera.aspect;
 
         const pose = frameSphere(sphere, FIELD_OF_VIEW, aspect, azimuth, elevation);
@@ -5042,18 +5051,18 @@ export class PreviewViewport {
             // off. The defect this function exists for, still open whenever the arcs were visible.
             isOverlay);
         const sphere = box.isEmpty()
-            ? { center: { x: 0, y: 0, z: 0 }, radius: 0 }
+            ? {center: {x: 0, y: 0, z: 0}, radius: 0}
             : (() => {
                 const s = box.getBoundingSphere(new THREE.Sphere());
                 return {
-                    center: { x: s.center.x, y: s.center.y, z: s.center.z },
+                    center: {x: s.center.x, y: s.center.y, z: s.center.z},
                     radius: s.radius,
                 };
             })();
 
         // Guards NaN as well as zero: `>` is false for NaN, so the fallback wins.
         const radius = Math.max(particleReach, sphere.radius);
-        return { center: sphere.center, radius: radius > 0 ? radius : 1 };
+        return {center: sphere.center, radius: radius > 0 ? radius : 1};
     }
 
     setGridVisible(visible: boolean): void {
@@ -5580,7 +5589,7 @@ export class PreviewViewport {
     /** Where the playhead is and how long the clip runs, for the scrubber. Zeroes when idle. */
     animationProgress(): { time: number; duration: number; running: boolean } {
         if (this.active.action === null) {
-            return { time: 0, duration: 0, running: false };
+            return {time: 0, duration: 0, running: false};
         }
 
         return {
@@ -5716,7 +5725,7 @@ export class PreviewViewport {
     ): void {
         const {
             attachToPartId, attachBone, attachBoneIndex, origin, scaleFactor = 1, at,
-            levels = { alt: null, lod: null, altDecreaseStayHidden: false },
+            levels = {alt: null, lod: null, altDecreaseStayHidden: false},
         } = placement;
 
         // Immediate: the id is about to name something else, and a fading twin under it would be
@@ -6086,13 +6095,13 @@ export class PreviewViewport {
             const found: BoneAttachment[] = [];
 
             for (const mesh of meshesByBone.get(index) ?? []) {
-                found.push({ kind: 'mesh', label: mesh.name });
+                found.push({kind: 'mesh', label: mesh.name});
             }
 
             // A attached part is a separate root parented onto the bone, so it reads as a hardpoint.
             for (const part of this.parts.values()) {
                 if (part.root.parent === node) {
-                    found.push({ kind: 'hardpoint', label: part.id });
+                    found.push({kind: 'hardpoint', label: part.id});
                 }
             }
 
@@ -6279,43 +6288,43 @@ export class PreviewViewport {
         // One triad per selected bone, all of them in the same geometry: the whole point of the set
         // is comparing two fire bones, and two draws would be two things to keep in step.
         for (const node of nodes) {
-        const origin = node.getWorldPosition(new THREE.Vector3());
-        const basis = new THREE.Matrix4().extractRotation(node.matrixWorld);
+            const origin = node.getWorldPosition(new THREE.Vector3());
+            const basis = new THREE.Matrix4().extractRotation(node.matrixWorld);
 
-        // Whether THIS bone is somewhere a weapon fires from. A fire bone aims along its local X -
-        // measured, see `AlamoFireBone.AimDirection` - so that axis gets an arrowhead and a longer
-        // reach. Nothing else on the triad says which way the gun points, which was the complaint.
-        const firing = this.fireBones.has(
-            (alamoBoneName(node.name)?.name ?? node.name).toLowerCase());
+            // Whether THIS bone is somewhere a weapon fires from. A fire bone aims along its local X -
+            // measured, see `AlamoFireBone.AimDirection` - so that axis gets an arrowhead and a longer
+            // reach. Nothing else on the triad says which way the gun points, which was the complaint.
+            const firing = this.fireBones.has(
+                (alamoBoneName(node.name)?.name ?? node.name).toLowerCase());
 
-        for (const [direction, colour] of axes) {
-            const aim = firing && direction.x === 1;
-            const reach = aim ? length * 2.2 : length;
-            const tip = direction.clone().applyMatrix4(basis).multiplyScalar(reach).add(origin);
+            for (const [direction, colour] of axes) {
+                const aim = firing && direction.x === 1;
+                const reach = aim ? length * 2.2 : length;
+                const tip = direction.clone().applyMatrix4(basis).multiplyScalar(reach).add(origin);
 
-            positions.push(origin.x, origin.y, origin.z, tip.x, tip.y, tip.z);
-            colours.push(...colour, ...colour);
+                positions.push(origin.x, origin.y, origin.z, tip.x, tip.y, tip.z);
+                colours.push(...colour, ...colour);
 
-            if (!aim) {
-                continue;
-            }
+                if (!aim) {
+                    continue;
+                }
 
-            // A four-barb head, drawn back down the shaft from the tip. Lines rather than a cone so
-            // it stays one draw with the rest of the triad and cannot be occluded differently.
-            const back = direction.clone().applyMatrix4(basis).multiplyScalar(-reach * 0.22);
-            const spread = reach * 0.09;
+                // A four-barb head, drawn back down the shaft from the tip. Lines rather than a cone so
+                // it stays one draw with the rest of the triad and cannot be occluded differently.
+                const back = direction.clone().applyMatrix4(basis).multiplyScalar(-reach * 0.22);
+                const spread = reach * 0.09;
 
-            for (const side of [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]) {
-                const out = side.clone().applyMatrix4(basis).multiplyScalar(spread);
+                for (const side of [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]) {
+                    const out = side.clone().applyMatrix4(basis).multiplyScalar(spread);
 
-                for (const sign of [1, -1]) {
-                    const barb = tip.clone().add(back).addScaledVector(out, sign);
+                    for (const sign of [1, -1]) {
+                        const barb = tip.clone().add(back).addScaledVector(out, sign);
 
-                    positions.push(tip.x, tip.y, tip.z, barb.x, barb.y, barb.z);
-                    colours.push(...colour, ...colour);
+                        positions.push(tip.x, tip.y, tip.z, barb.x, barb.y, barb.z);
+                        colours.push(...colour, ...colour);
+                    }
                 }
             }
-        }
         }
 
         setPositions(this.boneAxes.geometry, positions);
@@ -6816,13 +6825,13 @@ export class PreviewViewport {
                     (-ndc.y * 0.5 + 0.5) * rect.height - y);
 
                 if (best === null || distance < best.distance) {
-                    best = { id, axis, distance };
+                    best = {id, axis, distance};
                 }
             }
         }
 
         return best !== null && best.distance <= TURRET_KNOB_PICK_RADIUS
-            ? { id: best.id, axis: best.axis }
+            ? {id: best.id, axis: best.axis}
             : null;
     }
 
@@ -6963,7 +6972,7 @@ export class PreviewViewport {
                 (-ndc.y * 0.5 + 0.5) * rect.height - y);
 
             if (best === null || distance < best.distance) {
-                best = { index, distance };
+                best = {index, distance};
             }
         }
 
@@ -7020,7 +7029,12 @@ export class PreviewViewport {
             // different monitor.
             this.renderer.setPixelRatio(1);
             this.renderer.setSize(options.width, options.height, false);
-            this.camera.aspect = options.width / Math.max(options.height, 1);
+            // The frame drawn over the viewport, exactly: the largest rectangle of the capture's
+            // shape that fits the viewport, centred (captureFrame). Rendered as a view offset on the
+            // viewport's own projection, so a capture wider than the viewport shows what the frame
+            // shows - not more to either side, which is what widening the aspect used to do.
+            const frame = captureFrame(before.width, before.height, options.width, options.height);
+            this.camera.setViewOffset(before.width, before.height, frame.x, frame.y, frame.width, frame.height);
             this.camera.updateProjectionMatrix();
 
             // Null is TRANSPARENT, which is what an icon wants: the alpha the renderer was created
@@ -7077,6 +7091,7 @@ export class PreviewViewport {
             this.jointLines.visible = before.jointLines;
             this.selectionBoxes.visible = before.selection;
             this.setFireArcsVisible(before.arcs);
+            this.camera.clearViewOffset();
             this.camera.aspect = before.aspect;
             this.camera.updateProjectionMatrix();
             this.resize();
@@ -7427,7 +7442,7 @@ export class PreviewViewport {
     dispose(): void {
         this.disposed = true;
         // The capture flag has to match, or this silently removes nothing.
-        this.canvas.removeEventListener('pointerdown', this.onPointerDown, { capture: true });
+        this.canvas.removeEventListener('pointerdown', this.onPointerDown, {capture: true});
         this.canvas.removeEventListener('pointermove', this.onPointerMove);
         window.removeEventListener('pointerup', this.onPointerUp);
         window.removeEventListener('pointercancel', this.onPointerUp);
@@ -7479,7 +7494,7 @@ function isShadowVolume(mesh: THREE.Mesh): boolean {
 
 /** The twelve edges of one box, as line-segment pairs, appended to a position buffer. */
 function appendBoxEdges(into: number[], box: THREE.Box3): void {
-    const { min, max } = box;
+    const {min, max} = box;
     const corner = (x: number, y: number, z: number): [number, number, number] =>
         [x === 0 ? min.x : max.x, y === 0 ? min.y : max.y, z === 0 ? min.z : max.z];
 

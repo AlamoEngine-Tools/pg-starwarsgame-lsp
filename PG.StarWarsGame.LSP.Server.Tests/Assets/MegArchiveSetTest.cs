@@ -30,14 +30,14 @@ public sealed class MegArchiveSetTest
         var services = new ServiceCollection();
         services.AddSingleton(fileSystem);
         PetroglyphCommons.ContributeServices(services);
+        services.SupportPetroglyphHashing();
         services.SupportMEG();
         var provider = services.BuildServiceProvider();
 
         return new MegArchiveSet(
             fileSystem,
             new StubConfiguration(new LspConfiguration { GamePath = gamePath }),
-            provider.GetRequiredService<IMegFileService>(),
-            provider.GetRequiredService<IMegFileExtractor>(),
+            provider.GetRequiredService<IMegService>(),
             NullLogger<MegArchiveSet>.Instance);
     }
 

@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 ///     <c>Projectile_Types_Targeted</c> is the only tag with this value type, and nothing checked it.
 /// </summary>
 /// <remarks>
-///     Engine type code <c>0x51</c> (81) at <c>017f5020</c>, on <c>Laser_Defense_Ability</c>: the
+///     Engine type code <c>0x51</c> (81), on <c>Laser_Defense_Ability</c>: the
 ///     list of projectile categories a point-defence laser will shoot down. A typo in it does not
 ///     fail the load - the category simply never matches, so the defence silently ignores that
 ///     projectile, which is the hardest kind of mistake to see in-game.

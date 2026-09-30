@@ -30,7 +30,7 @@ public sealed class CreateLocalisationLanguageFileHandler
     private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationFormatConverter _converter;
     private readonly IDatTranslationExporter _datExporter;
-    private readonly IDatFileService _datFileService;
+    private readonly IDatService _datFileService;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
@@ -44,7 +44,7 @@ public sealed class CreateLocalisationLanguageFileHandler
         ILocalisationFormatConverter converter,
         ITranslationDatabaseFactory factory,
         IDatTranslationExporter datExporter,
-        IDatFileService datFileService,
+        IDatService datFileService,
         ILanguageService langService,
         IFileHelper fileHelper,
         ILocalisationProjectRegistry projectRegistry,
@@ -166,7 +166,7 @@ public sealed class CreateLocalisationLanguageFileHandler
             var model = _datExporter.Export(db, language);
             var fs = _fileHelper.FileSystem;
             using var stream = fs.File.Create(targetPath);
-            _datFileService.CreateDatFile(stream, model, model.KeySortOrder);
+            _datFileService.CreateDatBinary(stream, model, model.Layout);
             return true;
         }
         catch (Exception ex)

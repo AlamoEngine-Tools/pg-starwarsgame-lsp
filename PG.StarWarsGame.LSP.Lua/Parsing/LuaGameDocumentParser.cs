@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
@@ -18,6 +19,10 @@ namespace PG.StarWarsGame.LSP.Lua.Parsing;
 public sealed class LuaGameDocumentParser : IGameDocumentParser
 {
     private readonly ILuaAnnotationRepository _annotationRepository;
+
+    // documentUri -> the annotation contribution of its most recent parse, ready to persist.
+    // Concurrent because the workspace scan parses in parallel.
+    private readonly ConcurrentDictionary<string, byte[]> _lastState = new(DocumentUris.Comparer);
     private readonly ILspConfigurationProvider? _configProvider;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaGameDocumentParser> _logger;
@@ -75,12 +80,46 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
 
         _annotationRepository.Update(canonicalUri, [.. annotations]);
         _annotationRepository.UpdateFunctionAnnotations(canonicalUri, functionAnnotations);
+        // Kept so a snapshot written after this scan can carry what the repository was told. The
+        // repository stores the annotations but not the function PAIRING, and re-deriving that
+        // would mean parsing again - which is exactly what the snapshot exists to avoid.
+        _lastState[canonicalUri] = LuaAnnotationStateCodec.Serialize([.. annotations], functionAnnotations);
 
         return ValueTask.FromResult(new DocumentIndex(
             canonicalUri, version,
             [.. symbols],
             references.ToImmutableArray(),
             requireArgs));
+    }
+
+    /// <inheritdoc />
+    public byte[]? CaptureParserState(string documentUri)
+    {
+        return _lastState.GetValueOrDefault(_fileHelper.NormalizeUri(documentUri));
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Replays exactly what <see cref="ParseAsync" /> told the repository. Without this, a Lua
+    ///     document served from a cached index contributes NO annotations for the whole session -
+    ///     and on a layered mod most indexed files are Lua, so nearly every annotation in the
+    ///     workspace went missing on a warm start.
+    /// </remarks>
+    public void RestoreParserState(string documentUri, byte[] state)
+    {
+        var restored = LuaAnnotationStateCodec.Deserialize(state);
+        if (restored is not { } value)
+        {
+            // Bytes from another build, or truncated. The session loses this file's annotations,
+            // which is what would have happened anyway; failing the scan would be far worse.
+            _logger.LogDebug("Unreadable cached Lua annotations for '{Uri}'; skipping", documentUri);
+            return;
+        }
+
+        var canonicalUri = _fileHelper.NormalizeUri(documentUri);
+        _annotationRepository.Update(canonicalUri, value.Annotations);
+        _annotationRepository.UpdateFunctionAnnotations(canonicalUri, value.Functions);
+        _lastState[canonicalUri] = state;
     }
 
     private (List<GameSymbol> Symbols, List<EmmyLuaAnnotations> Annotations,

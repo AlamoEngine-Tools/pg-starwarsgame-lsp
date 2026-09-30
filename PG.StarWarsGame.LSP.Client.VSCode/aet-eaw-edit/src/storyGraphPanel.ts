@@ -3,10 +3,12 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway } from './lsp/lspGateway';
-import { revealDefinition } from './revealDefinition';
-import { panelKey, panelTitle, type StoryGraphTarget } from './storyGraphTarget';
-import { PanelRegistry, WebviewMessage, WebviewPanelHost } from './webviewPanelHost';
+import {logLine} from './log';
+import {LspGateway} from './lsp/lspGateway';
+import {revealDefinition} from './revealDefinition';
+import {battleLabelOf} from './storyBattles';
+import {galacticOf, panelKey, panelTitle, type StoryGraphTarget} from './storyGraphTarget';
+import {PanelRegistry, WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
 import {
     ApplyStoryCommandBatchResult, ExecuteStoryCommandResult, GetStoryDiagnosticsResult,
     GetStoryGraphResult, GetStoryLayoutResult, GetStoryNodeDetailResult,
@@ -15,8 +17,10 @@ import {
 } from './protocol';
 
 /**
- * Read-only story graph webview, one panel per campaign FACTION - a campaign's factions are
- * separate story chains and never share a graph. The webview (a rete.js app bundled to
+ * Read-only story graph webview, one panel per campaign FACTION and SCOPE - a campaign's factions
+ * are separate story chains and never share a graph, and within a faction each tactical battle is
+ * a sub-graph of its own: the galactic panel shows a battle as one portal, the battle's panel shows
+ * the galactic events it touches as portals back. The webview (a rete.js app bundled to
  * out/webview/storyGraph.js) is a pure renderer: it holds the current filter state and asks the
  * extension to re-fetch (`fetch` message) whenever filters change or the server pushes
  * `aet/storyGraphChanged` for this campaign (`invalidate` → the webview replays its filters so
@@ -25,14 +29,29 @@ import {
 export class StoryGraphPanel extends WebviewPanelHost {
     private static readonly _panels = new PanelRegistry<StoryGraphPanel>();
 
-    static show(target: StoryGraphTarget, extensionUri: vscode.Uri, lsp: LspGateway): void {
+    /**
+     * Opens or reveals the panel for a target. `centerOn` is a node the revealed graph should
+     * centre on - how a portal lands the reader on the event it stands for rather than wherever
+     * the other panel was last left.
+     */
+    static show(
+        target: StoryGraphTarget, extensionUri: vscode.Uri, lsp: LspGateway, centerOn?: string, simulate = false,
+    ): void {
         const key = panelKey(target);
         const existing = StoryGraphPanel._panels.get(key);
         if (existing) {
             existing.reveal();
+            if (centerOn) {
+                existing.post({type: 'centerNode', nodeId: centerOn});
+            }
+            if (simulate) {
+                existing.post({type: 'enterMode', mode: 'simulate'});
+            }
             return;
         }
-        StoryGraphPanel._panels.track(key, new StoryGraphPanel(target, extensionUri, lsp));
+        const panel = StoryGraphPanel._panels.track(key, new StoryGraphPanel(target, extensionUri, lsp));
+        panel._pendingCenter = centerOn;
+        panel._pendingSimulate = simulate;
     }
 
     /**
@@ -47,7 +66,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         const invalidated = new Set(campaigns.map(c => c.toLowerCase()));
         for (const panel of StoryGraphPanel._panels.all) {
             if (invalidated.has(panel._target.campaign.toLowerCase())) {
-                panel.post({ type: 'invalidate' });
+                panel.post({type: 'invalidate'});
             }
         }
     }
@@ -61,15 +80,21 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private _pendingCommands: Record<string, unknown>[] = [];
     // Cached "skip the delete-event confirmation" preference (undefined = not fetched yet).
     private _skipDeleteConfirm: boolean | undefined;
+    // A node to centre on once the first graph has been posted - a portal's landing spot on a panel
+    // that did not exist yet.
+    private _pendingCenter: string | undefined;
+    // Whether to enter Simulation once the first graph is up - a battle entered from the galactic
+    // simulation opens straight into its own session.
+    private _pendingSimulate = false;
 
     private constructor(
         private readonly _target: StoryGraphTarget,
-        extensionUri: vscode.Uri,
+        private readonly _extensionUri: vscode.Uri,
         private readonly _lsp: LspGateway
     ) {
         // No bodyStyle: this webview resets the page from inside its own styled-components global,
         // which is where the rest of its canvas styling lives.
-        super(extensionUri, {
+        super(_extensionUri, {
             viewType: 'aetStoryGraph',
             title: panelTitle(_target),
             column: vscode.ViewColumn.Active,
@@ -132,36 +157,92 @@ export class StoryGraphPanel extends WebviewPanelHost {
             case 'sim':
                 await this._runSim(msg.method as string, msg.args as Record<string, unknown> | undefined);
                 break;
+            case 'copy':
+                // The webview cannot reach the clipboard on every host; the extension can.
+                await vscode.env.clipboard.writeText(String(msg.text ?? ''));
+                void vscode.window.setStatusBarMessage('EaWEdit: simulation log copied', 2000);
+                break;
             case 'paramOptions':
                 await this._sendParamOptions(msg.requestId as number, msg.side as string,
-                    msg.typeName as string, msg.position as number, msg.prefix as string | undefined);
+                    msg.typeName as string, msg.position as number, msg.query as string | undefined);
                 break;
             case 'resolveRef':
                 await this._resolveRef(msg.value as string, msg.referenceType as string | undefined);
                 break;
-    }
+            case 'openScope':
+                // A portal on the galactic graph: the battle's own panel. The stub's label is the
+                // reference as the XML wrote it; the title takes the server's form of the name so
+                // the navigator and the portal open one and the same tab.
+                StoryGraphPanel.show(
+                    {
+                        ...galacticOf(this._target),
+                        scope: msg.scope as string,
+                        scopeLabel: battleLabelOf(String(msg.label ?? msg.scope)),
+                    },
+                    this._extensionUri, this._lsp, undefined, msg.simulate === true);
+                break;
+            case 'revealScope':
+                // A portal on a battle graph: the galactic panel, centred on the event it stands for.
+                StoryGraphPanel.show(galacticOf(this._target), this._extensionUri, this._lsp, msg.nodeId as string);
+                break;
+        }
     }
 
-    /** Called on `aet/storySimChanged` - the panel's webview re-fetches the sim state. */
+    /**
+     * Called on `aet/storySimChanged` - the panel showing that session re-fetches its state.
+     *
+     * A session is one scope: the galactic story, or one battle. The server names the scope a
+     * change happened in and pushes both when a battle's resolution reaches the galaxy, so the
+     * routing here is exact rather than fanned out over the faction.
+     */
     static simChanged(target: StoryGraphTarget): void {
-        StoryGraphPanel._panels.get(panelKey(target))?.post({ type: 'simChanged' });
+        StoryGraphPanel._panels.get(panelKey(target))?.post({type: 'simChanged'});
     }
 
     /**
      * Forwards a simulation request (`start`, `stop`, `getState`, `satisfyTrigger`, `setFlag`,
-     * `advanceClock`, `luaNotify`) and posts the resulting state document back.
+     * `advanceClock`, `luaNotify`, `resolveBattle`, ...) for this panel's scope and posts the
+     * resulting state document back.
      */
     private async _runSim(method: string, args: Record<string, unknown> | undefined): Promise<void> {
         const requestName = 'aet/storySim' + method.charAt(0).toUpperCase() + method.slice(1);
+        // The session's options travel with its start and hold until it stops; only the
+        // extension host can read configuration.
+        const options = method === 'start'
+            ? {assumeMediaCompletes: this._simulatorSetting('assumeMediaCompletes')}
+            : {};
         const result = await this._lsp.requestOrReport<StorySimStateResult>(
-            requestName, { campaign: this._target.campaign, faction: this._target.faction, ...(args ?? {}) }, 'simulation request failed');
-        if (result === undefined) { return; }
-
-        if (result.error) {
-            void vscode.window.showErrorMessage(`EaWEdit: ${result.error}`);
+            requestName, {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                scope: this._target.scope,
+                ...options,
+                ...(args ?? {})
+            }, 'simulation request failed');
+        // The record of a run, for a report of "nothing happened": every command but the
+        // clock's own ticks and polls, with what came back.
+        if (method !== 'tick' && method !== 'getState') {
+            const s = result?.state;
+            const scope = this._target.scope ? ` [${this._target.scope}]` : '';
+            const outcome = result === undefined ? 'request failed'
+                : result.error ? `refused - ${result.error}`
+                    : s ? `tick ${s.tick}, clock pending ${s.clockPending ?? '?'}, decisions ${s.interventions.length}`
+                        + (s.pausedFor ? `, paused for ${s.pausedFor}` : '') + (s.outcome ? `, ${s.outcome}` : '')
+                        : 'no state';
+            logLine(`Story sim ${method}${scope} ${JSON.stringify(args ?? {})} -> ${outcome}`);
+        }
+        if (result === undefined) {
             return;
         }
-        this.post({ type: 'simState', state: result.state ?? null });
+
+        if (result.error) {
+            // A refusal is the session's state, not a failure: the dock shows it beside the chip
+            // and stops play, since the same command would be refused again on the next tick. A
+            // toast per refusal was a storm once a battle panel kept playing past its end.
+            this.post({type: 'simError', message: result.error});
+            return;
+        }
+        this.post({type: 'simState', state: result.state ?? null});
     }
 
     /**
@@ -172,30 +253,39 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _runCommand(
         payload: Record<string, unknown>, confirm: string | undefined, refreshDetail: string | undefined
     ): Promise<void> {
-        if (!this._lsp.requireRunning()) { return; }
+        if (!this._lsp.requireRunning()) {
+            return;
+        }
 
         if (confirm) {
-            const choice = await vscode.window.showWarningMessage(confirm, { modal: true }, 'Continue');
-            if (choice !== 'Continue') { return; }
+            const choice = await vscode.window.showWarningMessage(confirm, {modal: true}, 'Continue');
+            if (choice !== 'Continue') {
+                return;
+            }
         }
 
         const result = await this._lsp.requestOrReport<ExecuteStoryCommandResult>(
-            'aet/executeStoryCommand', { campaign: this._target.campaign, faction: this._target.faction, ...payload },
+            'aet/executeStoryCommand', {campaign: this._target.campaign, faction: this._target.faction, ...payload},
             'story command failed');
 
         // Either a failed request or a refused command: a gesture may have changed the view
         // optimistically (e.g. a picked-off connection), so have the webview re-fetch and match
         // reality again.
-        if (result === undefined) { this.post({ type: 'invalidate' }); return; }
+        if (result === undefined) {
+            this.post({type: 'invalidate'});
+            return;
+        }
 
         if (!result.success) {
             void vscode.window.showErrorMessage(
                 `EaWEdit: ${result.error ?? 'The story command failed.'}`);
-            this.post({ type: 'invalidate' });
+            this.post({type: 'invalidate'});
             return;
         }
 
-        if (refreshDetail) { await this._sendDetail(refreshDetail); }
+        if (refreshDetail) {
+            await this._sendDetail(refreshDetail);
+        }
     }
 
     /**
@@ -203,7 +293,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * the webview's suggestion dropdown awaits the requestId and must not hang on errors.
      */
     private async _sendParamOptions(
-        requestId: number, side: string, typeName: string, position: number, prefix: string | undefined
+        requestId: number, side: string, typeName: string, position: number, query: string | undefined
     ): Promise<void> {
         // Always answers, empty on any failure - the webview's suggestion dropdown awaits this
         // requestId and would hang forever on a silent return.
@@ -211,9 +301,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
             'aet/getStoryParamOptions',
             {
                 campaign: this._target.campaign, faction: this._target.faction, side, typeName, position,
-                prefix: prefix || undefined, limit: 50,
+                query: query || undefined,
             },
-            { options: [] });
+            {options: []});
 
         this.post({
             type: 'paramOptions', requestId,
@@ -236,11 +326,18 @@ export class StoryGraphPanel extends WebviewPanelHost {
      */
     private async _saveBatch(commands: Record<string, unknown>[]): Promise<void> {
         const result = await this._lsp.requestOrReport<ApplyStoryCommandBatchResult>(
-            'aet/applyStoryCommandBatch', { campaign: this._target.campaign, faction: this._target.faction, commands }, 'save failed');
+            'aet/applyStoryCommandBatch', {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                commands
+            }, 'save failed');
 
         // The webview needs an answer either way: without one the Save button stays spinning and
         // the queue is neither cleared nor released for another attempt.
-        if (result === undefined) { this.post({ type: 'saveResult', success: false }); return; }
+        if (result === undefined) {
+            this.post({type: 'saveResult', success: false});
+            return;
+        }
 
         if (!result.success) {
             const where = typeof result.failedIndex === 'number'
@@ -248,7 +345,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
             void vscode.window.showErrorMessage(
                 `EaWEdit: ${result.error ?? 'The save failed.'}${where}`);
         }
-        this.post({ type: 'saveResult', success: result.success });
+        this.post({type: 'saveResult', success: result.success});
     }
 
     /**
@@ -261,7 +358,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
             this._skipDeleteConfirm = await this._fetchSkipDeleteConfirm();
         }
         if (this._skipDeleteConfirm) {
-            this.post({ type: 'confirmStageResult', proceed: true, payload });
+            this.post({type: 'confirmStageResult', proceed: true, payload});
             return;
         }
 
@@ -277,14 +374,14 @@ export class StoryGraphPanel extends WebviewPanelHost {
             'Delete', dontAskAgain);
 
         if (choice === undefined) {
-            this.post({ type: 'confirmStageResult', proceed: false, payload });
+            this.post({type: 'confirmStageResult', proceed: false, payload});
             return;
         }
         if (choice === dontAskAgain) {
             this._skipDeleteConfirm = true;
             await this._persistSkipDeleteConfirm(true);
         }
-        this.post({ type: 'confirmStageResult', proceed: true, payload });
+        this.post({type: 'confirmStageResult', proceed: true, payload});
     }
 
     /**
@@ -302,13 +399,22 @@ export class StoryGraphPanel extends WebviewPanelHost {
             // Not contributed in package.json (WIP): only ever true if hand-written into settings.
             simulate: features.get<boolean>('tools.storySimulator', false) === true,
         });
+        // The webview's own simulation preferences; the session's go with its start instead.
+        this.post({type: 'simSettings', autoResume: this._simulatorSetting('autoResume')});
+    }
+
+    /** A `aet-eaw-edit.storySimulator.*` setting; both default on, as the contribution says. */
+    private _simulatorSetting(name: 'assumeMediaCompletes' | 'autoResume'): boolean {
+        return vscode.workspace.getConfiguration('aet-eaw-edit.storySimulator').get<boolean>(name, true) !== false;
     }
 
     /** Fetches the workspace preferences and pushes the swimlane-lane toggles to the webview. */
     private async _sendWorkspaceSettings(): Promise<void> {
         // Preferences are optional - the graph works without them, so a failure is not reported.
         const settings = await this._lsp.request<WorkspaceSettingsDto>('aet/getWorkspaceSettings');
-        if (!settings.ok) { return; }
+        if (!settings.ok) {
+            return;
+        }
 
         this._skipDeleteConfirm = settings.value.skipStoryDeleteConfirmation === true;
         this.post({
@@ -320,7 +426,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
     /** Persists the swimlane-lane toggles (best-effort). */
     private async _setLanePrefs(showThreadLanes: boolean, showChapterLanes: boolean): Promise<void> {
-        await this._lsp.notify('aet/setWorkspaceSettings', { showThreadLanes, showChapterLanes });
+        await this._lsp.notify('aet/setWorkspaceSettings', {showThreadLanes, showChapterLanes});
     }
 
     private async _fetchSkipDeleteConfirm(): Promise<boolean> {
@@ -328,12 +434,12 @@ export class StoryGraphPanel extends WebviewPanelHost {
         // confirmation the user never turned off.
         const settings = await this._lsp.requestOr<WorkspaceSettingsDto>(
             'aet/getWorkspaceSettings', {},
-            { skipStoryDeleteConfirmation: false, showThreadLanes: false, showChapterLanes: false });
+            {skipStoryDeleteConfirmation: false, showThreadLanes: false, showChapterLanes: false});
         return settings.skipStoryDeleteConfirmation === true;
     }
 
     private async _persistSkipDeleteConfirm(value: boolean): Promise<void> {
-        await this._lsp.notify('aet/setWorkspaceSettings', { skipStoryDeleteConfirmation: value });
+        await this._lsp.notify('aet/setWorkspaceSettings', {skipStoryDeleteConfirmation: value});
     }
 
     /**
@@ -341,12 +447,16 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * this can only offer to flush the mirrored queue after the fact - not cancel the close.
      */
     private async _promptSaveOnClose(): Promise<void> {
-        if (this._pendingCommands.length === 0) { return; }
+        if (this._pendingCommands.length === 0) {
+            return;
+        }
         const choice = await vscode.window.showWarningMessage(
             `The story graph for '${this._target.campaign}' was closed with ${this._pendingCommands.length} ` +
             'unsaved change(s). Save them?',
             'Save', 'Discard');
-        if (choice !== 'Save') { return; }
+        if (choice !== 'Save') {
+            return;
+        }
 
         if (!this._lsp.isRunning) {
             void vscode.window.showWarningMessage(
@@ -356,9 +466,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         const result = await this._lsp.requestOrReport<ApplyStoryCommandBatchResult>(
             'aet/applyStoryCommandBatch',
-            { campaign: this._target.campaign, faction: this._target.faction, commands: this._pendingCommands },
+            {campaign: this._target.campaign, faction: this._target.faction, commands: this._pendingCommands},
             'could not save the closed story graph');
-        if (result === undefined || result.success) { return; }
+        if (result === undefined || result.success) {
+            return;
+        }
 
         const where = typeof result.failedIndex === 'number' ? ` (change ${result.failedIndex + 1})` : '';
         void vscode.window.showErrorMessage(
@@ -373,9 +485,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _confirmDirtyExit(next: string): Promise<void> {
         const choice = await vscode.window.showWarningMessage(
             'You have unsaved story changes. Save them before leaving Edit mode?',
-            { modal: true }, 'Save', "Don't Save");
+            {modal: true}, 'Save', "Don't Save");
         const resolved = choice === 'Save' ? 'save' : choice === "Don't Save" ? 'discard' : 'cancel';
-        this.post({ type: 'dirtyExitChoice', choice: resolved, next });
+        this.post({type: 'dirtyExitChoice', choice: resolved, next});
     }
 
     /**
@@ -386,8 +498,15 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _sendPreview(commands: Record<string, unknown>[], filters: GraphFilters): Promise<void> {
         const result = await this._lsp.requestOrReport<GetStoryGraphResult>(
             'aet/previewStoryGraph',
-            { campaign: this._target.campaign, faction: this._target.faction, commands, ...filterFields(filters) }, 'preview failed');
-        if (result === undefined) { return; }
+            {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                scope: this._target.scope,
+                commands, ...filterFields(filters)
+            }, 'preview failed');
+        if (result === undefined) {
+            return;
+        }
 
         if (result.error) {
             void vscode.window.showWarningMessage(`EaWEdit: ${result.error}`);
@@ -396,6 +515,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         this.post({
             type: 'graph', preview: true, campaign: this._target.campaign, faction: this._target.faction,
+            scope: this._target.scope ?? null,
             nodes: result.nodes ?? [], edges: result.edges ?? [],
             branches: result.branches ?? undefined, threads: result.threads ?? undefined,
             layout: await this._layout(),
@@ -405,25 +525,37 @@ export class StoryGraphPanel extends WebviewPanelHost {
     /** Dry-runs the staged batch on the server and posts the resulting diagnostics for the pending state. */
     private async _validateBatch(commands: Record<string, unknown>[]): Promise<void> {
         const result = await this._lsp.requestOrReport<GetStoryDiagnosticsResult>(
-            'aet/validateStoryCommandBatch', { campaign: this._target.campaign, faction: this._target.faction, commands },
+            'aet/validateStoryCommandBatch', {campaign: this._target.campaign, faction: this._target.faction, commands},
             'validation failed');
-        if (result === undefined) { return; }
+        if (result === undefined) {
+            return;
+        }
 
-        if (result.error) { void vscode.window.showWarningMessage(`EaWEdit: ${result.error}`); }
+        if (result.error) {
+            void vscode.window.showWarningMessage(`EaWEdit: ${result.error}`);
+        }
         this.post({
             type: 'diagnostics', diagnostics: result.error ? [] : result.diagnostics ?? [],
         });
     }
 
     private async _saveLayout(entries: StoryLayoutEntryDto[]): Promise<void> {
-        if (!entries?.length) { return; }
-        await this._lsp.notify('aet/setStoryLayout', { campaign: this._target.campaign, faction: this._target.faction, entries });
+        if (!entries?.length) {
+            return;
+        }
+        await this._lsp.notify('aet/setStoryLayout', {
+            campaign: this._target.campaign,
+            faction: this._target.faction,
+            entries
+        });
     }
 
     private async _sendSchema(): Promise<void> {
         // Schema is styling sugar - the graph renders without it, so a failure stays quiet.
         const schema = await this._lsp.request<GetStorySchemaResult>('aet/getStorySchema');
-        if (!schema.ok) { return; }
+        if (!schema.ok) {
+            return;
+        }
 
         const events = schema.value.eventTypes ?? [];
         const rewards = schema.value.rewardTypes ?? [];
@@ -431,8 +563,12 @@ export class StoryGraphPanel extends WebviewPanelHost {
             type: 'schema',
             eventTypes: events.map(t => t.name),
             rewardTypes: rewards.map(t => t.name),
-            untestedEventTypes: events.filter(t => t.untested).map(t => t.name),
-            untestedRewardTypes: rewards.filter(t => t.untested).map(t => t.name),
+            // Keyed by type name, ranked worst first, events and rewards together: a node knows
+            // which of the two it is, and the webview only ever looks one name up.
+            typeNotes: Object.fromEntries(
+                [...events, ...rewards]
+                    .filter(t => (t.notes ?? []).length > 0)
+                    .map(t => [t.name, t.notes])),
             eventTypeParams: Object.fromEntries(events.map(t => [t.name, t.params ?? []])),
             rewardTypeParams: Object.fromEntries(rewards.map(t => [t.name, t.params ?? []])),
         });
@@ -447,7 +583,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
      */
     private async _layout(): Promise<StoryLayoutEntryDto[]> {
         const stored = await this._lsp.requestOr<GetStoryLayoutResult>(
-            'aet/getStoryLayout', { campaign: this._target.campaign, faction: this._target.faction }, { entries: [] });
+            'aet/getStoryLayout',
+            {campaign: this._target.campaign, faction: this._target.faction, scope: this._target.scope},
+            {entries: []});
         return stored.entries ?? [];
     }
 
@@ -455,7 +593,12 @@ export class StoryGraphPanel extends WebviewPanelHost {
         // Reported into the webview rather than as a notification: this is the panel's whole
         // content, so the message belongs where the graph would have been.
         const outcome = await this._lsp.request<GetStoryGraphResult>(
-            'aet/getStoryGraph', { campaign: this._target.campaign, faction: this._target.faction, ...filterFields(filters) });
+            'aet/getStoryGraph', {
+                campaign: this._target.campaign,
+                faction: this._target.faction,
+                scope: this._target.scope,
+                ...filterFields(filters)
+            });
 
         if (!outcome.ok) {
             this.post({
@@ -468,19 +611,30 @@ export class StoryGraphPanel extends WebviewPanelHost {
         }
 
         if (outcome.value.error) {
-            this.post({ type: 'error', message: outcome.value.error });
+            this.post({type: 'error', message: outcome.value.error});
             return;
         }
 
         this.post({
             type: 'graph',
             campaign: this._target.campaign, faction: this._target.faction,
+            scope: this._target.scope ?? null,
             nodes: outcome.value.nodes ?? [],
             edges: outcome.value.edges ?? [],
             branches: outcome.value.branches ?? undefined,
             threads: outcome.value.threads ?? undefined,
             layout: await this._layout(),
         });
+        // The portal's landing spot, now that the graph holding it is on its way. The webview
+        // parks the jump until the nodes are mounted, so ordering behind the graph is enough.
+        if (this._pendingCenter) {
+            this.post({type: 'centerNode', nodeId: this._pendingCenter});
+            this._pendingCenter = undefined;
+        }
+        if (this._pendingSimulate) {
+            this.post({type: 'enterMode', mode: 'simulate'});
+            this._pendingSimulate = false;
+        }
         // Diagnostics are NO LONGER pushed on every graph refresh - they were the "live"
         // validation that made editing sluggish. They now come only from the explicit Validate
         // action (aet/validateStoryCommandBatch), which reflects the staged/pending state.
@@ -488,17 +642,19 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
     private async _sendDetail(nodeId: string): Promise<void> {
         const outcome = await this._lsp.request<GetStoryNodeDetailResult>(
-            'aet/getStoryNodeDetail', { campaign: this._target.campaign, faction: this._target.faction, nodeId });
+            'aet/getStoryNodeDetail', {campaign: this._target.campaign, faction: this._target.faction, nodeId});
 
         // The property view shows the failure in place; a notification would be a modal over a
         // panel that is already able to say what is wrong.
         this.post(outcome.ok
-            ? { type: 'detail', node: outcome.value.node ?? null, error: outcome.value.error ?? null }
-            : { type: 'detail', node: null, error: outcome.message });
+            ? {type: 'detail', node: outcome.value.node ?? null, error: outcome.value.error ?? null}
+            : {type: 'detail', node: null, error: outcome.message});
     }
 
     private async _openXml(threadUri: string, line: number | undefined): Promise<void> {
-        if (!threadUri) { return; }
+        if (!threadUri) {
+            return;
+        }
         try {
             const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(threadUri));
             const position = new vscode.Position(Math.max(0, line ?? 0), 0);

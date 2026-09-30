@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
@@ -33,6 +34,27 @@ public sealed record StoryCampaignModel(
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>> TacticalManifestThreads { get; init; } =
         new Dictionary<string, IReadOnlySet<string>>();
+
+    /// <summary>
+    ///     Every plot file the chain names, as its manifest writes it, to the document URI it
+    ///     resolved to - the faction manifest's plots and the tactical manifests' alike. Compared
+    ///     case-insensitively, since the engine reads files that way and the manifests' casing
+    ///     never matches the disk's. This is THE resolution; nothing downstream re-derives it.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ThreadUriByFile { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The campaign's starting world for the simulator; null when the chain carried none.</summary>
+    public StoryCampaignSeed? Seed { get; init; }
+
+    /// <summary>
+    ///     The faction's tactical battles in the order the galactic story reaches them - see
+    ///     <see cref="StoryGraphScoper.Battles" />. Each is a scope of <see cref="Graph" />.
+    /// </summary>
+    public IReadOnlyList<StoryBattle> Battles { get; init; } = [];
+
+    /// <summary>The campaign scripts as state machines, one per script the manifests attach that the workspace holds.</summary>
+    public IReadOnlyList<LuaStoryMachine> LuaMachines { get; init; } = [];
 }
 
 /// <summary>
@@ -49,8 +71,13 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
     ///     no manifest for it - a caller asking for a faction that is not there is asking about
     ///     nothing, and answering with another faction's chain is how this went wrong before.
     /// </param>
+    /// <param name="luaMachineFor">
+    ///     Resolves an attached script name (extensionless, as the manifest writes it) to its
+    ///     machine; null skips the Lua overlay. Called once per distinct script.
+    /// </param>
     public StoryCampaignModel? Assemble(string campaignName, string faction,
-        StoryChainScanResult chain, Func<string, (string Uri, string Text)?> readThread)
+        StoryChainScanResult chain, Func<string, (string Uri, string Text)?> readThread,
+        Func<string, LuaStoryMachine?>? luaMachineFor = null)
     {
         var campaigns = chain.Campaigns
             .Where(c => c.Name.Equals(campaignName, StringComparison.OrdinalIgnoreCase))
@@ -83,6 +110,9 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
         // Manifest file (only those reached via a tactical reference) → the raw thread files it
         // lists, resolved to document URIs once threads are read below.
         var tacticalManifestThreadFiles = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        // Manifest file (tactical only) → the scripts it attaches; the faction manifest never lists
+        // a battle's script, so the battle carries it.
+        var tacticalManifestScripts = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
 
         while (manifestQueue.Count > 0)
         {
@@ -93,8 +123,11 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             luaScripts.AddRange(contents.LuaScripts);
 
             if (tacticalManifestFiles.Contains(manifestFile))
+            {
                 tacticalManifestThreadFiles[manifestFile] =
                     [.. contents.ActiveThreads, .. contents.SuspendedThreads];
+                tacticalManifestScripts[manifestFile] = contents.LuaScripts;
+            }
 
             foreach (var thread in contents.ActiveThreads)
             {
@@ -128,11 +161,23 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
                 StringComparer.Ordinal),
             StringComparer.OrdinalIgnoreCase);
 
-        return new StoryCampaignModel(campaignName, faction, threads, suspendedUris,
-            new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads))
+        var luaMachines = luaMachineFor is null
+            ? []
+            : luaScripts.Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(luaMachineFor).Where(m => m is not null).Select(m => m!).ToList();
+        var graph = new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads, luaMachines);
+        var tacticalManifestFileLists = tacticalManifestThreadFiles.ToDictionary(
+            kvp => kvp.Key, IReadOnlyList<string> (kvp) => kvp.Value, StringComparer.OrdinalIgnoreCase);
+        return new StoryCampaignModel(campaignName, faction, threads, suspendedUris, graph)
         {
             LuaScripts = luaScripts,
-            TacticalManifestThreads = tacticalManifestThreads
+            LuaMachines = luaMachines,
+            TacticalManifestThreads = tacticalManifestThreads,
+            ThreadUriByFile = uriByThreadFile,
+            // The first declaration's seed: a campaign declared across layers keeps one world.
+            Seed = campaigns[0].Seed,
+            Battles = StoryGraphScoper.Battles(graph, tacticalManifestThreads, tacticalManifestFileLists,
+                tacticalManifestScripts)
         };
 
         void AddThread(string threadFile)

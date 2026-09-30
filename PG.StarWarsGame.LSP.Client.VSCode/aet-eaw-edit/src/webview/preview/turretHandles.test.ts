@@ -174,8 +174,8 @@ describe('aimText', () => {
 
 describe('turretEnvelopes', () => {
     /**
-     * C2, and the reason the feature exists. `Can_Weapon_Point_At`'s turret branch tests the yaw
-     * extent and nothing else, so the SHOT has no pitch bound; `Calculate_Desired_Turret_Angle`
+     * C2, and the reason the feature exists. the weapon-aim test's turret branch tests the yaw
+     * extent and nothing else, so the SHOT has no pitch bound; the turret-angle calculation
      * clamps both, so the BARREL does. The two envelopes are different shapes.
      */
     it('gives the shot no pitch bound while the barrel keeps one', () => {

@@ -12,7 +12,7 @@ export type Point = [number, number, number];
  *
  * Every cone is built along local +X with its width across Y and its height across Z, because that
  * is how a FIRE BONE aims, and a hardpoint arc hangs on its fire bone and inherits the bone's frame.
- * A `WEAPON` arc does not: `WeaponBehaviorClass::Is_In_Cone_Of_Fire` keeps only the muzzle's
+ * A `WEAPON` arc does not: the cone-of-fire test keeps only the muzzle's
  * position and rebuilds the frame from `owner->Get_Facing()`. The model root's raw axes are not that
  * frame. The hull's NOSE is +Z there - the same travel axis `spinAway` uses - so an arc that took
  * the root's orientation unrotated pointed along +X, a quarter turn off.

@@ -38,6 +38,32 @@ public sealed class PerFactionValueHandlerTest
     }
 
     [Fact]
+    public void ExtraPairsInOneTag_AreAWarningThatOnlyTheFirstIsRead()
+    {
+        // The engine's per-faction reader takes two tokens per tag and drops the rest, so this sets
+        // Rebel's credits and silently loses Empire's.
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Rebel, 1000, Empire, 2000"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("Empire, 2000", d.Message);
+    }
+
+    [Fact]
+    public void PlanetValuePair_NamesAPlanetInItsMessage()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("Corruption_Level_Override", XmlValueType.PerFactionValue,
+            TagSemanticType.PlanetValuePair);
+
+        var d = Assert.Single(Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "Endor"),
+            XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.Contains("Planet, Number", d.Message);
+        Assert.DoesNotContain("FactionName", d.Message);
+    }
+
+    [Fact]
     public void Wrong_type_returns_no_diagnostics()
     {
         var floatTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);

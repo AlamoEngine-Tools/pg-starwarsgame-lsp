@@ -10,13 +10,12 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     A named map that is not there is an Error, not a Warning (issue #132).
 /// </summary>
 /// <remarks>
-///     Measured in the 2018 build: <c>GameModeClass::Load_Named_Map</c> opens the name as given, and
-///     on failure retries it against <c>Get_Map_Path</c> with the extension forced to <c>.ted</c> -
-///     so the engine is forgiving about how the map is spelled. When that second open also fails it
-///     calls <c>Assert_Handler("false", "GameMode.cpp", 0x8db)</c> and returns false. Nothing stands
-///     in for it: the hardcoded <c>_Desert_L5_01.ted</c> and <c>_Space_Temperate1.ted</c> defaults
-///     belong to the EMPTY-name path in <c>GameModeManagerClass::Transition_To_Sub_Mode</c>, which a
-///     misspelled name never reaches.
+///     Measured in the 2018 build: the engine opens the name as given, and on failure retries it
+///     against the resolved map path with the extension forced to <c>.ted</c> - so it is forgiving
+///     about how the map is spelled. When that second open also fails it asserts and returns false.
+///     Nothing stands in for it: the hardcoded <c>_Desert_L5_01.ted</c> and
+///     <c>_Space_Temperate1.ted</c> defaults belong to the EMPTY-name path, which a misspelled name
+///     never reaches.
 ///     So unlike a missing model or texture, this does not degrade the battle - there is no battle.
 /// </remarks>
 public sealed class MapFileExistenceHandler : AssetFileExistenceHandlerBase

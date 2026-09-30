@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using System.IO.Compression;
 using System.Net;
 using MessagePack;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -270,10 +271,94 @@ public sealed class BaselineLoaderTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static BaselineLoader Build(MockFileSystem fs, FakeHttpHandler handler)
+    private static BaselineLoader Build(MockFileSystem fs, FakeHttpHandler handler,
+        ILogger<BaselineLoader>? logger = null)
     {
         var client = new HttpClient(handler);
-        return new BaselineLoader(client, new FileHelper(fs), NullLogger<BaselineLoader>.Instance);
+        return new BaselineLoader(client, new FileHelper(fs), logger ?? NullLogger<BaselineLoader>.Instance);
+    }
+
+    // ── a baseline that predates behaviours ──────────────────────────────────
+    //
+    // It still loads, because the key is additive. But every shipped object then answers "no
+    // behaviours", so anything asking what an object IS gets nothing for the whole base game -
+    // a feature quietly doing nothing, which is the kind of thing that should not be silent.
+
+    [Fact]
+    public async Task LoadAsync_BaselineWithoutBehaviors_WarnsOnce()
+    {
+        var logger = new ListLogger<BaselineLoader>();
+        var fs = new MockFileSystem();
+        fs.AddFile("C:\\b.bin", new MockFileData(Serialize(MakeBaseline())));
+        var loader = Build(fs, new FakeHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)), logger);
+
+        var result = await loader.LoadAsync(
+            new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = "C:\\b.bin" },
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Symbols);
+        var warning = Assert.Single(logger.Entries.Where(e => e.Level == LogLevel.Warning));
+        Assert.Contains("no behaviours", warning.Message);
+    }
+
+    [Fact]
+    public async Task LoadAsync_BaselineWithBehaviors_IsSilent()
+    {
+        var logger = new ListLogger<BaselineLoader>();
+        var baseline = MakeBaseline();
+        var withBehaviors = baseline with
+        {
+            Symbols = baseline.Symbols.SetItem("UNIT_A",
+                baseline.Symbols["UNIT_A"] with { Behaviors = ["DUMMY_STARSHIP"] })
+        };
+        var fs = new MockFileSystem();
+        fs.AddFile("C:\\b.bin", new MockFileData(Serialize(withBehaviors)));
+        var loader = Build(fs, new FakeHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)), logger);
+
+        await loader.LoadAsync(
+            new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = "C:\\b.bin" },
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(logger.Entries.Where(e => e.Level == LogLevel.Warning));
+    }
+
+    // An empty baseline is its own, already-reported problem; saying it also has no behaviours adds
+    // a second warning for one cause.
+    [Fact]
+    public async Task LoadAsync_EmptyBaseline_DoesNotWarnAboutBehaviors()
+    {
+        var logger = new ListLogger<BaselineLoader>();
+        var loader = Build(new MockFileSystem(),
+            new FakeHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)), logger);
+
+        await loader.LoadAsync(
+            new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = "C:\\missing.bin" },
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(logger.Entries.Where(e => e.Message.Contains("no behaviours")));
+    }
+
+    private sealed record LogEntry(LogLevel Level, string Message);
+
+    private sealed class ListLogger<T> : ILogger<T>
+    {
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add(new LogEntry(logLevel, formatter(state, exception)));
+        }
     }
 
     private sealed class FakeHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> respond)

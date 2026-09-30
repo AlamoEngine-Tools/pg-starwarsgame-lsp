@@ -9,8 +9,8 @@
 // need not agree; the shipped corpus ranges from 0.06x to 3.40x. What ties them is a pair of caps,
 // each expressed in PERCENTAGES, which is why the totals cancel:
 //
-//   GameObjectClass::Service            hull  <= hardpoint% + constraint   (tag-gated)
-//   GameObjectClass::Service_Hard_Points hardpoints <= hull% + constraint  (always)
+//   the hull pass          hull  <= hardpoint% + constraint   (tag-gated)
+//   the hardpoint pass     hardpoints <= hull% + constraint  (always)
 //
 // Both are guarded by the unit HAVING destroyable hardpoints. That guard is not incidental: without
 // it an empty hardpoint pool reads as 0% and would drag every fighter's hull down to the constraint.
@@ -52,7 +52,7 @@ export function percentOf(pool: Pool): number {
 /**
  * Both corrections, in the order the engine runs them.
  *
- * The hull is pulled first, inside `Service`, and the hardpoint step then reads the UPDATED hull -
+ * The hull is pulled first, inside the engine's per-frame object update, and the hardpoint step then reads the UPDATED hull -
  * which is what makes the two meet rather than merely approach when the constraint is 0.
  *
  * @param constraint `Hull_Vs_Hard_Points_Health_Constraint`. At 1 every cap clamps to 100% and
@@ -66,7 +66,7 @@ export function leashed(
 ): Leashed {
     // No destroyable hardpoints means neither correction runs at all.
     if (hardpoints.max <= 0) {
-        return { hull, hardpoints };
+        return {hull, hardpoints};
     }
 
     let hullNow = hull;
@@ -75,19 +75,19 @@ export function leashed(
         const cap = Math.min(1, percentOf(hardpoints) + constraint);
         if (percentOf(hullNow) > cap) {
             // A flat assignment through Set_Health_Percent, not damage applied to the pool.
-            hullNow = { ...hullNow, current: cap * hullNow.max };
+            hullNow = {...hullNow, current: cap * hullNow.max};
         }
     }
 
     const cap = Math.min(1, percentOf(hullNow) + constraint);
     if (percentOf(hardpoints) <= cap) {
-        return { hull: hullNow, hardpoints };
+        return {hull: hullNow, hardpoints};
     }
 
     // Damage, distributed across the destroyable hardpoints in proportion to their CURRENT health -
     // so every one loses the same fraction of what it had, and the total lands exactly on the cap
     // in a single tick rather than converging over several.
-    return { hull: hullNow, hardpoints: { ...hardpoints, current: cap * hardpoints.max } };
+    return {hull: hullNow, hardpoints: {...hardpoints, current: cap * hardpoints.max}};
 }
 
 /**

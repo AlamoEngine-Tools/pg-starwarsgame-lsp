@@ -29,14 +29,18 @@ public sealed class StorySimulationServiceTest
         "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
         "\t\t<Prereq>Begin</Prereq>\n" +
         "\t</Event>\n" +
+        "\t<Event Name=\"Later\">\n" +
+        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
+        "\t\t<Event_Param1>2</Event_Param1>\n" +
+        "\t</Event>\n" +
         "</Story>\n";
 
     /// <summary>The campaign faction every fixture here runs as; a session is keyed by both.</summary>
-    private static readonly StoryModelKey Key = new("GC", "Rebel");
+    private static readonly StorySimKey Key = new("GC", "Rebel");
 
-    private static (StorySimulationService Service, List<StoryModelKey> Notified) BuildService()
+    private static (StorySimulationService Service, List<StorySimKey> Notified) BuildService()
     {
-        var notified = new List<StoryModelKey>();
+        var notified = new List<StorySimKey>();
         var service = new StorySimulationService(
             new StubModelService(), new StubIndexService(IndexWithLuaSymbol()),
             new SimEnumSchema(), notified.Add);
@@ -74,7 +78,7 @@ public sealed class StorySimulationServiceTest
     {
         var (service, _) = BuildService();
 
-        var (state, error) = service.Start(new StoryModelKey("Nope", "Rebel"));
+        var (state, error) = service.Start(new StorySimKey("Nope", "Rebel"));
 
         Assert.Null(state);
         Assert.Contains("Nope", error);
@@ -106,13 +110,36 @@ public sealed class StorySimulationServiceTest
     }
 
     [Fact]
+    public void RuleOut_DropsTheDecision_IsOnTheState_AndSurvivesASeek()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+        var armed = service.GetState(Key).State!.Interventions.Single();
+
+        var (state, error) = service.RuleOut(Key, armed.NodeId, true);
+
+        Assert.Null(error);
+        Assert.Empty(state!.Interventions);
+        Assert.Equal([armed.NodeId], state.RuledOut);
+
+        service.Tick(Key, 2);
+        var sought = service.Seek(Key, 1).State!;
+        Assert.Equal([armed.NodeId], sought.RuledOut);
+        Assert.Empty(sought.Interventions);
+
+        var back = service.RuleOut(Key, armed.NodeId, false).State!;
+        Assert.Empty(back.RuledOut);
+        Assert.Single(back.Interventions);
+    }
+
+    [Fact]
     public void Mutations_WithoutSession_ReturnError()
     {
         var (service, _) = BuildService();
 
         var (_, error) = service.SetFlag(Key, "FLAG_X", 1);
 
-        Assert.Contains("No simulation is running", error);
+        Assert.Contains("No simulation running", error);
     }
 
     [Fact]
@@ -136,6 +163,143 @@ public sealed class StorySimulationServiceTest
         Assert.Equal(["Alert_From_Lua"], state!.LuaNotifications);
     }
 
+    [Fact]
+    public void Tick_ReturnsOnlyTheStepsAfterSinceSeq()
+    {
+        var (service, _) = BuildService();
+        var started = service.Start(Key).State!;
+
+        var (state, error) = service.Tick(Key, 2, started.TotalSteps);
+
+        Assert.Null(error);
+        Assert.Equal(2, state!.Tick);
+        Assert.Equal(2.0, state.Clock);
+        Assert.Equal(1.0, state.ClockStepSeconds);
+        Assert.All(state.Steps, s => Assert.True(s.Seq >= started.TotalSteps));
+        Assert.Contains(state.Steps, s => s.Cause == "poll" && s.To == "Fired");
+        Assert.True(state.TotalSteps > started.TotalSteps);
+        Assert.Equal(1, state.Nodes.Single(n => n.NodeId.EndsWith("#later", StringComparison.Ordinal)).FireCount);
+    }
+
+    [Fact]
+    public void Seek_RestoresTheStateJustAfterThatTick_AndDropsTheFuture()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+        service.Tick(Key, 3);
+        service.SetFlag(Key, "FLAG_X", 1);
+        service.Tick(Key, 2);
+        Assert.Equal(5, service.GetState(Key).State!.Tick);
+
+        var (state, error) = service.Seek(Key, 3);
+
+        Assert.Null(error);
+        Assert.Equal(3, state!.Tick);
+        Assert.Empty(state.Flags);
+
+        // The future is gone: ticking again continues from tick 3.
+        Assert.Equal(4, service.Tick(Key, 1).State!.Tick);
+        Assert.Empty(service.GetState(Key).State!.Flags);
+    }
+
+    [Fact]
+    public void Breakpoints_HaltATickRun_AndAreReportedOnTheState()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+        var later = service.GetState(Key).State!.Nodes
+            .Single(n => n.NodeId.EndsWith("#later", StringComparison.Ordinal)).NodeId;
+
+        var (state, error) = service.SetBreakpoints(Key, [later], false);
+        Assert.Null(error);
+        Assert.Equal([later], state!.Breakpoints);
+
+        var ticked = service.Tick(Key, 5).State!;
+        Assert.Equal(2, ticked.Tick);
+        Assert.Equal(later, ticked.HaltedAt);
+    }
+
+    [Fact]
+    public void WorldChange_WritesTheFact_AndTheStateCarriesTheWorld()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+
+        var (state, error) = service.ApplyWorldChange(Key,
+            new StorySimWorldChangeDto("capturePlanet") { Planet = "Kuat", Faction = "Rebel" });
+
+        Assert.Null(error);
+        var kuat = Assert.Single(state!.World.Planets, p => p.Name == "Kuat");
+        Assert.Equal("Rebel", kuat.Owner);
+        Assert.Contains(state.Steps, s => s.Cause == "fact");
+        Assert.Equal(1, state.World.Counters.Single(c => c.Name == "conquered|Rebel").Value);
+    }
+
+    [Fact]
+    public void Interventions_CarryFacetAndSuggestedChange_OnTheWire()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+
+        var manual = service.GetState(Key).State!.Interventions.Single(i => i.EventName == "Manual");
+
+        // STORY_GENERIC with no sub-type: a generic facet with no candidate, so no suggestion.
+        Assert.Equal("generic", manual.Facet);
+        Assert.Null(manual.Suggested);
+    }
+
+    [Fact]
+    public void State_CarriesEachScriptsMachine_WithItsOwedEmissions()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+        var manual = service.GetState(Key).State!.Interventions.Single(i => i.EventName == "Manual");
+
+        var fired = service.SatisfyTrigger(Key, manual.NodeId).State!;
+        var script = Assert.Single(fired.LuaStates);
+        Assert.Equal("story_lua", script.ScriptName);
+        Assert.Null(script.Current);
+        Assert.Equal("Manual", script.Next);
+        Assert.Contains(fired.Steps, s => s.Cause == "luaTrigger");
+
+        var entered = service.Tick(Key, 1).State!;
+        script = Assert.Single(entered.LuaStates);
+        Assert.Equal("Manual", script.Current);
+        var owed = Assert.Single(script.Pending);
+        Assert.Equal("Alert_From_Lua", owed.Id);
+        Assert.Equal(6.0, owed.DueClock);
+    }
+
+    [Fact]
+    public void RunToDecision_StopsAtTheFirstIntervention()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+
+        var (state, error) = service.RunToDecision(Key);
+
+        Assert.Null(error);
+        Assert.Equal(1, state!.Tick);
+        Assert.Single(state.Interventions);
+    }
+
+    [Fact]
+    public void State_CarriesWhatTheClockAloneCanStillChange()
+    {
+        var (service, _) = BuildService();
+        var started = service.Start(Key).State!;
+        Assert.True(started.ClockPending > 0, "a timer is armed at start");
+
+        // Manual is the new decision at tick 1, but Later's 2 s timer is still running.
+        var ran = service.RunToDecision(Key).State!;
+        Assert.Equal(1, ran.ClockPending);
+
+        // Once Later has fired nothing but the author can move the story.
+        var settled = service.Tick(Key, 5).State!;
+        Assert.Equal(0, settled.ClockPending);
+        Assert.Equal(0, StorySimStateDto.NotRunning.ClockPending);
+    }
+
     // ── Handler gating ───────────────────────────────────────────────────────
 
     [Fact]
@@ -153,6 +317,21 @@ public sealed class StorySimulationServiceTest
         Assert.Equal(StorySimFeature.DisabledMessage, result.Error);
     }
 
+    // Measured over the wire: a start request without the field arrived with the option OFF, since
+    // the deserializer fills a missing bool with false, never with the record's default. The field
+    // is nullable so that absent means the documented default.
+    [Fact]
+    public async Task Start_WithoutTheMediaField_AssumesMediaCompletes()
+    {
+        var (service, _) = BuildService();
+        var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags());
+
+        var started = await new StorySimStartHandler(service, config)
+            .Handle(new StorySimStartParams("GC", "Rebel") { AssumeMediaCompletes = null }, CancellationToken.None);
+
+        Assert.True(started.State!.AssumeMediaCompletes);
+    }
+
     [Fact]
     public async Task Handlers_FlagOn_PassThrough()
     {
@@ -163,9 +342,13 @@ public sealed class StorySimulationServiceTest
             .Handle(new StorySimStartParams("GC", "Rebel"), CancellationToken.None);
         var advanced = await new StorySimAdvanceClockHandler(service, config)
             .Handle(new StorySimAdvanceClockParams("GC", "Rebel", 5), CancellationToken.None);
+        var ticked = await new StorySimTickHandler(service, config)
+            .Handle(new StorySimTickParams("GC", "Rebel", 1, advanced.State!.TotalSteps), CancellationToken.None);
 
         Assert.Null(started.Error);
         Assert.Equal(5, advanced.State!.Clock);
+        Assert.Equal(6, ticked.State!.Tick);
+        Assert.All(ticked.State.Steps, s => Assert.True(s.Seq >= advanced.State.TotalSteps));
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
@@ -208,11 +391,19 @@ public sealed class StorySimulationServiceTest
         private static StoryCampaignModel BuildModel()
         {
             var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
+            // The script answers to the Manual event and, five seconds in, calls Story_Event.
+            var machine = new LuaStoryMachine(LuaUri, "story_lua",
+            [
+                new LuaStoryState("Manual", "State_Manual",
+                    new LuaStoryPhase([new LuaStoryEmission("Alert_From_Lua", 5)], [], [], ["Talk"]),
+                    LuaStoryPhase.Empty, LuaStoryPhase.Empty)
+            ]);
             return new StoryCampaignModel("GC", "Rebel", [thread],
                 new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new SimEnumSchema()).Build([thread]))
+                new StoryGraphBuilder(new SimEnumSchema()).Build([thread], null, [machine]))
             {
-                LuaScripts = ["Story_Lua"]
+                LuaScripts = ["Story_Lua"],
+                LuaMachines = [machine]
             };
         }
     }

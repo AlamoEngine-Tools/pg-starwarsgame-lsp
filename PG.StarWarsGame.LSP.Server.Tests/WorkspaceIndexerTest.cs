@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
+using PG.StarWarsGame.LSP.Server.Assets;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -30,7 +31,44 @@ public sealed class WorkspaceIndexerTest
         IProjectIndexCache? cache = null, ILuaAnnotationRepository? repo = null,
         params IGameDocumentParser[] parsers)
     {
-        return BuildWithHost(fs, svc, registry, schema, cache, repo, null, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, cache, repo, null, null, null, null, parsers);
+    }
+
+    /// <summary>
+    ///     Stamps a hand-built snapshot with the cross-layer key the indexer will compute for the
+    ///     layer rooted at <paramref name="layerXmlDirs" />, so the snapshot reads as current.
+    /// </summary>
+    /// <remarks>
+    ///     Call AFTER <c>PreScanMetafiles</c> - that is what fills the registry the key reads.
+    ///     Goes through the production function on purpose: a test that recomputed the key by hand
+    ///     could agree with itself while disagreeing with the indexer, and the failure it would
+    ///     hide is a silently stale index.
+    /// </remarks>
+    private static void StampCrossLayer(
+        ProjectIndexSnapshot snapshot, MockFileSystem fs, IFileTypeRegistry registry,
+        WorkspaceConfiguration config, params string[] layerXmlDirs)
+    {
+        var fh = new FileHelper(fs);
+        var files = layerXmlDirs
+            .Where(d => fs.Directory.Exists(d))
+            .SelectMany(d => fs.Directory.EnumerateFiles(d, "*.xml", SearchOption.AllDirectories))
+            .Select(fh.PathToFileUri)
+            .ToArray();
+
+        snapshot.CrossLayerFingerprint =
+            CrossLayerInputFingerprint.Compute(registry, files, config.XmlDirectories);
+    }
+
+    /// <summary>
+    ///     Its own builder rather than another optional parameter on <see cref="Build" />: that
+    ///     one ends in <c>params IGameDocumentParser[]</c>, so anything inserted before it is
+    ///     bound positionally by every existing caller that passes a parser.
+    /// </summary>
+    private static WorkspaceIndexer BuildWithBoneCache(
+        MockFileSystem fs, IGameIndexService svc, IModelBoneCatalogCache boneCache)
+    {
+        return BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+            null, null, null, null, null, boneCache).Indexer;
     }
 
     // Overload kept for callers that pass parsers without a cache
@@ -38,13 +76,22 @@ public sealed class WorkspaceIndexerTest
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return BuildWithHost(fs, svc, registry, schema, null, null, null, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, null, null, null, null, null, null, parsers);
+    }
+
+    private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithMegReader(
+        MockFileSystem fs, IGameIndexService svc, IMegEntryReader megReader)
+    {
+        return BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+            null, null, null, null, megReader, null);
     }
 
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithHost(
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         IProjectIndexCache? cache, ILuaAnnotationRepository? repo,
         IStoryChainProblemStore? storyProblems, ILspConfigurationProvider? config,
+        IMegEntryReader? megReader = null,
+        IModelBoneCatalogCache? boneCache = null,
         params IGameDocumentParser[] parsers)
     {
         var fh = new FileHelper(fs);
@@ -53,6 +100,8 @@ public sealed class WorkspaceIndexerTest
             cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
             storyProblems ?? new StoryChainProblemStore(),
             config ?? new FakeLspConfigurationProvider(),
+            megReader ?? NoMegEntries.Instance,
+            boneCache ?? new NullModelBoneCatalogCache(),
             NullLogger<WorkspaceIndexer>.Instance);
         return (indexer, ctx);
     }
@@ -534,6 +583,108 @@ public sealed class WorkspaceIndexerTest
         Assert.True(svc.AppliedAssetFiles.Contains("data/art/textures/shipped.tga"));
     }
 
+    /// <summary>
+    ///     A workspace asset is catalogued by its GAME-relative path, not by its path relative to
+    ///     whichever asset root happened to find it.
+    /// </summary>
+    /// <remarks>
+    ///     A .pgproj declares its asset roots as <c>data/audio</c>, <c>data/art</c> and so on, so
+    ///     normalising against the root that matched threw the <c>data/audio/</c> prefix away and
+    ///     stored <c>announcer/foo.wav</c>. The baseline stores <c>data/...</c>, and references are
+    ///     written game-relative too - EaWX writes <c>Data\Audio\Announcer\foo.wav</c> - so the two
+    ///     halves of the merged catalog never met and every such reference read as a missing file.
+    /// </remarks>
+    [Fact]
+    public void ApplyAssetCatalog_StoresWorkspaceAssetsGameRelative()
+    {
+        var root = Root("ws");
+        var audioRoot = Path.Combine(root, "Data", "Audio");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(audioRoot, "Announcer", "Destroyed_ENG.wav")] = new("")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+
+        // The asset ROOT is the audio directory itself, which is how a .pgproj declares it.
+        indexer.ApplyAssetCatalog([audioRoot]);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/audio/announcer/destroyed_eng.wav"),
+            "expected the game-relative path, got: " + string.Join(", ", svc.AppliedAssetFiles));
+    }
+
+    /// <summary>
+    ///     A root with no <c>data</c> segment above the file still yields something usable: the
+    ///     path relative to the root, as before. Nothing outside a game tree is guessed at.
+    /// </summary>
+    [Fact]
+    public void ApplyAssetCatalog_RootOutsideAGameTree_KeepsTheRootRelativePath()
+    {
+        var root = Root("loose");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "extra", "stray.tga")] = new("")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+
+        indexer.ApplyAssetCatalog([root]);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("extra/stray.tga"));
+    }
+
+    /// <summary>
+    ///     What a workspace archive holds counts as present.
+    /// </summary>
+    /// <remarks>
+    ///     The catalog used to glob loose files only, so a mod that ships its assets packed - which
+    ///     is how a mod ships - had every reference into its own archives reported missing. The
+    ///     shipped game is spared only because the baseline was built from its archives.
+    /// </remarks>
+    [Fact]
+    public void ApplyAssetCatalog_ReadsWorkspaceMegArchives()
+    {
+        var root = Root("ws");
+        var meg = Path.Combine(root, "Data", "mod.meg");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [meg] = new("not a real archive - the reader is the seam")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = BuildWithMegReader(fs, svc,
+            new FakeMegEntryReader(meg, [@"DATA\ART\TEXTURES\PACKED.TGA"]));
+
+        indexer.ApplyAssetCatalog([root]);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/packed.tga"));
+    }
+
+    /// <summary>
+    ///     An SFX archive IS the <c>data/audio/sfx</c> directory, so its flat entries are stored
+    ///     under that prefix - the same rule the baseline builder applies, from the same code.
+    /// </summary>
+    [Fact]
+    public void ApplyAssetCatalog_AppliesSfxConventionsToWorkspaceArchives()
+    {
+        var root = Root("ws");
+        var meg = Path.Combine(root, "Data", "Audio", "SFX", "sfx2d_english.meg");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [meg] = new("not a real archive - the reader is the seam")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = BuildWithMegReader(fs, svc,
+            new FakeMegEntryReader(meg, ["U000_SPD0101_ENG.WAV"]));
+
+        indexer.ApplyAssetCatalog([root]);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/audio/sfx/u000_spd0101_eng.wav"));
+    }
+
     [Fact]
     public void ApplyModelBoneCatalog_AppliesBaselineBones()
     {
@@ -548,10 +699,88 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
 
-        indexer.ApplyModelBoneCatalog([root]);
+        indexer.ApplyModelBoneCatalog(WorkspaceConfiguration.Empty with { AssetRoots = [root] });
 
         Assert.NotNull(svc.AppliedModelBones);
         Assert.Equal(["root", "muzzle_bone"], svc.AppliedModelBones!["data/art/models/shipped.alo"].ToArray());
+    }
+
+    /// <summary>
+    ///     A workspace that resolved no projects - a heuristic scan - still has to produce a
+    ///     catalog. It cannot be cached (there is no .pgproj to keep a snapshot beside), so the
+    ///     flattened asset roots stand in for a layer, and the behaviour must be what it was
+    ///     before snapshots existed.
+    /// </summary>
+    [Fact]
+    public void ApplyModelBoneCatalog_NoLayers_StillAppliesFromTheFlattenedRoots()
+    {
+        var root = Root("ws");
+        var fs = new MockFileSystem();
+        fs.AddDirectory(root);
+        var baseline = BaselineIndex.Empty with
+        {
+            ModelBones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("shipped.alo", ["root"])
+        };
+        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+
+        indexer.ApplyModelBoneCatalog(WorkspaceConfiguration.Empty with { AssetRoots = [root], Layers = [] });
+
+        Assert.NotNull(svc.AppliedModelBones);
+        Assert.True(svc.AppliedModelBones!.ContainsKey("shipped.alo"));
+    }
+
+    /// <summary>
+    ///     The reason the snapshot is per LAYER: a layer whose models are unchanged must be served
+    ///     from its own snapshot, and must NOT be re-extracted because a sibling layer changed.
+    /// </summary>
+    [Fact]
+    public void ApplyModelBoneCatalog_ReusesASnapshotPerLayer()
+    {
+        var fs = new MockFileSystem();
+        fs.AddDirectory(Root("dep/art"));
+        fs.AddDirectory(Root("leaf/art"));
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var cache = new StubBoneCache();
+        // Only the dependency has a snapshot; the leaf must still be extracted and then saved.
+        cache.Stored[Root("dep/dep.pgproj")] = new Dictionary<string, ModelCatalogEntry>
+        {
+            ["dep_model.alo"] = new(["dep_bone"], ["dep_texture.tga"])
+        };
+        var indexer = BuildWithBoneCache(fs, svc, cache);
+
+        indexer.ApplyModelBoneCatalog(WorkspaceConfiguration.Empty with
+        {
+            AssetRoots = [Root("dep/art"), Root("leaf/art")],
+            Layers =
+            [
+                new ProjectLayer(0, "dep", [], [], [], [Root("dep/art")], null, Root("dep/dep.pgproj")),
+                new ProjectLayer(1, "leaf", [], [], [], [Root("leaf/art")], null, Root("leaf/leaf.pgproj"))
+            ]
+        });
+
+        Assert.Equal(["dep_bone"], svc.AppliedModelBones!["dep_model.alo"].ToArray());
+        // The dependency was reused, so it was never re-saved; the leaf missed and was.
+        Assert.DoesNotContain(Root("dep/dep.pgproj"), cache.Saved);
+        Assert.Contains(Root("leaf/leaf.pgproj"), cache.Saved);
+    }
+
+    private sealed class StubBoneCache : IModelBoneCatalogCache
+    {
+        public Dictionary<string, IReadOnlyDictionary<string, ModelCatalogEntry>> Stored { get; } = new();
+        public List<string> Saved { get; } = [];
+
+        public IReadOnlyDictionary<string, ModelCatalogEntry>? TryLoad(string pgprojPath, string fingerprint)
+        {
+            return Stored.GetValueOrDefault(pgprojPath);
+        }
+
+        public void Save(
+            string pgprojPath, string fingerprint, IReadOnlyDictionary<string, ModelCatalogEntry> models)
+        {
+            Saved.Add(pgprojPath);
+        }
     }
 
     // ── Dynamic enum catalog ─────────────────────────────────────────────────
@@ -845,9 +1074,11 @@ public sealed class WorkspaceIndexerTest
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
+        StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
@@ -891,9 +1122,11 @@ public sealed class WorkspaceIndexerTest
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
+        StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
@@ -933,9 +1166,11 @@ public sealed class WorkspaceIndexerTest
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
+        StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
@@ -1099,13 +1334,143 @@ public sealed class WorkspaceIndexerTest
         Assert.Single(saved.Files);
     }
 
+    /// <summary>
+    ///     A dependency's OWN files changing must NOT discard a dependent layer's snapshot.
+    /// </summary>
+    /// <remarks>
+    ///     This is the whole point of the cross-layer key. The old key recorded the dependency's
+    ///     OverallHash, so one changed line in a shared core re-parsed every leaf that referenced
+    ///     it - on a four-leaf mod, four full re-parses for an edit that could not have changed
+    ///     how any of their files parse. What CAN change that is a dependency RETYPING this
+    ///     layer's files, which the next test covers.
+    /// </remarks>
     [Fact]
-    public async Task IndexDocumentsAsync_DependencyHashChanged_DiscardsLayerSnapshot()
+    public async Task IndexDocumentsAsync_DependencyContentChanged_KeepsLayerSnapshot()
     {
-        // The mod layer's cached parses were produced against the OLD dependency state - symbol
-        // extraction depends on cross-layer inputs (file-type registrations from dependency
-        // metafiles), so a dependency change must invalidate the whole layer snapshot even when
-        // the layer's own file contents are unchanged.
+        var depRoot = Root("dep");
+        var modRoot = Root("mod");
+        var depXml = Path.Combine(depRoot, "data", "xml");
+        var modXml = Path.Combine(modRoot, "data", "xml");
+        var depPgproj = Path.Combine(depRoot, "dep.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var modPgproj = Path.Combine(modRoot, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            // The dependency's own file differs from whatever it was when the mod was cached.
+            [Path.Combine(depXml, "dep.xml")] = new("<Root><Changed/></Root>"),
+            [Path.Combine(modXml, "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        var fh = new FileHelper(fs);
+        var unitsHash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(modXml, "units.xml"), fh.FileSystem);
+        var modSnapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything",
+            DependencyHashes = [],
+            Files =
+            [
+                new ProjectFileEntry
+                {
+                    RelativePath = "data/xml/units.xml", ContentHash = unitsHash,
+                    Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+                }
+            ],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+        };
+        var cache = new FakeProjectIndexCache { [modPgproj] = modSnapshot };
+        var config = new WorkspaceConfiguration([depXml, modXml], [], [], [], null)
+        {
+            Layers =
+            [
+                new ProjectLayer(0, "Dep", [depXml], [], [], [], null, depPgproj),
+                new ProjectLayer(1, "Mod", [modXml], [], [], [], null, modPgproj)
+            ]
+        };
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, null,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [depRoot, modRoot]);
+        StampCrossLayer(modSnapshot, fs, registry, config, modXml);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        // The dependency's own file is parsed; the mod's is served from its snapshot.
+        Assert.Single(svc.Calls);
+        Assert.Single(svc.InjectedDocuments);
+    }
+
+    /// <summary>
+    ///     A dependency that changes the TYPES registered for this layer's files must still
+    ///     discard the snapshot - the registered types decide which symbol passes run, so the
+    ///     cached parse is genuinely wrong. The narrower key must not lose this.
+    /// </summary>
+    [Fact]
+    public async Task IndexDocumentsAsync_DependencyRetypedThisLayersFiles_DiscardsLayerSnapshot()
+    {
+        var depRoot = Root("dep");
+        var modRoot = Root("mod");
+        var depXml = Path.Combine(depRoot, "data", "xml");
+        var modXml = Path.Combine(modRoot, "data", "xml");
+        var depPgproj = Path.Combine(depRoot, "dep.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var modPgproj = Path.Combine(modRoot, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(depXml, "dep.xml")] = new("<Root/>"),
+            [Path.Combine(modXml, "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        var fh = new FileHelper(fs);
+        var unitsHash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(modXml, "units.xml"), fh.FileSystem);
+        var modSnapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything",
+            DependencyHashes = [],
+            Files =
+            [
+                new ProjectFileEntry
+                {
+                    RelativePath = "data/xml/units.xml", ContentHash = unitsHash,
+                    Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+                }
+            ],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+        };
+        var cache = new FakeProjectIndexCache { [modPgproj] = modSnapshot };
+        var config = new WorkspaceConfiguration([depXml, modXml], [], [], [], null)
+        {
+            Layers =
+            [
+                new ProjectLayer(0, "Dep", [depXml], [], [], [], null, depPgproj),
+                new ProjectLayer(1, "Mod", [modXml], [], [], [], null, modPgproj)
+            ]
+        };
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, null,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [depRoot, modRoot]);
+        // Stamp the snapshot as it was when the mod's units.xml carried NO registered type...
+        StampCrossLayer(modSnapshot, fs, registry, config, modXml);
+        // ...then let a dependency metafile register one for it, as a dependency's metafile can.
+        registry.RegisterFile(fh.PathToFileUri(Path.Combine(modXml, "units.xml")), ["GameObjectType"]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        // Both re-parsed; nothing served from the now-stale mod snapshot.
+        Assert.Equal(2, svc.Calls.Count);
+        Assert.Empty(svc.InjectedDocuments);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_SupersededDependencyHashKey_IsNoLongerConsulted()
+    {
+        // The old key is retained on the DTO only to keep the MessagePack numbering append-only.
+        // A snapshot carrying an outdated dependency hash must now be KEPT, or the narrower key
+        // buys nothing.
         var depRoot = Root("dep");
         var modRoot = Root("mod");
         var depXml = Path.Combine(depRoot, "data", "xml");
@@ -1147,15 +1512,104 @@ public sealed class WorkspaceIndexerTest
                 new ProjectLayer(1, "Mod", [modXml], [], [], [], null, modPgproj)
             ]
         };
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [depRoot, modRoot]);
+        StampCrossLayer(modSnapshot, fs, registry, config, modXml);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        // Both files re-parsed; nothing injected from the stale mod snapshot.
-        Assert.Equal(2, svc.Calls.Count);
-        Assert.Empty(svc.InjectedDocuments);
+        // The outdated dependency hash is ignored: only the dependency's own file is parsed, and
+        // the mod's is still served from its snapshot.
+        Assert.Single(svc.Calls);
+        Assert.Single(svc.InjectedDocuments);
+    }
+
+    /// <summary>
+    ///     A cache hit skips the parser, so anything the parse published elsewhere has to be
+    ///     replayed from the snapshot - otherwise a warm start silently loses it.
+    /// </summary>
+    /// <remarks>
+    ///     The real instance is the Lua parser filling the annotation repository that completion,
+    ///     hover and inlay hints read. On a layered mod most indexed files are Lua, so before this
+    ///     nearly every annotation in the workspace was missing after a warm start, and stayed
+    ///     missing until someone happened to edit the file.
+    /// </remarks>
+    [Fact]
+    public async Task IndexDocumentsAsync_CacheHit_ReplaysTheParsersOutOfBandState()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "units.xml")] = new("<Root/>"u8.ToArray())
+        });
+        var svc = new FakeIndexService();
+
+        var fh = new FileHelper(fs);
+        var hash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(xmlDir, "units.xml"), fh.FileSystem);
+        byte[] state = [7, 8, 9];
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything",
+            DependencyHashes = [],
+            Files =
+            [
+                new ProjectFileEntry
+                {
+                    RelativePath = "data/xml/units.xml", ContentHash = hash,
+                    Document = new SerializedDocument
+                    {
+                        Symbols = [], References = [], RequireArgs = [], ParserState = state
+                    }
+                }
+            ],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var registry = new FileTypeRegistry();
+        var parser = new StatefulFakeParser();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, null, parser);
+        indexer.PreScanMetafiles(config, [root]);
+        StampCrossLayer(snapshot, fs, registry, config, xmlDir);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(svc.InjectedDocuments);
+        var restored = Assert.Single(parser.Restored);
+        Assert.Equal(state, restored.State);
+        Assert.Contains("units.xml", restored.Uri, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_SnapshotSave_CarriesTheParsersOutOfBandState()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "units.xml")] = new("<Root/>"u8.ToArray())
+        });
+        var svc = new FakeIndexService();
+        var cache = new FakeProjectIndexCache();
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var parser = new StatefulFakeParser();
+        var uri = new FileHelper(fs).PathToFileUri(Path.Combine(xmlDir, "units.xml"));
+        parser.Captured[uri] = [4, 2];
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+            parser);
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.True(cache.Saved.TryGetValue(pgproj, out var saved));
+        Assert.Equal([4, 2], Assert.Single(saved!.Files).Document.ParserState);
     }
 
     [Fact]
@@ -1193,9 +1647,11 @@ public sealed class WorkspaceIndexerTest
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
+        StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
@@ -1248,7 +1704,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), null, null,
-            null, null, new FakeParser());
+            null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
@@ -1269,7 +1725,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService();
         var config = ConfigWithLayer(xmlDir, pgproj);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            null, null, null, null, new FakeParser());
+            null, null, null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
@@ -1306,9 +1762,11 @@ public sealed class WorkspaceIndexerTest
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            cache, null, null, null, new FakeParser());
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = BuildWithHost(fs, svc, registry, new FakeSchemaProvider(),
+            cache, null, null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
+        StampCrossLayer(snapshot, fs, registry, config, xmlDir);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
@@ -1346,6 +1804,16 @@ public sealed class WorkspaceIndexerTest
         }
     }
 
+    /// <summary>An archive whose entry table is whatever the test says it is.</summary>
+    private sealed class FakeMegEntryReader(string megFilePath, IReadOnlyList<string> entryPaths)
+        : IMegEntryReader
+    {
+        public IEnumerable<string> EnumerateEntryPaths(string path)
+        {
+            return path.Equals(megFilePath, StringComparison.OrdinalIgnoreCase) ? entryPaths : [];
+        }
+    }
+
     private sealed class FakeParser : IGameDocumentParser
     {
         private readonly string _ext;
@@ -1363,6 +1831,36 @@ public sealed class WorkspaceIndexerTest
         public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version, CancellationToken ct)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    /// <summary>
+    ///     A parser with state published outside the document index, like the Lua one's annotation
+    ///     repository writes.
+    /// </summary>
+    private sealed class StatefulFakeParser : IGameDocumentParser
+    {
+        public Dictionary<string, byte[]> Captured { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<(string Uri, byte[] State)> Restored { get; } = [];
+
+        public bool CanParse(string ext)
+        {
+            return ext.Equals(".xml", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public byte[]? CaptureParserState(string documentUri)
+        {
+            return Captured.GetValueOrDefault(documentUri);
+        }
+
+        public void RestoreParserState(string documentUri, byte[] state)
+        {
+            Restored.Add((documentUri, state));
         }
     }
 

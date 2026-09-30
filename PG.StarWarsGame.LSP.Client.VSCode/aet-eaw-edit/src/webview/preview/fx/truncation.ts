@@ -146,7 +146,7 @@ function splitBinary(
                     continue;
                 }
 
-                return { left, right: text.slice(i + 1).trim(), operator: c };
+                return {left, right: text.slice(i + 1).trim(), operator: c};
             }
         }
     }
@@ -248,7 +248,7 @@ export function fixVectorTruncation(source: string): string {
         return body.replace(
             /^([ \t]+)(?:((?:float|vec[234]|mat[234](?:x[234])?|int|bool)\s+)?([A-Za-z_][A-Za-z0-9_.]*)\s*([-+*/]?=)(?!=)\s*)([^;]+);/gm,
             (whole, indent: string, declaredType: string | undefined, target: string,
-                operator: string, rhs: string) => {
+             operator: string, rhs: string) => {
                 const type = declaredType?.trim() ?? inferType(target, scope, structs, functions);
                 if (type === null) {
                     return whole;
@@ -283,7 +283,7 @@ export function fixBooleanConditions(source: string): string {
 
         const keyword = /\b(if|while)\s*\(/g;
 
-        for (;;) {
+        for (; ;) {
             keyword.lastIndex = cursor;
             const match = keyword.exec(body);
             if (match === null) {
@@ -368,7 +368,7 @@ function eachFunction(
     let out = '';
     let cursor = 0;
 
-    for (;;) {
+    for (; ;) {
         header.lastIndex = cursor;
         const match = header.exec(source);
         if (match === null) {
@@ -416,7 +416,7 @@ export function fixReturnWidths(source: string): string {
     let out = '';
     let cursor = 0;
 
-    for (;;) {
+    for (; ;) {
         signature.lastIndex = cursor;
         const match = signature.exec(source);
         if (match === null) {
@@ -474,10 +474,10 @@ function matchingBrace(text: string, open: number): number {
 /**
  * Gives an empty non-void function something to return.
  *
- * Not a translation problem: the shipped headers really do contain
- * `float Compute_DOF_Alpha_WS(float3 world_pos) { }` - depth-of-field stubs that were disabled and
- * left behind. HLSL compiles that; GLSL will not. Zero is the only honest filling, and it matches
- * what the disabled effect contributes.
+ * Not a translation problem: the shipped headers really do declare float-returning functions with
+ * an empty body - depth-of-field stubs that were disabled and left behind. HLSL compiles that;
+ * GLSL will not. Zero is the only honest filling, and it matches what the disabled effect
+ * contributes.
  */
 export function fillEmptyFunctions(source: string): string {
     const signature =
@@ -486,7 +486,7 @@ export function fillEmptyFunctions(source: string): string {
     let out = '';
     let cursor = 0;
 
-    for (;;) {
+    for (; ;) {
         signature.lastIndex = cursor;
         const match = signature.exec(source);
         if (match === null) {

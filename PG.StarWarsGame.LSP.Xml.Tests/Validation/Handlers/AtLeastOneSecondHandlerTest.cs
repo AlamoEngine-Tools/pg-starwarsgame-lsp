@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>LeechShieldsAbilityClass::Validate_Data</c> (<c>01028000</c>) tests
+///         the engine's load-time validation tests
 ///         <c>Duration &lt;= 1.0 &amp;&amp; Duration != 1.0</c> - which is <c>Duration &lt; 1.0</c> -
 ///         then sets <c>Duration = 1.0</c>. So one second is legal and the bound is inclusive,
 ///         which the message ("should have at least one second of time") happens to state

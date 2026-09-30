@@ -36,6 +36,21 @@ public static class SchemaFingerprint
                 .Append('|').Append(type.NameTag)
                 .Append('\n');
 
+        // Kinds drive what the PARSER emits, not just how a value is judged: the flags a symbol
+        // carries are exactly the ones some kind asks about. A snapshot written under a kinds file
+        // that named no flag would otherwise replay flagless symbols forever.
+        foreach (var kind in schema.AllKinds.OrderBy(k => k.Kind, StringComparer.Ordinal))
+        {
+            sb.Append("kind:").Append(kind.Kind);
+            foreach (var behavior in kind.Behaviors.OrderBy(b => b, StringComparer.Ordinal))
+                sb.Append("|b:").Append(behavior);
+            foreach (var flag in kind.Flags.OrderBy(f => f, StringComparer.Ordinal))
+                sb.Append("|f:").Append(flag);
+            foreach (var member in kind.MemberOf.OrderBy(m => m, StringComparer.Ordinal))
+                sb.Append("|m:").Append(member);
+            sb.Append('\n');
+        }
+
         foreach (var e in schema.AllEnums.OrderBy(e => e.Name, StringComparer.Ordinal))
         {
             sb.Append("enum:").Append(e.Name)
@@ -51,6 +66,17 @@ public static class SchemaFingerprint
             sb.Append("meta:").Append(m.Path)
                 .Append('|').Append(m.MetafileType);
             foreach (var t in m.Types.OrderBy(t => t, StringComparer.Ordinal))
+                sb.Append('|').Append(t);
+            sb.Append('\n');
+        }
+
+        // A scanned directory decides whether the files under it are exempt from the
+        // unregistered-file check, so it changes what a persisted index means. Leaving it out would
+        // let an index built under the old list be reused under the new one.
+        foreach (var d in schema.AllScannedDirectories.OrderBy(d => d.Path, StringComparer.Ordinal))
+        {
+            sb.Append("scan:").Append(d.Path);
+            foreach (var t in d.Types.OrderBy(t => t, StringComparer.Ordinal))
                 sb.Append('|').Append(t);
             sb.Append('\n');
         }

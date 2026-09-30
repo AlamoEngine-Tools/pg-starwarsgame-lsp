@@ -82,6 +82,12 @@ public sealed class StartupProgress : IStartupProgress
 
     private IWorkDoneObserver? Observer()
     {
+        // VSTHRD002 reads this as a synchronous wait, which it cannot be: IsCompletedSuccessfully
+        // is checked first, so Result reads a value that has already arrived. Before the client
+        // grants a token this returns null and the caller logs instead of reporting - never
+        // blocks. The waiting, with its timeout, lives in CreateObserverAsync.
+#pragma warning disable VSTHRD002
         return _createTask is { IsCompletedSuccessfully: true } ? _createTask.Result : null;
+#pragma warning restore VSTHRD002
     }
 }

@@ -14,5 +14,88 @@ public sealed record GameSymbol(
     [property: Key(4)] string? Description,
     // Id of the base object this symbol is a variant of (from Variant_Of_Existing_Type), or null.
     // Nullable with a default so existing 5-arg construction and older MessagePack snapshots remain valid.
-    [property: Key(5)] string? VariantBaseId = null
-);
+    [property: Key(5)] string? VariantBaseId = null,
+    // The behaviour tokens this object declares ITSELF, from its own Behavior, SpaceBehavior and
+    // LandBehavior tags; null when it declares none and for everything that is not a game object.
+    // Read it through GameIndex.BehaviorsOf, never directly: a variant that declares none inherits
+    // its base's whole list, and only the index can walk that chain.
+    //
+    // A plain array rather than an ImmutableArray because a GameSymbol is serialised by MessagePack
+    // as-is, into both the baseline and the project index cache, and no immutable-collection
+    // resolver is configured. Additive key, so both formats keep reading what was written before it.
+    [property: Key(6)] string[]? Behaviors = null,
+    // The boolean tags that are TRUE on this object, out of the ones some kind actually asks about
+    // (Is_Named_Hero, Is_Generic_Hero today). The set comes from the schema's kinds, so adding a
+    // kind that tests a new flag starts capturing it without a code change - which is also why the
+    // schema fingerprint covers kinds, or a cached index would replay the old set forever.
+    //
+    // EMPTY means the object was inspected and has none. NULL means nobody looked - a baseline
+    // built before flags - and a kind that rests on one then answers Unknown rather than "no",
+    // because putting an error on every shipped hero is the worse way to be wrong.
+    [property: Key(7)] string[]? Flags = null
+)
+{
+    /// <summary>
+    ///     Value equality, including the two array members - which a record would otherwise compare
+    ///     by reference.
+    /// </summary>
+    /// <remarks>
+    ///     <c>GameIndexService.ApplyDocumentIndex</c> recognises a content-only re-parse by
+    ///     comparing the old and new symbol lists, and keeps the workspace dictionaries
+    ///     reference-identical when they match, which is what lets the diagnostics publisher
+    ///     re-publish only the edited document. Reference equality here means two parses of the
+    ///     same unchanged text produce "different" symbols, so that guard never fires: every edit
+    ///     rebuilds the index and publishes beyond the file the author touched. It showed up as a
+    ///     rename leaving stale diagnostics behind in another file.
+    /// </remarks>
+    public bool Equals(GameSymbol? other)
+    {
+        return other is not null
+               && Id == other.Id
+               && Kind == other.Kind
+               && TypeName == other.TypeName
+               && Equals(Origin, other.Origin)
+               && Description == other.Description
+               && VariantBaseId == other.VariantBaseId
+               && SameTokens(Behaviors, other.Behaviors)
+               && SameTokens(Flags, other.Flags);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Id);
+        hash.Add(Kind);
+        hash.Add(TypeName);
+        hash.Add(Origin);
+        hash.Add(Description);
+        hash.Add(VariantBaseId);
+        AddTokens(ref hash, Behaviors);
+        AddTokens(ref hash, Flags);
+        return hash.ToHashCode();
+    }
+
+    /// <summary>
+    ///     Order counts and an empty list is not a missing one: "inspected and has none" and
+    ///     "nobody looked" are different answers, and the kind matcher reads them differently.
+    /// </summary>
+    private static bool SameTokens(string[]? left, string[]? right)
+    {
+        if (ReferenceEquals(left, right)) return true;
+        if (left is null || right is null) return false;
+        return left.AsSpan().SequenceEqual(right);
+    }
+
+    private static void AddTokens(ref HashCode hash, string[]? tokens)
+    {
+        if (tokens is null)
+        {
+            hash.Add(0);
+            return;
+        }
+
+        hash.Add(tokens.Length);
+        foreach (var token in tokens)
+            hash.Add(token);
+    }
+}

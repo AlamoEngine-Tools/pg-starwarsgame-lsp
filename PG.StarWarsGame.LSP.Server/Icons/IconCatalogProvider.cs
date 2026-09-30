@@ -15,9 +15,10 @@ namespace PG.StarWarsGame.LSP.Server.Icons;
 public interface IIconCatalogProvider : IIconRepackStatusProvider
 {
     /// <summary>
-    ///     The icon catalog for <paramref name="projectRoot" />, building it on first use.
+    ///     The icon catalog for <paramref name="layers" />, highest precedence first, built on first
+    ///     use and cached against the whole layer set.
     /// </summary>
-    Task<IconCatalog> GetAsync(string projectRoot, IconProjectSettings? settings, CancellationToken ct);
+    Task<IconCatalog> GetAsync(IReadOnlyList<IconLayer> layers, CancellationToken ct);
 
     /// <summary>Drops every cached catalog, so the next request re-reads from disk.</summary>
     void Invalidate();
@@ -46,13 +47,13 @@ public sealed class IconCatalogProvider : IIconCatalogProvider
     private readonly IFileHelper _fileHelper;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly ILogger<IconCatalogProvider> _logger;
-    private readonly IMtdFileService _mtdFileService;
+    private readonly IMtdService _mtdFileService;
     private readonly IconPackLoader _packLoader;
     private IconPack? _baseline;
 
     public IconCatalogProvider(
         IconPackLoader packLoader,
-        IMtdFileService mtdFileService,
+        IMtdService mtdFileService,
         IFileHelper fileHelper,
         ILspConfigurationProvider config,
         ILogger<IconCatalogProvider> logger)
@@ -64,13 +65,16 @@ public sealed class IconCatalogProvider : IIconCatalogProvider
         _logger = logger;
     }
 
-    public async Task<IconCatalog> GetAsync(
-        string projectRoot, IconProjectSettings? settings, CancellationToken ct)
+    public async Task<IconCatalog> GetAsync(IReadOnlyList<IconLayer> layers, CancellationToken ct)
     {
+        // Every layer's root, in order: two workspaces that share a dependency still differ by
+        // their leaf, and the same leaf with a reference added is a different catalog.
+        var key = string.Join('|', layers.Select(l => l.RootPath));
+
         await _gate.WaitAsync(ct);
         try
         {
-            if (_catalogs.TryGetValue(projectRoot, out var cached))
+            if (_catalogs.TryGetValue(key, out var cached))
                 return cached;
 
             _baseline ??= await _packLoader.LoadAsync(_config.Current.BaselineSource, ct);
@@ -78,12 +82,11 @@ public sealed class IconCatalogProvider : IIconCatalogProvider
             var catalog = IconCatalogLoader.Load(
                 _fileHelper.FileSystem,
                 _mtdFileService,
-                projectRoot,
-                settings ?? IconProjectSettings.Default,
+                layers,
                 _baseline,
                 _logger);
 
-            _catalogs[projectRoot] = catalog;
+            _catalogs[key] = catalog;
             return catalog;
         }
         finally

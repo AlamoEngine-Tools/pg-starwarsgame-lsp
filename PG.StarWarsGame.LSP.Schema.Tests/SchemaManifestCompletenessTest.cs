@@ -22,7 +22,7 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// </summary>
 public sealed class SchemaManifestCompletenessTest
 {
-    private static readonly string[] ManifestSections = ["types", "tags", "enums", "hardcoded", "meta"];
+    private static readonly string[] ManifestSections = ["types", "kinds", "tags", "enums", "hardcoded", "meta"];
 
     [Fact]
     public void EveryYamlFileOnDiskIsListedInTheManifest()

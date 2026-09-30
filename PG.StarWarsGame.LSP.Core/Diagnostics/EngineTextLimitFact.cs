@@ -15,10 +15,9 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///         error message: the copy simply runs off the end of the buffer.
 ///     </para>
 ///     <para>
-///         Measured limits, each read from the comparison immediately before its <c>strcpy</c>:
-///         a tag VALUE gets 8192 bytes (<c>DatabaseMap.cpp</c> line 5582, <c>CMP EAX, 0x2000</c>),
-///         and an object NAME gets 128 (<c>GameObjectType.cpp</c> line 2225). Both are exclusive -
-///         the check is <c>size() &lt; limit</c>.
+///         Measured limits, each read from the comparison immediately before the copy: a tag VALUE
+///         gets 8192 bytes and an object NAME gets 128. Both are exclusive - the check is
+///         <c>size() &lt; limit</c>.
 ///     </para>
 /// </remarks>
 /// <param name="Subject">What was too long, for the message - a tag name or the object's name.</param>

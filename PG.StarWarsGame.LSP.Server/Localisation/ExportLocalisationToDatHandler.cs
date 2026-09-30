@@ -26,7 +26,7 @@ public sealed class ExportLocalisationToDatHandler
     private readonly ILspConfigurationProvider _config;
     private readonly ICsvTranslationImporter _csvImporter;
     private readonly IDatTranslationExporter _datExporter;
-    private readonly IDatFileService _datFileService;
+    private readonly IDatService _datFileService;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
@@ -44,7 +44,7 @@ public sealed class ExportLocalisationToDatHandler
         ITranslationDatabaseFactory factory,
         ILanguageService langService,
         IDatTranslationExporter datExporter,
-        IDatFileService datFileService,
+        IDatService datFileService,
         IFileHelper fileHelper,
         ILocalisationProjectRegistry projectRegistry,
         ILocalisationLayerRegistry layerRegistry,
@@ -158,7 +158,7 @@ public sealed class ExportLocalisationToDatHandler
             var outPath = fs.Path.Combine(
                 dir, $"{stem}_{lang.LanguageIdentifier.ToLowerInvariant()}.dat");
             using var outStream = fs.File.Create(outPath);
-            _datFileService.CreateDatFile(outStream, model, model.KeySortOrder);
+            _datFileService.CreateDatBinary(outStream, model, model.Layout);
             written.Add(outPath);
         }
 

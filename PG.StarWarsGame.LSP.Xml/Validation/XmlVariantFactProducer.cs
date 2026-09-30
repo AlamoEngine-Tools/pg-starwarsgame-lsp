@@ -16,7 +16,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
 
     /// <summary>
     ///     Sweeps the engine gives variant resolution before it stops
-    ///     (<c>GameObjectTypeManagerClass::Overlay_Types</c>). A chain this long or shorter resolves
+    ///     (<c>Overlay_Types</c>). A chain this long or shorter resolves
     ///     whatever order things are declared in; longer depends on the order and fails silently.
     /// </summary>
     private const int MaxResolvablePasses = 10;

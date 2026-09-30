@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+	Fixture for StoryCompareMethodSmokeTest.
+
+	The middle link of the story chain: a thread file is only treated as story content because a
+	plot manifest names it, and a manifest is only read because a campaign names the manifest. Each
+	link fails silently on its own - the file simply parses as ordinary XML and no story diagnostic
+	is ever produced - so all three exist together or none of them is worth having.
+-->
+
+<Story_Mode_Plots>
+
+	<Active_Plot>Story_E2E_Compare.xml</Active_Plot>
+
+</Story_Mode_Plots>

@@ -38,6 +38,44 @@ public sealed class GameSymbolProjectorTest
         Assert.Empty(result.Symbols);
     }
 
+    // ── Behaviours ───────────────────────────────────────────────────────────
+    //
+    // The baseline is where most objects a mod references live, so kind-filtered completion is
+    // blank for all of them unless the projector carries the same behaviour tokens the workspace
+    // parser does. Tags are already captured here for the variant tag tree, so the source is at
+    // hand and no new engine data is needed.
+
+    [Fact]
+    public void Project_Object_CarriesItsBehaviourTokens()
+    {
+        var entry = Entry("CORUSCANT", "PLANET") with
+        {
+            Tags =
+            [
+                new BaselineTag("Behavior", "PLANET, PRODUCTION", "<Behavior>PLANET, PRODUCTION</Behavior>", 1),
+                new BaselineTag("SpaceBehavior", "SELECTABLE", "<SpaceBehavior>SELECTABLE</SpaceBehavior>", 2),
+                new BaselineTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 3)
+            ]
+        };
+
+        var result = Build().Project([entry], [], "hash");
+
+        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], result.Symbols["CORUSCANT"].Behaviors);
+    }
+
+    [Fact]
+    public void Project_ObjectWithoutBehaviourTags_CarriesNone()
+    {
+        var entry = Entry("MY_UNIT", "MY_CUSTOM_UNIT_TYPE") with
+        {
+            Tags = [new BaselineTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 1)]
+        };
+
+        var result = Build().Project([entry], [], "hash");
+
+        Assert.Null(result.Symbols["MY_UNIT"].Behaviors);
+    }
+
     // ── TypeName assignment ────────────────────────────────────────────────────
 
     [Fact]

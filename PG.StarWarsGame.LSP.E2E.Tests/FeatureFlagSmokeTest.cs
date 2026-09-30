@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Server.Localisation;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -160,54 +161,6 @@ public sealed class FeatureFlagSmokeTest : IClassFixture<FeatureFlagsServerFixtu
         {
             TextDocument = new TextDocumentIdentifier { Uri = uri }
         });
-    }
-
-    private static (int line, int col) FindFirstGrandchildElementPosition(string[] lines)
-    {
-        var firstChildLine = -1;
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt <= 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            firstChildLine = i;
-            break;
-        }
-
-        if (firstChildLine < 0) return (1, 1);
-
-        for (var i = firstChildLine + 1; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt < 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            return (i, lt + 1);
-        }
-
-        return (1, 1);
-    }
-
-    private static (int line, int col) FindXmlTagBodyValuePosition(
-        string[] lines, string tagName, string value)
-    {
-        var tagOpen = $"<{tagName}>";
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var tagIdx = lines[i].IndexOf(tagOpen, StringComparison.OrdinalIgnoreCase);
-            if (tagIdx < 0) continue;
-            var searchFrom = tagIdx + tagOpen.Length;
-            var valueIdx = lines[i].IndexOf(value, searchFrom, StringComparison.OrdinalIgnoreCase);
-            if (valueIdx < 0) continue;
-            return (i, valueIdx);
-        }
-
-        return (-1, -1);
     }
 
     private static void RequireEawWorkspace()

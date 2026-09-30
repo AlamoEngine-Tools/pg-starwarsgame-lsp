@@ -58,6 +58,21 @@ public sealed class SchemaFingerprintTest
         Assert.NotEqual(without, with);
     }
 
+    /// <summary>
+    ///     A scanned directory decides whether the files under it are exempt from the
+    ///     unregistered-file check, so two schemas that differ only there produce different
+    ///     diagnostics - and a fingerprint that cannot tell them apart lets a persisted index built
+    ///     under the old list be reused under the new one.
+    /// </summary>
+    [Fact]
+    public void Compute_ScannedDirectoryAdded_DifferentFingerprint()
+    {
+        var dir = new ScannedDirectoryDefinition("data/xml/ai/goals/", []);
+        var without = SchemaFingerprint.Compute(new StubSchema([]));
+        var with = SchemaFingerprint.Compute(new StubSchema([], scannedDirectories: [dir]));
+        Assert.NotEqual(without, with);
+    }
+
     [Fact]
     public void Compute_EnumValueAdded_DifferentFingerprint()
     {
@@ -76,7 +91,8 @@ public sealed class SchemaFingerprintTest
     private sealed class StubSchema(
         IReadOnlyList<XmlTagDefinition> tags,
         IReadOnlyList<MetafileDefinition>? metafiles = null,
-        IReadOnlyList<EnumDefinition>? enums = null) : ISchemaProvider
+        IReadOnlyList<EnumDefinition>? enums = null,
+        IReadOnlyList<ScannedDirectoryDefinition>? scannedDirectories = null) : ISchemaProvider
     {
         public XmlTagDefinition? GetTag(string _)
         {
@@ -108,6 +124,8 @@ public sealed class SchemaFingerprintTest
         public IReadOnlyList<EnumDefinition> AllEnums => enums ?? [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => metafiles ?? [];
+
+        public IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories => scannedDirectories ?? [];
 
         public event EventHandler? SchemaRefreshed
         {

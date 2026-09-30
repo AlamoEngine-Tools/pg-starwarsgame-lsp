@@ -304,6 +304,18 @@ public static class DiagnosticIds
     public static readonly DiagnosticId XmlNotes = new(DiagnosticGroup.Structure, 7);
     public static readonly DiagnosticId XmlStructure = new(DiagnosticGroup.Structure, 8);
 
+    // Notes carried by an enum VALUE that a file names. New in schema 2.0.0: until then only a
+    // hardcoded-set value could say anything about itself, so an enum member the engine ignores had
+    // nowhere to say so. One id per kind, because suppressing "this is a rare value" must not also
+    // suppress "this value does nothing"; the existing tag and event-type ids are untouched, so no
+    // suppression anyone has already written changes meaning.
+    // Appended after 13, the highest this group had used. The group's members are written in
+    // feature-area blocks rather than in numeric order, so the next free number is not the one
+    // below the next declaration - DiagnosticIdCatalogueTest is what catches a collision.
+    public static readonly DiagnosticId EnumValueDeprecated = new(DiagnosticGroup.Structure, 14);
+    public static readonly DiagnosticId EnumValueUntested = new(DiagnosticGroup.Structure, 15);
+    public static readonly DiagnosticId EnumValueNotes = new(DiagnosticGroup.Structure, 16);
+
     // Lua imports. Structure rather than a Lua-specific group: the group says what kind of problem
     // was reported, not which language reported it.
     public static readonly DiagnosticId LuaRedundantRequire = new(DiagnosticGroup.Structure, 9);
@@ -323,6 +335,16 @@ public static class DiagnosticIds
     ///     and eaw/.
     /// </remarks>
     public static readonly DiagnosticId UnknownTag = new(DiagnosticGroup.Structure, 12);
+
+    /// <summary>
+    ///     An XML file in the workspace that no registry names, so the engine never opens it.
+    /// </summary>
+    /// <remarks>
+    ///     Appended after 16, the highest this group had used - the members are written in
+    ///     feature-area blocks rather than in numeric order, so the next free number is not the one
+    ///     below the next declaration.
+    /// </remarks>
+    public static readonly DiagnosticId UnregisteredXmlFile = new(DiagnosticGroup.Structure, 17);
 
     // ── CrossTag ──
     public static readonly DiagnosticId DamageNonzero = new(DiagnosticGroup.CrossTag, 1);
@@ -535,6 +557,10 @@ public static class DiagnosticIds
     // expectation, the same kind of problem as the XML entries above.
     public static readonly DiagnosticId LuaEngineUpvalue = new(DiagnosticGroup.Engine, 5);
 
+    // A value the parser accepts and the engine then ignores or mishandles. An engine fact, which
+    // is why it sits in this group rather than with the structural notes.
+    public static readonly DiagnosticId EnumValueBuggedInEngine = new(DiagnosticGroup.Engine, 6);
+
     // ── Syntax ──
     // Lua's parse errors come from Loretta already numbered and are mapped across by
     // LorettaDiagnosticIds, which owns 1-2999 of this group. Anything declared here must start at
@@ -657,14 +683,14 @@ public static class DiagnosticIds
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>GameObjectClass::Take_Damage</c> finds a hardpoint by name, an exact
+    ///         The engine's damage path finds a hardpoint by name, an exact
     ///         <c>_stricmp</c> against each <c>Collision_Mesh</c>. An empty name fails the size check
-    ///         before that lookup (<c>00973ad9</c>) whether or not the hit was aimed, so the hardpoint
+    ///         before that lookup whether or not the hit was aimed, so the hardpoint
     ///         never dies and the all-destroyed branch - which counts by <c>Is_Destroyable</c> and never
     ///         asks whether a hardpoint was reachable - can never complete.
     ///     </para>
     ///     <para>
-    ///         A value the MODEL lacks is NOT this. <c>Take_Damage</c> replaces the name with the
+    ///         A value the MODEL lacks is NOT this. The engine's damage path replaces the name with the
     ///         hardpoint's own value when the hit is aimed at it, so aimed fire still lands. That case
     ///         once shared this id, as an error; it is reported by
     ///         <see cref="HardpointBoneNotOnModel" /> instead, as a warning. Not reported where the

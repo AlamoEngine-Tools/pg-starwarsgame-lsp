@@ -16,10 +16,8 @@ internal sealed record RawTagDefinition
     public IReadOnlyList<string> AllowedValues { get; init; } = [];
     public TagSemanticType SemanticType { get; init; }
     public IReadOnlyList<string> ValueGroups { get; init; } = [];
-    public bool Deprecated { get; init; }
-    public string? AvailableSince { get; init; }
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
     public bool MultipleAllowed { get; init; }
     public VariantMode VariantMode { get; init; }
     public TagValidationOverride? ValidationOverride { get; init; }

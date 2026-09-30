@@ -129,6 +129,17 @@ public static class StoryThreadParser
         return true;
     }
 
+    // Measured: the engine reads Prereq with its list field type (code 0x1b in the XML field
+    // table), the reader Affiliation shares, and vanilla writes Affiliation comma-separated and
+    // Prereq whitespace-separated - seven Underworld lines even one name per line with a trailing
+    // comma. So a comma is a delimiter exactly like whitespace, never part of a name.
+    private static readonly char[] ListDelimiters = [' ', '\t', '\r', '\n', ','];
+
+    private static bool IsListDelimiter(char c)
+    {
+        return c == ',' || char.IsWhiteSpace(c);
+    }
+
     private static StoryPrereqGroup ParsePrereqGroup(
         ParsedXmlDocument document, HtmlNode child, StorySourceRange groupRange)
     {
@@ -143,20 +154,20 @@ public static class StoryThreadParser
             var i = 0;
             while (i < raw.Length)
             {
-                if (char.IsWhiteSpace(raw[i]))
+                if (IsListDelimiter(raw[i]))
                 {
                     i++;
                     continue;
                 }
 
                 var start = i;
-                while (i < raw.Length && !char.IsWhiteSpace(raw[i])) i++;
+                while (i < raw.Length && !IsListDelimiter(raw[i])) i++;
                 tokens.Add(new StoryToken(raw[start..i], RangeAt(document, innerStart + start, i - start)));
             }
         }
         else
         {
-            foreach (var token in child.InnerText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var token in child.InnerText.Split(ListDelimiters, StringSplitOptions.RemoveEmptyEntries))
                 tokens.Add(new StoryToken(token, groupRange));
         }
 

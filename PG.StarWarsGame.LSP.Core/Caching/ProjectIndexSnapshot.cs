@@ -22,14 +22,32 @@ public sealed class ProjectIndexSnapshot
     // 5 = RelativePath keeps the file's real case (2026-09-09). Every snapshot written before this
     // holds lowercased keys, which are not names a case-sensitive host can open - so they are
     // discarded and rebuilt rather than read back and handed to the filesystem.
-    public const int CurrentSchemaVersion = 5;
+    // 6 = symbols carry their behaviour tokens (2026-09-21). A snapshot written before this replays
+    // objects with no behaviours, which reads as "this planet is not a planet" - every kind-filtered
+    // proposal and check over those files would come back empty rather than wrong-looking.
+    // 7 = cross-layer staleness moved from DependencyHashes to CrossLayerFingerprint (2026-09-30).
+    // An older snapshot carries no fingerprint, and believing it would keep a layer whose
+    // dependency retyped its files - so they are discarded rather than read with an empty key.
+    // 8 = entries carry ParserState (2026-09-30). A snapshot written before this has none, so a
+    // Lua document served from it contributes no annotations - the very defect the field fixes.
+    // Anything that changes the LAYOUT of those opaque bytes needs a bump here too.
+    public const int CurrentSchemaVersion = 8;
 
     [Key(0)] public int SchemaVersion { get; set; }
 
     [Key(1)] public string OverallHash { get; set; } = string.Empty;
 
-    // Keyed by normalised pgproj path; value = that dependency's OverallHash at snapshot build time.
-    [Key(2)] public SerializedDependencyHash[] DependencyHashes { get; set; } = [];
+    /// <summary>
+    ///     Superseded by <see cref="CrossLayerFingerprint" /> and no longer read.
+    /// </summary>
+    /// <remarks>
+    ///     Kept so the Key numbering stays append-only, and written as empty. It asked "did any
+    ///     dependency change at all", which discarded a whole dependent layer for one changed line
+    ///     - on a four-leaf mod, an edit in the shared core re-parsed everything.
+    /// </remarks>
+    [Key(2)]
+    public SerializedDependencyHash[] DependencyHashes { get; set; } = [];
+
     [Key(3)] public ProjectFileEntry[] Files { get; set; } = [];
 
     // SchemaFingerprint.Compute of the schema the snapshot was built under (append-only Key).
@@ -37,4 +55,13 @@ public sealed class ProjectIndexSnapshot
     // even when every file's content hash matches; empty (pre-fingerprint snapshots) never
     // matches a computed value and is discarded.
     [Key(4)] public string SchemaFingerprint { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     <see cref="CrossLayerInputFingerprint" /> of everything this layer's documents read
+    ///     from outside their own layer. A mismatch discards the snapshot; a match means a
+    ///     dependency's changes cannot have altered how these files parse, so per-file content
+    ///     hashes are enough.
+    /// </summary>
+    [Key(5)]
+    public string CrossLayerFingerprint { get; set; } = string.Empty;
 }

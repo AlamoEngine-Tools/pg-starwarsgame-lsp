@@ -34,7 +34,8 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
             var typeName = ResolveTypeName(entry.ClassificationName);
             var tags = entry.Tags ?? [];
             var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, typeName,
-                ResolveOrigin(entry.Location), null, ResolveVariantBaseId(tags));
+                ResolveOrigin(entry.Location), null, ResolveVariantBaseId(tags),
+                ResolveBehaviors(entry), entry.Flags);
             builder[sym.Id] = sym;
             if (tags.Count > 0)
                 objectTags[entry.Name] = [.. tags];
@@ -112,6 +113,20 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
             if (schema.GetTag(tag.TagName)?.SemanticType == TagSemanticType.VariantParent)
                 return tag.Value;
         return null;
+    }
+
+    /// <summary>
+    ///     The behaviour tokens a shipped object declares itself, or null when it declares none.
+    ///     Taken from the entry when it was given them, otherwise from its captured tags - and
+    ///     always through the same tokenizer as the workspace parser, since the two must never
+    ///     disagree about what an object is.
+    /// </summary>
+    private static string[]? ResolveBehaviors(ProjectableEntry entry)
+    {
+        if (entry.Behaviors is { Length: > 0 }) return entry.Behaviors;
+
+        var tokens = ObjectBehaviors.FromTags((entry.Tags ?? []).Select(t => (t.TagName, t.Value)));
+        return tokens.Length == 0 ? null : tokens;
     }
 
     private string ResolveTypeName(string classificationName)

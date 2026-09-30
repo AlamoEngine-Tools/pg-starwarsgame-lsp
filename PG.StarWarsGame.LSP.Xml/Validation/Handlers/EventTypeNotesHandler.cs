@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -12,7 +13,10 @@ public sealed class EventTypeNotesHandler : XmlDiagnosticsHandler<StoryEventFact
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(StoryEventFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Def is null || !fact.Def.Notes.TryGetValue(ctx.Locale, out var note))
+        // Remarks only. The kinds that say something is wrong - deprecated, bugged, untested - are
+        // each raised by their own handler at their own severity; this one carries what is left.
+        var note = fact.Def?.Notes.TextFor(SchemaNoteKind.Remark, ctx.Locale);
+        if (note is null)
             return [];
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, note)];

@@ -8,12 +8,12 @@ using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
 /// <summary>
-///     The per-tech-level respawn table, as <c>Validate_Respawn_Times</c> checks it.
+///     The per-tech-level respawn table, as the engine's respawn-list check checks it.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         One engine function, three checks, shared by <c>SlicerAbilityClass</c> and
-///         <c>BlackMarketAbilityClass</c>: exactly five entries, none below zero, and zeros
+///         One engine function, three checks, shared by <c>Slicer_Ability</c> and
+///         <c>Black_Market_Ability</c>: exactly five entries, none below zero, and zeros
 ///         all-or-nothing. It returns false on the FIRST failure and the caller then CLEARS both
 ///         lists, so a single bad entry costs the whole table.
 ///     </para>

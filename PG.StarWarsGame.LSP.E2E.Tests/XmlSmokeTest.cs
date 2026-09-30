@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static PG.StarWarsGame.LSP.E2E.Tests.DocumentPositions;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -181,40 +182,5 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     private Task<PublishDiagnosticsParams> WaitForDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
     {
         return _fixture.WaitForDiagnosticsAsync(uri, timeout);
-    }
-
-    /// <summary>
-    ///     Returns the position of the first grandchild element - the first field tag
-    ///     inside the first type container - so hover and completion tests hit a known tag.
-    /// </summary>
-    private static (int line, int col) FindFirstGrandchildElementPosition(string[] lines)
-    {
-        var firstChildLine = -1;
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt <= 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            firstChildLine = i;
-            break;
-        }
-
-        if (firstChildLine < 0) return (1, 1);
-
-        for (var i = firstChildLine + 1; i < lines.Length; i++)
-        {
-            var s = lines[i];
-            var lt = s.IndexOf('<');
-            if (lt < 0) continue;
-            if (s.Length <= lt + 1) continue;
-            var next = s[lt + 1];
-            if (next == '/' || next == '?' || next == '!') continue;
-            return (i, lt + 1);
-        }
-
-        return (1, 1);
     }
 }

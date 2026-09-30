@@ -11,9 +11,9 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Each states it in its own <c>Validate_Data</c> and then sets the flag to true itself:
-///         <c>GalacticSabotageAbilityClass</c> (<c>00ef6c30</c>), <c>BlackMarketAbilityClass</c>
-///         (<c>00f21130</c>) and <c>SlicerAbilityClass</c> (<c>00f1e8b0</c>). Writing
+///         Each states it in its own the engine's load-time validation and then sets the flag to true itself:
+///         <c>Galactic_Sabotage_Ability</c>, <c>Black_Market_Ability</c>
+///         and <c>Slicer_Ability</c>. Writing
 ///         <c>No</c> does not disable the despawn - it only hides it from the file.
 ///     </para>
 ///     <para>

@@ -28,6 +28,18 @@ public record XmlTagDefinition
     public EnumDefinition? Enum { get; init; }
 
     /// <summary>
+    ///     Non-null when the <c>referenceType</c> names an object KIND rather than a type: what the
+    ///     slot accepts is then a predicate over an object's content, not a type name.
+    /// </summary>
+    /// <remarks>
+    ///     A kind and a type are mutually exclusive - a kind may not share a type's name, which the
+    ///     schema tests enforce - so a resolved kind here means <see cref="ObjectType" /> is null
+    ///     and the slot narrows by behaviour instead. <see cref="ReferenceTypeName" /> keeps the raw
+    ///     name either way, which is what the story graph keys its edges on.
+    /// </remarks>
+    public ObjectKindDefinition? Kind { get; init; }
+
+    /// <summary>
     ///     Optional semantic refinement of the base <see cref="ValueType" />.
     ///     <see cref="TagSemanticType.Default" /> when no refinement is specified.
     /// </summary>
@@ -49,7 +61,7 @@ public record XmlTagDefinition
     ///     <para>
     ///         The restriction belongs to the owning type, not to the enum: eleven ability classes
     ///         accept exactly one <c>Activation_Style</c> and say so in their own
-    ///         <c>Validate_Data</c> ("The only currently supported Activation_Style is
+    ///         the engine's load-time validation ("The only currently supported Activation_Style is
     ///         Galactic_Automatic."), while the same nine-value enum stays correct everywhere else
     ///         it appears.
     ///     </para>
@@ -61,17 +73,11 @@ public record XmlTagDefinition
     /// </remarks>
     public IReadOnlyList<string> AllowedValues { get; init; } = [];
 
-    /// <summary>If true, this tag is deprecated and should not be used in new files.</summary>
-    public bool Deprecated { get; init; }
-
-    /// <summary>Game version in which this tag was introduced, e.g. "EaW 1.0" or "FoC 1.0". Null if unknown.</summary>
-    public string? AvailableSince { get; init; }
-
     /// <summary>Locale → description text (e.g. "en" → "Max hit points…").</summary>
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
 
     /// <summary>Locale → secondary caveat text (e.g. "en" → "Deprecated; use Foo instead.").</summary>
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
 
     /// <summary>If true, this tag may appear more than once under the same parent element; the engine merges all occurrences.</summary>
     public bool MultipleAllowed { get; init; }

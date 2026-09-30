@@ -57,7 +57,7 @@ public sealed class SchemaVersionWiringTest : IDisposable
     [Fact]
     public void Local_SupportedVersion_Loads()
     {
-        using var provider = CreateLocal("""{ "schemaVersion": "1.0.0" }""");
+        using var provider = CreateLocal("""{ "schemaVersion": "2.0.0" }""");
 
         Assert.Single(provider.AllTags);
         Assert.Equal(SchemaVersionCompatibility.Supported, provider.LastVersionCheck?.Compatibility);
@@ -75,7 +75,7 @@ public sealed class SchemaVersionWiringTest : IDisposable
     [Fact]
     public void Local_NewerMajor_LoadsNothing()
     {
-        using var provider = CreateLocal("""{ "schemaVersion": "2.0.0" }""");
+        using var provider = CreateLocal("""{ "schemaVersion": "3.0.0" }""");
 
         Assert.Empty(provider.AllTags);
         Assert.Equal(SchemaVersionCompatibility.Unsupported, provider.LastVersionCheck?.Compatibility);
@@ -123,7 +123,7 @@ public sealed class SchemaVersionWiringTest : IDisposable
     public async Task Http_SupportedVersion_Loads()
     {
         var provider = CreateHttp(
-            """{ "schemaVersion": "1.0.0", "tags": ["tags/GameObjectType.yaml"] }""");
+            """{ "schemaVersion": "2.0.0", "tags": ["tags/GameObjectType.yaml"] }""");
 
         await provider.LoadAsync(CancellationToken.None);
 
@@ -136,7 +136,7 @@ public sealed class SchemaVersionWiringTest : IDisposable
     {
         var handler = new StubHandler(new Dictionary<string, string>
         {
-            ["_index.json"] = """{ "schemaVersion": "2.0.0", "tags": ["tags/GameObjectType.yaml"] }""",
+            ["_index.json"] = """{ "schemaVersion": "3.0.0", "tags": ["tags/GameObjectType.yaml"] }""",
             ["tags/GameObjectType.yaml"] = TagsYaml
         });
         var provider = new HttpSchemaProvider(new HttpClient(handler), "https://schema.test/eaw/",
@@ -155,7 +155,7 @@ public sealed class SchemaVersionWiringTest : IDisposable
     public async Task Http_NewerMajor_StillSignalsReady()
     {
         var provider = CreateHttp(
-            """{ "schemaVersion": "2.0.0", "tags": ["tags/GameObjectType.yaml"] }""");
+            """{ "schemaVersion": "3.0.0", "tags": ["tags/GameObjectType.yaml"] }""");
 
         await provider.LoadAsync(CancellationToken.None);
 

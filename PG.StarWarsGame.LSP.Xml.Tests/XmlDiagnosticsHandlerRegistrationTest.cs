@@ -171,10 +171,10 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Reported once against the object, because neither flag is wrong alone - a No is the
         // ordinary value for whichever half an ability does not cover.
         // The third rule was not in the harvested list: the harvest keyed on the "Error: (%s) "
-        // prefix and NeutralizeHeroAbilityClass labels its copy "Warning" while stating the same
+        // prefix and Neutralize_Hero_Ability labels its copy "Warning" while stating the same
         // consequence, with the sentence split across two constants by an embedded newline.
         // 135 -> 136: AutomaticDespawnHandler added - an automatic activation style with
-        // Causes_Despawn on, which SpecialAbilityClass::Validate_Data reports and then turns off
+        // Causes_Despawn on, which the engine's load-time validation reports and then turns off
         // itself. Scoped by the two TAGS rather than by an element: the rule is stated on the base
         // class every ability type calls first, so naming elements would mean listing all of them
         // and missing whichever one a mod reaches for. Which six styles are automatic is measured
@@ -182,7 +182,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Global_Automatic turned up, a style our enum did not carry.
         // No collision with the three classes that DEMAND Causes_Despawn=Yes: each of those accepts
         // only Ground_Activated, which is not an automatic style.
-        // 136 -> 137: AtLeastOneSecondHandler added - LeechShieldsAbilityClass tests Duration < 1.0
+        // 136 -> 137: AtLeastOneSecondHandler added - Leech_Shields_Ability tests Duration < 1.0
         // and then assigns 1.0, so the bound is inclusive and the repair value is the bound itself.
         // Its own id and handler rather than a shared minimum: Duration_In_Secs appears on three
         // ability types and only this one's validator mentions it, so the rule opts in per owner.
@@ -196,7 +196,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // the allies split ON - the ignored-flag branch runs first and has already cleared
         // Split_Favors_Owner when it is off, so the engine never reaches the second complaint.
         // 139 -> 140: RespawnTimeListHandler added - the per-tech-level respawn table, as
-        // Validate_Respawn_Times checks it for both the Slicer and the Black Market: exactly five
+        // the engine's respawn-list check checks it for both the Slicer and the Black Market: exactly five
         // entries, none negative, zeros all-or-nothing. One handler and one id for all three,
         // because the engine gates them together and returns at the first failure, after which the
         // caller CLEARS both lists - so any of them costs the same thing and suppressing one while
@@ -210,7 +210,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Its own id for that reason - someone who disagrees with our routing model should not have
         // to silence the rules the engine itself states.
         // 141 -> 142: EngineTextLimitHandler added, and it is the only rule here whose consequence
-        // is a game that will not start. DatabaseMapClass::Map_Data_Of_Type strcpy's a tag's value
+        // is a game that will not start. the engine's tag-value mapper strcpy's a tag's value
         // into strtok_string_buffer[8192] with no length check - the size test beside it is an
         // assert, so it exists in the build Petroglyph tested with and not in the one anyone plays.
         // Produced in the fact producer rather than by a value handler because it is a property of
@@ -220,7 +220,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // its longest value of any kind 2,535, so the headroom is real but spendable.
         // 142 -> 143: CaseSensitiveTagHandler added - a tag spelled in a casing its own parser will
         // not accept. Rare by design: DatabaseMapClass uppercases every key it handles, so casing is
-        // free for all but the tags with a hand-rolled parser. StoryModeClass::Load_Plots is one,
+        // free for all but the tags with a hand-rolled parser. The plot loader is one,
         // comparing with std::operator==, and the result of its Active_Plot test becomes the
         // is_active argument to Load_Single_Plot - so <active_plot> loads SUSPENDED and the campaign
         // never starts, with nothing said at runtime.
@@ -229,8 +229,8 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Checked against the authored text rather than the node, because HAP lower-cases names and
         // the casing is gone everywhere else in the walk.
         // 143 -> 144: SystemSpyDurationHandler added - Duration_In_Secs on a System_Spy_Ability,
-        // whose legal range flips with Activation_Style. SystemSpyAbilityClass::Validate_Data
-        // (0101dcdf) demands the OPPOSITE sign in each arm: Galactic_Automatic complains when
+        // whose legal range flips with Activation_Style. the engine's load-time validation
+        // demands the OPPOSITE sign in each arm: Galactic_Automatic complains when
         // 0.0 <= duration and writes -1.0, Ground_Activated complains when duration <= 0.0 and
         // writes 30.0. Zero is refused by both.
         // Its own handler rather than a range on the tag, because no range could say it - the same
@@ -243,7 +243,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // the engine returns when a lookup misses. Prepending a type silently repoints every
         // default; appending is safe.
         // The first rule taken from the ASSERT seam rather than from an engine message - these two
-        // have no message at all (GameConstants.cpp:1170 and :1180), so neither message harvest
+        // have no message at all, so neither message harvest
         // could ever have found them, and no shipped build reports them.
         // Additive, not replace: the tag's own NameReferenceList handling still has to run.
         // Keyed on (owner, tag) in code beside the handler rather than carried in the schema - the
@@ -251,11 +251,10 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // could author correctly. Same reasoning as EngineValueRepairs.
         // 145 -> 146: GrenadeProjectileHandler added - a Grenade_Attack_Ability's Grenade_Type and a
         // Remote_Bomb_Ability's Bomb_Type must name a projectile whose Projectile_Category is
-        // GRENADE. From the assert seam, so there is no engine message: GrenadeAttackAbility.cpp:440
-        // and RemoteBombAbility.cpp:388 both read !type->Is_Projectile_Grenade(), and the BRANCH
-        // settles it - the assert fires when the call returns false, so the text states the failure
-        // and the rule is its opposite. Is_Projectile_Grenade is one comparison, ProjCategory ==
-        // PROJECTILE_CATEGORY_GRENADE.
+        // GRENADE. From the assert seam, so there is no engine message: the grenade ability and the
+        // remote bomb ability both test the same way, and the BRANCH settles it - the assert fires
+        // when the test returns false, so the text states the failure and the rule is its opposite.
+        // The test itself is one comparison, the projectile's category against GRENADE.
         // Reads the EFFECTIVE object, not the node: four of the ten shipped declarations name a
         // projectile that inherits its category through Variant_Of_Existing_Type, and a node-level
         // check would report every one of them.
@@ -264,8 +263,8 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // 146 -> 147: FireConeDegreesHandler added - a weapon hardpoint's Fire_Cone_Width and
         // Fire_Cone_Height, opted into per tag on HardPoint. Its own handler rather than the
         // existing angle-degrees-full-turn because the two differ at the floor: that rule admits
-        // zero and this one cannot. HardPointClass::Can_Weapon_Point_At asserts both angles are
-        // > 0.0f (HardPoint.cpp:1857 and :1858) above the branch, and the non-turret branch then
+        // zero and this one cannot. the weapon-aim test asserts both angles are
+        // > 0.0f above the branch, and the non-turret branch then
         // tests cone / 2.0 against the bearing, so a cone of zero points at nothing.
         // The ceiling is INFERRED, not stated: the halved cone is compared against a deviation that
         // cannot exceed 180 degrees, so 360 already passes everywhere and more is inert. That
@@ -274,9 +273,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Measured: 866 cone values across eaw/ and foc/, none <= 0, two > 360 - HP_MC30_LASER_00
         // at 364.0 and HP_Gargantuan_Small_Turret_Front_Left at 450.0 beside three siblings at 45.0.
         // 147 -> 148: FiresForwardHandler added, fed by FiresForwardRule. Fires_Forward has one
-        // reader, WeaponBehaviorClass::Calculate_Projectile_Facing, so on an object without the WEAPON
+        // reader, the projectile-facing calculation, so on an object without the WEAPON
         // behaviour it does nothing (zero shipped objects), and with WEAPON it skips
-        // Is_In_Cone_Of_Fire, so the turret-extent tags stop limiting the shot (Y-Wing_Bombing_Run,
+        // the cone-of-fire test, so the turret-extent tags stop limiting the shot (Y-Wing_Bombing_Run,
         // once per game, on purpose). Two ids, both hints. The rule only notices the flag; the handler
         // judges the EFFECTIVE object, because behaviours and extents are routinely inherited.
         // 148 -> 149: AttackDistanceBeyondHardpointRangeHandler added, fed by AttackDistanceRule (#101).
@@ -287,17 +286,24 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Measured: equal on 22 eaw and 43 foc units, above on 3 and 4 (Tantive_IV 2000 against 800).
         // 149 -> 150: HullFiringArcHandler added, fed by HullFiringArcRule (A5). On a WEAPON unit without
         // the TURRET behaviour the Turret_*_Extent_Degrees tags are the hull's firing arc - the only
-        // readers are Is_In_Cone_Of_Fire and TurretBehaviorClass. A HINT: the plan expected three vanilla
+        // readers are the cone-of-fire test and the TURRET behaviour. A HINT: the plan expected three vanilla
         // objects, the corpus has 86 foc and 41 eaw, fighters and speeders doing it on purpose.
         // 150 -> 151: SpecialWeaponIndexHandler added (#98). Every reader of a faction's standalone
         // special weapon tests Get_Special_Weapon_Index() >= 0, and Add_Special_Weapon asserts it is below
-        // Get_Max_Special_Weapons (3); outside 0 to 2 the weapon is never registered. The index defaults
+        // the special-weapon slot count (3); outside 0 to 2 the weapon is never registered. The index defaults
         // to -1. None of the readers checks the description's "faction must be able to build" claim.
         // 151 -> 152: DeathAnimationClipHandler added, fed by DeathAnimationClipRule (#104, the model half).
-        // DeathBehaviorClass::Init plays Specific_Death_Anim_Type at its index; the model call returns false
+        // Init plays Specific_Death_Anim_Type at its index; the model call returns false
         // past the last take, and with Remove_Upon_Death set Init then destroys the object at once. Vanilla:
         // 2 eaw, 10 foc, none with Remove_Upon_Death.
-        const int expectedHandlerCount = 152;
+        // 152 -> 153: StoryParamValueNotesHandler added with schema 2.0.0. Notes moved onto the enum
+        // VALUE a parameter names, and nothing surfaced those: only a hardcoded-set value could say
+        // anything about itself, so an enum member the engine ignores had nowhere to say so.
+        // NOT_EQUAL_TO on StoryFlagCompareMethod is the first of them.
+        // 153 -> 154: UnregisteredXmlFileHandler. A file is read because a registry lists it, because
+        // the engine opens it by a name compiled in, or because it sits in a directory the engine
+        // walks; one that is none of those is never opened, and nothing in the file says so.
+        const int expectedHandlerCount = 154;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

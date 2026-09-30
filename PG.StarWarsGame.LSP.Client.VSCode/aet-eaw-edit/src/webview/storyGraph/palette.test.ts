@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { colourTokens } from '../shared/tokens';
+import {colourTokens} from '../shared/tokens';
 import {
     BRANCH_PALETTE,
     EDGE_KINDS,
@@ -66,6 +66,11 @@ describe('the story graph palettes', () => {
             assert.equal(typeof kind.dash, 'string');
         }
         assert.equal(EDGE_KINDS.find(k => k.kind === 'Tactical')?.dash, '8 4');
+        // The engine link is neither the dashed battle edge nor the dotted flag edge: dash-dot, and
+        // a pattern no other kind uses, so one style never carries two meanings.
+        const implicitDash = EDGE_KINDS.find(k => k.kind === 'Implicit')?.dash;
+        assert.equal(implicitDash, '8 3 2 3');
+        assert.equal(EDGE_KINDS.filter(k => k.dash === implicitDash).length, 1);
         assert.equal(EDGE_KINDS.find(k => k.kind === 'Flag')?.dash, '2 4');
         assert.equal(EDGE_KINDS.find(k => k.kind === 'Prereq')?.dash, '');
     });
@@ -164,7 +169,9 @@ describe('the story graph palettes', () => {
         // Reproduces the shipped hash so a rename here cannot silently repaint the fallback.
         const legacy = (branch: string): string => {
             let hash = 0;
-            for (let i = 0; i < branch.length; i++) { hash = (hash * 31 + branch.charCodeAt(i)) | 0; }
+            for (let i = 0; i < branch.length; i++) {
+                hash = (hash * 31 + branch.charCodeAt(i)) | 0;
+            }
             return BRANCH_PALETTE[Math.abs(hash) % BRANCH_PALETTE.length];
         };
 
@@ -176,7 +183,9 @@ describe('the story graph palettes', () => {
     it('gives a lane the same slot the old hash gave it', () => {
         const legacy = (key: string): string => {
             let hash = 0;
-            for (let i = 0; i < key.length; i++) { hash = (hash * 31 + key.charCodeAt(i)) >>> 0; }
+            for (let i = 0; i < key.length; i++) {
+                hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+            }
             return LANE_PALETTE[hash % LANE_PALETTE.length];
         };
 

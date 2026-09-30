@@ -22,7 +22,7 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
 
     private readonly ILspConfigurationProvider _configProvider;
 
-    private readonly IDatFileService _datFileService;
+    private readonly IDatService _datFileService;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
@@ -32,7 +32,7 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
         IPropertiesTranslationImporter nlsImporter,
         ITranslationDatabaseFactory factory,
         ILanguageService langService,
-        IDatFileService datFileService,
+        IDatService datFileService,
         IFileHelper fileHelper,
         ILspConfigurationProvider configProvider)
     {
@@ -82,7 +82,7 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     /// </summary>
     private LocDocument ReadDat(string filePath)
     {
-        var model = _datFileService.Load(filePath).Content;
+        var model = _datFileService.LoadFile(filePath).Content;
 
         var language = LocalisationFileNameLanguageResolver.Resolve(
             filePath, _langService,

@@ -61,13 +61,54 @@ public sealed record GetStoryPlotsResult(IReadOnlyList<StoryCampaignDto> Campaig
 // Set is the Campaign_Set grouping value (a referenceGroup key) this campaign belongs to, sourced
 // from the workspace group index; null when the campaign declares no Campaign_Set. The navigator
 // groups campaigns by it (set-less campaigns fall under an "Ungrouped" node).
-public sealed record StoryCampaignDto(string Name, IReadOnlyList<StoryFactionDto> Factions, string? Set = null);
+/// <param name="PlayerFaction">
+///     <c>Starting_Active_Player</c> - the faction the human plays, and what a <c>Campaign_Set</c>
+///     picks its member by. Null when the campaign names none.
+/// </param>
+/// <param name="DefinitionUri">The document declaring the campaign, or null when it is not indexed.</param>
+/// <param name="DefinitionLine">0-based line of the <c>&lt;Campaign&gt;</c> element in that document.</param>
+public sealed record StoryCampaignDto(
+    string Name,
+    IReadOnlyList<StoryFactionDto> Factions,
+    string? Set = null,
+    string? PlayerFaction = null,
+    string? DefinitionUri = null,
+    int? DefinitionLine = null);
 
+/// <param name="Control">
+///     The faction's <c>AI_Player_Control</c> player type as written (<c>BasicEmpire</c>, <c>None</c>,
+///     <c>Human</c>, ...), or null when the campaign has no pair for it.
+/// </param>
 public sealed record StoryFactionDto(
     string Faction,
     string ManifestFile,
     IReadOnlyList<StoryPlotThreadDto> Threads,
-    IReadOnlyList<StoryLuaScriptDto> LuaScripts);
+    IReadOnlyList<StoryLuaScriptDto> LuaScripts,
+    // The faction's tactical battles in the order the galactic story reaches them; each opens as
+    // its own graph through getStoryGraph's Scope.
+    IReadOnlyList<StoryBattleDto>? Battles = null,
+    string? Control = null);
+
+/// <param name="Key">The scope key for getStoryGraph.</param>
+/// <param name="Label">The plot manifest's file name without extension.</param>
+/// <param name="EntryEventIds">The galactic event node ids whose reward links the battle in.</param>
+/// <param name="Rank">0-based order in which the galactic story reaches the battle.</param>
+/// <param name="Threads">The battle's thread document URIs.</param>
+/// <param name="Threads">
+///     The battle's plot files as its tactical manifest lists them, each with the document it
+///     resolved to. The faction's own thread list never carries these.
+/// </param>
+/// <param name="LuaScripts">
+///     The scripts the battle's tactical manifest attaches, resolved like the faction's own; the
+///     faction's script list never carries these either.
+/// </param>
+public sealed record StoryBattleDto(
+    string Key,
+    string Label,
+    IReadOnlyList<string> EntryEventIds,
+    int Rank,
+    IReadOnlyList<StoryPlotThreadDto> Threads,
+    IReadOnlyList<StoryLuaScriptDto>? LuaScripts = null);
 
 /// <param name="Name">Extensionless script name exactly as written in the plot manifest.</param>
 /// <param name="Uri">
@@ -101,7 +142,11 @@ public sealed record GetStoryGraphParams(
     // Which way <paramref name="ReachableFrom" /> reaches: "Downstream" (what the event leads to),
     // "Upstream" (what leads to it) or "Both". Null or unrecognised is Downstream, which is what the
     // filter did before the other two directions existed - so an older client keeps its behaviour.
-    string? ReachableDirection = null) : IRequest<GetStoryGraphResult>;
+    string? ReachableDirection = null,
+    // Which scope to show: null or empty is the galactic story with each battle as one portal;
+    // a battle key (from getStoryPlots' battles) is that battle's own graph with the galaxy as
+    // portals. An older client sends none and gets the galactic story.
+    string? Scope = null) : IRequest<GetStoryGraphResult>;
 
 /// <param name="Branches">
 ///     Every branch name in the campaign, INDEPENDENT of the filters that produced
@@ -136,7 +181,17 @@ public sealed record StoryGraphNodeDto(
     IReadOnlyList<StoryParamValueDto>? RewardParams = null,
     bool Perpetual = false,
     string? StoryDialog = null,
-    int? StoryChapter = null);
+    int? StoryChapter = null,
+    // For a GalacticPortal: the galactic event it stands for, so the client can jump to it.
+    string? PortalTarget = null,
+    // Names the REFERENCED project that owns the node's thread, which makes it read-only here: the
+    // client shows the node and disables its editing affordances rather than offering an edit that
+    // would be refused at the boundary. It carries the NAME rather than a flag because a disabled
+    // control has to say why, and with several layers in play "which project owns this" is the
+    // author's question. Per node rather than per graph, because a leaf commonly extends a graph it
+    // does not wholly own and the two kinds sit side by side in one view. Null - the default - is
+    // editable, so an unlayered workspace and every existing caller are unaffected.
+    string? ReadOnlyOwner = null);
 
 public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, string? Label);
 
@@ -182,8 +237,16 @@ public sealed record GetStorySchemaResult(
 public sealed record StoryTypeSchemaDto(
     string Name,
     string? Description,
-    bool Untested,
+    // Everything the schema says about this type, ranked worst first. This replaced a lone
+    // `untested` boolean in schema 2.0.0: the editor has to tell a type nobody has verified from
+    // one the engine ignores outright, and a boolean could only ever say the first.
+    IReadOnlyList<StoryNoteDto> Notes,
     IReadOnlyList<StoryParamSchemaDto> Params);
+
+/// <param name="Kind">A <c>SchemaNoteKind</c> name. Unknown to an older client, which ignores it.</param>
+/// <param name="Text">The note in the session's locale, already resolved, or null when it has none.</param>
+/// <param name="Value">What the kind carries instead of prose - a version for <c>Since</c>.</param>
+public sealed record StoryNoteDto(string Kind, string? Text, string? Value);
 
 public sealed record StoryParamSchemaDto(
     int Position,
@@ -194,13 +257,21 @@ public sealed record StoryParamSchemaDto(
     string? Description,
     // The enum's value names, shipped inline so enum params render as dropdowns without a
     // round trip. Null for non-enum params.
-    IReadOnlyList<string>? EnumValues = null);
+    IReadOnlyList<string>? EnumValues = null,
+    // What the slot holds, in one to three words: the field label. Null for a slot nobody has
+    // named yet, which the client labels by its position.
+    string? Label = null);
 
 // ── aet/getStoryParamOptions - completion candidates for one param slot ──────
 
 /// <param name="Side"><c>event</c> or <c>reward</c>.</param>
 /// <param name="TypeName">The event/reward type whose param schema applies.</param>
 /// <param name="Position">0-based param slot.</param>
+/// <param name="Query">
+///     Text the name must contain, case-insensitively; names that START with it come first. A
+///     substring rather than a prefix because the field filters what it holds the same way.
+/// </param>
+/// <param name="Limit">At most this many options; 2000 when absent.</param>
 [Method("aet/getStoryParamOptions", Direction.ClientToServer)]
 public sealed record GetStoryParamOptionsParams(
     string Campaign,
@@ -208,7 +279,7 @@ public sealed record GetStoryParamOptionsParams(
     string Side,
     string TypeName,
     int Position,
-    string? Prefix = null,
+    string? Query = null,
     int? Limit = null) : IRequest<GetStoryParamOptionsResult>;
 
 public sealed record GetStoryParamOptionsResult(
@@ -254,7 +325,12 @@ public sealed record StoryDiagnosticDto(
 // ── aet/getStoryLayout / aet/setStoryLayout - node position sidecar ──────────
 
 [Method("aet/getStoryLayout", Direction.ClientToServer)]
-public sealed record GetStoryLayoutParams(string Campaign, string Faction) : IRequest<GetStoryLayoutResult>;
+/// <param name="Scope">
+///     The battle whose panel asks, or null for the galactic level: a battle graph's portals exist
+///     only in that scope, and the answer names the nodes the panel holds.
+/// </param>
+public sealed record GetStoryLayoutParams(string Campaign, string Faction, string? Scope = null)
+    : IRequest<GetStoryLayoutResult>;
 
 public sealed record GetStoryLayoutResult(IReadOnlyList<StoryLayoutEntryDto> Entries, string? Error = null);
 
@@ -264,7 +340,11 @@ public sealed record SetStoryLayoutParams(string Campaign, string Faction, IRead
 
 public sealed record SetStoryLayoutResult(bool Success, string? Error = null);
 
-public sealed record StoryLayoutEntryDto(string ThreadUri, string EventName, double X, double Y);
+/// <param name="NodeId">
+///     Set for a virtual node - a junction, a portal, a tactical stub, a script state - which the
+///     sidecar names by id; the thread and event are then empty. Absent for an event.
+/// </param>
+public sealed record StoryLayoutEntryDto(string ThreadUri, string EventName, double X, double Y, string? NodeId = null);
 
 // ── aet/storyGraphChanged - server push after model invalidation ─────────────
 

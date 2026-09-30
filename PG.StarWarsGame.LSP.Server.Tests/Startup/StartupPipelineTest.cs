@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -10,7 +12,11 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Startup;
 
 public sealed class StartupPipelineTest
 {
-    private static StartupPipeline Build(Log log, IModProjectReloadService reloadService, IStartupGate gate)
+    private static StartupPipeline Build(
+        Log log, IModProjectReloadService reloadService, IStartupGate gate,
+        IPgprojMigrationOffer? migrationOffer = null,
+        IEnumerable<IDiagnosticsRepublisher>? republishers = null,
+        bool workspaceDiagnosticsOnStartup = false)
     {
         return new StartupPipeline(
             new RecordingSchemaBootstrapper(log),
@@ -19,7 +25,88 @@ public sealed class StartupPipelineTest
             gate,
             new RecordingProgress(log),
             new RecordingNotifier(log),
-            NullLogger<StartupPipeline>.Instance);
+            NullLogger<StartupPipeline>.Instance,
+            migrationOffer,
+            republishers,
+            new StubConfigurationProvider(workspaceDiagnosticsOnStartup));
+    }
+
+    private sealed class StubConfigurationProvider : ILspConfigurationProvider
+    {
+        public StubConfigurationProvider(bool workspaceDiagnosticsOnStartup)
+        {
+            Current = new LspConfiguration
+            {
+                Diagnostics = new DiagnosticsConfig { WorkspaceOnStartup = workspaceDiagnosticsOnStartup }
+            };
+        }
+
+        public LspConfiguration Current { get; }
+
+        public void LoadFrom(object? initializationOptions)
+        {
+        }
+    }
+
+    /// <summary>
+    ///     The workspace sweep is OFF unless asked for.
+    ///     <para>
+    ///         Measured 2026-09-28 on the eaw workspace - the base game, not a mod: 18,281
+    ///         diagnostics, 21.8 MiB on the wire, 11s of publishing after a 2s scan. FoC is larger
+    ///         and a real mod larger again. That cannot be what a server does on every start.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_ByDefault_DoesNotSweepTheWorkspace()
+    {
+        var log = new Log();
+        var pipeline = Build(log, new RecordingReloadService(log), new RecordingGate(log),
+            republishers: [new RecordingRepublisher(log, "xml")]);
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.DoesNotContain("republish.xml", log.Entries);
+    }
+
+    /// <summary>
+    ///     Turned on, it sweeps - the escape hatch for the case it exists to cover: a start where
+    ///     the XML sync handler never receives <c>didOpen</c>, after which the session publishes
+    ///     nothing for any file until it is restarted.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_WhenEnabled_RepublishesDiagnosticsAfterTheScan()
+    {
+        var log = new Log();
+        var pipeline = Build(log, new RecordingReloadService(log), new RecordingGate(log),
+            republishers: [new RecordingRepublisher(log, "xml"), new RecordingRepublisher(log, "lua")],
+            workspaceDiagnosticsOnStartup: true);
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Contains("republish.xml", log.Entries);
+        Assert.Contains("republish.lua", log.Entries);
+
+        // After the gate, never before it: the sweep touches every indexed document, and holding
+        // the gate shut for it would put that work in front of the editor becoming usable.
+        Assert.True(log.Entries.IndexOf("gate.open") < log.Entries.IndexOf("republish.xml"),
+            "the gate must open before the workspace republish");
+    }
+
+    /// <summary>
+    ///     Startup is fire-and-forget, so an escaping exception here is an unobserved one - and one
+    ///     publisher failing must not cost the others their sweep.
+    /// </summary>
+    [Fact]
+    public async Task RunAsync_RepublishFailure_DoesNotStopTheOthers()
+    {
+        var log = new Log();
+        var pipeline = Build(log, new RecordingReloadService(log), new RecordingGate(log),
+            republishers: [new ThrowingRepublisher(), new RecordingRepublisher(log, "xml")],
+            workspaceDiagnosticsOnStartup: true);
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Contains("republish.xml", log.Entries);
     }
 
     [Fact]
@@ -83,6 +170,38 @@ public sealed class StartupPipelineTest
 
         Assert.Contains("gate.open", log.Entries);
         Assert.True(gate.Opened);
+    }
+
+    [Fact]
+    public async Task RunAsync_AsksAboutPendingMigrations_OnlyOnceTheGateIsOpen()
+    {
+        // The offer is a modal question about the user's own project file. Asked from inside the
+        // load, it sits in front of the gate: every buffered notification waits for the answer, and
+        // the server says nothing for as long as the user reads. Measured at 22.1s on the eaw
+        // workspace, against 1.75s for the same startup with nothing left to migrate.
+        var log = new Log();
+        var gate = new RecordingGate(log);
+        var pipeline = Build(log, new RecordingReloadService(log), gate, new RecordingMigrationOffer(log));
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Contains("migration.offer", log.Entries);
+        Assert.True(log.Entries.IndexOf("gate.open") < log.Entries.IndexOf("migration.offer"),
+            "'gate.open' must precede 'migration.offer'");
+    }
+
+    [Fact]
+    public async Task RunAsync_StillAsksAboutPendingMigrations_WhenIndexingThrows()
+    {
+        // A project file brought forward in memory is the one thing a degraded start must still
+        // offer to write down - the failure it degraded on may be the very thing it fixes.
+        var log = new Log();
+        var pipeline = Build(log, new ThrowingReloadService(), new RecordingGate(log),
+            new RecordingMigrationOffer(log));
+
+        await pipeline.RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Contains("migration.offer", log.Entries);
     }
 
     [Fact]
@@ -198,6 +317,22 @@ public sealed class StartupPipelineTest
         }
     }
 
+    private sealed class RecordingMigrationOffer : IPgprojMigrationOffer
+    {
+        private readonly Log _log;
+
+        public RecordingMigrationOffer(Log log)
+        {
+            _log = log;
+        }
+
+        public Task OfferPendingAsync(CancellationToken ct)
+        {
+            _log.Add("migration.offer");
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class RecordingGate : IStartupGate
     {
         private readonly Log _log;
@@ -254,6 +389,32 @@ public sealed class StartupPipelineTest
         public void NotifyScanComplete()
         {
             _log.Add("notify");
+        }
+    }
+
+    private sealed class RecordingRepublisher : IDiagnosticsRepublisher
+    {
+        private readonly Log _log;
+        private readonly string _name;
+
+        public RecordingRepublisher(Log log, string name)
+        {
+            _log = log;
+            _name = name;
+        }
+
+        public Task RepublishAllAsync(CancellationToken ct)
+        {
+            _log.Add($"republish.{_name}");
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingRepublisher : IDiagnosticsRepublisher
+    {
+        public Task RepublishAllAsync(CancellationToken ct)
+        {
+            throw new InvalidOperationException("republish blew up");
         }
     }
 

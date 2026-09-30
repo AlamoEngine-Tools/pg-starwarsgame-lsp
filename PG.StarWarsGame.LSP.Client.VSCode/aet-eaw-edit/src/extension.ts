@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import {ChildProcess, spawn} from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -26,7 +27,10 @@ import {initViewerSettingsStorage} from './viewerSettingsStorage';
 import {initProjectSettingsStorage} from './projectSettingsStorage';
 import {LocalisationEditorPanel} from './localisationEditorPanel';
 import {LocalisationNavigatorViewProvider, LocTreeItem} from './localisationNavigatorViewProvider';
+import {logLine, setLogChannel} from './log';
+import {directoriesNeedingOwnWatcher} from './dependencyWatchers';
 import {LspGateway} from './lsp/lspGateway';
+import {stopClient} from './lsp/stopClient';
 import {vscodeMessageSink} from './lsp/vscodeMessageSink';
 import {LUA_DEBUG_TYPE, LuaDebugAdapterDescriptorFactory} from './luaDebug/luaDebugAdapterFactory';
 import {LuaDebugConfigurationProvider} from './luaDebug/luaDebugConfigurationProvider';
@@ -198,6 +202,15 @@ class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvid
 let lspClient: LanguageClient | undefined;
 
 /**
+ * The server process, while one is running.
+ *
+ * Held because the language client does not hold it for us on the factory path, and because a
+ * shutdown that times out leaves nothing else able to reach it. Cleared by the process's own
+ * `exit`, so it never names something already gone.
+ */
+let serverProcess: ChildProcess | undefined;
+
+/**
  * Every request to the server goes through here.
  *
  * Resolves `lspClient` per call rather than holding it: the client is replaced on every restart,
@@ -211,13 +224,75 @@ let pgprojProposedProvider: PgprojProposedContentProvider | undefined;
 let localisationNavigatorProvider: LocalisationNavigatorViewProvider | undefined;
 let storyNavigatorProvider: StoryNavigatorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
+
+/**
+ * The globs the server reacts to on disk. Kept in one place because two watcher sets are built
+ * from it: the workspace-folder ones VS Code resolves itself, and the per-directory ones below.
+ */
+const WATCHED_GLOBS = ['**/*.xml', '**/*.lua', '**/*.pgproj', '**/*.csv', '**/*.properties', '**/*.dat'];
+
+/**
+ * Watchers over project directories that lie OUTSIDE the open workspace folders.
+ *
+ * A bare glob only ever watches the folders the window is open on, so a project reached through
+ * `projectReferences` was invisible: editing a dependency's XML, scripts, localisation or its own
+ * `.pgproj` produced no `didChangeWatchedFiles` at all, and nothing re-indexed until the server was
+ * restarted. These carry an absolute `RelativePattern` instead, and their events are forwarded by
+ * hand because `synchronize.fileEvents` is fixed when the client is constructed, long before the
+ * server has resolved which projects exist.
+ */
+let dependencyWatchers: vscode.Disposable[] = [];
+
+/** A `.pgproj` may have changed the layer set, so the watched directories are rebuilt. */
+function onProjectFileTouched(uri: vscode.Uri): void {
+    if (uri.fsPath.toLowerCase().endsWith('.pgproj')) {
+        void refreshDependencyWatchers();
+    }
+}
+
+/**
+ * Asks the server where this workspace's content lives and watches whatever the open folders do
+ * not already cover. Safe to call repeatedly: the previous set is disposed first.
+ */
+async function refreshDependencyWatchers(): Promise<void> {
+    const answer = await lsp.request<{ directories?: readonly string[] }>('aet/getWatchDirectories');
+    if (!answer.ok) {
+        return;
+    }
+
+    const folders = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath);
+    const outside = directoriesNeedingOwnWatcher(answer.value.directories ?? [], folders);
+
+    for (const watcher of dependencyWatchers) {
+        watcher.dispose();
+    }
+    dependencyWatchers = [];
+
+    for (const directory of outside) {
+        for (const glob of WATCHED_GLOBS) {
+            const watcher = vscode.workspace.createFileSystemWatcher(
+                new vscode.RelativePattern(vscode.Uri.file(directory), glob));
+            dependencyWatchers.push(
+                watcher,
+                // 1 = Created, 2 = Changed, 3 = Deleted in the LSP FileChangeType enum.
+                watcher.onDidCreate(uri => forwardFileChange(uri, 1)),
+                watcher.onDidChange(uri => forwardFileChange(uri, 2)),
+                watcher.onDidDelete(uri => forwardFileChange(uri, 3)));
+        }
+    }
+
+    logLine(outside.length === 0
+        ? 'No project directories outside the workspace folders; no extra watchers needed.'
+        : `Watching ${outside.length} project director(y/ies) outside the workspace: ${outside.join(', ')}`);
+}
+
+function forwardFileChange(uri: vscode.Uri, type: 1 | 2 | 3): void {
+    void lsp.notify('workspace/didChangeWatchedFiles',
+        {changes: [{uri: uri.toString(), type}]});
+}
+
 let traceChannel: vscode.LogOutputChannel | undefined;
 let log: vscode.OutputChannel | undefined;
-
-function logLine(msg: string): void {
-    const ts = new Date().toISOString().replace('T', ' ').replace('Z', '');
-    log?.appendLine(`[${ts}] ${msg}`);
-}
 
 /**
  * vscode-languageclient v10 types `traceOutputChannel` as `LogOutputChannel` and writes protocol
@@ -267,10 +342,9 @@ function gameDirectory(name: 'baseGameDirectory' | 'expansionDirectory'): string
  * Builds the complete resolved feature-flag object sent to the server via initializationOptions.
  * The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults everything to
  * true; the user-facing off-defaults (lua.hover, lua.diagnostics, tools.localisation,
- * story.discovery) live in package.json, so the fallbacks here must mirror package.json. The one
- * exception is tools.storySimulator, which is intentionally not contributed at all - its fallback
- * below is the only default it has. Flags are restart-based: the config listener in activate()
- * restarts the server when any `aet-eaw-edit.features` value changes.
+ * story.discovery, tools.storySimulator) live in package.json, so the fallbacks here must mirror
+ * package.json. Flags are restart-based: the config listener in activate() restarts the server when
+ * any `aet-eaw-edit.features` value changes.
  */
 function resolveFeatureFlags() {
     const features = cfg('features');
@@ -304,10 +378,6 @@ function resolveFeatureFlags() {
             localisation: flag('tools.localisation', false),
             storyEditor: flag('tools.storyEditor', false),
             storyEditing: flag('tools.storyEditing', false),
-            // Deliberately NOT contributed in package.json: Simulation mode is unfinished, so it is
-            // kept out of the settings UI. Writing the key into settings.json by hand still works
-            // (VS Code returns undeclared values, and the features-wide restart listener still
-            // fires) - that is the escape hatch for trying it out.
             storySimulator: flag('tools.storySimulator', false),
             variants: flag('tools.variants', true),
             encyclopedia: flag('tools.encyclopedia', true),
@@ -387,16 +457,55 @@ function validateConfiguration(): boolean {
 
 async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     const waitForDebugger = cfg('lsp.debug').get<boolean>('waitForDebugger', false);
+    const extraArgs: string[] = [];
+    if (waitForDebugger) {
+        extraArgs.push('--wait-for-debugger');
+    }
+    // Where the server's debug log goes. Without it the server writes beside its own binary,
+    // because a spawned process inherits the EDITOR's working directory - one session's log landed
+    // inside the VS Code installation folder, and the workspace showed none at all.
+    const logRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (logRoot) {
+        extraArgs.push(`--log-dir=${logRoot}`);
+    }
+    // How loud that log is. Only passed when it differs from the server's own default, so the
+    // common case still starts with the command line it always had. Worth having as a setting
+    // rather than a rebuild: the lines that say whether a document reached a sync handler are
+    // Debug, so a session that publishes nothing cannot be diagnosed at the default level - and
+    // reading one of those lines as absent, when the level suppresses it always, is how an
+    // intermittent outage got a confident and wrong explanation.
+    const logLevel = cfg('lsp.debug').get<string>('logLevel', 'Information');
+    if (logLevel && logLevel !== 'Information') {
+        extraArgs.push(`--log-level=${logLevel}`);
+    }
     // The same resolution starts the Lua debug adapter (see luaDebugAdapterFactory), which is this
     // binary in a different mode; keeping it in one place is what keeps the two from drifting.
-    const server = resolveServerCommand(context.extensionPath, waitForDebugger ? ['--wait-for-debugger'] : []);
+    const server = resolveServerCommand(context.extensionPath, extraArgs);
     logLine(`Starting LSP server: ${server.description}`);
     const serverExe = server.command;
     const serverArgs = [...server.args];
 
-    const serverOptions: ServerOptions = {
-        run: {command: serverExe, args: serverArgs, transport: TransportKind.stdio},
-        debug: {command: serverExe, args: serverArgs, transport: TransportKind.stdio},
+    // Spawned here rather than handed to the client as {command, args} so that WE hold the handle.
+    //
+    // With the Executable form the library owns the process, and its only cleanup for a shutdown
+    // that fails is `checkProcessDied` - a setTimeout(2000) that force-terminates if the process
+    // is still alive. On deactivate the extension host exits long before that timer runs, so the
+    // one case that strands a server is exactly the case the net does not cover. Holding the
+    // ChildProcess ourselves is what makes an immediate kill possible; see stopClient.
+    //
+    // The library still pipes stderr to the output channel on this path, so the server's own
+    // startup lines are not lost. It does NOT record the process (`_serverProcess` stays unset),
+    // which is the trade: no library-side cleanup at all, and all of it ours.
+    const serverOptions: ServerOptions = async () => {
+        const child = spawn(serverExe, serverArgs, {stdio: ['pipe', 'pipe', 'pipe']});
+        serverProcess = child;
+        // Only clear if this is still the current one - a restart may already have replaced it.
+        child.on('exit', () => {
+            if (serverProcess === child) {
+                serverProcess = undefined;
+            }
+        });
+        return child;
     };
 
     const schemaSource = cfg('lsp.schema').get<string>('source', 'http');
@@ -412,8 +521,15 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     // and it equally affected asset, project-file and localisation reloads.
     //
     // Keep this list in step with the server's registration options.
-    const fileEvents = ['**/*.xml', '**/*.lua', '**/*.pgproj', '**/*.csv', '**/*.properties', '**/*.dat']
-        .map(glob => vscode.workspace.createFileSystemWatcher(glob));
+    const fileEvents = WATCHED_GLOBS.map(glob => vscode.workspace.createFileSystemWatcher(glob));
+    // A .pgproj change can add or drop a project reference, which moves the very directories the
+    // dependency watchers cover - so rebuild them whenever one changes, wherever it lives.
+    for (const watcher of fileEvents) {
+        context.subscriptions.push(
+            watcher.onDidCreate(uri => onProjectFileTouched(uri)),
+            watcher.onDidChange(uri => onProjectFileTouched(uri)),
+            watcher.onDidDelete(uri => onProjectFileTouched(uri)));
+    }
     // The client disposes what it is given, but only on a clean shutdown; tying them to the
     // extension's own lifetime means a failed start cannot leak OS watchers.
     context.subscriptions.push(...fileEvents);
@@ -445,6 +561,18 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
                 ? (cfg('lsp.source.baseline').get<string>('url') || undefined)
                 : undefined,
             baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined,
+            // Off by default and deliberately so: on the base game the startup sweep is 18,281
+            // diagnostics and 21.8 MiB, and a mod is larger. It is the escape hatch for a start
+            // where didOpen never reaches the server, not a normal mode.
+            diagnostics: {
+                workspaceOnStartup: cfg('diagnostics').get<boolean>('workspaceOnStartup', false)
+            },
+            // Which screen the encyclopedia card is drawn for. The game sizes that popup's glyphs
+            // from the display it runs on, so a preview has to be told which display to match.
+            encyclopedia: {
+                screenWidth: cfg('encyclopedia').get<number>('screenWidth', 1920),
+                screenHeight: cfg('encyclopedia').get<number>('screenHeight', 1080)
+            },
             features: resolveFeatureFlags()
         },
         middleware: {
@@ -520,6 +648,16 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
         // returns undefined and the trace level is stored but never applied to the transport.
         await lspClient?.setTrace(resolvedTrace);
         logLine('LSP server started and initialized.');
+
+        // The handshake is done and the server is answering; what remains is the workspace scan,
+        // which runs in the background and can take half a minute on a large mod. Saying so is the
+        // whole point of splitting these two states: the status used to read "Starting..." from
+        // before start() until $/workspaceScanComplete, so a 30-second scan was indistinguishable
+        // from a server that never came up - which is exactly how it was reported.
+        if (statusItem) {
+            statusItem.text = '$(loading~spin) EaWEdit LSP: Indexing workspace...';
+            statusItem.tooltip = 'The server is connected. Language features become complete when the scan finishes.';
+        }
 
         // Anything already waiting on a server can go now. A model preview restored when the window
         // opened is resolved by VS Code long before this point, and without being told it would sit
@@ -610,12 +748,21 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
         logLine('Workspace scan complete.');
         if (statusItem) {
             statusItem.text = '$(check) EaWEdit LSP';
+            statusItem.tooltip = undefined;
         }
+        // Only now does the server know which projects the workspace resolved to, so this is the
+        // first moment the dependency directories can be asked for. The notification fires on
+        // startup only, which is why a .pgproj change rebuilds them separately.
+        void refreshDependencyWatchers();
         // Both navigators fetch now rather than when they are first opened. A tree view only asks
         // for its children on reveal, so without this the first click on either paid for a round
         // trip - and until the scan finished they had nothing to show but a "loading" line.
         void storyNavigatorProvider?.preload();
         void localisationNavigatorProvider?.preload();
+        // An encyclopedia card opened during the scan was answered from the baseline alone and kept
+        // that answer: measured on EaWX, the popup width came back as vanilla's 262 before the scan
+        // and the mod's own 340 after it. Nothing re-asked, so the card stayed vanilla all session.
+        EncyclopediaPanel.refresh();
     });
 
     lspClient.onNotification('aet/localisationIndexUpdated', () => {
@@ -633,7 +780,9 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     });
 
     lspClient.onNotification('aet/storySimChanged', (params: StorySimChangedParams) => {
-        StoryGraphPanel.simChanged({campaign: params.campaign, faction: params.faction});
+        StoryGraphPanel.simChanged({
+            campaign: params.campaign, faction: params.faction, scope: params.scope ?? undefined,
+        });
     });
 
     lspClient.onNotification('aet/previewSceneChanged', () => {
@@ -646,12 +795,36 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 }
 
 async function stopLspClient(): Promise<void> {
-    if (lspClient) {
-        logLine('Stopping LSP server.');
-        await lspClient.stop();
-        lspClient = undefined;
+    // The reference goes first, and on every path. `LanguageClient.stop()` throws when its
+    // shutdown handshake loses the race with its own timer, and the old shape - stop, then clear -
+    // meant a timeout skipped both the clear and the restart that three of the four callers do
+    // next. The visible symptom was the language server never coming back after a feature-flag
+    // change, with nothing in the log but "Stopping the server timed out".
+    const client = lspClient;
+    const child = serverProcess;
+    lspClient = undefined;
+    serverProcess = undefined;
+    try {
+        await stopClient(client, logLine, {forceKill: () => killServer(child)});
+    } finally {
         lsp.markStopped();
     }
+}
+
+/**
+ * Terminates a server that would not shut down.
+ *
+ * SIGKILL rather than SIGTERM: this only runs after the polite request has already failed, and on
+ * Windows node maps both to TerminateProcess anyway, so asking twice would only be slower. A
+ * process that has already exited is left alone - `exitCode`/`signalCode` are set the moment it
+ * goes, and killing a reaped pid is how you end up signalling whatever reused the number.
+ */
+function killServer(child: ChildProcess | undefined): void {
+    if (child === undefined || child.exitCode !== null || child.signalCode !== null) {
+        return;
+    }
+    logLine(`Killing LSP server process ${child.pid ?? '(no pid)'}.`);
+    child.kill('SIGKILL');
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -966,9 +1139,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 return;
             }
 
+            // A battle node carries its key in fileName and its name in the label; it opens the
+            // battle's own graph, the sub-graph the galactic one shows as a portal.
             let target: StoryGraphTarget | undefined =
                 arg?.campaignName && arg?.factionName
-                    ? {campaign: arg.campaignName, faction: arg.factionName}
+                    ? {
+                        campaign: arg.campaignName, faction: arg.factionName,
+                        ...(arg.kind === 'battle' && arg.fileName
+                            ? {scope: arg.fileName, scopeLabel: String(arg.label ?? arg.fileName)}
+                            : {}),
+                    }
                     : undefined;
 
             if (!target) {
@@ -988,7 +1168,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                     return;
                 }
                 const picked = await vscode.window.showQuickPick(items, {
-                    title: 'Open Story Graph', placeHolder: 'Select a campaign faction',
+                    title: 'Open Story Graph', placeHolder: 'Select a campaign faction or one of its battles',
                 });
                 target = picked?.target;
             }
@@ -996,32 +1176,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 StoryGraphPanel.show(target, context.extensionUri, lsp);
             }
         }),
-        // Prefer the server-resolved URI: manifest entries and on-disk names differ in casing
-        // throughout vanilla data (the engine is case-insensitive, findFiles is not), and the
-        // file may live outside the workspace (dependency / base game). The name-based search
-        // remains as a fallback for entries the server could not resolve (broken chain links).
-        vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryFile', async (fileName: string, uri?: string) => {
-            if (uri) {
-                try {
-                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
-                    await vscode.window.showTextDocument(doc, {preview: true});
-                    return;
-                } catch {
-                    // e.g. stale URI after files changed on disk - fall through to the name search.
-                }
-            }
-            if (!fileName) {
+        // The server's resolution is the only one: the model resolved every manifest entry to its
+        // document when it was assembled, case-insensitively as the engine reads files. There is
+        // no name search here - a workspace glob is case-sensitive and would answer by a different
+        // rule than the one the model used, which is how a file that was right there read as missing.
+        // Invoked from a navigator node's inline button with the node; a node with nothing to open
+        // offers the disabled twin instead, so this never runs for one.
+        vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryFile', async (item?: StoryTreeItem) => {
+            if (!item?.openUri) {
                 return;
             }
-            const matches = await vscode.workspace.findFiles(`**/${fileName}`, '**/node_modules/**', 2);
-            if (!matches.length) {
-                vscode.window.showWarningMessage(
-                    `EaWEdit: '${fileName}' was not found in the workspace (it may live in a dependency or the base game).`);
-                return;
+            try {
+                const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(item.openUri));
+                const line = item.openLine ?? 0;
+                await vscode.window.showTextDocument(doc, {
+                    preview: true,
+                    selection: new vscode.Range(line, 0, line, 0),
+                });
+            } catch (e) {
+                vscode.window.showWarningMessage(`EaWEdit: Cannot open '${String(item.label)}' - ${e}`);
             }
-            const doc = await vscode.workspace.openTextDocument(matches[0]);
-            await vscode.window.showTextDocument(doc, {preview: true});
         }),
+        vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryFileUnavailable', () => undefined),
     );
 
     statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
@@ -1029,6 +1205,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(statusItem);
 
     log = vscode.window.createOutputChannel('EaWEdit');
+    setLogChannel(log);
     context.subscriptions.push(log);
 
     traceChannel = createTraceChannel('EaWEdit LSP Trace');

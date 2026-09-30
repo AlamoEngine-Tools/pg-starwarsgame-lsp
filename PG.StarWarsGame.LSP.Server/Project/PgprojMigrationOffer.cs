@@ -27,7 +27,7 @@ public sealed class PgprojMigrationOffer(
     IPgprojMigrationPrompt prompt,
     IUserNotifier notifier,
     ILogger<PgprojMigrationOffer> logger)
-    : IPgprojMigrationSink
+    : IPgprojMigrationSink, IPgprojMigrationOffer
 {
     private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 

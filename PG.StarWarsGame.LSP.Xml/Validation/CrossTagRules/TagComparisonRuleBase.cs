@@ -39,7 +39,7 @@ public abstract class TagComparisonRuleBase : IXmlCrossTagRule
     /// </summary>
     /// <remarks>
     ///     False by default. A relation being violated implies nothing about what the engine does
-    ///     next: <c>SpecialAbilityClass::Validate_Data</c> calls
+    ///     next: the engine's load-time validation calls
     ///     <c>std::swap(MinRespawnTime, MaxRespawnTime)</c>, while the chase-radius comparison
     ///     leaves both values alone. Inheriting a swap would offer the second rule a fix the engine
     ///     never performs.

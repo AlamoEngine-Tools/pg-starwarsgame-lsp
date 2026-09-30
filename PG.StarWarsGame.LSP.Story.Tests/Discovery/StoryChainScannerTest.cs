@@ -24,6 +24,118 @@ public sealed class StoryChainScannerTest
         return new StoryChainScanner(resolver).Scan(Registry);
     }
 
+    [Fact]
+    public void Scan_ReadsTheCampaignSeed_ForTheSimulator()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Test">
+                    <Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>
+                    <Locations>
+                      Galaxy_Core_Art_Model,
+                      Kuat, Hoth
+                    </Locations>
+                    <Home_Location> Rebel, Hoth </Home_Location>
+                    <Starting_Tech_Level> Rebel, 2 </Starting_Tech_Level>
+                    <Starting_Credits> Rebel,  5000 </Starting_Credits>
+                    <Starting_Forces> Rebel, Hoth, X_Wing </Starting_Forces>
+                    <Starting_Forces> Rebel, Hoth, X_Wing </Starting_Forces>
+                    <Starting_Forces> Empire, Kuat, TIE_Fighter </Starting_Forces>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Rebel.xml", "<Story_Mode_Plots/>");
+
+        var seed = Scan(resolver).Campaigns.Single().Seed;
+
+        Assert.Equal(["Galaxy_Core_Art_Model", "Kuat", "Hoth"], seed.Planets);
+        Assert.Equal(3, seed.StartingForces.Count);
+        Assert.Equal(new StoryStartingForce("Empire", "Kuat", "TIE_Fighter"), seed.StartingForces[2]);
+        Assert.Equal(2, seed.Tech["Rebel"]);
+        Assert.Equal(5000, seed.Credits["Rebel"]);
+        Assert.Equal("Hoth", seed.HomePlanets["Rebel"]);
+    }
+
+    [Fact]
+    public void Scan_ReadsThePlayerFactionAndAiControl()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Main_Campaign_Empire">
+                    <Rebel_Story_Name>Story_Plots_Empire.xml</Rebel_Story_Name>
+                    <Starting_Active_Player> Empire </Starting_Active_Player>
+                    <AI_Player_Control> Empire, ScriptableHuman </AI_Player_Control>
+                    <AI_Player_Control> Rebel, None </AI_Player_Control>
+                    <AI_Player_Control> Pirates, None </AI_Player_Control>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Empire.xml", "<Story_Mode_Plots/>");
+
+        var campaign = Scan(resolver).Campaigns.Single();
+
+        Assert.Equal("Empire", campaign.PlayerFaction);
+        Assert.Equal("ScriptableHuman", campaign.AiControl["Empire"]);
+        Assert.Equal("None", campaign.AiControl["rebel"]);
+        Assert.Equal("None", campaign.AiControl["Pirates"]);
+    }
+
+    [Fact]
+    public void Scan_AiControl_PairsTheFlatListAndTheLastPairWins()
+    {
+        // Measured: Assign_AI_Control walks the whole flat (faction, type) list
+        // and calls Set_AI_Control on every case-insensitive match, so the last pair wins.
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Mod_Campaign">
+                    <Story_Name>Hutts, Story_Plots_Hutts.xml</Story_Name>
+                    <Starting_Active_Player>Hutts</Starting_Active_Player>
+                    <AI_Player_Control>Empire, BasicEmpire, Rebel, BasicRebel</AI_Player_Control>
+                    <AI_Player_Control>EMPIRE, None</AI_Player_Control>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Hutts.xml", "<Story_Mode_Plots/>");
+
+        var campaign = Scan(resolver).Campaigns.Single();
+
+        Assert.Equal("Hutts", campaign.PlayerFaction);
+        Assert.Equal("Hutts", campaign.FactionManifests.Single().Faction);
+        Assert.Equal("None", campaign.AiControl["Empire"]);
+        Assert.Equal("BasicRebel", campaign.AiControl["Rebel"]);
+        Assert.False(campaign.AiControl.ContainsKey("Hutts"));
+    }
+
+    [Fact]
+    public void Scan_NoStartingActivePlayer_LeavesThePlayerFactionUnset()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Test">
+                    <Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Rebel.xml", "<Story_Mode_Plots/>");
+
+        var campaign = Scan(resolver).Campaigns.Single();
+
+        Assert.Null(campaign.PlayerFaction);
+        Assert.Empty(campaign.AiControl);
+    }
+
     // ── Happy path ───────────────────────────────────────────────────────────
 
     [Fact]

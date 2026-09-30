@@ -43,6 +43,9 @@ public sealed class StoryDialogReferenceHandler(IStoryDialogScope? scope = null)
             : "the file defines no chapters";
         yield return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             $"Chapter {chapter} is not defined in story dialog '{fact.DialogName}' ({defined}).",
-            fact.ChapterLine >= 0 ? fact.ChapterLine : null, Id: DiagnosticIds.StoryDialogChapterNotDefined);
+            fact.ChapterLine >= 0 ? fact.ChapterLine : null,
+            fact.ChapterLine >= 0 ? fact.ChapterColumn : null,
+            fact.ChapterLine >= 0 ? fact.ChapterLength : null,
+            Id: DiagnosticIds.StoryDialogChapterNotDefined);
     }
 }

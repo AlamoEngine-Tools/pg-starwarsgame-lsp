@@ -10,8 +10,8 @@ using PG.StarWarsGame.LSP.Xml.Util;
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
 /// <summary>
-///     Shared plumbing for the three rules in <c>IncomeStreamAbilityClass::Validate_Data</c>
-///     (<c>0100f6a0</c>), all of which are gated on flags rather than stated about a tag.
+///     Shared plumbing for the three rules in the engine's load-time validation
+///    , all of which are gated on flags rather than stated about a tag.
 /// </summary>
 public abstract class IncomeStreamRuleBase : IXmlCrossTagRule
 {

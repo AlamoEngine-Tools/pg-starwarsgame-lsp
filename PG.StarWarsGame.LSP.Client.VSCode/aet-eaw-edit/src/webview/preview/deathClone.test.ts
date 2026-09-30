@@ -118,8 +118,8 @@ describe('sweepAngles', () => {
 
     it('swings the turret the full extent EITHER SIDE of rest', () => {
         // The extent is a plus-or-minus bound, not a full angle to be halved. The engine's own
-        // clamp is the evidence - Calculate_Desired_Turret_Angle builds min = -extent (FCHS) and
-        // max = +extent and clamps between them, and Can_Weapon_Point_At refuses only when
+        // clamp is the evidence - the turret-angle calculation builds min = -extent (FCHS) and
+        // max = +extent and clamps between them, and the weapon-aim test refuses only when
         // `extent < |yaw|`. So a 90-degree extent is a 180-degree sweep.
         const at = (t: number) => sweepAngles(turret, t);
 

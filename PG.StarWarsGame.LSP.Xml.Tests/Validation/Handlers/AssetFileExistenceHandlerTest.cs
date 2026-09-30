@@ -65,6 +65,53 @@ public sealed class AssetFileExistenceHandlerTest
         Assert.Contains("missing.tga", d.Message);
     }
 
+    /// <summary>
+    ///     A reference may spell its path the way the ENGINE spells paths - backslashes, and an
+    ///     optional <c>./</c> anchor at the data directory.
+    /// </summary>
+    /// <remarks>
+    ///     Measured: vanilla writes <c>./Data/Music/Credits.mp3</c>, and EaWX writes 304 references
+    ///     as <c>Data\Audio\SFX\...</c>. The engine's own compiled-in paths are backslash
+    ///     (<c>.\Data\XML\...</c>) and it opens files through the Win32 API, which takes either
+    ///     separator. The catalog is normalised to lowercase forward-slash, so a reference that is
+    ///     not normalised the same way misses both the exact match and the suffix match, and 307
+    ///     perfectly good references in one mod were reported as missing files.
+    /// </remarks>
+    [Theory]
+    [InlineData(@"Data\Art\Textures\foo.tga")]
+    [InlineData("./Data/Art/Textures/foo.tga")]
+    [InlineData(@".\Data\Art\Textures\foo.tga")]
+    [InlineData("Data/Art/Textures/foo.tga")]
+    public void Texture_EngineStylePath_Resolves(string reference)
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), reference);
+        var ctx = CtxWith("data/art/textures/foo.tga");
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    /// <summary>A partial path is still anchored at a segment boundary, not mid-name.</summary>
+    [Fact]
+    public void Texture_EngineStylePath_DoesNotMatchAcrossASegmentBoundary()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), @"Textures\oo.tga");
+        var ctx = CtxWith("data/art/textures/foo.tga");
+
+        Assert.Single(TextureSut.Handle(fact, ctx));
+    }
+
+    /// <summary>Audio carries the bulk of these - the mod writes them under <c>Data\Audio</c>.</summary>
+    [Fact]
+    public void Audio_EngineStylePath_Resolves()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("SFXEvent", XmlValueType.NameReference,
+            referenceKind: ReferenceKind.AudioFile);
+        var fact = XmlHandlerTestFixtures.MakeFact(tag, @"Data\Audio\SFX\AT_AT\AT_AT_Side_Fire.wav");
+        var ctx = CtxWith("data/audio/sfx/at_at/at_at_side_fire.wav");
+
+        Assert.Empty(AudioSut.Handle(fact, ctx));
+    }
+
     [Fact]
     public void Texture_CaseInsensitiveLookup_EmitsNothing()
     {
@@ -254,6 +301,88 @@ public sealed class AssetFileExistenceHandlerTest
         Assert.Contains("missing.wav", d.Message);
     }
 
+    /// <summary>
+    ///     Each unresolved name in a list is anchored on ITSELF, not on the whole value.
+    /// </summary>
+    /// <remarks>
+    ///     Measured on the corpus: <c>commandbarcomponents.xml</c> carries
+    ///     <c>&lt;Icon_Alternate_Texture_Name&gt;</c> lists of 27 names on one line, and 28 warnings
+    ///     were landing on the same 759-character range. The author saw a stack of identical
+    ///     squiggles over the whole value with nothing to say which name was the bad one - a
+    ///     diagnostic that is right and unusable. 42 ranges in that one file carried more than one.
+    /// </remarks>
+    [Fact]
+    public void ListValuedTag_AnchorsEachNameOnItself()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("Samples", XmlValueType.NameReferenceList,
+            referenceKind: ReferenceKind.AudioFile);
+        const string raw = "one.wav missing.wav other.wav gone.wav";
+        var fact = XmlHandlerTestFixtures.MakeFact(tag, raw);
+        var ctx = CtxWith("data/audio/one.wav", "data/audio/other.wav");
+
+        var results = AudioSut.Handle(fact, ctx).ToList();
+
+        Assert.Equal(2, results.Count);
+        foreach (var d in results)
+        {
+            var name = d.Message.Split('\'')[1];
+            Assert.Equal(raw.IndexOf(name, StringComparison.Ordinal), d.OverrideColumn);
+            Assert.Equal(name.Length, d.OverrideLength);
+            Assert.Equal(0, d.OverrideLine);
+        }
+    }
+
+    /// <summary>
+    ///     A list that spans lines keeps each name on the line it is written on.
+    /// </summary>
+    [Fact]
+    public void ListValuedTag_AnchorsAcrossLines()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("Samples", XmlValueType.NameReferenceList,
+            referenceKind: ReferenceKind.AudioFile);
+        var fact = XmlHandlerTestFixtures.MakeFact(tag, "one.wav\n    missing.wav");
+        var ctx = CtxWith("data/audio/one.wav");
+
+        var d = Assert.Single(AudioSut.Handle(fact, ctx));
+        Assert.Equal(1, d.OverrideLine);
+        Assert.Equal(4, d.OverrideColumn);
+        Assert.Equal("missing.wav".Length, d.OverrideLength);
+    }
+
+    /// <summary>
+    ///     <c>NOT_USED</c> fills a slot, it does not name a file.
+    /// </summary>
+    /// <remarks>
+    ///     <c>&lt;Icon_Alternate_Texture_Name&gt;</c> is a list indexed BY ABILITY SLOT, and vanilla
+    ///     writes the literal <c>NOT_USED</c> in slot 0 to say that slot carries no icon - 23
+    ///     occurrences in <c>commandbarcomponents.xml</c>, in both corpora. The engine has no such
+    ///     string in it and simply fails to load the texture, which is exactly what the author
+    ///     intended, so reporting a missing file says the opposite of what happened.
+    /// </remarks>
+    [Fact]
+    public void ListValuedTag_NotUsedSlotMarker_IsNotAReference()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("Icon_Alternate_Texture_Name",
+            XmlValueType.NameReferenceList, referenceKind: ReferenceKind.TextureFile);
+        var fact = XmlHandlerTestFixtures.MakeFact(tag, "NOT_USED  present.tga");
+        var ctx = CtxWith("data/art/textures/present.tga");
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    /// <summary>
+    ///     The marker is a LIST slot filler. Alone in a single-valued tag it is a real value, and a
+    ///     texture called that really is missing.
+    /// </summary>
+    [Fact]
+    public void SingleValuedTag_NotUsed_IsStillReported()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "NOT_USED");
+        var ctx = CtxWith("data/art/textures/foo.tga");
+
+        Assert.Single(TextureSut.Handle(fact, ctx));
+    }
+
     [Fact]
     public void Map_Present_EmitsNothing()
     {
@@ -267,11 +396,10 @@ public sealed class AssetFileExistenceHandlerTest
     public void Map_Absent_IsAnError_NotAWarning()
     {
         // #132. A missing map is not a degraded battle, it is no battle: measured in the 2018 build,
-        // GameModeClass::Load_Named_Map retries with the resolved map path and a .ted extension, and
-        // when the file still will not open it calls Assert_Handler("false", "GameMode.cpp", 0x8db)
-        // and returns false. The hardcoded _Desert_L5_01.ted / _Space_Temperate1.ted defaults sit on
-        // the EMPTY-name path in Transition_To_Sub_Mode, not on this one, so nothing stands in for a
-        // map that was named and is not there.
+        // the engine retries with the resolved map path and a .ted extension, and when the file
+        // still will not open it asserts and returns false. The hardcoded _Desert_L5_01.ted /
+        // _Space_Temperate1.ted defaults sit on the EMPTY-name path, not on this one, so nothing
+        // stands in for a map that was named and is not there.
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.MapFile), "missing.ted");
         var ctx = CtxWith("data/maps/skirmish.ted");
 

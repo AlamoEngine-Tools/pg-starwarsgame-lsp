@@ -16,10 +16,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///     <c>Is_Destroyable</c> (#53).
 ///     <para>
 ///         Either bone will do, which is the engine's own condition:
-///         <c>HardPointClass::Get_Transformed_World_Position</c> (<c>009c92a0</c>) asserts
+///         the engine's world-position lookup asserts
 ///         <c>AttachmentBoneIndex &gt;= 0 || FireBoneAIndex &gt;= 0</c> and falls back to the fire
-///         bone. Destruction reads no bone at all - <c>HardPointClass::Take_Damage</c>
-///         (<c>009c8510</c>) consults only <c>Is_Destroyable()</c> and health - so the failure is
+///         bone. Destruction reads no bone at all - the hardpoint's own damage path
+///         consults only <c>Is_Destroyable()</c> and health - so the failure is
 ///         about being targetable, not about destruction.
 ///     </para>
 ///     <para>
@@ -56,11 +56,11 @@ public sealed class HardpointAttachmentBoneRule : IXmlCrossTagRule
             return [];
 
         // Either bone gives the hardpoint a world position, and that is what the engine actually
-        // requires: HardPointClass::Get_Transformed_World_Position (009c92a0) asserts
+        // requires: the engine's world-position lookup asserts
         // "AttachmentBoneIndex >= 0 || FireBoneAIndex >= 0" and falls back to the fire bone when the
-        // attachment bone is absent. Its error (014d6160) fires only when BOTH are -1.
+        // attachment bone is absent. Its error fires only when BOTH are -1.
         //
-        // Destruction itself reads no bone - HardPointClass::Take_Damage (009c8510) checks
+        // Destruction itself reads no bone - the hardpoint's own damage path checks
         // Is_Destroyable() and health and nothing else. A boneless hardpoint is indestructible
         // because it cannot be positioned and so cannot be targeted, which a fire bone also fixes.
         if (HasValue(childrenByName, AttachmentBoneTag) || HasValue(childrenByName, FireBoneTag))

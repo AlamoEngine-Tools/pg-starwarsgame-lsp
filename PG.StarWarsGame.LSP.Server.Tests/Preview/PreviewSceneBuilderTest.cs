@@ -80,6 +80,28 @@ public sealed class PreviewSceneBuilderTest
         Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").NoColorizationColor);
     }
 
+    [Fact]
+    public void BuildForObject_CarriesTheSubjectsIconName()
+    {
+        // The large command-bar icon has no tag of its own: the engine looks up `big_` + Icon_Name,
+        // so a capture can only be named for it if the scene says what Icon_Name is. Verbatim,
+        // extension included - that is the string the engine formats.
+        var index = Index([Sym("Luke", "GroundInfantry")]);
+        var tags = new FakeVariantTagSource().With("Luke",
+            Tag("Land_Model_Name", "hull.alo"), Tag("Icon_Name", " I_BUTTON_LUKE.TGA "));
+
+        Assert.Equal("I_BUTTON_LUKE.TGA", Builder(index, tags, "hull.alo").BuildForObject("Luke").IconName);
+    }
+
+    [Fact]
+    public void BuildForObject_LeavesTheIconNameNullWhenTheObjectDeclaresNone()
+    {
+        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").IconName);
+    }
+
     private static GameSymbol Sym(string id, string typeName, string? variantBaseId = null)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
@@ -527,7 +549,7 @@ public sealed class PreviewSceneBuilderTest
     /// <remarks>
     ///     <para>
     ///         MEASURED, and the two owners genuinely differ.
-    ///         <c>HardPointDataClass::HardPointDataClass</c> (<c>00be1220</c>) writes
+    ///         <c>HardPointDataClass</c> writes
     ///         <c>TurretRotateExtentDegrees = 180.0</c> and
     ///         <c>TurretElevateExtentDegrees = 90.0</c>, where <c>GameObjectTypeClass</c>'s
     ///         constructor writes 360 and 180. Sending the authored value and letting the client
@@ -535,7 +557,7 @@ public sealed class PreviewSceneBuilderTest
     ///     </para>
     ///     <para>
     ///         180 is exactly the threshold at which
-    ///         <c>HardPointClass::Calculate_Desired_Turret_Angle</c> skips its clamp
+    ///         the turret-angle calculation skips its clamp
     ///         (<c>extent &lt; 180.0 &amp;&amp; extent &gt; 0.0</c>), so the default yaw is a free
     ///         turn while the default pitch is a real stop at plus or minus 90.
     ///     </para>
@@ -562,8 +584,8 @@ public sealed class PreviewSceneBuilderTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>GameObjectClass::Update_Transform</c> builds the object's world matrix with no
-    ///         scale in it and then calls <c>Model-&gt;Set_Scale(Get_Scale_Factor(Type))</c>, so the
+    ///         the engine's transform update builds the object's world matrix with no
+    ///         scale in it and then calls <c>Model-&gt;the model-scale setter(the type's scale factor(Type))</c>, so the
     ///         scale belongs to the model alone. Sending it is what lets the client put the two
     ///         spaces together.
     ///     </para>
@@ -637,7 +659,7 @@ public sealed class PreviewSceneBuilderTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>HardPointClass::Can_Weapon_Point_At</c> branches: <c>if (Is_Turret)</c> it tests
+    ///         the weapon-aim test branches: <c>if (Is_Turret)</c> it tests
     ///         <c>Turret_Rotate_Extent_Degrees &lt; |yaw|</c> and nothing else, and the fire cone is
     ///         tested only in the <c>ELSE</c>. The two are exclusive, so a turret's cone is never
     ///         read - all 7 shipped turret hardpoints declare one anyway, and one of them

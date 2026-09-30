@@ -46,9 +46,24 @@ public static class MegAssetCatalogBuilder
     ///     MTD files are skipped and no icon names are added from mega-texture atlases.
     /// </param>
     /// <param name="logger">Logger for collision warnings.</param>
+    /// <param name="extractTextures">
+    ///     Reads the texture names an open <c>.alo</c> carries inside itself. When
+    ///     <see langword="null" />, no texture catalog is built and the validator falls back to
+    ///     parsing each model on demand - which is what it did before, and what MEASURED as the
+    ///     entire cost of a workspace diagnostics sweep.
+    ///     <para>
+    ///         Opens the entry a SECOND time rather than sharing the bone pass's stream. That is
+    ///         deliberate: the bone path hands the ALO loader the original entry stream because the
+    ///         loader resolves the model's path from it, and a <c>MemoryStream</c> throws - a trap
+    ///         that once turned into a silently empty baseline. Threading a second reader through
+    ///         that sequence buys one open per model in an OFFLINE build and risks the same
+    ///         silence; textures come straight off the bytes and need none of it.
+    ///     </para>
+    /// </param>
     public static (
         ImmutableHashSet<string> assetFiles,
-        ImmutableDictionary<string, ImmutableArray<string>> modelBones
+        ImmutableDictionary<string, ImmutableArray<string>> modelBones,
+        ImmutableDictionary<string, ImmutableArray<string>> modelTextures
         ) Build(
             IEnumerable<(string megName, IEnumerable<string> entryPaths)> megEntries,
             IFileSystem looseFileSystem,
@@ -56,12 +71,14 @@ public static class MegAssetCatalogBuilder
             Func<string, Stream?> openEntry,
             Func<Stream, IReadOnlyList<string>> extractBones,
             Func<Stream, IEnumerable<string>>? extractMtdIcons,
-            ILogger logger)
+            ILogger logger,
+            Func<Stream, IReadOnlyList<string>>? extractTextures = null)
     {
         // Track source MEG for each normalised path - used for collision detection.
         var pathSource = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var assetBuilder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
         var bonesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+        var texturesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (megName, entryPaths) in megEntries)
         foreach (var rawPath in entryPaths)
@@ -87,7 +104,11 @@ public static class MegAssetCatalogBuilder
             assetBuilder.Add(normalized);
 
             if (ext.Equals(".alo", StringComparison.OrdinalIgnoreCase))
+            {
                 TryExtractBones(normalized, openEntry, extractBones, bonesBuilder);
+                if (extractTextures is not null)
+                    TryExtractTextures(normalized, openEntry, extractTextures, texturesBuilder);
+            }
         }
 
         // Merge loose files on top (workspace loose files may extend the MEG catalog).
@@ -121,6 +142,8 @@ public static class MegAssetCatalogBuilder
 
         return (assetBuilder.ToImmutable(),
             bonesBuilder.ToImmutableDictionary(
+                kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase),
+            texturesBuilder.ToImmutableDictionary(
                 kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase));
     }
 
@@ -134,39 +157,25 @@ public static class MegAssetCatalogBuilder
     }
 
     /// <summary>
-    ///     Applies SFX packaging conventions to an already-normalised MEG entry path.
-    ///     <list type="bullet">
-    ///         <item>Flat paths (no directory) from SFX MEGs are prefixed with <c>data/audio/sfx/</c>.</item>
-    ///         <item>
-    ///             <c>_eng</c> stem suffix is stripped from <c>.wav</c> and <c>.mp3</c> files
-    ///             (localized audio; XML references the base name without the language suffix).
-    ///         </item>
-    ///     </list>
+    ///     Applies SFX packaging conventions to an already-normalised MEG entry path: a flat path
+    ///     (no directory) from an SFX MEG is prefixed with <c>data/audio/sfx/</c>, because the MEG
+    ///     itself IS that directory.
     /// </summary>
+    /// <remarks>
+    ///     The entry name is otherwise kept verbatim, language suffix included. This used to strip a
+    ///     <c>_eng</c> stem suffix from <c>.wav</c> and <c>.mp3</c> entries on the premise that XML
+    ///     names sounds without one, and the premise was false on every side: the localised MEG
+    ///     spells 6825 of its 6835 audio entries <c>I000_EHD0101_ENG.WAV</c>, the loose install
+    ///     spells the same line <c>Data/Audio/Speech/English/C000_emp0101_eng.mp3</c>, and the XML
+    ///     asks for <c>U000_SPD0101_ENG.wav</c>. Folding the suffix away in the catalog alone left
+    ///     every localised reference in the game unresolvable - 7480 warnings over one message.
+    /// </remarks>
     public static string ApplySfxConventions(string normalizedPath, string megName)
     {
-        // Flat path from an SFX MEG → the MEG itself is the DATA/AUDIO/SFX directory.
-        if (!normalizedPath.Contains('/') &&
-            megName.Contains("sfx", StringComparison.OrdinalIgnoreCase))
-            normalizedPath = "data/audio/sfx/" + normalizedPath;
-
-        // Strip _eng suffix from audio file stems - XML references sounds without language suffix.
-        var ext = Path.GetExtension(normalizedPath);
-        if (ext.Equals(".wav", StringComparison.OrdinalIgnoreCase) ||
-            ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase))
-        {
-            var stem = Path.GetFileNameWithoutExtension(normalizedPath);
-            if (stem.EndsWith("_eng", StringComparison.OrdinalIgnoreCase))
-            {
-                var dir = Path.GetDirectoryName(normalizedPath)?.Replace('\\', '/');
-                var newStem = stem[..^4];
-                normalizedPath = string.IsNullOrEmpty(dir)
-                    ? newStem + ext
-                    : $"{dir}/{newStem}{ext}";
-            }
-        }
-
-        return normalizedPath;
+        return !normalizedPath.Contains('/') &&
+               megName.Contains("sfx", StringComparison.OrdinalIgnoreCase)
+            ? "data/audio/sfx/" + normalizedPath
+            : normalizedPath;
     }
 
     /// <summary>Returns true when the file extension belongs to the tracked asset categories.</summary>
@@ -203,6 +212,31 @@ public static class MegAssetCatalogBuilder
             var normalized = name.ToLowerInvariant().Trim();
             if (!string.IsNullOrEmpty(normalized))
                 assetBuilder.Add(normalized);
+        }
+    }
+
+    /// <summary>
+    ///     Records the textures a model names inside itself. Unlike the bone pass, an EMPTY list is
+    ///     kept: "this model names no textures" is a real answer, and it is what stops the
+    ///     validator parsing the file again on every reference to it.
+    /// </summary>
+    private static void TryExtractTextures(
+        string normalizedPath,
+        Func<string, Stream?> openEntry,
+        Func<Stream, IReadOnlyList<string>> extractTextures,
+        Dictionary<string, ImmutableArray<string>> texturesBuilder)
+    {
+        try
+        {
+            using var stream = openEntry(normalizedPath);
+            if (stream is null) return;
+            // Keyed by bare filename, like the bones: XML references models by name and the engine
+            // resolves them by name across the VFS.
+            texturesBuilder[ModelBoneKey.From(normalizedPath)] = extractTextures(stream).ToImmutableArray();
+        }
+        catch
+        {
+            // Corrupt or unsupported files must not abort the build.
         }
     }
 

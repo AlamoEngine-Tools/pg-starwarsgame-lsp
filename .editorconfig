@@ -1,0 +1,75 @@
+# Mechanical formatting for this repo.
+#
+# CLAUDE.md is the authority on what a string SAYS; this file is the authority on how the code is
+# SHAPED. Before it existed the shape lived only in each contributor's IDE, and
+# PG.StarWarsGame.LSP.sln.DotSettings.user is a *.user file - a personal one, not shared, and it
+# carries inspection excludes rather than a code style.
+#
+# Every value below was measured against the tree rather than chosen, so adopting this file
+# reformats nothing. Three settings people usually expect here are deliberately absent, because the
+# tree does not agree on them and quietly picking a side would put a whole-repo reformat inside
+# whoever's next commit:
+#
+#   end_of_line             - 213 C# files are CRLF, 187 are LF, and .gitattributes sets no
+#                             text=auto. Normalising is a deliberate pass of its own.
+#   insert_final_newline    - 196 of 200 sampled C# files end WITHOUT one. Setting true rewrites
+#                             almost every file in the repo.
+#   trim_trailing_whitespace - 275 C# files carry some today.
+#
+# Each is worth fixing in one intentional commit that touches nothing else. Until then, leaving
+# them unset is the honest state.
+
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+
+[*.cs]
+indent_size = 4
+
+# Unanimous in the tree: 212 of 212 namespaces in Core are file-scoped, braces open on their own
+# line, and no C# file uses a tab.
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+
+# `var` wherever the type is on the line already, which is what the code does throughout.
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Properties forward in one line; methods keep a body even when short. Both follow the shape of the
+# providers and handlers rather than a preference.
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_methods = false:suggestion
+
+# Usings sit above a file-scoped namespace, so there is nowhere else to put them.
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# Nothing in the tree qualifies with `this.`.
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# Severities stay at suggestion on purpose. Production projects treat warnings as errors
+# (Directory.Build.props), so a style rule raised to warning here would start failing builds over
+# formatting - which is not what warnings-as-errors was turned on for.
+
+[*.{ts,tsx,js,mjs}]
+indent_size = 4
+
+[*.{json,jsonc}]
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.{csproj,props,targets,slnx}]
+indent_size = 4
+
+[*.md]
+indent_size = 2

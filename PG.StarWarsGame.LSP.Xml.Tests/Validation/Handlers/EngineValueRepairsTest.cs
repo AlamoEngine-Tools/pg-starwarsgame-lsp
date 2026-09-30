@@ -27,7 +27,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 public sealed class EngineValueRepairsTest
 {
     [Theory]
-    // LeechShieldsAbilityClass::Validate_Data assigns 0.0 to both ranges.
+    // the engine's load-time validation assigns 0.0 to both ranges.
     [InlineData("LeechShieldsAbility", "Activation_Min_Range", "-5", "0.0")]
     [InlineData("LeechShieldsAbility", "Activation_Max_Range", "-1.5", "0.0")]
     public void A_measured_repair_is_offered_for_its_own_owner(

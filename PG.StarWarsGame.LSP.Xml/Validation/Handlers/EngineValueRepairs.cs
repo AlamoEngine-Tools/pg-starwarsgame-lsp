@@ -32,28 +32,28 @@ internal static class EngineValueRepairs
     private static readonly Dictionary<(string Owner, string Tag), string> Repairs =
         new(OwnerTagComparer.Instance)
         {
-            // LeechShieldsAbilityClass::Validate_Data (01028000)
+            // the engine's load-time validation
             [("LeechShieldsAbility", "Activation_Min_Range")] = "0.0",
             [("LeechShieldsAbility", "Activation_Max_Range")] = "0.0",
             [("LeechShieldsAbility", "Duration_In_Secs")] = "1.0",
 
-            // PoliticalTransitionBonusAbilityClass::Validate_Data (01016100) - reset, not clamped
+            // the engine's load-time validation - reset, not clamped
             // to the nearest legal value.
             [("PoliticalTransitionBonusAbility", "Time_Reduction_Percentage")] = "0.0",
 
-            // IncomeStreamAbilityClass::Validate_Data (0100f6a0)
+            // the engine's load-time validation
             [("IncomeStreamAbility", "Base_Interval_In_Secs")] = "1.0",
 
-            // ForceHealingAbilityClass::Validate_Data (01004930). The interval is the one that does
+            // the engine's load-time validation. The interval is the one that does
             // NOT take its own bound - it is refused at zero and then set to ten.
             [("ForceHealingAbility", "Heal_Percent")] = "0.0",
             [("ForceHealingAbility", "Heal_Range")] = "0.0",
             [("ForceHealingAbility", "Heal_Interval_In_Secs")] = "10.0",
 
-            // BountyOnFactionAbilityClass::Validate_Data (00ff8960)
+            // the engine's load-time validation
             [("BountyOnFactionAbility", "Bounty_Percentage_Amount")] = "0.0",
 
-            // GrenadeAttackAbilityClass::Validate_Data (0100b330) - the message names the default
+            // the engine's load-time validation - the message names the default
             // itself, "Defaulting to 10.0 seconds".
             [("GrenadeAttackAbility", "Grenade_Explode_Timer_In_Secs")] = "10.0"
         };

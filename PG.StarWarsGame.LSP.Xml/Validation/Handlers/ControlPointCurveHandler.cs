@@ -11,8 +11,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// <remarks>
 ///     <para>
 ///         <c>Error: (%s) Cost_Mod_By_Base_Level must have at least two control points!</c>
-///         (<c>01543398</c>), and the same for <c>Cost_Mod_By_Planetary_Corruption_Level</c>
-///         (<c>015432e0</c>) and <c>Cost_Mod_By_Previous_Neutralizations</c> (<c>01543340</c>).
+///        , and the same for <c>Cost_Mod_By_Planetary_Corruption_Level</c>
+///         and <c>Cost_Mod_By_Previous_Neutralizations</c>.
 ///         A single point gives the engine nothing to interpolate between.
 ///     </para>
 ///     <para>

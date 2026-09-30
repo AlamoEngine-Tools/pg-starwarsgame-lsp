@@ -130,11 +130,11 @@ describe('weaponRows', () => {
 
     it('hangs a UNIT weapon`s arc in the hull frame, not the bone`s', () => {
         // The engine reads the muzzle matrix for its TRANSLATION and discards its rotation, taking
-        // the orientation from the object - `Is_In_Cone_Of_Fire` builds its frame from
+        // the orientation from the object - the cone-of-fire test builds its frame from
         // `owner->Get_Facing()` at the muzzle position. So a rotated MuzzleA bone moves where the
         // shot STARTS and not which way the arc points.
         //
-        // A hardpoint is the opposite: `Can_Weapon_Point_At` measures in the hardpoint's own
+        // A hardpoint is the opposite: the weapon-aim test measures in the hardpoint's own
         // coordinate system, so there the bone's rotation IS the aim. One flag, because the two
         // paths genuinely disagree.
         const rows = weaponRows({
@@ -231,8 +231,8 @@ describe('weaponRows', () => {
             assert.equal(row({}).inaccuracy, null);
         });
 
-        // Calculate_Projectile_Facing returns the object's own heading BEFORE it reaches
-        // Add_Random_Inaccuracy_To_Fire_At_Position and before Intercept, so a Fires_Forward weapon
+        // the projectile-facing calculation returns the object's own heading BEFORE it reaches
+        // the fire-inaccuracy scatter and before Intercept, so a Fires_Forward weapon
         // has no spread and does not lead. Printing the authored figure would claim an engine
         // behaviour that never runs.
         it('says a Fires_Forward weapon applies none of it, whatever the file declares', () => {
@@ -294,8 +294,8 @@ describe('the two envelopes a turret hardpoint keeps', () => {
     }
 
     /**
-     * The payoff, and it is specific to this engine. `Can_Weapon_Point_At`'s turret branch tests
-     * the yaw extent and NOTHING else, so the shot has no pitch bound; `Calculate_Desired_Turret_Angle`
+     * The payoff, and it is specific to this engine. the weapon-aim test's turret branch tests
+     * the yaw extent and NOTHING else, so the shot has no pitch bound; the turret-angle calculation
      * clamps both, so the barrel does. One arc cannot say that.
      */
     it('draws the barrel envelope as well as the firing one', () => {

@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// <remarks>
 ///     <para>
 ///         Stated once, on the base class, and therefore true of every ability type:
-///         <c>SpecialAbilityClass::Validate_Data</c> complains and then sets
+///         the engine's load-time validation complains and then sets
 ///         <c>CausesDespawn = false</c> itself. The ability keeps running; it just no longer does
 ///         the thing the author asked for.
 ///     </para>

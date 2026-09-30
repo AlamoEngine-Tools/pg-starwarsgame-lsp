@@ -146,6 +146,7 @@ public sealed class CreateLocalisationLanguageFileHandlerTest
 
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(fs);
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
         services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
@@ -164,7 +165,7 @@ public sealed class CreateLocalisationLanguageFileHandlerTest
             sp2.GetRequiredService<ILocalisationFormatConverter>(),
             sp2.GetRequiredService<ITranslationDatabaseFactory>(),
             sp2.GetRequiredService<IDatTranslationExporter>(),
-            sp2.GetRequiredService<IDatFileService>(),
+            sp2.GetRequiredService<IDatService>(),
             sp2.GetRequiredService<ILanguageService>(),
             new FileHelper(fs),
             registry,

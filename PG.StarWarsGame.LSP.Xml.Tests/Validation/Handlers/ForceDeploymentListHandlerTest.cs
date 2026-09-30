@@ -17,11 +17,23 @@ public sealed class ForceDeploymentListHandlerTest
     [Theory]
     [InlineData("REBEL, Yavin4, X_Wing")]
     [InlineData("EMPIRE,Coruscant,TIE_Fighter")]
-    [InlineData("NEUTRAL, Tatooine, Infantry_A, Infantry_B")]
     public void Valid_values_return_no_diagnostics(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
+    }
+
+    [Fact]
+    public void ExtraTokensInOneTag_AreAWarningThatOnlyTheFirstEntryIsRead()
+    {
+        // The engine's force reader takes three tokens per tag and drops the rest: Infantry_B is
+        // never placed. One unit per tag is the only shape that works.
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "NEUTRAL, Tatooine, Infantry_A, Infantry_B"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("Infantry_B", d.Message);
     }
 
     [Theory]

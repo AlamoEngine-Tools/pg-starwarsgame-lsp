@@ -14,14 +14,13 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         From the assert seam - there is no engine message.
-///         <c>GrenadeAttackAbility.cpp:440</c> and <c>RemoteBombAbility.cpp:388</c> both read
-///         <c>!type-&gt;Is_Projectile_Grenade()</c>, and both are FAIL_IF-shaped: the assert fires
+///         From the assert seam - there is no engine message. The grenade ability and the remote
+///         bomb ability both test the same way, and both are FAIL_IF-shaped: the assert fires
 ///         when the answer is FALSE and the function then returns false. So the text states the
 ///         failure and the rule is the opposite of how it reads.
 ///     </para>
 ///     <para>
-///         <c>Is_Projectile_Grenade()</c> is one comparison -
+///         the is-a-grenade test is one comparison -
 ///         <c>ProjCategory == PROJECTILE_CATEGORY_GRENADE</c> - so the property to check on the
 ///         target is its <c>Projectile_Category</c>.
 ///     </para>

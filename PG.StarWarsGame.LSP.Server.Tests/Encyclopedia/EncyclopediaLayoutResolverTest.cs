@@ -58,6 +58,67 @@ public sealed class EncyclopediaLayoutResolverTest
         Assert.Equal(new EncyclopediaRgba(255, 255, 255, 128), layout.BackdropColor);
     }
 
+    // ── the wrap budget ──────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     A text component's <c>Size</c> X is the CHARACTER budget its lines wrap at - not a width
+    ///     in any spatial unit, and nothing to do with the card's own width.
+    /// </summary>
+    [Fact]
+    public void Resolve_NothingIndexed_UsesBaseGameWrapBudgets()
+    {
+        var layout = Resolve(GameIndex.Empty, new FakeVariantTagSource());
+
+        // The shipped file says 41 and carries a stale "42 14" comment beside it. 41 is the value
+        // that reproduces the shipped wrap of Luke Skywalker's biography; the comment does not.
+        Assert.Equal(41, layout.Body.WrapChars);
+        Assert.Equal(23, layout.Header.WrapChars);
+        Assert.Equal(42, layout.RightText.WrapChars);
+        Assert.Equal(42, layout.CenterText.WrapChars);
+        Assert.Equal(42, layout.CostText.WrapChars);
+    }
+
+    /// <summary>
+    ///     Widening the card and widening the text budget are two separate edits, and EaWX makes
+    ///     both. Reading the budget off the backdrop would break every divider a mod tuned.
+    /// </summary>
+    [Fact]
+    public void Resolve_ModWidensBodyText_TakesBudgetFromTheTextComponentNotTheCard()
+    {
+        var index = IndexWith("encyclopedia_back", "encyclopedia_text");
+        var source = new FakeVariantTagSource()
+            .With("encyclopedia_back", Tag("Size", "340 14"))
+            .With("encyclopedia_text", Tag("Size", "56 14"));
+
+        var layout = Resolve(index, source);
+
+        Assert.Equal(340d, layout.Width);
+        Assert.Equal(56, layout.Body.WrapChars);
+    }
+
+    /// <summary>
+    ///     A budget is a count of characters, so a fractional value is truncated rather than
+    ///     rounded - the engine reads it as an integer.
+    /// </summary>
+    [Fact]
+    public void Resolve_FractionalBudget_Truncates()
+    {
+        var source = new FakeVariantTagSource().With("encyclopedia_text", Tag("Size", "56.9 14"));
+
+        Assert.Equal(56, Resolve(IndexWith("encyclopedia_text"), source).Body.WrapChars);
+    }
+
+    /// <summary>
+    ///     Junk must not collapse the budget to zero, which would put one character on every line.
+    /// </summary>
+    [Fact]
+    public void Resolve_UnparsableBudget_KeepsBaseGameValue()
+    {
+        var source = new FakeVariantTagSource().With("encyclopedia_text", Tag("Size", "wide"));
+
+        Assert.Equal(41, Resolve(IndexWith("encyclopedia_text"), source).Body.WrapChars);
+    }
+
     // ── mod overrides ────────────────────────────────────────────────────────
 
     [Fact]

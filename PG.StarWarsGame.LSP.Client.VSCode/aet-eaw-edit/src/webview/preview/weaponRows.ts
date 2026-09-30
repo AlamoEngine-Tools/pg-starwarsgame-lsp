@@ -25,10 +25,10 @@ import { axisRange, turretEnvelopes } from './turretHandles';
  * Which frame an arc is measured in, because the two firing paths genuinely disagree.
  *
  * - `bone` - the arc is measured in the FIRE BONE's own space, so rotating the bone rotates the
- *   arc. `HardPointClass::Can_Weapon_Point_At` builds its frame from
- *   `Get_Hard_Point_Coordinate_System`, which is the hardpoint's own.
+ *   arc. the weapon-aim test builds its frame from
+ *   the hardpoint coordinate-system lookup, which is the hardpoint's own.
  * - `hull` - the arc takes its POSITION from the bone and its ORIENTATION from the object.
- *   `WeaponBehaviorClass::Is_In_Cone_Of_Fire` reads the muzzle matrix for its translation and then
+ *   the cone-of-fire test reads the muzzle matrix for its translation and then
  *   discards its rotation, rebuilding the frame from `owner->Get_Facing()`. A rotated `MuzzleA`
  *   bone therefore moves where the shot STARTS and not which way the unit may shoot.
  */
@@ -37,8 +37,8 @@ export type WeaponArcFrame = 'bone' | 'hull';
 /**
  * Which envelope an arc is, because a turret hardpoint keeps two that are not the same shape.
  *
- * - `fire` - where the weapon may SHOOT. `HardPointClass::Can_Weapon_Point_At`.
- * - `rotation` - where the BARREL may point. `HardPointClass::Calculate_Desired_Turret_Angle`.
+ * - `fire` - where the weapon may SHOOT. the weapon-aim test.
+ * - `rotation` - where the BARREL may point. the turret-angle calculation.
  *
  * They differ in pitch and only in pitch: the turret branch of the firing gate tests the yaw extent
  * and has no elevation test at all, while the motion clamp applies both. So the barrel is
@@ -360,9 +360,9 @@ function coneText(weapon: PreviewWeapon): string | null {
 /**
  * What the shot's spread actually is, which for one kind of weapon is nothing.
  *
- * `WeaponBehaviorClass::Calculate_Projectile_Facing` returns the OBJECT's own heading the moment
+ * the projectile-facing calculation returns the OBJECT's own heading the moment
  * `Fires_Forward` is set, and that return sits above both `Intercept` (which leads a moving target)
- * and `Add_Random_Inaccuracy_To_Fire_At_Position` (which is this figure). So the engine reads
+ * and the fire-inaccuracy scatter (which is this figure). So the engine reads
  * neither, and printing the authored number would claim a behaviour that never runs. Saying "none"
  * and saying WHY is the disable-don't-hide rule applied to a fact instead of to a control.
  *

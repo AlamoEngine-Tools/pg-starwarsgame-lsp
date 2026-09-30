@@ -15,14 +15,15 @@ public sealed class PerFactionPlanetHandler : CommaSeparatedPairHandlerBase
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        var parts = SplitOnFirstComma(fact.RawValue.Trim());
-        if (parts.Length != 2 || parts[0].Trim().Length == 0 || parts[1].Trim().Length == 0)
+        var raw = fact.RawValue.Trim();
+        var parts = raw.Split(',').Select(p => p.Trim()).ToArray();
+        if (parts.Length < 2 || parts[0].Length == 0 || parts[1].Length == 0)
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid per-faction planet for <{fact.Tag.Tag}>. Expected: FactionName, PlanetName.")
+                    $"'{raw}' is not a valid per-faction planet for <{fact.Tag.Tag}>. Expected: FactionName, PlanetName.")
             ];
 
-        return [];
+        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 2) is { } extra ? [extra] : [];
     }
 }

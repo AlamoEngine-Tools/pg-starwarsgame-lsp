@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+	Fixture for StoryCompareMethodSmokeTest.
+
+	The outermost link: a campaign file is only read as one because this metafile lists it. Metafiles
+	override rather than merge, first found wins, so this replaces the baseline's list for this
+	workspace - which is why it names only the fixture campaign and nothing else.
+-->
+
+<Campaign_Files>
+
+	<File>Campaigns_E2E.xml</File>
+
+</Campaign_Files>

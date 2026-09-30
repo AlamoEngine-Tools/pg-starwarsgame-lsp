@@ -3,6 +3,8 @@
 
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Project;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Icons;
@@ -45,13 +47,30 @@ public sealed class WorkspaceIconCatalog(
         if (icons is null)
             return null;
 
-        var root = projects?.LastWorkspaceRoots?.FirstOrDefault() ?? config.Current.WorkspaceRoot;
-        if (string.IsNullOrEmpty(root))
-            return null;
+        var layers = IconLayersOf(projects?.LastWorkspaceConfig);
+        if (layers.Count == 0)
+        {
+            // "No layers" means two different things, and answering the wrong one is how the first
+            // card opened after startup came back drawn entirely from the baked base game - the
+            // wrong portrait, and a 262-wide band on a card the mod had widened to 340.
+            //
+            // A load that has FINISHED and found no project file leaves nothing but the workspace
+            // root to scan, and the heuristic fallback below is the right answer. A load still in
+            // flight looks identical from here, and falling back then answers from the base game
+            // while the project holding the real art is still being read. Nothing is served until
+            // it is known which case this is; the next request gets the real catalog.
+            if (projects is { HasLoadedProjects: false })
+                return null;
+
+            var root = projects?.LastWorkspaceRoots?.FirstOrDefault() ?? config.Current.WorkspaceRoot;
+            if (string.IsNullOrEmpty(root))
+                return null;
+            layers = [new IconLayer(root, IconProjectSettings.Default)];
+        }
 
         try
         {
-            return await icons.GetAsync(root, projects?.LastWorkspaceConfig?.Icons, ct);
+            return await icons.GetAsync(layers, ct);
         }
         catch (OperationCanceledException)
         {
@@ -61,5 +80,27 @@ public sealed class WorkspaceIconCatalog(
         {
             return null;
         }
+    }
+
+    /// <summary>
+    ///     Every layer's icon sources, leaf first, each rooted at its OWN project directory.
+    /// </summary>
+    /// <remarks>
+    ///     A layer with no <c>icons</c> node still takes part, on
+    ///     <see cref="IconProjectSettings.Default" />: the engine always looks for the same mega
+    ///     texture in the same place, so a dependency that declares nothing can still ship one.
+    ///     Layers without a <c>.pgproj</c> have no directory to resolve against and are skipped.
+    /// </remarks>
+    private static List<IconLayer> IconLayersOf(WorkspaceConfiguration? workspace)
+    {
+        if (workspace is null)
+            return [];
+
+        return workspace.Layers
+            .OrderByDescending(layer => layer.Rank)
+            .Select(layer => (Root: layer.ProjectDirectory, layer.Icons))
+            .Where(l => l.Root is not null)
+            .Select(l => new IconLayer(l.Root!, l.Icons ?? IconProjectSettings.Default))
+            .ToList();
     }
 }

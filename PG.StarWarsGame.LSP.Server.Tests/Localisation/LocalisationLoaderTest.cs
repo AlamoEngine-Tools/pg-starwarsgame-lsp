@@ -734,6 +734,7 @@ public sealed class LocalisationLoaderTest
 
         // Register mock file system BEFORE SupportLocalisationBaseline so TryAddSingleton skips it.
         services.AddSingleton(fs);
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
 
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
@@ -757,6 +758,7 @@ public sealed class LocalisationLoaderTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(fs);
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         return services.BuildServiceProvider();
     }
@@ -767,7 +769,7 @@ public sealed class LocalisationLoaderTest
     {
         var factory = sp.GetRequiredService<ITranslationDatabaseFactory>();
         var exporter = sp.GetRequiredService<IDatTranslationExporter>();
-        var datFileService = sp.GetRequiredService<IDatFileService>();
+        var datFileService = sp.GetRequiredService<IDatService>();
 
         var db = factory.CreateKeyed([language]);
         db.SetTranslation(key, language, value);
@@ -775,7 +777,7 @@ public sealed class LocalisationLoaderTest
 
         fs.Directory.CreateDirectory(fs.Path.GetDirectoryName(path)!);
         using var stream = fs.File.Create(path);
-        datFileService.CreateDatFile(stream, model, model.KeySortOrder);
+        datFileService.CreateDatBinary(stream, model, model.Layout);
     }
 }
 

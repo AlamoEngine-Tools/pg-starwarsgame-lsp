@@ -185,6 +185,7 @@ public sealed class GetBaselineEntriesHandlerTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
 

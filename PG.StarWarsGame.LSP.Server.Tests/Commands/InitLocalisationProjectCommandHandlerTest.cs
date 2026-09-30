@@ -415,6 +415,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         var services = new ServiceCollection();
         // Register MockFileSystem BEFORE SupportLocalisationBaseline so TryAddSingleton skips RealFileSystem.
         services.AddSingleton<IFileSystem>(mockFs);
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
 

@@ -6,6 +6,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -148,7 +149,7 @@ public sealed class StoryModelService : IStoryModelService
 
         var reader = new RecordingReader(this);
         var model = new StoryCampaignAssembler(_schema)
-            .Assemble(campaignName, faction, chain.Result, reader.ReadThread);
+            .Assemble(campaignName, faction, chain.Result, reader.ReadThread, reader.ReadLuaMachine);
         if (model is null) return null;
 
         _logger.LogDebug("Story model for {Key} built: {Threads} thread(s)",
@@ -162,14 +163,76 @@ public sealed class StoryModelService : IStoryModelService
         return model;
     }
 
+    /// <summary>
+    ///     The campaign models whose threads include <paramref name="canonicalUri" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The CHAIN narrows the candidates; the MODEL still decides. That order is the whole
+    ///         point: asking each model directly meant assembling every campaign model in the
+    ///         workspace to answer a question about one document, and models are invalidated by an
+    ///         edit to anything they read - so this ran on every keystroke in a story file, not
+    ///         once. MEASURED on a real layered mod: opening one story file took 7.9s and the next
+    ///         6.7s, with 7,553 model assemblies logged.
+    ///     </para>
+    ///     <para>
+    ///         The chain already records which manifest lists which thread, and a thread is
+    ///         recorded as an xml-relative path that the document's URI ends with - so the
+    ///         narrowing needs no file reads and no new dependency. The final
+    ///         <c>model.Threads</c> test is kept so the ANSWER is exactly what it was: the chain
+    ///         can only over-offer candidates, never hide one.
+    ///     </para>
+    /// </remarks>
     public IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri)
     {
+        var chain = GetChain().Result;
+
+        var manifestsWithDocument = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var manifest in chain.Manifests)
+        {
+            if (!manifest.ActiveThreads.Any(t => IsThreadOf(canonicalUri, t))
+                && !manifest.SuspendedThreads.Any(t => IsThreadOf(canonicalUri, t)))
+                continue;
+
+            manifestsWithDocument.Add(manifest.ManifestFile);
+        }
+
+        // Not a thread of any manifest - no model can contain it, and none is built to find out.
+        if (manifestsWithDocument.Count == 0) return [];
+
         var result = new List<StoryCampaignModel>();
-        foreach (var key in GetModelKeys())
-            if (GetCampaignModel(key.Campaign, key.Faction) is { } model
+        var seen = new HashSet<StoryModelKey>();
+
+        foreach (var campaign in chain.Campaigns)
+        foreach (var factionManifest in campaign.FactionManifests)
+        {
+            if (!manifestsWithDocument.Contains(factionManifest.ManifestFile)) continue;
+            // Deduplicated like GetModelKeys: a campaign may name the same faction twice.
+            if (!seen.Add(new StoryModelKey(campaign.Name, factionManifest.Faction))) continue;
+
+            if (GetCampaignModel(campaign.Name, factionManifest.Faction) is { } model
                 && model.Threads.Any(t => string.Equals(t.DocumentUri, canonicalUri, StringComparison.Ordinal)))
                 result.Add(model);
+        }
+
         return result;
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="documentUri" /> is the thread the manifest spells as
+    ///     <paramref name="xmlRelativeThread" />.
+    /// </summary>
+    /// <remarks>
+    ///     Anchored at a segment boundary, so <c>Story_Sith.xml</c> is never satisfied by
+    ///     <c>Alt_Story_Sith.xml</c>. Manifests spell separators either way, and case never agrees
+    ///     between shipped and mod data, so both are folded.
+    /// </remarks>
+    private static bool IsThreadOf(string documentUri, string xmlRelativeThread)
+    {
+        if (string.IsNullOrEmpty(xmlRelativeThread)) return false;
+
+        var relative = xmlRelativeThread.Replace('\\', '/').TrimStart('/');
+        return documentUri.EndsWith("/" + relative, StringComparison.OrdinalIgnoreCase);
     }
 
     public StoryChainScanResult GetChainResult()
@@ -329,6 +392,23 @@ public sealed class StoryModelService : IStoryModelService
             if (read is null) return null;
             Versions[read.Value.Uri] = service.CurrentVersionOf(read.Value.Uri);
             return read;
+        }
+
+        /// <summary>
+        ///     The attached script (manifest name, extensionless) as a state machine: the indexed
+        ///     .lua document of that file name, read open-buffer-first and extracted statically.
+        ///     Recorded like a thread, so an edit to the script rebuilds the model.
+        /// </summary>
+        public LuaStoryMachine? ReadLuaMachine(string scriptName)
+        {
+            var suffix = "/" + scriptName.ToLowerInvariant() + ".lua";
+            var uri = service._indexService.Current.Documents.Keys
+                .FirstOrDefault(u => u.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+            if (uri is null) return null;
+            var text = service._textSource.GetText(uri);
+            if (text is null) return null;
+            Versions[uri] = service.CurrentVersionOf(uri);
+            return LuaStoryMachineExtractor.Extract(text.Text, uri);
         }
     }
 }

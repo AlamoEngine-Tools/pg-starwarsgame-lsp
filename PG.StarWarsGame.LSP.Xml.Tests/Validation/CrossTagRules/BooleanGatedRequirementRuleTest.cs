@@ -18,9 +18,9 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.CrossTagRules;
 /// <remarks>
 ///     <para>
 ///         Six of them, all read out of the 2018 binary. Five are on
-///         <c>SystemSpyAbilityClass::Validate_Data</c> (<c>0101da00</c>) and pair one detail flag
+///         the engine's load-time validation and pair one detail flag
 ///         with the summary flag it needs; the sixth is on
-///         <c>GalacticSabotageAbilityClass::Validate_Data</c> (<c>00ef6c30</c>) and gates a
+///         the engine's load-time validation and gates a
 ///         DURATION rather than another flag.
 ///     </para>
 ///     <para>

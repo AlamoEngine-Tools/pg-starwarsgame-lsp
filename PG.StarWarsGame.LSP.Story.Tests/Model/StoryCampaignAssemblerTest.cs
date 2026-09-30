@@ -159,6 +159,30 @@ public sealed class StoryCampaignAssemblerTest
         });
     }
 
+    /// <summary>
+    ///     The model keeps the one resolution of manifest entry to document, for the faction's
+    ///     plots and a battle's alike, compared as the engine reads files: whatever the manifest's
+    ///     casing, the entry finds its document, and nothing downstream re-derives it.
+    /// </summary>
+    [Fact]
+    public void Assemble_KeepsTheManifestEntryToDocumentResolution_ForPlotsAndBattles()
+    {
+        var chain = Chain(
+            [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M.xml")])],
+            [
+                new StoryManifestContents("M.xml", ["Story_Act_I.XML"], [], []),
+                new StoryManifestContents("Plots_M02.xml", ["Story_M02_Land.xml"], [], [])
+            ],
+            [new StoryTacticalReference("Story_Act_I.XML", "Plots_M02.xml")]);
+
+        var model = Assemble(chain)!;
+
+        Assert.Equal("file:///xml/story_act_i.xml", model.ThreadUriByFile["story_act_i.xml"]);
+        Assert.Equal("file:///xml/story_m02_land.xml", model.ThreadUriByFile["STORY_M02_LAND.XML"]);
+        var battle = Assert.Single(model.Battles);
+        Assert.Equal(["Story_M02_Land.xml"], battle.ThreadFiles);
+    }
+
     [Fact]
     public void Assemble_ThreadOnlyEverSuspended_IsSuspended()
     {
@@ -242,6 +266,26 @@ public sealed class StoryCampaignAssemblerTest
         Assert.Equal("M_Tac.xml", entry.Key);
         var uri = Assert.Single(entry.Value);
         Assert.Equal("file:///xml/t_tactical.xml", uri);
+    }
+
+    // A tactical manifest attaches the mission's script; the faction manifest never lists it, so
+    // the battle carries it the way it carries its plot files - for the navigator and the feed.
+    [Fact]
+    public void Assemble_BattlesCarryTheirManifestsScripts()
+    {
+        var chain = Chain(
+            [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M.xml")])],
+            [
+                new StoryManifestContents("M.xml", ["T_Galactic.xml"], [], ["Script_Galactic"]),
+                new StoryManifestContents("M_Tac.xml", ["T_Tactical.xml"], [], ["Script_Tac"])
+            ],
+            [new StoryTacticalReference("T_Galactic.xml", "M_Tac.xml")]);
+
+        var model = Assemble(chain)!;
+
+        var battle = Assert.Single(model.Battles);
+        Assert.Equal(["Script_Tac"], battle.LuaScripts);
+        Assert.Equal(["Script_Galactic", "Script_Tac"], model.LuaScripts);
     }
 
     [Fact]

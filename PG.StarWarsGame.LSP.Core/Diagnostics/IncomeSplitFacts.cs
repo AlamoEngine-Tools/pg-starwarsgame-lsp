@@ -36,7 +36,7 @@ public sealed record OwnerIncomeShareFact(
 ///     Observation: a flag combination on an income stream that the engine refuses and clears.
 /// </summary>
 /// <remarks>
-///     Two of these, both stated in <c>IncomeStreamAbilityClass::Validate_Data</c> and both repaired
+///     Two of these, both stated in the engine's load-time validation and both repaired
 ///     by the engine turning flags off. They share an id because they are one concern from the
 ///     author's side - <c>Split_Favors_Owner</c> set where it cannot mean anything - and someone
 ///     silencing one would mean the other.

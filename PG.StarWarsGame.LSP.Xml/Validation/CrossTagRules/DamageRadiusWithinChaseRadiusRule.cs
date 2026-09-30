@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///     Buzz droids that damage further than they will chase.
 /// </summary>
 /// <remarks>
-///     <c>Error: (%s) Damage_Radius must be less than Chase_Radius.</c> (<c>01558a44</c>). The
+///     <c>Error: (%s) Damage_Radius must be less than Chase_Radius.</c>. The
 ///     droids chase a target and damage it once close enough, so a damage radius at or beyond the
 ///     chase radius describes a state the approach can never reach.
 /// </remarks>

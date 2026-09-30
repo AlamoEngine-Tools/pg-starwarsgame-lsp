@@ -19,6 +19,44 @@ public interface ISchemaProvider
     IReadOnlyList<MetafileDefinition> AllMetafiles { get; }
 
     /// <summary>
+    ///     Directories the engine walks, taking every file it finds. Default empty for the same
+    ///     reason <see cref="AllKinds" /> is: a provider that predates them, and every test double,
+    ///     still satisfies the interface - and a provider that reports none simply knows of no
+    ///     directory whose files are exempt from registration.
+    /// </summary>
+    IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories => [];
+
+    /// <summary>
+    ///     Whether this document sits under a directory the engine walks, in which case nothing
+    ///     names it and nothing was ever supposed to.
+    /// </summary>
+    /// <param name="path">
+    ///     A path or URI in any spelling; matched case-insensitively on the declared directory as a
+    ///     substring, because the declaration is game-relative and the document is not.
+    /// </param>
+    bool IsInScannedDirectory(string path)
+    {
+        if (AllScannedDirectories.Count == 0) return false;
+
+        var normalized = path.Replace('\\', '/');
+        return AllScannedDirectories.Any(d =>
+            normalized.Contains(d.Path, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    ///     Object kinds from <c>kinds.yaml</c>: what makes an object a planet, a star base, a
+    ///     squadron. Default empty so a provider that predates kinds, and every test double, still
+    ///     satisfies the interface.
+    /// </summary>
+    IReadOnlyList<ObjectKindDefinition> AllKinds => [];
+
+    /// <summary>The kind of that name, or null. Kind names are compared case-insensitively.</summary>
+    ObjectKindDefinition? GetKind(string kindName)
+    {
+        return null;
+    }
+
+    /// <summary>
     ///     A task that completes when the provider has finished its initial load and is ready for queries.
     ///     Providers that load synchronously (e.g. <c>LocalFileSchemaProvider</c>) return
     ///     <see cref="Task.CompletedTask" /> so callers can await without blocking.

@@ -9,4 +9,5 @@ internal sealed class YamlMetafileEntry
     public string MetaFileType { get; set; } = string.Empty;
     public List<string> Types { get; set; } = [];
     public Dictionary<string, string> Description { get; set; } = [];
+    public List<YamlNote> Notes { get; set; } = [];
 }

@@ -207,7 +207,7 @@ public sealed class EffectiveObjectResolver : IEffectiveObjectSource
     /// <remarks>
     ///     <para>
     ///         An additive tag APPENDS - this is not a union. Measured in
-    ///         <c>DatabaseMapClass::Map_Data_Of_Type</c>: the 17 additive type codes push into a
+    ///         the engine's tag-value mapper: the 17 additive type codes push into a
     ///         plain vector with no reset and no membership test on either path, and nothing in the
     ///         engine ever removes a repeat. Deduplicating here would make the effective object
     ///         disagree with the game, and for the spawn tables - where repeating an entry is how

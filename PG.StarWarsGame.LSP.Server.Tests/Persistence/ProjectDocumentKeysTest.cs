@@ -130,4 +130,93 @@ public sealed class ProjectDocumentKeysTest
     {
         Assert.Null(Build().NodeKeyForBaseName("story_main.xml", "Start"));
     }
+
+    // ── documents in a referenced project ────────────────────────────────────
+
+    private const string CoreDir = "C:/mods/core";
+    private const string CorePgproj = CoreDir + "/core.pgproj";
+
+    /// <summary>A leaf over a dependency, leaf ranked higher.</summary>
+    private static ProjectDocumentKeys BuildLayered()
+    {
+        ProjectLayer[] layers =
+        [
+            new(1, "Mod", [ProjectDir + "/data/xml"], [], [], [], null, Pgproj),
+            new(0, "Core", [CoreDir + "/data/xml"], [], [], [], null, CorePgproj)
+        ];
+        return new ProjectDocumentKeys(
+            new StoryCommandTestFixtures.StubReloadService(
+                WorkspaceConfiguration.Empty with { Layers = layers }),
+            new FileHelper(new MockFileSystem()));
+    }
+
+    /// <summary>
+    ///     A thread that lives in a REFERENCED project still has a key.
+    /// </summary>
+    /// <remarks>
+    ///     Every key was taken relative to the root project alone, and a path outside it resolved to
+    ///     null - so a node in a dependency had no key, its position was silently not saved, and the
+    ///     graph re-laid-out on every open. That is the lag the maintainer reported.
+    /// </remarks>
+    [Fact]
+    public void NodeKey_ForADocumentInAReferencedProject_IsNotNull()
+    {
+        Assert.NotNull(BuildLayered().NodeKey(CoreDir + "/data/xml/core_story.xml", "Start"));
+    }
+
+    /// <summary>
+    ///     It is keyed against the layer the file LIVES in, so the same dependency thread keys the
+    ///     same whichever leaf is open - four EaWX mods share one core project, and a layout the
+    ///     author arranged through one must not be a different graph through another.
+    /// </summary>
+    [Fact]
+    public void NodeKey_ForADependencyDocument_IsRelativeToThatDependency()
+    {
+        Assert.Equal(
+            DocumentKey.Composite("data/xml/core_story.xml", "Start"),
+            BuildLayered().NodeKey(CoreDir + "/data/xml/core_story.xml", "Start"));
+    }
+
+    /// <summary>
+    ///     The root project's own documents keep the key they always had, so no layout saved before
+    ///     this change is orphaned.
+    /// </summary>
+    [Fact]
+    public void NodeKey_ForARootDocument_IsUnchanged()
+    {
+        Assert.Equal(
+            DocumentKey.Composite("data/xml/story_main.xml", "Start"),
+            BuildLayered().NodeKey(ProjectDir + "/data/xml/story_main.xml", "Start"));
+    }
+
+    /// <summary>
+    ///     When one project's directory CONTAINS another's, the innermost wins. Otherwise a leaf
+    ///     nested inside its dependency would key its own files relative to the dependency and every
+    ///     existing layout in it would be orphaned.
+    /// </summary>
+    [Fact]
+    public void NodeKey_WithANestedProject_UsesTheInnermost()
+    {
+        ProjectLayer[] layers =
+        [
+            new(1, "Leaf", ["C:/mods/outer/leaf/data/xml"], [], [], [], null,
+                "C:/mods/outer/leaf/leaf.pgproj"),
+            new(0, "Outer", ["C:/mods/outer/data/xml"], [], [], [], null, "C:/mods/outer/outer.pgproj")
+        ];
+        var keys = new ProjectDocumentKeys(
+            new StoryCommandTestFixtures.StubReloadService(
+                WorkspaceConfiguration.Empty with { Layers = layers }),
+            new FileHelper(new MockFileSystem()));
+
+        Assert.Equal(
+            DocumentKey.Composite("data/xml/t.xml", "Start"),
+            keys.NodeKey("C:/mods/outer/leaf/data/xml/t.xml", "Start"));
+    }
+
+    /// <summary>A document under no project at all still has no key.</summary>
+    [Fact]
+    public void NodeKey_ForADocumentOutsideEveryProject_IsNull()
+    {
+        Assert.Null(BuildLayered().NodeKey("C:/elsewhere/data/xml/stray.xml", "Start"));
+    }
 }

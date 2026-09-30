@@ -80,41 +80,22 @@ public sealed class ProjectDependencyGraph
 
     private static string GetDirectory(string normalizedPath)
     {
-        var idx = normalizedPath.LastIndexOf('/');
-        return idx < 0 ? string.Empty : normalizedPath[..idx];
+        return ProjectPathResolution.GetDirectory(normalizedPath);
     }
 
+    /// <summary>
+    ///     Resolves a dependency path, which this one may already state absolutely.
+    /// </summary>
+    /// <remarks>
+    ///     An absolute path is returned untouched - there is nothing to resolve it against, and
+    ///     walking it onto a base would corrupt it. <see cref="ModProjectResolver" /> has no such
+    ///     branch because the references it follows are always relative.
+    /// </remarks>
     private static string Combine(string directory, string relativeOrAbsolute)
     {
         var candidate = relativeOrAbsolute.Replace('\\', '/');
-        if (IsRooted(candidate))
-            return candidate;
-
-        var basePath = string.IsNullOrEmpty(directory) ? "." : directory;
-        var segments = new List<string>(basePath.Split('/', StringSplitOptions.RemoveEmptyEntries));
-        var basePrefix = basePath.StartsWith('/') ? "/" : string.Empty;
-
-        foreach (var segment in candidate.Split('/', StringSplitOptions.RemoveEmptyEntries))
-            switch (segment)
-            {
-                case ".":
-                    continue;
-                case "..":
-                    if (segments.Count > 0)
-                        segments.RemoveAt(segments.Count - 1);
-                    break;
-                default:
-                    segments.Add(segment);
-                    break;
-            }
-
-        return basePrefix + string.Join('/', segments);
-    }
-
-    private static bool IsRooted(string path)
-    {
-        if (path.StartsWith('/'))
-            return true;
-        return path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
+        return ProjectPathResolution.IsRooted(candidate)
+            ? candidate
+            : ProjectPathResolution.Resolve(directory, candidate);
     }
 }

@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     The engine states this rule about 29 tags in three wordings that mean the same thing:
-///     <c>Error: (%s) Damage_Absorb_Amount must be 0 or greater.</c> (<c>0155100c</c>),
+///     <c>Error: (%s) Damage_Absorb_Amount must be 0 or greater.</c>,
 ///     <c>Damage_Amount cannot be less than zero</c> and
 ///     <c>Charging_Time_In_Seconds must be greater than or equal to zero</c>. It checks at load, so
 ///     the modder currently hears about it only when the ability misbehaves.

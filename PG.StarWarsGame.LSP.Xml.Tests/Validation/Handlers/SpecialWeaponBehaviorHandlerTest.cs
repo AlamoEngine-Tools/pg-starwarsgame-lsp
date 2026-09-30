@@ -21,7 +21,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 ///     </para>
 ///     <para>
 ///         The reporter's revised rule was the behaviour, and the engine agrees with a correction:
-///         <c>GameModeClass::Add_Special_Weapon</c> registers the weapon only if it behaves like
+///         Special-weapon registration accepts the weapon only if it behaves like
 ///         <c>SPECIAL_WEAPON</c> OR <c>LOBBING_SUPERWEAPON</c>, and otherwise returns false without an
 ///         assert - the weapon is never registered, so there is nothing to fire.
 ///     </para>

@@ -35,6 +35,7 @@ public sealed class DatRowRoundTripTest
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
         services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
@@ -117,16 +118,17 @@ public sealed class DatRowRoundTripTest
 
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
+        services.SupportPetroglyphHashing();
         services.SupportLocalisationBaseline();
-        var datService = services.BuildServiceProvider().GetRequiredService<IDatFileService>();
+        var datService = services.BuildServiceProvider().GetRequiredService<IDatService>();
 
-        var before = datService.Load(path).Content.KeySortOrder;
+        var before = datService.LoadFile(path).Content.Layout;
 
         await editor.ApplyToFileAsync(
             path, [new LocEditCommandDto("setCell", 0, Language: "ENGLISH", Value: "X")],
             CancellationToken.None);
 
-        Assert.Equal(before, datService.Load(path).Content.KeySortOrder);
+        Assert.Equal(before, datService.LoadFile(path).Content.Layout);
     }
 
     [Fact]

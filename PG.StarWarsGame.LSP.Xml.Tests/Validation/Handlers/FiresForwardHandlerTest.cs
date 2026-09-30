@@ -13,13 +13,13 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Its only reader is <c>WeaponBehaviorClass::Calculate_Projectile_Facing</c>, reached only from
+///         Its only reader is the projectile-facing calculation, reached only from
 ///         the WEAPON behaviour's <c>Fire_Projectile</c>. Set it on an object without WEAPON and it does
-///         nothing - hardpoints fire through <c>HardPoint.cpp</c> and never call it. Measured over eaw/
+///         nothing - hardpoints fire through their own path and never call it. Measured over eaw/
 ///         and foc/: zero objects.
 ///     </para>
 ///     <para>
-///         With WEAPON, it returns before <c>Is_In_Cone_Of_Fire</c>, the one firing-side reader of the
+///         With WEAPON, it returns before the cone-of-fire test, the one firing-side reader of the
 ///         four <c>*Turret_*_Extent_Degrees</c> tags. Those still swing a TURRET, whose behaviour reads
 ///         them too, but they stop limiting the shot. Measured: one object per game,
 ///         <c>Y-Wing_Bombing_Run</c>, with a comment showing the author meant it - so both are hints.
@@ -76,7 +76,7 @@ public sealed class FiresForwardHandlerTest
         Assert.DoesNotContain("swing", d.Message);
     }
 
-    // TurretBehaviorClass reads the same tags to swing the turret bone, so they are only dead for
+    // the TURRET behaviour reads the same tags to swing the turret bone, so they are only dead for
     // the SHOT - the message must not tell a turret author to delete them.
     [Fact]
     public void With_a_turret_the_extents_are_said_to_still_swing_it()

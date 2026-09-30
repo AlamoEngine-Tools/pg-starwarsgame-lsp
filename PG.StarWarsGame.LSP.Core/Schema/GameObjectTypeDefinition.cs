@@ -14,5 +14,5 @@ public record GameObjectTypeDefinition
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
 
     /// <summary>Locale → secondary caveat text.</summary>
-    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
 }

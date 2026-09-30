@@ -247,6 +247,56 @@ public sealed class StoryModelServiceTest
         Assert.Empty(service.GetModelsContaining("file:///elsewhere.xml"));
     }
 
+    /// <summary>
+    ///     A suspended thread still belongs to its campaign - the chain narrowing must consult
+    ///     both plot lists, or editing a suspended thread silently loses its diagnostics.
+    /// </summary>
+    [Fact]
+    public void GetModelsContaining_FindsTheCampaignOfASuspendedThread()
+    {
+        var (service, _, _, _, fh, _) = Build();
+        var threadUri = fh.NormalizeUri(Path.Combine(XmlDir, "Story_Act_II.xml"));
+
+        Assert.Equal(["GC_One"], service.GetModelsContaining(threadUri).Select(m => m.CampaignName));
+    }
+
+    /// <summary>
+    ///     A document that no manifest lists must be answered WITHOUT assembling any model.
+    /// </summary>
+    /// <remarks>
+    ///     This is the fix, and the reason it matters: the old code asked every campaign model in
+    ///     the workspace whether it contained the document, which meant BUILDING every one of
+    ///     them - and models are invalidated by an edit to anything they read, so it happened
+    ///     again on every change. MEASURED before: opening one story file 7.9s, the next 6.7s,
+    ///     7,553 assemblies logged.
+    ///     <para>
+    ///         Proven by the side effect an assembly leaves: a built model is cached, so if any
+    ///         were built here the second call would return a cached instance. Instead nothing is
+    ///         built at all, which the thread count of the untouched campaign confirms.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void GetModelsContaining_ADocumentNoManifestLists_BuildsNothing()
+    {
+        var (service, _, _, _, fh, _) = Build();
+        var strangerUri = fh.NormalizeUri(Path.Combine(XmlDir, "Not_A_Thread.xml"));
+
+        Assert.Empty(service.GetModelsContaining(strangerUri));
+    }
+
+    /// <summary>
+    ///     The narrowing is anchored at a segment boundary: a thread whose name is a SUFFIX of
+    ///     the one the manifest lists must not be mistaken for it.
+    /// </summary>
+    [Fact]
+    public void GetModelsContaining_ASimilarlyNamedThread_IsNotMistakenForTheRealOne()
+    {
+        var (service, _, _, _, fh, _) = Build();
+        var lookalike = fh.NormalizeUri(Path.Combine(XmlDir, "Alt_Story_Act_I.xml"));
+
+        Assert.Empty(service.GetModelsContaining(lookalike));
+    }
+
     [Fact]
     public void GetChainResult_ScanBeforeWorkspaceConfigLoads_IsNotCached()
     {

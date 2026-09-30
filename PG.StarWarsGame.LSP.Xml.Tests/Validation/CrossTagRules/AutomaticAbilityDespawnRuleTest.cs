@@ -18,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.CrossTagRules;
 /// <remarks>
 ///     <para>
 ///         <c>Error: (%s) Automatic special abilities must have Causes_Despawn=false.</c>
-///         (<c>01503518</c>) from <c>SpecialAbilityClass::Validate_Data</c>, which then sets
+///         from the engine's load-time validation, which then sets
 ///         <c>CausesDespawn = false</c> itself.
 ///     </para>
 ///     <para>

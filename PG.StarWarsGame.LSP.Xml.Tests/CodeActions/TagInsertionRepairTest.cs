@@ -18,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.CodeActions;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>DemolitionAbilityClass::Validate_Data</c> defaults a missing <c>Bomb_Type</c> to
+///         the engine's load-time validation defaults a missing <c>Bomb_Type</c> to
 ///         <c>Demolition_Bomb</c>, so the file can be made to say what the game will do with it.
 ///     </para>
 ///     <para>

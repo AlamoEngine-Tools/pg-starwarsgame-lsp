@@ -16,26 +16,29 @@
 // dock is the wrong home for them and LocProblemsBar already records why: it is narrow, so messages
 // are truncated, and a list that appears and disappears there shoves everything around it.
 
-import { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
+import {useEffect, useRef, useState} from 'react';
+import {createRoot} from 'react-dom/client';
 import styled from 'styled-components';
 
-import { GetEncyclopediaEntryResult } from '../protocol/encyclopedia';
-import { EncyclopediaCard } from './encyclopediaCard';
-import { encyclopediaNotices, noticeSeverity } from './encyclopediaNotices';
+import {GetEncyclopediaEntryResult} from '../protocol/encyclopedia';
+import {EncyclopediaCard} from './encyclopediaCard';
+import {encyclopediaNotices, noticeSeverity} from './encyclopediaNotices';
 import {
     dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
 } from './shared/dockChrome';
-import { DockSection } from './shared/DockSection';
-import { Field } from './shared/Field';
-import { ProblemsPanel } from './shared/ProblemsPanel';
-import { problemLook } from './shared/problemLook';
-import { RightDock } from './shared/RightDock';
+import {DockSection} from './shared/DockSection';
+import {Field} from './shared/Field';
+import {ProblemsPanel} from './shared/ProblemsPanel';
+import {problemLook} from './shared/problemLook';
+import {RightDock} from './shared/RightDock';
 
-import { initPanelLayout } from './shared/panelLayoutBridge';
-import { SeverityTag } from './shared/SeverityTag';
+import {initPanelLayout} from './shared/panelLayoutBridge';
+import {SeverityTag} from './shared/SeverityTag';
+import {ModeSelector} from './shared/ModeSelector';
+import {BODY_MODES, bodyModeOf, factionModes, factionSlotOf} from './encyclopediaModes';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
+
 const vscode = acquireVsCodeApi();
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
@@ -79,7 +82,14 @@ const Shell = styled.div`
        arrangement as the localisation editors (.grid-column) and the story graph (.canvas-column).
        min-height: 0 is load-bearing - without it the scrolling stage refuses to shrink below its
        content and pushes the bar off the bottom. */
-    .stage-column { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+    .stage-column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+    }
 
     /* The card sits in the middle of whatever space is left, both ways, and the stage scrolls
        rather than the page when a tall card or a high zoom outgrows it.
@@ -88,6 +98,7 @@ const Shell = styled.div`
        a narrow panel - plain centring pushes the overflow equally past both edges, and the part
        past the START edge cannot be scrolled back to. 'safe' falls back to flex-start exactly in
        that case, so the whole card stays reachable. */
+
     .preview-stage {
         flex: 1;
         min-width: 0;
@@ -98,12 +109,22 @@ const Shell = styled.div`
         justify-content: safe center;
         padding: var(--space-16);
     }
-    .preview-stage > * { flex: 0 0 auto; }
 
-    .empty { padding: var(--space-12); opacity: 0.7; }
+    .preview-stage > * {
+        flex: 0 0 auto;
+    }
+
+    .empty {
+        padding: var(--space-12);
+        opacity: 0.7;
+    }
 
     /* ── Header: the severity tag ───────────────────────────────────────── */
-    .dock-header { min-height: 34px; }
+
+    .dock-header {
+        min-height: 34px;
+    }
+
     .header-title {
         font-weight: 600;
         text-align: center;
@@ -115,6 +136,7 @@ const Shell = styled.div`
     }
 
     /* ── Foot of the editor: what the tag has to say ────────────────────── */
+
     .encyclopedia-problems {
         position: relative;
         flex-shrink: 0;
@@ -125,11 +147,17 @@ const Shell = styled.div`
         background: var(--vscode-sideBar-background, #252526);
         font-size: var(--font-size-12);
     }
+
     /* This editor's notices are PROSE, not the short entry labels the other two report, so they
        wrap instead of being clamped to the row - the shared rule's one-line ellipsis would hide
        most of every message. Full width is available here, which is the whole reason these moved
        out of the dock. */
-    .encyclopedia-problems .problem-row { align-items: flex-start; padding: var(--space-2) var(--space-6); }
+
+    .encyclopedia-problems .problem-row {
+        align-items: flex-start;
+        padding: var(--space-2) var(--space-6);
+    }
+
     .encyclopedia-problems .problem-msg {
         white-space: normal;
         overflow: visible;
@@ -137,7 +165,10 @@ const Shell = styled.div`
         /* A Windows path has no break opportunity in it, so without this it runs off the edge. */
         overflow-wrap: anywhere;
     }
-    .encyclopedia-problems .problem-row .codicon { margin-top: var(--space-2); }
+
+    .encyclopedia-problems .problem-row .codicon {
+        margin-top: var(--space-2);
+    }
 
     /* ── Content: the ship name pool ────────────────────────────────────── */
     /* A real list, one name per row, scrolling in place - the Star Destroyer pool alone is nineteen
@@ -146,12 +177,25 @@ const Shell = styled.div`
        the name; which one it drew is reported, not chosen. */
     /* The library fills the level it owns rather than stopping at a guessed height: a nineteen-name
        pool should use a tall dock, and a short one should not leave a box of dead space. */
-    .dock-content { display: flex; flex-direction: column; }
+
+    .dock-content {
+        display: flex;
+        flex-direction: column;
+    }
+
     /* Through the body as well as the section. DockSection wraps its children in .dock-section-body,
        so without this the fill stops at the section and the list keeps its minimum height with dead
        space under it. */
-    .dock-content > .dock-section { flex: 1; min-height: 0; }
-    .dock-content > .dock-section > .dock-section-body { flex: 1; min-height: 0; }
+
+    .dock-content > .dock-section {
+        flex: 1;
+        min-height: 0;
+    }
+
+    .dock-content > .dock-section > .dock-section-body {
+        flex: 1;
+        min-height: 0;
+    }
 
     .name-list {
         display: flex;
@@ -166,6 +210,7 @@ const Shell = styled.div`
         border-radius: var(--radius-3);
         background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
     }
+
     .name-list li {
         display: flex;
         align-items: baseline;
@@ -174,13 +219,16 @@ const Shell = styled.div`
         border-left: 2px solid transparent;
         cursor: default;
     }
+
     /* The one currently on the card, called out in words as well as weight - the marker has to say
        what it means, and an outline alone reads as "selected", which would imply a choice. */
+
     .name-list li.drawn {
         border-left-color: var(--vscode-focusBorder, #007fd4);
         background: var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.14));
         font-weight: 600;
     }
+
     .name-list li .drawn-tag {
         margin-left: auto;
         font-size: var(--font-size-10);
@@ -188,8 +236,12 @@ const Shell = styled.div`
         opacity: 0.7;
         white-space: nowrap;
     }
+
     /* ── Foot: the view controls ────────────────────────────────────────── */
-    .dock-overview .field + .field { margin-top: var(--space-2); }
+
+    .dock-overview .field + .field {
+        margin-top: var(--space-2);
+    }
 `;
 
 function App(): React.JSX.Element {
@@ -234,14 +286,16 @@ function App(): React.JSX.Element {
      */
     useEffect(() => {
         const stage = stageRef.current;
-        if (stage === null) { return; }
+        if (stage === null) {
+            return;
+        }
 
         const onWheel = (e: WheelEvent): void => {
             e.preventDefault();
             setZoom(z => clampZoom(z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)));
         };
 
-        stage.addEventListener('wheel', onWheel, { passive: false });
+        stage.addEventListener('wheel', onWheel, {passive: false});
         return () => stage.removeEventListener('wheel', onWheel);
     }, []);
 
@@ -253,22 +307,26 @@ function App(): React.JSX.Element {
                 multiplayer?: boolean;
                 shipName?: string | null;
             };
-            if (msg.type !== 'entry' || msg.entry === undefined) { return; }
+            if (msg.type !== 'entry' || msg.entry === undefined) {
+                return;
+            }
             setEntry(msg.entry);
             setShipName(msg.shipName ?? null);
             // The mode the host actually requested. Note this is not `usedMultiplayerBody` - it is
             // what was asked for, which is what the toggle represents.
-            if (typeof msg.multiplayer === 'boolean') { setMultiplayer(msg.multiplayer); }
+            if (typeof msg.multiplayer === 'boolean') {
+                setMultiplayer(msg.multiplayer);
+            }
         };
 
         window.addEventListener('message', handle);
-        vscode.postMessage({ type: 'ready' });
+        vscode.postMessage({type: 'ready'});
         return () => window.removeEventListener('message', handle);
     }, []);
 
     const onToggleMultiplayer = (next: boolean): void => {
         setMultiplayer(next);
-        vscode.postMessage({ type: 'setMultiplayer', multiplayer: next });
+        vscode.postMessage({type: 'setMultiplayer', multiplayer: next});
     };
 
     const stage = entry === null
@@ -276,7 +334,7 @@ function App(): React.JSX.Element {
         : entry.found
             ? (
                 <EncyclopediaCard
-                    entry={shipName === null ? entry : { ...entry, unitClass: shipName }}
+                    entry={shipName === null ? entry : {...entry, unitClass: shipName}}
                     zoom={zoom}
                     factionSlot={factionSlot}
                 />
@@ -288,7 +346,7 @@ function App(): React.JSX.Element {
     const factionFrames = entry?.chrome?.factionFrames ?? [];
 
     // Everything the preview has to report about this card, in one place - see encyclopediaNotices.
-    const notices = encyclopediaNotices(entry, { multiplayer, factionSlot });
+    const notices = encyclopediaNotices(entry, {multiplayer, factionSlot});
     const severity = noticeSeverity(notices);
     const noticeWord = notices.length === 1 ? 'note' : 'notes';
     // Counted heading, the shape the other two editors' bars use. The warning count is only worth
@@ -397,42 +455,32 @@ function App(): React.JSX.Element {
                         />
                     </Field>
 
-                    {factionFrames.length > 1 && (
-                        <Field label="Faction frame" as="label">
-                            <select
-                                value={factionSlot}
-                                onChange={e => setFactionSlot(Number(e.target.value))}
-                                title="Which faction's frame the card is drawn with. The game picks
-                                    this from the viewing player's faction."
-                            >
-                                {factionFrames.map(frame => (
-                                    <option
-                                        key={frame.slot}
-                                        value={frame.slot}
-                                        title={frame.textureName}
-                                    >
-                                        {frame.slotName ?? `Slot ${frame.slot}`}
-                                    </option>
-                                ))}
-                            </select>
-                        </Field>
-                    )}
-
-                    <label
-                        className="check-field"
-                        title="Preview the MP_Encyclopedia_Text body, where one is defined"
-                    >
-                        <input
-                            type="checkbox"
-                            checked={multiplayer}
-                            onChange={e => onToggleMultiplayer(e.target.checked)}
+                    {/* Both of these pick one of a handful, and in both the alternatives are the
+                        point - so they read as joined buttons rather than hiding every option but
+                        one behind a click. The faction row stays VISIBLE when there is nothing to
+                        switch to, disabled and saying why: that is the arrangement where a reader
+                        most needs telling the choice exists at all. */}
+                    <Field label="Faction frame">
+                        <ModeSelector
+                            label="Faction frame"
+                            value={String(factionSlot)}
+                            options={factionModes(factionFrames)}
+                            onSelect={id => setFactionSlot(factionSlotOf(id))}
                         />
-                        <span>Multiplayer body</span>
-                    </label>
+                    </Field>
+
+                    <Field label="Body">
+                        <ModeSelector
+                            label="Body text"
+                            value={bodyModeOf(multiplayer)}
+                            options={BODY_MODES}
+                            onSelect={id => onToggleMultiplayer(id === 'mp')}
+                        />
+                    </Field>
                 </>}
             />
         </Shell>
     );
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(<App/>);

@@ -79,7 +79,7 @@ public sealed class ModelAnimationClipsTest
     }
 
     /// <summary>
-    ///     <c>ModelAnimsListClass::Get_Total_Animations_Of_Type</c>, as the file names spell it: every take of
+    ///     the animation-count lookup, as the file names spell it: every take of
     ///     <c>&lt;model&gt;_&lt;type&gt;_&lt;nn&gt;.ala</c>.
     /// </summary>
     [Fact]

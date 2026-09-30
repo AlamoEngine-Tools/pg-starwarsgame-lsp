@@ -95,6 +95,16 @@ public sealed record EncyclopediaAbility(
 ///     Geometry, fonts and colours for the card. Travels with the text rather than on its own
 ///     request so the panel can never draw one against a stale copy of the other.
 /// </param>
+/// <param name="ProjectsWithoutIcons">
+///     Projects in this workspace that can supply no icons at all, so the card can say WHY it is
+///     drawing base-game artwork rather than the mod's.
+///     <para>
+///         Empty is the healthy case. A name here means that project ships no mega texture at the
+///         conventional path and declares no <c>icons</c> node, so every icon it owns falls through
+///         to the baked base game. Naming it is the whole point: the fix is a setting, and without
+///         this the card looks like a rendering fault instead.
+///     </para>
+/// </param>
 /// <param name="Icon">The object's portrait, or <see langword="null" /> when none resolved.</param>
 /// <param name="ShipNames">
 ///     The pool of individual ship names this object draws from, or <see langword="null" /> when it
@@ -121,7 +131,10 @@ public sealed record GetEncyclopediaEntryResult(
     EncyclopediaLayout Layout,
     EncyclopediaIcon? Icon = null,
     EncyclopediaChrome? Chrome = null,
-    EncyclopediaShipNames? ShipNames = null
+    EncyclopediaShipNames? ShipNames = null,
+    IReadOnlyList<string>? ProjectsWithoutIcons = null,
+    int? BuildCost = null,
+    EncyclopediaRowBudget? RowBudgets = null
 )
 {
     /// <summary>The answer for an unknown object, and for every request while the feature is off.</summary>
@@ -152,6 +165,19 @@ public sealed record EncyclopediaShipNames(
     string SourcePath,
     bool FileFound,
     IReadOnlyList<string> Names);
+
+/// <summary>
+///     The wrap budgets of the two rows that do not take theirs from their own component.
+/// </summary>
+/// <remarks>
+///     Both share their row with something else, and the budget moves to make room: the name gains
+///     eight characters when no cost is drawn beside it, and the class line starts at 32 and loses
+///     four for each ability icon on it. See <see cref="EncyclopediaRowBudgets" /> for which parts
+///     of that are measured and which are read off the object.
+/// </remarks>
+/// <param name="Name">The name row, from <c>encyclopedia_header_text</c> plus the no-cost bonus.</param>
+/// <param name="UnitClass">The class row, narrowed by each drawn ability icon.</param>
+public sealed record EncyclopediaRowBudget(int Name, int UnitClass);
 
 /// <summary>A resolved icon, ready for the client to drop straight into an <c>img</c> element.</summary>
 /// <param name="Name">The icon name as written in <c>Icon_Name</c>.</param>
@@ -224,6 +250,20 @@ public sealed record EncyclopediaIcon(
 ///     listed even when the art is missing, because the slots come from the XML rather than from the
 ///     atlas.
 /// </param>
+/// <param name="Credit">
+///     The credits coin, for the cost row.
+///     <para>
+///         The engine draws no icon there: it writes a literal <c>$</c> and sets that row in
+///         <c>EmpireAtWar-Bold</c>, whose dollar glyph IS the coin. The preview cannot use that font
+///         - it is embedded in the game's executable under a commercial licence - so it substitutes
+///         the atlas entry, which is the same artwork from the user's own install and needs no
+///         licence the card does not already rely on for the portrait and the band.
+///     </para>
+///     <para>
+///         Null when the atlas has no such entry, and the card then draws the dollar sign the data
+///         actually contains rather than nothing.
+///     </para>
+/// </param>
 public sealed record EncyclopediaChrome(
     EncyclopediaImage? Background,
     EncyclopediaImage? TopBar,
@@ -231,7 +271,8 @@ public sealed record EncyclopediaChrome(
     EncyclopediaImage? Line,
     EncyclopediaImage? AgainstFrame,
     EncyclopediaImage? UnitAgainst,
-    IReadOnlyList<EncyclopediaFactionFrame> FactionFrames);
+    IReadOnlyList<EncyclopediaFactionFrame> FactionFrames,
+    EncyclopediaImage? Credit = null);
 
 /// <summary>
 ///     One faction's frame for the card - an entry of <c>encyclopedia_back</c>'s

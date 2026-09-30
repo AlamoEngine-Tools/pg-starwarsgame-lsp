@@ -865,8 +865,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_MarkupFilename_EmitsFactionSlotOnly_NotTheMarkupFile()
     {
-        // "Empire, DefaultGalacticHints": the faction navigates; the GUI markup file is not an
-        // indexable workspace object and must not be emitted (it would be a false unresolved ref).
+        // "Empire, DefaultGalacticHints": the faction navigates; the AI galactic markup file lives in
+        // the unindexed AI tree and must not be emitted (it would be a false unresolved ref).
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Campaign"));
         schema.AddTag(new XmlTagDefinition
@@ -883,6 +883,57 @@ public sealed class XmlGameDocumentParserTest
         var reference = Assert.Single(result.References);
         Assert.Equal("Empire", reference.TargetId);
         Assert.Equal("Faction", reference.ExpectedTypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_PlanetValuePair_EmitsThePlanetSlot_NotAFaction()
+    {
+        // Corruption_Level_Override shares the per-faction reader with Starting_Credits, but the game
+        // looks slot 0 up as an object type and requires a planet. Emitting it as a Faction made
+        // vanilla's "Endor, 1" an unresolved faction.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "Corruption_Level_Override",
+            ValueType = XmlValueType.PerFactionValue,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceTypeName = "Planet",
+            SemanticType = TagSemanticType.PlanetValuePair
+        });
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            """<Campaign Name="C"><Corruption_Level_Override>Endor, 1</Corruption_Level_Override></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("Endor", reference.TargetId);
+        Assert.NotEqual("Faction", reference.ExpectedTypeName);
+    }
+
+    [Theory]
+    [InlineData("Human")]
+    [InlineData("HUMAN")]
+    public async Task AiPlayerControl_HumanKeyword_EmitsNoAiPlayerReference(string keyword)
+    {
+        // The game compares the value case-insensitively with "Human" and removes the AI; no
+        // AIPlayerType is looked up. Emitting it as one made every human-played faction a "cannot
+        // check this type" notice.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "AI_Player_Control",
+            ValueType = XmlValueType.PerFactionObjectList,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ObjectType = new GameObjectTypeDefinition { TypeName = "AIPlayerType" },
+            SemanticType = TagSemanticType.FactionAiPlayerPairList
+        });
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            $"<Campaign>\n<AI_Player_Control> Rebel, {keyword} </AI_Player_Control>\n</Campaign>",
+            1, default);
+
+        Assert.Equal(["Rebel"], index.References.Select(r => r.TargetId));
     }
 
     [Theory]
@@ -972,6 +1023,70 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("BASE_SHIP", reference.TargetId);
         Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
         Assert.Equal("SpaceUnit", reference.ExpectedTypeName); // enclosing object's type, not GameObjectType
+    }
+
+    // ── behaviours on the symbol ────────────────────────────────────────────
+    //
+    // A behaviour answers what an object IS, so kind-filtered completion reads it for every
+    // candidate. Resolving the effective object that many times is not affordable, so the tokens
+    // ride on the symbol and the parser is where they are picked up.
+
+    [Fact]
+    public async Task ParseAsync_Object_Carries_Its_Behaviour_Tokens()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Planet"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("planets.xml", ["Planet"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///planets.xml",
+            """<GameObjectFiles><Planet Name="CORUSCANT"><Behavior>PLANET, PRODUCTION</Behavior><SpaceBehavior>SELECTABLE</SpaceBehavior><Max_Health>100</Max_Health></Planet></GameObjectFiles>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal(["PLANET", "PRODUCTION", "SELECTABLE"], sym.Behaviors);
+    }
+
+    // Shape taken verbatim from the shipped Planets.xml - the real root element, the real tabs and
+    // CRLF, and the real Behavior spelling. The corpus itself is gitignored, so it is reproduced
+    // here rather than read: the unit tests above would pass just as happily if real planets
+    // reached the index down some other path and never carried a behaviour at all.
+    [Fact]
+    public async Task ParseAsync_ShippedPlanetShape_CarriesItsBehaviours()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Planet"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("planets.xml", ["Planet"]);
+
+        const string content = "<?xml version=\"1.0\"?>\r\n<Planets>\r\n\r\n\t<Planet Name=\"Alderaan\">\r\n"
+                               + " \t\t<Zoomed_Terrain_Index>0</Zoomed_Terrain_Index>\r\n"
+                               + "\t\t<Text_ID>TEXT_OBJECT_STAR_SYSTEM_ALDERAAN</Text_ID>\r\n"
+                               + "\t\t<Mass>1.0</Mass>\r\n"
+                               + "\t\t<Behavior>SELECTABLE, PLANET, PRODUCTION</Behavior>\r\n"
+                               + "\t</Planet>\r\n</Planets>\r\n";
+
+        var result = await Build(schema, registry).ParseAsync("file:///planets.xml", content, 1,
+            TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("Alderaan", sym.Id);
+        Assert.Equal(["SELECTABLE", "PLANET", "PRODUCTION"], sym.Behaviors);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Object_WithoutBehaviourTags_CarriesNone()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("units.xml", ["Unit"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///units.xml",
+            """<GameObjectFiles><Unit Name="UNIT_A"><Max_Health>100</Max_Health></Unit></GameObjectFiles>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Null(Assert.Single(result.Symbols).Behaviors);
     }
 
     [Fact]

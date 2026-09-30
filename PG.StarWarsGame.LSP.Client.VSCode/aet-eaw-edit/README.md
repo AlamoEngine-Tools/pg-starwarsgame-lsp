@@ -142,6 +142,8 @@ Scripts under the declared `scripts` directories are indexed and checked.
 
 > **Work in progress, off by default.** Flag: `aet-eaw-edit.features.lua.debugger`. Requires a debug build of the game with its Lua debug server running; retail builds have none.
 
+> **With thanks to EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, whose [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) documented the game's Lua debug server protocol. This debugger was built against that description.
+
 Debug type **Empire at War Lua** in Run and Debug:
 
 - Breakpoints in Lua files under the project's script directories
@@ -293,25 +295,43 @@ Dialog quick fixes require `aet-eaw-edit.features.dialog.codeActions`; the rest 
 Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `Story_*.xml` thread files and understood as one graph. Opt-in and in development; see the story flags under [feature flags](#feature-flags).
 
 - **Campaign Editor view**
-  - Campaigns, factions, plot threads and attached Lua scripts
+  - Campaigns, factions, galactic plot threads, the faction's battles in play order with their own plot files and the script their manifest attaches beneath them, and the faction's attached Lua scripts
   - Suspended threads marked
-  - Click opens the file
-- **Story graph**
-  - Auto-laid-out event flow with AND/OR junctions, cross-file portals and tactical plots
+  - Click opens the file; a battle opens its graph
+- **Story graph** - one panel per campaign faction at the galactic level, and one per battle
+  - Auto-laid-out event flow with AND/OR junctions and cross-file portals
+  - **Battles as sub-graphs**: the galactic graph shows each tactical mission as one portal that opens the battle's own panel; the battle graph shows the galactic events that link it in and listen for its outcome as portals back, each opening the galactic panel on that event. In Simulation a pick on the portal selects the battle's decision beside the dock instead - fight, auto-resolve, won or lost - and the portal's arrow opens the battle's graph into Simulation. The command palette lists the battles after their faction
   - Node colour by lifecycle: inactive, waiting, armed, fired, disabled
   - Unreachable events dimmed; schema-untested types dashed
-  - Filters: name, branch, lifecycle, the incoming or outgoing chain of one event
+  - Filters: name, branch, lifecycle, plot state, the incoming or outgoing chain of one event - inside the panel's scope; the chain runs through a battle's portal
+  - **Engine links** (dash-dot): the links the game makes that no prerequisite writes - a speech or movie to the listener that waits for it to end, a tutorial dialog to the listener for its Continue button, a battle to the galactic listeners for its outcome and for the summary dialog closing. Drawn so a sequence the game plays in order reads in order; never a prerequisite
+  - Thread lanes on the galactic graph (Empire at War's acts); disabled inside a battle, which is one plot
+- **Params by name** - every event and reward slot carries a label from the schema ("Planets", "Flash id", "Required result"); the description with its legend and ranges is the tooltip, and a missing-param warning quotes the same name after the slot
 - **Colour key** - flyout keying node, border and edge styles, including per-branch hues on zoomed-out nodes
 - **Editing** (Edit mode)
   - Drag a prerequisite between events
   - Drop event and reward types from the palette
   - Edit names, params, branch, perpetual and dialog in place
   - Staged and applied on save as one `workspace/applyEdit`; minimal edits; inserted tags in the engine's order
+- **Simulation** (Simulation mode, flag `tools.storySimulator`)
+  - The campaign runs forward in 1 s ticks by the engine's own event rules: push-based arming, campaign-wide trigger rewards, resets, disables, timers from arming, flag comparisons with the engine's defaults, speech and movie completions owed to the next tick
+  - The world is a fact table seeded from the campaign XML - planets and owners, units, tech, credits - written only by rewards and by the author; nothing moves, builds or fights on its own
+  - Every trigger the game would decide is a **decision** for the author: capture a planet, build or destroy a unit, win or lose a battle, send a script event, or assume the trigger met; pickers list what fits the facts first and accept any name
+  - **Battles run as their own session**, as the game plays them: the galactic simulation arms the galactic listeners only. Entering a battle - from its portal, its row in the dock, or the decision that waits on it - opens its panel into Simulation on its own clock, seeded with the galaxy's flags and world, and the galaxy stands still until it resolves. Won or lost, from either panel: the battle's own listeners fire, the flags it wrote cross into the galaxy, and the galactic outcome listeners fire. A rewind replays the outcome as one step without replaying the battle
+  - **A `Continue_Tutorial` listener is a decision only while a tutorial dialog shows**: the dialog's Continue button is what raises it, a `TUTORIAL_DIALOG` reward puts the dialog up and continuing closes it. A flag poll that already holds is the clock's work, not a wait: the story is not waiting for input while a chain behind a flag write is still landing
+  - **Rule out**: a decision the author knows will not come in this run (the defeat listener of a battle to be won, say) leaves the list from its flyout. The listener stays armed, as in the game; the Ruled out group at the end of the decisions reverses the call, and the listener firing after all clears it
+  - **A linked battle waits for its choice**, as the game's pending-battle panel does: a `LINK_TACTICAL` reward makes the battle pending and holds gameplay time - the story keeps running (pushes, flag polls, scripts, generic and GUI events), only `STORY_ELAPSED` timers stand still. The decision sits on the battle's portal: **Fight** opens the battle's panel straight into its session, **Auto-resolve** leaves won or lost and the flag picks to you. A `FORCE_CLICK_GUI` on the left choice button fights by itself, as the tutorial does, and on the right one auto-resolves. The `battle_end_closed` listener is the battle's to raise, not a decision, while one is pending or running; a loss that links the same mission again is a new attempt
+  - Campaign scripts run as their `PGStateMachine`: a fired event enters the state, its `OnEnter` thread sleeps and sends `Story_Event` ids back into the graph, drawn as state nodes and links
+  - Dock header: the tick and what stopped the clock; content: decisions, world, flags, scripts, each row opening beside the dock; foot: the transport - restart, one tick back, play, one tick, run until the story reaches a new decision, a breakpoint or nothing more can happen - with a pace of pulse, step or a custom rate. The clock is never held back by open decisions: a real campaign has hundreds of armed listeners from tick 0
+  - Canvas: the flow along the edges, fire counts, gate meters on armed timers and flag checks, breakpoint marks; lenses for the path taken, the flow tints and the script states
+  - Trace panel: every transition with its tick, node, cause and source; filter by text or `t12` for one tick; copy
+  - Breakpoints on any event and on every clock or flag gate; rewind to any tick replays the same answers
 - **Large campaigns** - lightweight overview when zoomed out, real nodes only for the visible part; 1000+ events stay responsive
 - **Campaign diagnostics**
   - Dangling or cyclic prerequisites
   - Duplicate event names
-  - Ambiguous campaign-global targets
+  - Prerequisites, reset and disable targets the engine cannot see because they live in another plot file
+  - Two events of one name in one plot file
   - Events that can never fire
   - Suspended plots nothing activates
   - Problems bar can follow the branch filter; jumping to a hidden problem lifts it
@@ -324,7 +344,7 @@ Campaigns are followed from `CampaignFiles.xml` through plot manifests to the `S
   - Inlay hints with the localisation text of `TEXT` and `TITLE` lines
   - Go to definition on speech, movie and sound arguments
 
-Dependency and base-game files are read-only. Hand-arranged node positions persist per campaign in `.aetswg/story-layout.json`.
+Dependency and base-game files are read-only. Node positions, events and junctions, portals and script states alike, persist per campaign faction in `.aetswg/story-layout.json`.
 
 ---
 
@@ -473,6 +493,7 @@ Flag column: the feature-flag id without its common prefix.
 | `aet-eaw-edit.lsp.locale` | `en` | Language of hover text and diagnostics (`en`, `de`, `fr`, `es`, `it`, `pl`, `ru`) |
 | `aet-eaw-edit.lsp.localisation.language` | `ENGLISH` | Game language for displayed localisation text (hovers, inlay hints, encyclopedia card) |
 | `aet-eaw-edit.lsp.debug.traceServer` | `off` | `messages` or `verbose`: LSP traffic in the EaWEdit output channel |
+| `aet-eaw-edit.lsp.debug.logLevel` | `Information` | Detail in the server's own log file; `Debug` records whether a document reached a sync handler |
 
 ### Game installation and external tools
 
@@ -535,6 +556,13 @@ Read only with `aet-eaw-edit.features.lua.debugger` on; a `launch.json` attribut
 | `aet-eaw-edit.game.luaDebugPort` | `1234` | Lua debug UDP port; the game takes the first free port from 1234 upward |
 | `aet-eaw-edit.game.unsafeTableExpansion` | `false` | Expand tables in the Variables view; the game is reported to crash on member text of 255 bytes or more |
 
+### Story simulation
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `aet-eaw-edit.storySimulator.assumeMediaCompletes` | `true` | A speech or movie a reward starts completes on the next tick, so its `STORY_SPEECH_DONE` or `STORY_MOVIE_DONE` listener fires on its own. Off, each is a decision until answered; the game never ends one on a timer. Either way a new speech ends the one still playing and a battle's end ends every speech, as the game does. Takes effect when a simulation starts |
+| `aet-eaw-edit.storySimulator.autoResume` | `true` | When play paused itself for a decision, answering it resumes play |
+
 ### Feature flags
 
 Every feature has a flag. Work-in-progress features default to off. A flag the language server reads restarts it on change; editor-side flags apply at once.
@@ -574,7 +602,7 @@ Story mode:
 | Setting | Default | Description |
 |---|---|---|
 | `aet-eaw-edit.features.story.discovery` | `false` | Follows the campaign story chain and types its files; base of every other story flag _(work in progress)_ |
-| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign analysis: dangling and cyclic prerequisites, duplicate event names, ambiguous targets, unreachable events, orphaned suspended plots, tag order, over-long flag names _(work in progress)_ |
+| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign analysis: dangling and cyclic prerequisites, duplicate event names, targets outside their plot file, unreachable events, orphaned suspended plots, tag order, over-long flag names, `STORY_GENERIC` listeners for a name the game never raises _(work in progress)_ |
 | `aet-eaw-edit.features.story.symbols` | `false` | Story event names, flags and AI-notification ids indexed across XML and Lua _(work in progress)_ |
 | `aet-eaw-edit.features.story.rename` | `false` | Cross-language rename of story symbols; builds on story symbols _(work in progress)_ |
 
@@ -594,12 +622,11 @@ Tools:
 | `aet-eaw-edit.features.tools.localisation` | `false` | Localisation editor, initialise and import commands, create-key code action _(work in progress)_ |
 | `aet-eaw-edit.features.tools.storyEditor` | `false` | Campaign Editor view and story graph in View mode; builds on `story.discovery` _(work in progress)_ |
 | `aet-eaw-edit.features.tools.storyEditing` | `false` | Edit mode in the story graph; builds on `tools.storyEditor` _(work in progress)_ |
+| `aet-eaw-edit.features.tools.storySimulator` | `false` | Simulation mode in the story graph; builds on `tools.storyEditor` |
 | `aet-eaw-edit.features.tools.variants` | `true` | Show Effective Object and its code lens |
 | `aet-eaw-edit.features.tools.modelPreview` | `true` | Model preview; game models need `aet-eaw-edit.lsp.source.baseGameDirectory` |
 | `aet-eaw-edit.features.tools.encyclopedia` | `true` | Encyclopedia popup preview and its code lens |
 | `aet-eaw-edit.features.preview.energyPool` | `false` | Energy pool in the preview (editor-side, no restart). Off on purpose: the shipped game disables the mechanic |
-
-> The story graph's Simulation mode is unfinished and absent from the settings UI; `"aet-eaw-edit.features.tools.storySimulator": true` in `settings.json` enables it.
 
 ---
 
@@ -642,6 +669,14 @@ Three data sources; nothing else is sent or received. No telemetry.
 **Launch refused: layer not runnable.** Declared directories under `Data/` and no space in the path, or pass the folders via `modPaths`. See [Lua debugger](#lua-debugger).
 
 **Raw server output.** `aet-eaw-edit.lsp.debug.traceServer` = `messages`; **EaWEdit** output channel.
+
+**No diagnostics at all, for any file.** `aet-eaw-edit.lsp.debug.logLevel` = `Debug`, then restart the server and read `aetswg-*.log` in the workspace root: it records whether XML document sync was registered and whether each `didOpen` reached the handler. At the default level neither line is written.
+
+---
+
+## Acknowledgements
+
+**EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, for [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) - the Python client that documented the game's Lua debug server protocol. The [Lua debugger](#lua-debugger) here was built against that description.
 
 ---
 

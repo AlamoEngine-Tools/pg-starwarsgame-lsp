@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Persistence;
@@ -23,7 +24,15 @@ namespace PG.StarWarsGame.LSP.Server.Persistence;
 /// </summary>
 public sealed class ProjectDocumentKeys(IModProjectReloadService reloadService, IFileHelper fileHelper)
 {
-    /// <summary>The root project's directory - the anchor every key is relative to.</summary>
+    /// <summary>
+    ///     The root project's directory.
+    /// </summary>
+    /// <remarks>
+    ///     No longer the anchor every key is relative to - see <see cref="RelativePathFor" />, which
+    ///     anchors each document on the layer it lives in so a referenced project's documents get
+    ///     keys at all. This remains the answer to "where is the root project", which is a different
+    ///     question and still the right one for anything that writes into the project being edited.
+    /// </remarks>
     public string? ProjectDirectory
     {
         get
@@ -31,11 +40,7 @@ public sealed class ProjectDocumentKeys(IModProjectReloadService reloadService, 
             var rootLayer = reloadService.LastWorkspaceConfig?.Layers
                 .OrderByDescending(l => l.Rank)
                 .FirstOrDefault();
-            if (rootLayer?.ProjectPath is not { } pgprojPath) return null;
-
-            var normalized = pgprojPath.Replace('\\', '/');
-            var slash = normalized.LastIndexOf('/');
-            return slash < 0 ? null : normalized[..slash];
+            return rootLayer?.ProjectDirectory;
         }
     }
 
@@ -58,7 +63,38 @@ public sealed class ProjectDocumentKeys(IModProjectReloadService reloadService, 
     /// </summary>
     public string? RelativePathFor(string absolutePathOrUri)
     {
-        return ProjectDirectory is { } root ? DocumentKey.Relative(root, absolutePathOrUri) : null;
+        // Against the project the document actually LIVES in, not the root one.
+        //
+        // Every key used to be taken relative to the root project alone, so a document in a
+        // referenced project resolved to null: its nodes had no key, their positions were silently
+        // not saved, and the graph was laid out again on every open.
+        //
+        // Keying against the containing layer is also what makes a dependency's layout stable. Four
+        // EaWX mods share one core project, and a graph the author arranged through one leaf has to
+        // be the same graph through another - which a key carrying the leaf's own path could never
+        // be. A root-project document still yields exactly the key it did before, so no layout
+        // saved earlier is orphaned.
+        return ProjectDirectories()
+            .Select(root => DocumentKey.Relative(root, absolutePathOrUri))
+            .FirstOrDefault(relative => relative is not null);
+    }
+
+    /// <summary>
+    ///     Every layer's project directory, INNERMOST FIRST.
+    /// </summary>
+    /// <remarks>
+    ///     Longest first rather than by rank: one project's directory may contain another's, and a
+    ///     leaf nested inside its own dependency would otherwise key its files relative to the
+    ///     dependency - orphaning every layout already saved against it. The most specific
+    ///     directory is the one the document belongs to.
+    /// </remarks>
+    private IEnumerable<string> ProjectDirectories()
+    {
+        return (reloadService.LastWorkspaceConfig?.Layers ?? [])
+            .Select(layer => layer.ProjectDirectory)
+            .OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(d => d.Length);
     }
 
     /// <summary>One node's key: the thread it lives in and the event it is, hashed together.</summary>
@@ -67,6 +103,26 @@ public sealed class ProjectDocumentKeys(IModProjectReloadService reloadService, 
         return RelativePathFor(threadUri) is { } relative
             ? DocumentKey.Composite(relative, eventName)
             : null;
+    }
+
+    /// <summary>
+    ///     A virtual node's key - a junction, a portal, a tactical stub, a script state. Such a node
+    ///     has no thread and event to be named by, so its id is the name: the graph builds ids from
+    ///     '#'-joined parts, and every part that is a document URI is made project-relative first,
+    ///     so the key survives a clone as an event's does and no absolute path is hashed. Null when
+    ///     a URI in the id lies outside the project.
+    /// </summary>
+    public Guid? VirtualNodeKey(string nodeId)
+    {
+        var parts = nodeId.Split('#');
+        for (var i = 0; i < parts.Length; i++)
+        {
+            if (!parts[i].StartsWith("file:", StringComparison.OrdinalIgnoreCase)) continue;
+            if (RelativePathFor(parts[i]) is not { } relative) return null;
+            parts[i] = relative;
+        }
+
+        return DocumentKey.Composite(["node", .. parts]);
     }
 
     /// <summary>

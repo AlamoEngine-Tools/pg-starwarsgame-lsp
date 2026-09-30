@@ -39,6 +39,17 @@ public static class EncyclopediaTags
     public const string UnitAbilitiesData = "Unit_Abilities_Data";
 
     /// <summary>
+    ///     What the object costs to build, drawn on the popup's name row.
+    /// </summary>
+    /// <remarks>
+    ///     Also decides how wide the NAME may run: with no cost sharing that row, the name is given
+    ///     eight more characters of it. The engine reads a per-player cost with tactical and
+    ///     galactic variants; this is the object's own declared value, which is what a preview with
+    ///     no player in it can know.
+    /// </remarks>
+    public const string BuildCostCredits = "Build_Cost_Credits";
+
+    /// <summary>
     ///     The object's portrait, named as it appears in the mega texture directory - normally with a
     ///     <c>.TGA</c> suffix, though authors write it either way.
     /// </summary>

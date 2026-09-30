@@ -136,9 +136,9 @@ public sealed class ProjectIndexCacheTest
     }
 
     [Fact]
-    public void EnsureGitHygiene_Idempotent_DoesNotOverwriteExisting()
+    public void EnsureGitHygiene_EverythingAlreadyListed_ChangesNothing()
     {
-        var existing = "# custom\nindices/\n";
+        var existing = "# custom\nindices/\nbones/\n";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
             { [AetswgDir + "/.gitignore"] = new(existing) });
         var cache = Build(fs);
@@ -146,5 +146,41 @@ public sealed class ProjectIndexCacheTest
         cache.EnsureGitHygiene(PgprojPath);
 
         Assert.Equal(existing, fs.File.ReadAllText(AetswgDir + "/.gitignore"));
+    }
+
+    /// <summary>
+    ///     Write-if-absent was enough while <c>indices/</c> was the only generated directory, but
+    ///     it silently skips every project set up before a new cache was added - so the bone
+    ///     snapshots would have been committed by everyone who had already opened the project. The
+    ///     author's own lines are kept; only what is missing is appended.
+    /// </summary>
+    [Fact]
+    public void EnsureGitHygiene_ExistingFileMissingAnEntry_AppendsItAndKeepsTheRest()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+            { [AetswgDir + "/.gitignore"] = new("# custom\nindices/\n") });
+        var cache = Build(fs);
+
+        cache.EnsureGitHygiene(PgprojPath);
+
+        var content = fs.File.ReadAllText(AetswgDir + "/.gitignore");
+        Assert.Contains("# custom", content);
+        Assert.Contains("indices/", content);
+        Assert.Contains("bones/", content);
+        // Appended once, not duplicated.
+        Assert.Single(content.Split('\n').Where(l => l.Trim() == "indices/"));
+    }
+
+    [Fact]
+    public void EnsureGitHygiene_RunTwice_DoesNotAccumulateDuplicates()
+    {
+        var fs = new MockFileSystem();
+        var cache = Build(fs);
+
+        cache.EnsureGitHygiene(PgprojPath);
+        cache.EnsureGitHygiene(PgprojPath);
+
+        var lines = fs.File.ReadAllText(AetswgDir + "/.gitignore").Split('\n');
+        Assert.Single(lines.Where(l => l.Trim() == "bones/"));
     }
 }

@@ -6,6 +6,9 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Assets.Icons;
+using PG.StarWarsGame.LSP.Core.Project;
+using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -18,9 +21,9 @@ public sealed class ModProjectReloadServiceTest
         new(["/ws/data/xml"], ["/ws/data/scripts"], [], ["/ws/data/art", "/ws/data/audio"], null);
 
     private static (ModProjectReloadService Service, RecordingIndexer Indexer, ListLogger Logger) Build(
-        WorkspaceConfiguration? resolved)
+        WorkspaceConfiguration? resolved, IIconCatalogProvider? icons = null)
     {
-        var (service, indexer, logger, _) = BuildWithBaseline(resolved, true);
+        var (service, indexer, logger, _) = BuildWithBaseline(resolved, true, icons);
         return (service, indexer, logger);
     }
 
@@ -28,7 +31,7 @@ public sealed class ModProjectReloadServiceTest
     // baseline gate say otherwise.
     private static (ModProjectReloadService Service, RecordingIndexer Indexer, ListLogger Logger,
         RecordingUserNotifier Notifier) BuildWithBaseline(
-            WorkspaceConfiguration? resolved, bool baselineLoaded)
+            WorkspaceConfiguration? resolved, bool baselineLoaded, IIconCatalogProvider? icons = null)
     {
         var indexer = new RecordingIndexer();
         var logger = new ListLogger();
@@ -36,7 +39,7 @@ public sealed class ModProjectReloadServiceTest
         var service = new ModProjectReloadService(
             new FakeResolver(resolved), indexer, new NullLocalisationLoader(),
             new RecordingLayerMap(), new FakeGameIndexService(IndexWithBaseline(baselineLoaded)),
-            notifier, logger);
+            notifier, logger, icons: icons);
         return (service, indexer, logger, notifier);
     }
 
@@ -278,6 +281,61 @@ public sealed class ModProjectReloadServiceTest
         }
     }
 
+    // ── Icon catalog invalidation ────────────────────────────────────────────
+
+    /// <summary>
+    ///     Resolving the workspace again drops the cached icon catalog.
+    /// </summary>
+    /// <remarks>
+    ///     The catalog is built lazily on first request and cached against the roots it was built
+    ///     from, and <c>Invalidate</c> had NO production caller. So anything that asked for an icon
+    ///     during the workspace scan - a preview restored when the window opened - built a catalog
+    ///     from the fallback root, before any project was resolved, and that one answered for the
+    ///     rest of the session: baseline icons only. Measured as the sibling of the same fault in
+    ///     the encyclopedia layout, which reported vanilla's 262 width before the scan and the
+    ///     mod's 340 after it.
+    /// </remarks>
+    [Fact]
+    public async Task ReloadAsync_DropsTheCachedIconCatalog()
+    {
+        var icons = new CountingIconCatalogProvider();
+        var (service, _, _) = Build(SampleConfig, icons);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(1, icons.Invalidations);
+    }
+
+    /// <summary>Every reload drops it again; a later one must not be skipped as redundant.</summary>
+    [Fact]
+    public async Task ReloadAsync_DropsItOnEveryReload()
+    {
+        var icons = new CountingIconCatalogProvider();
+        var (service, _, _) = Build(SampleConfig, icons);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+        await service.ReloadAsync(CancellationToken.None);
+
+        Assert.Equal(2, icons.Invalidations);
+    }
+
+    private sealed class CountingIconCatalogProvider : IIconCatalogProvider
+    {
+        public int Invalidations { get; private set; }
+
+        public Task<IconCatalog> GetAsync(IReadOnlyList<IconLayer> layers, CancellationToken ct)
+        {
+            throw new NotSupportedException("The catalog is not built in this test.");
+        }
+
+        public IReadOnlySet<string> IconsAwaitingRepack => new HashSet<string>();
+
+        public void Invalidate()
+        {
+            Invalidations++;
+        }
+    }
+
     private sealed class RecordingIndexer : IWorkspaceIndexer
     {
         public WorkspaceConfiguration? LastConfig { get; private set; }
@@ -310,7 +368,7 @@ public sealed class ModProjectReloadServiceTest
             AssetCatalogApplied = true;
         }
 
-        public void ApplyModelBoneCatalog(IReadOnlyList<string> roots)
+        public void ApplyModelBoneCatalog(WorkspaceConfiguration config)
         {
             BonesApplied = true;
         }

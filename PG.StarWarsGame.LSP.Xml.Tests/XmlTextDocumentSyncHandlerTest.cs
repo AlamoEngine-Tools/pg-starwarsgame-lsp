@@ -43,6 +43,22 @@ public sealed class XmlTextDocumentSyncHandlerTest
         return gate;
     }
 
+    // ── Routing ──────────────────────────────────────────────────────────────
+
+    // OmniSharp asks every sync handler what a document is and routes the open to the handler
+    // whose selector matches the answer it takes. A handler claiming its own language for every
+    // URI made the pick depend on enumeration order: some server starts sent every XML open to
+    // the dialog handler, which ignores anything but .txt, and the file was never indexed.
+    [Theory]
+    [InlineData("file:///d%3A/mod/data/xml/story_plot.xml", "xml")]
+    [InlineData("file:///d%3A/mod/data/scripts/story/plot.lua", "lua")]
+    [InlineData("file:///d%3A/mod/data/text/dialog.txt", "plaintext")]
+    public void GetTextDocumentAttributes_AnswersByExtension_NotByOwner(string uri, string language)
+    {
+        var (handler, _, _) = Build();
+        Assert.Equal(language, handler.GetTextDocumentAttributes(DocumentUri.From(uri)).LanguageId);
+    }
+
     // ── DidOpen ──────────────────────────────────────────────────────────────
 
     [Fact]

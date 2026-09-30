@@ -2,31 +2,36 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // Which CSS face the card draws a game font name with. Split out of encyclopediaCard.tsx so it can
-// be unit-tested: the Arial remap is load-bearing calibration, not cosmetics - it is what makes the
-// body wrap where the game wraps.
+// be unit-tested. The ask-then-degrade rule itself is shared - see shared/gameFontStack.
+
+import {gameFontStack} from './shared/gameFontStack';
 
 /**
- * The face the popup is measured in.
+ * The face the popup is drawn in: the one the component names, unless the preview cannot have it.
  *
- * `encyclopedia_text` says `Arial`, and Arial is provably not what the engine wraps with: the game
- * keeps "Skywalker trained under Jedi Master Yoda" on one line but breaks before "to become the
- * first of a new generation of", and in Arial the string it KEEPS is 1.6% *wider* than the one it
- * BREAKS - so no width can satisfy both. That holds for fractional/kerned measurement and for
- * GDI-style integer per-glyph advances at every size from 8px to 22px. Sweeping the common Windows
- * faces, Tahoma satisfies every break with a 1.5% margin, and it was the standard Windows UI font
- * of this game's era. Only Arial and the EmpireAtWar family are remapped; a mod naming any other
- * font gets what it asked for.
+ * Arial used to be remapped to Tahoma here, and that remap was load-bearing calibration - Tahoma
+ * was the face that reproduced the shipped line breaks of Luke Skywalker's biography, which Arial
+ * could not. The reasoning was sound and the conclusion was still wrong: the engine wraps this text
+ * on a CHARACTER COUNT and measures no glyphs at all, so NO face could have reproduced those breaks
+ * by width. The sweep was answering a question the engine never asks, and the cost was every row
+ * rendering in a font the data did not name. See `encyclopediaWrap.ts` for the rule that replaced
+ * it.
+ *
+ * Only the EmpireAtWar family is substituted now, because those faces genuinely are not ours to
+ * ship. Everything else is drawn as asked.
  */
 export function cssFontStack(gameFontName: string): string {
     const family = gameFontName.trim();
 
-    if (/^arial$/i.test(family)) { return "'Tahoma', 'Verdana', sans-serif"; }
+    // The EmpireAtWar faces are now ASKED FOR and then fallen back from, rather than replaced
+    // outright - see gameFontStack for why naming them is free. A reader who has installed them
+    // gets the real thing, including the dollar glyph that is the credits coin; everyone else gets
+    // the fallback chain, which is what this returned unconditionally before.
+    if (isSubstitutedFont(family)) {
+        return gameFontStack(family, ['Trebuchet MS', 'Segoe UI', 'Tahoma']);
+    }
 
-    // One stack for the whole EmpireAtWar family: the -Bold/-Medium/-Light suffix is a WEIGHT, and
-    // fontOf already strips it and applies weight separately.
-    if (isSubstitutedFont(family)) { return "'Trebuchet MS', 'Segoe UI', 'Tahoma', sans-serif"; }
-
-    return `'${family}', 'Tahoma', sans-serif`;
+    return gameFontStack(family, ['Tahoma']);
 }
 
 /**

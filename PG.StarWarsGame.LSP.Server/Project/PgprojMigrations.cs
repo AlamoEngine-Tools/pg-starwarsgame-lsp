@@ -79,6 +79,21 @@ public interface IPgprojMigrationSink
     void Migrated(string pgprojPath, JsonNode migrated, IReadOnlyList<string> notices);
 }
 
+/// <summary>
+///     The other half of <see cref="IPgprojMigrationSink" />: asks the user about everything
+///     reported to the sink since the last call.
+///     <para>
+///         Separate from the sink because the two are called from opposite sides of the startup
+///         gate. Reporting happens while the workspace loads; ASKING blocks on a dialog, so it must
+///         come after the gate is open - held in front of it, a user who takes twenty seconds to
+///         read the diff is a server that answers nothing for twenty seconds.
+///     </para>
+/// </summary>
+public interface IPgprojMigrationOffer
+{
+    Task OfferPendingAsync(CancellationToken ct);
+}
+
 /// <summary>For contexts with no user to ask - tests, and the baseline builder.</summary>
 public sealed class NullPgprojMigrationSink : IPgprojMigrationSink
 {

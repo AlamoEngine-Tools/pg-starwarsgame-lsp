@@ -19,7 +19,16 @@ public enum StoryNodeKind
     Portal,
 
     /// <summary>A tactical plot manifest attached via STORY_*_TACTICAL / LINK_TACTICAL.</summary>
-    TacticalPlot
+    TacticalPlot,
+
+    /// <summary>A <c>StoryModeEvents</c> state of a campaign Lua script; its id is the script uri plus the state.</summary>
+    LuaState,
+
+    /// <summary>
+    ///     A galactic event seen from inside a battle's graph: the event that links the battle in,
+    ///     or one that listens for its outcome. <see cref="StoryNode.PortalTarget" /> names it.
+    /// </summary>
+    GalacticPortal
 }
 
 public enum StoryEdgeKind
@@ -37,7 +46,16 @@ public enum StoryEdgeKind
     ///     threads its manifest includes - lets the editor jump from the stub into that
     ///     battle's own story via the existing reachable-from traversal.
     /// </summary>
-    TacticalEntry
+    TacticalEntry,
+
+    /// <summary>
+    ///     A link the engine makes between a reward and the listeners it will reach, drawn so a
+    ///     sequence the game plays in order reads in order: a speech or movie to the listener that
+    ///     waits for it to end, a battle's stub to the galactic listeners for its outcome and for
+    ///     the summary dialog closing. Never a prerequisite - the evaluator ignores it, the
+    ///     simulator follows the same link through its world changes. The label names the link.
+    /// </summary>
+    Implicit
 }
 
 /// <summary>
@@ -50,7 +68,15 @@ public sealed record StoryNode(
     StoryNodeKind Kind,
     string Label,
     string? ThreadUri,
-    StoryEvent? Event = null);
+    StoryEvent? Event = null)
+{
+    /// <summary>
+    ///     For a portal, the id of the node it stands for in the other scope: a
+    ///     <see cref="StoryNodeKind.GalacticPortal" /> names a galactic event, a
+    ///     <see cref="StoryNodeKind.TacticalPlot" /> names nothing here (its battle key is in its id).
+    /// </summary>
+    public string? PortalTarget { get; init; }
+}
 
 public sealed record StoryEdge(string FromId, string ToId, StoryEdgeKind Kind, string? Label = null);
 
@@ -58,7 +84,21 @@ public enum StoryGraphProblemKind
 {
     DanglingPrereq,
     UnresolvedControlTarget,
-    AmbiguousTarget
+    AmbiguousTarget,
+
+    /// <summary>
+    ///     A STORY_GENERIC listener whose names the game never raises (measured: 36 names from
+    ///     the engine's call sites, see <see cref="StoryGenericNames" />) and which no
+    ///     TRIGGER_EVENT pushes: it never fires.
+    /// </summary>
+    GenericNeverRaised,
+
+    /// <summary>
+    ///     A STORY_MISSION_LOST listener that can only arm once the battle summary has closed
+    ///     (every prerequisite line waits on a battle_end_closed listener). Measured: the loss is
+    ///     delivered before the summary closes, so the listener never fires.
+    /// </summary>
+    MissionLostAfterSummary
 }
 
 /// <summary>A resolution defect found while building the graph, anchored to the referencing value.</summary>

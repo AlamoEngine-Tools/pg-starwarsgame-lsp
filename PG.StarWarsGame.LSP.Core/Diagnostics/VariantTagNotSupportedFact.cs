@@ -14,7 +14,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///         engine, and the tag has exactly one row in the parser table, under that type. Every
 ///         other class parses its own tags and warns about whatever it does not recognise:
 ///         <c>
-///             HardPointDataClass::Parse_Database_Entry() - Unprocessed entry
+///             Parse_Database_Entry() - Unprocessed entry
 ///             'Variant_Of_Existing_Type' in object 'HP_Whatever'.
 ///         </c>
 ///     </para>

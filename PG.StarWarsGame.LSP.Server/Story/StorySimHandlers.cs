@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Story.Sim;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
@@ -13,7 +14,8 @@ public sealed class StorySimStartHandler(IStorySimulationService sim, ILspConfig
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.Start(new StoryModelKey(request.Campaign, request.Faction));
+        var (state, error) = sim.Start(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            new StorySimOptions(request.AssumeMediaCompletes ?? true));
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -25,7 +27,7 @@ public sealed class StorySimStopHandler(IStorySimulationService sim, ILspConfigu
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.Stop(new StoryModelKey(request.Campaign, request.Faction));
+        var (state, error) = sim.Stop(new StorySimKey(request.Campaign, request.Faction, request.Scope));
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -37,7 +39,8 @@ public sealed class StorySimGetStateHandler(IStorySimulationService sim, ILspCon
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.GetState(new StoryModelKey(request.Campaign, request.Faction));
+        var (state, error) = sim.GetState(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.SinceSeq);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -49,7 +52,8 @@ public sealed class StorySimSatisfyTriggerHandler(IStorySimulationService sim, I
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.SatisfyTrigger(new StoryModelKey(request.Campaign, request.Faction), request.NodeId);
+        var (state, error) = sim.SatisfyTrigger(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.NodeId, request.SinceSeq);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -61,8 +65,8 @@ public sealed class StorySimSetFlagHandler(IStorySimulationService sim, ILspConf
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) =
-            sim.SetFlag(new StoryModelKey(request.Campaign, request.Faction), request.Flag, request.Value);
+        var (state, error) = sim.SetFlag(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Flag, request.Value, request.SinceSeq);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -74,7 +78,21 @@ public sealed class StorySimAdvanceClockHandler(IStorySimulationService sim, ILs
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.AdvanceClock(new StoryModelKey(request.Campaign, request.Faction), request.Seconds);
+        var (state, error) = sim.AdvanceClock(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Seconds, request.SinceSeq);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
+public sealed class StorySimRuleOutHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimRuleOutParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimRuleOutParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.RuleOut(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.NodeId, request.RuledOut, request.SinceSeq);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -86,7 +104,99 @@ public sealed class StorySimLuaNotifyHandler(IStorySimulationService sim, ILspCo
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.LuaNotify(new StoryModelKey(request.Campaign, request.Faction), request.Id);
+        var (state, error) = sim.LuaNotify(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Id, request.SinceSeq);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
+public sealed class StorySimTickHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimTickParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimTickParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.Tick(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Count, request.SinceSeq);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
+public sealed class StorySimRunToDecisionHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimRunToDecisionParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimRunToDecisionParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.RunToDecision(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.SinceSeq);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
+public sealed class StorySimSeekHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimSeekParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimSeekParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.Seek(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Tick);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
+public sealed class StorySimWorldHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimWorldParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimWorldParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.ApplyWorldChange(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Change, request.SinceSeq);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
+public sealed class StorySimBreakpointsHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimBreakpointsParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimBreakpointsParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.SetBreakpoints(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.NodeIds, request.OnConditionalGates);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
+public sealed class StorySimResolveBattleHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimResolveBattleParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimResolveBattleParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.ResolveBattle(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Battle, request.Won, request.SinceSeq, request.Flags);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
+public sealed class StorySimRetryBattleHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimRetryBattleParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimRetryBattleParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.RetryBattle(new StorySimKey(request.Campaign, request.Faction, request.Scope),
+            request.Battle);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }

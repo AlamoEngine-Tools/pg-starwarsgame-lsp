@@ -47,6 +47,23 @@ public sealed class StoryParamValueProposalProvider
     private static IReadOnlyList<ValueProposal> GetRefProposals(
         ParamDefinition def, string partialValue, GameIndex index)
     {
+        var workspace = index.WorkspaceDefinitions.Values.SelectMany(arr => arr);
+        var baseline = index.Baseline.Symbols.Values;
+
+        // A referenceType naming a KIND is a predicate over the object's content, not a type name:
+        // 58 story slots ask for a planet, and a planet is whatever carries the PLANET behaviour
+        // whatever element declared it. Story symbols share the index and are never objects, so
+        // they are excluded outright rather than left to a predicate that cannot judge them.
+        if (def.Kind is { } kind)
+            return Narrow(
+                workspace.Concat(baseline).Where(s => s.Kind == GameSymbolKind.XmlObject
+                                                      && !StoryReferenceTypes.IsStorySymbolType(s.TypeName)
+                                                      && !string.Equals(s.TypeName,
+                                                          StoryReferenceTypes.ThreadFileTypeName,
+                                                          StringComparison.OrdinalIgnoreCase)
+                                                      && ObjectKinds.CanPropose(index, s, kind)),
+                partialValue);
+
         // ObjectType is only resolved when the referenceType is a types.yaml object type; story
         // params carry only the raw referenceType string — fall back to it.
         var referenceType = def.ObjectType?.TypeName ?? def.ReferenceTypeName;
@@ -67,17 +84,21 @@ public sealed class StoryParamValueProposalProvider
         // object reference even though it lives in the same index.
         var isWildcard = string.Equals(typeName, "GameObjectType", StringComparison.OrdinalIgnoreCase);
 
-        var workspaceSymbols = index.WorkspaceDefinitions.Values
-            .SelectMany(arr => arr);
-        var baselineSymbols = index.Baseline.Symbols.Values;
+        return Narrow(
+            workspace.Concat(baseline)
+                .Where(s => isWildcard
+                    ? s.Kind == GameSymbolKind.XmlObject
+                      && !StoryReferenceTypes.IsStorySymbolType(s.TypeName)
+                      && !string.Equals(s.TypeName, StoryReferenceTypes.ThreadFileTypeName,
+                          StringComparison.OrdinalIgnoreCase)
+                    : string.Equals(s.TypeName, typeName, StringComparison.OrdinalIgnoreCase)),
+            partialValue);
+    }
 
-        return workspaceSymbols.Concat(baselineSymbols)
-            .Where(s => isWildcard
-                ? s.Kind == GameSymbolKind.XmlObject
-                  && !StoryReferenceTypes.IsStorySymbolType(s.TypeName)
-                  && !string.Equals(s.TypeName, StoryReferenceTypes.ThreadFileTypeName,
-                      StringComparison.OrdinalIgnoreCase)
-                : string.Equals(s.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
+    /// <summary>Applies the prefix and turns symbols into proposals, one way for every path.</summary>
+    private static IReadOnlyList<ValueProposal> Narrow(IEnumerable<GameSymbol> symbols, string partialValue)
+    {
+        return symbols
             // Scoped ability IDs are stored as "OWNER$name"; propose and filter the bare name.
             .Select(s => (Symbol: s, DisplayId: ReferenceResolutionEvaluator.StripOwnerPrefix(s.Id)))
             .Where(t => partialValue.Length == 0 ||

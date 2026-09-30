@@ -14,7 +14,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 ///     <para>
 ///         It began life inside <see cref="DynamicEnumValueHandler" />, which was wrong the moment
 ///         a second value type needed it: <c>Causes_Despawn</c> is a Boolean, and
-///         <c>GalacticSabotageAbilityClass::Validate_Data</c> (<c>00ef6c30</c>) demands it be Yes
+///         the engine's load-time validation demands it be Yes
 ///         and sets it itself otherwise. A restriction that only worked on enums would have
 ///         silently done nothing there.
 ///     </para>

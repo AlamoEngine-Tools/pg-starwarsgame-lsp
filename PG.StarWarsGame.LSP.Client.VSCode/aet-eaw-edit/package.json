@@ -38,6 +38,20 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "jsonc",
+        "extensions": [
+          ".pgproj"
+        ]
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "*.pgproj",
+        "url": "./resources/pgproj.schema.json"
+      }
+    ],
     "breakpoints": [
       {
         "language": "lua"
@@ -220,6 +234,16 @@
       ]
     },
     "menus": {
+      "commandPalette": [
+        {
+          "command": "aet-eaw-edit.lsp.openStoryFile",
+          "when": "false"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
+          "when": "false"
+        }
+      ],
       "editor/title": [
         {
           "command": "aet-eaw-edit.lsp.previewCreditsCrawl",
@@ -278,6 +302,21 @@
         {
           "command": "aet-eaw-edit.lsp.openStoryGraph",
           "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryFaction",
+          "group": "inline"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openStoryGraph",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryBattle",
+          "group": "inline"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openStoryFile",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem =~ /^aetStory(Campaign|File)$/",
+          "group": "inline"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem =~ /^aetStory(CampaignNoFile|FileMissing)$/",
           "group": "inline"
         },
         {
@@ -375,6 +414,18 @@
         "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
       },
       {
+        "command": "aet-eaw-edit.lsp.openStoryFile",
+        "title": "Open File",
+        "icon": "$(go-to-file)",
+        "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.openStoryFileUnavailable",
+        "title": "Open File - no document in the project",
+        "icon": "$(go-to-file)",
+        "enablement": "false"
+      },
+      {
         "command": "aet-eaw-edit.lsp.refreshStoryNavigator",
         "title": "EaWEdit: Refresh Story Navigator",
         "icon": "$(refresh)",
@@ -465,6 +516,26 @@
             "format": "uri-reference",
             "markdownDescription": "Path to `PG.StarWarsGame.LSP.Server.exe`. Download the server archive from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases), extract it, and point this setting at the `.exe`.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode.enabled#` is `false`.",
             "scope": "machine-overridable"
+          },
+          "aet-eaw-edit.diagnostics.workspaceOnStartup": {
+            "order": 390,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Diagnose every indexed file once the startup scan finishes, instead of only the files that get opened.\n\n**Expensive.** Measured on the base game - 580 files, smaller than any real mod - this publishes **18,281 diagnostics, 21.8 MiB**, over about **11 seconds** after the scan, and the editor holds all of it in the problems list before a single file has been opened. A mod is larger.\n\nThe scan runs after the server is ready, so nothing waits on it; the cost is editor memory and the problems list, not server responsiveness.\n\nLeave this off unless a session starts with no diagnostics at all - a known fault where the editor's open-document notification never reaches the server, which nothing else recovers from until a restart."
+          },
+          "aet-eaw-edit.encyclopedia.screenWidth": {
+            "order": 392,
+            "type": "number",
+            "default": 1920,
+            "minimum": 320,
+            "markdownDescription": "Screen width, in pixels, that the encyclopedia preview draws its card for.\n\nThe game sizes the popup's glyphs from the display it is running on, so the preview has to be told which display to match - set this to the resolution the mod is played at. The width converts the glyph size into the card's own units; `#aet-eaw-edit.encyclopedia.screenHeight#` sets the size itself.\n\nLine breaks do not move with this: those come from a character count the mod's own `encyclopedia_text` component declares."
+          },
+          "aet-eaw-edit.encyclopedia.screenHeight": {
+            "order": 393,
+            "type": "number",
+            "default": 1080,
+            "minimum": 240,
+            "markdownDescription": "Screen height, in pixels, that the encyclopedia preview draws its card for.\n\nThis is what sets the glyph size: the game derives a font height from the screen height against a 600-line reference, truncating to whole pixels, so the text does not scale smoothly - several nearby resolutions give the same size.\n\nAt exactly 800x600 the game also narrows every line's character budget by 5%, which the preview reproduces."
           },
           "aet-eaw-edit.lsp.locale": {
             "order": 400,
@@ -663,6 +734,26 @@
               "Off",
               "Messages",
               "Verbose"
+            ]
+          },
+          "aet-eaw-edit.lsp.debug.logLevel": {
+            "order": 1950,
+            "type": "string",
+            "default": "Information",
+            "markdownDescription": "How much the LSP server writes to its own log file. `Debug` adds the lines that say whether a document reached a sync handler, which is what a session publishing no diagnostics has to be diagnosed from.\n\nThis is the server's FILE log, not the output panel - see `#aet-eaw-edit.lsp.debug.traceServer#` for wire traffic. Takes effect on the next server start.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "enum": [
+              "Trace",
+              "Debug",
+              "Information",
+              "Warning",
+              "Error"
+            ],
+            "enumItemLabels": [
+              "Trace",
+              "Debug",
+              "Information (default)",
+              "Warning",
+              "Error"
             ]
           },
           "aet-eaw-edit.lsp.debug.waitForDebugger": {
@@ -875,6 +966,24 @@
             "default": false,
             "markdownDescription": "Enables **Edit mode** in the story graph panel: staging changes, previewing and validating them, and writing them back to the story XML.\n\nWithout this the panel is read-only - the graph can still be browsed in View mode.\n\nBuilds on `#aet-eaw-edit.features.tools.storyEditor#` (the panel hosting it).\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.tools.storySimulator": {
+            "order": 1957,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables **Simulation mode** in the story graph panel: the campaign runs forward in 1 s ticks as the engine would, with every trigger the game decides answered by the author - planets captured, units built, battles won or lost, script events - from a fact table seeded by the campaign XML. The panel shows the flow along the edges, the decisions the story waits on, the world, the flags, each script's state machine, and a trace of every transition. A battle runs as its own session in its own panel while the galaxy stands still, as in the game.\n\nThe simulation reproduces the engine's event rules; it does not run the galactic layer, so nothing moves, builds or fights unless you say it did.\n\nBuilds on `#aet-eaw-edit.features.tools.storyEditor#` (the panel hosting it).\n\n*Disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.storySimulator.assumeMediaCompletes": {
+            "order": 1958,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Story simulation: a speech or movie a reward starts is taken to complete on the next tick, so the `STORY_SPEECH_DONE` and `STORY_MOVIE_DONE` listeners that wait on it fire on their own. Off, each such listener is a decision for you until you answer it or the engine's 60 s timeout ends it - for stepping through media by hand.\n\nA listener no reward starts is a decision either way; that is a structural problem in the story, not a media length.\n\nTakes effect when a simulation starts."
+          },
+          "aet-eaw-edit.storySimulator.autoResume": {
+            "order": 1959,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Story simulation: when play paused itself because the clock had nothing left but a decision, answering the decision resumes play. Off, play stays paused until pressed again."
+          },
           "aet-eaw-edit.features.tools.variants": {
             "order": 2000,
             "type": "boolean",
@@ -994,6 +1103,17 @@
     "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && eslint src",
     "test": "vscode-test",
     "package": "vsce package --no-dependencies"
+  },
+  "_overridesNote": [
+    "serialize-javascript: mocha 11 (via @vscode/test-cli 0.0.15, the LATEST) pulls 6.0.2, which",
+    "carries a ReDoS - Dependabot #3 and #4. mocha 12 moved to ^7.1.1, but test-cli has not",
+    "followed, and npm's own offer is to DOWNGRADE test-cli to 0.0.11, which is backwards.",
+    "Scope is small: this chain is dev-only, CI runs dotnet test alone, and the client's own suite",
+    "is node --test - nothing automated runs mocha. Pinned forward rather than left to rot so a",
+    "real alert is not buried under a standing one. Drop this entry once test-cli ships mocha 12."
+  ],
+  "overrides": {
+    "serialize-javascript": "^7.0.5"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",

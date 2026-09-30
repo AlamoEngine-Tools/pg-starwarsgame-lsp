@@ -442,7 +442,7 @@ public sealed class XmlDiagnosticsPublisherTest
         {
             Tag = "Old_Tag",
             ValueType = XmlValueType.Float,
-            Notes = new Dictionary<string, string> { ["en"] = "Never used in vanilla." }
+            Notes = [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { ["en"] = "Never used in vanilla." })]
         });
         var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Globalization;
+using System.IO.Abstractions;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -59,11 +60,16 @@ public sealed class GetEncyclopediaEntryHandler
     private readonly IShipNameCatalogProvider? _shipNames;
     private readonly IVariantTagSource _tagSource;
 
+    // Only to ask whether a project ships the conventional mega texture, which decides whether its
+    // missing icons are a missing SETTING or genuinely absent art.
+    private readonly IFileSystem _fileSystem;
+
     public GetEncyclopediaEntryHandler(IGameIndexService indexService, ISchemaProvider schema,
         IVariantTagSource tagSource, ILspConfigurationProvider config,
         IWorkspaceIconCatalog? catalog = null,
         IShipNameCatalogProvider? shipNames = null,
-        IModProjectReloadService? projects = null)
+        IModProjectReloadService? projects = null,
+        IFileSystem? fileSystem = null)
     {
         _indexService = indexService;
         _schema = schema;
@@ -72,6 +78,7 @@ public sealed class GetEncyclopediaEntryHandler
         _catalog = catalog;
         _shipNames = shipNames;
         _projects = projects;
+        _fileSystem = fileSystem ?? new FileSystem();
     }
 
     public async Task<GetEncyclopediaEntryResult> Handle(GetEncyclopediaEntryParams request,
@@ -83,7 +90,11 @@ public sealed class GetEncyclopediaEntryHandler
 
         var index = _indexService.Current;
         var resolver = new EffectiveObjectResolver(index, _schema, _tagSource);
-        var layout = new EncyclopediaLayoutResolver(resolver).Resolve();
+        // The card is drawn for a particular screen, because the game sizes these glyphs from the
+        // display it runs on - see EncyclopediaGlyphSize.
+        var screen = _config.Current.Encyclopedia;
+        var layout = new EncyclopediaLayoutResolver(resolver, screen.ScreenWidth, screen.ScreenHeight)
+            .Resolve();
 
         var effective = resolver.Resolve(request.ObjectId);
         if (!effective.Found)
@@ -107,6 +118,11 @@ public sealed class GetEncyclopediaEntryHandler
         // picked here - see EncyclopediaShipNames for why that is the client's call.
         var shipNames = ResolveShipNames(resolver, effective.ObjectId);
 
+        // Both feed a row's wrap budget, and both travel on the result so the numbers can be
+        // checked against a card rather than taken on trust - see EncyclopediaRowBudgets.
+        var abilities = ResolveAbilities(effective, catalog);
+        var buildCost = ParseCount(TagValue(effective, EncyclopediaTags.BuildCostCredits));
+
         return new GetEncyclopediaEntryResult(
             true,
             effective.ObjectId,
@@ -116,13 +132,18 @@ public sealed class GetEncyclopediaEntryHandler
             body,
             useMultiplayerBody,
             ParseCount(TagValue(effective, EncyclopediaTags.PopulationValue)),
-            ResolveAbilities(effective, catalog),
+            abilities,
             ResolveReferences(resolver, loca, catalog, TagValue(effective, EncyclopediaTags.GoodAgainst)),
             ResolveReferences(resolver, loca, catalog, TagValue(effective, EncyclopediaTags.VulnerableTo)),
             layout,
             ResolveIcon(catalog, effective),
             ResolveChrome(catalog, layout),
-            shipNames);
+            shipNames,
+            IconSourceGap.ProjectsWithoutIconSources(_projects?.LastWorkspaceConfig, _fileSystem),
+            buildCost,
+            new EncyclopediaRowBudget(
+                EncyclopediaRowBudgets.Name(layout.Header.WrapChars, buildCost is > 0),
+                EncyclopediaRowBudgets.UnitClass(abilities.Count)));
     }
 
     /// <summary>
@@ -176,7 +197,9 @@ public sealed class GetEncyclopediaEntryHandler
     /// </summary>
     private Task<IconCatalog?> GetCatalogAsync(CancellationToken ct)
     {
-        return _catalog?.GetAsync(ct) ?? Task.FromResult<IconCatalog?>(null);
+        // Spelled as a branch rather than `_catalog?.GetAsync(ct) ?? ...`: inside a null-conditional
+        // the call reads as an unobserved awaitable (VSTHRD110) even though it is returned.
+        return _catalog is null ? Task.FromResult<IconCatalog?>(null) : _catalog.GetAsync(ct);
     }
 
     private static EncyclopediaIcon? ResolveIcon(IconCatalog? catalog, EffectiveObject effective)
@@ -325,7 +348,10 @@ public sealed class GetEncyclopediaEntryHandler
             Cut("E_LINE.TGA"),
             Cut("E_AGAINST_FRAME.TGA"),
             Cut("E_UNIT_AGAINST.TGA"),
-            frames);
+            frames,
+            // Stands in for the "$" the cost row is written with, whose coin shape comes from a
+            // font the preview cannot use. Same artwork, out of the same atlas as everything above.
+            Cut("I_ICON_CREDIT.TGA"));
 
         // Nothing resolved at all: send null rather than a record of nulls, so the client's
         // "do I have chrome?" check stays a single test. Declared-but-artless faction slots do not
@@ -333,7 +359,7 @@ public sealed class GetEncyclopediaEntryHandler
         return chrome is
                {
                    Background: null, TopBar: null, TopBarNoBlip: null,
-                   Line: null, AgainstFrame: null, UnitAgainst: null
+                   Line: null, AgainstFrame: null, UnitAgainst: null, Credit: null
                }
                && frames.All(f => f.Image is null)
             ? null

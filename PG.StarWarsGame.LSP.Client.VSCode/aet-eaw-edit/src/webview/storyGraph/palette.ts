@@ -55,8 +55,11 @@ export const UNKNOWN_LIFECYCLE_TOKEN = '--colour-faint';
  * disagree with the edge it describes. `dash` is an SVG stroke-dasharray; empty means solid.
  * `Prereq` is the plain case and takes the chart foreground rather than a hue, because "A must
  * happen first" is the default relation and colouring it would say something it does not mean.
- * `LuaLink` is reserved and never produced yet, so it is deliberately absent and falls through to
- * the default stroke.
+ * `LuaLink` takes the muted token deliberately: a story event's hop through a Lua state is real but
+ * secondary, and it has its own lens to hide it. That is the same stroke `canvasEdgeStyle` falls
+ * back to, so listing it here changes no pixel - it changes whether the reader can look the edge up.
+ * It was absent for a long time on the belief that the server never produced it, which stopped being
+ * true when StoryGraphBuilder started emitting it for Story_Event_Trigger and Set_Next_State.
  */
 export interface EdgeKindStyle {
     /** Matches StoryEdgeKind on the server; `TacticalEntry` shares the tactical presentation. */
@@ -67,10 +70,15 @@ export interface EdgeKindStyle {
 }
 
 export const EDGE_KINDS: readonly EdgeKindStyle[] = [
-    { kind: 'Prereq', token: '--colour-data-neutral', dash: '', label: 'Requires' },
-    { kind: 'Control', token: '--colour-data-orange', dash: '', label: 'Activates or suspends' },
-    { kind: 'Tactical', token: '--colour-data-yellow', dash: '8 4', label: 'Tactical battle' },
-    { kind: 'Flag', token: '--colour-data-blue', dash: '2 4', label: 'Story flag' },
+    {kind: 'Prereq', token: '--colour-data-neutral', dash: '', label: 'Requires'},
+    {kind: 'Control', token: '--colour-data-orange', dash: '', label: 'Activates or suspends'},
+    {kind: 'Tactical', token: '--colour-data-yellow', dash: '8 4', label: 'Tactical battle'},
+    {kind: 'Flag', token: '--colour-data-blue', dash: '2 4', label: 'Story flag'},
+    // The engine's own link from a reward to the listeners it reaches - a speech to its speech-done,
+    // a battle to its outcome and summary listeners. Dash-dot so it reads as neither the dashed
+    // tactical edge nor the dotted flag edge, and in the neutral grey so no branch hue claims it.
+    {kind: 'Implicit', token: '--colour-data-neutral', dash: '8 3 2 3', label: 'Engine link'},
+    {kind: 'LuaLink', token: '--colour-muted', dash: '', label: 'Lua script link'},
 ];
 
 /**
@@ -145,13 +153,17 @@ export function branchColours(campaignBranches: readonly string[]): BranchColour
  */
 export function branchToken(branch: string): string {
     let hash = 0;
-    for (let i = 0; i < branch.length; i++) { hash = (hash * 31 + branch.charCodeAt(i)) | 0; }
+    for (let i = 0; i < branch.length; i++) {
+        hash = (hash * 31 + branch.charCodeAt(i)) | 0;
+    }
     return BRANCH_PALETTE[Math.abs(hash) % BRANCH_PALETTE.length];
 }
 
 /** The lane hash, unchanged: unsigned, so it does not need the Math.abs the branch hash does. */
 export function laneToken(key: string): string {
     let hash = 0;
-    for (let i = 0; i < key.length; i++) { hash = (hash * 31 + key.charCodeAt(i)) >>> 0; }
+    for (let i = 0; i < key.length; i++) {
+        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    }
     return LANE_PALETTE[hash % LANE_PALETTE.length];
 }

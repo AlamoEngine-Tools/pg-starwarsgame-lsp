@@ -35,7 +35,7 @@ public sealed class ConvertLocalisationFormatHandler
     private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationFormatConverter _converter;
     private readonly ICsvTranslationImporter _csvImporter;
-    private readonly IDatFileService _datFileService;
+    private readonly IDatService _datFileService;
     private readonly IDatTranslationImporter _datImporter;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
@@ -52,7 +52,7 @@ public sealed class ConvertLocalisationFormatHandler
         IXmlTranslationImporter xmlImporter,
         IPropertiesTranslationImporter nlsImporter,
         IDatTranslationImporter datImporter,
-        IDatFileService datFileService,
+        IDatService datFileService,
         ITranslationDatabaseFactory factory,
         ILanguageService langService,
         ILocalisationFormatConverter converter,
@@ -195,7 +195,7 @@ public sealed class ConvertLocalisationFormatHandler
                     return $"Cannot convert '{path}': its name does not say which language it holds " +
                            "(expected '..._<LANGUAGE>.dat').";
 
-                using var datFile = _datFileService.Load(path);
+                using var datFile = _datFileService.LoadFile(path);
                 _datImporter.Import(datFile.Content, language!, db);
                 return null;
             }

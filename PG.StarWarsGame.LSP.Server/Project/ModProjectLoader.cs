@@ -374,7 +374,19 @@ public sealed class ModProjectLoader
 
         migrated["_type"] = PgprojFormat.TypeName;
         migrated["_typeVersion"] = PgprojFormat.Current.ToString();
-        _migrationSink.Migrated(path, migrated, migration.Notices);
+
+        // The diff is the one moment the author is already being asked to change this file, so a
+        // project with icon sources it has no way to reach is offered the node here rather than
+        // finding out later that every icon came from the base game. Outside the migration chain
+        // because it needs the PATH: a migration step sees only the tree, so it could not tell
+        // whether the folder it would name is really there. See PgprojIconProposal.
+        var notices = migration.Notices;
+        var directory = _fileHelper.FileSystem.Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory)
+            && PgprojIconProposal.TryPropose(migrated, directory, _fileHelper.FileSystem) is { } icons)
+            notices = [.. notices, icons];
+
+        _migrationSink.Migrated(path, migrated, notices);
         return migrated;
     }
 

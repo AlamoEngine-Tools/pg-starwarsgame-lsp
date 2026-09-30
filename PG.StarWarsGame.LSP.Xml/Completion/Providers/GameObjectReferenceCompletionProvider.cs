@@ -18,14 +18,22 @@ public sealed class GameObjectReferenceCompletionProvider : IXmlCompletionProvid
     public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex index)
     {
         var typeName = tag.ObjectType?.TypeName;
-        if (typeName is null) return [];
+        var kind = tag.Kind;
+        if (typeName is null && kind is null) return [];
 
         var workspaceSymbols = index.WorkspaceDefinitions.Values.SelectMany(arr => arr);
         var baselineSymbols = index.Baseline.Symbols.Values;
         var isWildcard = string.Equals(typeName, "GameObjectType", StringComparison.OrdinalIgnoreCase);
 
         return workspaceSymbols.Concat(baselineSymbols)
-            .Where(s => isWildcard || string.Equals(s.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
+            // A referenceType naming a KIND accepts whatever satisfies the predicate, whatever
+            // element declared it - which is the whole point: the engine reads behaviours, not
+            // element names. Story symbols share the index and are never objects.
+            .Where(s => kind is not null
+                ? s.Kind == GameSymbolKind.XmlObject
+                  && !StoryReferenceTypes.IsStorySymbolType(s.TypeName)
+                  && ObjectKinds.CanPropose(index, s, kind)
+                : isWildcard || string.Equals(s.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
             .Select(s => (Symbol: s, DisplayId: ReferenceResolutionEvaluator.StripOwnerPrefix(s.Id)))
             .Where(t => partialValue.Length == 0 ||
                         t.DisplayId.StartsWith(partialValue, StringComparison.OrdinalIgnoreCase))

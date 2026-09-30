@@ -33,33 +33,64 @@ public static class IconCatalogLoader
     /// <param name="logger">Optional; receives one line per layer that could not be read.</param>
     public static IconCatalog Load(
         IFileSystem fileSystem,
-        IMtdFileService mtdFileService,
+        IMtdService mtdFileService,
         string rootPath,
         IconProjectSettings settings,
         IconPack baseline,
         ILogger? logger = null)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+        return Load(fileSystem, mtdFileService, [new IconLayer(rootPath, settings)], baseline, logger);
+    }
+
+    /// <summary>
+    ///     The catalog for a LAYERED workspace, <paramref name="layers" /> highest precedence first.
+    /// </summary>
+    /// <remarks>
+    ///     A leaf mod used to reach its dependency's icons through nothing at all: the catalog was
+    ///     built from one root and the root project's settings, so a referenced project's mega
+    ///     texture and its loose sources were invisible and its art fell through to the baked
+    ///     baseline.
+    ///     <para>
+    ///         The two kinds layer differently, on purpose. A mega texture REPLACES rather than
+    ///         merges, so the first layer that ships one wins outright and no later atlas is read -
+    ///         which is what keeps a build pipeline that packs dependency icons into the leaf's
+    ///         atlas authoritative. Loose sources are individual files, so they layer by name and
+    ///         the leaf's copy wins.
+    ///     </para>
+    /// </remarks>
+    public static IconCatalog Load(
+        IFileSystem fileSystem,
+        IMtdService mtdFileService,
+        IReadOnlyList<IconLayer> layers,
+        IconPack baseline,
+        ILogger? logger = null)
+    {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(mtdFileService);
-        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(layers);
         ArgumentNullException.ThrowIfNull(baseline);
 
         logger ??= NullLogger.Instance;
 
-        var workspace = LoadWorkspaceMegaTexture(fileSystem, mtdFileService, rootPath, settings, logger);
+        // First atlas found wins; the rest are not opened at all.
+        var workspace = layers
+            .Select(layer => LoadWorkspaceMegaTexture(
+                fileSystem, mtdFileService, layer.RootPath, layer.Settings, logger))
+            .FirstOrDefault(icons => icons is not null);
 
-        var roots = settings.SourceRoots
-            .Select(r => fileSystem.Path.Combine(rootPath, r))
+        // Every layer's loose roots, leaf first, so the scan's own first-wins rule gives the leaf
+        // precedence without a second pass.
+        var roots = layers
+            .SelectMany(layer => layer.Settings.SourceRoots
+                .Select(r => fileSystem.Path.Combine(layer.RootPath, r)))
             .ToList();
+        // Scanned, not decoded. The scan answers every question the catalog asks of this layer -
+        // which names exist, and which are missing from the mega texture - and a mod's source
+        // folders run to thousands of files, so the pixels wait until something wants one.
         var catalog = LooseIconCatalog.Scan(fileSystem, roots);
-        var loose = LooseIconDecoder.DecodeAll(fileSystem, catalog, out var unsupported);
 
-        foreach (var name in unsupported)
-            logger.LogWarning(
-                "Icon source '{Name}' could not be decoded; BMP sources are not supported and " +
-                "corrupt images are skipped.", name);
-
-        return new IconCatalog(workspace, loose, baseline.Icons);
+        return new IconCatalog(workspace, LooseIconStore.Over(fileSystem, catalog), baseline.Icons);
     }
 
 
@@ -70,7 +101,7 @@ public static class IconCatalogLoader
     /// </summary>
     private static IReadOnlyDictionary<string, byte[]>? LoadWorkspaceMegaTexture(
         IFileSystem fileSystem,
-        IMtdFileService mtdFileService,
+        IMtdService mtdFileService,
         string rootPath,
         IconProjectSettings settings,
         ILogger logger)
@@ -83,7 +114,7 @@ public static class IconCatalogLoader
 
         try
         {
-            var directory = mtdFileService.Load(mtdPath).Content;
+            var directory = mtdFileService.LoadFile(mtdPath).Content;
             using var texture = fileSystem.File.OpenRead(texturePath);
             return MegaTextureIconExtractor.ExtractAll(directory, texture);
         }

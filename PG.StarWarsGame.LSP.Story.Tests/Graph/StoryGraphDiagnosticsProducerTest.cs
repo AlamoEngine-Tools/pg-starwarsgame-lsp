@@ -33,6 +33,20 @@ public sealed class StoryGraphDiagnosticsProducerTest
         return new StoryGraphDiagnosticsProducer(Schema).Produce(model, uri);
     }
 
+    // A listener the game never reaches is a warning on its name: the file is valid, the event is dead.
+    [Fact]
+    public void GenericListener_TheGameNeverRaises_WarnsOnTheName()
+    {
+        var model = Model([
+            (UriA,
+                "<Event Name=\"Dead\"><Event_Type>STORY_GENERIC</Event_Type><Event_Param1>right_click</Event_Param1></Event>")
+        ]);
+
+        var dead = Assert.Single(Produce(model), d => d.Message.Contains("never fires"));
+
+        Assert.Equal(XmlDiagnosticSeverity.Warning, dead.Severity);
+    }
+
     [Fact]
     public void DuplicateEventNames_ErrorOnEveryOccurrence()
     {
@@ -159,15 +173,18 @@ public sealed class StoryGraphDiagnosticsProducerTest
     [Fact]
     public void AmbiguousTarget_SurfacesAsWarning()
     {
+        // Two events of one name in ONE file: the only ambiguity left, since a twin in another
+        // file is either a legitimate campaign-wide target or invisible to the engine.
         var model = Model([
             (UriA,
-                "<Event Name=\"Twin\"/>" +
-                "<Event Name=\"Src\"><Reward_Type>TRIGGER_EVENT</Reward_Type>" +
+                "<Event Name=\"Twin\"/><Event Name=\"Twin\"/>" +
+                "<Event Name=\"Src\"><Reward_Type>RESET_EVENT</Reward_Type>" +
                 "<Reward_Param1>Twin</Reward_Param1></Event>"),
             (UriB, "<Event Name=\"Twin\"/>")
         ]);
 
-        var ambiguity = Assert.Single(Produce(model), d => d.Message.Contains("matches 2 events"));
+        var ambiguity = Assert.Single(Produce(model),
+            d => d.Message.Contains("more than one event in the same plot file"));
         Assert.Equal(XmlDiagnosticSeverity.Warning, ambiguity.Severity);
     }
 
@@ -193,6 +210,18 @@ file sealed class DiagnosticsSchemaProvider : ISchemaProvider
             new EnumValueDefinition
             {
                 Name = "TRIGGER_EVENT",
+                Params =
+                [
+                    new ParamDefinition
+                    {
+                        Position = 0, ValueType = XmlValueType.NameReference,
+                        ReferenceTypeName = "StoryEventName"
+                    }
+                ]
+            },
+            new EnumValueDefinition
+            {
+                Name = "RESET_EVENT",
                 Params =
                 [
                     new ParamDefinition

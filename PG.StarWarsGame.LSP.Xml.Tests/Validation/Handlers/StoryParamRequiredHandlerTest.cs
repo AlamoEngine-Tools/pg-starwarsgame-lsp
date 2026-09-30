@@ -55,4 +55,27 @@ public sealed class StoryParamRequiredHandlerTest
         var d = Assert.Single(results);
         Assert.Contains("Reward_Param2", d.Message);
     }
+
+    // The slot's label follows its name, so the message and the graph say the same word; a slot
+    // without a label is named by the slot alone.
+    [Fact]
+    public void Required_param_with_a_label_quotes_it_after_the_slot()
+    {
+        var def = new ParamDefinition
+        {
+            Position = 0, ValueType = XmlValueType.NameReference, Optional = false,
+            Label = new Dictionary<string, string> { ["en"] = "GUI element" }
+        };
+        var fact = new StoryParamFact("file:///test.xml", 1, 4, 36, "FLASH_GUI", true, 0, def, "");
+        var d = Assert.Single(Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
+        Assert.Equal("FLASH_GUI requires Reward_Param1 - GUI element.", d.Message);
+    }
+
+    [Fact]
+    public void Required_param_without_a_label_names_the_slot_alone()
+    {
+        var fact = new StoryParamFact("file:///test.xml", 1, 4, 33, "STORY_ELAPSED", false, 0, MakeDef(0, false), "");
+        var d = Assert.Single(Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
+        Assert.Equal("STORY_ELAPSED requires Event_Param1.", d.Message);
+    }
 }

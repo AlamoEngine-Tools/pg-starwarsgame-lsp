@@ -92,7 +92,7 @@ public abstract class EitherOrRequirementRuleBase : IXmlCrossTagRule
     ///     Whether the engine asks the question of this object at all.
     /// </summary>
     /// <remarks>
-    ///     Nearly always yes. <c>ForceHealingAbilityClass</c> is the exception: it only asks which
+    ///     Nearly always yes. <c>Force_Healing_Ability</c> is the exception: it only asks which
     ///     units it applies to when <c>Heal_Range</c> is positive, so an ability that heals at no
     ///     range is not required to name any. Reporting it would be inventing a rule the engine
     ///     does not state for that object.

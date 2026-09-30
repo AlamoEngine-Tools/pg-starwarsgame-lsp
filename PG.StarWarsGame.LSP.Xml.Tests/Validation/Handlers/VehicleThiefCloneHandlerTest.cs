@@ -19,14 +19,14 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 ///         enforced, under separate ids so either can be silenced alone.
 ///     </para>
 ///     <para>
-///         The ability half is an engine assert: <c>VehicleThiefBehaviorClass::Begin_Stealing_Vehicle</c>
+///         The ability half is an engine assert: the vehicle-theft entry point
 ///         asserts the clone has EJECT_VEHICLE_THIEF and only activates the eject when it does. All 18
 ///         clones vanilla points at carry it.
 ///     </para>
 ///     <para>
 ///         The behaviour half was held back until the maintainer asked for it. The capture never reads
 ///         GARRISON_VEHICLE, but it puts the thief into the vehicle's flagship container, and
-///         <c>GarrisonableBehaviorClass::Garrison_Unit</c> loads garrisoned units into that same
+///         <c>Garrison_Unit</c> loads garrisoned units into that same
 ///         container. Two vanilla clones - F9TZ_Cloaking_Transport_Captured and
 ///         HAV_Juggernaut_Captured - inherit the behaviour from their base and are reported; a vanilla
 ///         hit is not a veto.
