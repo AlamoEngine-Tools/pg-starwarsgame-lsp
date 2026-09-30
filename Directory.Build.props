@@ -26,9 +26,9 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <Version>0.3.0</Version>
+        <Version>0.4.0</Version>
         <Authors>Alamo Engine Tools and Contributors</Authors>
-        <Copyright>Copyright © 2026 Alamo Engine Tools and contributors. All rights reserved.</Copyright>
+        <Copyright>Copyright Â© 2026 Alamo Engine Tools and contributors. All rights reserved.</Copyright>
         <Company>Alamo Engine Tools</Company>
     </PropertyGroup>
 

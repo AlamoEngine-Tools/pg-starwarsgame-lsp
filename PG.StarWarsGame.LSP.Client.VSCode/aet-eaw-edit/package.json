@@ -3,10 +3,10 @@
   "displayName": "Alamo Engine Tools - Empire at War Edit",
   "description": "Editor intelligence for Star Wars: Empire at War and Forces of Corruption mod development - XML completions, diagnostics, hover, go-to-definition, rename, and Lua support.",
   "author": {
-    "name": "Lukas Grünwald"
+    "name": "Lukas GrÃ¼nwald"
   },
   "publisher": "AlamoEngineTools",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "preview": true,
   "keywords": [
     "star wars",
