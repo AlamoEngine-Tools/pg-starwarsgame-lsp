@@ -53,6 +53,16 @@ describe('safeImageSource', () => {
         assert.equal(safeImageSource('data:image/png;base64,AAA"onerror="alert(1)'), undefined);
     });
 
+    // The string that was CHECKED must be the string that is handed on. Returning the untrimmed
+    // original while validating the trimmed copy is a gap in its own right, and it is also what
+    // stopped a taint analyser following the guard - it saw the check applied to one value and a
+    // different one reach the sink.
+    it('returns the value it actually validated', () => {
+        assert.equal(
+            safeImageSource('  data:image/png;base64,AAAA  '),
+            'data:image/png;base64,AAAA');
+    });
+
     it('refuses null, undefined and empty', () => {
         assert.equal(safeImageSource(null), undefined);
         assert.equal(safeImageSource(undefined), undefined);

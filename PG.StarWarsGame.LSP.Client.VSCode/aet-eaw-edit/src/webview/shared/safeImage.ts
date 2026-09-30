@@ -2,20 +2,24 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 /**
- * The image subtypes an icon may legitimately be. SVG is deliberately absent: it is the one image
- * format that can carry script, so allowing it would give back exactly what this guard removes.
- */
-const ALLOWED_SUBTYPES = ['png', 'jpeg', 'jpg', 'gif', 'webp', 'bmp'];
-
-/**
  * `data:image/<subtype>;base64,<base64>` and nothing else - the exact shape the server emits.
  *
  * Anchored at both ends, and the payload is restricted to the base64 alphabet so a quote or an
- * angle bracket cannot ride along inside it.
+ * angle bracket cannot ride along inside it. SVG is deliberately absent from the subtypes: it is
+ * the one image format that can carry script, so allowing it would give back exactly what this
+ * guard removes.
+ *
+ * Written as a LITERAL rather than built with `new RegExp(...)` from a subtype list. That is not
+ * style: a static analyser can see that a literal is anchored and treat it as a sanitising guard,
+ * while a dynamically assembled pattern is opaque to it. The first version of this file composed
+ * the pattern from an array, and CodeQL went on reporting js/xss and
+ * js/client-side-unvalidated-url-redirection at every call site because it could not tell what
+ * the guard admitted.
  */
-const DATA_IMAGE = new RegExp(
-    `^data:image/(?:${ALLOWED_SUBTYPES.join('|')});base64,[A-Za-z0-9+/]*={0,2}$`,
-    'i');
+const DATA_IMAGE = /^data:image\/(?:png|jpeg|jpg|gif|webp|bmp);base64,[A-Za-z0-9+/]*={0,2}$/i;
+
+/** The literal prefix every allowed value carries - see the `startsWith` guard below. */
+const DATA_IMAGE_PREFIX = 'data:image/';
 
 /**
  * The value to hand an `<img src>`, or `undefined` when it is not a data-image URI this webview
@@ -39,5 +43,22 @@ export function safeImageSource(value: string | null | undefined): string | unde
         return undefined;
     }
 
-    return DATA_IMAGE.test(value.trim()) ? value : undefined;
+    // Trim FIRST, then test and return that same string. The earlier version tested `value.trim()`
+    // and returned `value`, so the string that was checked was not the string that was handed on -
+    // a gap in its own right, and the reason a taint analyser could not follow the guard either.
+    const uri = value.trim();
+
+    // Two guards, and the first is not redundant. A literal-prefix `startsWith` is the shape a
+    // taint analyser recognises as a barrier; the regex below is what actually constrains the
+    // value. Keeping both means the check reads the same to a human and to CodeQL - the first
+    // attempt here carried only the regex and every call site went on being reported.
+    if (!uri.startsWith(DATA_IMAGE_PREFIX)) {
+        return undefined;
+    }
+
+    if (!DATA_IMAGE.test(uri)) {
+        return undefined;
+    }
+
+    return uri;
 }
