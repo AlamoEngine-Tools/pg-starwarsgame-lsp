@@ -80,7 +80,50 @@ public static class SuppressionCodeActionBuilder
             }
         }));
 
+        // Reporting comes last: it is the rarer act, and it changes nothing in the project.
+        var report = ReportPayload(documentUri, diagnostic, id, lines);
+        actions.Add(ReportAction($"Report {id} on GitHub", DiagnosticReportCommands.ReportOnGitHub, diagnostic,
+            report));
+        actions.Add(ReportAction($"Open report for {id} in editor", DiagnosticReportCommands.OpenInEditor, diagnostic,
+            report));
+
         return actions;
+    }
+
+    private static CommandOrCodeAction ReportAction(string title, string command, Diagnostic diagnostic, JObject report)
+    {
+        return new CommandOrCodeAction(new CodeAction
+        {
+            Title = title,
+            Kind = CodeActionKind.QuickFix,
+            Diagnostics = new Container<Diagnostic>(diagnostic),
+            Command = new Command { Name = command, Title = title, Arguments = new JArray(report) }
+        });
+    }
+
+    /// <summary>
+    ///     What a report says about one diagnostic: its id, severity and message, the file NAME, and
+    ///     every source line the range touches. The name and not the path, because the report goes
+    ///     into a public issue; the lines whole, because a multi-line value is the usual false
+    ///     positive and its first line alone shows nothing.
+    /// </summary>
+    private static JObject ReportPayload(DocumentUri documentUri, Diagnostic diagnostic, DiagnosticId id,
+        string[] lines)
+    {
+        var first = Math.Clamp(diagnostic.Range.Start.Line, 0, Math.Max(lines.Length - 1, 0));
+        var last = Math.Clamp(diagnostic.Range.End.Line, first, Math.Max(lines.Length - 1, 0));
+        var source = lines.Length == 0 ? [] : lines[first..(last + 1)];
+        var path = documentUri.Path;
+
+        return new JObject
+        {
+            ["id"] = id.ToString(),
+            ["severity"] = (diagnostic.Severity ?? DiagnosticSeverity.Error).ToString(),
+            ["message"] = diagnostic.Message,
+            ["fileName"] = path[(path.LastIndexOf('/') + 1)..],
+            ["startLine"] = first,
+            ["lines"] = new JArray(source.Cast<object>().ToArray())
+        };
     }
 
     private static CommandOrCodeAction Insert(

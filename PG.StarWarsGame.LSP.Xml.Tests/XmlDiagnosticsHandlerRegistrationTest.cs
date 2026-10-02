@@ -219,7 +219,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // planets - once names get descriptive. Vanilla's longest HardPoints is 869 characters and
         // its longest value of any kind 2,535, so the headroom is real but spendable.
         // 142 -> 143: CaseSensitiveTagHandler added - a tag spelled in a casing its own parser will
-        // not accept. Rare by design: DatabaseMapClass uppercases every key it handles, so casing is
+        // not accept. Rare by design: the engine's tag mapper uppercases every key it handles, so casing is
         // free for all but the tags with a hand-rolled parser. The plot loader is one,
         // comparing with std::operator==, and the result of its Active_Plot test becomes the
         // is_active argument to Load_Single_Plot - so <active_plot> loads SUSPENDED and the campaign
@@ -303,7 +303,16 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // 153 -> 154: UnregisteredXmlFileHandler. A file is read because a registry lists it, because
         // the engine opens it by a name compiled in, or because it sits in a directory the engine
         // walks; one that is none of those is never opened, and nothing in the file says so.
-        const int expectedHandlerCount = 154;
+        // 154 -> 156: TupleSlotEnumHandler and TupleSlotModelHandler (schema 2.2.0 slots). They
+        // check one typed item of a slotted tuple each, on a fact of their own - every slotted tag
+        // uses mode: replace, which discards the default value handlers. The model one is now
+        // TupleSlotAssetHandler and checks every asset kind.
+        // 156 -> 155: ListMapHandler replaces PerFactionObjectListHandler and
+        // PresenceInducedAnimationsHandler (schema 2.3.0). Both tags are one engine type, a key then
+        // its items, and one handler reads every occurrence of either the way the engine does.
+        // 155 -> 156: NameCrcCollisionHandler. The engine files game objects by a CRC-32 of the name
+        // and keeps the first it loads, so of two names sharing a hash one can never be found.
+        const int expectedHandlerCount = 156;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

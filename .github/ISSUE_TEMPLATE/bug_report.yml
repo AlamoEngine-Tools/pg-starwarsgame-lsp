@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in the extension or the language server behaves wrongly
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What was expected, what happened instead, and the steps that lead there.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: workspace-setup
+    attributes:
+      label: Workspace setup
+      description: Multi-root workspaces are not supported out of the box yet.
+      options:
+        - Single folder
+        - Multi-root (.code-workspace)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug-report-info
+    attributes:
+      label: Bug report info
+      description: >-
+        Output of the command "EaWEdit: Copy Bug Report Info", or of a click on the EaWEdit item in
+        the status bar. It holds versions, sources and counts - no paths and no project names.
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: extended-stats
+    attributes:
+      label: Extended stats (optional)
+      description: >-
+        The extended variant of the same command - dependency and index counts that help rebuild the
+        setup as a test case.
+      render: markdown
+    validations:
+      required: false

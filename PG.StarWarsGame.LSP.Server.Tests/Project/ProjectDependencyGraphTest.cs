@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Project;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Project;
@@ -18,6 +19,49 @@ public sealed class ProjectDependencyGraphTest
             null,
             new DirectoryMap(),
             references.Select(r => new ProjectReference(r)).ToList());
+    }
+
+    // ── the shape, for the bug report ────────────────────────────────────────
+    //
+    // Only the flattened layer list survived resolution, so "direct or transitive" and "how deep"
+    // were gone by the time anything could report them - and a dependency setup is exactly what a
+    // test case has to rebuild.
+
+    [Fact]
+    public void Build_PlainMod_HasNoDependencies()
+    {
+        new ProjectDependencyGraph(NullLoggerFactory())
+            .Build("/mods/root/root.pgproj", Project(), _ => null, out var shape);
+
+        Assert.Equal(new ProjectDependencyShape(0, 0, 0, 0), shape);
+    }
+
+    [Fact]
+    public void Build_Diamond_CountsDirectTotalAndDepth()
+    {
+        // root -> A, root -> B, A -> C, B -> C
+        var files = new Dictionary<string, ModProjectFile>
+        {
+            ["/mods/a/a.pgproj"] = Project("../c/c.pgproj"),
+            ["/mods/b/b.pgproj"] = Project("../c/c.pgproj"),
+            ["/mods/c/c.pgproj"] = Project()
+        };
+
+        new ProjectDependencyGraph(NullLoggerFactory()).Build("/mods/root/root.pgproj",
+            Project("../a/a.pgproj", "../b/b.pgproj"),
+            p => files.TryGetValue(p, out var f) ? f : null, out var shape);
+
+        Assert.Equal(new ProjectDependencyShape(Direct: 2, Total: 3, Depth: 2, Unresolved: 0), shape);
+    }
+
+    [Fact]
+    public void Build_ReferenceThatDoesNotLoad_IsCountedAsUnresolved()
+    {
+        // The graph skips it with a log line; a report from that setup is missing a layer.
+        new ProjectDependencyGraph(NullLoggerFactory())
+            .Build("/mods/root/root.pgproj", Project("../gone/gone.pgproj"), _ => null, out var shape);
+
+        Assert.Equal(new ProjectDependencyShape(0, 0, 0, Unresolved: 1), shape);
     }
 
     [Fact]

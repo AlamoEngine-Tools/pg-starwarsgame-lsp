@@ -40,6 +40,18 @@ public sealed record GetPreviewSceneParams : IRequest<GetPreviewSceneResult>
 /// </param>
 public sealed record GetPreviewSceneResult(PreviewScene Scene);
 
+/// <summary>Request for every model the project can preview, for the "Preview Model" picker.</summary>
+[Method("aet/listModels", Direction.ClientToServer)]
+public sealed record ListModelsParams : IRequest<ListModelsResult>;
+
+/// <summary>One model the picker offers.</summary>
+/// <param name="Name">The file name, which is what <c>aet/getPreviewScene</c> resolves.</param>
+/// <param name="BaseGame">True when it comes from the shipped game rather than the project's layers.</param>
+public sealed record PreviewModelEntry(string Name, bool BaseGame);
+
+/// <summary>Result of <c>aet/listModels</c>, sorted by name. Empty when the preview is turned off.</summary>
+public sealed record ListModelsResult(IReadOnlyList<PreviewModelEntry> Models);
+
 /// <summary>Request for one model's geometry as a glTF binary.</summary>
 [Method("aet/getModelGlb", Direction.ClientToServer)]
 public sealed record GetModelGlbParams : IRequest<GetModelGlbResult>

@@ -649,9 +649,35 @@ export interface PreviewSpinAway {
     maxSpeed: number;
 }
 
+/** One model the "Preview Model" picker offers - `aet/listModels`. */
+export interface PreviewModelEntry {
+    /** The file name, which is what `aet/getPreviewScene` resolves. */
+    name: string;
+    /** True when it comes from the shipped game rather than the project's layers. */
+    baseGame: boolean;
+}
+
+/** Result of `aet/listModels`, sorted by name. Empty when the preview is turned off. */
+export interface ListModelsResult {
+    models: PreviewModelEntry[];
+}
+
+/** Where a previewed model lives on disk, as far as an external tool is concerned. */
+export interface PreviewSourceFile {
+    /** The loose file the name resolved to, or null when it exists only inside a MEG archive. */
+    path: string | null;
+    /** True when the model was found only inside a MEG archive. */
+    packed: boolean;
+}
+
 export interface PreviewScene {
     /** See {@link PREVIEW_SCENE_KIND}. */
     kind: string;
+    /**
+     * The file a bare model resolved to, for the hand-off to AloViewer or the Particle Editor.
+     * Absent for an object scene and for a model that resolves nowhere.
+     */
+    sourceFile?: PreviewSourceFile | null;
     subject: string;
     parts: PreviewPart[];
     hardpoints: PreviewHardpoint[];
@@ -994,8 +1020,18 @@ export type AlamoParticleBlendMode =
 export type AlamoGroundBehavior = 'None' | 'Disappear' | 'Bounce' | 'Stick';
 export type AlamoEmitFromMesh = 'Disabled' | 'RandomVertex' | 'RandomMesh' | 'EveryVertex';
 
-export interface AlamoVector3 { x: number; y: number; z: number }
-export interface AlamoVector4 { x: number; y: number; z: number; w: number }
+export interface AlamoVector3 {
+    x: number;
+    y: number;
+    z: number
+}
+
+export interface AlamoVector4 {
+    x: number;
+    y: number;
+    z: number;
+    w: number
+}
 
 /**
  * A randomised emitter property.

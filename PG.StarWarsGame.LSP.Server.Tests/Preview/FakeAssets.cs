@@ -45,11 +45,27 @@ internal sealed class FakeAssets(params string[] resolvable) : IGameAssetResolve
 
     public GameAssetTiers Tiers => new(1, false, false, 0);
 
+    private readonly Dictionary<string, GameAssetLocation> _located = new(StringComparer.OrdinalIgnoreCase);
+
     public GameAssetLocation? Locate(string gameRelativePath)
     {
+        if (_located.TryGetValue(gameRelativePath, out var located))
+            return located;
+
         return _resolvable.Contains(gameRelativePath)
             ? new GameAssetLocation(gameRelativePath, gameRelativePath, GameAssetTier.Workspace)
             : null;
+    }
+
+    /// <summary>
+    ///     Makes one asset resolve from a particular tier and file, rather than the default
+    ///     workspace hit whose resolved path is the requested one.
+    /// </summary>
+    public FakeAssets LocatedAt(string name, string resolvedPath, GameAssetTier tier)
+    {
+        var path = "Data/Art/Models/" + name;
+        _located[path] = new GameAssetLocation(path, resolvedPath, tier);
+        return this;
     }
 
     public byte[]? Read(string gameRelativePath)

@@ -44,8 +44,7 @@ public static class ReferenceResolutionEvaluator
         {
             // An EMPTY set means nothing is indexed yet - startup, or a fixture - not that this type
             // is unsupported. Claiming "not indexed yet" there would silence every genuine missing
-            // reference until the index loads. Same guard PerFactionObjectListHandler applies to the
-            // baseline before it trusts a faction lookup.
+            // reference until the index loads. ListMapHandler guards its key lookup the same way.
             if (expectedTypeName is not null && indexedTypeNames is { Count: > 0 }
                                              && !indexedTypeNames.Contains(expectedTypeName))
                 // The gap is the tool's (the AI tree, for one, is a later milestone), so the notice

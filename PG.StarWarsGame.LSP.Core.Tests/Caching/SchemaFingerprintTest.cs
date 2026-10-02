@@ -40,6 +40,26 @@ public sealed class SchemaFingerprintTest
         Assert.NotEqual(before, after);
     }
 
+    /// <summary>
+    ///     Slots decide what the parser records inside a tuple value, so a schema that only changes
+    ///     a slot must still discard the snapshots written under the old one.
+    /// </summary>
+    [Fact]
+    public void Compute_TagSlotChanged_DifferentFingerprint()
+    {
+        var pairs = Tag("Pairs") with { ValueType = XmlValueType.TupleList };
+        var untyped = pairs with { Slots = [new TupleSlotDefinition { Label = "Model" }] };
+        var typed = pairs with
+        {
+            Slots = [new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }]
+        };
+
+        Assert.NotEqual(SchemaFingerprint.Compute(new StubSchema([pairs])),
+            SchemaFingerprint.Compute(new StubSchema([untyped])));
+        Assert.NotEqual(SchemaFingerprint.Compute(new StubSchema([untyped])),
+            SchemaFingerprint.Compute(new StubSchema([typed])));
+    }
+
     [Fact]
     public void Compute_TagOrderIrrelevant_SameFingerprint()
     {

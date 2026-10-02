@@ -30,7 +30,13 @@ public static class DiagnosticIds
     public static readonly DiagnosticId NameReferenceList = new(DiagnosticGroup.References, 12);
     public static readonly DiagnosticId PerFactionObjectList = new(DiagnosticGroup.References, 13);
     public static readonly DiagnosticId PerFactionPlanet = new(DiagnosticGroup.References, 14);
+
+    /// <summary>
+    ///     No longer raised: <c>Presence_Induced_Animations</c> is a <c>ListMap</c> and is checked by
+    ///     its slots. Kept, as every id is, so a suppression naming it stays inert rather than wrong.
+    /// </summary>
     public static readonly DiagnosticId PresenceInducedAnimations = new(DiagnosticGroup.References, 15);
+
     public static readonly DiagnosticId SfxEventHudReference = new(DiagnosticGroup.References, 16);
     public static readonly DiagnosticId SFXEventReference = new(DiagnosticGroup.References, 17);
     public static readonly DiagnosticId SpeechEventReference = new(DiagnosticGroup.References, 18);
@@ -41,7 +47,13 @@ public static class DiagnosticIds
     public static readonly DiagnosticId ContextNamePairUnresolvedMusicEvent = new(DiagnosticGroup.References, 23);
     public static readonly DiagnosticId NameReferenceEmpty = new(DiagnosticGroup.References, 24);
     public static readonly DiagnosticId PerFactionObjectListUnknownFaction = new(DiagnosticGroup.References, 25);
+
+    /// <summary>
+    ///     No longer raised: the engine never parses an empty value - it keeps the list it had - so
+    ///     there is nothing wrong to report.
+    /// </summary>
     public static readonly DiagnosticId PerFactionObjectListEmpty = new(DiagnosticGroup.References, 26);
+
     public static readonly DiagnosticId StoryDialogChapterNotDefined = new(DiagnosticGroup.References, 27);
 
     /// <summary>
@@ -68,6 +80,40 @@ public static class DiagnosticIds
 
     /// <summary>A dialog command argument naming something that does not resolve.</summary>
     public static readonly DiagnosticId DialogArgReference = new(DiagnosticGroup.References, 29);
+
+    // ListMap - a key, then the items it maps to. The first two ids predate the type's generic name
+    // and keep their numbers: PerFactionObjectList is the handler's default, and
+    // PerFactionObjectListUnknownFaction is a value that does not start with a key, of any kind.
+
+    /// <summary>
+    ///     A repeated <c>ListMap</c> tag starts with an item that is no key, so its items join the
+    ///     last key of the previous occurrence - the engine appends repeats outside a variant.
+    /// </summary>
+    public static readonly DiagnosticId ListMapContinuesPreviousKey = new(DiagnosticGroup.References, 31);
+
+    /// <summary>
+    ///     An item of a <c>ListMap</c> names a key as well as an object, so the engine reads it as a
+    ///     new key - it tries every item as a key first.
+    /// </summary>
+    public static readonly DiagnosticId ListMapItemNamesAKey = new(DiagnosticGroup.References, 32);
+
+    /// <summary>
+    ///     A key appears twice in one object's <c>ListMap</c>. The engine keeps the two groups apart,
+    ///     and what reads the tag does not merge them.
+    /// </summary>
+    public static readonly DiagnosticId ListMapRepeatedKey = new(DiagnosticGroup.References, 33);
+
+    /// <summary>
+    ///     An item of a <c>ListMap</c> is not of the kind its value slot names. The engine accepts any
+    ///     object there, so it is a warning about intent, not a load failure.
+    /// </summary>
+    public static readonly DiagnosticId ListMapValueKind = new(DiagnosticGroup.References, 34);
+
+    /// <summary>
+    ///     A variant repeats a <c>ListMap</c> tag. Each occurrence in a variant clears the list first,
+    ///     so only the last one survives.
+    /// </summary>
+    public static readonly DiagnosticId ListMapReplacedInVariant = new(DiagnosticGroup.References, 35);
 
     // ── Enums ──
     public static readonly DiagnosticId AbilityModFlag = new(DiagnosticGroup.Enums, 1);
@@ -105,6 +151,13 @@ public static class DiagnosticIds
     ///     defence silently ignore that projectile.
     /// </summary>
     public static readonly DiagnosticId ProjectileCategoryList = new(DiagnosticGroup.Enums, 18);
+
+    /// <summary>
+    ///     An enum-typed item of a slotted tuple value names no value of its enum - the terrain of a
+    ///     <c>Land_Terrain_Model_Mapping</c> pair. Its own id rather than the whole-tag enum check's,
+    ///     so the two can be suppressed apart.
+    /// </summary>
+    public static readonly DiagnosticId TupleSlotEnumValue = new(DiagnosticGroup.Enums, 19);
 
     // ── Values ──
     public static readonly DiagnosticId AbilityModMultiplier = new(DiagnosticGroup.Values, 1);
@@ -289,6 +342,21 @@ public static class DiagnosticIds
     ///     </para>
     /// </summary>
     public static readonly DiagnosticId ModelTextureExistence = new(DiagnosticGroup.Assets, 12);
+
+    /// <summary>
+    ///     A model-typed item of a slotted tuple value names a file the game data and the workspace
+    ///     do not have - the model of a <c>Land_Terrain_Model_Mapping</c> pair.
+    /// </summary>
+    public static readonly DiagnosticId TupleSlotModelFileExistence = new(DiagnosticGroup.Assets, 13);
+
+    /// <summary>A model-typed item of a slotted tuple value is not an <c>.alo</c>.</summary>
+    public static readonly DiagnosticId TupleSlotModelFileFormat = new(DiagnosticGroup.Assets, 14);
+
+    /// <summary>
+    ///     A texture, audio or map item of a tuple value names a file the game data and the workspace
+    ///     do not have. Models keep <see cref="TupleSlotModelFileExistence" />, which predates it.
+    /// </summary>
+    public static readonly DiagnosticId TupleSlotAssetFileExistence = new(DiagnosticGroup.Assets, 15);
 
     // ── Localisation ──
     public static readonly DiagnosticId LocalisationKeyExistence = new(DiagnosticGroup.Localisation, 1);
@@ -544,6 +612,12 @@ public static class DiagnosticIds
     public static readonly DiagnosticId CrossLayerShadow = new(DiagnosticGroup.Symbols, 2);
     public static readonly DiagnosticId CrossTypeShadow = new(DiagnosticGroup.Symbols, 3);
     public static readonly DiagnosticId UnnamedObject = new(DiagnosticGroup.Symbols, 4);
+
+    /// <summary>
+    ///     Two game objects whose different names share the CRC-32 the engine files objects under.
+    ///     The engine keeps the first one it loads and can never find the other.
+    /// </summary>
+    public static readonly DiagnosticId ObjectNameCrcCollision = new(DiagnosticGroup.Symbols, 5);
 
     // ── Engine ──
     // Built directly by XmlDiagnosticsPublisher rather than by a handler: these check values the

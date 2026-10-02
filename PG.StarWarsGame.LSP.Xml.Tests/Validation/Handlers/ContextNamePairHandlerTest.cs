@@ -39,53 +39,43 @@ public sealed class ContextNamePairHandlerTest
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
 
-    // ── Music event name validation ───────────────────────────────────────────
+    // ── what the items are is not this handler's business ─────────────────────
 
-    private static GameIndex IndexWithSymbol(string id)
+    /// <summary>
+    ///     The music event used to be looked up here, by name and against nothing in particular.
+    ///     It is the second slot now, typed as a MusicEvent reference: the parser records it, and
+    ///     the reference pipeline resolves it - with hover, go-to and rename besides.
+    /// </summary>
+    [Fact]
+    public void AnUnknownMusicEvent_IsLeftToTheReferenceCheck()
     {
-        var sym = new GameSymbol(id, GameSymbolKind.XmlObject, "MusicEvent", new UnknownOrigin("test"), null);
-        var defs = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
-            .Add(id, ImmutableArray.Create(sym));
-        return new GameIndex(BaselineIndex.Empty,
+        var sym = new GameSymbol("Space_Ambient_Music", GameSymbolKind.XmlObject, "MusicEvent",
+            new UnknownOrigin("test"), null);
+        var index = new GameIndex(BaselineIndex.Empty,
             ImmutableDictionary<string, DocumentIndex>.Empty,
-            defs,
+            ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+                .Add(sym.Id, [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+
+        Assert.Empty(Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Space, Missing_Event"), ctx));
     }
 
     [Fact]
-    public void Known_music_event_returns_no_diagnostics()
+    public void ABadPair_IsDescribedInTheSlotsWords()
     {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithSymbol("Space_Ambient_Music"),
-            "file:///test.xml", "en");
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Space, Space_Ambient_Music"), ctx).ToList();
-        Assert.Empty(results);
-    }
+        var slotted = Tag with
+        {
+            Slots =
+            [
+                new TupleSlotDefinition { Label = "Context" },
+                new TupleSlotDefinition { Label = "Music event" }
+            ]
+        };
 
-    [Fact]
-    public void Unknown_music_event_returns_error()
-    {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithSymbol("Space_Ambient_Music"),
-            "file:///test.xml", "en");
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Space, Missing_Event"), ctx).ToList();
-        var d = Assert.Single(results);
-        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
-        Assert.Contains("Missing_Event", d.Message);
-    }
+        var d = Assert.Single(Sut.Handle(XmlHandlerTestFixtures.MakeFact(slotted, "Space"),
+            XmlHandlerTestFixtures.EmptyCtx));
 
-    [Fact]
-    public void Empty_index_skips_name_validation()
-    {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Space, Missing_Event"),
-            XmlHandlerTestFixtures.EmptyCtx).ToList();
-        Assert.Empty(results);
-    }
-
-    [Fact]
-    public void Name_lookup_is_case_insensitive()
-    {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithSymbol("Space_Ambient_Music"),
-            "file:///test.xml", "en");
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Space, space_ambient_music"), ctx).ToList();
-        Assert.Empty(results);
+        Assert.Contains("`Context, Music event`", d.Message);
     }
 }

@@ -9,6 +9,13 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
 {
+    private readonly IObjectNameHash _nameHash;
+
+    public XmlIndexFactProducer(IObjectNameHash nameHash)
+    {
+        _nameHash = nameHash;
+    }
+
     public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
     {
         if (!index.Documents.TryGetValue(documentUri, out var doc))
@@ -38,6 +45,17 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
             if (string.Equals(sym.TypeName, StoryReferenceTypes.ThreadFileTypeName,
                     StringComparison.OrdinalIgnoreCase))
                 continue;
+
+            // A different name the engine files under the same hash - one of the two is unreachable.
+            // The index keeps game objects by hash already, so this is a lookup, not a scan.
+            if (GameIndex.IsNameHashedObject(sym))
+            {
+                var hash = _nameHash.Of(sym.Id);
+                var others = index.SharingNameHash(sym, hash);
+                if (others.Count > 0)
+                    facts.Add(new XmlNameCrcCollisionFact(documentUri, fo.Line, fo.Column ?? 0, 0, sym.Id, hash,
+                        others));
+            }
 
             if (!index.WorkspaceDefinitions.TryGetValue(sym.Id, out var all) || all.Length <= 1)
                 continue;

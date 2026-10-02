@@ -27,6 +27,47 @@ public sealed class ValueTypeHintTest
         };
     }
 
+    // ── tuple lists ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     The hint was "MusicEventName, weight pairs" for every TupleList - on a list of terrain and
+    ///     model pairs too. What the items are belongs to the tag's slots, not to the type.
+    /// </summary>
+    [Fact]
+    public void TupleList_NamesTheTagsOwnSlots()
+    {
+        var tag = Tag(XmlValueType.TupleList) with
+        {
+            Slots =
+            [
+                new TupleSlotDefinition { Label = "Terrain" },
+                new TupleSlotDefinition { Label = "Model" }
+            ]
+        };
+
+        Assert.Equal("**Format:** `Terrain, Model` pairs", ValueTypeHint.Build(tag));
+    }
+
+    [Fact]
+    public void TupleList_WithoutSlots_ClaimsNothingAboutTheItems()
+    {
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.TupleList));
+
+        Assert.Equal("**Format:** comma-separated pairs", hint);
+    }
+
+    [Fact]
+    public void ListMap_SaysKeyThenItems_InTheSlotsWords()
+    {
+        // The type was "per-faction object list" while one of its tags maps animation states.
+        var tag = Tag(XmlValueType.ListMap) with
+        {
+            Slots = [new TupleSlotDefinition { Label = "Animation" }, new TupleSlotDefinition { Label = "Unit" }]
+        };
+
+        Assert.Equal("**Format:** `Animation` keys, each followed by `Unit` items", ValueTypeHint.Build(tag));
+    }
+
     // ── scalar types ────────────────────────────────────────────────────────
 
     [Fact]

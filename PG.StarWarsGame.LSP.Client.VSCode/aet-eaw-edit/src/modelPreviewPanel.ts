@@ -10,20 +10,22 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway } from './lsp/lspGateway';
-import { subMeshGeometryReply } from './lsp/subMeshGeometry';
-import { ModelInspectorPanel } from './modelInspectorPanel';
+import {LspGateway} from './lsp/lspGateway';
+import {subMeshGeometryReply} from './lsp/subMeshGeometry';
+import {ModelInspectorPanel} from './modelInspectorPanel';
 import {
     GetModelDetailResult, GetModelGlbResult, GetModelTextureResult, GetParticleSystemResult,
     GetProjectileResult,
     GetPreviewSceneResult,
     GetShaderSourceResult,
+    PreviewSourceFile,
 } from './protocol/modelPreview';
-import { revealDefinition } from './revealDefinition';
-import { subjectStateFrom, type SubjectState } from './webview/preview/subjectState';
-import { readViewerSettings, saveViewerSettings } from './viewerSettingsStorage';
-import { readProjectSettings, saveProjectSettings } from './projectSettingsStorage';
-import { PanelRegistry, WebviewPanelHost, WebviewMessage, panelKey } from './webviewPanelHost';
+import {handoffFile, launchDetached} from './externalTool';
+import {revealDefinition} from './revealDefinition';
+import {subjectStateFrom, type SubjectState} from './webview/preview/subjectState';
+import {readViewerSettings, saveViewerSettings} from './viewerSettingsStorage';
+import {readProjectSettings, saveProjectSettings} from './projectSettingsStorage';
+import {PanelRegistry, WebviewPanelHost, WebviewMessage, panelKey} from './webviewPanelHost';
 
 /** What the preview is showing, and therefore what to ask the server for. */
 export type PreviewSubject =
@@ -200,6 +202,9 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     /** The clips this subject's model has, as the scene reported them. */
     private sceneAnimations: string[] = [];
 
+    /** The file the subject's name resolved to, as the scene reported it - what a hand-off opens. */
+    private sceneSourceFile: PreviewSourceFile | null = null;
+
     private get stateKey(): string {
         return subjectKey(this.subject);
     }
@@ -226,7 +231,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
 
         const target = await vscode.window.showSaveDialog({
             defaultUri: vscode.Uri.file(String(message.fileName ?? 'capture.png')),
-            filters: { Images: ['png'] },
+            filters: {Images: ['png']},
         });
 
         if (target === undefined) {
@@ -259,7 +264,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         const inspector = ModelInspectorPanel.show(this.extensionUri, this.lsp, subject);
 
         if (!alreadyOpen) {
-            inspector.onDidDispose(() => this.post({ type: 'inspectorClosed' }));
+            inspector.onDidDispose(() => this.post({type: 'inspectorClosed'}));
         }
     }
 
@@ -406,6 +411,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         // Kept for the GLB request that follows: the scene is what knows which clips exist for this
         // model, and the geometry has to be baked with them or the picker has nothing to offer.
         this.sceneAnimations = result.value.scene.animations ?? [];
+        this.sceneSourceFile = result.value.scene.sourceFile ?? null;
 
         // The reader's own state goes FIRST, exactly as it does on open: the webview holds it in a
         // ref and applies it after the scene handler has reset everything. Without it, a refresh
@@ -420,7 +426,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
             });
         }
 
-        this.post({ type: 'scene', scene: result.value.scene, refresh });
+        this.post({type: 'scene', scene: result.value.scene, refresh});
     }
 
     /**
@@ -468,7 +474,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
             attachBone: message.attachBone,
             result: result.ok
                 ? result.value
-                : { glb: null, animations: [], error: result.message },
+                : {glb: null, animations: [], error: result.message},
         });
     }
 
@@ -480,23 +486,23 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      */
     private async sendModelDetail(modelReference: string): Promise<void> {
         const result = await this.lsp.request<GetModelDetailResult>(
-            'aet/getModelDetail', { modelReference });
+            'aet/getModelDetail', {modelReference});
 
         this.post({
             type: 'modelDetail',
             modelReference,
-            result: result.ok ? result.value : { detail: null, error: result.message },
+            result: result.ok ? result.value : {detail: null, error: result.message},
         });
     }
 
     private async sendParticleSystem(name: string): Promise<void> {
         const result = await this.lsp.request<GetParticleSystemResult>(
-            'aet/getParticleSystem', { name });
+            'aet/getParticleSystem', {name});
 
         this.post({
             type: 'particleSystem',
             name,
-            result: result.ok ? result.value : { system: null, error: result.message },
+            result: result.ok ? result.value : {system: null, error: result.message},
         });
     }
 
@@ -508,25 +514,25 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      */
     private async sendProjectile(name: string): Promise<void> {
         const result = await this.lsp.request<GetProjectileResult>(
-            'aet/getProjectile', { name });
+            'aet/getProjectile', {name});
 
         this.post({
             type: 'projectile',
             name,
-            result: result.ok ? result.value : { projectile: null, error: result.message },
+            result: result.ok ? result.value : {projectile: null, error: result.message},
         });
     }
 
     private async sendShader(name: string): Promise<void> {
         const result = await this.lsp.request<GetShaderSourceResult>(
-            'aet/getShaderSource', { name });
+            'aet/getShaderSource', {name});
 
         this.post({
             type: 'shader',
             name,
             result: result.ok
                 ? result.value
-                : { source: null, hasManagedShaders: false, error: result.message },
+                : {source: null, hasManagedShaders: false, error: result.message},
         });
     }
 
@@ -538,14 +544,14 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         this.requestedTextures.add(name.toLowerCase());
 
         const result = await this.lsp.request<GetModelTextureResult>(
-            'aet/getModelTexture', { name });
+            'aet/getModelTexture', {name});
 
         this.post({
             type: 'texture',
             name,
             result: result.ok
                 ? result.value
-                : { format: null, data: null, error: result.message },
+                : {format: null, data: null, error: result.message},
         });
     }
 
@@ -570,52 +576,62 @@ export class ModelPreviewPanel extends WebviewPanelHost {
             return;
         }
 
-        const file = subjectFile(this.subject);
+        // The webview disables the button when there is no file, so this is the stale-scene case:
+        // pressed in the moment between a refresh and the next scene.
+        const file = handoffFile(subjectFile(this.subject), this.sceneSourceFile);
         if (file === null) {
-            void vscode.window.showWarningMessage(
-                `EaWEdit: ${tool.label} opens a file, and this preview was opened from a game object `
-                + 'rather than a file.');
+            void vscode.window.showWarningMessage(`EaWEdit: No file to open in ${tool.label}`);
             return;
         }
 
-        // A terminal rather than a detached process: the tool's own output stays visible, and a
-        // failure to start is something the user can see and read.
-        const terminal = vscode.window.createTerminal({ name: tool.label });
-        terminal.sendText(`& "${executable}" "${file}"`, true);
-        terminal.show(true);
+        try {
+            await launchDetached(executable, file);
+        } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            void vscode.window.showErrorMessage(`EaWEdit: Could not start ${tool.label} - ${reason}`);
+        }
     }
 }
 
 /** Identifies a panel, so the same subject reveals rather than opening a second one. */
 function subjectKey(subject: PreviewSubject): string {
     switch (subject.kind) {
-        case 'object': return `object:${subject.objectId}`;
-        case 'model': return `model:${subject.modelReference}`;
-        default: return `animation:${subject.animationReference}`;
+        case 'object':
+            return `object:${subject.objectId}`;
+        case 'model':
+            return `model:${subject.modelReference}`;
+        default:
+            return `animation:${subject.animationReference}`;
     }
 }
 
 /** The request body for a subject. */
 function requestFor(subject: PreviewSubject): Record<string, string> {
     switch (subject.kind) {
-        case 'object': return { objectId: subject.objectId };
-        case 'model': return { modelReference: subject.modelReference };
-        default: return { animationReference: subject.animationReference };
+        case 'object':
+            return {objectId: subject.objectId};
+        case 'model':
+            return {modelReference: subject.modelReference};
+        default:
+            return {animationReference: subject.animationReference};
     }
 }
 
 /** The file a subject came from, or null when it came from XML rather than a file. */
 function subjectFile(subject: PreviewSubject): string | null {
     switch (subject.kind) {
-        case 'model': return uriToPath(subject.modelReference);
-        case 'animation': return uriToPath(subject.animationReference);
-        default: return null;
+        case 'model':
+            return uriToPath(subject.modelReference);
+        case 'animation':
+            return uriToPath(subject.animationReference);
+        default:
+            return null;
     }
 }
 
 function uriToPath(reference: string): string | null {
     if (!reference.startsWith('file://')) {
-        // A bare model name from the XML is not a path the external tool could open.
+        // A bare model name is not a path. The file the scene resolved it to stands in for it.
         return null;
     }
 

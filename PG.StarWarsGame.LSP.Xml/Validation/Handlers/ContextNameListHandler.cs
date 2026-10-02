@@ -6,14 +6,13 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
-///     Named handler (ID: <c>context-name-list</c>) for tags that hold multiple
-///     (ContextName, ValueName) pairs in a single tag value - e.g.
-///     <c>Land_Terrain_Model_Mapping</c>. Reached through <c>validationOverride</c> in YAML.
+///     Named handler (ID: <c>context-name-list</c>) for tags holding any number of tuple groups in
+///     one value - <c>Land_Terrain_Model_Mapping</c>. Reached through <c>validationOverride</c>.
 /// </summary>
 /// <remarks>
-///     Its <c>mode: replace</c> supersedes the TupleList shape check, but the mode is wider than
-///     that intent - see <see cref="ContextNamePairHandler" /> for what else it discards and the
-///     test that guards it.
+///     It counts and nothing else; what each item is belongs to the tag's slots, checked per item by
+///     the slot handlers. Those run on their own fact, which is why <c>mode: replace</c> here cannot
+///     discard them the way it discards every default value handler.
 /// </remarks>
 public sealed class ContextNameListHandler : XmlDiagnosticsHandler<XmlTagValueFact>, IXmlNamedDiagnosticsHandler
 {
@@ -24,24 +23,6 @@ public sealed class ContextNameListHandler : XmlDiagnosticsHandler<XmlTagValueFa
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        var trimmed = fact.RawValue.Trim();
-        if (trimmed.Length == 0)
-            return [Error(fact)];
-
-        var parts = trimmed.Split(',')
-            .Select(p => p.Trim())
-            .Where(p => p.Length > 0)
-            .ToArray();
-
-        if (parts.Length == 0 || parts.Length % 2 != 0)
-            return [Error(fact)];
-
-        return [];
-    }
-
-    private static XmlDiagnosticResult Error(XmlTagValueFact fact)
-    {
-        return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"'{fact.RawValue.Trim()}' is not a valid context-name list for <{fact.Tag.Tag}>. Expected alternating ContextName, ValueName pairs.");
+        return TupleShape.WholeGroups(fact) is { } error ? [error] : [];
     }
 }

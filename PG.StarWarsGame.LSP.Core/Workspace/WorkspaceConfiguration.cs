@@ -37,4 +37,10 @@ public sealed record WorkspaceConfiguration(
     ///     engine convention - rather than "no icons".
     /// </remarks>
     public IconProjectSettings? Icons { get; init; }
+
+    /// <summary>
+    ///     The dependency tree's shape, as counts. Kept because the flattened <see cref="Layers" />
+    ///     no longer say which dependency the root named and which came in through another.
+    /// </summary>
+    public ProjectDependencyShape Dependencies { get; init; } = new(0, 0, 0, 0);
 }

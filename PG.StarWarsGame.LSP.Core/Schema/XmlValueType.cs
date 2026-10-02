@@ -133,11 +133,25 @@ public enum XmlValueType
     [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type51 = 51,
 
-    /// <summary>Weighted list of music events.</summary>
+    /// <summary>
+    ///     The engine's generic repeating tuple - <c>Land_Terrain_Model_Mapping</c> (terrain, model)
+    ///     and the faction music lists (context, music event). What each item is comes from the
+    ///     tag's <see cref="XmlTagDefinition.Slots" />, never from this type.
+    /// </summary>
     TupleList = 52,
 
-    /// <summary>Per-faction object list pair (faction name + space-separated object names).</summary>
-    PerFactionObjectList = 53,
+    /// <summary>
+    ///     The engine's generic key-to-list value: comma-separated, each KEY followed by the items it
+    ///     maps to, any number of keys in one value - <c>Empire, A, B, Rebel, C</c>. What the key and
+    ///     the items are comes from the tag's two <see cref="XmlTagDefinition.Slots" />, never from
+    ///     this type.
+    /// </summary>
+    /// <remarks>
+    ///     The engine tries every item as a key first and only then as an item of the current key, so
+    ///     a key is told apart by WHAT it is, not by where it sits. Read it through
+    ///     <see cref="TupleItems" /> with a <see cref="ListMapKeys" /> test.
+    /// </remarks>
+    ListMap = 53,
 
     /// <summary>
     ///     List of ship-name text files. Used by <c>GameConstants</c>'s <c>ShipNameTextFiles</c> in

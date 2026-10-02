@@ -6,17 +6,22 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
-///     Named handler (ID: <c>context-name-pair</c>) for tags that hold a single
-///     (ContextName, ValueName) pair - e.g. <c>Music_Event_List_Ambient</c> and
-///     <c>Music_Event_List_Battle</c>. Reached through <c>validationOverride</c> in YAML.
+///     Named handler (ID: <c>context-name-pair</c>) for tags holding exactly one tuple group -
+///     <c>Music_Event_List_Ambient</c> and <c>Music_Event_List_Battle</c>, which repeat the TAG
+///     rather than the value. Reached through <c>validationOverride</c>.
 /// </summary>
 /// <remarks>
-///     Its <c>mode: replace</c> is here to supersede the TupleList shape check, which those tags'
-///     declared type would otherwise apply to a value it does not describe. Be aware that the mode
-///     is wider than that intent: <c>XmlDiagnosticsHandlerRegistry.Dispatch</c> discards EVERY
-///     default handler for the fact type, so reference resolution and allowed values would stop
-///     running too. Neither tag carries either, which is what makes the wider scope harmless -
-///     and <c>EawSchemaReplaceOverrideScopeTest</c> fails if that stops being true.
+///     <para>
+///         It counts and nothing else. The music event used to be looked up here, by name and
+///         against nothing in particular; it is the tag's second slot now, typed as a MusicEvent
+///         reference, so the parser records it and the reference pipeline resolves it - with
+///         hover, go-to and rename besides. <see cref="DiagnosticIds.ContextNamePairUnresolvedMusicEvent" />
+///         is no longer raised; ids are append-only, so it stays registered.
+///     </para>
+///     <para>
+///         <c>mode: replace</c> discards every default value handler for these tags. Nothing is
+///         lost by it: the reference and slot checks run on facts of their own.
+///     </para>
 /// </remarks>
 public sealed class ContextNamePairHandler : XmlDiagnosticsHandler<XmlTagValueFact>, IXmlNamedDiagnosticsHandler
 {
@@ -27,32 +32,6 @@ public sealed class ContextNamePairHandler : XmlDiagnosticsHandler<XmlTagValueFa
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        var idx = fact.RawValue.IndexOf(',');
-        if (idx < 0)
-            return [Error(fact)];
-
-        var context = fact.RawValue[..idx].Trim();
-        var name = fact.RawValue[(idx + 1)..].Trim();
-
-        if (context.Length == 0 || name.Length == 0)
-            return [Error(fact)];
-
-        var index = ctx.Index;
-        if ((index.Baseline.Symbols.Count > 0 || index.WorkspaceDefinitions.Count > 0)
-            && index.Resolve(name) is null)
-            return
-            [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{name}' could not be resolved as a music event for <{fact.Tag.Tag}>.",
-                    Id: DiagnosticIds.ContextNamePairUnresolvedMusicEvent)
-            ];
-
-        return [];
-    }
-
-    private static XmlDiagnosticResult Error(XmlTagValueFact fact)
-    {
-        return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"'{fact.RawValue.Trim()}' is not a valid context-name pair for <{fact.Tag.Tag}>. Expected: ContextName, ValueName.");
+        return TupleShape.ExactlyOneGroup(fact) is { } error ? [error] : [];
     }
 }

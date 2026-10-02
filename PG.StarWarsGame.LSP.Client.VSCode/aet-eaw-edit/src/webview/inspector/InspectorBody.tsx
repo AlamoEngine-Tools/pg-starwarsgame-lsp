@@ -8,18 +8,20 @@
 // `inspectPanels`, the same function the preview's flyout used, so moving the inspector into its
 // own tab did not fork how a mesh's facts are described.
 
-import { Fragment } from 'react';
+import {Fragment} from 'react';
 
-import { inspectPanels } from '../preview/inspector';
-import { geometryKeyOf, type InspectorSubject } from '../preview/inspectorSubject';
-import { type GeometryRows } from '../preview/geometryRows';
-import { GeometryRowsTable, GeometryTabs } from './GeometryTables';
-import { type GeometryTable } from '../../protocol/modelPreview';
+import {inspectPanels} from '../preview/inspector';
+import {geometryKeyOf, type InspectorSubject} from '../preview/inspectorSubject';
+import {type GeometryRows} from '../preview/geometryRows';
+import {GeometryRowsTable, GeometryTabs} from './GeometryTables';
+import {type GeometryTable} from '../../protocol/modelPreview';
 
 export function InspectorBody(
-    { subject, geometry, geometryError, onGeometry, onOpenTable }: {
+    {subject, selectedTable, geometry, geometryError, onGeometry, onOpenTable}: {
         /** The row being described, or null before the preview has sent one. */
         subject: InspectorSubject | null;
+        /** The open geometry tab, or null for a row with no geometry. */
+        selectedTable: GeometryTable | null;
         /** Everything gathered for the open table, or null before one is opened. */
         geometry: GeometryRows | null;
         geometryError: string | null;
@@ -86,7 +88,7 @@ export function InspectorBody(
                                         {row.swatch !== undefined && (
                                             <span
                                                 className="inspect-swatch"
-                                                style={{ background: row.swatch }}
+                                                style={{background: row.swatch}}
                                             />
                                         )}
                                         {row.value}
@@ -98,16 +100,22 @@ export function InspectorBody(
                 ))}
             </div>
 
-            {/* The bulk tables, as a tabbed box.
+            {/* The bulk tables, as a tab box that fills the rest of the page.
 
-                Still a deliberate press rather than something the tab loads with: this is the only
-                genuinely large thing the inspector can ask for. A row with no geometry - a bone, a
-                particle system - shows the tabs inert rather than dropping them, so the reader can
-                see the tables exist and that this row has none. */}
+                A tab is always open for a row with geometry - Vertices to begin with - so the box
+                has a body from the start rather than waiting for a press. Only the first page is
+                fetched; the rest follow as the scroller nears its end. A row with no geometry - a
+                bone, a particle system - shows the tabs inert rather than dropping them, so the
+                reader can see the tables exist and that this row has none. */}
             <div className="inspect-group inspect-geometry">
                 <div className="inspect-title">Geometry</div>
 
-                <GeometryTabs rows={geometry} disabled={key === null} onSelect={onOpenTable} />
+                <GeometryTabs
+                    rows={geometry}
+                    selected={selectedTable}
+                    disabled={key === null}
+                    onSelect={onOpenTable}
+                />
 
                 {key === null && (
                     <div className="field-note">
@@ -117,7 +125,17 @@ export function InspectorBody(
 
                 {geometryError !== null && <div className="field-note">{geometryError}</div>}
 
-                {geometry !== null && <GeometryRowsTable rows={geometry} onMore={onGeometry} />}
+                {geometry !== null && geometry.table === selectedTable
+                    ? <GeometryRowsTable rows={geometry} onMore={onGeometry}/>
+                    : selectedTable !== null && geometryError === null && (
+                    // Open and waiting on its first page: the panel is there at its full size
+                    // straight away, so nothing below it jumps when the rows land.
+                    <div className="geometry-panel" role="tabpanel">
+                        <div className="geometry-scroll">
+                            <div className="field-note">Loading</div>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );

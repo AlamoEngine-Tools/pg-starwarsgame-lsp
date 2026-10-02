@@ -10,7 +10,9 @@ using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Schema.Versioning;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Startup;
 
@@ -70,13 +72,48 @@ public sealed class SchemaBootstrapperTest
         Assert.Empty(notifier.Errors);
     }
 
+    // ── what the bug report is told ──────────────────────────────────────────
+
+    // The provider that ran is dropped once the proxy is configured, and its version check with it,
+    // so without this a report could not say which schema the server was actually running.
+    [Fact]
+    public async Task LoadAsync_RecordsTheSourceAndTheVersionCheck()
+    {
+        var recorder = new ServerStatusRecorder();
+        var bootstrapper = Build(
+            new FakeHttpClientFactory(new ManifestHttpHandler("""{ "schemaVersion": "99.0.0" }""")),
+            new RecordingUserNotifier(), out _, recorder: recorder);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(StatusSchemaSource.CustomUrl, recorder.SchemaSource);
+        Assert.Equal(SchemaVersionCompatibility.Unsupported, recorder.SchemaCheck?.Compatibility);
+        Assert.Equal("99.0.0", recorder.SchemaCheck?.DeclaredVersion);
+    }
+
+    [Fact]
+    public async Task LoadAsync_FromTheDefaultUrl_RecordsOfficial()
+    {
+        var recorder = new ServerStatusRecorder();
+        var bootstrapper = Build(
+            new FakeHttpClientFactory(new ManifestHttpHandler("""{ "tags": [] }""")),
+            new RecordingUserNotifier(), out _, new SchemaSourceConfig().Url, recorder);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(StatusSchemaSource.Official, recorder.SchemaSource);
+        // First load with an empty cache: rebuilt from the network.
+        Assert.False(recorder.SchemaFromCache);
+    }
+
     private static SchemaBootstrapper Build(IHttpClientFactory factory)
     {
         return Build(factory, new RecordingUserNotifier(), out _);
     }
 
     private static SchemaBootstrapper Build(
-        IHttpClientFactory factory, IUserNotifier notifier, out SchemaProviderProxy proxy)
+        IHttpClientFactory factory, IUserNotifier notifier, out SchemaProviderProxy proxy,
+        string url = "https://example.com/eaw/", ServerStatusRecorder? recorder = null)
     {
         var fs = new MockFileSystem();
         var fileHelper = new FileHelper(fs);
@@ -85,7 +122,7 @@ public sealed class SchemaBootstrapperTest
             SchemaSource = new SchemaSourceConfig
             {
                 Type = SchemaSourceType.Http,
-                Url = "https://example.com/eaw/"
+                Url = url
             }
         });
 
@@ -101,7 +138,8 @@ public sealed class SchemaBootstrapperTest
             notifier,
             NullLogger<SchemaBootstrapper>.Instance,
             NullLogger<LocalFileSchemaProvider>.Instance,
-            NullLogger<HttpSchemaProvider>.Instance);
+            NullLogger<HttpSchemaProvider>.Instance,
+            recorder);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
