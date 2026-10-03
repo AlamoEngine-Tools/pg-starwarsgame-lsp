@@ -373,8 +373,9 @@ dotnet build PG.StarWarsGame.LSP.slnx
 1. **Prepare Release** - Actions tab, input `version`; branch `release/v<version>` with the version bump, and its pull request
 2. **Changelog** - the `## <version>` section of the extension's `CHANGELOG.md`, committed to that branch; the push runs CI
 3. **Merge** the pull request into `master`
-4. **Release** - Actions tab, on `master`; tests, builds, tags, creates the GitHub release with the changelog section as notes
-5. **Approve** - the Marketplace publish waits in the `release` environment
+4. **Release** - Actions tab, on `master`; tests and builds, then waits
+5. **Approve** - one approval in the `release` environment publishes everything: GitHub release with the changelog section as notes, tag, Marketplace
+   - All or nothing: a draft release first, the Marketplace next, the draft made public last; a failure removes the draft
 
 - **Schema first** - the schema version the server is built against must already be released; a merge to eaw-schema `main` publishes it
 - **Nothing automatic** - no step starts the next; the release branch reaches `master` only through the merge

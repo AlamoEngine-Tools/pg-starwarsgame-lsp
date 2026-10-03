@@ -6,8 +6,8 @@ name: Release
 #   guard        version files agree, tag v<version> does not exist yet
 #   test         the full test workflow; it also produces the two SBOMs
 #   build        Windows: workspace, schema-release check, server publish + zip, VSIX
-#   publish      tag + GitHub release with server zip, VSIX and SBOMs
-#   marketplace  VS Code Marketplace; environment "release" waits for a reviewer's approval
+#   publish      ONE approval (environment "release") for everything public, all or nothing:
+#                token check -> draft GitHub release -> Marketplace -> draft made public (tag)
 #
 # Replaces the publishing half of release.ps1; that script now only builds locally.
 
@@ -140,22 +140,57 @@ jobs:
           PG.StarWarsGame.LSP/dist/*.vsix
         if-no-files-found: error
 
+  # Everything that becomes public, behind one approval and in an order that keeps it all or
+  # nothing as far as two outside services allow:
+  #   1. the Marketplace token is checked, so a bad token fails before anything exists
+  #   2. the GitHub release is created as a DRAFT - invisible, and no tag yet
+  #   3. the VSIX goes to the Marketplace - the one step that cannot be undone
+  #   4. the draft is made public, which creates the tag
+  # Any failure deletes the draft, so a failure before step 3 leaves nothing public. The only
+  # partial state is step 4 failing after step 3; a re-run then skips the Marketplace (the version
+  # is already there) and redoes steps 2 and 4.
+  # The draft input stops after step 2; skip_marketplace leaves out steps 1 and 3.
   publish:
-    name: GitHub release
+    name: Publish
     needs: [guard, build]
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     env:
       VERSION: ${{ needs.guard.outputs.version }}
+      TAG: v${{ needs.guard.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      MARKETPLACE: ${{ !inputs.draft && !inputs.skip_marketplace }}
+      PRERELEASE: ${{ inputs.prerelease }}
 
     steps:
-    - name: Checkout the changelog
+    - name: Checkout the changelog and the extension manifest
       uses: actions/checkout@v4
       with:
-        sparse-checkout: PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/CHANGELOG.md
+        sparse-checkout: |
+          PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/CHANGELOG.md
+          PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/package.json
         sparse-checkout-cone-mode: false
         path: repo
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Extension id
+      id: ext
+      run: |
+        manifest=repo/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/package.json
+        echo "publisher=$(jq -r .publisher "$manifest")" >>"$GITHUB_OUTPUT"
+        echo "id=$(jq -r '.publisher + "." + .name' "$manifest")" >>"$GITHUB_OUTPUT"
+
+    # vsce reads the token from VSCE_PAT.
+    - name: Check the Marketplace token
+      if: env.MARKETPLACE == 'true'
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      run: npx --yes @vscode/vsce verify-pat "${{ steps.ext.outputs.publisher }}"
 
     - name: Download artifacts
       uses: actions/download-artifact@v4
@@ -180,15 +215,16 @@ jobs:
 
     # Notes, first that exists: the notes input; the "## <version>" section of the extension's
     # CHANGELOG (the same text the Marketplace shows); GitHub's generated notes.
-    - name: Create the release
+    # A draft left by an earlier failed run is replaced; a public release cannot get here, because
+    # its tag would have stopped the guard.
+    - name: Draft the GitHub release
       env:
-        GH_TOKEN: ${{ github.token }}
         NOTES: ${{ inputs.notes }}
-        DRAFT: ${{ inputs.draft }}
-        PRERELEASE: ${{ inputs.prerelease }}
       run: |
-        args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "v$VERSION")
-        [ "$DRAFT" = true ] && args+=(--draft)
+        if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft 2>/dev/null)" = true ]; then
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
+        fi
+        args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --draft)
         [ "$PRERELEASE" = true ] && args+=(--prerelease)
         awk -v v="## $VERSION" '$0 == v { on = 1; next } /^## / { on = 0 } on' \
           repo/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/CHANGELOG.md | tr -d '\r' >notes.md
@@ -200,34 +236,30 @@ jobs:
           echo "::warning::No '## $VERSION' section in CHANGELOG.md - using generated notes"
           args+=(--generate-notes)
         fi
-        gh release create "v$VERSION" files/* "${args[@]}"
+        gh release create "$TAG" files/* "${args[@]}"
 
-  marketplace:
-    name: VS Code Marketplace
-    needs: [guard, publish]
-    if: ${{ !inputs.draft && !inputs.skip_marketplace }}
-    runs-on: ubuntu-latest
-    environment: release
-    env:
-      VERSION: ${{ needs.guard.outputs.version }}
-
-    steps:
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: release-files
-        path: files
-
-    - uses: actions/setup-node@v4
-      with:
-        node-version: 22
-
-    # vsce reads the token from VSCE_PAT.
-    - name: Publish
+    - name: Publish to the Marketplace
+      if: env.MARKETPLACE == 'true'
       env:
         VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        PRERELEASE: ${{ inputs.prerelease }}
       run: |
+        published=$(npx --yes @vscode/vsce show "${{ steps.ext.outputs.id }}" --json | jq -r '.versions[].version')
+        if grep -qx "$VERSION" <<<"$published"; then
+          echo "::notice::$VERSION is already on the Marketplace - an earlier run published it"
+          exit 0
+        fi
         args=(publish --packagePath "files/aet-eaw-edit-$VERSION.vsix")
         [ "$PRERELEASE" = true ] && args+=(--pre-release)
         npx --yes @vscode/vsce "${args[@]}"
+
+    - name: Make the GitHub release public
+      if: ${{ !inputs.draft }}
+      run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+
+    - name: Remove the draft
+      if: failure()
+      run: |
+        if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft 2>/dev/null)" = true ]; then
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
+          echo "::warning::Draft $TAG removed - nothing was made public on GitHub"
+        fi
