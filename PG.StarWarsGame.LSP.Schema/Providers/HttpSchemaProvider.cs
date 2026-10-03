@@ -15,7 +15,8 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 ///     Loads the schema from a remote HTTP source (e.g. raw GitHub).
 ///     Fetches _index.json first, then each listed YAML file.
 ///     Downloaded files are persisted to a local cache; the cache is validated by a SHA-256
-///     checksum of the manifest plus all downloaded YAML file contents.
+///     checksum of the manifest plus all downloaded YAML file contents. For a release tag the
+///     cache is labelled with the tag, and a cache already holding it loads with no request.
 /// </summary>
 public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSchemaProvider
 {
@@ -31,15 +32,22 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
     private readonly TaskCompletionSource _readyTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private readonly string? _releaseTag;
+
     private IReadOnlyList<RawEnumDefinition> _rawEnumFallbacks = [];
 
+    /// <param name="releaseTag">
+    ///     The schema release <paramref name="baseUrl" /> points into, or null for a branch or an
+    ///     explicit URL. A cache already holding this tag loads with no request at all.
+    /// </param>
     public HttpSchemaProvider(HttpClient http, string baseUrl, SchemaHttpCache cache,
-        ILogger<HttpSchemaProvider> logger)
+        ILogger<HttpSchemaProvider> logger, string? releaseTag = null)
     {
         _http = http;
         _baseUrl = baseUrl.TrimEnd('/') + '/';
         _cache = cache;
         _logger = logger;
+        _releaseTag = releaseTag;
     }
 
     /// <inheritdoc />
@@ -58,28 +66,23 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
     {
         try
         {
+            if (TryLoadCachedRelease())
+                return;
+
             _logger.LogInformation("Fetching schema manifest from {BaseUrl}", _baseUrl);
             var indexJson = await _http.GetStringAsync(_baseUrl + "_index.json", ct);
-            var manifest = JsonSerializer.Deserialize<SchemaManifest>(indexJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var manifest = ParseManifest(indexJson);
             if (manifest is null) return;
 
             // Gate on the manifest alone, before a single YAML file is fetched: an unusable schema
             // costs one request instead of ~180, and nothing partially-loaded can reach the index.
-            LastVersionCheck = SchemaVersionGate.Check(manifest.SchemaVersion);
-            if (!LastVersionCheck.CanLoad)
-            {
-                _logger.LogError("Schema rejected: {Message}", LastVersionCheck.Message);
-                _readyTcs.TrySetResult();
+            if (!PassesGate(manifest))
                 return;
-            }
-
-            if (LastVersionCheck.Message.Length > 0)
-                _logger.LogWarning("{Message}", LastVersionCheck.Message);
 
             if (_cache.TryLoad(indexJson, manifest, out var cached))
             {
                 _logger.LogInformation("Schema loaded from local cache");
+                _cache.RecordRelease(indexJson, _releaseTag);
                 LastLoadFromCache = true;
                 Publish(cached);
                 _readyTcs.TrySetResult();
@@ -96,6 +99,53 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
             _readyTcs.TrySetResult();
             throw;
         }
+    }
+
+    /// <summary>
+    ///     Loads the release named by the tag straight from disk when the cache holds that tag. The
+    ///     gate still runs on the cached manifest. False means the network path has to run.
+    /// </summary>
+    private bool TryLoadCachedRelease()
+    {
+        if (_releaseTag is null || !string.Equals(_cache.CachedTag, _releaseTag, StringComparison.Ordinal))
+            return false;
+        if (!_cache.TryLoadIndexJson(out var indexJson) || ParseManifest(indexJson) is not { } manifest)
+            return false;
+
+        if (!PassesGate(manifest))
+            return true;
+
+        if (!_cache.TryLoad(indexJson, manifest, out var cached))
+            return false;
+
+        _logger.LogInformation("Schema release {Tag} loaded from local cache", _releaseTag);
+        LastLoadFromCache = true;
+        Publish(cached);
+        _readyTcs.TrySetResult();
+        return true;
+    }
+
+    private static readonly JsonSerializerOptions ManifestJsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private static SchemaManifest? ParseManifest(string indexJson)
+    {
+        return JsonSerializer.Deserialize<SchemaManifest>(indexJson, ManifestJsonOptions);
+    }
+
+    /// <summary>Runs the version gate; on a refusal releases <see cref="ReadyAsync" /> and returns false.</summary>
+    private bool PassesGate(SchemaManifest manifest)
+    {
+        LastVersionCheck = SchemaVersionGate.Check(manifest.SchemaVersion);
+        if (!LastVersionCheck.CanLoad)
+        {
+            _logger.LogError("Schema rejected: {Message}", LastVersionCheck.Message);
+            _readyTcs.TrySetResult();
+            return false;
+        }
+
+        if (LastVersionCheck.Message.Length > 0)
+            _logger.LogWarning("{Message}", LastVersionCheck.Message);
+        return true;
     }
 
     private async Task BuildIndexAsync(SchemaManifest manifest, string indexJson, CancellationToken ct)
@@ -238,7 +288,7 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
         Publish(new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles, kinds, scannedDirectories));
         _readyTcs.TrySetResult();
 
-        _cache.Update(indexJson, fetchedFiles, manifest.BaselineHash);
+        _cache.Update(indexJson, fetchedFiles, manifest.BaselineHash, _releaseTag);
 
         _logger.LogInformation(
             "Schema index built: {TagCount} tags, {TypeCount} types, {KindCount} kinds, {EnumCount} enums, {HardcodedCount} hardcoded set(s)",

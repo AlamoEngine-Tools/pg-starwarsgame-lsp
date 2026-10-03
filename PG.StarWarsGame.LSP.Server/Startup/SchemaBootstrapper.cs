@@ -30,6 +30,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<HttpSchemaProvider> _httpLogger;
     private readonly ILogger<LocalFileSchemaProvider> _localLogger;
+    private readonly SchemaLocationResolver _locations;
     private readonly ILogger<SchemaBootstrapper> _logger;
     private readonly LuaApiSchemaProxy _luaProxy;
     private readonly IUserNotifier _notifier;
@@ -44,6 +45,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         IFileHelper fileHelper,
         IHttpClientFactory httpClientFactory,
         SchemaHttpCache cache,
+        SchemaLocationResolver locations,
         IUserNotifier notifier,
         ILogger<SchemaBootstrapper> logger,
         ILogger<LocalFileSchemaProvider> localLogger,
@@ -58,6 +60,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         _fileHelper = fileHelper;
         _httpClientFactory = httpClientFactory;
         _cache = cache;
+        _locations = locations;
         _notifier = notifier;
         _logger = logger;
         _localLogger = localLogger;
@@ -71,37 +74,55 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         var isLocal = src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath);
 
         ISchemaProvider realProvider;
+        SchemaLocation? location = null;
         if (isLocal)
+        {
             realProvider = new LocalFileSchemaProvider(src.LocalPath!, _fileSystem, _localLogger);
+        }
         else
+        {
+            location = await _locations.ResolveAsync(src.Repository, src.Url, ct);
+            _logger.LogInformation("Schema source: {Origin} {Tag} at {BaseUrl}",
+                location.Origin, location.Tag ?? "-", location.BaseUrl);
             realProvider = new HttpSchemaProvider(
-                _httpClientFactory.CreateClient(nameof(HttpSchemaProvider)), src.Url, _cache, _httpLogger);
+                _httpClientFactory.CreateClient(nameof(HttpSchemaProvider)), location.BaseUrl, _cache, _httpLogger,
+                location.Tag);
+        }
 
         _proxy.Configure(realProvider);
 
-        if (isLocal)
+        if (location is null)
             // LocalFileSchemaProvider loads synchronously in its constructor.
             LoadLuaSchemaFromDisk(src.LocalPath!);
         else
-            // Both HTTP downloads are independent - fan them out in parallel.
+            // Both HTTP downloads are independent - fan them out in parallel. The Lua API ships in
+            // the same repository, so it is read from the same release or branch.
             await Task.WhenAll(
                 LoadEaWSchemaAsync((HttpSchemaProvider)realProvider, ct),
-                LoadLuaSchemaFromHttpAsync(DeriveLuaHttpUrl(src.Url), ct));
+                LoadLuaSchemaFromHttpAsync(DeriveLuaHttpUrl(location.BaseUrl), ct));
 
         ReportVersionIncompatibility(realProvider);
 
         // Recorded here because this is the last place the real provider is reachable: the proxy
         // hides it, and its version check goes with it.
         _status?.RecordSchema(
-            isLocal
-                ? StatusSchemaSource.Local
-                : string.Equals(src.Url, new SchemaSourceConfig().Url, StringComparison.OrdinalIgnoreCase)
-                    ? StatusSchemaSource.Official
-                    : StatusSchemaSource.CustomUrl,
+            StatusSource(location),
             (realProvider as IVersionedSchemaProvider)?.LastVersionCheck,
             (realProvider as HttpSchemaProvider)?.LastLoadFromCache);
 
         _logger.LogInformation("Loading schema completed.");
+    }
+
+    private static StatusSchemaSource StatusSource(SchemaLocation? location)
+    {
+        return location?.Origin switch
+        {
+            null => StatusSchemaSource.Local,
+            SchemaOrigin.Release => StatusSchemaSource.Release,
+            SchemaOrigin.CachedRelease => StatusSchemaSource.CachedRelease,
+            SchemaOrigin.Branch => StatusSchemaSource.Branch,
+            _ => StatusSchemaSource.CustomUrl
+        };
     }
 
     /// <summary>

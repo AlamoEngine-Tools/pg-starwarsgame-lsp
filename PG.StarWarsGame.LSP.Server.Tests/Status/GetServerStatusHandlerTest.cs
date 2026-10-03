@@ -34,7 +34,7 @@ public sealed class GetServerStatusHandlerTest
     private static ServerStatusRecorder HealthyRecorder()
     {
         var recorder = new ServerStatusRecorder();
-        recorder.RecordSchema(StatusSchemaSource.Official,
+        recorder.RecordSchema(StatusSchemaSource.Release,
             new SchemaVersionCheck(SchemaVersionCompatibility.Supported, "2.3.0", ">=2.0.0 <3.0.0", ""));
         recorder.RecordBaseline(StatusAssetSource.Cache);
         recorder.RecordIconPack(StatusAssetSource.Network);
@@ -68,7 +68,7 @@ public sealed class GetServerStatusHandlerTest
     {
         var status = await Status(HealthyRecorder());
 
-        Assert.Equal(new ServerStatusSchemaDto("2.3.0", "Supported", "Official"), status.Schema);
+        Assert.Equal(new ServerStatusSchemaDto("2.3.0", "Supported", "Release"), status.Schema);
         Assert.Equal("Cache", status.Baseline.Source);
         Assert.Equal("Network", status.IconPack.Source);
         Assert.Equal("Complete", status.Index.State);
@@ -165,7 +165,7 @@ public sealed class GetServerStatusHandlerTest
     public async Task WarnsAboutARefusedSchema()
     {
         var recorder = HealthyRecorder();
-        recorder.RecordSchema(StatusSchemaSource.Official,
+        recorder.RecordSchema(StatusSchemaSource.Release,
             new SchemaVersionCheck(SchemaVersionCompatibility.Unsupported, "3.0.0", ">=2.0.0 <3.0.0", "x"));
 
         Assert.Contains("Schema: Unsupported", (await Status(recorder)).Warnings);
@@ -282,7 +282,7 @@ public sealed class GetServerStatusHandlerTest
     public async Task Extended_ReportsEveryCachesOutcome()
     {
         var recorder = HealthyRecorder();
-        recorder.RecordSchema(StatusSchemaSource.Official, recorder.SchemaCheck, fromCache: true);
+        recorder.RecordSchema(StatusSchemaSource.Release, recorder.SchemaCheck, fromCache: true);
 
         var caches = (await Extended(recorder, LayeredIndex())).Extended!.Caches;
 

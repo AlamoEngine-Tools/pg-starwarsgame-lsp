@@ -645,7 +645,7 @@
             "type": "string",
             "default": "",
             "format": "uri-reference",
-            "markdownDescription": "Custom HTTP URL for the EaW XML schema index. Leave empty to use the default GitHub source.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `http`."
+            "markdownDescription": "Custom HTTP URL for the EaW XML schema index. Leave empty to use the newest compatible schema release.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `http`."
           },
           "aet-eaw-edit.lsp.schema.localPath": {
             "order": 1000,

@@ -29,6 +29,7 @@ using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Schema.Versioning;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Caching;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -207,6 +208,12 @@ public static class ServerConfigurator
                 services.AddSingleton<IFileSystem, FileSystem>();
                 services.AddSingleton<IFileHelper, FileHelper>();
                 services.AddSingleton<SchemaHttpCache>();
+                // One release lookup per start; the client is taken from the factory then, so
+                // holding it in a singleton costs no handler rotation that matters.
+                services.AddSingleton(sp => new SchemaReleaseResolver(
+                    sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(SchemaReleaseResolver)),
+                    sp.GetRequiredService<ILogger<SchemaReleaseResolver>>()));
+                services.AddSingleton<SchemaLocationResolver>();
 
                 // Late-binding proxy: OmniSharp resolves ISchemaProvider at handler-registration time
                 // (before OnInitialize). The proxy starts empty; Configure() is called in OnInitialize
@@ -401,6 +408,7 @@ public static class ServerConfigurator
                 services.AddSingleton<ShaderSourceResolver>();
 
                 services.AddHttpClient(nameof(HttpSchemaProvider));
+                services.AddHttpClient(nameof(SchemaReleaseResolver));
                 services.AddHttpClient(nameof(BaselineLoader));
                 services.AddHttpClient(nameof(IconPackLoader));
                 services.AddHttpClient("LuaSchema");

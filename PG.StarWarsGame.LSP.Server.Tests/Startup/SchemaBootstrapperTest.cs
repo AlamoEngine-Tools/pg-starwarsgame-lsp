@@ -91,19 +91,70 @@ public sealed class SchemaBootstrapperTest
         Assert.Equal("99.0.0", recorder.SchemaCheck?.DeclaredVersion);
     }
 
+    // ── schema releases ──────────────────────────────────────────────────────
+
+    private const string ApiHost = "api.github.com";
+
+    private static RoutingHttpHandler ReleaseServer(string releasesJson, string manifestJson = """{ "tags": [] }""")
+    {
+        return new RoutingHttpHandler(request => request.RequestUri!.Host == ApiHost
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(releasesJson) }
+            : request.RequestUri.AbsolutePath.EndsWith("_index.json")
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifestJson) }
+                : new HttpResponseMessage(HttpStatusCode.NotFound));
+    }
+
     [Fact]
-    public async Task LoadAsync_FromTheDefaultUrl_RecordsOfficial()
+    public async Task LoadAsync_DefaultSource_ReadsTheNewestReleaseFromItsTag()
     {
         var recorder = new ServerStatusRecorder();
-        var bootstrapper = Build(
-            new FakeHttpClientFactory(new ManifestHttpHandler("""{ "tags": [] }""")),
-            new RecordingUserNotifier(), out _, new SchemaSourceConfig().Url, recorder);
+        var handler = ReleaseServer("""[{ "tag_name": "v2.1.0" }, { "tag_name": "v2.2.0" }]""");
+        var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _,
+            "", recorder);
 
         await bootstrapper.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(StatusSchemaSource.Official, recorder.SchemaSource);
+        Assert.Contains(handler.Urls, u => u.EndsWith("/refs/tags/v2.2.0/eaw/_index.json"));
+        Assert.Equal(StatusSchemaSource.Release, recorder.SchemaSource);
         // First load with an empty cache: rebuilt from the network.
         Assert.False(recorder.SchemaFromCache);
+    }
+
+    // The Lua API ships in the same repository, so it must come from the same release.
+    [Fact]
+    public async Task LoadAsync_DefaultSource_ReadsTheLuaApiFromTheSameTag()
+    {
+        var handler = ReleaseServer("""[{ "tag_name": "v2.2.0" }]""");
+        var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _, "");
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Contains(handler.Urls, u => u.EndsWith("/refs/tags/v2.2.0/lua/api.d.lua"));
+    }
+
+    [Fact]
+    public async Task LoadAsync_DefaultSource_NoRelease_ReadsTheDefaultBranch()
+    {
+        var recorder = new ServerStatusRecorder();
+        var handler = ReleaseServer("[]");
+        var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _,
+            "", recorder);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Contains(handler.Urls, u => u.EndsWith("/refs/heads/main/eaw/_index.json"));
+        Assert.Equal(StatusSchemaSource.Branch, recorder.SchemaSource);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ExplicitUrl_NeverAsksForReleases()
+    {
+        var handler = ReleaseServer("""[{ "tag_name": "v2.2.0" }]""");
+        var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.DoesNotContain(handler.Urls, u => u.Contains(ApiHost));
     }
 
     private static SchemaBootstrapper Build(IHttpClientFactory factory)
@@ -126,6 +177,12 @@ public sealed class SchemaBootstrapperTest
             }
         });
 
+        var cache = new SchemaHttpCache(fileHelper, NullLogger<SchemaHttpCache>.Instance);
+        var locations = new SchemaLocationResolver(
+            new SchemaReleaseResolver(factory.CreateClient(nameof(SchemaReleaseResolver)),
+                NullLogger<SchemaReleaseResolver>.Instance),
+            cache, NullLogger<SchemaLocationResolver>.Instance);
+
         proxy = new SchemaProviderProxy();
         return new SchemaBootstrapper(
             config,
@@ -134,7 +191,8 @@ public sealed class SchemaBootstrapperTest
             fs,
             fileHelper,
             factory,
-            new SchemaHttpCache(fileHelper, NullLogger<SchemaHttpCache>.Instance),
+            cache,
+            locations,
             notifier,
             NullLogger<SchemaBootstrapper>.Instance,
             NullLogger<LocalFileSchemaProvider>.Instance,
@@ -143,6 +201,20 @@ public sealed class SchemaBootstrapperTest
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>Answers through a delegate and records every URL asked for.</summary>
+    private sealed class RoutingHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        public List<string> Urls { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            lock (Urls)
+                Urls.Add(request.RequestUri!.ToString());
+            return Task.FromResult(respond(request));
+        }
+    }
 
     /// <summary>Serves the given manifest for _index.json and 404s everything else.</summary>
     private sealed class ManifestHttpHandler(string manifestJson) : HttpMessageHandler

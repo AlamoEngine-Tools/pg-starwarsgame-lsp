@@ -51,11 +51,16 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
-    # Both scripts on both operating systems, against local throwaway repositories. Runs before
-    # the real setup so a broken script fails here, with a scenario name, rather than as a build
-    # error further down.
-    - name: Test the workspace setup scripts
-      run: node --test scripts/workspace-setup.test.js
+    # node --test takes glob patterns from Node 21 on; the runner image's default may be older.
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    # The workspace setup scripts (both, on both operating systems, against local throwaway
+    # repositories) and the release version helper. Runs before the real setup so a broken script
+    # fails here, with a scenario name, rather than as a build error further down.
+    - name: Test the repo scripts
+      run: node --test "scripts/*.test.js"
 
     # Windows runs the PowerShell script and Ubuntu the bash one, so every run exercises both on
     # the real repositories. On a pull request, owned repos (schema, baseline) with a branch named

@@ -66,7 +66,7 @@ public sealed record ServerStatusExtendedDto(
 
 /// <param name="Version">The schema's declared version, or null when it declares none.</param>
 /// <param name="Compatibility">The version check's verdict, or <c>NotChecked</c>.</param>
-/// <param name="Source">Official, CustomUrl, Local or NotLoaded.</param>
+/// <param name="Source">Release, CachedRelease, Branch, CustomUrl, Local or NotLoaded.</param>
 public sealed record ServerStatusSchemaDto(string? Version, string Compatibility, string Source);
 
 /// <param name="Source">Network, Cache, Local, Empty or NotLoaded.</param>

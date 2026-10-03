@@ -27,6 +27,50 @@ public sealed class SchemaHttpCache
 
     private string ChecksumPath => _fileHelper.FileSystem.Path.Combine(_dir, "_index.sha256");
 
+    private string IndexPath => _fileHelper.FileSystem.Path.Combine(_dir, "_index.json");
+
+    private string TagPath => _fileHelper.FileSystem.Path.Combine(_dir, "_release");
+
+    /// <summary>
+    ///     The release tag the cached schema was downloaded from, or null when it came from a branch
+    ///     or an explicit URL, or nothing is cached. A tag never moves, so a cache holding the
+    ///     resolved tag IS that release and needs no request.
+    /// </summary>
+    public string? CachedTag
+    {
+        get
+        {
+            try
+            {
+                if (!_fileHelper.FileSystem.File.Exists(TagPath)) return null;
+                var tag = _fileHelper.FileSystem.File.ReadAllText(TagPath).Trim();
+                return tag.Length == 0 ? null : tag;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Cached schema release tag unreadable");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>The cached <c>_index.json</c>, for a load that needs no network.</summary>
+    public bool TryLoadIndexJson(out string indexJson)
+    {
+        indexJson = "";
+        try
+        {
+            if (!_fileHelper.FileSystem.File.Exists(IndexPath)) return false;
+            indexJson = _fileHelper.FileSystem.File.ReadAllText(IndexPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cached schema manifest unreadable");
+            return false;
+        }
+    }
+
     /// <summary>
     ///     Returns true and populates <paramref name="index" /> when the stored checksum matches
     ///     the manifest's <see cref="SchemaManifest.BaselineHash" /> (fast path) or the
@@ -122,12 +166,18 @@ public sealed class SchemaHttpCache
     ///     Writes <paramref name="indexJson" />, all YAML files, and the checksum to disk.
     ///     When <paramref name="baselineHash" /> is supplied it is stored directly; otherwise
     ///     the checksum is computed as SHA-256 of all YAML file contents in order.
+    ///     <paramref name="tag" /> records the release the files came from; null clears an earlier
+    ///     one, so content from a branch or an explicit URL is never taken for a release.
     /// </summary>
     public void Update(string indexJson, IReadOnlyList<(string relativePath, string content)> yamlFiles,
-        string? baselineHash = null)
+        string? baselineHash = null, string? tag = null)
     {
         _fileHelper.FileSystem.Directory.CreateDirectory(_dir);
-        _fileHelper.FileSystem.File.WriteAllText(_fileHelper.FileSystem.Path.Combine(_dir, "_index.json"), indexJson);
+        // The tag goes first and is only written back once everything else is on disk: a write
+        // that dies half-way leaves no tag, and an untagged cache is never trusted without a fetch.
+        if (_fileHelper.FileSystem.File.Exists(TagPath))
+            _fileHelper.FileSystem.File.Delete(TagPath);
+        _fileHelper.FileSystem.File.WriteAllText(IndexPath, indexJson);
 
         foreach (var (rel, content) in yamlFiles)
         {
@@ -140,6 +190,29 @@ public sealed class SchemaHttpCache
 
         var hash = baselineHash ?? ComputeYamlHash(yamlFiles.Select(f => f.content));
         _fileHelper.FileSystem.File.WriteAllText(ChecksumPath, hash);
+
+        if (tag is not null)
+            _fileHelper.FileSystem.File.WriteAllText(TagPath, tag);
+    }
+
+    /// <summary>
+    ///     Re-labels a cache whose files are already current: writes the manifest that was just
+    ///     fetched and the tag it came from (null clears it). Two releases can share every YAML
+    ///     file, and the cached manifest and tag must still name the one actually in use.
+    /// </summary>
+    public void RecordRelease(string indexJson, string? tag)
+    {
+        _fileHelper.FileSystem.Directory.CreateDirectory(_dir);
+        _fileHelper.FileSystem.File.WriteAllText(IndexPath, indexJson);
+        if (tag is null)
+        {
+            if (_fileHelper.FileSystem.File.Exists(TagPath))
+                _fileHelper.FileSystem.File.Delete(TagPath);
+        }
+        else
+        {
+            _fileHelper.FileSystem.File.WriteAllText(TagPath, tag);
+        }
     }
 
     /// <summary>

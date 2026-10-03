@@ -326,7 +326,7 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 
 | What | Where | When | How to disable |
 |---|---|---|---|
-| XML schema | GitHub (raw content) | On server start; changed files only (ETag caching) | `aet-eaw-edit.lsp.schema.source` = `local` |
+| XML schema | GitHub - newest compatible schema release | On server start; nothing when the release is already cached; default branch when no release exists | `aet-eaw-edit.lsp.schema.source` = `local` |
 | Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\` | `aet-eaw-edit.lsp.source.baseline.type` = `local` or `none` |
 | Shader sources | Petroglyph's published download, or `aet-eaw-edit.shaders.sourceUrl` | Only on **Set Up Base Shader Sources** | Do not run the command |
 
@@ -365,6 +365,16 @@ dotnet build PG.StarWarsGame.LSP.slnx
 - **E2E data** - `--groups build,e2e` adds `baseline/`; the game files in `eaw/` and `foc/` are not distributable
 - **Cross-repo changes** - a schema or baseline branch named like the LSP branch; CI on the pull request builds against it
 - **External update** - the wanted commit checked out in `../ModVerify` or `../PetroglyphTools`, then `./setup-workspace.sh record` and a commit of `workspace.deps`
+
+### Releasing
+
+**GitHub Actions, two runs.** Maintainers only.
+
+1. **Prepare Release** - Actions tab, input `version`; opens the version-bump pull request
+2. **Merge** the pull request
+3. **Release** - Actions tab, on `master`; tests, builds, tags, creates the GitHub release; the Marketplace publish waits for approval in the `release` environment
+
+- **Schema first** - the schema version the server is built against must already be released; a merge to eaw-schema `main` publishes it
 
 ---
 

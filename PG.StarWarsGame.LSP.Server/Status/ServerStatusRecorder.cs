@@ -26,8 +26,15 @@ public enum StatusSchemaSource
 {
     NotLoaded,
 
-    /// <summary>Over HTTP from the default URL.</summary>
-    Official,
+    /// <summary>The newest official schema release in range, resolved at this start.</summary>
+    Release,
+
+    /// <summary>Releases could not be listed; the official release cached by an earlier start.</summary>
+    CachedRelease,
+
+    /// <summary>No official release resolvable or cached; the schema repository's default branch.</summary>
+    Branch,
+
     CustomUrl,
     Local
 }

@@ -10,7 +10,7 @@ export interface ServerStatusSchema {
     version: string | null;
     /** Supported, Unversioned, OutOfRange, Unsupported, Malformed or NotChecked. */
     compatibility: string;
-    /** Official (the default URL), CustomUrl, Local or NotLoaded. */
+    /** Release, CachedRelease, Branch, CustomUrl, Local or NotLoaded. */
     source: string;
 }
 
