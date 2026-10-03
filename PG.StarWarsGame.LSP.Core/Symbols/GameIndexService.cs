@@ -20,12 +20,7 @@ public sealed class GameIndexService : IGameIndexService
 
     private readonly IProjectLayerMap? _layerMap;
     private readonly ILogger<GameIndexService> _logger;
-
     private readonly object _mergeLock = new();
-
-    // Production passes a CachedObjectNameHash, so a name leaving or re-entering the index is not
-    // hashed again.
-    private readonly IObjectNameHash? _nameHash;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
 
     // Document operations deferred while a bulk update is open. Applying documents one-by-one to
@@ -44,15 +39,13 @@ public sealed class GameIndexService : IGameIndexService
 
     // layerMap is optional so minimal test setups can omit it (rank defaults to 0); production wires
     // the registered IProjectLayerMap so each document is stamped with its project layer's precedence.
-    // nameHash likewise: without one the name-hash tables stay empty and no collision is found.
     public GameIndexService(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
-        ILogger<GameIndexService> logger, IProjectLayerMap? layerMap = null, IObjectNameHash? nameHash = null)
+        ILogger<GameIndexService> logger, IProjectLayerMap? layerMap = null)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
         _logger = logger;
         _layerMap = layerMap;
-        _nameHash = nameHash;
     }
 
     public GameIndex Current => Volatile.Read(ref _current);
@@ -148,12 +141,7 @@ public sealed class GameIndexService : IGameIndexService
         do
         {
             snapshot = Volatile.Read(ref _current);
-            updated = snapshot with
-            {
-                Baseline = baseline,
-                BaselineNameHashes = HashedTable(ImmutableDictionary<uint, ImmutableArray<GameSymbol>>.Empty,
-                    baseline.Symbols.Values, [])
-            };
+            updated = snapshot with { Baseline = baseline };
         } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.Symbols.Count,
@@ -471,8 +459,6 @@ public sealed class GameIndexService : IGameIndexService
         }
 
         var docs = index.Documents.ToBuilder();
-        var addedSymbols = new List<GameSymbol>();
-        var removedSymbols = new List<GameSymbol>();
         var defDeltas = new Dictionary<string, Delta<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
         var refDeltas = new Dictionary<string, Delta<GameReference>>(StringComparer.OrdinalIgnoreCase);
         var groupDeltas = new Dictionary<string, Delta<GroupMembership>>(StringComparer.OrdinalIgnoreCase);
@@ -482,7 +468,6 @@ public sealed class GameIndexService : IGameIndexService
             if (docs.TryGetValue(uri, out var old))
             {
                 foreach (var sym in old.Symbols) DeltaFor(defDeltas, sym.Id).Removed.Add(sym);
-                removedSymbols.AddRange(old.Symbols);
                 foreach (var reference in old.References)
                     DeltaFor(refDeltas, reference.TargetId).Removed.Add(reference);
                 if (!old.GroupMemberships.IsDefault)
@@ -498,7 +483,6 @@ public sealed class GameIndexService : IGameIndexService
 
             docs[uri] = newDoc;
             foreach (var sym in newDoc.Symbols) DeltaFor(defDeltas, sym.Id).Added.Add(sym);
-            addedSymbols.AddRange(newDoc.Symbols);
             foreach (var reference in newDoc.References) DeltaFor(refDeltas, reference.TargetId).Added.Add(reference);
             if (!newDoc.GroupMemberships.IsDefault)
                 foreach (var dgm in newDoc.GroupMemberships)
@@ -510,51 +494,8 @@ public sealed class GameIndexService : IGameIndexService
             Documents = docs.ToImmutable(),
             WorkspaceDefinitions = ApplyDeltas(index.WorkspaceDefinitions, defDeltas),
             WorkspaceReferences = ApplyDeltas(index.WorkspaceReferences, refDeltas),
-            WorkspaceGroupMemberships = ApplyDeltas(index.WorkspaceGroupMemberships, groupDeltas),
-            WorkspaceNameHashes = HashedTable(index.WorkspaceNameHashes, addedSymbols, removedSymbols)
+            WorkspaceGroupMemberships = ApplyDeltas(index.WorkspaceGroupMemberships, groupDeltas)
         };
-    }
-
-    private uint HashOf(string name)
-    {
-        return _nameHash!.Of(name);
-    }
-
-    /// <summary>
-    ///     <paramref name="table" /> with <paramref name="removed" /> taken out and <paramref name="added" />
-    ///     put in - game objects only, and unchanged when the service was given no hash.
-    /// </summary>
-    private ImmutableDictionary<uint, ImmutableArray<GameSymbol>> HashedTable(
-        ImmutableDictionary<uint, ImmutableArray<GameSymbol>> table, IEnumerable<GameSymbol> added,
-        IEnumerable<GameSymbol> removed)
-    {
-        if (_nameHash is null) return table;
-
-        Dictionary<uint, List<GameSymbol>>? touched = null;
-
-        List<GameSymbol> Bucket(uint hash)
-        {
-            touched ??= [];
-            if (!touched.TryGetValue(hash, out var list))
-                touched[hash] = list = table.TryGetValue(hash, out var existing) ? [.. existing] : [];
-            return list;
-        }
-
-        foreach (var symbol in removed)
-            if (GameIndex.IsNameHashedObject(symbol))
-                Bucket(HashOf(symbol.Id)).Remove(symbol);
-
-        foreach (var symbol in added)
-            if (GameIndex.IsNameHashedObject(symbol))
-                Bucket(HashOf(symbol.Id)).Add(symbol);
-
-        if (touched is null) return table;
-
-        var builder = table.ToBuilder();
-        foreach (var (hash, list) in touched)
-            if (list.Count == 0) builder.Remove(hash);
-            else builder[hash] = [.. list];
-        return builder.ToImmutable();
     }
 
     private static Delta<T> DeltaFor<T>(Dictionary<string, Delta<T>> deltas, string key)
@@ -595,7 +536,7 @@ public sealed class GameIndexService : IGameIndexService
         IndexChanged?.Invoke(index);
     }
 
-    private GameIndex ApplyDocumentIndex(GameIndex index, DocumentIndex doc)
+    private static GameIndex ApplyDocumentIndex(GameIndex index, DocumentIndex doc)
     {
         // Content-only re-parse (an edit in a comment or non-indexed value): the symbol,
         // reference, and group sets are value-identical, so skip the strip/re-add and replace only
@@ -639,12 +580,11 @@ public sealed class GameIndexService : IGameIndexService
             Documents = base_.Documents.SetItem(doc.DocumentUri, doc),
             WorkspaceDefinitions = defs,
             WorkspaceReferences = refs,
-            WorkspaceGroupMemberships = groups,
-            WorkspaceNameHashes = HashedTable(base_.WorkspaceNameHashes, doc.Symbols, [])
+            WorkspaceGroupMemberships = groups
         };
     }
 
-    private GameIndex StripDocumentFromIndex(GameIndex index, string uri)
+    private static GameIndex StripDocumentFromIndex(GameIndex index, string uri)
     {
         if (!index.Documents.TryGetValue(uri, out var existing))
             return index;
@@ -680,8 +620,7 @@ public sealed class GameIndexService : IGameIndexService
             Documents = index.Documents.Remove(uri),
             WorkspaceDefinitions = defs,
             WorkspaceReferences = refs,
-            WorkspaceGroupMemberships = groups,
-            WorkspaceNameHashes = HashedTable(index.WorkspaceNameHashes, [], existing.Symbols)
+            WorkspaceGroupMemberships = groups
         };
     }
 

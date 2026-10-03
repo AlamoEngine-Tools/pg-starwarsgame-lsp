@@ -64,7 +64,7 @@ public sealed class EngineTextLimitsScopeTest
     [InlineData(XmlValueType.TypeReferenceList)]
     [InlineData(XmlValueType.TupleList)]
     [InlineData(XmlValueType.FloatTupleList)]
-    [InlineData(XmlValueType.ListMap)]
+    [InlineData(XmlValueType.PerFactionObjectList)]
     [InlineData(XmlValueType.UnitSpawnTable)]
     [InlineData(XmlValueType.HardPointSfxMap)]
     [InlineData(XmlValueType.AbilityModFlag)]

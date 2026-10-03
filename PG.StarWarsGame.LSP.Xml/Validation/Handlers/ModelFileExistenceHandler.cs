@@ -12,4 +12,6 @@ public sealed class ModelFileExistenceHandler : AssetFileExistenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.ModelFileExistence;
 
     protected override ReferenceKind TargetKind => ReferenceKind.ModelFile;
+    protected override string AssetNoun => "Model";
+    protected override IReadOnlyList<string> AllowedExtensions => [".alo"];
 }

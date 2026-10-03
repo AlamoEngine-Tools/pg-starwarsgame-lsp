@@ -12,7 +12,6 @@ using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
-using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Project;
 
@@ -32,8 +31,7 @@ public sealed class ModProjectReloadServiceTest
     // baseline gate say otherwise.
     private static (ModProjectReloadService Service, RecordingIndexer Indexer, ListLogger Logger,
         RecordingUserNotifier Notifier) BuildWithBaseline(
-            WorkspaceConfiguration? resolved, bool baselineLoaded, IIconCatalogProvider? icons = null,
-            ServerStatusRecorder? status = null)
+            WorkspaceConfiguration? resolved, bool baselineLoaded, IIconCatalogProvider? icons = null)
     {
         var indexer = new RecordingIndexer();
         var logger = new ListLogger();
@@ -41,22 +39,8 @@ public sealed class ModProjectReloadServiceTest
         var service = new ModProjectReloadService(
             new FakeResolver(resolved), indexer, new NullLocalisationLoader(),
             new RecordingLayerMap(), new FakeGameIndexService(IndexWithBaseline(baselineLoaded)),
-            notifier, logger, icons: icons, status: status);
+            notifier, logger, icons: icons);
         return (service, indexer, logger, notifier);
-    }
-
-    // The project itself is fine here, so the resolver records it as valid; what the report must
-    // show instead is that indexing was refused, or it reads as a healthy project with no symbols.
-    [Fact]
-    public async Task LoadAsync_ProjectFileFound_WithoutABaseline_RecordsTheRefusal()
-    {
-        var status = new ServerStatusRecorder();
-        var (service, _, _, _) = BuildWithBaseline(SampleConfig, baselineLoaded: false, status: status);
-
-        await service.LoadAsync(["/ws"], CancellationToken.None);
-
-        Assert.True(status.ProjectDetected);
-        Assert.Equal(ProjectProblem.BaselineRefused, status.ProjectProblem);
     }
 
     // The tests that are not about the gate still have to get past it.

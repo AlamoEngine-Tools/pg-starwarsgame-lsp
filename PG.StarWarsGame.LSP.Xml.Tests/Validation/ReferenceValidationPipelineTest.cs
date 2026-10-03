@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -85,7 +84,7 @@ public sealed class ReferenceValidationPipelineTest
         Assert.Equal(2, docIndex.References.Length);
 
         var index = BuildIndex(docIndex, ("FIGHTER_A", "SpaceUnit"), ("FIGHTER_B", "SpaceUnit"));
-        var facts = new XmlIndexFactProducer(DistinctObjectNameHash.Instance).Produce("file:///test.xml", index);
+        var facts = new XmlIndexFactProducer().Produce("file:///test.xml", index);
         var diagnostics = TypeMismatchDiagnostics(facts);
 
         Assert.Empty(diagnostics);
@@ -115,7 +114,7 @@ public sealed class ReferenceValidationPipelineTest
         Assert.Equal(2, docIndex.References.Length);
 
         var index = BuildIndex(docIndex, ("REBEL_SOLDIER", "GroundCompanyUnit"), ("X_WING", "SpaceUnit"));
-        var facts = new XmlIndexFactProducer(DistinctObjectNameHash.Instance).Produce("file:///test.xml", index);
+        var facts = new XmlIndexFactProducer().Produce("file:///test.xml", index);
         var diagnostics = TypeMismatchDiagnostics(facts);
 
         Assert.Empty(diagnostics);
@@ -147,7 +146,7 @@ public sealed class ReferenceValidationPipelineTest
         Assert.Single(docIndex.References);
 
         var index = BuildIndex(docIndex, ("REBEL_FIGHTER_01", "SpaceUnit"));
-        var facts = new XmlIndexFactProducer(DistinctObjectNameHash.Instance).Produce("file:///test.xml", index);
+        var facts = new XmlIndexFactProducer().Produce("file:///test.xml", index);
         var diagnostics = TypeMismatchDiagnostics(facts);
 
         var d = Assert.Single(diagnostics);

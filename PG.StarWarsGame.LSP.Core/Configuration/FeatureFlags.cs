@@ -6,9 +6,9 @@ namespace PG.StarWarsGame.LSP.Core.Configuration;
 /// <summary>
 ///     Per-language, per-capability feature flags. Every flag defaults to <c>true</c>: a bare
 ///     server (no client-supplied <c>features</c> node) behaves exactly as before flags existed.
-///     The user-facing defaults - which flags are off out of the box - live in the VS Code
-///     client's package.json, the one list of them; the client always sends the complete resolved
-///     object via initializationOptions, so these defaults only reach a bare server.
+///     The user-facing opt-in defaults (Lua hover, Lua diagnostics, localisation tools and story
+///     discovery are off out of the box) live in the VS Code client's package.json, which always
+///     sends the complete resolved object via initializationOptions.
 ///     In <c>.pg-lsp.json</c> the node is spelled PascalCase (<c>"Features"</c>, case-sensitive);
 ///     in initializationOptions it is camelCase (<c>"features"</c>, parsed case-insensitively).
 /// </summary>
@@ -145,9 +145,7 @@ public record ToolsFeatureFlags
 
     /// <summary>
     ///     Gates the story simulator: every <c>aet/storySim*</c> endpoint and the
-    ///     <c>aet/storySimChanged</c> notification. The endpoints also require
-    ///     <c>features.story.discovery</c>, which supplies the campaigns; the client runs the
-    ///     simulation in the panel <see cref="StoryEditor" /> hosts.
+    ///     <c>aet/storySimChanged</c> notification (builds on <c>features.story.discovery</c>).
     /// </summary>
     public bool StorySimulator { get; init; } = true;
 }

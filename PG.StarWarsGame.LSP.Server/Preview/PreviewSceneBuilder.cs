@@ -51,7 +51,8 @@ public sealed class PreviewSceneBuilder(
     private const float DefaultHullVsHardpointsConstraint = 0.2f;
 
     /// <summary>
-    ///     The engine's defaults for the two turret extents, from its object type constructor.
+    ///     The engine's defaults for the two turret extents, from the
+    ///     <c>GameObjectTypeClass</c> constructor.
     /// </summary>
     /// <remarks>
     ///     Both comparisons in the cone-of-fire test are then always true, so an object that
@@ -152,8 +153,7 @@ public sealed class PreviewSceneBuilder(
     public PreviewScene BuildForModel(string modelReference)
     {
         var path = PreviewModelReference.ModelPath(modelReference);
-        var location = assets.Locate(path);
-        var resolved = location is not null;
+        var resolved = assets.Locate(path) is not null;
 
         var problems = new List<PreviewProblem>();
         if (!resolved)
@@ -193,26 +193,7 @@ public sealed class PreviewSceneBuilder(
             null,
             particles,
             AnimationsFor(modelReference),
-            resolved ? CamerasOf(modelReference, problems) : [])
-        {
-            SourceFile = SourceFileOf(location)
-        };
-    }
-
-    /// <summary>
-    ///     The file an external tool would be handed, or null when the model resolved nowhere.
-    /// </summary>
-    /// <remarks>
-    ///     An archive hit's resolved path is the path INSIDE the MEG, which no tool can open - so it
-    ///     travels as "packed" with no path rather than as something that looks openable.
-    /// </remarks>
-    private static PreviewSourceFile? SourceFileOf(GameAssetLocation? location)
-    {
-        if (location is null) return null;
-
-        return location.Tier == GameAssetTier.Archive
-            ? new PreviewSourceFile(null, true)
-            : new PreviewSourceFile(location.ResolvedPath, false);
+            resolved ? CamerasOf(modelReference, problems) : []);
     }
 
     /// <summary>

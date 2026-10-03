@@ -96,10 +96,10 @@ public enum TagSemanticType
     ///     A <c>Faction, AIPlayerType</c> pair: slot 0 names a <see cref="Faction" /> object, slot 1
     ///     the AI player type the faction is played by. Used by <c>Campaign.AI_Player_Control</c>,
     ///     which repeats - one tag per faction - rather than carrying several pairs in one value.
-    ///     The engine reads the value as a plain name list (<see cref="XmlValueType.NameReferenceList" />)
-    ///     and pairs it up where it is used. Measured across both shipped corpora this tag is a pair
+    ///     Refines <see cref="XmlValueType.PerFactionObjectList" />, whose grammar is the more general
+    ///     <c>Faction[, Object ...]</c> group: measured across both shipped corpora this tag is a pair
     ///     in all 484 occurrences (178 eaw, 306 foc) and never longer, which is what makes reading
-    ///     slot 1 positionally safe.
+    ///     slot 1 positionally safe here and not for the type's other tags.
     /// </summary>
     FactionAiPlayerPairList,
 

@@ -11,7 +11,6 @@ using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Schema.Versioning;
-using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
@@ -34,7 +33,6 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     private readonly LuaApiSchemaProxy _luaProxy;
     private readonly IUserNotifier _notifier;
     private readonly SchemaProviderProxy _proxy;
-    private readonly ServerStatusRecorder? _status;
 
     public SchemaBootstrapper(
         ILspConfigurationProvider config,
@@ -47,10 +45,8 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         IUserNotifier notifier,
         ILogger<SchemaBootstrapper> logger,
         ILogger<LocalFileSchemaProvider> localLogger,
-        ILogger<HttpSchemaProvider> httpLogger,
-        ServerStatusRecorder? status = null)
+        ILogger<HttpSchemaProvider> httpLogger)
     {
-        _status = status;
         _config = config;
         _proxy = proxy;
         _luaProxy = luaProxy;
@@ -89,17 +85,6 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
                 LoadLuaSchemaFromHttpAsync(DeriveLuaHttpUrl(src.Url), ct));
 
         ReportVersionIncompatibility(realProvider);
-
-        // Recorded here because this is the last place the real provider is reachable: the proxy
-        // hides it, and its version check goes with it.
-        _status?.RecordSchema(
-            isLocal
-                ? StatusSchemaSource.Local
-                : string.Equals(src.Url, new SchemaSourceConfig().Url, StringComparison.OrdinalIgnoreCase)
-                    ? StatusSchemaSource.Official
-                    : StatusSchemaSource.CustomUrl,
-            (realProvider as IVersionedSchemaProvider)?.LastVersionCheck,
-            (realProvider as HttpSchemaProvider)?.LastLoadFromCache);
 
         _logger.LogInformation("Loading schema completed.");
     }

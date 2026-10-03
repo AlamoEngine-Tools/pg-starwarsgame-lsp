@@ -1,13 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
-using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
@@ -34,7 +32,6 @@ public sealed class StartupPipeline
     private readonly IModProjectReloadService _reloadService;
     private readonly IReadOnlyList<IDiagnosticsRepublisher> _republishers;
     private readonly ISchemaBootstrapper _schema;
-    private readonly ServerStatusRecorder? _status;
 
     // migrationOffer is optional so the minimal test setups can omit it; production always wires it.
     public StartupPipeline(
@@ -47,10 +44,8 @@ public sealed class StartupPipeline
         ILogger<StartupPipeline> logger,
         IPgprojMigrationOffer? migrationOffer = null,
         IEnumerable<IDiagnosticsRepublisher>? republishers = null,
-        ILspConfigurationProvider? configProvider = null,
-        ServerStatusRecorder? status = null)
+        ILspConfigurationProvider? configProvider = null)
     {
-        _status = status;
         _configProvider = configProvider;
         _republishers = republishers?.ToList() ?? [];
         _migrationOffer = migrationOffer;
@@ -65,8 +60,6 @@ public sealed class StartupPipeline
 
     public async Task RunAsync(IReadOnlyList<string> scanRoots, CancellationToken ct)
     {
-        var clock = Stopwatch.StartNew();
-        var failed = false;
         try
         {
             _progress.Report("Loading schema and baseline", 5);
@@ -81,12 +74,9 @@ public sealed class StartupPipeline
         {
             // Startup is fire-and-forget; never let a stage failure leave the gate closed.
             _logger.LogError(ex, "Startup pipeline failed; opening gate in degraded state.");
-            failed = true;
         }
         finally
         {
-            // Before the gate opens, so a status read the moment it opens sees the outcome.
-            _status?.RecordIndexFinished(failed, clock.Elapsed);
             _progress.Report("Finalising", 95);
             await _gate.OpenAsync();
             _progress.Complete();

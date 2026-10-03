@@ -3,7 +3,7 @@
   "displayName": "Alamo Engine Tools - Empire at War Edit",
   "description": "Editor intelligence for Star Wars: Empire at War and Forces of Corruption mod development - XML completions, diagnostics, hover, go-to-definition, rename, and Lua support.",
   "author": {
-    "name": "Lukas Grünwald"
+    "name": "Lukas GrÃ¼nwald"
   },
   "publisher": "AlamoEngineTools",
   "version": "0.4.0",
@@ -481,10 +481,6 @@
         "title": "EaWEdit: Play Credits Crawl Full Screen",
         "icon": "$(screen-full)",
         "enablement": "config.aet-eaw-edit.features.tools.localisation"
-      },
-      {
-        "command": "aet-eaw-edit.copyBugReportInfo",
-        "title": "EaWEdit: Copy Bug Report Info"
       },
       {
         "command": "aet-eaw-edit.lsp.previewModel",

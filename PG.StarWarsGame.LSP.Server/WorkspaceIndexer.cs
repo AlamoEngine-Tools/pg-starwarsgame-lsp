@@ -137,12 +137,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     ///     declared script roots, in a single <see cref="IGameIndexService.BeginBulkUpdate" />.
     ///     Returns the number of files indexed.
     /// </summary>
-    /// <inheritdoc />
-    public IndexCacheStats? LastIndexCache { get; private set; }
-
-    /// <inheritdoc />
-    public BoneCatalogStats? LastBoneCatalog { get; private set; }
-
     public async Task<int> IndexDocumentsAsync(WorkspaceConfiguration config, CancellationToken ct,
         Action<int, int>? progress = null)
     {
@@ -262,7 +256,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         var workspaceCount = 0;
         var reusedLayers = 0;
-        var layerCount = 0;
 
         // Rank ASCENDING - dependencies first, root project last - so a leaf's own model of the
         // same filename overwrites the dependency's, matching every other layered lookup. The old
@@ -271,7 +264,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         foreach (var layer in LayersForBones(config))
         {
             var (models, reused) = ModelsForLayer(layer);
-            layerCount++;
             if (reused) reusedLayers++;
 
             foreach (var (path, entry) in models)
@@ -288,7 +280,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             "Model catalog: {Workspace} workspace model(s) merged with {Baseline} baseline "
             + "model(s); {Reused} layer(s) reused a snapshot; {Textures} model(s) with texture data",
             workspaceCount, baselineBones.Count, reusedLayers, mergedTextures.Count);
-        LastBoneCatalog = new BoneCatalogStats(reusedLayers, layerCount);
 
         _indexService.ApplyModelBones(mergedBones.ToImmutable());
         _indexService.ApplyModelTextures(mergedTextures.ToImmutable());
@@ -595,8 +586,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             });
         }
 
-        // No layers means no snapshots: everything was parsed.
-        LastIndexCache = new IndexCacheStats(0, 0, 0, indexed);
         _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
         return indexed;
     }
@@ -615,8 +604,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (layered scan)", totalFiles);
 
         var indexed = 0;
-        var reused = 0;
-        var layersFromSnapshot = 0;
         var options = new ParallelOptions
             { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct };
 
@@ -688,7 +675,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 // Overall hash of the validated snapshot, for skipping the redundant re-save below.
                 if (snapshot is not null && pgprojPath is not null)
                     validSnapshotHashes[pgprojPath] = snapshot.OverallHash;
-                if (snapshot is not null) layersFromSnapshot++;
 
                 // Build lookup from relPath → cached entry.
                 var projectDir = pgprojPath is not null ? GetDirectory(pgprojPath) : null;
@@ -727,7 +713,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                         // never happened. Replay it, or a cached Lua file contributes none of its
                         // annotations for the whole session.
                         RestoreParserState(file, uri, cachedEntry.Document.ParserState);
-                        Interlocked.Increment(ref reused);
                     }
                     else
                     {
@@ -749,9 +734,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 layerResults.Add((layer, layerEntries.ToList()));
             }
         } // fires one IndexChanged with the complete final state
-
-        LastIndexCache = new IndexCacheStats(
-            layersFromSnapshot, layerFileLists.Count - layersFromSnapshot, reused, indexed - reused);
 
         // Write snapshots after the bulk update so Current.Documents is fully populated.
         foreach (var (layer, entries) in layerResults)

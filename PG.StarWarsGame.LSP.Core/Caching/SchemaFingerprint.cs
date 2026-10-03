@@ -22,24 +22,14 @@ public static class SchemaFingerprint
         var sb = new StringBuilder();
 
         foreach (var tag in schema.AllTags.OrderBy(t => t.Tag, StringComparer.Ordinal))
-        {
             sb.Append("tag:").Append(tag.Tag)
                 .Append('|').Append(tag.ValueType)
                 .Append('|').Append(tag.ReferenceKind)
                 .Append('|').Append(tag.ObjectType?.TypeName)
                 .Append('|').Append(tag.Enum?.Name)
                 .Append('|').Append(tag.SemanticType)
-                .Append('|').Append(tag.ValidationOverride?.ValidationId);
-
-            // Slots decide which items of a tuple value the parser records as references, so a
-            // slot-only change has to discard the snapshots too. In order: position is meaning.
-            foreach (var slot in tag.Slots)
-                sb.Append("|slot:").Append(slot.ReferenceKind)
-                    .Append(',').Append(slot.ReferenceTypeName)
-                    .Append(',').Append(slot.Enum?.Name);
-
-            sb.Append('\n');
-        }
+                .Append('|').Append(tag.ValidationOverride?.ValidationId)
+                .Append('\n');
 
         foreach (var type in schema.AllObjectTypes.OrderBy(t => t.TypeName, StringComparer.Ordinal))
             sb.Append("type:").Append(type.TypeName)

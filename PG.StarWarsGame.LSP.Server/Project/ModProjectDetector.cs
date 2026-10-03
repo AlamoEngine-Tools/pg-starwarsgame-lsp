@@ -32,8 +32,7 @@ public sealed class ModProjectDetector : IModProjectDetector
                 throw new ModProjectLoadException(
                     $"Found multiple .pgproj files under '{root}': {string.Join(", ", matches)}. " +
                     "Only one .pgproj is supported per workspace - remove or relocate the extras, " +
-                    "or open the specific directory that contains the one you want to use.",
-                    problem: ProjectProblem.Ambiguous);
+                    "or open the specific directory that contains the one you want to use.");
 
             projectFilePath = matches[0];
             _logger.LogInformation("Detected mod project file '{Path}'.", projectFilePath);

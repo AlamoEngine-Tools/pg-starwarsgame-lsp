@@ -699,16 +699,6 @@ public sealed record PreviewProblem(
     string? HardpointId = null);
 
 /// <summary>
-///     Where a previewed model lives on disk, as far as an external tool is concerned.
-/// </summary>
-/// <param name="Path">
-///     The loose file the name resolved to, highest layer first - or null when it exists only
-///     inside a MEG archive, where no tool can open it.
-/// </param>
-/// <param name="Packed">True when the model was found only inside a MEG archive.</param>
-public sealed record PreviewSourceFile(string? Path, bool Packed);
-
-/// <summary>
 ///     Everything needed to draw a preview, with no binary payload.
 /// </summary>
 /// <remarks>
@@ -913,12 +903,7 @@ public sealed record PreviewScene(
     ///     engine formats <c>big_</c> + <c>Icon_Name</c> and falls back to the plain icon when that
     ///     texture is missing, so the name is the whole link between a capture and its slot.
     /// </remarks>
-    string? IconName = null,
-    /// <summary>
-    ///     The file a bare model resolved to, for handing it to AloViewer or the Particle Editor.
-    ///     Null for an object scene and for a model that resolves nowhere.
-    /// </summary>
-    PreviewSourceFile? SourceFile = null)
+    string? IconName = null)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

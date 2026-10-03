@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Project;
-using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
 
@@ -19,27 +18,15 @@ public sealed class ProjectDependencyGraph
     public IReadOnlyList<(string Path, ModProjectFile File)> Build(
         string rootPath,
         ModProjectFile root,
-        Func<string, ModProjectFile?> loadReference,
-        out ProjectDependencyShape shape)
+        Func<string, ModProjectFile?> loadReference)
     {
         var ordered = new List<(string Path, ModProjectFile File)>();
         var emitted = new HashSet<string>();
         var onStack = new HashSet<string>();
-        var tally = new Tally();
 
-        Visit(Normalize(rootPath), root, loadReference, ordered, emitted, onStack, 0, tally);
+        Visit(Normalize(rootPath), root, loadReference, ordered, emitted, onStack);
 
-        // The root is the last entry, and is not a dependency of itself.
-        shape = new ProjectDependencyShape(tally.Direct, ordered.Count - 1, tally.Depth, tally.Unresolved);
         return ordered;
-    }
-
-    public IReadOnlyList<(string Path, ModProjectFile File)> Build(
-        string rootPath,
-        ModProjectFile root,
-        Func<string, ModProjectFile?> loadReference)
-    {
-        return Build(rootPath, root, loadReference, out _);
     }
 
     private void Visit(
@@ -48,12 +35,8 @@ public sealed class ProjectDependencyGraph
         Func<string, ModProjectFile?> loadReference,
         List<(string Path, ModProjectFile File)> ordered,
         HashSet<string> emitted,
-        HashSet<string> onStack,
-        int depth,
-        Tally tally)
+        HashSet<string> onStack)
     {
-        tally.Depth = Math.Max(tally.Depth, depth);
-
         if (emitted.Contains(normalizedPath))
             return;
 
@@ -70,10 +53,7 @@ public sealed class ProjectDependencyGraph
         {
             var resolved = Normalize(Combine(projectDir, reference.Path));
             if (emitted.Contains(resolved))
-            {
-                if (depth == 0) tally.Direct++;
                 continue;
-            }
 
             var referenced = loadReference(resolved);
             if (referenced is null)
@@ -81,26 +61,16 @@ public sealed class ProjectDependencyGraph
                 _logger.LogWarning(
                     "Project reference '{Reference}' resolved to '{Resolved}' could not be loaded; skipping.",
                     reference.Path, resolved);
-                tally.Unresolved++;
                 continue;
             }
 
-            if (depth == 0) tally.Direct++;
-            Visit(resolved, referenced, loadReference, ordered, emitted, onStack, depth + 1, tally);
+            Visit(resolved, referenced, loadReference, ordered, emitted, onStack);
         }
 
         onStack.Remove(normalizedPath);
 
         if (emitted.Add(normalizedPath))
             ordered.Add((normalizedPath, file));
-    }
-
-    /// <summary>What the walk counts as it goes, for <see cref="ProjectDependencyShape" />.</summary>
-    private sealed class Tally
-    {
-        public int Depth;
-        public int Direct;
-        public int Unresolved;
     }
 
     private static string Normalize(string path)

@@ -29,26 +29,6 @@ public sealed class DynamicEnumValueHandlerTest
         Assert.Empty(results);
     }
 
-    // The engine's animation names carry spaces ("Turn Left") and are matched whole, case ignored.
-    // The suffix-style names the enum used to hold ("TURNL") are not the engine's and must be flagged.
-    [Theory]
-    [InlineData("Turn Left", true)]
-    [InlineData("turn left", true)]
-    [InlineData("TURNL", false)]
-    public void AnAnimationName_IsMatchedWhole_SpacesIncluded(string value, bool valid)
-    {
-        var tag = XmlHandlerTestFixtures.MakeTag("Move_Animation_Type", XmlValueType.DynamicEnumValue,
-            enumDef: new EnumDefinition
-            {
-                Name = "AnimationType", Kind = EnumKind.SchemaFixed,
-                Values = [new EnumValueDefinition { Name = "Move" }, new EnumValueDefinition { Name = "Turn Left" }]
-            });
-
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
-
-        Assert.Equal(valid, results.Count == 0);
-    }
-
     // A per-owner subset is NOT this handler's business - see AllowedValuesHandlerTest. Pinned
     // here because the check lived in this handler first, and putting it back would make it
     // invisible to every tag that is not an enum.

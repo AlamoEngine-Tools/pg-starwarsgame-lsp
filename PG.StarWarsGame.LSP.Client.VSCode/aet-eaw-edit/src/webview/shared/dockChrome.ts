@@ -1220,7 +1220,7 @@ export const inspectorCss = `
         border-color: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         background: var(--vscode-editorWidget-background, #202020);
         color: var(--vscode-foreground, #ccc);
-        margin-bottom: calc(-1 * var(--space-1));
+        margin-bottom: -var(--space-1);
         padding-bottom: var(--space-4);
     }
 
@@ -1230,43 +1230,21 @@ export const inspectorCss = `
         font-variant-numeric: tabular-nums;
     }
 
-    /* The geometry box takes the height left under the sections, and every link down to the
-       scroller passes it on: a flex column that grows and is allowed to shrink. One link without
-       min-height is where the fill stops - it grows to its content instead and the page scrolls.
-       The floor keeps the box usable on a short window; the page scrolls to reach it then. */
-    .inspect-geometry {
-        display: flex;
-        flex-direction: column;
-        flex: 1 1 0;
-        min-height: 320px;
-        margin-top: var(--space-16);
-        padding-top: var(--space-12);
-        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
-    }
-
-    .inspect-geometry > :not(.geometry-panel) { flex-shrink: 0; }
-
     .geometry-panel {
-        display: flex;
-        flex-direction: column;
-        flex: 1 1 0;
-        min-height: 0;
         border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         border-radius: 0 var(--radius-3) var(--radius-3) var(--radius-3);
         overflow: hidden;
     }
 
     /* A vertex row is ten columns wide and the list is however long the sub-mesh is, so the table
-       scrolls in BOTH directions inside itself and its host keeps its shape. Its height is the
-       panel's - a fixed cap here left a tall tab mostly empty and a short one overflowing. */
+       scrolls in BOTH directions inside itself and its host keeps its shape. The height is set by
+       whoever mounts it - a dock and a full editor tab want very different amounts of it. */
     .geometry-scroll {
-        flex: 1 1 0;
-        min-height: 0;
         overflow: auto;
+        max-height: 40vh;
     }
 
     .geometry-table {
-        width: 100%;
         border-collapse: collapse;
         font-family: var(--vscode-editor-font-family, monospace);
         font-size: var(--font-size-smaller);
@@ -1296,7 +1274,6 @@ export const inspectorCss = `
        request at 500 - and a reader several thousand rows down wants to know whether the end they
        are looking at is the table's end or merely today's. */
     .geometry-foot {
-        flex-shrink: 0;
         padding: var(--space-2) var(--space-8);
         border-top: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         color: var(--vscode-descriptionForeground, #999);

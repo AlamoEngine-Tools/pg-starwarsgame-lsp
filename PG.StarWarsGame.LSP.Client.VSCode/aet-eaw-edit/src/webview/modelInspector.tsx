@@ -13,31 +13,25 @@
 // runs the same `inspectPanels` over them and fetches its own geometry pages, which were always a
 // server round trip.
 
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {createRoot} from 'react-dom/client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
 
-import {InspectorBody} from './inspector/InspectorBody';
-import {GEOMETRY_PAGE, appendPage, type GeometryRows} from './preview/geometryRows';
+import { InspectorBody } from './inspector/InspectorBody';
+import { GEOMETRY_PAGE, appendPage, type GeometryRows } from './preview/geometryRows';
 import {
     geometryKeyOf, sameGeometryKey, type InspectorSubject,
 } from './preview/inspectorSubject';
-import {dockChromeCss, inspectorCss} from './shared/dockChrome';
-import {type GeometryTable, type GetSubMeshGeometryResult} from '../protocol/modelPreview';
+import { dockChromeCss, inspectorCss } from './shared/dockChrome';
+import { type GeometryTable, type GetSubMeshGeometryResult } from '../protocol/modelPreview';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
-
 const vscode = acquireVsCodeApi();
 
 const Shell = styled.div`
     ${dockChromeCss}
-    ${inspectorCss} /* A column, so the geometry box can take whatever height the sections above leave - it was a
-       plain block before, and the box sat at a fixed 60vh however tall the tab was. Still a
-       scroller: on a short window the box keeps its floor and the page scrolls to reach it. The
-       table inside stays BOUNDED either way, which the paging needs - it fetches the next page as
-       the scroller nears its end, and a scroller with no height never nears anything. */
-    display: flex;
-    flex-direction: column;
+    ${inspectorCss}
+
     height: 100%;
     overflow-y: auto;
     padding: var(--space-12) var(--space-16) var(--space-16);
@@ -45,9 +39,11 @@ const Shell = styled.div`
     font-size: var(--font-size-12);
     color: var(--vscode-foreground);
 
-    > .inspect-page-head, > .inspect-columns, > .inspect-empty {
-        flex-shrink: 0;
-    }
+    /* Tall, because a tab has the room a 320px flyout never did - but still BOUNDED. The table
+       fetches its next page as the scroller nears the end, and a scroller with no height never
+       nears anything: it would grow to fit every row and pull the whole sub-mesh down in one
+       burst. Bounded, it fills the view and scrolls, which is what was asked for. */
+    .geometry-scroll { max-height: 60vh; }
 
     .inspect-page-head {
         display: flex;
@@ -74,7 +70,6 @@ const Shell = styled.div`
     /* Columns that fill the width they are given rather than a fixed count: the sections are short
        and independent, so on a wide tab they sit side by side and on a narrow one they stack, with
        no breakpoint to keep in step with the tab's real width. */
-
     .inspect-columns {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -84,10 +79,17 @@ const Shell = styled.div`
 
     /* The group margin is the column gap's job here - the flyout stacked these, so it spaced them
        with a top margin that would double the gap in a grid. */
+    .inspect-columns .inspect-group + .inspect-group { margin-top: 0; }
 
-    .inspect-columns .inspect-group + .inspect-group {
-        margin-top: 0;
+    .inspect-geometry {
+        margin-top: var(--space-16);
+        padding-top: var(--space-12);
+        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
     }
+
+    /* The panel is as wide as its widest table needs and no wider - a three-column bone mapping
+       stretched across a full-width tab is mostly empty rule. It scrolls sideways within this. */
+    .inspect-geometry .geometry-panel { max-width: 100%; }
 
     .inspect-empty {
         max-width: 46em;
@@ -99,7 +101,6 @@ function ModelInspector(): React.JSX.Element {
     const [subject, setSubject] = useState<InspectorSubject | null>(null);
     const [geometry, setGeometry] = useState<GeometryRows | null>(null);
     const [geometryError, setGeometryError] = useState<string | null>(null);
-    const [selectedTable, setSelectedTable] = useState<GeometryTable | null>(null);
 
     // What has been ASKED for, so the same offset is never asked for twice. The scroller fires far
     // more often than a page comes back, and every one of those firings sees the same short table
@@ -134,7 +135,7 @@ function ModelInspector(): React.JSX.Element {
         };
 
         window.addEventListener('message', handle);
-        vscode.postMessage({type: 'ready'});
+        vscode.postMessage({ type: 'ready' });
         return () => window.removeEventListener('message', handle);
     }, []);
 
@@ -149,8 +150,6 @@ function ModelInspector(): React.JSX.Element {
         setShownKey(key);
         setGeometry(null);
         setGeometryError(null);
-        // A row with geometry opens on Vertices: a tab box always has a tab open.
-        setSelectedTable(key === null ? null : 'vertices');
         asked.current = null;
     }
 
@@ -184,30 +183,15 @@ function ModelInspector(): React.JSX.Element {
 
     // Switching tab starts that table again from row zero: the rows in hand belong to the table
     // they came from, and `appendPage` replaces rather than appends when the table changes.
-    // Pressing the tab that is already open does nothing - it is a tab, not a reload.
     const openTable = useCallback((table: GeometryTable): void => {
-        if (table === selectedTable && geometry?.table === table) {
-            return;
-        }
-
-        setSelectedTable(table);
         asked.current = null;
         requestGeometry(table, 0);
-    }, [requestGeometry, selectedTable, geometry?.table]);
-
-    // The first page of the open tab, fetched as soon as a row with geometry is shown. Keyed on
-    // the sub-mesh, so a tree rebuild that keeps the same row does not fetch it again.
-    useEffect(() => {
-        if (key !== null && selectedTable !== null && geometry === null) {
-            requestGeometry(selectedTable, 0);
-        }
-    }, [key?.modelReference, key?.meshIndex, key?.subMeshIndex, selectedTable, geometry, requestGeometry]);
+    }, [requestGeometry]);
 
     return (
         <Shell>
             <InspectorBody
                 subject={subject}
-                selectedTable={selectedTable}
                 geometry={geometry}
                 geometryError={geometryError}
                 onGeometry={requestGeometry}
@@ -217,4 +201,4 @@ function ModelInspector(): React.JSX.Element {
     );
 }
 
-createRoot(document.getElementById('root')!).render(<ModelInspector/>);
+createRoot(document.getElementById('root')!).render(<ModelInspector />);

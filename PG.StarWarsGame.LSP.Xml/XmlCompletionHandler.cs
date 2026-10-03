@@ -22,14 +22,14 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static readonly Regex ParamTagPattern =
         new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // Comma-separated tuple types. The fixed-shape ones split on the FIRST comma only, so their
-    // strategy treats every index past 0 as slot 1; a TupleList repeats its slots for the whole
-    // value, so it needs the real item index, and a ListMap needs to know whether it is the first.
+    // Every validator for these types splits on the FIRST comma only - completions therefore only
+    // ever need to distinguish "before the first comma" (slot 0) from "after it" (slot 1), regardless
+    // of how many further commas appear within slot 1's own value.
     private static readonly HashSet<XmlValueType> TupleValueTypes =
     [
         XmlValueType.HardPointSfxMap, XmlValueType.AbilitySfxMap, XmlValueType.ConditionalSfxEvent,
         XmlValueType.UnitSpawnTable, XmlValueType.AbilityModMultiplier, XmlValueType.TupleList,
-        XmlValueType.InaccuracyMap, XmlValueType.ListMap
+        XmlValueType.InaccuracyMap
     ];
 
     private readonly ILspConfigurationProvider _config;
@@ -243,8 +243,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     }
 
     /// <summary>
-    ///     Counts commas between the enclosing element's content start and the cursor - the 0-based
-    ///     index of the item the cursor sits in. See <see cref="TupleValueTypes" />.
+    ///     Counts commas between the enclosing element's content start and the cursor, clamped to 1 —
+    ///     see <see cref="TupleValueTypes" /> for why only "before/after the first comma" matters.
     /// </summary>
     private static int ComputeTupleSlotIndex(string text, HtmlNode enclosingNode, int lineIndex, int character)
     {
@@ -257,7 +257,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         foreach (var c in span)
             if (c == ',')
                 commaCount++;
-        return commaCount;
+        return Math.Min(1, commaCount);
     }
 
     /// <summary>

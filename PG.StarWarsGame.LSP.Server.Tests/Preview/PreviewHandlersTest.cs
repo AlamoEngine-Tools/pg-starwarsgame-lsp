@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
@@ -82,54 +81,6 @@ public sealed class PreviewHandlersTest
         var part = Assert.Single(result.Scene.Parts);
         Assert.Equal("Ev_stardestroyer.alo", part.ModelRef);
         Assert.True(part.Resolved);
-    }
-
-    // ── the model list ────────────────────────────────────────────────────────
-
-    private static ListModelsHandler ListModels(bool modelPreview = true)
-    {
-        var index = GameIndex.Empty with
-        {
-            AssetFiles = MergedAssetFileIndex.Merge(
-                [
-                    "data/art/models/ev_stardestroyer.alo", "data/art/models/p_smoke.alo",
-                    "data/art/textures/ev_stardestroyer.tga", "data/art/models/ev_stardestroyer.ala"
-                ],
-                ["data/art/models/my_frigate.alo"])
-        };
-        return new ListModelsHandler(new FakeGameIndexService(index), Config(modelPreview));
-    }
-
-    /// <summary>
-    ///     What the "Preview Model" picker offers: every <c>.alo</c> the project can reach, its own
-    ///     and the base game's, by file name - so a model in a dependency or a MEG can be opened
-    ///     without knowing its name first.
-    /// </summary>
-    [Fact]
-    public async Task ListModels_OffersEveryReachableAloByFileName()
-    {
-        var result = await ListModels().Handle(new ListModelsParams(), CancellationToken.None);
-
-        Assert.Equal(
-            ["ev_stardestroyer.alo", "my_frigate.alo", "p_smoke.alo"],
-            result.Models.Select(m => m.Name));
-    }
-
-    [Fact]
-    public async Task ListModels_SaysWhichModelsComeFromTheBaseGame()
-    {
-        var result = await ListModels().Handle(new ListModelsParams(), CancellationToken.None);
-
-        Assert.True(result.Models.Single(m => m.Name == "ev_stardestroyer.alo").BaseGame);
-        Assert.False(result.Models.Single(m => m.Name == "my_frigate.alo").BaseGame);
-    }
-
-    [Fact]
-    public async Task ListModels_WhenTheFeatureIsOff_OffersNothing()
-    {
-        var result = await ListModels(false).Handle(new ListModelsParams(), CancellationToken.None);
-
-        Assert.Empty(result.Models);
     }
 
     // ── the GLB endpoint ──────────────────────────────────────────────────────

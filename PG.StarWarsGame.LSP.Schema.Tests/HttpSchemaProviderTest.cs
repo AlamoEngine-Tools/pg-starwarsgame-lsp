@@ -197,16 +197,12 @@ public sealed class HttpSchemaProviderTest
         });
 
         await provider.LoadAsync(); // first load - downloads + populates cache
-        // Kept for the bug report: a warm start reads the cache, a cold one rebuilds from the
-        // network, and only the log used to say which.
-        Assert.False(provider.LastLoadFromCache);
         fake.Requests.Clear();
 
         await provider.LoadAsync(); // second load - cache hit; only manifest is fetched
 
         Assert.Single(fake.Requests);
         Assert.EndsWith("_index.json", fake.Requests[0].RequestUri!.ToString());
-        Assert.True(provider.LastLoadFromCache);
     }
 
     [Fact]
