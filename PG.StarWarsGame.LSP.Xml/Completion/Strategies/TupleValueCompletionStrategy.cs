@@ -9,9 +9,10 @@ namespace PG.StarWarsGame.LSP.Xml.Completion;
 
 /// <summary>
 ///     Positional completion for comma-separated tuple value types (e.g. <c>HardPointSfxMap</c>,
-///     <c>UnitSpawnTable</c>). Every such type has a fixed, hardcoded shape - which slot holds an
-///     enum, a hardcoded set, an object reference, or a free-form value with no completion source —
-///     so this strategy looks up that shape per (ValueType, <see cref="TagValueCompletionContext.TupleSlotIndex" />)
+///     <c>UnitSpawnTable</c>). Each such type has a shape - which slot holds an enum, a hardcoded
+///     set, an object reference, or a free-form value with no completion source. The fixed-shape
+///     types are hardcoded here; a TupleList reads its slots from the schema. This strategy looks up
+///     that shape per (ValueType, <see cref="TagValueCompletionContext.TupleSlotIndex" />)
 ///     and queries the same registries <see cref="StandardValueCompletionStrategy" /> uses, via a
 ///     synthetic single-purpose <see cref="XmlTagDefinition" /> for the slot in question.
 /// </summary>
@@ -68,6 +69,7 @@ internal sealed class TupleValueCompletionStrategy : IXmlTagValueCompletionStrat
                 _ => [] // plain float distance
             },
             XmlValueType.TupleList => TupleListProposals(ctx),
+            XmlValueType.ListMap => ListMapProposals(ctx),
             _ => []
         };
 
@@ -83,20 +85,52 @@ internal sealed class TupleValueCompletionStrategy : IXmlTagValueCompletionStrat
         });
     }
 
-    // Only two ValidationIds exist for TupleList in schema today: "context-name-pair" (a single
-    // ContextName, MusicEventName pair) and "context-name-list" (an arbitrary-length alternating
-    // list). The bare default (no override) validates MusicEventName+Weight but no tag currently
-    // uses it. Only context-name-pair's music-event slot has a reliable completion source.
+    // A TupleList's shape is in the schema: its slots repeat for the whole value, so the item
+    // index picks the slot modulo the slot count. A tag without slots, or an untyped slot, has no
+    // completion source.
     private IReadOnlyList<ValueProposal> TupleListProposals(TagValueCompletionContext ctx)
     {
-        if (ctx.TagDef!.ValidationOverride?.ValidationId != "context-name-pair")
+        var tag = ctx.TagDef!;
+        return tag.Slots.Count == 0 ? [] : SlotProposals(ctx, tag.Slots[ctx.TupleSlotIndex % tag.Slots.Count]);
+    }
+
+    // The engine drops a value whose first item is no key, so the first item proposes keys alone.
+    // Any later item may start a new group or join the current one - an item is a key when it IS
+    // one - so both are offered.
+    private IReadOnlyList<ValueProposal> ListMapProposals(TagValueCompletionContext ctx)
+    {
+        var tag = ctx.TagDef!;
+        if (tag.Slots.Count != 2)
             return [];
 
-        return ctx.TupleSlotIndex switch
+        var keys = SlotProposals(ctx, tag.Slots[0]);
+        return ctx.TupleSlotIndex == 0 ? keys : [.. keys, .. SlotProposals(ctx, tag.Slots[1])];
+    }
+
+    private IReadOnlyList<ValueProposal> SlotProposals(TagValueCompletionContext ctx, TupleSlotDefinition slot)
+    {
+        var tag = ctx.TagDef!;
+        switch (slot.ReferenceKind)
         {
-            0 => [],
-            _ => ObjectReference(ctx, "MusicEvent")
-        };
+            case ReferenceKind.Enum when slot.Enum is not null:
+                var enumTag = new XmlTagDefinition
+                {
+                    Tag = tag.Tag, ValueType = XmlValueType.DynamicEnumValue,
+                    ReferenceKind = ReferenceKind.Enum, Enum = slot.Enum
+                };
+                return _proposals.GetProposals(XmlValueType.DynamicEnumValue, enumTag, ctx.PartialValue);
+            case ReferenceKind.ModelFile or ReferenceKind.TextureFile or ReferenceKind.AudioFile
+                or ReferenceKind.MapFile:
+                var assetTag = new XmlTagDefinition
+                {
+                    Tag = tag.Tag, ValueType = tag.ValueType, ReferenceKind = slot.ReferenceKind
+                };
+                return _completionRegistry.GetProposals(assetTag, ctx.PartialValue, ctx.Index);
+            case ReferenceKind.XmlObject when (slot.ObjectType?.TypeName ?? slot.ReferenceTypeName) is { } type:
+                return ObjectReference(ctx, type);
+            default:
+                return [];
+        }
     }
 
     private IReadOnlyList<ValueProposal> EnumValues(TagValueCompletionContext ctx, string enumName)

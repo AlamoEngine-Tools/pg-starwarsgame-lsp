@@ -20,7 +20,7 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 ///     <para>
 ///         That is wider than any current user needs. All of them replace the SHAPE check for a
 ///         tag whose declared type does not describe it - a <c>TupleList</c> that is really one
-///         pair, a <c>PerFactionObjectList</c> with its own grammar - and none of them wants to
+///         pair - and none of them wants to
 ///         switch off reference checking. It costs nothing today because no tag using
 ///         <c>replace</c> carries a <c>referenceKind</c> or <c>allowedValues</c>, so there is
 ///         nothing for the wider scope to drop.
@@ -35,8 +35,9 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 public sealed class EawSchemaReplaceOverrideScopeTest
 {
     /// <summary>
-    ///     The four users as of this writing, pinned by name so the next one is a deliberate
-    ///     addition rather than something that arrives unnoticed.
+    ///     The users as of this writing, pinned by name so the next one is a deliberate addition
+    ///     rather than something that arrives unnoticed. <c>Presence_Induced_Animations</c> left the
+    ///     list when its type became a <c>ListMap</c>: its slots say what its named grammar did.
     /// </summary>
     [Fact]
     public void Replace_is_used_by_exactly_the_tags_we_have_checked()
@@ -45,8 +46,7 @@ public sealed class EawSchemaReplaceOverrideScopeTest
             [
                 "Land_Terrain_Model_Mapping",
                 "Music_Event_List_Ambient",
-                "Music_Event_List_Battle",
-                "Presence_Induced_Animations"
+                "Music_Event_List_Battle"
             ],
             ReplaceTags().Select(t => t.Tag.Tag).Order(StringComparer.Ordinal).ToArray());
     }

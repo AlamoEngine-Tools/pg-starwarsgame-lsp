@@ -15,7 +15,7 @@
 
 import * as vscode from 'vscode';
 
-import { readPanelLayout, savePanelSize } from './panelLayoutStorage';
+import {readPanelLayout, savePanelSize} from './panelLayoutStorage';
 
 /** What makes one panel different from another. */
 export interface WebviewPanelSpec {
@@ -91,7 +91,7 @@ export abstract class WebviewPanelHost {
             {
                 enableScripts: true,
                 retainContextWhenHidden: true,
-                ...(spec.enableFindWidget ? { enableFindWidget: true } : {}),
+                ...(spec.enableFindWidget ? {enableFindWidget: true} : {}),
                 localResourceRoots,
             });
 
@@ -99,7 +99,7 @@ export abstract class WebviewPanelHost {
             // An adopted panel arrives with scripts disabled and no roots. retainContextWhenHidden
             // is NOT settable here - it is a creation option, so a custom editor declares it in its
             // registration instead.
-            this.panel.webview.options = { enableScripts: true, localResourceRoots };
+            this.panel.webview.options = {enableScripts: true, localResourceRoots};
         }
 
         const scriptUri = this.panel.webview.asWebviewUri(
@@ -117,13 +117,17 @@ export abstract class WebviewPanelHost {
             // no subclass has an opinion about it, and five identical cases in five switches is
             // exactly the duplication this class exists to prevent.
             if (msg.type === 'setPanelLayout') {
-                const { key, value } = msg as { key?: unknown; value?: unknown };
+                const {key, value} = msg as { key?: unknown; value?: unknown };
                 if (typeof key === 'string' && typeof value === 'number') {
                     savePanelSize(key, value);
                 }
                 return;
             }
-            void this.onMessage(msg);
+            // Caught here, once, because a rejected handler used to vanish: the hand-off button
+            // "did nothing" and nothing anywhere said why.
+            Promise.resolve(this.onMessage(msg)).catch((error: unknown) => {
+                console.error(`EaWEdit: Webview message '${msg.type}' failed`, error);
+            });
         });
     }
 
@@ -146,6 +150,7 @@ export abstract class WebviewPanelHost {
 /** A message from a webview: a tagged union the subclass switches on. */
 export interface WebviewMessage {
     type: string;
+
     [key: string]: unknown;
 }
 
@@ -180,7 +185,9 @@ export class PanelRegistry<T extends WebviewPanelHost> {
 
     disposeAll(): void {
         // Copied first: disposing runs the hook that mutates the map.
-        for (const panel of this.all) { panel.dispose(); }
+        for (const panel of this.all) {
+            panel.dispose();
+        }
     }
 }
 

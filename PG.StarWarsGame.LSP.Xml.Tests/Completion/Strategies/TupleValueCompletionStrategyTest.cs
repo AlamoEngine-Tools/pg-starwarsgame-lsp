@@ -210,65 +210,148 @@ public sealed class TupleValueCompletionStrategyTest
         Assert.Null(proposals.LastTag);
     }
 
-    // ── TupleList (context-name-pair / context-name-list) ─────────────────────
+    // ── TupleList: proposals follow the tag's slots ───────────────────────────
+    //
+    // The validation id used to pick the proposals - music events for context-name-pair, nothing
+    // for context-name-list - so a terrain/model list completed nothing at all. The slots say what
+    // each item is, and the item index runs past 1 because a list alternates for its whole length.
+
+    private static readonly XmlTagDefinition MusicList = Tag("Music_Event_List_Ambient", XmlValueType.TupleList) with
+    {
+        Slots =
+        [
+            new TupleSlotDefinition { Label = "Context" },
+            new TupleSlotDefinition
+            {
+                Label = "Music event", ReferenceKind = ReferenceKind.XmlObject,
+                ObjectType = new GameObjectTypeDefinition { TypeName = "MusicEvent" }
+            }
+        ]
+    };
+
+    private static readonly XmlTagDefinition TerrainModel =
+        Tag("Land_Terrain_Model_Mapping", XmlValueType.TupleList) with
+        {
+            Slots =
+            [
+                new TupleSlotDefinition
+                {
+                    Label = "Terrain", ReferenceKind = ReferenceKind.Enum,
+                    Enum = new EnumDefinition
+                    {
+                        Name = "TerrainType", Kind = EnumKind.SchemaFixed,
+                        Values = [new EnumValueDefinition { Name = "TEMPERATE" }]
+                    }
+                },
+                new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }
+            ]
+        };
 
     [Fact]
-    public void TupleList_ContextNamePair_Slot0_ReturnsNoCompletions()
+    public void TupleList_AnUntypedSlot_ProposesNothing()
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
-        var tag = Tag("Music_Event_List_Ambient", XmlValueType.TupleList,
-            new TagValidationOverride { ValidationId = "context-name-pair" });
 
-        var result = strategy.Handle(Ctx(tag, 0)).ToList();
-
-        Assert.Empty(result);
+        Assert.Empty(strategy.Handle(Ctx(MusicList, 0)));
         Assert.Null(completion.LastTag);
     }
 
     [Fact]
-    public void TupleList_ContextNamePair_Slot1_QueriesMusicEventReference()
+    public void TupleList_AnObjectSlot_ProposesThatObjectType()
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
-        var tag = Tag("Music_Event_List_Ambient", XmlValueType.TupleList,
-            new TagValidationOverride { ValidationId = "context-name-pair" });
 
-        strategy.Handle(Ctx(tag, 1)).ToList();
+        strategy.Handle(Ctx(MusicList, 1)).ToList();
 
         Assert.Equal("MusicEvent", completion.LastTag?.ObjectType?.TypeName);
     }
 
-    [Fact]
-    public void TupleList_ContextNameList_ReturnsNoCompletions()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public void TupleList_AnEnumSlot_ProposesItsValues_AllAlongTheList(int itemIndex)
+    {
+        var proposals = new CapturingProposalRegistry();
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), proposals, new CapturingCompletionRegistry());
+
+        var result = strategy.Handle(Ctx(TerrainModel, itemIndex)).ToList();
+
+        Assert.Equal("TerrainType", proposals.LastTag?.Enum?.Name);
+        Assert.Contains(result, c => c.Label == "TEMPERATE");
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void TupleList_AModelSlot_AsksForModelFiles(int itemIndex)
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
-        var tag = Tag("Land_Terrain_Model_Mapping", XmlValueType.TupleList,
-            new TagValidationOverride { ValidationId = "context-name-list" });
 
-        var result0 = strategy.Handle(Ctx(tag, 0)).ToList();
-        var result1 = strategy.Handle(Ctx(tag, 1)).ToList();
+        strategy.Handle(Ctx(TerrainModel, itemIndex)).ToList();
 
-        Assert.Empty(result0);
-        Assert.Empty(result1);
-        Assert.Null(completion.LastTag);
+        Assert.Equal(ReferenceKind.ModelFile, completion.LastTag?.ReferenceKind);
+    }
+
+    // ── ListMap: the first item is a key; any later one may be a key or an item ─
+
+    private static readonly XmlTagDefinition Buildables =
+        Tag("Tactical_Buildable_Objects_Multiplayer", XmlValueType.ListMap) with
+        {
+            Slots =
+            [
+                new TupleSlotDefinition
+                {
+                    Label = "Faction", ReferenceKind = ReferenceKind.XmlObject,
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
+                },
+                new TupleSlotDefinition
+                {
+                    Label = "Object", ReferenceKind = ReferenceKind.XmlObject,
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
+                }
+            ]
+        };
+
+    [Fact]
+    public void ListMap_TheFirstItem_ProposesKeysOnly()
+    {
+        // The engine drops a value that does not start with a key, so nothing else belongs there.
+        var completion = new CapturingCompletionRegistry();
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+
+        strategy.Handle(Ctx(Buildables, 0)).ToList();
+
+        Assert.Equal(["Faction"], completion.Asked.Select(t => t.ObjectType?.TypeName));
     }
 
     [Fact]
-    public void TupleList_NoValidationOverride_ReturnsNoCompletions()
+    public void ListMap_ALaterItem_ProposesKeysAndItems()
     {
         var completion = new CapturingCompletionRegistry();
         var strategy =
             new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
-        var tag = Tag("Music_Events", XmlValueType.TupleList);
 
-        var result = strategy.Handle(Ctx(tag, 0)).ToList();
+        strategy.Handle(Ctx(Buildables, 3)).ToList();
 
-        Assert.Empty(result);
+        Assert.Equal(["Faction", "GameObjectType"], completion.Asked.Select(t => t.ObjectType?.TypeName));
+    }
+
+    [Fact]
+    public void TupleList_WithoutSlots_ProposesNothing()
+    {
+        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(),
+            new CapturingCompletionRegistry());
+
+        Assert.Empty(strategy.Handle(Ctx(Tag("Music_Events", XmlValueType.TupleList), 1)));
     }
 
     // ── gating ─────────────────────────────────────────────────────────────────
@@ -375,9 +458,11 @@ public sealed class TupleValueCompletionStrategyTest
     {
         public XmlTagDefinition? LastTag { get; private set; }
         public string? LastPartialValue { get; private set; }
+        public List<XmlTagDefinition> Asked { get; } = [];
 
         public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex index)
         {
+            Asked.Add(tag);
             LastTag = tag;
             LastPartialValue = partialValue;
             return [];

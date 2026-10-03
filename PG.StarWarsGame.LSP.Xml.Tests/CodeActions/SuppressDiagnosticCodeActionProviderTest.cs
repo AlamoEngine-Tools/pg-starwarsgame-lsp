@@ -70,7 +70,8 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
     [Fact]
     public void AllFourScopes_AreOffered()
     {
-        var titles = Actions("aetswg-004-0001").Select(a => a.Title).ToList();
+        // The two report actions follow the suppressions; this pins the suppressions alone.
+        var titles = Actions("aetswg-004-0001").Select(a => a.Title).Where(t => t.StartsWith("Suppress")).ToList();
 
         Assert.Equal(4, titles.Count);
         Assert.Contains(titles, t => t.Contains("this line"));
@@ -142,7 +143,8 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
     [Fact]
     public void DiagnosticOutsideAnyObject_OmitsTheObjectScope()
     {
-        var titles = Actions("aetswg-004-0001", 0).Select(a => a.Title).ToList();
+        var titles = Actions("aetswg-004-0001", 0).Select(a => a.Title).Where(t => t.StartsWith("Suppress"))
+            .ToList();
 
         Assert.Equal(3, titles.Count);
         Assert.DoesNotContain(titles, t => t.Contains("<Unit>"));

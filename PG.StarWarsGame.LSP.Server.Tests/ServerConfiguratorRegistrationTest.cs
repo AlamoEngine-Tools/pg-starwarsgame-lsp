@@ -8,6 +8,8 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.Files.MEG.Services;
 using PG.StarWarsGame.Files.MTD.Services;
 using PG.StarWarsGame.LSP.Server.Assets;
+using PG.StarWarsGame.LSP.Server.Icons;
+using PG.StarWarsGame.LSP.Server.Status;
 using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Symbols;
@@ -151,6 +153,38 @@ public sealed class ServerConfiguratorRegistrationTest
         Assert.NotNull(ActivatorUtilities.CreateInstance<GetPreviewSceneHandler>(provider));
         Assert.NotNull(ActivatorUtilities.CreateInstance<GetModelGlbHandler>(provider));
         Assert.NotNull(ActivatorUtilities.CreateInstance<GetModelTextureHandler>(provider));
+        Assert.NotNull(ActivatorUtilities.CreateInstance<ListModelsHandler>(provider));
+    }
+
+    [Fact]
+    public void ServerStatusHandler_Resolves()
+    {
+        using var provider = BuildProviderWithHostStubs();
+
+        Assert.NotNull(ActivatorUtilities.CreateInstance<GetServerStatusHandler>(provider));
+    }
+
+    /// <summary>
+    ///     The two loaders are built by hand-written factories, which is exactly where a new
+    ///     constructor argument goes missing without failing anything: the parameter is optional, so
+    ///     the server starts and the bug report simply says "NotLoaded" for ever.
+    /// </summary>
+    [Fact]
+    public void Loaders_ShareTheOneStatusRecorder()
+    {
+        using var provider = BuildProviderWithHostStubs();
+        var recorder = provider.GetRequiredService<ServerStatusRecorder>();
+
+        Assert.Same(recorder, RecorderOf(provider.GetRequiredService<BaselineLoader>()));
+        Assert.Same(recorder, RecorderOf(provider.GetRequiredService<IconPackLoader>()));
+    }
+
+    private static object? RecorderOf(object loader)
+    {
+        return loader.GetType()
+            .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .Single(f => f.FieldType == typeof(ServerStatusRecorder))
+            .GetValue(loader);
     }
 
     /// <summary>

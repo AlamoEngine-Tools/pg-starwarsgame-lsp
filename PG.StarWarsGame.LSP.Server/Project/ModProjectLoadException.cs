@@ -10,8 +10,16 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 /// </summary>
 public sealed class ModProjectLoadException : Exception
 {
-    public ModProjectLoadException(string message, Exception? innerException = null)
+    public ModProjectLoadException(string message, Exception? innerException = null,
+        ProjectProblem problem = ProjectProblem.Invalid)
         : base(message, innerException)
     {
+        Problem = problem;
     }
+
+    /// <summary>
+    ///     What went wrong, as a category. The message names the file and its path; this is the part
+    ///     a bug report can carry.
+    /// </summary>
+    public ProjectProblem Problem { get; }
 }

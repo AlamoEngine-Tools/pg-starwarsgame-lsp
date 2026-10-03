@@ -348,6 +348,26 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 
 ---
 
+## Building from source
+
+**git, the .NET 10 SDK and Node.js.** The server builds against sibling repositories listed in `workspace.deps`; the setup script clones them next to this repo.
+
+```
+git clone https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp.git PG.StarWarsGame.LSP
+cd PG.StarWarsGame.LSP
+./setup-workspace.sh            # or: pwsh ./setup-workspace.ps1
+dotnet build PG.StarWarsGame.LSP.slnx
+```
+
+- **Back in sync** - the same command: fast-forwards this repo and the owned repos (`schema/`, `baseline/`) on their default branch, moves ModVerify and PetroglyphTools to their pinned commits
+  - A repo with uncommitted changes or on another branch is left alone and reported
+- **State without changes** - `./setup-workspace.sh check`
+- **E2E data** - `--groups build,e2e` adds `baseline/`; the game files in `eaw/` and `foc/` are not distributable
+- **Cross-repo changes** - a schema or baseline branch named like the LSP branch; CI on the pull request builds against it
+- **External update** - the wanted commit checked out in `../ModVerify` or `../PetroglyphTools`, then `./setup-workspace.sh record` and a commit of `workspace.deps`
+
+---
+
 ## Issues
 
 [AlamoEngine-Tools/pg-starwarsgame-lsp/issues](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues)

@@ -20,6 +20,13 @@ import {EncyclopediaPanel} from './encyclopediaPanel';
 import {ModelPreviewEditorProvider} from './modelPreviewEditor';
 import {ModelInspectorPanel} from './modelInspectorPanel';
 import {ModelPreviewPanel} from './modelPreviewPanel';
+import {type ModelPickItem, modelPickItems, pickedModelName} from './modelPicker';
+import {type ListModelsResult} from './protocol/modelPreview';
+import {type ServerStatus} from './protocol/serverStatus';
+import {
+    type BugReportClientInfo, type BugReportOptions, flattenFlags, formatBugReport, formatExtendedStats,
+} from './bugReport';
+import {type DiagnosticReportPayload, editorReport, gitHubIssue} from './diagnosticReport';
 import {offerShaderSources, shaderDirectory} from './shaderSources';
 import {initDialogGeometryStorage} from './dialogGeometryStorage';
 import {initPanelLayoutStorage} from './panelLayoutStorage';
@@ -341,9 +348,8 @@ function gameDirectory(name: 'baseGameDirectory' | 'expansionDirectory'): string
 /**
  * Builds the complete resolved feature-flag object sent to the server via initializationOptions.
  * The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults everything to
- * true; the user-facing off-defaults (lua.hover, lua.diagnostics, tools.localisation,
- * story.discovery, tools.storySimulator) live in package.json, so the fallbacks here must mirror
- * package.json. Flags are restart-based: the config listener in activate() restarts the server when
+ * true; the user-facing defaults, including every flag that is off out of the box, live in
+ * package.json, so the fallbacks here must mirror package.json. Flags are restart-based: the config listener in activate() restarts the server when
  * any `aet-eaw-edit.features` value changes.
  */
 function resolveFeatureFlags() {
@@ -827,6 +833,140 @@ function killServer(child: ChildProcess | undefined): void {
     child.kill('SIGKILL');
 }
 
+/**
+ * The basic bug report block: what the client knows about itself, plus the server's own status
+ * when it is running. Outcomes only - no path and no project name - because it goes into public
+ * issues.
+ */
+async function collectBugReport(
+    context: vscode.ExtensionContext, gateway: LspGateway, options: BugReportOptions = {},
+): Promise<string> {
+    const {client, server} = await reportInputs(context, gateway, options.extended === true);
+    return formatBugReport(client, server, options);
+}
+
+/** What the client knows about itself, and the server's status when it is running. */
+async function reportInputs(
+    context: vscode.ExtensionContext, gateway: LspGateway, extended: boolean,
+): Promise<{ client: BugReportClientInfo; server: ServerStatus | null }> {
+    const client: BugReportClientInfo = {
+        extensionVersion: String(context.extension.packageJSON.version ?? 'unknown'),
+        vscodeVersion: vscode.version,
+        os: `${process.platform} ${process.arch}`,
+        workspaceFolders: vscode.workspace.workspaceFolders?.length ?? 0,
+        workspaceFile: vscode.workspace.workspaceFile !== undefined,
+        featureFlags: flattenFlags(resolveFeatureFlags()),
+    };
+
+    const status = gateway.isRunning
+        ? await gateway.request<ServerStatus>('aet/getServerStatus', {extended})
+        : undefined;
+
+    return {client, server: status?.ok ? status.value : null};
+}
+
+/**
+ * Basic or basic plus extended stats - asked every time rather than remembered, because the
+ * extended counts describe the project's shape and sharing them is a choice made per report.
+ * Undefined when dismissed.
+ */
+async function pickReportTier(title: string): Promise<{ extended: boolean } | undefined> {
+    return vscode.window.showQuickPick([
+        {label: 'Basic info', description: 'Versions, sources and workspace checks', extended: false},
+        {label: 'Basic + extended stats', description: 'Adds dependency, index and asset counts', extended: true},
+    ], {title, placeHolder: 'What to include'});
+}
+
+/**
+ * Opens a prefilled GitHub issue for one diagnostic. The author reviews and submits it in the
+ * browser; nothing is posted from here, which is why no login is needed.
+ */
+async function reportDiagnosticOnGitHub(
+    context: vscode.ExtensionContext, gateway: LspGateway, report: DiagnosticReportPayload,
+): Promise<void> {
+    const tier = await pickReportTier(`Report ${report.id} on GitHub`);
+    if (!tier) {
+        return;
+    }
+
+    const {client, server} = await reportInputs(context, gateway, tier.extended);
+    // The per-type symbol list stays out: it runs to dozens of lines and the prefill is capped.
+    const extended = tier.extended && server?.extended ? formatExtendedStats(server.extended, false) : null;
+    const issue = gitHubIssue(report, formatBugReport(client, server), extended);
+
+    if (!issue.fits) {
+        const choice = await vscode.window.showWarningMessage(
+            `EaWEdit: The report for ${report.id} is too long to prefill an issue`, 'Open report in editor');
+        if (choice === 'Open report in editor') {
+            await openDiagnosticReport(context, gateway, report, tier);
+        }
+        return;
+    }
+
+    await vscode.env.openExternal(vscode.Uri.parse(issue.url));
+
+    if (issue.trimmed.length > 0) {
+        const left = issue.trimmed.map(t => t === 'extended' ? 'extended stats' : 'part of the basic info');
+        const choice = await vscode.window.showInformationMessage(
+            `EaWEdit: Issue prefill shortened - ${left.join(' and ')} left out`, 'Open full report');
+        if (choice === 'Open full report') {
+            await openDiagnosticReport(context, gateway, report, tier);
+        }
+    }
+}
+
+/** The same report, untrimmed, in an untitled Markdown tab - for pasting anywhere. */
+async function openDiagnosticReport(
+    context: vscode.ExtensionContext, gateway: LspGateway, report: DiagnosticReportPayload,
+    chosen?: { extended: boolean },
+): Promise<void> {
+    const tier = chosen ?? await pickReportTier(`Open report for ${report.id}`);
+    if (!tier) {
+        return;
+    }
+
+    const {client, server} = await reportInputs(context, gateway, tier.extended);
+    const full = formatBugReport(client, server, {extended: tier.extended, symbolTypes: tier.extended});
+    const document = await vscode.workspace.openTextDocument({
+        language: 'markdown',
+        content: editorReport(report, full),
+    });
+    await vscode.window.showTextDocument(document);
+}
+
+/**
+ * Asks which model to preview, from every model the project can reach - its own, its dependencies'
+ * and the base game's - so a model that is not in the explorer can be found without its name.
+ *
+ * A QuickPick that also accepts what was typed: the list is the asset catalog, and a model saved a
+ * moment ago may not be in it yet.
+ */
+async function pickModel(gateway: LspGateway): Promise<string | null> {
+    const result = await gateway.requestOrReport<ListModelsResult>(
+        'aet/listModels', {}, 'Could not list models');
+    if (!result) {
+        return null;
+    }
+
+    const pick = vscode.window.createQuickPick<ModelPickItem>();
+    pick.title = 'Preview Model';
+    pick.placeholder = 'Model file name, e.g. EV_StarDestroyer.ALO';
+    pick.matchOnDescription = true;
+    pick.items = modelPickItems(result.models);
+
+    const name = await new Promise<string | null>(resolve => {
+        pick.onDidAccept(() => {
+            resolve(pickedModelName(pick.activeItems[0], pick.value));
+            pick.hide();
+        });
+        pick.onDidHide(() => resolve(null));
+        pick.show();
+    });
+
+    pick.dispose();
+    return name;
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 
     // Per project, not per machine: where a dialog belongs depends on the mod being edited.
@@ -1202,6 +1342,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
     statusItem.tooltip = CLIENT_NAME;
+    // The one place every state of the server is shown, so it is where a report starts.
+    statusItem.command = {command: 'aet-eaw-edit.copyBugReportInfo', title: 'Copy bug report info'};
     context.subscriptions.push(statusItem);
 
     log = vscode.window.createOutputChannel('EaWEdit');
@@ -1509,6 +1651,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // a setting would leave those files opening as binary with no hint why.
     context.subscriptions.push(ModelPreviewEditorProvider.register(context, lsp));
 
+    // The bug report block. Works with the server down too - "not running" is itself the most
+    // useful thing a report can say - so it asks rather than requiring a running server.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('aet-eaw-edit.copyBugReportInfo', async () => {
+            const tier = await pickReportTier('Copy Bug Report Info');
+            if (!tier) {
+                return;
+            }
+
+            // The clipboard has no size limit, so the extended copy carries the per-type list too.
+            const text = await collectBugReport(context, lsp,
+                tier.extended ? {extended: true, symbolTypes: true} : {});
+            await vscode.env.clipboard.writeText(text);
+            void vscode.window.showInformationMessage('EaWEdit: Bug report info copied');
+        }));
+
+    // The two report actions every diagnostic offers beside its suppressions. Client commands the
+    // server only names: the version, the clipboard and the browser are all on this side.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('aet-eaw-edit.reportDiagnosticOnGitHub',
+            (report: DiagnosticReportPayload) => reportDiagnosticOnGitHub(context, lsp, report)),
+        vscode.commands.registerCommand('aet-eaw-edit.openDiagnosticReport',
+            (report: DiagnosticReportPayload) => openDiagnosticReport(context, lsp, report)));
+
     context.subscriptions.push(
         vscode.commands.registerCommand('aet-eaw-edit.lsp.previewModel',
             async (referenceArg?: string) => {
@@ -1516,19 +1682,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                     return;
                 }
 
-                let reference = referenceArg;
-                if (!reference) {
-                    reference = await vscode.window.showInputBox({
-                        title: 'Preview Model',
-                        prompt: 'Model file name, e.g. EV_StarDestroyer.ALO',
-                        validateInput: v => (v?.trim() ? null : 'Model name is required'),
-                    });
-                }
-                if (!reference?.trim()) {
+                const name = referenceArg?.trim() || await pickModel(lsp);
+                if (!name) {
                     return;
                 }
 
-                const name = reference.trim();
                 ModelPreviewPanel.show(context.extensionUri, lsp,
                     {kind: 'model', modelReference: name}, name);
             }));

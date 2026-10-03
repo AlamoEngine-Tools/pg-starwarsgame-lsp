@@ -11,43 +11,22 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// <summary>
 ///     Base for handlers that warn when an asset-file reference (texture, model, audio, map) does
 ///     not resolve against the merged <see cref="IAssetFileIndex" /> on the
-///     <see cref="DiagnosticsContext.Index" />. Gates on <see cref="TargetKind" />; subclasses supply
-///     the <see cref="ReferenceKind" />, the user-facing <see cref="AssetNoun" /> and the allowed
-///     extensions (so a bare filename can be matched against full catalog paths of the right type).
+///     <see cref="DiagnosticsContext.Index" />. Gates on <see cref="TargetKind" />; what satisfies a
+///     name of that kind, and what a missing one costs, comes from <see cref="AssetKindRules" /> -
+///     the same rules an asset item of a tuple is checked by.
 /// </summary>
 public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlTagValueFact>
 {
     protected abstract ReferenceKind TargetKind { get; }
-    protected abstract string AssetNoun { get; }
-    protected abstract IReadOnlyList<string> AllowedExtensions { get; }
 
-    /// <summary>
-    ///     Extensions the engine treats as ONE asset: a reference to any of them is satisfied by a
-    ///     file with any other (textures: a .tga reference falls back to the .dds and vice versa;
-    ///     the TGA wins at runtime when both exist). Empty = exact-extension matching only.
-    /// </summary>
-    protected virtual IReadOnlyList<string> InterchangeableExtensions => [];
+    private AssetKindRule Rule => AssetKindRules.For(TargetKind)
+                                  ?? throw new InvalidOperationException($"{TargetKind} names no asset kind.");
 
-    /// <summary>
-    ///     Whether art packed into a mega texture satisfies this reference.
-    /// </summary>
-    /// <remarks>
-    ///     Off by default, and deliberately narrow. A mega texture holds GUI art and nothing else,
-    ///     so excusing a model, a sound or a map because a <c>.mtd</c> happens to name something
-    ///     similar would turn a real missing-asset warning into silence.
-    /// </remarks>
-    protected virtual bool ResolvesFromMegaTexture => false;
-
-    /// <summary>
-    ///     How badly the game takes this asset going missing. Warning by default, because most
-    ///     missing art degrades what the player sees and the game still runs.
-    /// </summary>
-    /// <remarks>
-    ///     Per asset kind rather than one severity for all of them, because the engine does not treat
-    ///     them alike: a missing model is drawn as nothing, while a missing map ends the load. See
-    ///     <see cref="MapFileExistenceHandler" /> for the measured branch.
-    /// </remarks>
-    protected virtual XmlDiagnosticSeverity MissingSeverity => XmlDiagnosticSeverity.Warning;
+    private string AssetNoun => Rule.Noun;
+    private IReadOnlyList<string> AllowedExtensions => Rule.AllowedExtensions;
+    private IReadOnlyList<string> InterchangeableExtensions => Rule.InterchangeableExtensions;
+    private bool ResolvesFromMegaTexture => Rule.ResolvesFromMegaTexture;
+    private XmlDiagnosticSeverity MissingSeverity => Rule.MissingSeverity;
 
     protected sealed override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {

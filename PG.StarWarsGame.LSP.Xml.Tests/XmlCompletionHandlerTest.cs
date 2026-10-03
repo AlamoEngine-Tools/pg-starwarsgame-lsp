@@ -1244,8 +1244,10 @@ public sealed class XmlCompletionHandlerTest
     }
 
     [Fact]
-    public async Task Handle_TupleList_ContextNamePair_Slot1_OffersMusicEventReference()
+    public async Task Handle_TupleList_PastTheFirstPair_StillFollowsTheSlots()
     {
+        // The item index used to clamp at 1, which is right for a fixed two-part tuple and wrong for
+        // a list that repeats its slots: the third item is a context again, not a music event.
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("Faction"));
         var capturing = new CapturingCompletionRegistry();
@@ -1255,17 +1257,66 @@ public sealed class XmlCompletionHandlerTest
         schema.AddTagForType("Faction", new XmlTagDefinition
         {
             Tag = "Music_Event_List_Ambient", ValueType = XmlValueType.TupleList, MultipleAllowed = true,
-            ValidationOverride = new TagValidationOverride { ValidationId = "context-name-pair" }
+            Slots =
+            [
+                new TupleSlotDefinition { Label = "Context" },
+                new TupleSlotDefinition
+                {
+                    Label = "Music event", ReferenceKind = ReferenceKind.XmlObject,
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "MusicEvent" }
+                }
+            ]
         });
 
+        const string pair = "<Music_Event_List_Ambient>Space, ";
+        const string third = "<Music_Event_List_Ambient>Space, Ambient_A, ";
         host.AddOrUpdate(TestUri.ToString(),
-            "<Root>\n<Faction Name=\"X\">\n<Music_Event_List_Ambient>Space, </Music_Event_List_Ambient>\n</Faction>\n</Root>",
-            1);
+            $"<Root>\n<Faction Name=\"X\">\n{third}</Music_Event_List_Ambient>\n</Faction>\n</Root>", 1);
 
-        // "<Music_Event_List_Ambient>Space, " is 33 chars - cursor right after the comma+space.
-        await handler.Handle(At(2, 33), CancellationToken.None);
-
+        await handler.Handle(At(2, pair.Length), CancellationToken.None);
         Assert.Equal("MusicEvent", capturing.LastTagDef?.ObjectType?.TypeName);
+
+        capturing.LastTagDef = null;
+        await handler.Handle(At(2, third.Length), CancellationToken.None);
+        Assert.Null(capturing.LastTagDef?.ObjectType);
+    }
+
+    [Fact]
+    public async Task Handle_ListMap_PastTheFirstItem_ReachesTheSlots()
+    {
+        // A ListMap tag carries no referenceKind of its own - its slots do - so unless the type
+        // counts as a tuple, the handler decides there is nothing to complete.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("Unit"));
+        var capturing = new CapturingCompletionRegistry();
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
+        schema.AddTagForType("Unit", new XmlTagDefinition
+        {
+            Tag = "Tactical_Buildable_Objects_Multiplayer", ValueType = XmlValueType.ListMap, MultipleAllowed = true,
+            Slots =
+            [
+                new TupleSlotDefinition
+                {
+                    Label = "Faction", ReferenceKind = ReferenceKind.XmlObject,
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
+                },
+                new TupleSlotDefinition
+                {
+                    Label = "Object", ReferenceKind = ReferenceKind.XmlObject,
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
+                }
+            ]
+        });
+
+        const string open = "<Tactical_Buildable_Objects_Multiplayer>Empire, A, ";
+        host.AddOrUpdate(TestUri.ToString(),
+            $"<Root>\n<Unit Name=\"X\">\n{open}</Tactical_Buildable_Objects_Multiplayer>\n</Unit>\n</Root>", 1);
+
+        await handler.Handle(At(2, open.Length), CancellationToken.None);
+
+        Assert.Equal("GameObjectType", capturing.LastTagDef?.ObjectType?.TypeName);
     }
 
     // ── boneName completions ──────────────────────────────────────────────────
@@ -1465,7 +1516,7 @@ public sealed class XmlCompletionHandlerTest
 
     private sealed class CapturingCompletionRegistry : IXmlCompletionRegistry
     {
-        public XmlTagDefinition? LastTagDef { get; private set; }
+        public XmlTagDefinition? LastTagDef { get; set; }
         public string? LastPartialValue { get; private set; }
 
         public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex index)

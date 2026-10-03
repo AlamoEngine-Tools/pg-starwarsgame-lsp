@@ -305,6 +305,115 @@ public sealed class XmlDocumentFactProducerTest
         Assert.Equal(XmlValueType.NameReferenceList, tvf.Tag.ValueType);
     }
 
+    /// <summary>
+    ///     A type container's object elements are mostly NOT named after the schema type:
+    ///     GameObjectType files hold <c>&lt;GroundInfantry&gt;</c>, <c>&lt;SpaceUnit&gt;</c> and 44 more,
+    ///     TerrainDecalFX files hold <c>&lt;Decal&gt;</c>. Such an object still belongs to the
+    ///     container's type, so its tags must resolve through that type - with the restrictions the
+    ///     type states. Walked without a context they reached the flat fallback, which drops every
+    ///     owner restriction, and <c>Land_Terrain_Model_Mapping</c> lost its replace override and
+    ///     was checked as a music-event list.
+    /// </summary>
+    [Theory]
+    [InlineData("GameObjectType", "GroundInfantry")]
+    [InlineData("GameObjectType", "SpaceUnit")]
+    [InlineData("TerrainDecalFX", "Decal")]
+    public void Object_element_not_named_after_its_type_resolves_through_the_container_type(
+        string containerType, string element)
+    {
+        var xml = $"<Root><{element} Name=\"X\"><Restricted_Tag>a, b</Restricted_Tag></{element}></Root>";
+
+        var facts = Build(new ContainerOverrideSchemaProvider(), new FixedFileTypeRegistry(containerType))
+            .Produce(xml, GameObjectUri);
+
+        var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
+        Assert.Equal("container-rule", tvf.Tag.ValidationOverride?.ValidationId);
+    }
+
+    // ── typed tuple slots ─────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Each enum or model item of a slotted value becomes a fact of its own, positioned on the
+    ///     item. A fact of its own because every tag that has slots today uses <c>mode: replace</c>,
+    ///     which discards the default value handlers - and with them any check hung off the tag
+    ///     value's fact.
+    /// </summary>
+    [Fact]
+    public void SlottedValue_EmitsAFactPerTypedItem_OnTheItem()
+    {
+        const string xml = "<Root>\n<Pairs>\n  Temperate, A.ALO,\n  Urban, B.ALO\n</Pairs>\n</Root>";
+
+        var slots = Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlTupleSlotFact>().ToList();
+
+        Assert.Equal(["Temperate", "A.ALO", "Urban", "B.ALO"], slots.Select(s => s.Value));
+        Assert.Equal(["Terrain", "Model", "Terrain", "Model"], slots.Select(s => s.Slot.Label));
+        var urban = slots[2];
+        Assert.Equal((3, 2, 5), (urban.Line, urban.Column, urban.Length));
+    }
+
+    [Fact]
+    public void SlottedValue_UntypedAndObjectItems_GetNoSlotFact()
+    {
+        // An untyped item is checked for nothing; an object item is a parser reference, resolved by
+        // the reference pipeline - a slot fact as well would report it twice.
+        const string xml = "<Root><Music>Space, Some_Event</Music></Root>";
+
+        Assert.Empty(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
+    }
+
+    [Fact]
+    public void SlottedValue_ATextureItem_GetsASlotFactToo()
+    {
+        const string xml = "<Root><Icons>Space, i_unit.tga</Icons></Root>";
+
+        var slot = Assert.Single(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
+
+        Assert.Equal("i_unit.tga", slot.Value);
+    }
+
+    // ── ListMap: one fact per object and tag, every occurrence in order ───────
+
+    /// <summary>
+    ///     Which item is a key needs the index, and whether a repeat continues the previous key needs
+    ///     every occurrence - so the producer hands the handler all of them, items positioned, and
+    ///     leaves the classifying to it.
+    /// </summary>
+    [Fact]
+    public void ListMap_EmitsOneFact_WithEveryOccurrenceAndItsPositionedItems()
+    {
+        const string xml = "<Root>\n<Map>Empire, A,\n  Rebel, B</Map>\n<Map>C</Map>\n</Root>";
+
+        var fact = Assert.Single(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlListMapFact>());
+
+        Assert.False(fact.IsVariant);
+        Assert.Equal(2, fact.Occurrences.Count);
+        Assert.Equal(["Empire", "A", "Rebel", "B"], fact.Occurrences[0].Items.Select(i => i.Text));
+        Assert.Equal((2, 2), (fact.Occurrences[0].Items[2].Line, fact.Occurrences[0].Items[2].Column));
+        Assert.Equal(["C"], fact.Occurrences[1].Items.Select(i => i.Text));
+        Assert.Equal(3, fact.Occurrences[1].Line);
+    }
+
+    [Fact]
+    public void ListMap_InAVariant_SaysSo()
+    {
+        const string xml =
+            "<Root>\n<Variant_Of_Existing_Type>Base</Variant_Of_Existing_Type>\n<Map>Empire, A</Map>\n</Root>";
+
+        var fact = Assert.Single(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlListMapFact>());
+
+        Assert.True(fact.IsVariant);
+    }
+
+    [Fact]
+    public void ListMap_AnAssetValueSlot_GetsNoTupleSlotFact()
+    {
+        // Which items are values is the ListMap handler's call; a slot fact per item would judge a
+        // key as a value.
+        const string xml = "<Root><ModelMap>Empire, A.ALO</ModelMap></Root>";
+
+        Assert.Empty(Build(new SlottedTagSchemaProvider()).Produce(xml, Uri).OfType<XmlTupleSlotFact>());
+    }
+
     // ── structural validation ─────────────────────────────────────────────────
 
     [Fact]
@@ -1055,6 +1164,183 @@ file sealed class GameObjectFileTypeRegistry : IFileTypeRegistry
     public ImmutableArray<string> GetTypesForFile(string _)
     {
         return ImmutableArray.Create("GameObjectType");
+    }
+
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+    {
+    }
+
+    public void UnregisterFile(string normalizedPath)
+    {
+    }
+}
+
+/// <summary>
+///     Two container types that both declare <c>Restricted_Tag</c> with a replace override. The
+///     flat map holds the same definition, as the real schema does, so only a lookup through the
+///     owning type keeps the override.
+/// </summary>
+file sealed class ContainerOverrideSchemaProvider : ISchemaProvider
+{
+    private static readonly XmlTagDefinition Restricted = new()
+    {
+        Tag = "Restricted_Tag", ValueType = XmlValueType.TupleList,
+        ValidationOverride = new TagValidationOverride
+            { ValidationId = "container-rule", Mode = ValidationOverrideMode.Replace }
+    };
+
+    private static readonly GameObjectTypeDefinition[] Types =
+    [
+        new() { TypeName = "GameObjectType", NameTag = "Name" },
+        new() { TypeName = "TerrainDecalFX", NameTag = "Name" }
+    ];
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return tagName.Equals(Restricted.Tag, StringComparison.OrdinalIgnoreCase) ? Restricted : null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    {
+        return Types.FirstOrDefault(t => t.TypeName.Equals(typeName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+    {
+        return GetObjectType(typeName) is null ? [] : [Restricted];
+    }
+
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => [Restricted];
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => Types;
+    public IReadOnlyList<EnumDefinition> AllEnums => [];
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
+}
+
+/// <summary>
+///     <c>Pairs</c>: a terrain enum then a model, the shape of <c>Land_Terrain_Model_Mapping</c>.
+///     <c>Music</c>: an untyped context then a music event object, the shape of the music lists.
+/// </summary>
+file sealed class SlottedTagSchemaProvider : ISchemaProvider
+{
+    private static readonly XmlTagDefinition Pairs = new()
+    {
+        Tag = "Pairs", ValueType = XmlValueType.TupleList,
+        Slots =
+        [
+            new TupleSlotDefinition
+            {
+                Label = "Terrain", ReferenceKind = ReferenceKind.Enum,
+                Enum = new EnumDefinition { Name = "TerrainType", Kind = EnumKind.SchemaFixed, Values = [] }
+            },
+            new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }
+        ]
+    };
+
+    private static readonly XmlTagDefinition Music = new()
+    {
+        Tag = "Music", ValueType = XmlValueType.TupleList,
+        Slots =
+        [
+            new TupleSlotDefinition { Label = "Context" },
+            new TupleSlotDefinition { Label = "Music event", ReferenceKind = ReferenceKind.XmlObject }
+        ]
+    };
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return AllTags.FirstOrDefault(t => t.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
+
+    private static readonly XmlTagDefinition Icons = new()
+    {
+        Tag = "Icons", ValueType = XmlValueType.TupleList,
+        Slots =
+        [
+            new TupleSlotDefinition { Label = "Context" },
+            new TupleSlotDefinition { Label = "Icon", ReferenceKind = ReferenceKind.TextureFile }
+        ]
+    };
+
+    private static readonly XmlTagDefinition Map = new()
+    {
+        Tag = "Map", ValueType = XmlValueType.ListMap, MultipleAllowed = true,
+        Slots =
+        [
+            new TupleSlotDefinition { Label = "Faction", ReferenceKind = ReferenceKind.XmlObject },
+            new TupleSlotDefinition { Label = "Object", ReferenceKind = ReferenceKind.XmlObject }
+        ]
+    };
+
+    private static readonly XmlTagDefinition ModelMap = Map with
+    {
+        Tag = "ModelMap",
+        Slots = [Map.Slots[0], new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }]
+    };
+
+    private static readonly XmlTagDefinition VariantOf = new()
+    {
+        Tag = "Variant_Of_Existing_Type", ValueType = XmlValueType.NameReference,
+        SemanticType = TagSemanticType.VariantParent
+    };
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => [Pairs, Music, Icons, Map, ModelMap, VariantOf];
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+    public IReadOnlyList<EnumDefinition> AllEnums => [];
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
+}
+
+file sealed class FixedFileTypeRegistry(string typeName) : IFileTypeRegistry
+{
+    public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
+        new Dictionary<string, ImmutableArray<string>>();
+
+    public ImmutableArray<string> GetTypesForFile(string _)
+    {
+        return ImmutableArray.Create(typeName);
     }
 
     public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
