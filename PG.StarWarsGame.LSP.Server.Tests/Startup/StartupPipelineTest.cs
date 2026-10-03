@@ -7,6 +7,7 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Startup;
 
@@ -16,7 +17,8 @@ public sealed class StartupPipelineTest
         Log log, IModProjectReloadService reloadService, IStartupGate gate,
         IPgprojMigrationOffer? migrationOffer = null,
         IEnumerable<IDiagnosticsRepublisher>? republishers = null,
-        bool workspaceDiagnosticsOnStartup = false)
+        bool workspaceDiagnosticsOnStartup = false,
+        ServerStatusRecorder? status = null)
     {
         return new StartupPipeline(
             new RecordingSchemaBootstrapper(log),
@@ -28,7 +30,36 @@ public sealed class StartupPipelineTest
             NullLogger<StartupPipeline>.Instance,
             migrationOffer,
             republishers,
-            new StubConfigurationProvider(workspaceDiagnosticsOnStartup));
+            new StubConfigurationProvider(workspaceDiagnosticsOnStartup),
+            status);
+    }
+
+    // ── what the bug report is told ──────────────────────────────────────────
+
+    [Fact]
+    public async Task RunAsync_RecordsIndexingAsBuildingUntilItFinishes()
+    {
+        var status = new ServerStatusRecorder();
+        Assert.Equal(StatusIndexState.Building, status.IndexState);
+
+        await Build(new Log(), new RecordingReloadService(new Log()), new RecordingGate(new Log()), status: status)
+            .RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(StatusIndexState.Complete, status.IndexState);
+        Assert.NotNull(status.IndexDuration);
+    }
+
+    // The pipeline swallows a stage failure so the gate always opens, which left "degraded" visible
+    // in the log alone - a report from that state looked like a healthy one with no symbols.
+    [Fact]
+    public async Task RunAsync_RecordsAFailedStage()
+    {
+        var status = new ServerStatusRecorder();
+
+        await Build(new Log(), new ThrowingReloadService(), new RecordingGate(new Log()), status: status)
+            .RunAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(StatusIndexState.Failed, status.IndexState);
     }
 
     private sealed class StubConfigurationProvider : ILspConfigurationProvider

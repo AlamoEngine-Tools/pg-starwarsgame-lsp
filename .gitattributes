@@ -1,2 +1,6 @@
 # Treat MessagePack index snapshots as binary - prevents diff noise if teams commit project caches
 *.msgpack binary
+
+# bash cannot run a script with CRLF line endings, and both setup scripts read the manifest
+*.sh text eol=lf
+workspace.deps text eol=lf

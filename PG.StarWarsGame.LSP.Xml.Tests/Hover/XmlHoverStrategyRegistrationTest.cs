@@ -49,7 +49,8 @@ public sealed class XmlHoverStrategyRegistrationTest
     [Fact]
     public void Registered_strategy_count_is_locked()
     {
-        const int expectedCount = 3;
+        // 3 -> 4: TupleSlotHoverStrategy, for the enum and model items of a slotted tuple value.
+        const int expectedCount = 4;
         Assert.Equal(expectedCount, RegisteredStrategyTypes().Count);
     }
 

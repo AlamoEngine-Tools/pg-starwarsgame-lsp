@@ -6,6 +6,7 @@ using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -14,12 +15,15 @@ public sealed class BaselineLoader
     private readonly IFileHelper _fileHelper;
     private readonly HttpClient _httpClient;
     private readonly ILogger<BaselineLoader> _logger;
+    private readonly ServerStatusRecorder? _status;
 
-    public BaselineLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<BaselineLoader> logger)
+    public BaselineLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<BaselineLoader> logger,
+        ServerStatusRecorder? status = null)
     {
         _httpClient = httpClient;
         _fileHelper = fileHelper;
         _logger = logger;
+        _status = status;
     }
 
     private string CacheDir => _fileHelper.FileSystem.Path.Combine(
@@ -28,12 +32,14 @@ public sealed class BaselineLoader
 
     public async Task<BaselineIndex> LoadAsync(BaselineSourceConfig config, CancellationToken ct)
     {
-        var baseline = await (config.Type switch
+        var (baseline, source) = await (config.Type switch
         {
             BaselineSourceType.Local => LoadLocalAsync(config.LocalPath, ct),
             BaselineSourceType.Http => LoadHttpAsync(config.Url, ct),
-            _ => Task.FromResult(BaselineIndex.Empty)
+            _ => Task.FromResult((BaselineIndex.Empty, StatusAssetSource.Empty))
         });
+
+        _status?.RecordBaseline(source);
 
         WarnIfWithoutBehaviors(baseline);
         return baseline;
@@ -56,17 +62,17 @@ public sealed class BaselineLoader
             baseline.Symbols.Count);
     }
 
-    private async Task<BaselineIndex> LoadLocalAsync(string? path, CancellationToken ct)
+    private async Task<(BaselineIndex, StatusAssetSource)> LoadLocalAsync(string? path, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(path))
-            return BaselineIndex.Empty;
+            return (BaselineIndex.Empty, StatusAssetSource.Empty);
 
         try
         {
             var bytes = await _fileHelper.FileSystem.File.ReadAllBytesAsync(path, ct);
             var baseline = BaselineSerializer.Deserialize(bytes);
             if (baseline is not null)
-                return baseline;
+                return (baseline, StatusAssetSource.Local);
             _logger.LogWarning("Baseline at '{Path}' is stale or incompatible; using empty baseline", path);
         }
         catch (Exception ex)
@@ -74,10 +80,10 @@ public sealed class BaselineLoader
             _logger.LogWarning(ex, "Failed to load local baseline from '{Path}'", path);
         }
 
-        return BaselineIndex.Empty;
+        return (BaselineIndex.Empty, StatusAssetSource.Empty);
     }
 
-    private async Task<BaselineIndex> LoadHttpAsync(string url, CancellationToken ct)
+    private async Task<(BaselineIndex, StatusAssetSource)> LoadHttpAsync(string url, CancellationToken ct)
     {
         var cacheFile = _fileHelper.FileSystem.Path.Combine(CacheDir, _fileHelper.FileSystem.Path.GetFileName(url));
 
@@ -91,7 +97,7 @@ public sealed class BaselineLoader
                 // never overwrite a previously-good cached copy that the fallback below could still use.
                 _fileHelper.FileSystem.Directory.CreateDirectory(CacheDir);
                 await _fileHelper.FileSystem.File.WriteAllBytesAsync(cacheFile, bytes, ct);
-                return baseline;
+                return (baseline, StatusAssetSource.Network);
             }
 
             _logger.LogWarning("Downloaded baseline from '{Url}' is stale or incompatible; trying cache", url);
@@ -107,7 +113,7 @@ public sealed class BaselineLoader
                 var cached = await _fileHelper.FileSystem.File.ReadAllBytesAsync(cacheFile, ct);
                 var baseline = BaselineSerializer.Deserialize(cached);
                 if (baseline is not null)
-                    return baseline;
+                    return (baseline, StatusAssetSource.Cache);
                 _logger.LogWarning("Cached baseline at '{Path}' is stale or incompatible", cacheFile);
             }
             catch (Exception ex)
@@ -115,6 +121,6 @@ public sealed class BaselineLoader
                 _logger.LogWarning(ex, "Failed to load cached baseline from '{Path}'", cacheFile);
             }
 
-        return BaselineIndex.Empty;
+        return (BaselineIndex.Empty, StatusAssetSource.Empty);
     }
 }

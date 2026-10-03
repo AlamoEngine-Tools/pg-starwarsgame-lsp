@@ -40,7 +40,6 @@ public static class XmlLanguageServiceExtensions
 
         // XmlTagValueFact handlers (format validators)
         services.AddSingleton<IXmlDiagnosticsHandler, DeprecatedTagHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, ContextNamePairHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ContextNameListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageNonzeroHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, NonNegativeValueHandler>();
@@ -54,7 +53,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, MissingRequiredTagHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ControlPointCurveHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TagComparisonHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, PresenceInducedAnimationsHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Audio3dProviderNameHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioParamIntHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioFileFormatHandler>();
@@ -106,12 +104,14 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, PerFactionValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, PerFactionPlanetHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, PerFactionIntMapHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, PerFactionObjectListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ForceDeploymentListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VictoryConditionListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnitSpawnTableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnitSpawnProbabilityTableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TupleListHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, TupleSlotEnumHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, TupleSlotAssetHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ListMapHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ConditionalSpeechEventHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FloatTupleListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IntFloatTupleListHandler>();
@@ -138,6 +138,7 @@ public static class XmlLanguageServiceExtensions
 
         // XmlSymbolFact + XmlReferenceFact handlers (index-level)
         services.AddSingleton<IXmlDiagnosticsHandler, DuplicateSymbolHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, NameCrcCollisionHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnnamedObjectHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnknownTagHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, CaseSensitiveTagHandler>();
@@ -317,10 +318,14 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeActionProvider, RemoveRedundantOverrideCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveEarlierDuplicatesCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, SuppressDiagnosticCodeActionProvider>();
+        // Actions on what is under the cursor, with no diagnostic behind them.
+        services.AddSingleton<IXmlCursorCodeActionProvider, PreviewModelCodeActionProvider>();
 
         // Hover strategies - add IXmlHoverStrategy implementations here to register new strategies
         services.AddSingleton<IXmlHoverStrategyRegistry, XmlHoverStrategyRegistry>();
         services.AddSingleton<IXmlHoverStrategy, ReferenceHoverStrategy>();
+        // After the reference hover, which already answers for object-typed tuple items.
+        services.AddSingleton<IXmlHoverStrategy, TupleSlotHoverStrategy>();
         services.AddSingleton<IXmlHoverStrategy, AssetHoverStrategy>();
         services.AddSingleton<IXmlHoverStrategy, TagNameHoverStrategy>();
 

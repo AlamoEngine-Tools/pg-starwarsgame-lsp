@@ -12,10 +12,10 @@
 // rows and a Star Destroyer sub-mesh is 3814 faces, so the next page is fetched as the scroller
 // nears its end. `geometryRows` holds what has arrived and decides when to ask.
 
-import { useEffect, useRef } from 'react';
+import {useEffect, useRef} from 'react';
 
-import { geometryTabs, nearEnd, nextOffset, type GeometryRows } from '../preview/geometryRows';
-import { type GeometryTable } from '../../protocol/modelPreview';
+import {geometryTabs, nearEnd, nextOffset, type GeometryRows} from '../preview/geometryRows';
+import {type GeometryTable} from '../../protocol/modelPreview';
 
 /**
  * Which table is being read.
@@ -24,9 +24,15 @@ import { type GeometryTable } from '../../protocol/modelPreview';
  * three independent switches first, which told a screen reader the wrong thing.
  */
 export function GeometryTabs(
-    { rows, disabled, onSelect }: {
+    {rows, selected, disabled, onSelect}: {
         /** What is in hand, so the open tab can carry its row count. */
         rows: GeometryRows | null;
+        /**
+         * The open tab. Held apart from the rows: a tab is open from the moment it is chosen, not
+         * from the moment its first page lands - deriving it from the rows left nothing selected
+         * while the box waited, which is what made it read as a flyout.
+         */
+        selected: GeometryTable | null;
         /** No mesh index means nothing can be fetched, so the choice is shown but inert. */
         disabled: boolean;
         onSelect: (table: GeometryTable) => void;
@@ -35,7 +41,7 @@ export function GeometryTabs(
     return (
         <div className="geometry-tabs" role="tablist" aria-label="Which table to read">
             {geometryTabs(rows).map(tab => {
-                const open = rows?.table === tab.id;
+                const open = selected === tab.id;
 
                 return (
                     <button
@@ -67,7 +73,7 @@ export function GeometryTabs(
  * Star Destroyer sub-mesh.
  */
 export function GeometryRowsTable(
-    { rows, onMore }: {
+    {rows, onMore}: {
         rows: GeometryRows;
         /** Asked for the next offset. Called only while there is more to come. */
         onMore: (table: GeometryTable, offset: number) => void;
@@ -113,12 +119,12 @@ export function GeometryRowsTable(
             <div className="geometry-scroll" ref={box} onScroll={onScroll}>
                 <table className="geometry-table">
                     <thead>
-                        <tr>{rows.columns.map(column => <th key={column}>{column}</th>)}</tr>
+                    <tr>{rows.columns.map(column => <th key={column}>{column}</th>)}</tr>
                     </thead>
                     <tbody>
-                        {rows.rows.map((row, at) => (
-                            <tr key={at}>{row.map((cell, col) => <td key={col}>{cell}</td>)}</tr>
-                        ))}
+                    {rows.rows.map((row, at) => (
+                        <tr key={at}>{row.map((cell, col) => <td key={col}>{cell}</td>)}</tr>
+                    ))}
                     </tbody>
                 </table>
             </div>

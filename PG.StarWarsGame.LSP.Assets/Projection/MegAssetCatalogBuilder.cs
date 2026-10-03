@@ -27,6 +27,9 @@ public static class MegAssetCatalogBuilder
             // their model under a name prefix with nothing else to discover them by.
             ".tga", ".dds", ".alo", ".ala", ".wav", ".mp3", ".ted");
 
+    /// <summary>Every extension the catalog records, for reporting counts per extension.</summary>
+    public static IReadOnlyCollection<string> KnownAssetExtensions => AssetExtensions;
+
     /// <summary>
     ///     Builds the combined asset catalog.
     /// </summary>

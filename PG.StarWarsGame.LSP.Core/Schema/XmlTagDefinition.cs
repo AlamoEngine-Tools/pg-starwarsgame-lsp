@@ -93,4 +93,15 @@ public record XmlTagDefinition
     ///     <c>null</c> means "run all registered handlers for this fact type" (default behaviour).
     /// </summary>
     public TagValidationOverride? ValidationOverride { get; init; }
+
+    /// <summary>
+    ///     What each item of a repeating tuple value is, in order; empty for any tag whose value is
+    ///     not such a list. The value reads as consecutive groups of this many comma-separated items.
+    /// </summary>
+    /// <remarks>
+    ///     The value type alone cannot say this: <see cref="XmlValueType.TupleList" /> is the engine's
+    ///     generic pair list, and its three users hold music events in one case and terrain/model
+    ///     pairs in another.
+    /// </remarks>
+    public IReadOnlyList<TupleSlotDefinition> Slots { get; init; } = [];
 }

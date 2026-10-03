@@ -29,7 +29,7 @@ public sealed class ModProjectResolver
 
     public WorkspaceConfiguration Resolve(string rootPath, ModProjectFile root)
     {
-        var ordered = _graph.Build(rootPath, root, LoadReference);
+        var ordered = _graph.Build(rootPath, root, LoadReference, out var dependencies);
 
         var xml = new List<string>();
         var scripts = new List<string>();
@@ -82,7 +82,8 @@ public sealed class ModProjectResolver
             StoryDialogRoots = storyDialog,
             // Root project only - a mega texture replaces rather than merges, so a dependency's
             // icon configuration has no say in which one the root project ships.
-            Icons = root.Icons
+            Icons = root.Icons,
+            Dependencies = dependencies
         };
     }
 

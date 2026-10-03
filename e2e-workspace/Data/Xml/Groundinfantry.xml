@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- E2E fixture for ContainerTypeOverrideSmokeTest.
+
+     The objects here are <GroundInfantry>, an element name the schema does not know as a type. Their
+     tags must still resolve through GameObjectType, the file's container type, and keep the
+     validation overrides it declares.
+
+       E2E_TERRAIN_MAPPED_INFANTRY  Land_Terrain_Model_Mapping and Presence_Induced_Animations in the
+                                    shape the shipped game writes them. Both are VALID; neither may
+                                    be checked as a music-event list or a per-faction list.
+       E2E_ZERO_DAMAGE_INFANTRY     <Damage>0</Damage> is INVALID on purpose: the damage-nonzero
+                                    override must fire. It is the control that proves the overrides
+                                    are reached at all, so a regression cannot pass by going quiet.
+       E2E_BAD_TERRAIN_INFANTRY     Land_Terrain_Model_Mapping with two INVALID items on purpose:
+                                    Not_A_Terrain is no map environment, and E2E_NO_SUCH_MODEL.ALO is a
+                                    model no game data has. Each slot must be checked as what it is;
+                                    the valid items around them are the control. Multi-line like the
+                                    shipped data, so the items sit on lines where no element starts.
+       E2E_BAD_PRESENCE_INFANTRY    Presence_Induced_Animations whose value starts with Atention, which
+                                    is INVALID on purpose: no animation state, so the engine drops the
+                                    whole value. The shipped-shape value on E2E_TERRAIN_MAPPED_INFANTRY
+                                    is the control and must stay silent.
+       E2E_CRC_BXO9XL / _CDATBA     Two names that share a CRC-32 (0xC492BBC0), found by search. The
+                                    engine files game objects by that hash and keeps the first it
+                                    loads, so one of the two can never be found - both are warned. -->
+
+
+
+<GameObjectFiles>
+
+    <GroundInfantry Name="E2E_TERRAIN_MAPPED_INFANTRY">
+        <Land_Terrain_Model_Mapping>
+            Temperate, EI_TROOPER.ALO,
+            Arctic, EI_TROOPER_Snow.ALO,
+            Desert, EI_TROOPER_Sand.ALO
+        </Land_Terrain_Model_Mapping>
+        <Presence_Induced_Animations>Attention, Darth_Vader,</Presence_Induced_Animations>
+    </GroundInfantry>
+
+    <GroundInfantry Name="E2E_ZERO_DAMAGE_INFANTRY">
+        <Damage>0</Damage>
+    </GroundInfantry>
+
+    <GroundInfantry Name="E2E_BAD_TERRAIN_INFANTRY">
+        <Land_Terrain_Model_Mapping>
+            Not_A_Terrain, EI_TROOPER.ALO,
+            Arctic, E2E_NO_SUCH_MODEL.ALO
+        </Land_Terrain_Model_Mapping>
+    </GroundInfantry>
+
+    <GroundInfantry Name="E2E_BAD_PRESENCE_INFANTRY">
+        <Presence_Induced_Animations>Atention, Darth_Vader</Presence_Induced_Animations>
+    </GroundInfantry>
+
+    <GroundInfantry Name="E2E_CRC_BXO9XL">
+    </GroundInfantry>
+
+    <GroundInfantry Name="E2E_CRC_CDATBA">
+    </GroundInfantry>
+
+</GameObjectFiles>

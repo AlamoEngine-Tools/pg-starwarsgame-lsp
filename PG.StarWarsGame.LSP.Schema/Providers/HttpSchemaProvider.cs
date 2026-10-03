@@ -48,6 +48,12 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
     /// <inheritdoc />
     public SchemaVersionCheck? LastVersionCheck { get; private set; }
 
+    /// <summary>
+    ///     Whether the last load was served from the local cache (true) or rebuilt from the network
+    ///     (false). Null until a load got as far as either.
+    /// </summary>
+    public bool? LastLoadFromCache { get; private set; }
+
     public async Task LoadAsync(CancellationToken ct = default)
     {
         try
@@ -74,11 +80,13 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
             if (_cache.TryLoad(indexJson, manifest, out var cached))
             {
                 _logger.LogInformation("Schema loaded from local cache");
+                LastLoadFromCache = true;
                 Publish(cached);
                 _readyTcs.TrySetResult();
                 return;
             }
 
+            LastLoadFromCache = false;
             await BuildIndexAsync(manifest, indexJson, ct);
         }
         catch
