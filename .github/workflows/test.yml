@@ -122,12 +122,20 @@ jobs:
       # Run each project individually - solution-wide run with all E2E tests filtered produces
       # exit code 8 (MTP ZeroTestsRan policy) even when all other tests pass.
       # xunit v3 + MTP uses --filter-not-trait, not --filter.
+      # Every project runs even when an earlier one fails, so one run reports every failure; the
+      # step fails at the end and names the projects that failed. bash on both runners (Git Bash
+      # on Windows), so the loop is written once.
+      shell: bash
       run: |
-        dotnet test PG.StarWarsGame.LSP.Core.Tests/PG.StarWarsGame.LSP.Core.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
-        dotnet test PG.StarWarsGame.LSP.Schema.Tests/PG.StarWarsGame.LSP.Schema.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
-        dotnet test PG.StarWarsGame.LSP.Assets.Tests/PG.StarWarsGame.LSP.Assets.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
-        dotnet test PG.StarWarsGame.LSP.Xml.Tests/PG.StarWarsGame.LSP.Xml.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
-        dotnet test PG.StarWarsGame.LSP.Lua.Tests/PG.StarWarsGame.LSP.Lua.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
-        dotnet test PG.StarWarsGame.LSP.Lua.Debug.Tests/PG.StarWarsGame.LSP.Lua.Debug.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
-        dotnet test PG.StarWarsGame.LSP.Server.Tests/PG.StarWarsGame.LSP.Server.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
-        dotnet test PG.StarWarsGame.LSP.Story.Tests/PG.StarWarsGame.LSP.Story.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
+        failed=""
+        for p in Core Schema Assets Xml Lua Lua.Debug Server Story; do
+          echo "::group::$p tests"
+          if ! dotnet test "PG.StarWarsGame.LSP.$p.Tests/PG.StarWarsGame.LSP.$p.Tests.csproj" --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github; then
+            failed="$failed $p"
+          fi
+          echo "::endgroup::"
+        done
+        if [ -n "$failed" ]; then
+          echo "::error::Test projects failed:$failed"
+          exit 1
+        fi
