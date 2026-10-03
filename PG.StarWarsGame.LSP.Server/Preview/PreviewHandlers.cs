@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -57,40 +56,6 @@ public sealed class GetProjectileHandler(
         return Task.FromResult(found is null
             ? new GetProjectileResult(null, $"Projectile '{id}' is not defined in this project.")
             : new GetProjectileResult(found));
-    }
-}
-
-/// <summary>Lists the models the "Preview Model" picker offers.</summary>
-/// <remarks>
-///     Read off the merged asset catalog - the project's layers and the baseline together - so a
-///     model that sits in a dependency or inside a shipped MEG is offered as readily as one in the
-///     project's own folder. Particle systems are listed too: they share the <c>.alo</c> extension
-///     and the folder, and telling them apart means reading every file, which the scene does anyway
-///     once one is picked.
-/// </remarks>
-public sealed class ListModelsHandler(IGameIndexService indexService, ILspConfigurationProvider config)
-    : IJsonRpcRequestHandler<ListModelsParams, ListModelsResult>
-{
-    private const string ModelFolder = "data/art/models/";
-
-    public Task<ListModelsResult> Handle(ListModelsParams request, CancellationToken cancellationToken)
-    {
-        if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new ListModelsResult([]));
-
-        var assets = indexService.Current.AssetFiles;
-        var models = assets.GetByExtension(".alo")
-            .Where(p => p.StartsWith(ModelFolder, StringComparison.OrdinalIgnoreCase))
-            .Select(p => new PreviewModelEntry(MergedAssetFileIndex.FileNameOf(p), assets.IsPackedAsset(p)))
-            // A name in two subfolders is one entry: the scene resolves by name, so a second row
-            // would open the same model. The project's copy is the one kept, as it is the one the
-            // scene will resolve to.
-            .OrderBy(m => m.BaseGame)
-            .DistinctBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        return Task.FromResult(new ListModelsResult(models));
     }
 }
 

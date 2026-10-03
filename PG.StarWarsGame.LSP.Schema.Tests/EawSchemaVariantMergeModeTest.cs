@@ -18,10 +18,9 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 ///     <para>
 ///         Measured in the engine's tag-value mapper. A variant is
 ///         built by copying the whole base and re-parsing the variant's own XML on top with an
-///         overlay flag; 15 type codes append with no reset on either path, so the variant's entries
+///         overlay flag; 17 type codes append with no reset on either path, so the variant's entries
 ///         are ADDED to the base's. Which code a tag carries is per OWNING TYPE, so the list comes
-///         from DatabaseMapExport rather than from tag names. (The first count was 17: 0x34 and 0x35
-///         clear with a vector resize under the overlay flag, which the classification missed.)
+///         from DatabaseMapExport rather than from tag names.
 ///     </para>
 /// </remarks>
 public sealed class EawSchemaVariantMergeModeTest
@@ -30,6 +29,7 @@ public sealed class EawSchemaVariantMergeModeTest
     // DynamicVectorClass or std::vector, which nothing clears on the overlay path.
     [Theory]
     [InlineData("GameObjectType.yaml", "Starting_Spawned_Units_Tech_0")] // 0x46 spawn table
+    [InlineData("GameObjectType.yaml", "Land_Terrain_Model_Mapping")] // 0x34
     [InlineData("GameObjectType.yaml", "SFXEvent_Attack_Override")] // 0x22
     [InlineData("GameObjectType.yaml", "Faction_Anim_Subindex")] // 0x3c
     [InlineData("Faction.yaml", "Music_Event_Tactical_Win_Vs_Faction")] // 0x29
@@ -66,20 +66,6 @@ public sealed class EawSchemaVariantMergeModeTest
     [InlineData("GameObjectType.yaml", "Death_Clone")] // 0x3b
     [InlineData("HeroClashType.yaml", "Involved_Hero_Types")] // 0x1e
     public void DeferredClearTags_AreNotAdditive(string file, string tag)
-    {
-        Assert.Equal(VariantMode.Replace, Tag(file, tag).VariantMode);
-    }
-
-    /// <summary>
-    ///     The 0x34 pair lists: the engine empties the vector (resize to 0) when it re-parses an
-    ///     overlay, so a variant's pairs replace the base's. They were marked <c>merge</c> from the
-    ///     same misclassification that filed them as additive.
-    /// </summary>
-    [Theory]
-    [InlineData("GameObjectType.yaml", "Land_Terrain_Model_Mapping")]
-    [InlineData("Faction.yaml", "Music_Event_List_Ambient")]
-    [InlineData("Faction.yaml", "Music_Event_List_Battle")]
-    public void OverlayClearedPairLists_Replace(string file, string tag)
     {
         Assert.Equal(VariantMode.Replace, Tag(file, tag).VariantMode);
     }

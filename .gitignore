@@ -22,9 +22,6 @@ mono_crash.*
 
 # Build results
 [Dd]ebug/
-# Source folders named Debug (the launch-layer handlers), not build output
-!/PG.StarWarsGame.LSP.Server/Debug/
-!/PG.StarWarsGame.LSP.Server.Tests/Debug/
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
@@ -513,8 +510,6 @@ fabric.properties
 docs/
 *.py
 *.ps1
-# The workspace setup script is tracked; every other .ps1 here is a local tool
-!/setup-workspace.ps1
 *.md
 *.MD
 /dist

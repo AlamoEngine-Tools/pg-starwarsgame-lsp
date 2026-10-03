@@ -4,7 +4,6 @@
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
 
@@ -58,9 +57,15 @@ public sealed class AssetFileCompletionProvider : IXmlCompletionProvider
         return fileName.StartsWith(partial, StringComparison.OrdinalIgnoreCase);
     }
 
-    // The same rules the existence check uses, so completion never offers a file it would then flag.
     private static IReadOnlyList<string>? AllowedExtensions(ReferenceKind kind)
     {
-        return AssetKindRules.For(kind)?.AllowedExtensions;
+        return kind switch
+        {
+            ReferenceKind.TextureFile => [".tga", ".dds"],
+            ReferenceKind.ModelFile => [".alo"],
+            ReferenceKind.AudioFile => [".wav", ".mp3"],
+            ReferenceKind.MapFile => [".ted"],
+            _ => null
+        };
     }
 }

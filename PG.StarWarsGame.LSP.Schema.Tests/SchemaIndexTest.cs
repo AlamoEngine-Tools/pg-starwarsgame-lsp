@@ -41,27 +41,6 @@ public sealed class SchemaIndexTest
         Assert.Equal(new[] { "Planet" }, index.AllKinds.Select(k => k.Kind));
     }
 
-    [Fact]
-    public void ASlotNamingAKind_ResolvesTheKind_AsAWholeTagDoes()
-    {
-        var planet = new ObjectKindDefinition { Kind = "Planet", Behaviors = ["PLANET"] };
-        var tag = new RawTagDefinition
-        {
-            Tag = "Map", ValueType = XmlValueType.ListMap,
-            Slots =
-            [
-                new RawTupleSlot("Faction", ReferenceKind.XmlObject, "Faction", null),
-                new RawTupleSlot("Planet", ReferenceKind.XmlObject, "Planet", null)
-            ]
-        };
-        var index = new SchemaIndex([("Foo", [tag])], [Type("Faction")], [], kinds: [planet]);
-
-        var slots = index.GetTag("Map")!.Slots;
-
-        Assert.Null(slots[0].Kind);
-        Assert.Same(planet, slots[1].Kind);
-    }
-
     // ── GetTag ──────────────────────────────────────────────────────────────
 
     [Fact]

@@ -16,7 +16,6 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Server.Assets;
- using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -765,7 +764,6 @@ public sealed class WorkspaceIndexerTest
         // The dependency was reused, so it was never re-saved; the leaf missed and was.
         Assert.DoesNotContain(Root("dep/dep.pgproj"), cache.Saved);
         Assert.Contains(Root("leaf/leaf.pgproj"), cache.Saved);
-        Assert.Equal(new BoneCatalogStats(LayersReused: 1, Layers: 2), indexer.LastBoneCatalog);
     }
 
     private sealed class StubBoneCache : IModelBoneCatalogCache
@@ -1041,8 +1039,6 @@ public sealed class WorkspaceIndexerTest
 
         Assert.Single(svc.Calls); // parsed normally
         Assert.Empty(svc.InjectedDocuments);
-        Assert.Equal(new IndexCacheStats(LayersFromSnapshot: 0, LayersRebuilt: 1, FilesReused: 0, FilesParsed: 1),
-            indexer.LastIndexCache);
     }
 
     [Fact]
@@ -1088,9 +1084,6 @@ public sealed class WorkspaceIndexerTest
 
         Assert.Empty(svc.Calls); // no re-parse
         Assert.Single(svc.InjectedDocuments); // injected from cache
-        // Kept for the bug report, which otherwise could not tell a warm start from a cold one.
-        Assert.Equal(new IndexCacheStats(LayersFromSnapshot: 1, LayersRebuilt: 0, FilesReused: 1, FilesParsed: 0),
-            indexer.LastIndexCache);
     }
 
     // The index's own key used to be lowercased on the way in, which made every lookup work by

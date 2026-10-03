@@ -134,36 +134,11 @@ internal static class YamlSchemaParser
                 Notes = ReadNotes(entry.Notes),
                 MultipleAllowed = entry.MultipleAllowed,
                 VariantMode = variantMode,
-                ValidationOverride = validationOverride,
-                Slots = ReadSlots(entry, logger)
+                ValidationOverride = validationOverride
             });
         }
 
         return result;
-    }
-
-    /// <summary>
-    ///     A tag's tuple slots. An unknown referenceKind leaves the slot untyped rather than
-    ///     dropping it: the position still counts, and an untyped slot checks nothing, which is the
-    ///     safe failure - a guessed type would report problems that are not there.
-    /// </summary>
-    private static IReadOnlyList<RawTupleSlot> ReadSlots(YamlTagEntry entry, ILogger? logger)
-    {
-        if (entry.Slots is not { Count: > 0 } slots) return [];
-
-        return slots.Select(slot =>
-        {
-            var kind = ReferenceKind.None;
-            if (slot.ReferenceKind is not null && !Enum.TryParse(slot.ReferenceKind, true, out kind))
-            {
-                logger?.LogWarning(
-                    "Unknown referenceKind '{Kind}' on slot '{Slot}' of tag '{Tag}' - the slot is left untyped",
-                    slot.ReferenceKind, slot.Label, entry.Tag);
-                kind = ReferenceKind.None;
-            }
-
-            return new RawTupleSlot(slot.Label, kind, slot.ReferenceType, slot.EnumName);
-        }).ToList();
     }
 
     public static List<GameObjectTypeDefinition> ParseTypeFile(string yaml)

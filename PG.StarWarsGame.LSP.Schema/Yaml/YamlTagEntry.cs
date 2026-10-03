@@ -19,5 +19,4 @@ internal sealed class YamlTagEntry
     public bool MultipleAllowed { get; set; }
     public string? VariantMode { get; set; }
     public YamlTagValidationOverride? ValidationOverride { get; set; }
-    public List<YamlTupleSlot>? Slots { get; set; }
 }

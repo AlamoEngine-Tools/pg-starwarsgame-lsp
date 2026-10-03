@@ -100,7 +100,7 @@ public sealed class GarrisonUpgradeUnitsRule : RequiredTagsRuleBase
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Both classes test the RESOLVED animation - whether it is the invalid one - rather than
+///         Both classes test the RESOLVED animation - <c>AnimType == ANIM_INVALID</c> - rather than
 ///         the text, so the engine's complaint covers two different mistakes: a tag that is absent,
 ///         and one naming an animation that does not resolve.
 ///     </para>

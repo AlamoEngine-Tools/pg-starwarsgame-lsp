@@ -19,20 +19,6 @@ public static class SuppressionCommands
 }
 
 /// <summary>
-///     The report actions beside the suppressions. Both are CLIENT commands: the client holds the
-///     extension version, the clipboard and the browser, so the server never registers them - it
-///     only names them in the code action, with the diagnostic as the one argument.
-/// </summary>
-public static class DiagnosticReportCommands
-{
-    /// <summary>Opens a prefilled GitHub issue. The author submits it; nothing is posted.</summary>
-    public const string ReportOnGitHub = "aet-eaw-edit.reportDiagnosticOnGitHub";
-
-    /// <summary>Opens the same report, untrimmed, in an untitled editor tab.</summary>
-    public const string OpenInEditor = "aet-eaw-edit.openDiagnosticReport";
-}
-
-/// <summary>
 ///     Project-wide suppressions, persisted in <c>.aetswg/suppressions.json</c>.
 ///     <para>
 ///         The interface lives here so the diagnostics pipeline can consult it without depending on

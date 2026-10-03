@@ -4,14 +4,13 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 
 public sealed class XmlIndexFactProducerTest
 {
-    private static readonly XmlIndexFactProducer Sut = new(DistinctObjectNameHash.Instance);
+    private static readonly XmlIndexFactProducer Sut = new();
 
     private static GameSymbol MakeSym(string id, string uri, int line, string typeName = "SpaceUnit")
     {
@@ -371,28 +370,5 @@ public sealed class XmlIndexFactProducerTest
         // Not null: falls back to untyped SpaceUnit; TypeMismatchHandler will handle the mismatch
         Assert.NotNull(f.Resolved);
         Assert.Equal("SpaceUnit", f.Resolved!.TypeName);
-    }
-
-    // ── name hash collisions ──────────────────────────────────────────────────
-
-    [Fact]
-    public void Objects_whose_names_share_a_hash_each_get_a_collision_fact()
-    {
-        var alpha = MakeSym("Alpha", "file:///a.xml", 2, "GameObjectType");
-        var bravo = MakeSym("Bravo", "file:///a.xml", 6, "GameObjectType");
-        var charlie = MakeSym("Charlie", "file:///a.xml", 9, "GameObjectType");
-        var sut = new XmlIndexFactProducer(new DistinctObjectNameHash(("Alpha", 7), ("Bravo", 7)));
-        // The index service keeps this table; built by hand here, as the rest of the index is.
-        var index = BuildIndex([alpha, bravo, charlie], []) with
-        {
-            WorkspaceNameHashes = ImmutableDictionary<uint, ImmutableArray<GameSymbol>>.Empty.Add(7, [alpha, bravo])
-        };
-
-        var facts = sut.Produce("file:///a.xml", index).OfType<XmlNameCrcCollisionFact>().ToList();
-
-        Assert.Equal(["Alpha", "Bravo"], facts.Select(f => f.SymbolId));
-        Assert.Equal(["Bravo"], facts[0].Others.Select(s => s.Id));
-        Assert.Equal(7u, facts[0].Hash);
-        Assert.Equal(2, facts[0].Line);
     }
 }

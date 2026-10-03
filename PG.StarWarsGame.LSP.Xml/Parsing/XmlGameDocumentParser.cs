@@ -287,6 +287,17 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // Presence_Induced_Animations: "AnimationStateId, ObjectName, ..." - the first
+                // token is an engine animation state (not indexable), the rest are game objects
+                // whose presence triggers it. Record those as object references so
+                // go-to-definition and unresolved-reference validation cover them.
+                if (tagDef.ValidationOverride?.ValidationId == "presence-induced-animations")
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectPresenceInducedObjectReferences(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 // (GameObjectCategoryType, float) tuples: record slot 0 as an enum: reference
                 // so go-to-definition/rename work on the category token. Membership is validated
                 // by InaccuracyMapHandler; XmlIndexFactProducer skips enum: ids.
@@ -341,17 +352,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 {
                     if (HasChildElement(child)) continue;
                     CollectLeadingSlotReference(child, null, lineIndex, documentUri, references);
-                    continue;
-                }
-
-                // Tags whose schema declares what each tuple item is. Every object-typed item is a
-                // reference, so it gets hover, go-to, find-references and rename like any other -
-                // the faction music lists' events, which nothing recorded before slots existed.
-                // Enum and asset items are checked as slot facts instead; untyped ones name nothing.
-                if (tagDef.Slots.Count > 0)
-                {
-                    if (HasChildElement(child)) continue;
-                    CollectTupleSlotReferences(child, tagDef, lineIndex, documentUri, references);
                     continue;
                 }
 
@@ -460,6 +460,34 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         }
 
         return references;
+    }
+
+    // Every token AFTER the leading animation-state id of a Presence_Induced_Animations value,
+    // as wildcard-typed object references.
+    private static void CollectPresenceInducedObjectReferences(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var first = true;
+        foreach (var (token, tokenOffset) in XmlUtility.SplitListWithOffsets(innerText))
+        {
+            if (first)
+            {
+                first = false; // the animation state id - not a game object
+                continue;
+            }
+
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
+            references.Add(new GameReference(
+                token,
+                GameSymbolKind.XmlObject,
+                null,
+                documentUri,
+                line,
+                column,
+                length));
+        }
     }
 
     // Slot 0 of an (object, number) tuple as a game object reference; the number is the handler's.
@@ -651,8 +679,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var slot = 0;
         foreach (var (token, offset) in XmlUtility.SplitListWithOffsets(innerText))
         {
-            // A third token is not a shape this tag has in either corpus, and what the engine makes
-            // of one is unmeasured - so the pair is recorded and the collector stops there.
+            // A third token is not a shape this tag has in either corpus; if a mod writes one, the
+            // PerFactionObjectList grammar reports it rather than this collector guessing at it.
             if (slot > 1) break;
 
             var expectedType = slot == 0 ? "Faction" : tagDef.ObjectType?.TypeName;
@@ -665,33 +693,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 token,
                 GameSymbolKind.XmlObject,
                 expectedType,
-                documentUri,
-                line,
-                column,
-                length));
-        }
-    }
-
-    // Every object-typed item of a slotted tuple, as a reference typed by its slot. Offsets come from
-    // TupleItems over the untrimmed inner text - the reading the slot facts use too.
-    private static void CollectTupleSlotReferences(HtmlNode child, XmlTagDefinition tagDef,
-        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
-    {
-        // A ListMap key that is an object can only be told from an item by looking it up, and this
-        // parser builds the index it would look in. So neither is typed: every name still resolves
-        // and navigates, and the ListMap handler, which has the index, judges which is which.
-        var untyped = tagDef.ValueType == XmlValueType.ListMap && ListMapKeys.FromSchema(tagDef) is null;
-
-        foreach (var item in TupleItems.Read(tagDef, child.InnerText))
-        {
-            if (item.Slot?.ReferenceKind != ReferenceKind.XmlObject) continue;
-
-            var (line, column, length) =
-                XmlUtility.GetInnerOffsetValuePosition(child, item.Offset, item.Text.Length, lineIndex);
-            references.Add(new GameReference(
-                item.Text,
-                GameSymbolKind.XmlObject,
-                untyped ? null : item.Slot.ObjectType?.TypeName ?? item.Slot.ReferenceTypeName,
                 documentUri,
                 line,
                 column,
@@ -881,7 +882,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                          || tagDef.ValueType is XmlValueType.GameObjectTypeReferenceList
                              or XmlValueType.TypeReferenceList
                              or XmlValueType.NameReferenceList
-                             or XmlValueType.ListMap;
+                             or XmlValueType.PerFactionObjectList;
 
         if (!multiValue)
         {

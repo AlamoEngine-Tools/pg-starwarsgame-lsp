@@ -12,15 +12,12 @@ namespace PG.StarWarsGame.LSP.Xml;
 public sealed class XmlCodeActionHandler : CodeActionHandlerBase
 {
     private readonly ILspConfigurationProvider _config;
-    private readonly IReadOnlyList<IXmlCursorCodeActionProvider> _cursorProviders;
     private readonly IXmlCodeActionRegistry _registry;
 
-    public XmlCodeActionHandler(IXmlCodeActionRegistry registry, ILspConfigurationProvider config,
-        IEnumerable<IXmlCursorCodeActionProvider> cursorProviders)
+    public XmlCodeActionHandler(IXmlCodeActionRegistry registry, ILspConfigurationProvider config)
     {
         _registry = registry;
         _config = config;
-        _cursorProviders = cursorProviders.ToList();
     }
 
     public override Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken ct)
@@ -31,7 +28,6 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
         var uri = request.TextDocument.Uri;
         var actions = request.Context.Diagnostics
             .SelectMany(d => _registry.Dispatch(new XmlCodeActionContext(uri, d)))
-            .Concat(_cursorProviders.SelectMany(p => p.Handle(uri, request.Range.Start)))
             .ToList();
 
         return Task.FromResult<CommandOrCodeActionContainer?>(new CommandOrCodeActionContainer(actions));

@@ -59,11 +59,10 @@ public sealed class TagValueCompletionContext
     public int StoryParamPosition { get; }
 
     /// <summary>
-    ///     0-based index of the comma-separated item the cursor sits in, for tuple-shaped
-    ///     <see cref="XmlTagDefinition.ValueType" />s (e.g. <c>HardPointSfxMap</c>). Not clamped: a
-    ///     fixed-shape tuple splits on the FIRST comma, so its consumer reads any index past 0 as slot
-    ///     1, while a TupleList repeats its slots and takes the index modulo the slot count.
-    ///     Meaningless (always 0) for non-tuple types.
+    ///     0-based comma-separated slot the cursor sits in, clamped to 1, for tuple-shaped
+    ///     <see cref="XmlTagDefinition.ValueType" />s (e.g. <c>HardPointSfxMap</c>). Clamped because every
+    ///     tuple validator splits on the FIRST comma only - anything past it belongs to slot 1 regardless
+    ///     of further commas within that slot's own value. Meaningless (always 0) for non-tuple types.
     /// </summary>
     public int TupleSlotIndex { get; }
 }

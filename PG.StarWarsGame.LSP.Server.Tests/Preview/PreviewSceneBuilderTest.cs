@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
@@ -314,47 +313,6 @@ public sealed class PreviewSceneBuilderTest
         Assert.Empty(scene.Problems);
     }
 
-    // ── source file, for the external-tool hand-off ───────────────────────────
-
-    /// <summary>
-    ///     A preview opened by NAME has no file of its own, so the hand-off to AloViewer or the
-    ///     Particle Editor needs the file the name resolved to. A loose file is one a tool can open.
-    /// </summary>
-    [Fact]
-    public void BuildForModel_CarriesTheLooseFileTheModelResolvedTo()
-    {
-        var assets = new FakeAssets("hull.alo").WithRootChunk("hull.alo", 0x200)
-            .LocatedAt("hull.alo", @"C:\Game\Data\Art\Models\HULL.ALO", GameAssetTier.BaseGameLoose);
-
-        var scene = Builder(GameIndex.Empty, new FakeVariantTagSource(), assets).BuildForModel("hull.alo");
-
-        Assert.Equal(new PreviewSourceFile(@"C:\Game\Data\Art\Models\HULL.ALO", false), scene.SourceFile);
-    }
-
-    /// <summary>
-    ///     A model that exists only inside a MEG has no file on disk to hand over. Said so, rather
-    ///     than handing the tool the archive-relative path it cannot open.
-    /// </summary>
-    [Fact]
-    public void BuildForModel_ReportsAModelThatExistsOnlyInAnArchive()
-    {
-        var assets = new FakeAssets("hull.alo").WithRootChunk("hull.alo", 0x200)
-            .LocatedAt("hull.alo", "data/art/models/hull.alo", GameAssetTier.Archive);
-
-        var scene = Builder(GameIndex.Empty, new FakeVariantTagSource(), assets).BuildForModel("hull.alo");
-
-        Assert.Equal(new PreviewSourceFile(null, true), scene.SourceFile);
-    }
-
-    [Fact]
-    public void BuildForModel_CarriesNoSourceFileForAModelThatResolvesNowhere()
-    {
-        var scene = Builder(GameIndex.Empty, new FakeVariantTagSource(), new FakeAssets())
-            .BuildForModel("missing.alo");
-
-        Assert.Null(scene.SourceFile);
-    }
-
     [Fact]
     public void BuildForModel_TreatsAModelAsAModel()
     {
@@ -593,7 +551,7 @@ public sealed class PreviewSceneBuilderTest
     ///         MEASURED, and the two owners genuinely differ.
     ///         <c>HardPointDataClass</c> writes
     ///         <c>TurretRotateExtentDegrees = 180.0</c> and
-    ///         <c>TurretElevateExtentDegrees = 90.0</c>, where the engine's object type
+    ///         <c>TurretElevateExtentDegrees = 90.0</c>, where <c>GameObjectTypeClass</c>'s
     ///         constructor writes 360 and 180. Sending the authored value and letting the client
     ///         guess would have to guess differently per owner.
     ///     </para>

@@ -7,7 +7,6 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Util;
-using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -51,9 +50,8 @@ public sealed class XmlDocumentFactProducer(
         // errors they cannot act on, and learns to ignore the file.
         if (isRegistered && fileTypes.IsEmpty) return facts;
 
-        // The type that makes this file a container of named objects, if any.
-        var containerTypeName = fileTypes.FirstOrDefault(t => schema.GetObjectType(t)?.NameTag is not null);
-        var isTypeContainerLevel = containerTypeName is not null;
+        var isTypeContainerLevel = !fileTypes.IsEmpty &&
+                                   fileTypes.Any(t => schema.GetObjectType(t)?.NameTag is not null);
 
         TagResolutionContext? initialContext = null;
         if (!isTypeContainerLevel && !fileTypes.IsEmpty)
@@ -70,8 +68,7 @@ public sealed class XmlDocumentFactProducer(
             // type, so "does this document's type declare it" IS the engine's rule.
             fileTypes.Any(t => schema.GetTagsForType(t)
                 .Any(x => x.SemanticType == TagSemanticType.VariantParent)),
-            fileTypes.IsEmpty ? null : fileTypes[0],
-            containerTypeName);
+            fileTypes.IsEmpty ? null : fileTypes[0]);
 
         foreach (var root in doc.DocumentNode.ChildNodes)
         {
@@ -278,74 +275,6 @@ public sealed class XmlDocumentFactProducer(
         }
     }
 
-    /// <summary>
-    ///     One fact per enum or model item of a slotted tuple value, positioned on the item.
-    /// </summary>
-    /// <remarks>
-    ///     Object items are left to the parser, which records them as references, and untyped items
-    ///     are checked for nothing - a slot fact for either would report it twice or for no reason.
-    ///     Offsets are into the element's untrimmed inner text, the same basis the reference
-    ///     collectors use, so an item's squiggle and its go-to range cannot drift apart.
-    /// </remarks>
-    private static void AddTupleSlotFacts(
-        HtmlNode child, XmlTagDefinition tagDef, string documentUri, LineOffsetIndex lineIndex, List<XmlFact> facts)
-    {
-        // A ListMap's items are classified by its handler, which has the index to tell a key from a
-        // value - a slot fact per item here would judge a key as a value.
-        if (tagDef.Slots.Count == 0 || tagDef.ValueType == XmlValueType.ListMap) return;
-
-        foreach (var item in TupleItems.Read(tagDef, child.InnerText))
-        {
-            if (item.Slot is not { } slot ||
-                (slot.ReferenceKind != ReferenceKind.Enum && AssetKindRules.For(slot.ReferenceKind) is null))
-                continue;
-
-            var (line, column, length) =
-                XmlUtility.GetInnerOffsetValuePosition(child, item.Offset, item.Text.Length, lineIndex);
-            facts.Add(new XmlTupleSlotFact(documentUri, line, column, length, tagDef, slot, item.Text));
-        }
-    }
-
-    /// <summary>
-    ///     One <see cref="XmlListMapFact" /> per <see cref="XmlValueType.ListMap" /> tag on this
-    ///     object, carrying every occurrence in document order with its items positioned.
-    /// </summary>
-    private void AddListMapFacts(
-        Dictionary<string, List<HtmlNode>> childGroups, TagResolutionContext? context, WalkState state)
-    {
-        var isVariant = childGroups.Keys.Any(name =>
-            ResolveTag(name, context)?.SemanticType == TagSemanticType.VariantParent);
-
-        foreach (var (name, nodes) in childGroups)
-        {
-            if (ResolveTag(name, context) is not { ValueType: XmlValueType.ListMap } tagDef) continue;
-
-            var occurrences = new List<ListMapOccurrence>();
-            foreach (var node in nodes)
-            {
-                // A value with element children is not a list of names at all.
-                if (node.ChildNodes.Any(c => c.NodeType == HtmlNodeType.Element)) continue;
-
-                var items = TupleItems.Read(tagDef, node.InnerText)
-                    .Select(item =>
-                    {
-                        var (line, column, _) = XmlUtility.GetInnerOffsetValuePosition(
-                            node, item.Offset, item.Text.Length, state.LineIndex);
-                        return new ListMapItem(item.Text, line, column);
-                    })
-                    .ToList();
-                occurrences.Add(new ListMapOccurrence(XmlUtility.GetLine(node),
-                    XmlUtility.GetTagBracketColumn(node), XmlUtility.GetOpeningTagLength(node), items));
-            }
-
-            if (occurrences.Count == 0) continue;
-
-            var first = occurrences[0];
-            state.Facts.Add(new XmlListMapFact(state.DocumentUri, first.Line, first.Column, first.Length, tagDef,
-                isVariant, occurrences));
-        }
-    }
-
     /// <param name="isObjectLevel">
     ///     Whether <paramref name="node" /> is an OBJECT element, so its direct element children are
     ///     tags and can be judged against the tag vocabulary. False everywhere below that: the
@@ -364,14 +293,8 @@ public sealed class XmlDocumentFactProducer(
         {
             foreach (var child in node.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
             {
-                // Most object elements are NOT named after their schema type: a GameObjectType file
-                // holds <GroundInfantry> and <SpaceUnit>, a TerrainDecalFX file holds <Decal>. Those
-                // objects belong to the container's type all the same. Walked without a context their
-                // tags reached the flat fallback, which drops every owner restriction, so a
-                // replace override never ran and the default handler for the value type did.
                 var typeName = schema.GetObjectType(child.Name)?.TypeName
-                               ?? schema.GetObjectType(XmlUtility.ToPascalCase(child.Name))?.TypeName
-                               ?? state.ContainerTypeName;
+                               ?? schema.GetObjectType(XmlUtility.ToPascalCase(child.Name))?.TypeName;
                 var childContext = typeName is not null
                     ? new TagResolutionContext(typeName, XmlUtility.GetDepth(child), child, context)
                     : context;
@@ -482,7 +405,6 @@ public sealed class XmlDocumentFactProducer(
                         facts.Add(new XmlTagValueFact(
                             documentUri, dupLine, dupCol, dupLen, tagDef, duplicateValue,
                             context?.ObjectTypeName));
-                        AddTupleSlotFacts(child, tagDef, documentUri, lineIndex, facts);
                     }
                 }
 
@@ -498,7 +420,6 @@ public sealed class XmlDocumentFactProducer(
                 // identify a rule, and the engine's repair for it can differ per owner.
                 facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, valLen, tagDef, rawValue,
                     context?.ObjectTypeName));
-                AddTupleSlotFacts(child, tagDef, documentUri, lineIndex, facts);
 
                 // The database mapper strcpy's this into a fixed stack buffer - but only for the
                 // value types whose case in the engine's tag-value mapper does that copy. It is one switch on
@@ -520,9 +441,6 @@ public sealed class XmlDocumentFactProducer(
 
             WalkNodes(child, state, context, false, false);
         }
-
-        // A ListMap reads every occurrence as one list, so it is judged across all of them at once.
-        AddListMapFacts(childGroups, context, state);
 
         // Pass 3: cross-tag rules evaluated on the current object's full child set
         if (_crossTagRules.Count > 0)
@@ -607,6 +525,5 @@ public sealed class XmlDocumentFactProducer(
         LineOffsetIndex LineIndex,
         List<XmlFact> Facts,
         bool VariantSupported,
-        string? OwnerTypeName,
-        string? ContainerTypeName);
+        string? OwnerTypeName);
 }

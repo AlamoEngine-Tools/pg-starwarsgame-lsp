@@ -74,21 +74,19 @@ public sealed class ModProjectLoader
         }
         catch (JsonException ex)
         {
-            throw new ModProjectLoadException(BuildLoadErrorMessage(fileName, ex), ex, ProjectProblem.Unparseable);
+            throw new ModProjectLoadException(BuildLoadErrorMessage(fileName, ex), ex);
         }
 
         if (root is not JsonObject document)
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': The file is empty or is not a JSON object.",
-                problem: ProjectProblem.Unparseable);
+                $"Could not load mod project '{fileName}': The file is empty or is not a JSON object.");
 
         // JSON permits a repeated property and the parser accepts one; JsonObject only objects on
         // the first access, as a dictionary-key ArgumentException. A hand-edited file (the envelope
         // pasted in twice) deserves the file and property named instead.
         if (FindDuplicateProperty(text) is { } duplicate)
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': The property '{duplicate}' appears more than once. Keep one of them.",
-                problem: ProjectProblem.Unparseable);
+                $"Could not load mod project '{fileName}': The property '{duplicate}' appears more than once. Keep one of them.");
 
         // Before anything is read out of it: a project from a newer extension is refused rather
         // than read as best we can, because this build would go on to write its own shape back
@@ -96,8 +94,7 @@ public sealed class ModProjectLoader
         var declaredType = (string?)document["_type"];
         var declaredVersion = (string?)document["_typeVersion"];
         if (PgprojFormat.Check(declaredVersion, declaredType) is { CanLoad: false } refusal)
-            throw new ModProjectLoadException($"Could not load mod project '{fileName}': {refusal.Message}",
-                problem: ProjectProblem.UnsupportedVersion);
+            throw new ModProjectLoadException($"Could not load mod project '{fileName}': {refusal.Message}");
 
         document = BringForward(document, declaredVersion, path, fileName);
 

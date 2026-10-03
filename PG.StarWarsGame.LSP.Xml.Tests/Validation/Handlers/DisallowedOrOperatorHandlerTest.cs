@@ -15,7 +15,7 @@ public sealed class DisallowedOrOperatorHandlerTest
     [InlineData(XmlValueType.GameObjectTypeReferenceList)]
     [InlineData(XmlValueType.TypeReferenceList)]
     [InlineData(XmlValueType.NameReferenceList)]
-    [InlineData(XmlValueType.ListMap)]
+    [InlineData(XmlValueType.PerFactionObjectList)]
     public void Pipe_in_and_only_list_returns_error_with_comma_suggested_fix(XmlValueType type)
     {
         var tag = XmlHandlerTestFixtures.MakeTag("Tactical_Build_Prerequisites", type);

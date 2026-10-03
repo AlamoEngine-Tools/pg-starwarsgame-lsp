@@ -50,8 +50,6 @@ public sealed record GameIndex(
         WorkspaceDefinitions = original.WorkspaceDefinitions;
         WorkspaceReferences = original.WorkspaceReferences;
         WorkspaceGroupMemberships = original.WorkspaceGroupMemberships;
-        WorkspaceNameHashes = original.WorkspaceNameHashes;
-        BaselineNameHashes = original.BaselineNameHashes;
         Localisation = original.Localisation;
         AssetFiles = original.AssetFiles;
         ModelBones = original.ModelBones;
@@ -87,49 +85,6 @@ public sealed record GameIndex(
     /// </summary>
     public ImmutableDictionary<string, ImmutableArray<GroupMembership>> WorkspaceGroupMemberships { get; init; } =
         ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    ///     Workspace game objects by the hash the engine files them under (<see cref="IObjectNameHash" />),
-    ///     kept by the same per-document deltas as <see cref="WorkspaceDefinitions" /> - a name is
-    ///     hashed once, when it enters the index. Empty when the index service was given no hash.
-    /// </summary>
-    public ImmutableDictionary<uint, ImmutableArray<GameSymbol>> WorkspaceNameHashes { get; init; } =
-        ImmutableDictionary<uint, ImmutableArray<GameSymbol>>.Empty;
-
-    /// <summary>The shipped game objects by name hash, built once when the baseline is applied.</summary>
-    public ImmutableDictionary<uint, ImmutableArray<GameSymbol>> BaselineNameHashes { get; init; } =
-        ImmutableDictionary<uint, ImmutableArray<GameSymbol>>.Empty;
-
-    /// <summary>
-    ///     Whether a symbol is in the engine's name-hashed object table. Only game objects are:
-    ///     factions, SFX events, hardpoints and the rest are kept by managers of their own.
-    /// </summary>
-    public static bool IsNameHashedObject(GameSymbol symbol)
-    {
-        return symbol.Kind == GameSymbolKind.XmlObject &&
-               string.Equals(symbol.TypeName, "GameObjectType", StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    ///     The game objects - workspace and shipped - whose DIFFERENT names share
-    ///     <paramref name="hash" /> with <paramref name="symbol" />, one per name. The same name in
-    ///     another case or layer is one name to the engine, so it is never in the answer.
-    /// </summary>
-    public IReadOnlyList<GameSymbol> SharingNameHash(GameSymbol symbol, uint hash)
-    {
-        var byName = new Dictionary<string, GameSymbol>(StringComparer.OrdinalIgnoreCase) { [symbol.Id] = symbol };
-        var others = new List<GameSymbol>();
-        foreach (var table in (ImmutableDictionary<uint, ImmutableArray<GameSymbol>>[])
-                 [WorkspaceNameHashes, BaselineNameHashes])
-        {
-            if (!table.TryGetValue(hash, out var named)) continue;
-            foreach (var other in named)
-                if (byName.TryAdd(other.Id, other))
-                    others.Add(other);
-        }
-
-        return others;
-    }
 
     /// <summary>
     ///     Merged (baseline ∪ workspace) localisation key set. Used by

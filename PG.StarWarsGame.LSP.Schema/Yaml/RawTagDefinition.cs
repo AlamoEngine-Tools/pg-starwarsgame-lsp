@@ -21,5 +21,4 @@ internal sealed record RawTagDefinition
     public bool MultipleAllowed { get; init; }
     public VariantMode VariantMode { get; init; }
     public TagValidationOverride? ValidationOverride { get; init; }
-    public IReadOnlyList<RawTupleSlot> Slots { get; init; } = [];
 }

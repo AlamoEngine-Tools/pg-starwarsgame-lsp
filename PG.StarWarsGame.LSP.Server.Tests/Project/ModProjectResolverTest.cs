@@ -5,7 +5,6 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Project;
@@ -82,28 +81,6 @@ public sealed class ModProjectResolverTest
         Assert.Equal(2, config.XmlDirectories.Count);
         Assert.True(config.XmlDirectories.ToList().IndexOf(depXml)
                     < config.XmlDirectories.ToList().IndexOf(rootXml));
-    }
-
-    // The flattened lists lose whether a layer was named directly or pulled in; the shape keeps it.
-    [Fact]
-    public void Resolve_CarriesTheDependencyShape()
-    {
-        const string rootJson = """
-                                {
-                                  "modinfo": { "name": "Root" },
-                                  "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
-                                }
-                                """;
-        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-        {
-            [RootPath] = new(rootJson),
-            [DepPath] = new("""{ "modinfo": { "name": "Dep" } }""")
-        });
-        var (resolver, root) = Build(fs);
-
-        var config = resolver.Resolve(RootPath, root);
-
-        Assert.Equal(new ProjectDependencyShape(1, 1, 1, 0), config.Dependencies);
     }
 
     [Fact]

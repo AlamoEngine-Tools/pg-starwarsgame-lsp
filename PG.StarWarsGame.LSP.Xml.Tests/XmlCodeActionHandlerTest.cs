@@ -14,54 +14,14 @@ namespace PG.StarWarsGame.LSP.Xml.Tests;
 public sealed class XmlCodeActionHandlerTest
 {
     private static XmlCodeActionHandler MakeSut(IXmlFixCache? cache = null,
-        ILspConfigurationProvider? config = null, IXmlCursorCodeActionProvider? cursor = null)
+        ILspConfigurationProvider? config = null)
     {
         var resolvedConfig = config ?? new FakeLspConfigurationProvider();
         var registry = new XmlCodeActionRegistry([
             new FixSuggestionCodeActionProvider(cache ?? new EmptyFixCache()),
             new CreateLocKeyCodeActionProvider(resolvedConfig)
         ]);
-        return new XmlCodeActionHandler(registry, resolvedConfig, cursor is null ? [] : [cursor]);
-    }
-
-    // ── cursor actions ───────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task CursorProviders_AreAskedAboutTheRequestStart_WithNoDiagnosticsAtAll()
-    {
-        var cursor = new RecordingCursorProvider();
-        var request = ParamsWithDiagnostics("file:///test.xml") with
-        {
-            Range = new LspRange(new Position(4, 7), new Position(4, 7))
-        };
-
-        var result = await MakeSut(cursor: cursor).Handle(request, CancellationToken.None);
-
-        Assert.Equal("cursor", Assert.Single(result!).CodeAction!.Title);
-        Assert.Equal(new Position(4, 7), cursor.Asked);
-    }
-
-    [Fact]
-    public async Task CursorProviders_AreSilent_WhenCodeActionsAreOff()
-    {
-        var config = FakeLspConfigurationProvider.WithFeatures(
-            new FeatureFlags { Xml = new XmlFeatureFlags { CodeActions = false } });
-
-        var result = await MakeSut(config: config, cursor: new RecordingCursorProvider())
-            .Handle(ParamsWithDiagnostics("file:///test.xml"), CancellationToken.None);
-
-        Assert.Empty(result!);
-    }
-
-    private sealed class RecordingCursorProvider : IXmlCursorCodeActionProvider
-    {
-        public Position? Asked { get; private set; }
-
-        public IEnumerable<CommandOrCodeAction> Handle(DocumentUri documentUri, Position position)
-        {
-            Asked = position;
-            return [new CommandOrCodeAction(new CodeAction { Title = "cursor" })];
-        }
+        return new XmlCodeActionHandler(registry, resolvedConfig);
     }
 
     // ── feature flag ─────────────────────────────────────────────────────────

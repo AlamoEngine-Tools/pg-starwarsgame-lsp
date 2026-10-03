@@ -31,13 +31,7 @@ public sealed class ProjectIndexSnapshot
     // 8 = entries carry ParserState (2026-09-30). A snapshot written before this has none, so a
     // Lua document served from it contributes no annotations - the very defect the field fixes.
     // Anything that changes the LAYOUT of those opaque bytes needs a bump here too.
-    // 9 = 0.4.1 (2026-10-02): tuple and ListMap values are read through the tag's slots - object
-    // items become references, an object-keyed ListMap records every item untyped and an enum key
-    // none. The schema fingerprint folds in slots too, but a snapshot whose schema did not change
-    // would replay the old parser's references.
-    // One bump per release, not per change: within a cycle, clear local caches when parser output
-    // changes; only the difference between two releases reaches anyone.
-    public const int CurrentSchemaVersion = 9;
+    public const int CurrentSchemaVersion = 8;
 
     [Key(0)] public int SchemaVersion { get; set; }
 

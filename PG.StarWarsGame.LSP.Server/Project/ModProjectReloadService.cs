@@ -7,7 +7,6 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Startup;
-using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
 
@@ -28,7 +27,6 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly PgprojMigrationOffer? _migrationOffer;
     private readonly IClientRefreshNotifier? _refresh;
     private readonly IProjectConfigurationResolver _resolver;
-    private readonly ServerStatusRecorder? _status;
 
     private readonly IIconCatalogProvider? _icons;
     private List<string>? _lastRoots;
@@ -51,10 +49,8 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // wires it, and without it a catalog built before the projects resolved - by any preview
         // restored while the window was opening - answers with baseline icons for the whole
         // session, because nothing else ever drops it.
-        IIconCatalogProvider? icons = null,
-        ServerStatusRecorder? status = null)
+        IIconCatalogProvider? icons = null)
     {
-        _status = status;
         _resolver = resolver;
         _indexer = indexer;
         _localisation = localisation;
@@ -107,7 +103,6 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         if (_index.Current.Baseline.Symbols.IsEmpty)
         {
             _logger.LogError("No baseline is loaded; refusing to index '{Roots}'.", string.Join(", ", roots));
-            _status?.RecordProject(true, ProjectProblem.BaselineRefused);
             _notifier.ShowError(
                 "The shipped-game baseline could not be loaded, so nothing in this project can be "
                 + "checked against the game. Set 'aet-eaw-edit.lsp.source.baseline.type' to 'http' to "

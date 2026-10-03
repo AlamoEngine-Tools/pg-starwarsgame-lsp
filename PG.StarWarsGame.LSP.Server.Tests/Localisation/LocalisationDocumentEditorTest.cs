@@ -123,8 +123,7 @@ public sealed class LocalisationDocumentEditorTest
     public void GoldenFile_SingleEdit_LeavesEveryOtherLineByteIdentical()
     {
         var path = Path.Combine(FindRepoRoot(), "eaw", "Data", "Text", "MasterTextFile.csv");
-        if (!File.Exists(path))
-            Assert.Skip("Needs the checked-in eaw/ tree.");
+        Assert.True(File.Exists(path), $"Golden file not found: {path}");
 
         var original = File.ReadAllText(path);
         var result = Apply(original, ".csv", SetCell(10, "ENGLISH", "A Changed Value"));

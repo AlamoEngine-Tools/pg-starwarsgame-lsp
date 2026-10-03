@@ -124,11 +124,8 @@ internal static class ValueTypeHint
             XmlValueType.UnitSpawnProbabilityTable =>
                 "**Format:** `UnitType, probability` pairs",
 
-            // What the items are belongs to the tag's slots, not to the type: TupleList is the
-            // engine's generic pair list, used for music events AND for terrain/model pairs, and a
-            // ListMap maps factions to objects AND animation states to units.
-            XmlValueType.TupleList or XmlValueType.ListMap =>
-                $"**Format:** {TupleItems.Describe(tag)}",
+            XmlValueType.TupleList =>
+                "**Format:** `MusicEventName, weight` pairs",
 
             XmlValueType.DeathCloneSpec =>
                 "**Format:** `condition, UnitType` pairs",

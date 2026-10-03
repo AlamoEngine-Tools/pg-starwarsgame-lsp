@@ -4,7 +4,6 @@
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
-using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
@@ -21,17 +20,14 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
     private readonly ILogger<ProjectConfigurationResolver> _logger;
     private readonly IUserNotifier _notifier;
     private readonly ModProjectResolver _resolver;
-    private readonly ServerStatusRecorder? _status;
 
     public ProjectConfigurationResolver(
         IModProjectDetector detector,
         ModProjectLoader loader,
         ModProjectResolver resolver,
         IUserNotifier notifier,
-        ILogger<ProjectConfigurationResolver> logger,
-        ServerStatusRecorder? status = null)
+        ILogger<ProjectConfigurationResolver> logger)
     {
-        _status = status;
         _detector = detector;
         _loader = loader;
         _resolver = resolver;
@@ -51,18 +47,11 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
             if (_detector.TryFind(roots, out var pgprojPath) && pgprojPath is not null)
             {
                 var file = _loader.Load(pgprojPath);
-                var resolved = _resolver.Resolve(pgprojPath, file);
-                _status?.RecordProject(true, ProjectProblem.None);
-                return resolved;
+                return _resolver.Resolve(pgprojPath, file);
             }
         }
         catch (Exception ex)
         {
-            // Every failure here is a project that was found: TryFind returns false rather than
-            // throwing when there is none, and throws only for more than one.
-            _status?.RecordProject(true,
-                ex is ModProjectLoadException load ? load.Problem : ProjectProblem.Invalid);
-
             _logger.LogError(ex,
                 "Failed to resolve mod project configuration under [{Roots}]; no directories will be indexed.",
                 string.Join(", ", roots));
@@ -81,7 +70,6 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         // one. That used to be a log line nobody reads, which left the editor looking like it worked
         // and simply knew nothing.
         _logger.LogWarning("No .pgproj found under [{Roots}]; nothing to index.", string.Join(", ", roots));
-        _status?.RecordProject(false, ProjectProblem.Missing);
         _notifier.ShowError(
             $"No .pgproj file was found under [{string.Join(", ", roots)}]. This folder is not a mod "
             + "project, so nothing has been indexed and no XML or Lua support is available here. Open "
