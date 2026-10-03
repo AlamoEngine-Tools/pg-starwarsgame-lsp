@@ -28,7 +28,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 public sealed class ListMapHandler : XmlDiagnosticsHandler<XmlListMapFact>
 {
     /// <inheritdoc />
-    public override DiagnosticId? DefaultId => DiagnosticIds.PerFactionObjectList;
+    public override DiagnosticId? DefaultId => DiagnosticIds.ListMap;
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlListMapFact fact, DiagnosticsContext ctx)
     {
@@ -92,7 +92,7 @@ public sealed class ListMapHandler : XmlDiagnosticsHandler<XmlListMapFact>
                     // The engine stops reading the value here and keeps nothing of it.
                     results.Add(At(item, XmlDiagnosticSeverity.Error,
                         $"<{tag.Tag}> has to start with {Article(keySlot.Label)} {Describe(keySlot)}: '{item.Text}' is none. The engine drops the whole value.",
-                        DiagnosticIds.PerFactionObjectListUnknownFaction));
+                        DiagnosticIds.ListMapFirstItemNotAKey));
                     break;
                 }
 

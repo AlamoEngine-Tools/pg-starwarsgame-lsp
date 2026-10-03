@@ -12,7 +12,7 @@
                                     override must fire. It is the control that proves the overrides
                                     are reached at all, so a regression cannot pass by going quiet.
        E2E_BAD_TERRAIN_INFANTRY     Land_Terrain_Model_Mapping with two INVALID items on purpose:
-                                    Not_A_Terrain is no TerrainType, and E2E_NO_SUCH_MODEL.ALO is a
+                                    Not_A_Terrain is no map environment, and E2E_NO_SUCH_MODEL.ALO is a
                                     model no game data has. Each slot must be checked as what it is;
                                     the valid items around them are the control. Multi-line like the
                                     shipped data, so the items sit on lines where no element starts.

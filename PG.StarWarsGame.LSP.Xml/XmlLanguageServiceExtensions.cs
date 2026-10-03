@@ -40,7 +40,6 @@ public static class XmlLanguageServiceExtensions
 
         // XmlTagValueFact handlers (format validators)
         services.AddSingleton<IXmlDiagnosticsHandler, DeprecatedTagHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, ContextNamePairHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ContextNameListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageNonzeroHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, NonNegativeValueHandler>();

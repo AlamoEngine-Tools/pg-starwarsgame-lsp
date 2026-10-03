@@ -21,14 +21,20 @@ public static class DiagnosticIds
     public static readonly DiagnosticId ConditionalSfxEvent = new(DiagnosticGroup.References, 3);
     public static readonly DiagnosticId ConditionalSpeechEvent = new(DiagnosticGroup.References, 4);
     public static readonly DiagnosticId ContextNameList = new(DiagnosticGroup.References, 5);
+
+    /// <summary>
+    ///     No longer raised: it was the "exactly one pair" rule of the faction music lists, and the
+    ///     engine reads any number of pairs from one tag. Kept so a suppression naming it stays inert.
+    /// </summary>
     public static readonly DiagnosticId ContextNamePair = new(DiagnosticGroup.References, 6);
+
     public static readonly DiagnosticId FactionReference = new(DiagnosticGroup.References, 7);
     public static readonly DiagnosticId GuiActivatedAbilityDefinitionSubObjectList = new(DiagnosticGroup.References, 8);
     public static readonly DiagnosticId HardPointSfxMap = new(DiagnosticGroup.References, 9);
     public static readonly DiagnosticId MusicEventReference = new(DiagnosticGroup.References, 10);
     public static readonly DiagnosticId NameReference = new(DiagnosticGroup.References, 11);
     public static readonly DiagnosticId NameReferenceList = new(DiagnosticGroup.References, 12);
-    public static readonly DiagnosticId PerFactionObjectList = new(DiagnosticGroup.References, 13);
+    public static readonly DiagnosticId ListMap = new(DiagnosticGroup.References, 13);
     public static readonly DiagnosticId PerFactionPlanet = new(DiagnosticGroup.References, 14);
 
     /// <summary>
@@ -46,13 +52,13 @@ public static class DiagnosticIds
     public static readonly DiagnosticId StoryDialogReference = new(DiagnosticGroup.References, 22);
     public static readonly DiagnosticId ContextNamePairUnresolvedMusicEvent = new(DiagnosticGroup.References, 23);
     public static readonly DiagnosticId NameReferenceEmpty = new(DiagnosticGroup.References, 24);
-    public static readonly DiagnosticId PerFactionObjectListUnknownFaction = new(DiagnosticGroup.References, 25);
+    public static readonly DiagnosticId ListMapFirstItemNotAKey = new(DiagnosticGroup.References, 25);
 
     /// <summary>
     ///     No longer raised: the engine never parses an empty value - it keeps the list it had - so
     ///     there is nothing wrong to report.
     /// </summary>
-    public static readonly DiagnosticId PerFactionObjectListEmpty = new(DiagnosticGroup.References, 26);
+    public static readonly DiagnosticId ListMapEmptyValue = new(DiagnosticGroup.References, 26);
 
     public static readonly DiagnosticId StoryDialogChapterNotDefined = new(DiagnosticGroup.References, 27);
 
@@ -81,9 +87,9 @@ public static class DiagnosticIds
     /// <summary>A dialog command argument naming something that does not resolve.</summary>
     public static readonly DiagnosticId DialogArgReference = new(DiagnosticGroup.References, 29);
 
-    // ListMap - a key, then the items it maps to. The first two ids predate the type's generic name
-    // and keep their numbers: PerFactionObjectList is the handler's default, and
-    // PerFactionObjectListUnknownFaction is a value that does not start with a key, of any kind.
+    // ListMap - a key, then the items it maps to. ListMap (References 13, the handler's default),
+    // ListMapFirstItemNotAKey (25) and ListMapEmptyValue (26) above predate the type's generic name
+    // and keep their numbers; only their field names changed, and the number is the id.
 
     /// <summary>
     ///     A repeated <c>ListMap</c> tag starts with an item that is no key, so its items join the

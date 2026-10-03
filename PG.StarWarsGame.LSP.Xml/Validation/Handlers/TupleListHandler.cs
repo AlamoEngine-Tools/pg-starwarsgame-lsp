@@ -47,14 +47,4 @@ internal static class TupleShape
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             $"<{fact.Tag.Tag}> holds {count} item(s), which is not a whole number of {TupleItems.Describe(fact.Tag)}.");
     }
-
-    /// <summary>An error when the value is not exactly one group.</summary>
-    public static XmlDiagnosticResult? ExactlyOneGroup(XmlTagValueFact fact)
-    {
-        var count = TupleItems.Read(fact.Tag, fact.RawValue).Count;
-        if (count == TupleItems.GroupSize(fact.Tag)) return null;
-
-        return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"<{fact.Tag.Tag}> takes one of {TupleItems.Describe(fact.Tag)}, and holds {count} item(s).");
-    }
 }

@@ -37,7 +37,7 @@ public sealed class TupleSlotSmokeTest(E2eModServerFixture fixture) : IClassFixt
 
         var messages = (await received).Diagnostics.Select(d => d.Message).ToList();
 
-        Assert.Contains(messages, m => m.Contains("'Not_A_Terrain' is not a TerrainType value", StringComparison.Ordinal));
+        Assert.Contains(messages, m => m.Contains("'Not_A_Terrain' is not a MapEnvironment value", StringComparison.Ordinal));
         Assert.Contains(messages, m => m.Contains("'E2E_NO_SUCH_MODEL.ALO' was not found", StringComparison.Ordinal));
         Assert.DoesNotContain(messages, m => m.Contains("EI_TROOPER", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(messages, m => m.Contains("'Arctic'", StringComparison.OrdinalIgnoreCase));

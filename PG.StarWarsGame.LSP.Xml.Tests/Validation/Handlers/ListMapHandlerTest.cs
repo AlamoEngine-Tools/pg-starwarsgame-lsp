@@ -100,7 +100,7 @@ public sealed class ListMapHandlerTest
         var d = Assert.Single(Run(Buildables, false, Occ(3, "Empyre", "A")));
 
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
-        Assert.Equal(DiagnosticIds.PerFactionObjectListUnknownFaction, d.Id);
+        Assert.Equal(DiagnosticIds.ListMapFirstItemNotAKey, d.Id);
         Assert.Equal((3, 10), (d.OverrideLine, d.OverrideColumn));
         Assert.Equal("<Tactical_Buildable_Objects_Multiplayer> has to start with a Faction: 'Empyre' is none. The engine drops the whole value.", d.Message);
     }
@@ -173,7 +173,7 @@ public sealed class ListMapHandlerTest
         // Each occurrence in a variant clears the list first, so there is no previous key to join.
         var results = Run(Buildables, true, Occ(3, "Empire", "A"), Occ(4, "A"));
 
-        Assert.Contains(results, d => d.Id == DiagnosticIds.PerFactionObjectListUnknownFaction && d.OverrideLine == 4);
+        Assert.Contains(results, d => d.Id == DiagnosticIds.ListMapFirstItemNotAKey && d.OverrideLine == 4);
         Assert.DoesNotContain(results, d => d.Id == DiagnosticIds.ListMapContinuesPreviousKey);
     }
 

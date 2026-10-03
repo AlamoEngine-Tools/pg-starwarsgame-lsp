@@ -348,9 +348,8 @@ function gameDirectory(name: 'baseGameDirectory' | 'expansionDirectory'): string
 /**
  * Builds the complete resolved feature-flag object sent to the server via initializationOptions.
  * The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults everything to
- * true; the user-facing off-defaults (lua.hover, lua.diagnostics, tools.localisation,
- * story.discovery, tools.storySimulator) live in package.json, so the fallbacks here must mirror
- * package.json. Flags are restart-based: the config listener in activate() restarts the server when
+ * true; the user-facing defaults, including every flag that is off out of the box, live in
+ * package.json, so the fallbacks here must mirror package.json. Flags are restart-based: the config listener in activate() restarts the server when
  * any `aet-eaw-edit.features` value changes.
  */
 function resolveFeatureFlags() {

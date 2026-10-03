@@ -101,18 +101,31 @@ public static class SuppressionCodeActionBuilder
         });
     }
 
+    /// <summary>Lines kept from each end of a range longer than twice this.</summary>
+    private const int ReportLinesPerEnd = 20;
+
+    /// <summary>Characters kept of a longer source line.</summary>
+    private const int ReportLineLength = 400;
+
     /// <summary>
     ///     What a report says about one diagnostic: its id, severity and message, the file NAME, and
-    ///     every source line the range touches. The name and not the path, because the report goes
-    ///     into a public issue; the lines whole, because a multi-line value is the usual false
-    ///     positive and its first line alone shows nothing.
+    ///     the source lines the range touches. The name and not the path, because the report goes
+    ///     into a public issue; several lines, because a multi-line value is the usual false positive
+    ///     and its first line alone shows nothing.
     /// </summary>
+    /// <remarks>
+    ///     Truncated, because a prefilled issue stops working somewhere past 8 KB and a whole-object
+    ///     diagnostic can span hundreds of lines. A long range keeps its first and last
+    ///     <see cref="ReportLinesPerEnd" /> lines - where the value starts and where it closes - with
+    ///     one line saying how many were left out; a line longer than
+    ///     <see cref="ReportLineLength" /> characters is cut.
+    /// </remarks>
     private static JObject ReportPayload(DocumentUri documentUri, Diagnostic diagnostic, DiagnosticId id,
         string[] lines)
     {
         var first = Math.Clamp(diagnostic.Range.Start.Line, 0, Math.Max(lines.Length - 1, 0));
         var last = Math.Clamp(diagnostic.Range.End.Line, first, Math.Max(lines.Length - 1, 0));
-        var source = lines.Length == 0 ? [] : lines[first..(last + 1)];
+        var source = TruncateForReport(lines.Length == 0 ? [] : lines[first..(last + 1)]);
         var path = documentUri.Path;
 
         return new JObject
@@ -124,6 +137,21 @@ public static class SuppressionCodeActionBuilder
             ["startLine"] = first,
             ["lines"] = new JArray(source.Cast<object>().ToArray())
         };
+    }
+
+    private static string[] TruncateForReport(string[] source)
+    {
+        var lines = source.Select(l => l.Length > ReportLineLength ? l[..ReportLineLength] + "..." : l).ToList();
+        if (lines.Count <= 2 * ReportLinesPerEnd)
+            return [.. lines];
+
+        var omitted = lines.Count - 2 * ReportLinesPerEnd;
+        return
+        [
+            .. lines.Take(ReportLinesPerEnd),
+            $"... {omitted} lines omitted ...",
+            .. lines.Skip(lines.Count - ReportLinesPerEnd)
+        ];
     }
 
     private static CommandOrCodeAction Insert(

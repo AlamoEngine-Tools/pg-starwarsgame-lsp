@@ -7,7 +7,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
 ///     Named handler (ID: <c>context-name-list</c>) for tags holding any number of tuple groups in
-///     one value - <c>Land_Terrain_Model_Mapping</c>. Reached through <c>validationOverride</c>.
+///     one value - <c>Land_Terrain_Model_Mapping</c> and the faction music lists, which the engine
+///     reads pair by pair until the items run out. Reached through <c>validationOverride</c>.
 /// </summary>
 /// <remarks>
 ///     It counts and nothing else; what each item is belongs to the tag's slots, checked per item by

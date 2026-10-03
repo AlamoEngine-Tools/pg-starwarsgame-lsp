@@ -16,7 +16,11 @@ export interface DiagnosticReportPayload {
     fileName: string;
     /** 0-based, as the server counts. */
     startLine: number;
-    /** Every source line the diagnostic's range touches, whole. */
+    /**
+     * The source lines the diagnostic's range touches. The server truncates: a range over 40
+     * lines keeps its first and last 20 with one line saying how many were left out, and a line
+     * over 400 characters is cut.
+     */
     lines: string[];
 }
 

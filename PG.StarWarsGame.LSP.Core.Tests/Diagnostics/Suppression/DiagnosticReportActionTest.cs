@@ -80,6 +80,54 @@ public sealed class DiagnosticReportActionTest
             report["lines"]!.Select(t => (string)t!).ToArray());
     }
 
+    private static string[] ReportedLines(string[] lines, Diagnostic diagnostic)
+    {
+        var report = (JObject)SuppressionCodeActionBuilder
+            .Build(Uri, diagnostic, Id, SuppressionCommentFormat.Xml, lines, [])
+            .Select(a => a.CodeAction!)
+            .First(a => a.Command?.Name == DiagnosticReportCommands.ReportOnGitHub)
+            .Command!.Arguments![0];
+        return report["lines"]!.Select(t => (string)t!).ToArray();
+    }
+
+    [Fact]
+    public void AVeryLongRange_KeepsItsStartAndEnd_AndSaysWhatWasLeftOut()
+    {
+        // A whole-object diagnostic can span hundreds of lines, which no prefilled issue survives.
+        // The start shows where it begins and the end where the value closes; the middle goes.
+        var lines = Enumerable.Range(0, 100).Select(i => $"line {i}").ToArray();
+        var diagnostic = Diagnostic with { Range = new LspRange(new Position(0, 0), new Position(99, 3)) };
+
+        var reported = ReportedLines(lines, diagnostic);
+
+        Assert.Equal(41, reported.Length);
+        Assert.Equal("line 0", reported[0]);
+        Assert.Equal("line 19", reported[19]);
+        Assert.Equal("... 60 lines omitted ...", reported[20]);
+        Assert.Equal("line 80", reported[21]);
+        Assert.Equal("line 99", reported[40]);
+    }
+
+    [Fact]
+    public void AVeryLongLine_IsCut()
+    {
+        var lines = new[] { new string('x', 1000) };
+        var diagnostic = Diagnostic with { Range = new LspRange(new Position(0, 0), new Position(0, 5)) };
+
+        var line = Assert.Single(ReportedLines(lines, diagnostic));
+
+        Assert.Equal(new string('x', 400) + "...", line);
+    }
+
+    [Fact]
+    public void ARangeOfFortyLines_IsSentWhole()
+    {
+        var lines = Enumerable.Range(0, 40).Select(i => $"line {i}").ToArray();
+        var diagnostic = Diagnostic with { Range = new LspRange(new Position(0, 0), new Position(39, 3)) };
+
+        Assert.Equal(lines, ReportedLines(lines, diagnostic));
+    }
+
     [Fact]
     public void ComesAfterTheSuppressions()
     {

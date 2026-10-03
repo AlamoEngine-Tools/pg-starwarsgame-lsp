@@ -312,7 +312,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // its items, and one handler reads every occurrence of either the way the engine does.
         // 155 -> 156: NameCrcCollisionHandler. The engine files game objects by a CRC-32 of the name
         // and keeps the first it loads, so of two names sharing a hash one can never be found.
-        const int expectedHandlerCount = 156;
+        // 156 -> 155: ContextNamePairHandler removed. Its "exactly one pair" rule was wrong: the
+        // engine reads any number of pairs from a music list, so those tags use context-name-list.
+        const int expectedHandlerCount = 155;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

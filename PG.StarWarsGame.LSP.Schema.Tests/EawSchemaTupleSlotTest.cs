@@ -74,30 +74,40 @@ public sealed class EawSchemaTupleSlotTest
     }
 
     [Fact]
-    public void Shipped_TerrainModelMapping_IsATerrainThenAModel()
+    public void Shipped_TerrainModelMapping_IsAnEnvironmentThenAModel()
     {
+        // Read through the same converter as the music lists, so Space parses here too.
         var slots = Shipped.Value.GetTag("Land_Terrain_Model_Mapping")!.Slots;
 
-        Assert.Equal(["Terrain", "Model"], slots.Select(s => s.Label));
+        Assert.Equal(["Environment", "Model"], slots.Select(s => s.Label));
         Assert.Equal(ReferenceKind.Enum, slots[0].ReferenceKind);
-        Assert.Equal("TerrainType", slots[0].Enum?.Name);
+        Assert.Equal("MapEnvironment", slots[0].Enum?.Name);
         Assert.Equal(ReferenceKind.ModelFile, slots[1].ReferenceKind);
     }
 
     [Theory]
     [InlineData("Music_Event_List_Ambient")]
     [InlineData("Music_Event_List_Battle")]
-    public void Shipped_MusicLists_AreAnUntypedContextThenAMusicEvent(string tag)
+    public void Shipped_MusicLists_AreAnEnvironmentThenAMusicEvent_AnyNumberOfPairs(string tag)
     {
-        // The context is the seven terrains plus Space in the shipped data, so it is NOT
-        // TerrainType - typing it so would flag every Space.
+        // Measured: the first item goes through the map-environment converter - the seven terrains
+        // and Space - and one tag can hold several pairs, which the engine reads until the items
+        // run out. The old one-pair rule rejected values the game loads.
         var definition = Shipped.Value.GetTagsForType("Faction")
             .Single(t => t.Tag.Equals(tag, StringComparison.OrdinalIgnoreCase));
 
-        Assert.Equal(["Context", "Music event"], definition.Slots.Select(s => s.Label));
-        Assert.Equal(ReferenceKind.None, definition.Slots[0].ReferenceKind);
-        Assert.Equal(ReferenceKind.XmlObject, definition.Slots[1].ReferenceKind);
+        Assert.Equal(["Environment", "Music event"], definition.Slots.Select(s => s.Label));
+        Assert.Equal("MapEnvironment", definition.Slots[0].Enum?.Name);
         Assert.Equal("MusicEvent", definition.Slots[1].ObjectType?.TypeName);
+        Assert.NotEqual("context-name-pair", definition.ValidationOverride?.ValidationId);
+    }
+
+    [Fact]
+    public void Shipped_MapEnvironment_IsTheEngineList()
+    {
+        var values = Shipped.Value.GetEnum("MapEnvironment")!.Values.Select(v => v.Name).ToList();
+
+        Assert.Equal(["Temperate", "Arctic", "Desert", "Forest", "Swamp", "Volcanic", "Urban", "Space"], values);
     }
 
     // ── ListMap: a key, then the items it maps to ──────────────────────────────
