@@ -1,0 +1,15 @@
+# Repositories the LSP builds against. Read by setup-workspace.sh and setup-workspace.ps1;
+# "setup-workspace record" rewrites the pins of the external rows.
+#
+# Paths are relative to this repo's root and stay inside the workspace (its parent folder).
+# ref:   default      Owned repo - the latest commit on the remote's default branch. On a pull
+#                     request, CI uses a branch named like the PR's branch instead, if one exists.
+#        40-char SHA  External repo - pinned. Moves only when someone records a new pin.
+# group: build        Needed to compile the solution and run its unit tests
+#        e2e          Needed only by the E2E tests
+#
+# name            path                 group  ref                                       url
+ModVerify         ../ModVerify         build  ee9fc4bd6126054ac791e3a5c6e39d17c385e921  https://github.com/AlamoEngine-Tools/ModVerify.git
+PetroglyphTools   ../PetroglyphTools   build  106130be12700af3b9d8f66e9acc2f9c85966130  https://github.com/AlamoEngine-Tools/PetroglyphTools.git
+eaw-schema        schema               build  default                                   https://github.com/AlamoEngine-Tools/eaw-schema.git
+eaw-baseline      baseline             e2e    default                                   https://github.com/AlamoEngine-Tools/eaw-baseline.git

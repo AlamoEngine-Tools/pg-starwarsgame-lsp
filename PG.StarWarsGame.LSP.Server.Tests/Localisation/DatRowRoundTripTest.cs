@@ -28,7 +28,10 @@ public sealed class DatRowRoundTripTest
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "PG.StarWarsGame.LSP.slnx")))
             dir = dir.Parent;
 
-        return Path.Combine(dir!.FullName, "eaw", "Data", "Text", "creditstext_english.dat");
+        var path = Path.Combine(dir!.FullName, "eaw", "Data", "Text", "creditstext_english.dat");
+        if (!File.Exists(path))
+            Assert.Skip("Needs the checked-in eaw/ tree.");
+        return path;
     }
 
     private static (ILocalisationRowReader Reader, ILocalisationDocumentEditor Editor) Build()
