@@ -197,12 +197,16 @@ public sealed class HttpSchemaProviderTest
         });
 
         await provider.LoadAsync(); // first load - downloads + populates cache
+        // Kept for the bug report: a warm start reads the cache, a cold one rebuilds from the
+        // network, and only the log used to say which.
+        Assert.False(provider.LastLoadFromCache);
         fake.Requests.Clear();
 
         await provider.LoadAsync(); // second load - cache hit; only manifest is fetched
 
         Assert.Single(fake.Requests);
         Assert.EndsWith("_index.json", fake.Requests[0].RequestUri!.ToString());
+        Assert.True(provider.LastLoadFromCache);
     }
 
     [Fact]
@@ -273,39 +277,85 @@ public sealed class HttpSchemaProviderTest
         Assert.True(provider.ReadyAsync.IsCompleted);
     }
 
-    // ── fake HTTP handler ───────────────────────────────────────────────────
+    // ── release tags ─────────────────────────────────────────────────────────
 
-    private sealed class FakeFailingHttpHandler : HttpMessageHandler
+    private const string MassYaml = "tags:\n  - tag: Mass\n    type: Float\n";
+
+    private static string ManifestJson(string schemaVersion = "2.1.0")
     {
-        private readonly Exception _exception;
-
-        public FakeFailingHttpHandler(Exception exception)
-        {
-            _exception = exception;
-        }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-        {
-            return Task.FromException<HttpResponseMessage>(_exception);
-        }
+        return JsonSerializer.Serialize(new { schemaVersion, tags = new[] { "tags/Unit.yaml" } });
     }
 
-    private sealed class FakeHttpMessageHandler : HttpMessageHandler
+    private static SchemaHttpCache CacheHolding(string tag, string schemaVersion = "2.1.0")
     {
-        private readonly Func<HttpRequestMessage, HttpResponseMessage> _respond;
+        var cache = new SchemaHttpCache(new FileHelper(new MockFileSystem()), NullLogger<SchemaHttpCache>.Instance);
+        cache.Update(ManifestJson(schemaVersion), [("tags/Unit.yaml", MassYaml)], tag: tag);
+        return cache;
+    }
 
-        public FakeHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> respond)
-        {
-            _respond = respond;
-        }
+    // A tag never changes, so a cached copy of it is the release: no request at all, which is also
+    // what makes an offline start work.
+    [Fact]
+    public async Task LoadAsync_CachedTagMatches_LoadsWithoutAnyRequest()
+    {
+        var cache = CacheHolding("v2.1.0");
+        var provider = new HttpSchemaProvider(
+            new HttpClient(new FakeFailingHttpHandler(new HttpRequestException("offline"))),
+            BaseUrl, cache, NullLogger<HttpSchemaProvider>.Instance, "v2.1.0");
 
-        public List<HttpRequestMessage> Requests { get; } = [];
+        await provider.LoadAsync();
 
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken ct)
-        {
-            Requests.Add(request);
-            return Task.FromResult(_respond(request));
-        }
+        Assert.NotNull(provider.GetTag("Mass"));
+        Assert.True(provider.LastLoadFromCache);
+        Assert.True(provider.ReadyAsync.IsCompleted);
+    }
+
+    [Fact]
+    public async Task LoadAsync_CachedTagDiffers_FetchesAndRecordsTheNewTag()
+    {
+        var cache = CacheHolding("v2.1.0");
+        var fake = new FakeHttpMessageHandler(req =>
+            req.RequestUri!.AbsolutePath.EndsWith("_index.json")
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ManifestJson("2.2.0")) }
+                : YamlResponse(MassYaml));
+        var provider = new HttpSchemaProvider(new HttpClient(fake), BaseUrl, cache,
+            NullLogger<HttpSchemaProvider>.Instance, "v2.2.0");
+
+        await provider.LoadAsync();
+
+        Assert.NotEmpty(fake.Requests);
+        Assert.Equal("v2.2.0", cache.CachedTag);
+        Assert.Equal("2.2.0", provider.LastVersionCheck?.DeclaredVersion);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WithoutATag_LeavesNoTagInTheCache()
+    {
+        var cache = CacheHolding("v2.1.0");
+        var fake = new FakeHttpMessageHandler(req =>
+            req.RequestUri!.AbsolutePath.EndsWith("_index.json")
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ManifestJson("2.3.0")) }
+                : YamlResponse(MassYaml));
+        var provider = new HttpSchemaProvider(new HttpClient(fake), BaseUrl, cache,
+            NullLogger<HttpSchemaProvider>.Instance);
+
+        await provider.LoadAsync();
+
+        Assert.Null(cache.CachedTag);
+    }
+
+    // The cache shortcut must not become a way around the gate.
+    [Fact]
+    public async Task LoadAsync_CachedTagMatches_StillAppliesTheVersionGate()
+    {
+        var cache = CacheHolding("v9.0.0", "9.0.0");
+        var provider = new HttpSchemaProvider(
+            new HttpClient(new FakeFailingHttpHandler(new HttpRequestException("offline"))),
+            BaseUrl, cache, NullLogger<HttpSchemaProvider>.Instance, "v9.0.0");
+
+        await provider.LoadAsync();
+
+        Assert.False(provider.LastVersionCheck?.CanLoad);
+        Assert.Null(provider.GetTag("Mass"));
     }
 }

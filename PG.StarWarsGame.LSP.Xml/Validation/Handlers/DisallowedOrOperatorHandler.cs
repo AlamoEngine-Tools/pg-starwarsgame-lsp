@@ -24,7 +24,7 @@ public sealed class DisallowedOrOperatorHandler : XmlDiagnosticsHandler<XmlTagVa
         XmlValueType.GameObjectTypeReferenceList,
         XmlValueType.TypeReferenceList,
         XmlValueType.NameReferenceList,
-        XmlValueType.PerFactionObjectList
+        XmlValueType.ListMap
     ];
 
     /// <inheritdoc />

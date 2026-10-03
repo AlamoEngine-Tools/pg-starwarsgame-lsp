@@ -1,0 +1,69 @@
+name: Prepare Release
+
+# Step 1 of a release: opens the version-bump pull request. master only takes pull requests, so the
+# bump cannot be pushed by the release itself. Merge the PR, then run "Release" (release.yml).
+#
+# A pull request opened with GITHUB_TOKEN starts no workflows, so this PR shows no CI checks.
+# Nothing is lost: the bump touches three version strings, and "Release" runs the full test
+# workflow before it builds anything.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version, MAJOR.MINOR.PATCH (the Marketplace allows no pre-release suffix)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Open version bump PR
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # The version arrives through the environment, never spliced into the command.
+    - name: Check the version is new
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Version must be MAJOR.MINOR.PATCH: '$VERSION'"
+          exit 1
+        fi
+        if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+          echo "::error::v$VERSION is already released"
+          exit 1
+        fi
+        if git ls-remote --exit-code --heads origin "release/v$VERSION" >/dev/null; then
+          echo "::error::Branch release/v$VERSION already exists - merge or delete its PR first"
+          exit 1
+        fi
+
+    - name: Bump and open the PR
+      env:
+        VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        previous=$(node scripts/release-version.js check)
+        node scripts/release-version.js set "$VERSION"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git switch -c "release/v$VERSION"
+        git commit -am "chore: release v$VERSION"
+        git push origin "release/v$VERSION"
+        gh pr create --base master --head "release/v$VERSION" --title "Release v$VERSION" --body "$(printf '%s\n' \
+          "Version bump $previous -> $VERSION in \`Directory.Build.props\`, \`package.json\` and \`REQUIRED_SERVER_VERSION\`." \
+          "" \
+          "After merging, run **Release** from the Actions tab on \`master\`." \
+          "" \
+          "No CI checks on this PR: pull requests opened by GITHUB_TOKEN start no workflows. Release runs the full test workflow first.")"

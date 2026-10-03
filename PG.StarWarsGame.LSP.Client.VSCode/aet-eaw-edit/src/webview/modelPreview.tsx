@@ -42,6 +42,7 @@ import {collectTextureNames} from './preview/materials';
 import {type InspectorSubject} from './preview/inspectorSubject';
 import {AssetLedger, loadState, type LoadTally} from './preview/loadProgress';
 import {anchorFlyout} from './preview/flyoutAnchor';
+import {handoffFor} from './preview/handoff';
 import {groundRange, snapToZero} from './preview/groundRange';
 import {InfoBadge} from './shared/InfoBadge';
 import {Button, IconButton} from './shared/Button';
@@ -323,8 +324,6 @@ const Shell = styled.div`
 
     /* The header's centre slot holds the dial ALONE, so it reads as centred rather than as one item
        in a row - the graph's own layout, one anchored button either side. */
-    /* The dial and the two hand-off buttons are one centred column, so the buttons sit under the
-       thing they belong to rather than in a corner of the header. */
 
     .header-modes {
         display: inline-flex;
@@ -333,9 +332,24 @@ const Shell = styled.div`
         gap: var(--space-2);
     }
 
-    .header-handoff {
-        display: inline-flex;
-        gap: var(--space-6);
+    /* The right edge as a column: the hand-off above the severity tag, the pair centred on the
+       header's height. The tag carries header-right for every other dock, which positions it on its
+       own; inside this column it is a plain item. */
+
+    .header-corner {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        gap: var(--space-2);
+    }
+
+    .header-corner .header-right {
+        position: static;
     }
 
     /* The model's identity, floating under the button that opens it. Anchored to the header, which
@@ -6208,6 +6222,7 @@ function ModelPreview(): React.JSX.Element {
     }, [problems, attachmentIssues, colourFindings, translatedOn, anyShaderSource, shieldOffShader]);
 
     const severity = worstSeverity(notices);
+    const handoff = scene === null ? null : handoffFor(scene.kind, scene.sourceFile);
     const problemWord = notices.length === 1 ? 'note' : 'notes';
 
     /**
@@ -8527,39 +8542,36 @@ function ModelPreview(): React.JSX.Element {
                                     })}
                                     onSelect={setMode}
                                 />
-
-                                {/* Hand-off, not view controls: this preview is read-only by design
-                                    and these are where editing happens. Under the dial rather than
-                                    in a corner, because they are about the subject it names. */}
-                                {scene.kind === 'Model' && (
-                                    <span className="header-handoff">
-                                        <IconButton
-                                            icon="open"
-                                            title="Open this model in AloViewer"
-                                            onClick={() => vscode.postMessage(
-                                                {type: 'openExternal', tool: 'model'})}
-                                        />
-                                        <IconButton
-                                            icon="bloom"
-                                            title="Open this file in the Particle Editor"
-                                            onClick={() => vscode.postMessage(
-                                                {type: 'openExternal', tool: 'particles'})}
-                                        />
-                                    </span>
-                                )}
                             </span>
                         )}
 
-                        <SeverityTag
-                            severity={severity}
-                            count={notices.length}
-                            expanded={problemsOpen}
-                            disabled={notices.length === 0}
-                            disabledReason="Nothing to report about this model"
-                            title={`${problemsOpen ? 'Hide' : 'Read'} `
-                                + `${notices.length} ${problemWord}`}
-                            onClick={() => setProblemsOpen(open => !open)}
-                        />
+                        {/* The right edge is a column: the hand-off above the severity tag. Outside
+                            the dial's span, because a particle file has no dial and is exactly where
+                            the Particle Editor belongs. One tool per scene - see handoffFor. */}
+                        <span className="header-corner">
+                            {handoff !== null && (
+                                <IconButton
+                                    icon={handoff.icon}
+                                    className="as-action"
+                                    title={handoff.title}
+                                    disabled={handoff.disabledReason !== undefined}
+                                    disabledReason={handoff.disabledReason ?? ''}
+                                    onClick={() => vscode.postMessage(
+                                        {type: 'openExternal', tool: handoff.tool})}
+                                />
+                            )}
+
+                            <SeverityTag
+                                severity={severity}
+                                count={notices.length}
+                                expanded={problemsOpen}
+                                disabled={notices.length === 0}
+                                disabledReason="Nothing to report about this model"
+                                title={`${problemsOpen ? 'Hide' : 'Read'} `
+                                    + `${notices.length} ${problemWord}`}
+                                onClick={() => setProblemsOpen(open => !open)}
+                            />
+                        </span>
 
 
                     </>}

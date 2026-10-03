@@ -326,7 +326,7 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 
 | What | Where | When | How to disable |
 |---|---|---|---|
-| XML schema | GitHub (raw content) | On server start; changed files only (ETag caching) | `aet-eaw-edit.lsp.schema.source` = `local` |
+| XML schema | GitHub - newest compatible schema release | On server start; nothing when the release is already cached; default branch when no release exists | `aet-eaw-edit.lsp.schema.source` = `local` |
 | Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\` | `aet-eaw-edit.lsp.source.baseline.type` = `local` or `none` |
 | Shader sources | Petroglyph's published download, or `aet-eaw-edit.shaders.sourceUrl` | Only on **Set Up Base Shader Sources** | Do not run the command |
 
@@ -345,6 +345,36 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 **"The game did not answer on 127.0.0.1:1234 within 60 s".** Debug build with `luadebug` run in its console required; match `aet-eaw-edit.game.luaDebugPort` to the instance (first free port from 1234 upward).
 
 **Server output.** `aet-eaw-edit.lsp.debug.traceServer` = `messages`; **EaWEdit** output channel.
+
+---
+
+## Building from source
+
+**git, the .NET 10 SDK and Node.js.** The server builds against sibling repositories listed in `workspace.deps`; the setup script clones them next to this repo.
+
+```
+git clone https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp.git PG.StarWarsGame.LSP
+cd PG.StarWarsGame.LSP
+./setup-workspace.sh            # or: pwsh ./setup-workspace.ps1
+dotnet build PG.StarWarsGame.LSP.slnx
+```
+
+- **Back in sync** - the same command: fast-forwards this repo and the owned repos (`schema/`, `baseline/`) on their default branch, moves ModVerify and PetroglyphTools to their pinned commits
+  - A repo with uncommitted changes or on another branch is left alone and reported
+- **State without changes** - `./setup-workspace.sh check`
+- **E2E data** - `--groups build,e2e` adds `baseline/`; the game files in `eaw/` and `foc/` are not distributable
+- **Cross-repo changes** - a schema or baseline branch named like the LSP branch; CI on the pull request builds against it
+- **External update** - the wanted commit checked out in `../ModVerify` or `../PetroglyphTools`, then `./setup-workspace.sh record` and a commit of `workspace.deps`
+
+### Releasing
+
+**GitHub Actions, two runs.** Maintainers only.
+
+1. **Prepare Release** - Actions tab, input `version`; opens the version-bump pull request
+2. **Merge** the pull request
+3. **Release** - Actions tab, on `master`; tests, builds, tags, creates the GitHub release; the Marketplace publish waits for approval in the `release` environment
+
+- **Schema first** - the schema version the server is built against must already be released; a merge to eaw-schema `main` publishes it
 
 ---
 

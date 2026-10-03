@@ -3,7 +3,7 @@
   "displayName": "Alamo Engine Tools - Empire at War Edit",
   "description": "Editor intelligence for Star Wars: Empire at War and Forces of Corruption mod development - XML completions, diagnostics, hover, go-to-definition, rename, and Lua support.",
   "author": {
-    "name": "Lukas GrÃ¼nwald"
+    "name": "Lukas Grünwald"
   },
   "publisher": "AlamoEngineTools",
   "version": "0.4.0",
@@ -483,6 +483,10 @@
         "enablement": "config.aet-eaw-edit.features.tools.localisation"
       },
       {
+        "command": "aet-eaw-edit.copyBugReportInfo",
+        "title": "EaWEdit: Copy Bug Report Info"
+      },
+      {
         "command": "aet-eaw-edit.lsp.previewModel",
         "title": "EaWEdit: Preview Model",
         "enablement": "config.aet-eaw-edit.features.tools.modelPreview"
@@ -641,7 +645,7 @@
             "type": "string",
             "default": "",
             "format": "uri-reference",
-            "markdownDescription": "Custom HTTP URL for the EaW XML schema index. Leave empty to use the default GitHub source.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `http`."
+            "markdownDescription": "Custom HTTP URL for the EaW XML schema index. Leave empty to use the newest compatible schema release.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `http`."
           },
           "aet-eaw-edit.lsp.schema.localPath": {
             "order": 1000,

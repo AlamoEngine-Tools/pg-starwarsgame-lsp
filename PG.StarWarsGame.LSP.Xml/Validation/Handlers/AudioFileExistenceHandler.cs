@@ -12,6 +12,4 @@ public sealed class AudioFileExistenceHandler : AssetFileExistenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.AudioFileExistence;
 
     protected override ReferenceKind TargetKind => ReferenceKind.AudioFile;
-    protected override string AssetNoun => "Audio";
-    protected override IReadOnlyList<string> AllowedExtensions => [".wav", ".mp3"];
 }

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using PG.Commons.Hashing;
 using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.Files.MEG;
 using PG.StarWarsGame.Files.MTD;
@@ -28,6 +29,7 @@ using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Schema.Versioning;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Caching;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -39,6 +41,7 @@ using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.ShipNames;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Status;
 using PG.StarWarsGame.LSP.Server.Workspace;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Suppression;
@@ -158,6 +161,8 @@ public static class ServerConfigurator
             .WithHandler<GetWatchDirectoriesHandler>()
             .WithHandler<GetEncyclopediaEntryHandler>()
             .WithHandler<GetPreviewSceneHandler>()
+            .WithHandler<ListModelsHandler>()
+            .WithHandler<GetServerStatusHandler>()
             .WithHandler<GetModelGlbHandler>()
             .WithHandler<GetModelDetailHandler>()
             .WithHandler<GetSubMeshGeometryHandler>()
@@ -203,6 +208,12 @@ public static class ServerConfigurator
                 services.AddSingleton<IFileSystem, FileSystem>();
                 services.AddSingleton<IFileHelper, FileHelper>();
                 services.AddSingleton<SchemaHttpCache>();
+                // One release lookup per start; the client is taken from the factory then, so
+                // holding it in a singleton costs no handler rotation that matters.
+                services.AddSingleton(sp => new SchemaReleaseResolver(
+                    sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(SchemaReleaseResolver)),
+                    sp.GetRequiredService<ILogger<SchemaReleaseResolver>>()));
+                services.AddSingleton<SchemaLocationResolver>();
 
                 // Late-binding proxy: OmniSharp resolves ISchemaProvider at handler-registration time
                 // (before OnInitialize). The proxy starts empty; Configure() is called in OnInitialize
@@ -318,11 +329,16 @@ public static class ServerConfigurator
                 services.AddSingleton<IPgprojMigrationOffer>(sp => sp.GetRequiredService<PgprojMigrationOffer>());
 
 
+                // What startup learned about itself, for aet/getServerStatus. One instance: every
+                // startup step writes into it and the bug report reads it.
+                services.AddSingleton<ServerStatusRecorder>();
+
                 services.AddSingleton<BaselineLoader>(sp =>
                     new BaselineLoader(
                         sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(BaselineLoader)),
                         sp.GetRequiredService<IFileHelper>(),
-                        sp.GetRequiredService<ILogger<BaselineLoader>>()));
+                        sp.GetRequiredService<ILogger<BaselineLoader>>(),
+                        sp.GetRequiredService<ServerStatusRecorder>()));
 
                 // Icon preview. The MTD reader needs PG.Commons' CRC32 hashing, and as of the 4.1.4
                 // packages nothing else supplies it: SupportDAT used to TryAdd IHashingService on
@@ -338,7 +354,8 @@ public static class ServerConfigurator
                     new IconPackLoader(
                         sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IconPackLoader)),
                         sp.GetRequiredService<IFileHelper>(),
-                        sp.GetRequiredService<ILogger<IconPackLoader>>()));
+                        sp.GetRequiredService<ILogger<IconPackLoader>>(),
+                        sp.GetRequiredService<ServerStatusRecorder>()));
                 services.AddSingleton<IIconCatalogProvider, IconCatalogProvider>();
                 // Same instance behind both contracts: the Xml diagnostics pipeline consumes the
                 // Core-side interface, which is how it stays unaware of the server's icon catalog.
@@ -391,6 +408,7 @@ public static class ServerConfigurator
                 services.AddSingleton<ShaderSourceResolver>();
 
                 services.AddHttpClient(nameof(HttpSchemaProvider));
+                services.AddHttpClient(nameof(SchemaReleaseResolver));
                 services.AddHttpClient(nameof(BaselineLoader));
                 services.AddHttpClient(nameof(IconPackLoader));
                 services.AddHttpClient("LuaSchema");
@@ -398,6 +416,11 @@ public static class ServerConfigurator
                 services.AddLuaLanguageServices();
                 services.AddXmlLanguageServices();
                 services.SupportLocalisationBaseline();
+                // The engine's object name hash, which the index keeps game objects by and the XML
+                // diagnostics find collisions with. It is PG.Commons' CRC-32, which only the host
+                // references; one cache in front of it means each name is hashed once.
+                services.AddSingleton<IObjectNameHash>(sp => new CachedObjectNameHash(
+                    new EngineObjectNameHash(sp.GetRequiredService<ICrc32HashingService>())));
                 services.AddSingleton<LocalisationProjectRegistry>();
                 services.AddSingleton<ILocalisationProjectRegistry>(sp =>
                     sp.GetRequiredService<LocalisationProjectRegistry>());

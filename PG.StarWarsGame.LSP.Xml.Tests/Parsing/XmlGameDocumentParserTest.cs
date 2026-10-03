@@ -217,7 +217,7 @@ public sealed class XmlGameDocumentParserTest
         schema.AddTag(new XmlTagDefinition
         {
             Tag = "AI_Player_Control",
-            ValueType = XmlValueType.PerFactionObjectList,
+            ValueType = XmlValueType.NameReferenceList,
             ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "AIPlayerType" },
             SemanticType = TagSemanticType.FactionAiPlayerPairList
@@ -241,7 +241,7 @@ public sealed class XmlGameDocumentParserTest
         schema.AddTag(new XmlTagDefinition
         {
             Tag = "AI_Player_Control",
-            ValueType = XmlValueType.PerFactionObjectList,
+            ValueType = XmlValueType.NameReferenceList,
             ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "AIPlayerType" },
             SemanticType = TagSemanticType.FactionAiPlayerPairList
@@ -608,6 +608,45 @@ public sealed class XmlGameDocumentParserTest
             lineText.Substring(reference.Column, reference.Length));
     }
 
+    // ── typed tuple slots ─────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     An object-typed slot is a reference like any other, so it gets hover, go-to, find
+    ///     references and rename from the pipeline everything else uses. Before slots, nothing was
+    ///     recorded for any TupleList tag at all.
+    /// </summary>
+    [Fact]
+    public async Task ParseAsync_TupleList_RecordsEachObjectSlotAsATypedReference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Faction"));
+        schema.AddType(Type("MusicEvent"));
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "Music_Event_List_Ambient", ValueType = XmlValueType.TupleList, MultipleAllowed = true,
+            Slots =
+            [
+                new TupleSlotDefinition { Label = "Context" },
+                new TupleSlotDefinition
+                {
+                    Label = "Music event", ReferenceKind = ReferenceKind.XmlObject, ReferenceTypeName = "MusicEvent",
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "MusicEvent" }
+                }
+            ]
+        });
+
+        const string text =
+            """<Faction Name="Rebel"><Music_Event_List_Ambient>Space, Rebel_Space_Ambient</Music_Event_List_Ambient></Faction>""";
+        var result = await Build(schema).ParseAsync("file:///f.xml", text, 1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References, r => r.TargetId == "Rebel_Space_Ambient");
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Equal("MusicEvent", reference.ExpectedTypeName);
+        Assert.Equal("Rebel_Space_Ambient", text.Substring(reference.Column, reference.Length));
+        // The untyped context slot records nothing: it names no object.
+        Assert.DoesNotContain(result.References, r => r.TargetId == "Space");
+    }
+
     // ── (damage type, clone) Death_Clone tuple tags ───────────────────────────
 
     private static XmlTagDefinition DeathCloneTag()
@@ -923,7 +962,7 @@ public sealed class XmlGameDocumentParserTest
         schema.AddTag(new XmlTagDefinition
         {
             Tag = "AI_Player_Control",
-            ValueType = XmlValueType.PerFactionObjectList,
+            ValueType = XmlValueType.NameReferenceList,
             ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "AIPlayerType" },
             SemanticType = TagSemanticType.FactionAiPlayerPairList
@@ -1213,25 +1252,71 @@ public sealed class XmlGameDocumentParserTest
         Assert.Contains(result.References, r => r.TargetId == "B_Wing");
     }
 
-    [Fact]
-    public async Task ParseAsync_PerFactionObjectList_Emits_Reference_Per_Token()
+    // ── ListMap: a key, then the items it maps to ──────────────────────────────
+
+    private static XmlTagDefinition ListMapTag(string tag, TupleSlotDefinition key)
     {
-        // PerFactionObjectList is a map<Faction, List<GameObjectType>>. All tokens - faction names
-        // and game objects alike - are emitted as references to enable go-to-definition.
-        // Structural + faction-identity validation is owned by PerFactionObjectListHandler;
-        // game object existence is validated by the reference pipeline.
+        return new XmlTagDefinition
+        {
+            Tag = tag, ValueType = XmlValueType.ListMap, MultipleAllowed = true,
+            Slots =
+            [
+                key,
+                new TupleSlotDefinition
+                {
+                    Label = "Object", ReferenceKind = ReferenceKind.XmlObject,
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
+                }
+            ]
+        };
+    }
+
+    [Fact]
+    public async Task ParseAsync_ListMap_AnObjectKey_RecordsEveryItem_Untyped()
+    {
+        // A faction is told from an object by looking it up, and the parser builds the index it
+        // would look in - so it cannot tell "Rebel" from "Ship_A" and types neither. Every name
+        // still resolves, navigates and renames; the ListMap handler, which has the index, judges
+        // which is which.
         var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-        schema.AddTag(ListRefTag("Transport_Units", "Unit", XmlValueType.PerFactionObjectList));
+        schema.AddTag(ListMapTag("Tactical_Buildable_Objects_Multiplayer", new TupleSlotDefinition
+        {
+            Label = "Faction", ReferenceKind = ReferenceKind.XmlObject,
+            ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
+        }));
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
-            """<Unit Name="UNIT_A"><Transport_Units>Pirates, Ship_A, Ship_B</Transport_Units></Unit>""", 1,
-            TestContext.Current.CancellationToken);
+            """<U Name="U"><Tactical_Buildable_Objects_Multiplayer>Pirates, Ship_A, Rebel, Ship_B</Tactical_Buildable_Objects_Multiplayer></U>""",
+            1, TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, result.References.Length);
-        Assert.Contains(result.References, r => r.TargetId == "Pirates");
-        Assert.Contains(result.References, r => r.TargetId == "Ship_A");
-        Assert.Contains(result.References, r => r.TargetId == "Ship_B");
+        Assert.Equal(["Pirates", "Ship_A", "Rebel", "Ship_B"], result.References.Select(r => r.TargetId));
+        Assert.All(result.References, r => Assert.Null(r.ExpectedTypeName));
+    }
+
+    [Fact]
+    public async Task ParseAsync_ListMap_AnEnumKey_IsNoReference_AndTheItemsAreTyped()
+    {
+        // An animation state is told apart from the schema alone - every key, wherever it sits.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(ListMapTag("Presence_Induced_Animations", new TupleSlotDefinition
+        {
+            Label = "Animation", ReferenceKind = ReferenceKind.Enum,
+            Enum = new EnumDefinition
+            {
+                Name = "AnimationType", Kind = EnumKind.SchemaFixed,
+                Values =
+                [
+                    new EnumValueDefinition { Name = "Attention" }, new EnumValueDefinition { Name = "Celebrate" }
+                ]
+            }
+        }));
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<U Name="U"><Presence_Induced_Animations>Attention, Emperor_Palpatine, Celebrate, Darth_Vader,</Presence_Induced_Animations></U>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Emperor_Palpatine", "Darth_Vader"], result.References.Select(r => r.TargetId));
+        Assert.All(result.References, r => Assert.Equal("GameObjectType", r.ExpectedTypeName));
     }
 
     [Fact]
@@ -1898,37 +1983,6 @@ public sealed class XmlGameDocumentParserTest
 
         var reference = Assert.Single(result.References);
         Assert.Equal("My_Special_Ability", reference.TargetId);
-    }
-
-    // ── presence-induced animation object references ────────────────────────
-
-    [Fact]
-    public async Task ParseAsync_PresenceInducedAnimations_CollectsObjectRefsSkippingTheAnimation()
-    {
-        // Format: AnimationStateId, ObjectName, ObjectName, ... - the first token is an
-        // engine animation state (not indexable); the rest are game objects whose presence
-        // triggers it, and must be navigable/validated as object references.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(new XmlTagDefinition
-        {
-            Tag = "Presence_Induced_Animations",
-            ValueType = XmlValueType.PerFactionObjectList,
-            ValidationOverride = new TagValidationOverride
-            {
-                ValidationId = "presence-induced-animations",
-                Mode = ValidationOverrideMode.Replace
-            }
-        });
-
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<U><Presence_Induced_Animations>Attention, Emperor_Palpatine, Darth_Vader,</Presence_Induced_Animations></U>""",
-            1, TestContext.Current.CancellationToken);
-
-        Assert.Equal(2, result.References.Length);
-        Assert.Contains(result.References, r => r.TargetId == "Emperor_Palpatine");
-        Assert.Contains(result.References, r => r.TargetId == "Darth_Vader");
-        Assert.DoesNotContain(result.References, r => r.TargetId == "Attention");
     }
 
     // ── tuple category enum reference extraction ────────────────────────────

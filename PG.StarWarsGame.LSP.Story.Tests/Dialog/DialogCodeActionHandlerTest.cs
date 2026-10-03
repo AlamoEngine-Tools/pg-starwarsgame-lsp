@@ -68,7 +68,9 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n");
 
-        var titles = (await Actions(handler, Request(1, Unknown.ToString()))).Select(a => a.Title);
+        // The two report actions follow the suppressions; this pins the suppressions alone.
+        var titles = (await Actions(handler, Request(1, Unknown.ToString()))).Select(a => a.Title)
+            .Where(t => t.StartsWith("Suppress"));
 
         Assert.Equal([
             $"Suppress {Unknown} for this line",
@@ -85,7 +87,8 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("BOGUS 1\n");
 
-        var titles = (await Actions(handler, Request(0, Unknown.ToString()))).Select(a => a.Title);
+        var titles = (await Actions(handler, Request(0, Unknown.ToString()))).Select(a => a.Title)
+            .Where(t => t.StartsWith("Suppress"));
 
         Assert.DoesNotContain($"Suppress {Unknown} for this chapter", titles);
         Assert.Equal(3, titles.Count());
@@ -127,7 +130,8 @@ public sealed class DialogCodeActionHandlerTest
     {
         var handler = Handler("[CHAPTER 0]\nBOGUS 1\n");
 
-        var action = (await Actions(handler, Request(1, Unknown.ToString()))).Last();
+        var action = (await Actions(handler, Request(1, Unknown.ToString())))
+            .Last(a => a.Title.StartsWith("Suppress"));
 
         Assert.Null(action.Edit);
         Assert.Equal(SuppressionCommands.SuppressGlobally, action.Command!.Name);

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Icons;
 
@@ -29,43 +30,49 @@ public sealed class IconPackLoader
     private readonly IFileHelper _fileHelper;
     private readonly HttpClient _httpClient;
     private readonly ILogger<IconPackLoader> _logger;
+    private readonly ServerStatusRecorder? _status;
 
-    public IconPackLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<IconPackLoader> logger)
+    public IconPackLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<IconPackLoader> logger,
+        ServerStatusRecorder? status = null)
     {
         _httpClient = httpClient;
         _fileHelper = fileHelper;
         _logger = logger;
+        _status = status;
     }
 
     private string CacheDir => _fileHelper.FileSystem.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".aetswg", "baselines");
 
-    public Task<IconPack> LoadAsync(BaselineSourceConfig config, CancellationToken ct)
+    public async Task<IconPack> LoadAsync(BaselineSourceConfig config, CancellationToken ct)
     {
-        return config.Type switch
+        var (pack, source) = await (config.Type switch
         {
             BaselineSourceType.Local => LoadLocalAsync(config.LocalPath, ct),
             BaselineSourceType.Http => LoadHttpAsync(config.Url, ct),
-            _ => Task.FromResult(IconPack.Empty)
-        };
+            _ => Task.FromResult((IconPack.Empty, StatusAssetSource.Empty))
+        });
+
+        _status?.RecordIconPack(source);
+        return pack;
     }
 
-    private async Task<IconPack> LoadLocalAsync(string? baselinePath, CancellationToken ct)
+    private async Task<(IconPack, StatusAssetSource)> LoadLocalAsync(string? baselinePath, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(baselinePath))
-            return IconPack.Empty;
+            return (IconPack.Empty, StatusAssetSource.Empty);
 
         var path = IconPackSerializer.SidecarPathFor(baselinePath);
         if (!_fileHelper.FileSystem.File.Exists(path))
-            return IconPack.Empty;
+            return (IconPack.Empty, StatusAssetSource.Empty);
 
         try
         {
             var pack = IconPackSerializer.Deserialize(
                 await _fileHelper.FileSystem.File.ReadAllBytesAsync(path, ct));
             if (pack is not null)
-                return pack;
+                return (pack, StatusAssetSource.Local);
 
             _logger.LogWarning("Icon pack at '{Path}' is stale or incompatible; previews will use " +
                                "the built-in placeholder.", path);
@@ -75,10 +82,10 @@ public sealed class IconPackLoader
             _logger.LogWarning(ex, "Failed to load icon pack from '{Path}'", path);
         }
 
-        return IconPack.Empty;
+        return (IconPack.Empty, StatusAssetSource.Empty);
     }
 
-    private async Task<IconPack> LoadHttpAsync(string baselineUrl, CancellationToken ct)
+    private async Task<(IconPack, StatusAssetSource)> LoadHttpAsync(string baselineUrl, CancellationToken ct)
     {
         var url = IconPackSerializer.SidecarPathFor(baselineUrl);
         var cacheFile = _fileHelper.FileSystem.Path.Combine(
@@ -93,7 +100,7 @@ public sealed class IconPackLoader
                 // Only cache once confirmed loadable, so a bad download never clobbers a good copy.
                 _fileHelper.FileSystem.Directory.CreateDirectory(CacheDir);
                 await _fileHelper.FileSystem.File.WriteAllBytesAsync(cacheFile, bytes, ct);
-                return pack;
+                return (pack, StatusAssetSource.Network);
             }
 
             _logger.LogWarning("Downloaded icon pack from '{Url}' is stale or incompatible; trying cache", url);
@@ -105,20 +112,20 @@ public sealed class IconPackLoader
         }
 
         if (!_fileHelper.FileSystem.File.Exists(cacheFile))
-            return IconPack.Empty;
+            return (IconPack.Empty, StatusAssetSource.Empty);
 
         try
         {
             var pack = IconPackSerializer.Deserialize(
                 await _fileHelper.FileSystem.File.ReadAllBytesAsync(cacheFile, ct));
             if (pack is not null)
-                return pack;
+                return (pack, StatusAssetSource.Cache);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to load cached icon pack from '{Path}'", cacheFile);
         }
 
-        return IconPack.Empty;
+        return (IconPack.Empty, StatusAssetSource.Empty);
     }
 }

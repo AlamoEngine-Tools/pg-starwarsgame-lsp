@@ -152,7 +152,27 @@ public sealed class SchemaIndex
             Notes = raw.Notes,
             MultipleAllowed = raw.MultipleAllowed,
             VariantMode = raw.VariantMode,
-            ValidationOverride = raw.ValidationOverride
+            ValidationOverride = raw.ValidationOverride,
+            Slots = raw.Slots.Select(ResolveSlot).ToList()
+        };
+    }
+
+    private TupleSlotDefinition ResolveSlot(RawTupleSlot raw)
+    {
+        return new TupleSlotDefinition
+        {
+            Label = raw.Label,
+            ReferenceKind = raw.ReferenceKind,
+            ReferenceTypeName = raw.ReferenceType,
+            ObjectType = raw.ReferenceKind == ReferenceKind.XmlObject && raw.ReferenceType is not null
+                ? _types.GetValueOrDefault(raw.ReferenceType)
+                : null,
+            Enum = raw.ReferenceKind == ReferenceKind.Enum && raw.EnumName is not null
+                ? _enums.GetValueOrDefault(raw.EnumName)
+                : null,
+            Kind = raw.ReferenceKind == ReferenceKind.XmlObject && raw.ReferenceType is not null
+                ? _kinds.GetValueOrDefault(raw.ReferenceType)
+                : null
         };
     }
 

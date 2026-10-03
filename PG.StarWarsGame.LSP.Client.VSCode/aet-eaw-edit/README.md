@@ -513,7 +513,7 @@ Never searched for; used only once set.
 
 ### Schema
 
-The EaW/FoC XML schema, fetched from GitHub on server start and cached with ETags; a local copy for offline or pinned use.
+The EaW/FoC XML schema: the newest compatible release, resolved on server start and cached per release; a local copy for offline or pinned use.
 
 | Setting | Default | Description |
 |---|---|---|
@@ -653,7 +653,7 @@ Three data sources; nothing else is sent or received. No telemetry.
 
 | What | Where | When | How to disable |
 |---|---|---|---|
-| XML schema | GitHub (raw content) | On server start; changed files only (ETag caching) | `aet-eaw-edit.lsp.schema.source` = `local` |
+| XML schema | GitHub - newest compatible schema release | On server start; nothing when the release is already cached; default branch when no release exists | `aet-eaw-edit.lsp.schema.source` = `local` |
 | Game baseline | Configured URL (default: GitHub releases) | Once; cached in `%USERPROFILE%\.pg-swg-lsp\baselines\`; refreshed on new versions | `aet-eaw-edit.lsp.source.baseline.type` = `local` or `none` |
 | Shader sources | Petroglyph's published download, or `aet-eaw-edit.shaders.sourceUrl` | Only on **Set Up Base Shader Sources** | Do not run the command; set `aet-eaw-edit.shaders.directory` to your own copy |
 

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Startup;
 
@@ -25,7 +26,8 @@ public sealed class ProjectConfigurationResolverTest
         return Build(fs, out _);
     }
 
-    private static ProjectConfigurationResolver Build(MockFileSystem fs, out RecordingUserNotifier notifier)
+    private static ProjectConfigurationResolver Build(MockFileSystem fs, out RecordingUserNotifier notifier,
+        ServerStatusRecorder? status = null)
     {
         var fileHelper = new FileHelper(fs);
         var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
@@ -34,7 +36,58 @@ public sealed class ProjectConfigurationResolverTest
         var detector = new ModProjectDetector(fileHelper, NullLogger<ModProjectDetector>.Instance);
         notifier = new RecordingUserNotifier();
         return new ProjectConfigurationResolver(detector, loader, resolver, notifier,
-            NullLogger<ProjectConfigurationResolver>.Instance);
+            NullLogger<ProjectConfigurationResolver>.Instance, status);
+    }
+
+    // ── what the bug report is told ──────────────────────────────────────────
+    //
+    // The user sees the message, which names the file and its path. The report carries the
+    // category instead, so it says what went wrong without saying where.
+
+    [Fact]
+    public void Resolve_NoProjectFile_RecordsMissing()
+    {
+        var fs = new MockFileSystem();
+        fs.AddDirectory(WorkspaceRoot);
+        var status = new ServerStatusRecorder();
+
+        Build(fs, out _, status).Resolve([WorkspaceRoot]);
+
+        Assert.False(status.ProjectDetected);
+        Assert.Equal(ProjectProblem.Missing, status.ProjectProblem);
+    }
+
+    [Theory]
+    [InlineData("""{ "modinfo": { "name": "My Mod" }, "directories": { "xml": ["data/xml"] } }""", ProjectProblem.None)]
+    [InlineData("{ not json", ProjectProblem.Unparseable)]
+    [InlineData("[]", ProjectProblem.Unparseable)]
+    [InlineData("""{ "_type": "aetswg.ModProject", "_typeVersion": "aetswg-99" }""", ProjectProblem.UnsupportedVersion)]
+    [InlineData("""{ "modinfo": { "name": "My Mod" }, "icons": { "megaTexture": "" } }""", ProjectProblem.Invalid)]
+    public void Resolve_OneProjectFile_RecordsItsCategory(string json, ProjectProblem expected)
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [ProjectPath] = new(json) });
+        var status = new ServerStatusRecorder();
+
+        Build(fs, out _, status).Resolve([WorkspaceRoot]);
+
+        Assert.True(status.ProjectDetected);
+        Assert.Equal(expected, status.ProjectProblem);
+    }
+
+    [Fact]
+    public void Resolve_TwoProjectFiles_RecordsAmbiguous()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ProjectPath] = new("{}"),
+            [Path.Combine(WorkspaceRoot, "sub", "other.pgproj")] = new("{}")
+        });
+        var status = new ServerStatusRecorder();
+
+        Build(fs, out _, status).Resolve([WorkspaceRoot]);
+
+        Assert.True(status.ProjectDetected);
+        Assert.Equal(ProjectProblem.Ambiguous, status.ProjectProblem);
     }
 
     [Fact]

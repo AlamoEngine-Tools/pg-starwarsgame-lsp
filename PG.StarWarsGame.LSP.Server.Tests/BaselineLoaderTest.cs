@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -269,13 +270,95 @@ public sealed class BaselineLoaderTest
         Assert.True(result.Symbols.ContainsKey("UNIT_A"));
     }
 
+    // ── which path was taken, for the bug report ─────────────────────────────
+    //
+    // Every outcome below used to be a log line and nothing else, so a report could not tell a
+    // fresh download from a week-old cache from the empty fallback.
+
+    private static readonly BaselineSourceConfig HttpSource = new()
+    {
+        Type = BaselineSourceType.Http,
+        Url = "https://example.com/foc-baseline.bin"
+    };
+
+    [Fact]
+    public async Task LoadAsync_Http_Success_RecordsNetwork()
+    {
+        var recorder = new ServerStatusRecorder();
+        var bytes = Serialize(MakeBaseline());
+        var loader = Build(new MockFileSystem(), new FakeHttpHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }), recorder: recorder);
+
+        await loader.LoadAsync(HttpSource, CancellationToken.None);
+
+        Assert.Equal(StatusAssetSource.Network, recorder.BaselineSource);
+    }
+
+    [Fact]
+    public async Task LoadAsync_Http_DownloadFails_CacheExists_RecordsCache()
+    {
+        var recorder = new ServerStatusRecorder();
+        var cacheFile = Path.Combine(CacheDir, "foc-baseline.bin");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+            { [cacheFile] = new(Serialize(MakeBaseline())) });
+        var loader = Build(fs, new FakeHttpHandler(_ => throw new HttpRequestException("network error")),
+            recorder: recorder);
+
+        await loader.LoadAsync(HttpSource, CancellationToken.None);
+
+        Assert.Equal(StatusAssetSource.Cache, recorder.BaselineSource);
+    }
+
+    [Fact]
+    public async Task LoadAsync_Http_NothingUsable_RecordsEmpty()
+    {
+        var recorder = new ServerStatusRecorder();
+        var loader = Build(new MockFileSystem(),
+            new FakeHttpHandler(_ => throw new HttpRequestException("network error")), recorder: recorder);
+
+        await loader.LoadAsync(HttpSource, CancellationToken.None);
+
+        Assert.Equal(StatusAssetSource.Empty, recorder.BaselineSource);
+    }
+
+    [Fact]
+    public async Task LoadAsync_Local_Loaded_RecordsLocal()
+    {
+        var recorder = new ServerStatusRecorder();
+        var fs = new MockFileSystem();
+        fs.AddFile("C:\\b.bin", new MockFileData(Serialize(MakeBaseline())));
+        var loader = Build(fs, new FakeHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)),
+            recorder: recorder);
+
+        await loader.LoadAsync(
+            new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = "C:\\b.bin" },
+            CancellationToken.None);
+
+        Assert.Equal(StatusAssetSource.Local, recorder.BaselineSource);
+    }
+
+    [Fact]
+    public async Task LoadAsync_Local_Missing_RecordsEmpty()
+    {
+        var recorder = new ServerStatusRecorder();
+        var loader = Build(new MockFileSystem(),
+            new FakeHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)), recorder: recorder);
+
+        await loader.LoadAsync(
+            new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = "C:\\missing.bin" },
+            CancellationToken.None);
+
+        Assert.Equal(StatusAssetSource.Empty, recorder.BaselineSource);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static BaselineLoader Build(MockFileSystem fs, FakeHttpHandler handler,
-        ILogger<BaselineLoader>? logger = null)
+        ILogger<BaselineLoader>? logger = null, ServerStatusRecorder? recorder = null)
     {
         var client = new HttpClient(handler);
-        return new BaselineLoader(client, new FileHelper(fs), logger ?? NullLogger<BaselineLoader>.Instance);
+        return new BaselineLoader(client, new FileHelper(fs), logger ?? NullLogger<BaselineLoader>.Instance,
+            recorder);
     }
 
     // ── a baseline that predates behaviours ──────────────────────────────────

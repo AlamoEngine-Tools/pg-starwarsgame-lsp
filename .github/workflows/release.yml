@@ -1,0 +1,215 @@
+name: Release
+
+# Step 2 of a release, after the bump PR from "Prepare Release" is merged. Run from the Actions tab
+# on master. The version is read from the three version files, which must agree.
+#
+#   guard        version files agree, tag v<version> does not exist yet
+#   test         the full test workflow; it also produces the two SBOMs
+#   build        Windows: workspace, schema-release check, server publish + zip, VSIX
+#   publish      tag + GitHub release with server zip, VSIX and SBOMs
+#   marketplace  VS Code Marketplace; environment "release" waits for a reviewer's approval
+#
+# Replaces the publishing half of release.ps1; that script now only builds locally.
+
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: Pre-release on GitHub and the Marketplace
+        type: boolean
+        default: false
+      draft:
+        description: GitHub draft only - Marketplace skipped
+        type: boolean
+        default: false
+      skip_marketplace:
+        description: GitHub release only - Marketplace skipped
+        type: boolean
+        default: false
+      notes:
+        description: Release notes - empty uses the generated notes
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Version guard
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Read the version
+      id: version
+      run: |
+        version=$(node scripts/release-version.js check)
+        if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+          echo "::error::v$version is already released - run Prepare Release for a new version first"
+          exit 1
+        fi
+        echo "version=$version" >>"$GITHUB_OUTPUT"
+        echo "Releasing v$version" >>"$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Test
+    needs: guard
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
+  build:
+    name: Build artifacts
+    needs: [guard, test]
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+    defaults:
+      run:
+        working-directory: PG.StarWarsGame.LSP
+        shell: pwsh
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        path: PG.StarWarsGame.LSP
+        fetch-depth: 0
+
+    - uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Set up workspace
+      run: ./setup-workspace.ps1 -NoSelfUpdate -Groups build -Summary $env:GITHUB_STEP_SUMMARY
+
+    # Servers read the newest schema RELEASE, not schema main. A server built against a schema
+    # version that is not released yet would ship and then resolve an older schema.
+    - name: Check the schema is released
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $schema = (Get-Content schema/eaw/_index.json -Raw | ConvertFrom-Json).schemaVersion
+        gh release view "v$schema" -R AlamoEngine-Tools/eaw-schema --json tagName | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+          Write-Output "::error::Schema v$schema is not released - merge it to eaw-schema main first; its release workflow publishes it"
+          exit 1
+        }
+        "Schema v$schema is released" | Add-Content $env:GITHUB_STEP_SUMMARY
+
+    - name: Publish the server
+      run: |
+        dotnet publish PG.StarWarsGame.LSP.Server/PG.StarWarsGame.LSP.Server.csproj `
+          --configuration Release --runtime win-x64 --self-contained true `
+          -p:PublishSingleFile=true -p:DebugType=None --output dist/server
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        Compress-Archive -Path dist/server/* -DestinationPath "dist/PG.StarWarsGame.LSP.Server-$env:VERSION-win-x64.zip"
+
+    - name: Package the extension
+      working-directory: PG.StarWarsGame.LSP/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
+      run: |
+        npm ci
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        $vsceArgs = @('package', '--no-dependencies', '--out', "../../dist/aet-eaw-edit-$env:VERSION.vsix")
+        if ('${{ inputs.prerelease }}' -eq 'true') { $vsceArgs += '--pre-release' }
+        npx --yes @vscode/vsce @vsceArgs
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-files
+        path: |
+          PG.StarWarsGame.LSP/dist/*.zip
+          PG.StarWarsGame.LSP/dist/*.vsix
+        if-no-files-found: error
+
+  publish:
+    name: GitHub release
+    needs: [guard, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: release-files
+        path: files
+
+    - name: Download SBOMs
+      uses: actions/download-artifact@v4
+      with:
+        pattern: '*.sbom.spdx.json'
+        path: sbom
+
+    # Named after the artifact each SBOM describes, as release.ps1 did.
+    - name: Name the SBOMs
+      run: |
+        cp "$(find sbom/server.sbom.spdx.json -type f -name '*.json' | head -n 1)" \
+          "files/PG.StarWarsGame.LSP.Server-$VERSION-win-x64.sbom.spdx.json"
+        cp "$(find sbom/extension.sbom.spdx.json -type f -name '*.json' | head -n 1)" \
+          "files/aet-eaw-edit-$VERSION.sbom.spdx.json"
+        ls -l files
+
+    - name: Create the release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        NOTES: ${{ inputs.notes }}
+        DRAFT: ${{ inputs.draft }}
+        PRERELEASE: ${{ inputs.prerelease }}
+      run: |
+        args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "v$VERSION")
+        [ "$DRAFT" = true ] && args+=(--draft)
+        [ "$PRERELEASE" = true ] && args+=(--prerelease)
+        if [ -n "$NOTES" ]; then args+=(--notes "$NOTES"); else args+=(--generate-notes); fi
+        gh release create "v$VERSION" files/* "${args[@]}"
+
+  marketplace:
+    name: VS Code Marketplace
+    needs: [guard, publish]
+    if: ${{ !inputs.draft && !inputs.skip_marketplace }}
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: release-files
+        path: files
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    # vsce reads the token from VSCE_PAT.
+    - name: Publish
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        PRERELEASE: ${{ inputs.prerelease }}
+      run: |
+        args=(publish --packagePath "files/aet-eaw-edit-$VERSION.vsix")
+        [ "$PRERELEASE" = true ] && args+=(--pre-release)
+        npx --yes @vscode/vsce "${args[@]}"

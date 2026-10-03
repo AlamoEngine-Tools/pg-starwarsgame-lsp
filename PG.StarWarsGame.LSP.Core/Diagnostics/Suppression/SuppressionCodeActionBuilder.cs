@@ -80,7 +80,78 @@ public static class SuppressionCodeActionBuilder
             }
         }));
 
+        // Reporting comes last: it is the rarer act, and it changes nothing in the project.
+        var report = ReportPayload(documentUri, diagnostic, id, lines);
+        actions.Add(ReportAction($"Report {id} on GitHub", DiagnosticReportCommands.ReportOnGitHub, diagnostic,
+            report));
+        actions.Add(ReportAction($"Open report for {id} in editor", DiagnosticReportCommands.OpenInEditor, diagnostic,
+            report));
+
         return actions;
+    }
+
+    private static CommandOrCodeAction ReportAction(string title, string command, Diagnostic diagnostic, JObject report)
+    {
+        return new CommandOrCodeAction(new CodeAction
+        {
+            Title = title,
+            Kind = CodeActionKind.QuickFix,
+            Diagnostics = new Container<Diagnostic>(diagnostic),
+            Command = new Command { Name = command, Title = title, Arguments = new JArray(report) }
+        });
+    }
+
+    /// <summary>Lines kept from each end of a range longer than twice this.</summary>
+    private const int ReportLinesPerEnd = 20;
+
+    /// <summary>Characters kept of a longer source line.</summary>
+    private const int ReportLineLength = 400;
+
+    /// <summary>
+    ///     What a report says about one diagnostic: its id, severity and message, the file NAME, and
+    ///     the source lines the range touches. The name and not the path, because the report goes
+    ///     into a public issue; several lines, because a multi-line value is the usual false positive
+    ///     and its first line alone shows nothing.
+    /// </summary>
+    /// <remarks>
+    ///     Truncated, because a prefilled issue stops working somewhere past 8 KB and a whole-object
+    ///     diagnostic can span hundreds of lines. A long range keeps its first and last
+    ///     <see cref="ReportLinesPerEnd" /> lines - where the value starts and where it closes - with
+    ///     one line saying how many were left out; a line longer than
+    ///     <see cref="ReportLineLength" /> characters is cut.
+    /// </remarks>
+    private static JObject ReportPayload(DocumentUri documentUri, Diagnostic diagnostic, DiagnosticId id,
+        string[] lines)
+    {
+        var first = Math.Clamp(diagnostic.Range.Start.Line, 0, Math.Max(lines.Length - 1, 0));
+        var last = Math.Clamp(diagnostic.Range.End.Line, first, Math.Max(lines.Length - 1, 0));
+        var source = TruncateForReport(lines.Length == 0 ? [] : lines[first..(last + 1)]);
+        var path = documentUri.Path;
+
+        return new JObject
+        {
+            ["id"] = id.ToString(),
+            ["severity"] = (diagnostic.Severity ?? DiagnosticSeverity.Error).ToString(),
+            ["message"] = diagnostic.Message,
+            ["fileName"] = path[(path.LastIndexOf('/') + 1)..],
+            ["startLine"] = first,
+            ["lines"] = new JArray(source.Cast<object>().ToArray())
+        };
+    }
+
+    private static string[] TruncateForReport(string[] source)
+    {
+        var lines = source.Select(l => l.Length > ReportLineLength ? l[..ReportLineLength] + "..." : l).ToList();
+        if (lines.Count <= 2 * ReportLinesPerEnd)
+            return [.. lines];
+
+        var omitted = lines.Count - 2 * ReportLinesPerEnd;
+        return
+        [
+            .. lines.Take(ReportLinesPerEnd),
+            $"... {omitted} lines omitted ...",
+            .. lines.Skip(lines.Count - ReportLinesPerEnd)
+        ];
     }
 
     private static CommandOrCodeAction Insert(

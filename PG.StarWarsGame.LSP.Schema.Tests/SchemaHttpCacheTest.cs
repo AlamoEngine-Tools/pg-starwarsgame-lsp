@@ -221,4 +221,51 @@ public sealed class SchemaHttpCacheTest
 
         Assert.True(fs.File.Exists(Path.Combine(CacheDir, "nested", "subdir", "file.txt")));
     }
+
+    // ── release tag ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CachedTag_IsNull_WhenNothingWasCached()
+    {
+        Assert.Null(BuildCache(new MockFileSystem()).CachedTag);
+    }
+
+    [Fact]
+    public void Update_WithATag_RecordsIt()
+    {
+        var cache = BuildCache(new MockFileSystem());
+
+        cache.Update("{}", [("tags/Unit.yaml", TagYaml)], tag: "v2.1.0");
+
+        Assert.Equal("v2.1.0", cache.CachedTag);
+    }
+
+    // A schema loaded from an explicit URL is not a release; keeping the old tag would let the
+    // next offline start present that content as the release.
+    [Fact]
+    public void Update_WithoutATag_ClearsAnEarlierOne()
+    {
+        var cache = BuildCache(new MockFileSystem());
+        cache.Update("{}", [("tags/Unit.yaml", TagYaml)], tag: "v2.1.0");
+
+        cache.Update("{}", [("tags/Unit.yaml", TagYaml)]);
+
+        Assert.Null(cache.CachedTag);
+    }
+
+    [Fact]
+    public void TryLoadIndexJson_ReturnsWhatUpdateWrote()
+    {
+        var cache = BuildCache(new MockFileSystem());
+        cache.Update("{\"tags\":[]}", [], tag: "v2.1.0");
+
+        Assert.True(cache.TryLoadIndexJson(out var json));
+        Assert.Equal("{\"tags\":[]}", json);
+    }
+
+    [Fact]
+    public void TryLoadIndexJson_ReturnsFalse_WhenNothingWasCached()
+    {
+        Assert.False(BuildCache(new MockFileSystem()).TryLoadIndexJson(out _));
+    }
 }
