@@ -150,6 +150,13 @@ jobs:
       VERSION: ${{ needs.guard.outputs.version }}
 
     steps:
+    - name: Checkout the changelog
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/CHANGELOG.md
+        sparse-checkout-cone-mode: false
+        path: repo
+
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
@@ -171,6 +178,8 @@ jobs:
           "files/aet-eaw-edit-$VERSION.sbom.spdx.json"
         ls -l files
 
+    # Notes, first that exists: the notes input; the "## <version>" section of the extension's
+    # CHANGELOG (the same text the Marketplace shows); GitHub's generated notes.
     - name: Create the release
       env:
         GH_TOKEN: ${{ github.token }}
@@ -181,7 +190,16 @@ jobs:
         args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "v$VERSION")
         [ "$DRAFT" = true ] && args+=(--draft)
         [ "$PRERELEASE" = true ] && args+=(--prerelease)
-        if [ -n "$NOTES" ]; then args+=(--notes "$NOTES"); else args+=(--generate-notes); fi
+        awk -v v="## $VERSION" '$0 == v { on = 1; next } /^## / { on = 0 } on' \
+          repo/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/CHANGELOG.md | tr -d '\r' >notes.md
+        if [ -n "$NOTES" ]; then
+          args+=(--notes "$NOTES")
+        elif grep -q '[^[:space:]]' notes.md; then
+          args+=(--notes-file notes.md)
+        else
+          echo "::warning::No '## $VERSION' section in CHANGELOG.md - using generated notes"
+          args+=(--generate-notes)
+        fi
         gh release create "v$VERSION" files/* "${args[@]}"
 
   marketplace:

@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.4.1
+
+Requires server 0.4.1. A 0.4.0 server reads schema 2.2.0 without three tags and reports them as unknown.
+
+### Features
+
+- **Schema from releases** - the server reads the newest compatible
+  [eaw-schema](https://github.com/AlamoEngine-Tools/eaw-schema/releases) release instead of its `main` branch
+  - Cached per release; a release already cached loads without a request
+  - Offline start loads the cached release; 0.4.0 loaded no schema at all offline
+  - Default branch only when no release is reachable or cached
+  - `aet-eaw-edit.lsp.schema.url` still overrides
+- **Preview from XML** - lightbulb **Preview model X.ALO** on any value naming a model, multi-line values included
+  - A missing model is offered disabled, with the reason
+- **Preview by name** - **EaWEdit: Preview Model** without an argument lists every model of the workspace and the game
+- **Hand-off by file kind** - **Open in AloViewer** for a model, **Open in the Particle Editor** for a particle system
+  - A file packed in a MEG archive is offered disabled
+- **Bug report info** - **EaWEdit: Copy Bug Report Info**: versions, flags and counts, never a path or a name
+  - Opt-in extended tier: dependency shape, index and bone cache statistics
+- **Report a diagnostic** - code action `Report <ID> on GitHub`: the issue form filled with the diagnostic and its
+  range
+  - Long ranges cut to the first and last 20 lines; lines over 400 characters cut
+- **Object name collisions** - `Symbols5` warns on both objects when two GameObjectType names share the engine's
+  CRC32 name hash; vanilla has none
+- **Typed tuple slots** - hover, completion and checks per slot in tuple lists
+  - Per-slot enum, model and asset checks under their own IDs, so a `replace` override of the tag keeps them
+  - Music lists take any number of environment and music event pairs; the environment is the new `MapEnvironment`
+    enum, also used by `Land_Terrain_Model_Mapping`
+
+### Fixes
+
+- **Type containers** - objects in containers whose element names no schema type (`<GroundInfantry>`, `<Decal>`, 12
+  containers in vanilla) validate as the container's type; their `ValidationOverride` entries apply again
+- **AnimationType** - the engine's 117 animation names; 55 valid names were false errors, 57 suffixed names false passes
+- **Per-faction lists** (`Tactical_Buildable_Objects_Campaign`, `Tactical_Buildable_Objects_Multiplayer`,
+  `Presence_Induced_Animations`) - read as the engine reads them: a key, then the items it owns, until the next key
+  - New checks: an item continuing a previous key, an item naming a key, a repeated key, a value of the wrong kind,
+    a list replaced in a variant
+  - A variant replaces the list, as the engine does; 0.4.0 merged it
+- **`AI_Player_Control`** - a name reference list
+- **Particle Editor on models** - no longer offered for plain models
+  ([#163](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/163), the hand-off half)
+- **Model inspector** - the Geometry box opens on its vertex table
+
+### Diagnostic IDs
+
+- **Renamed, numbers unchanged** - suppressions keep working
+  - `References13` `PerFactionObjectList` -> `ListMap`
+  - `References25` `PerFactionObjectListUnknownFaction` -> `ListMapFirstItemNotAKey`
+  - `References26` `PerFactionObjectListEmpty` -> `ListMapEmptyValue`
+- **New** - `References31` to `References35`, `Enums19`, `Assets13` to `Assets15`, `Symbols5`
+
+### Building and releasing
+
+- **Workspace setup** - `setup-workspace.sh` / `setup-workspace.ps1` clone ModVerify, PetroglyphTools and the schema
+  at the commits `workspace.deps` names
+- **CI** - builds and tests on Windows and Ubuntu; Ubuntu tests report only, see
+  [#169](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/169)
+- **Releases** - GitHub Actions: **Prepare Release**, then **Release**
+
 ## 0.4.0
 
 ### Features
