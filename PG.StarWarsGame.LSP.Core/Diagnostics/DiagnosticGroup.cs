@@ -81,7 +81,23 @@ public enum DiagnosticGroup
     ///         about my unfinished turret" must not also silence every unresolved reference.
     ///     </para>
     /// </summary>
-    Preview = 14
+    Preview = 14,
+
+    /// <summary>
+    ///     Well-formedness the engine's lenient parser tolerates and a strict XML parser rejects:
+    ///     one id per defect category from the corpus survey. Separate from <see cref="Structure" />
+    ///     and <see cref="Syntax" /> because it is a WARNING tier with a repair, and an author who
+    ///     silences it must keep seeing the errors both parsers agree on.
+    /// </summary>
+    XmlStrictness = 15,
+
+    /// <summary>
+    ///     Findings folded in from the Lua analyzer sidecar: one id per analyzer rule name, assigned
+    ///     in order of adoption and never renumbered. Separate from <see cref="Syntax" /> (the
+    ///     analyzer's parse errors go there, numbered from 3000) so that silencing one rule never
+    ///     silences a parse error.
+    /// </summary>
+    LuaAnalyzer = 16
 }
 
 /// <summary>Display names for <see cref="DiagnosticGroup" />, shown in suppression UI and hovers.</summary>
@@ -105,6 +121,8 @@ public static class DiagnosticGroups
             DiagnosticGroup.Syntax => "Syntax",
             DiagnosticGroup.Suppression => "Suppression comments",
             DiagnosticGroup.Preview => "Model preview",
+            DiagnosticGroup.XmlStrictness => "XML strictness",
+            DiagnosticGroup.LuaAnalyzer => "Lua analyzer",
             _ => group.ToString()
         };
     }
