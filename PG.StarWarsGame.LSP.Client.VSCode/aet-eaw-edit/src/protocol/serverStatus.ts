@@ -39,6 +39,8 @@ export interface ServerStatusWorkspace {
     projectProblem: string | null;
     /** Workspace folders the server found no project in. */
     foldersWithoutProject: number;
+    /** Project files under the root besides the one this server loaded; a count, never names. */
+    otherProjectFiles: number;
 }
 
 /** The opt-in tier: counts that help rebuild a setup as a test case. */

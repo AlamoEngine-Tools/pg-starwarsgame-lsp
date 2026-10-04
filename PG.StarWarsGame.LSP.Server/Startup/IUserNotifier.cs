@@ -12,6 +12,9 @@ public interface IUserNotifier
 {
     void ShowError(string message);
 
+    /// <summary>Something degraded but the server carries on - the user should know, not stop.</summary>
+    void ShowWarning(string message);
+
     /// <summary>
     ///     Reports that something the user asked for actually happened, and what it did. Needed
     ///     wherever the client cannot tell success from a silent no-op on its own - a command whose

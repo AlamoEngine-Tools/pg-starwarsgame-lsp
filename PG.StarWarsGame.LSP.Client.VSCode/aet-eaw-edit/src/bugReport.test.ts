@@ -22,7 +22,13 @@ const server: ServerStatus = {
     schema: {version: '2.3.0', compatibility: 'Supported', source: 'Official'},
     baseline: {source: 'Cache', official: true, builtAt: '2026-09-16T10:00:00Z', manifestHash: 'ab12'},
     iconPack: {source: 'Network', official: true},
-    workspace: {projectDetected: true, projectValid: true, projectProblem: null, foldersWithoutProject: 1},
+    workspace: {
+        projectDetected: true,
+        projectValid: true,
+        projectProblem: null,
+        foldersWithoutProject: 1,
+        otherProjectFiles: 0
+    },
     index: {state: 'Complete'},
     warnings: ['Lua symbols: 0'],
 };
@@ -145,6 +151,13 @@ describe('formatBugReport', () => {
         ]) {
             assert.ok(text.includes(line), `missing "${line}" in:\n${text}`);
         }
+    });
+
+    it('mentions other project files under the root only when there are some', () => {
+        assert.ok(!formatBugReport(client, server).includes('Other project files'));
+
+        const several: ServerStatus = {...server, workspace: {...server.workspace, otherProjectFiles: 2}};
+        assert.ok(formatBugReport(client, several).includes('- Other project files under the root: 2'));
     });
 
     it('puts warnings at the top, before anything else is read', () => {

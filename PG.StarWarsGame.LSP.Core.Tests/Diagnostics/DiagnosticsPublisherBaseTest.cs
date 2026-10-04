@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Util;
+using System.IO.Abstractions.TestingHelpers;
 using System.Collections.Immutable;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -40,6 +42,121 @@ public sealed class DiagnosticsPublisherBaseTest
         var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, extension,
             debounceMs, enabled);
         return (publisher, published, indexService, workspaceHost);
+    }
+
+    // ── origin ────────────────────────────────────────────────────────────────
+    //
+    // One server per open project means a Problems view fed by several servers. Every diagnostic
+    // names the project that raised it, and a diagnostic on a dependency's file names the layer,
+    // so "which project said this" is answered where the diagnostic is read. Applied in the base,
+    // once, rather than at every site that builds a Diagnostic.
+
+    private static string DriveRoot => Path.GetPathRoot(Path.GetFullPath("."))!;
+
+    private static (ProjectLayerMap Map, string DepXml, string ModXml) LayeredMap()
+    {
+        var depXml = Path.Combine(DriveRoot, "dep", "data", "xml");
+        var modXml = Path.Combine(DriveRoot, "mod", "data", "xml");
+        var map = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
+        map.SetLayers([
+            new ProjectLayer(0, "Core Library", [depXml], [], [], [], null, "/dep/dep.pgproj"),
+            new ProjectLayer(1, "My Mod", [modXml], [], [], [], null, "/mod/mod.pgproj")
+        ]);
+        return (map, depXml, modXml);
+    }
+
+    private static Diagnostic Problem(string? source = null)
+    {
+        return new Diagnostic
+        {
+            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(new Position(0, 0),
+                new Position(0, 1)),
+            Message = "a problem",
+            Code = new DiagnosticCode("AET-001-0001"),
+            Source = source
+        };
+    }
+
+    private static (List<PublishDiagnosticsParams> published, FakeIndexService indexService, FakeWorkspaceHost host)
+        BuildWithOrigin(IProjectLayerMap? layerMap, params Diagnostic[] diagnostics)
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeIndexService();
+        var host = new FakeWorkspaceHost();
+        _ = new ConcretePublisher(p => published.Add(p), indexService, host, ".xml", 0, true,
+            diagnostics, null, null, layerMap);
+        return (published, indexService, host);
+    }
+
+    [Fact]
+    public void Publish_StampsTheProjectNameAsTheSource()
+    {
+        var (map, _, modXml) = LayeredMap();
+        var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(modXml, "units.xml"));
+        var (published, indexService, host) = BuildWithOrigin(map, Problem());
+        host.Add(uri, "<Root/>");
+
+        indexService.Fire(IndexWithDoc(uri));
+
+        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
+        Assert.Equal("aetswg (My Mod)", diagnostic.Source);
+        Assert.Null(diagnostic.RelatedInformation);
+    }
+
+    [Fact]
+    public void Publish_WithoutLayers_StampsTheBareSource()
+    {
+        var (published, indexService, host) = BuildWithOrigin(null, Problem());
+        host.Add("file:///a.xml", "<Root/>");
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        Assert.Equal("aetswg", Assert.Single(Assert.Single(published).Diagnostics).Source);
+    }
+
+    [Fact]
+    public void Publish_ReplacesTheServersOwnSourceWithTheProjectTag()
+    {
+        // Every producer stamps the server id today; that is the one the tag replaces.
+        var (map, _, modXml) = LayeredMap();
+        var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(modXml, "units.xml"));
+        var (published, indexService, host) = BuildWithOrigin(map, Problem(AppProperties.LspServerId));
+        host.Add(uri, "<Root/>");
+
+        indexService.Fire(IndexWithDoc(uri));
+
+        Assert.Equal("aetswg (My Mod)", Assert.Single(Assert.Single(published).Diagnostics).Source);
+    }
+
+    [Fact]
+    public void Publish_KeepsASourceADiagnosticAlreadyHas()
+    {
+        var (map, _, modXml) = LayeredMap();
+        var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(modXml, "units.xml"));
+        var (published, indexService, host) = BuildWithOrigin(map, Problem("someone-else"));
+        host.Add(uri, "<Root/>");
+
+        indexService.Fire(IndexWithDoc(uri));
+
+        Assert.Equal("someone-else", Assert.Single(Assert.Single(published).Diagnostics).Source);
+    }
+
+    [Fact]
+    public void Publish_OnADependencyDocument_NamesItsLayer()
+    {
+        var (map, depXml, _) = LayeredMap();
+        var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(depXml, "infantry.xml"));
+        var (published, indexService, host) = BuildWithOrigin(map, Problem());
+        host.Add(uri, "<Root/>");
+
+        indexService.Fire(IndexWithDoc(uri));
+
+        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
+        // Raised by the project, about a file of its dependency: both are named.
+        Assert.Equal("aetswg (My Mod)", diagnostic.Source);
+        var related = Assert.Single(diagnostic.RelatedInformation);
+        Assert.Equal("Layer - Core Library", related.Message);
+        Assert.Equal(DocumentUri.From(uri), related.Location.Uri);
     }
 
     // ── tests ─────────────────────────────────────────────────────────────────
@@ -377,8 +494,9 @@ public sealed class DiagnosticsPublisherBaseTest
             bool enabled = true,
             IReadOnlyList<Diagnostic>? diagnostics = null,
             IReadOnlyList<SuppressionRange>? ranges = null,
-            IGlobalSuppressionStore? globalSuppressions = null)
-            : base(publish, indexService, workspaceHost, debounceMs, null, globalSuppressions)
+            IGlobalSuppressionStore? globalSuppressions = null,
+            IProjectLayerMap? layerMap = null)
+            : base(publish, indexService, workspaceHost, debounceMs, null, globalSuppressions, layerMap)
         {
             FileExtension = extension;
             DiagnosticsEnabled = enabled;

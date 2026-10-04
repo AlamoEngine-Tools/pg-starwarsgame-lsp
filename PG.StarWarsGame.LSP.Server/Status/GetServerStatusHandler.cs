@@ -109,11 +109,13 @@ public sealed record ServerStatusBaselineDto(string Source, bool Official, strin
 public sealed record ServerStatusIconPackDto(string Source, bool Official);
 
 /// <param name="ProjectProblem">A <see cref="Project.ProjectProblem" /> name, or null when valid.</param>
+/// <param name="OtherProjectFiles">Project files under the root besides the one loaded; a count, never names.</param>
 public sealed record ServerStatusWorkspaceDto(
     bool ProjectDetected,
     bool ProjectValid,
     string? ProjectProblem,
-    int FoldersWithoutProject);
+    int FoldersWithoutProject,
+    int OtherProjectFiles);
 
 /// <param name="State">Building, Complete or Failed.</param>
 public sealed record ServerStatusIndexDto(string State);
@@ -167,7 +169,8 @@ public sealed class GetServerStatusHandler(
             recorder.ProjectDetected == true,
             recorder.ProjectDetected == true && problem == ProjectProblem.None,
             problem == ProjectProblem.None ? null : problem.ToString(),
-            FoldersWithoutProject());
+            FoldersWithoutProject(),
+            recorder.OtherProjectFiles);
 
         var files = Files(index);
 

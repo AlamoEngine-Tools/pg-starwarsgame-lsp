@@ -6,6 +6,14 @@ namespace PG.StarWarsGame.LSP.Core.Configuration;
 public record LspConfiguration
 {
     public string? WorkspaceRoot { get; init; }
+
+    /// <summary>
+    ///     The project file this server serves, named by the client. One server runs per open
+    ///     project, so the client knows which; detection under <see cref="WorkspaceRoot" /> is the
+    ///     fallback for a client that passes none.
+    /// </summary>
+    public string? ProjectPath { get; init; }
+
     public string? GamePath { get; init; }
     public string? ExpansionPath { get; init; }
 

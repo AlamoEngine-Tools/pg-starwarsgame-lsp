@@ -45,12 +45,15 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILogger<LuaDiagnosticsPublisher> logger,
         ILuaParseCache parseCache,
         ILspConfigurationProvider configProvider,
+        // REQUIRED: the layer map names the project in every diagnostic's source, and an optional
+        // dependency is the one shape the container is free to skip without a word.
+        IProjectLayerMap layerMap,
         ServerOptions? options = null,
         IGlobalSuppressionStore? globalSuppressions = null)
         : this(p => server.TextDocument.PublishDiagnostics(p),
             indexService, workspaceHost, fileHelper, schemaProvider, logger,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            parseCache, configProvider, globalSuppressions)
+            parseCache, configProvider, globalSuppressions, layerMap)
     {
     }
 
@@ -64,8 +67,9 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         int debounceMs = 0,
         ILuaParseCache? parseCache = null,
         ILspConfigurationProvider? configProvider = null,
-        IGlobalSuppressionStore? globalSuppressions = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
+        IGlobalSuppressionStore? globalSuppressions = null,
+        IProjectLayerMap? layerMap = null)
+        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions, layerMap)
     {
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;

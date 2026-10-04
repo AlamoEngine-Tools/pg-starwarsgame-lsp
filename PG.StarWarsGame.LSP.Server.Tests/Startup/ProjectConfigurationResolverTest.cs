@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -27,7 +28,7 @@ public sealed class ProjectConfigurationResolverTest
     }
 
     private static ProjectConfigurationResolver Build(MockFileSystem fs, out RecordingUserNotifier notifier,
-        ServerStatusRecorder? status = null)
+        ServerStatusRecorder? status = null, LspConfiguration? configuration = null)
     {
         var fileHelper = new FileHelper(fs);
         var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
@@ -36,7 +37,8 @@ public sealed class ProjectConfigurationResolverTest
         var detector = new ModProjectDetector(fileHelper, NullLogger<ModProjectDetector>.Instance);
         notifier = new RecordingUserNotifier();
         return new ProjectConfigurationResolver(detector, loader, resolver, notifier,
-            NullLogger<ProjectConfigurationResolver>.Instance, status);
+            NullLogger<ProjectConfigurationResolver>.Instance, status,
+            configuration is null ? null : new FakeLspConfigurationProvider { Current = configuration });
     }
 
     // ── what the bug report is told ──────────────────────────────────────────
@@ -74,8 +76,13 @@ public sealed class ProjectConfigurationResolverTest
         Assert.Equal(expected, status.ProjectProblem);
     }
 
+    /// <summary>
+    ///     Several project files under one root used to be refused outright. One server runs per
+    ///     project now, so a client that names no project gets the shallowest one, a warning says
+    ///     how many others there are, and the status carries the count.
+    /// </summary>
     [Fact]
-    public void Resolve_TwoProjectFiles_RecordsAmbiguous()
+    public void Resolve_TwoProjectFiles_LoadsTheShallowest_WarnsAndCountsTheOther()
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -84,10 +91,51 @@ public sealed class ProjectConfigurationResolverTest
         });
         var status = new ServerStatusRecorder();
 
-        Build(fs, out _, status).Resolve([WorkspaceRoot]);
+        var config = Build(fs, out var notifier, status).Resolve([WorkspaceRoot]);
 
+        Assert.NotNull(config);
+        Assert.Equal(AbsLower("mymod.pgproj"), config.Layers.Single().ProjectPath);
         Assert.True(status.ProjectDetected);
-        Assert.Equal(ProjectProblem.Ambiguous, status.ProjectProblem);
+        Assert.Equal(ProjectProblem.None, status.ProjectProblem);
+        Assert.Equal(1, status.OtherProjectFiles);
+        Assert.Single(notifier.Warnings);
+        Assert.Empty(notifier.Errors);
+    }
+
+    [Fact]
+    public void Resolve_ExplicitProjectPath_LoadsThatFile_WithoutDetection()
+    {
+        var other = Path.Combine(WorkspaceRoot, "sub", "other.pgproj");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ProjectPath] = new("{}"),
+            [other] = new("{}")
+        });
+        var status = new ServerStatusRecorder();
+
+        var config = Build(fs, out var notifier, status, new LspConfiguration { ProjectPath = other })
+            .Resolve([WorkspaceRoot]);
+
+        Assert.NotNull(config);
+        Assert.Equal(AbsLower(Path.Combine("sub", "other.pgproj")), config.Layers.Single().ProjectPath);
+        // Named explicitly, so the sibling is not "another project file" worth a warning.
+        Assert.Equal(0, status.OtherProjectFiles);
+        Assert.Empty(notifier.Warnings);
+    }
+
+    [Fact]
+    public void Resolve_ExplicitProjectPathThatDoesNotExist_IsAnError()
+    {
+        var fs = new MockFileSystem();
+        fs.AddDirectory(WorkspaceRoot);
+        var status = new ServerStatusRecorder();
+
+        var config = Build(fs, out var notifier, status,
+            new LspConfiguration { ProjectPath = Path.Combine(WorkspaceRoot, "gone.pgproj") }).Resolve([WorkspaceRoot]);
+
+        Assert.Null(config);
+        Assert.Single(notifier.Errors);
+        Assert.Equal(ProjectProblem.Missing, status.ProjectProblem);
     }
 
     [Fact]
@@ -151,7 +199,7 @@ public sealed class ProjectConfigurationResolverTest
     }
 
     [Fact]
-    public void Resolve_MultiplePgprojFiles_ReturnsNullAndShowsUserErrorNotification()
+    public void Resolve_TwoProjectFilesAtTheSameDepth_LoadsTheFirstByNameAndWarns()
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -161,10 +209,11 @@ public sealed class ProjectConfigurationResolverTest
 
         var config = Build(fs, out var notifier).Resolve([WorkspaceRoot]);
 
-        Assert.Null(config);
-        var message = Assert.Single(notifier.Errors);
+        Assert.NotNull(config);
+        Assert.Equal(AbsLower("a.pgproj"), config.Layers.Single().ProjectPath);
+        Assert.Empty(notifier.Errors);
+        var message = Assert.Single(notifier.Warnings);
         Assert.Contains("a.pgproj", message);
-        Assert.Contains("b.pgproj", message);
     }
 
     [Fact]

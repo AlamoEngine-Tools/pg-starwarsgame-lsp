@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using PG.Commons.Hashing;
 using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.Files.MEG;
@@ -498,6 +499,17 @@ public static class ServerConfigurator
             {
                 var initLogger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
                 var config = server.Services.GetRequiredService<ILspConfigurationProvider>();
+
+                // One server per open project: a workspace folder coming or going is the client's
+                // business (it starts or stops servers), not a notification this server can act on.
+                // The library advertises the capability by default with nothing behind it, and the
+                // client then sends notifications that are dropped. Say what is true.
+                response.Capabilities.Workspace ??= new WorkspaceServerCapabilities();
+                response.Capabilities.Workspace.WorkspaceFolders = new DidChangeWorkspaceFolderRegistrationOptions.StaticOptions
+                {
+                    Supported = false,
+                    ChangeNotifications = false
+                };
 
                 var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
 

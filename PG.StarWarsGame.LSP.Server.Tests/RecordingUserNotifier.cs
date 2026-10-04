@@ -14,10 +14,16 @@ public sealed class RecordingUserNotifier : IUserNotifier
 {
     public List<string> Errors { get; } = [];
     public List<string> Infos { get; } = [];
+    public List<string> Warnings { get; } = [];
 
     public void ShowError(string message)
     {
         Errors.Add(message);
+    }
+
+    public void ShowWarning(string message)
+    {
+        Warnings.Add(message);
     }
 
     public void ShowInfo(string message)

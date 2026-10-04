@@ -117,4 +117,15 @@ public sealed class ServerStatusRecorder
         ProjectDetected = detected;
         ProjectProblem = problem;
     }
+
+    /// <summary>
+    ///     Project files under the root besides the one this server loaded. A count, never names:
+    ///     the status is pasted into public issues.
+    /// </summary>
+    public int OtherProjectFiles { get; private set; }
+
+    public void RecordOtherProjectFiles(int count)
+    {
+        OtherProjectFiles = count;
+    }
 }

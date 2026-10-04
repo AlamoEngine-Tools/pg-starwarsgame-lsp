@@ -59,6 +59,26 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Equal("/mod/eaw", provider.Current.WorkspaceRoot);
     }
 
+    /// <summary>
+    ///     One server per open project: the client names the project file to load instead of
+    ///     leaving the server to find one under the folders.
+    /// </summary>
+    [Fact]
+    public void LoadFrom_WithProjectPath_PopulatesProjectPath()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { workspaceRoot = "/mod/eaw", projectPath = "/mod/eaw/eaw.pgproj" }));
+        Assert.Equal("/mod/eaw/eaw.pgproj", provider.Current.ProjectPath);
+    }
+
+    [Fact]
+    public void LoadFrom_WithoutProjectPath_LeavesItNull()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { workspaceRoot = "/mod/eaw" }));
+        Assert.Null(provider.Current.ProjectPath);
+    }
+
     [Fact]
     public void LoadFrom_WithGamePath_Extracted()
     {

@@ -38,14 +38,21 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     private GameIndex? _lastRunIndex;
     private int _pendingVersion;
 
+    /// <summary>Every diagnostic this server publishes names it, with the project when one is loaded.</summary>
+    private const string SourceName = "aetswg";
+
+    private readonly IProjectLayerMap? _layerMap;
+
     protected DiagnosticsPublisherBase(
         Action<PublishDiagnosticsParams> publish,
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         int debounceMs = 100,
         ILogger? logger = null,
-        IGlobalSuppressionStore? globalSuppressions = null)
+        IGlobalSuppressionStore? globalSuppressions = null,
+        IProjectLayerMap? layerMap = null)
     {
+        _layerMap = layerMap;
         _publish = publish;
         _workspaceHost = workspaceHost;
         _debounceMs = debounceMs;
@@ -109,7 +116,84 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 
     protected void Publish(PublishDiagnosticsParams p)
     {
-        _publish(p);
+        _publish(WithOrigin(p));
+    }
+
+    /// <summary>
+    ///     Stamps where a diagnostic came from. One server runs per open project, so a Problems
+    ///     view is fed by several servers at once: the <c>source</c> names the project that raised
+    ///     it, and a diagnostic on a dependency's document names that layer in its related
+    ///     information. Applied here, once, rather than at every site that builds a
+    ///     <see cref="Diagnostic" />; a source a producer set itself is kept.
+    /// </summary>
+    private PublishDiagnosticsParams WithOrigin(PublishDiagnosticsParams p)
+    {
+        if (!p.Diagnostics.Any())
+            return p;
+
+        var source = SourceName;
+        string? layerName = null;
+        var layers = _layerMap?.Layers;
+        if (_layerMap is not null && layers is { Count: > 0 })
+        {
+            var topRank = layers.Max(l => l.Rank);
+            var project = _layerMap.GetLayerName(topRank);
+            if (!string.IsNullOrEmpty(project))
+                source = $"{SourceName} ({project})";
+            else
+                _logger.LogDebug("Diagnostic origin: the top layer (rank {Rank}) has no name; {Count} layer(s) known",
+                    topRank, layers.Count);
+
+            // Unencoded: the layer map's prefixes come from PathToFileUri ("file:///c:/..."), and
+            // the encoded form ("c%3A") would match nothing and read as the top layer.
+            var rank = _layerMap.GetRank(p.Uri.ToUnencodedString());
+            if (rank < topRank)
+                layerName = _layerMap.GetLayerName(rank);
+        }
+
+        if (_layerMap is null)
+            _logger.LogDebug(
+                "Diagnostic origin: no layer map wired into {Publisher} (suppressions wired: {Suppressions})",
+                GetType().Name, _globalSuppressions is not null);
+
+        var stamped = p.Diagnostics.Select(d => Stamp(d, source, layerName, p.Uri)).ToList();
+        return new PublishDiagnosticsParams
+        {
+            Uri = p.Uri,
+            Version = p.Version,
+            Diagnostics = new Container<Diagnostic>(stamped)
+        };
+    }
+
+    private static Diagnostic Stamp(Diagnostic d, string source, string? layerName, DocumentUri uri)
+    {
+        var related = d.RelatedInformation;
+        if (layerName is not null)
+        {
+            var mine = new DiagnosticRelatedInformation
+            {
+                Location = new Location { Uri = uri, Range = d.Range },
+                Message = "Layer - " + layerName
+            };
+            related = related is null
+                ? new Container<DiagnosticRelatedInformation>(mine)
+                : new Container<DiagnosticRelatedInformation>(related.Append(mine));
+        }
+
+        return new Diagnostic
+        {
+            Range = d.Range,
+            Severity = d.Severity,
+            Code = d.Code,
+            CodeDescription = d.CodeDescription,
+            // The producers stamp the server's id; that is what the project tag replaces. A source
+            // that is not ours (a producer forwarding another tool's finding) stays as it is.
+            Source = d.Source is null || d.Source == AppProperties.LspServerId ? source : d.Source,
+            Message = d.Message,
+            Tags = d.Tags,
+            RelatedInformation = related,
+            Data = d.Data
+        };
     }
 
     /// <summary>
