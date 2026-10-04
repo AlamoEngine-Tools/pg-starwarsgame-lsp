@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
@@ -32,6 +33,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlFixCache>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
         services.AddSingleton<IXmlDiagnosticsCollector>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
         services.AddSingleton<IDiagnosticsRepublisher>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
+        services.AddSingleton<ICacheStatisticsSource>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
         services.AddSingleton<RevalidateWorkspaceCommandHandler>();
         services.AddSingleton<RevalidateDocumentCommandHandler>();
 
@@ -216,6 +218,8 @@ public static class XmlLanguageServiceExtensions
             sp.GetRequiredService<IDocumentTextSource>(),
             sp.GetRequiredService<ServerOptions>().ParseCacheCapacity,
             sp.GetRequiredService<ILogger<XmlParseCache>>()));
+        services.AddSingleton<ICacheStatisticsSource>(sp =>
+            (ICacheStatisticsSource)sp.GetRequiredService<IXmlParseCache>());
 
         // Fact producers
         services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
@@ -348,6 +352,8 @@ public static class XmlLanguageServiceExtensions
         // Variant inheritance (Variant_Of_Existing_Type) - workspace tag source feeds the
         // EffectiveObjectResolver; shadows shipped-game baseline tags.
         services.AddSingleton<IVariantTagSource, WorkspaceVariantTagSource>();
+        services.AddSingleton<ICacheStatisticsSource>(sp =>
+            (ICacheStatisticsSource)sp.GetRequiredService<IVariantTagSource>());
         services.AddSingleton<IXmlVariantFactProducer, XmlVariantFactProducer>();
         services.AddSingleton<IXmlHardpointFactProducer, XmlHardpointFactProducer>();
         services.AddSingleton<IXmlDamageStageFactProducer, XmlDamageStageFactProducer>();

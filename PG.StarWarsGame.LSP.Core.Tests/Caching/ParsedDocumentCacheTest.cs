@@ -14,6 +14,28 @@ public sealed class ParsedDocumentCacheTest
         return new Artifact(text);
     }
 
+    // ── statistics ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Count_TracksLiveEntriesThroughInsertsReplacementsAndEvictions()
+    {
+        var cache = new ParsedDocumentCache<Artifact>(2);
+        Assert.Equal(0, cache.Count);
+
+        cache.GetOrParse("file:///a.xml", "<A/>", ContentHasher.Hash("<A/>"), Parse);
+        cache.GetOrParse("file:///b.xml", "<B/>", ContentHasher.Hash("<B/>"), Parse);
+        Assert.Equal(2, cache.Count);
+
+        // A changed hash replaces the entry rather than adding one.
+        cache.GetOrParse("file:///a.xml", "<A2/>", ContentHasher.Hash("<A2/>"), Parse);
+        Assert.Equal(2, cache.Count);
+
+        // A third document evicts the least recent; the count stays at capacity.
+        cache.GetOrParse("file:///c.xml", "<C/>", ContentHasher.Hash("<C/>"), Parse);
+        Assert.Equal(2, cache.Count);
+        Assert.Equal(1, cache.Statistics.Evictions);
+    }
+
     // ── hit / miss semantics ─────────────────────────────────────────────────
 
     [Fact]

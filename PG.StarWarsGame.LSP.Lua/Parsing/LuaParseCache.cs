@@ -54,7 +54,7 @@ public interface ILuaParseCache
     ParsedLuaDocument? GetOrParse(string canonicalUri);
 }
 
-public sealed class LuaParseCache : ILuaParseCache
+public sealed class LuaParseCache : ILuaParseCache, ICacheStatisticsSource
 {
     private readonly ParsedDocumentCache<ParsedLuaDocument> _cache;
     private readonly IDocumentTextSource _textSource;
@@ -67,6 +67,12 @@ public sealed class LuaParseCache : ILuaParseCache
     }
 
     public (long Hits, long Misses, long Evictions) Statistics => _cache.Statistics;
+
+    public CacheStatistics Snapshot()
+    {
+        var (hits, misses, evictions) = _cache.Statistics;
+        return new CacheStatistics("lua-parse", _cache.Count, null, hits, misses, evictions);
+    }
 
     public ParsedLuaDocument GetOrParse(string canonicalUri, string text)
     {

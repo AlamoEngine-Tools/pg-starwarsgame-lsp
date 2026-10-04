@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -53,6 +54,37 @@ public sealed record ServerStatusCachesDto(
 
 public sealed record ServerStatusTypeCountDto(string TypeName, int Count);
 
+/// <summary>What the index holds for one layer, by RANK - never by name; this is pasted into public issues.</summary>
+public sealed record ServerStatusLayerDto(int Rank, int Documents, int Symbols, int References);
+
+/// <summary>One in-memory cache's self-description; nulls where the cache does not count that.</summary>
+public sealed record ServerStatusCacheEntryDto(
+    string Name,
+    int Entries,
+    long? ApproximateBytes,
+    long? Hits,
+    long? Misses,
+    long? Evictions);
+
+/// <summary>
+///     The process's memory and where it goes. MEASURED 2026-10-04: a cold start held about 300 MB
+///     more than a warm start of the same workspace and nothing could say where; these are the
+///     figures that answer that from a bug report. The GC numbers are read without forcing a
+///     collection, so they describe the process as it runs.
+/// </summary>
+/// <param name="FragmentedBytes">Free space inside the managed heap the GC has not compacted.</param>
+/// <param name="LargeObjectHeapBytes">Objects over 85 KB - file buffers, big arrays - which are compacted only on demand.</param>
+public sealed record ServerStatusMemoryDto(
+    long HeapBytes,
+    long CommittedBytes,
+    long FragmentedBytes,
+    long LargeObjectHeapBytes,
+    long LargeObjectHeapFragmentedBytes,
+    long WorkingSetBytes,
+    int Gen2Collections,
+    IReadOnlyList<ServerStatusLayerDto> Layers,
+    IReadOnlyList<ServerStatusCacheEntryDto> Caches);
+
 /// <summary>The opt-in tier: counts that help rebuild a setup as a test case.</summary>
 /// <param name="SymbolTypes">Project symbols by type, most first - too long for an issue body.</param>
 public sealed record ServerStatusExtendedDto(
@@ -62,7 +94,8 @@ public sealed record ServerStatusExtendedDto(
     ServerStatusSymbolsDto Symbols,
     IReadOnlyList<ServerStatusAssetCountDto> Assets,
     ServerStatusCachesDto Caches,
-    IReadOnlyList<ServerStatusTypeCountDto> SymbolTypes);
+    IReadOnlyList<ServerStatusTypeCountDto> SymbolTypes,
+    ServerStatusMemoryDto Memory);
 
 /// <param name="Version">The schema's declared version, or null when it declares none.</param>
 /// <param name="Compatibility">The version check's verdict, or <c>NotChecked</c>.</param>
@@ -106,7 +139,8 @@ public sealed class GetServerStatusHandler(
     IGameIndexService indexService,
     IModProjectReloadService projects,
     IFileHelper fileHelper,
-    IWorkspaceIndexer? indexer = null)
+    IWorkspaceIndexer? indexer = null,
+    IEnumerable<ICacheStatisticsSource>? caches = null)
     : IJsonRpcRequestHandler<GetServerStatusParams, ServerStatusDto>
 {
     public Task<ServerStatusDto> Handle(GetServerStatusParams request, CancellationToken cancellationToken)
@@ -163,7 +197,42 @@ public sealed class GetServerStatusHandler(
             Symbols(index),
             Assets(index),
             Caches(),
-            SymbolTypes(index));
+            SymbolTypes(index),
+            Memory(index));
+    }
+
+    /// <summary>
+    ///     Process figures from the GC without forcing a collection, the index by layer rank, and
+    ///     every registered cache in registration order.
+    /// </summary>
+    private ServerStatusMemoryDto Memory(GameIndex index)
+    {
+        var info = GC.GetGCMemoryInfo();
+        var loh = info.GenerationInfo.Length > 3 ? info.GenerationInfo[3] : default;
+
+        var layers = index.Documents.Values
+            .GroupBy(d => d.LayerRank)
+            .OrderBy(g => g.Key)
+            .Select(g => new ServerStatusLayerDto(
+                g.Key, g.Count(), g.Sum(d => d.Symbols.Length), g.Sum(d => d.References.Length)))
+            .ToList();
+
+        var cacheEntries = (caches ?? [])
+            .Select(c => c.Snapshot())
+            .Select(s => new ServerStatusCacheEntryDto(
+                s.Name, s.Entries, s.ApproximateBytes, s.Hits, s.Misses, s.Evictions))
+            .ToList();
+
+        return new ServerStatusMemoryDto(
+            info.HeapSizeBytes,
+            info.TotalCommittedBytes,
+            info.FragmentedBytes,
+            loh.SizeAfterBytes,
+            loh.FragmentationAfterBytes,
+            Environment.WorkingSet,
+            GC.CollectionCount(2),
+            layers,
+            cacheEntries);
     }
 
     /// <summary>

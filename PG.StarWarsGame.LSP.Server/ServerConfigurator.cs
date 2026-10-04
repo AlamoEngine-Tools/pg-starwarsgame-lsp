@@ -239,6 +239,8 @@ public static class ServerConfigurator
 
                 // Story campaign models (per-campaign threads + graph) and their diagnostics.
                 services.AddSingleton<IStoryModelService, StoryModelService>();
+                services.AddSingleton<ICacheStatisticsSource>(sp =>
+                    (ICacheStatisticsSource)sp.GetRequiredService<IStoryModelService>());
                 services.AddSingleton<IStoryGraphDiagnosticsSource, StoryGraphDiagnosticsService>();
                 services.AddSingleton<StoryGraphChangeNotifier>(sp =>
                     new StoryGraphChangeNotifier(
@@ -309,6 +311,10 @@ public static class ServerConfigurator
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();
                 services.AddSingleton<IProjectConfigurationResolver, ProjectConfigurationResolver>();
                 services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
+                // One compacting collection after each workspace load: the parallel bulk parse
+                // leaves the heap fragmented (MEASURED about 200 MB on a two-layer workspace) and
+                // nothing else ever compacts it.
+                services.AddSingleton<IHeapTrimmer, GcHeapTrimmer>();
                 services.AddSingleton<IModProjectFileWriter, ModProjectFileWriter>();
                 services.AddSingleton<ILocalisationSeedFileWriter, LocalisationSeedFileWriter>();
                 services.AddSingleton<ILocalisationFormatConverter, LocalisationFormatConverter>();
@@ -363,6 +369,8 @@ public static class ServerConfigurator
                         sp.GetRequiredService<ServerStatusRecorder>(),
                         sp.GetRequiredService<ICrossProcessLock>()));
                 services.AddSingleton<IIconCatalogProvider, IconCatalogProvider>();
+                services.AddSingleton<ICacheStatisticsSource>(sp =>
+                    (ICacheStatisticsSource)sp.GetRequiredService<IIconCatalogProvider>());
                 // Same instance behind both contracts: the Xml diagnostics pipeline consumes the
                 // Core-side interface, which is how it stays unaware of the server's icon catalog.
                 services.AddSingleton<IIconRepackStatusProvider>(sp =>
@@ -404,6 +412,7 @@ public static class ServerConfigurator
                 // how the Xml project consumes it without ever referencing the asset layer it
                 // cannot depend on.
                 services.AddSingleton<ModelTextureIndex>();
+                services.AddSingleton<ICacheStatisticsSource>(sp => sp.GetRequiredService<ModelTextureIndex>());
                 services.AddSingleton<IModelTextureIndex>(sp =>
                     sp.GetRequiredService<ModelTextureIndex>());
 

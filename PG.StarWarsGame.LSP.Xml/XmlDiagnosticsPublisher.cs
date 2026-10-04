@@ -11,6 +11,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -28,6 +29,7 @@ using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiagnosticsRevalidator, IXmlFixCache,
+    ICacheStatisticsSource,
     IXmlDiagnosticsCollector
 {
     // The engine hardcodes these 20 damage types at fixed positions relative to the end of
@@ -60,6 +62,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private const long SlowDocumentMs = 1000;
 
     private readonly ConcurrentDictionary<string, Dictionary<(int Line, int Char), string>> _fixCache = new();
+
+    /// <summary>Documents with a fix-token map; never pruned, so a workspace sweep fills it for every file.</summary>
+    public CacheStatistics Snapshot()
+    {
+        return new CacheStatistics("xml-fixes", _fixCache.Count);
+    }
+
     private readonly IXmlDiagnosticsHandlerRegistry _handlerRegistry;
     private readonly IXmlHardpointFactProducer? _hardpointProducer;
 

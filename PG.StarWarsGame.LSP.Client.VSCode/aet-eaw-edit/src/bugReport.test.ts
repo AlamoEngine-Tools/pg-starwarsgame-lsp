@@ -43,6 +43,31 @@ const extendedServer: ServerStatus = {
             boneLayersReused: 3, boneLayers: 3,
         },
         symbolTypes: [{typeName: 'SpaceUnit', count: 20}, {typeName: 'LuaGlobal', count: 4}],
+        memory: {
+            heapBytes: 320 * 1048576,
+            committedBytes: 400 * 1048576,
+            fragmentedBytes: 12 * 1048576,
+            largeObjectHeapBytes: 90 * 1048576,
+            largeObjectHeapFragmentedBytes: 30 * 1048576,
+            workingSetBytes: 441 * 1048576,
+            gen2Collections: 7,
+            layers: [
+                {rank: 0, documents: 883, symbols: 8922, references: 30000},
+                {rank: 1, documents: 999, symbols: 32289, references: 90000},
+            ],
+            caches: [
+                {name: 'xml-parse', entries: 16, approximateBytes: null, hits: 120, misses: 40, evictions: 3},
+                {
+                    name: 'lua-parser-state',
+                    entries: 1432,
+                    approximateBytes: 2100000,
+                    hits: null,
+                    misses: null,
+                    evictions: null
+                },
+                {name: 'xml-fixes', entries: 580, approximateBytes: null, hits: null, misses: null, evictions: null},
+            ],
+        },
     },
 };
 
@@ -62,6 +87,21 @@ describe('formatBugReport, extended tier', () => {
             '- Assets: .ala 0, .alo 1500 (1379 base game)',
             '- Caches: schema Hit; index snapshots 2 of 3 layers, 50 files reused, 2 parsed; '
             + 'bone catalog 3 of 3 layers',
+        ]) {
+            assert.ok(text.includes(line), `missing "${line}" in:\n${text}`);
+        }
+    });
+
+    it('reports memory, the index per layer rank and every cache, all as counts', () => {
+        const text = formatBugReport(client, extendedServer, {extended: true});
+
+        for (const line of [
+            '- Memory: heap 320 MB, committed 400 MB, fragmented 12 MB; large object heap 90 MB '
+            + '(30 MB fragmented); working set 441 MB; 7 gen2 collections',
+            '- Layers: rank 0 883 documents, 8922 symbols, 30000 references; '
+            + 'rank 1 999 documents, 32289 symbols, 90000 references',
+            '- Cache entries: xml-parse 16 (120 hits, 40 misses, 3 evictions); '
+            + 'lua-parser-state 1432 (2.0 MB); xml-fixes 580',
         ]) {
             assert.ok(text.includes(line), `missing "${line}" in:\n${text}`);
         }

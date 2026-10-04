@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Icons;
@@ -31,6 +32,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly ServerStatusRecorder? _status;
 
     private readonly IIconCatalogProvider? _icons;
+    private readonly IHeapTrimmer _heapTrimmer;
     private List<string>? _lastRoots;
 
     // refresh is optional so the many minimal test setups can omit it; production always wires it.
@@ -52,9 +54,13 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // restored while the window was opening - answers with baseline icons for the whole
         // session, because nothing else ever drops it.
         IIconCatalogProvider? icons = null,
-        ServerStatusRecorder? status = null)
+        ServerStatusRecorder? status = null,
+        // Optional for the same reason again. Production wires the compacting trimmer; without it
+        // the bulk parse's fragmentation stays for the session (MEASURED: about 200 MB).
+        IHeapTrimmer? heapTrimmer = null)
     {
         _status = status;
+        _heapTrimmer = heapTrimmer ?? new NullHeapTrimmer();
         _resolver = resolver;
         _indexer = indexer;
         _localisation = localisation;
@@ -140,6 +146,10 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         {
             _logger.LogError(ex, "Workspace localisation load failed.");
         }
+
+        // The bulk phase is over: everything above parsed, hashed and catalogued in parallel and
+        // left the heap full of holes. One compacting collection here, never on a request path.
+        _heapTrimmer.TrimAfterBulkWork("workspace load");
 
         // No migration offer here, on purpose. A project brought forward while loading has already
         // been read as its current shape; whether to write that down is a QUESTION, and this method

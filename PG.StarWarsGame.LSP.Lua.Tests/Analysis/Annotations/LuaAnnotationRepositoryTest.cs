@@ -27,6 +27,21 @@ public sealed class LuaAnnotationRepositoryTest
         return new LuaEnumDefinition(name, false);
     }
 
+    /// <summary>The repository describes itself for the server status: files that contributed annotations.</summary>
+    [Fact]
+    public void Snapshot_CountsTheFilesThatContributedAnnotations()
+    {
+        var repo = new LuaAnnotationRepository();
+        repo.Update("file:///a.lua", [EmmyLuaAnnotations.Empty with { ClassDef = Class("A") }]);
+        repo.Update("file:///b.lua", [EmmyLuaAnnotations.Empty with { AliasDef = Alias("B") }]);
+        repo.Update("file:///a.lua", [EmmyLuaAnnotations.Empty with { ClassDef = Class("A2") }]);
+
+        var stats = ((PG.StarWarsGame.LSP.Core.Caching.ICacheStatisticsSource)repo).Snapshot();
+
+        Assert.Equal("lua-annotations", stats.Name);
+        Assert.Equal(2, stats.Entries);
+    }
+
     [Fact]
     public void Update_AddsAnnotations_AllContainsUri()
     {

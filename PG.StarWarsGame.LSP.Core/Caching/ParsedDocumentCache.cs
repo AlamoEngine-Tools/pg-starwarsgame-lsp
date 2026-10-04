@@ -54,6 +54,18 @@ public sealed class ParsedDocumentCache<TArtifact> where TArtifact : class
         }
     }
 
+    /// <summary>Live entries, at most the capacity.</summary>
+    public int Count
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _entries.Count;
+            }
+        }
+    }
+
     public TArtifact GetOrParse(string canonicalUri, string text, long contentHash,
         Func<string, TArtifact> parse)
     {

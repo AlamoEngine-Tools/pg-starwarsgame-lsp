@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -31,7 +32,7 @@ namespace PG.StarWarsGame.LSP.Server.Assets;
 public sealed class ModelTextureIndex(
     IGameAssetResolver assets,
     IGameIndexService index,
-    ILogger<ModelTextureIndex> logger) : IModelTextureIndex
+    ILogger<ModelTextureIndex> logger) : IModelTextureIndex, ICacheStatisticsSource
 {
     private readonly IGameIndexService _index = index;
 
@@ -66,6 +67,12 @@ public sealed class ModelTextureIndex(
             return known;
 
         return _cache.GetOrAdd(reference, Read);
+    }
+
+    /// <summary>Models answered by parsing rather than by the catalog; never cleared in production.</summary>
+    public CacheStatistics Snapshot()
+    {
+        return new CacheStatistics("model-textures", _cache.Count);
     }
 
     /// <summary>Forgets everything, for when the asset layers underneath have moved.</summary>

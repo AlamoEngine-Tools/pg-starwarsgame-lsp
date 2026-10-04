@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -62,6 +63,32 @@ public sealed class WorkspaceVariantTagSourceTest
             NullLogger<DocumentTextSource>.Instance);
         var source = new WorkspaceVariantTagSource(new XmlParseCache(textSource, 16), indexService);
         return (source, indexService, host, fs);
+    }
+
+    // ── statistics ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     The per-document tag maps hold verbatim XML fragments and are never pruned - the
+    ///     inventory's first suspect for the cold-start residue. Entries and an estimate of the
+    ///     fragment text they hold, so a bug report can say how big it has grown.
+    /// </summary>
+    [Fact]
+    public void Snapshot_CountsCachedDocumentMapsAndEstimatesTheirText()
+    {
+        var (source, index, host, _) = Build();
+        host.AddOrUpdate("file:///c:/mod/a.xml",
+            """<GameObjectFiles><SpaceUnit Name="A"><Mass>1</Mass></SpaceUnit></GameObjectFiles>""", 1);
+        host.AddOrUpdate("file:///c:/mod/b.xml",
+            """<GameObjectFiles><SpaceUnit Name="B"><Mass>2</Mass></SpaceUnit></GameObjectFiles>""", 1);
+        index.Current = IndexWith(("A", "file:///c:/mod/a.xml", 1, 0), ("B", "file:///c:/mod/b.xml", 1, 0));
+
+        source.TryGetTags("A");
+        source.TryGetTags("B");
+        var stats = ((ICacheStatisticsSource)source).Snapshot();
+
+        Assert.Equal("variant-tags", stats.Name);
+        Assert.Equal(2, stats.Entries);
+        Assert.True(stats.ApproximateBytes > 0);
     }
 
     // ── open-document resolution ─────────────────────────────────────────────
