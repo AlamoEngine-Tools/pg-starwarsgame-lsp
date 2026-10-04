@@ -41,10 +41,16 @@ public sealed class CrossLayerInputFingerprintTest
         return registry;
     }
 
+    /// <summary>
+    ///     The layer's own xml roots default to the whole union, which is the single-project case:
+    ///     every root is the layer's own, nothing is narrowed away.
+    /// </summary>
     private static string Compute(
-        IFileTypeRegistry registry, IReadOnlyList<string> files, IReadOnlyList<string>? xmlDirs = null)
+        IFileTypeRegistry registry, IReadOnlyList<string> files, IReadOnlyList<string>? xmlDirs = null,
+        IReadOnlyList<string>? layerXmlDirs = null)
     {
-        return CrossLayerInputFingerprint.Compute(registry, files, xmlDirs ?? OneXmlDir);
+        var union = xmlDirs ?? OneXmlDir;
+        return CrossLayerInputFingerprint.Compute(registry, files, layerXmlDirs ?? union, union);
     }
 
     // ── stability ────────────────────────────────────────────────────────────
@@ -113,6 +119,69 @@ public sealed class CrossLayerInputFingerprintTest
     }
 
     [Fact]
+    public void Compute_ChangesWhenARootContainingThisLayersDirectoryIsAdded()
+    {
+        // An ancestor root can be the longest match for nothing in this layer today, but it IS a
+        // candidate for every file in it, and the set of candidates is what the key names.
+        var registry = RegistryWith(("file:///c:/mod/data/xml/story.xml", ["StoryParser"]));
+        var layerDirs = new[] { "file:///c:/mod/data/xml/" };
+
+        Assert.NotEqual(
+            Compute(registry, ["file:///c:/mod/data/xml/story.xml"], layerDirs, layerDirs),
+            Compute(registry, ["file:///c:/mod/data/xml/story.xml"],
+                ["file:///c:/mod/data/xml/", "file:///c:/mod/"], layerDirs));
+    }
+
+    // ── what must NOT move it: a sibling project's roots ─────────────────────
+
+    /// <summary>
+    ///     MEASURED 2026-10-04: EaWX's core layer was re-parsed on four of seven starts because its
+    ///     key folded in the whole xml-root UNION, and the union differs between "core opened
+    ///     alone" and "core under Rev". A root that neither contains nor lies inside this layer's
+    ///     own directories can never be the longest match for one of its files, so it must not be
+    ///     part of this layer's key.
+    /// </summary>
+    [Fact]
+    public void Compute_IgnoresAnXmlRootThatCannotMatchThisLayersFiles()
+    {
+        var registry = RegistryWith(("file:///c:/core/data/xml/units.xml", ["GameObjectType"]));
+        var files = new[] { "file:///c:/core/data/xml/units.xml" };
+        var coreDirs = new[] { "file:///c:/core/data/xml/" };
+
+        var alone = Compute(registry, files, coreDirs, coreDirs);
+        var underALeaf = Compute(registry, files, ["file:///c:/core/data/xml/", "file:///c:/rev/data/xml/"], coreDirs);
+
+        Assert.Equal(alone, underALeaf);
+    }
+
+    [Fact]
+    public void Compute_StillSeesANestedRootInsideThisLayersDirectory_WhenNarrowed()
+    {
+        // The narrowing keeps what it must: a root INSIDE the layer's directory is a longer match
+        // for the files under it, whichever layer contributed it.
+        var registry = RegistryWith(("file:///c:/core/data/xml/story.xml", ["StoryParser"]));
+        var files = new[] { "file:///c:/core/data/xml/story.xml" };
+        var coreDirs = new[] { "file:///c:/core/data/xml/" };
+
+        Assert.NotEqual(
+            Compute(registry, files, coreDirs, coreDirs),
+            Compute(registry, files, ["file:///c:/core/data/xml/", "file:///c:/core/data/xml/conquests/"], coreDirs));
+    }
+
+    [Fact]
+    public void Compute_NarrowingFoldsCaseAndSeparators()
+    {
+        // Paths arrive as the indexer spells them (backslashes, mixed case) and as URIs; a root
+        // must be recognised as this layer's own in either spelling, or it is wrongly dropped.
+        var registry = RegistryWith(("file:///c:/core/data/xml/units.xml", ["GameObjectType"]));
+        var files = new[] { "file:///c:/core/data/xml/units.xml" };
+
+        Assert.Equal(
+            Compute(registry, files, [@"C:\Core\Data\XML"], [@"C:\Core\Data\XML"]),
+            Compute(registry, files, ["c:/core/data/xml/", "c:/rev/data/xml/"], ["c:/core/data/xml"]));
+    }
+
+    [Fact]
     public void Compute_DoesNotDependOnXmlDirectoryOrder()
     {
         var registry = RegistryWith(("file:///c:/mod/a.xml", ["A"]));
@@ -130,7 +199,7 @@ public sealed class CrossLayerInputFingerprintTest
         // THE WIN. A dependency edited one of its OWN files and its type registration changed.
         // That cannot affect how this layer's documents parse, so this layer's snapshot must
         // survive - where the old dependency-OverallHash key discarded it whole.
-        var files = new[] {"file:///c:/mod/units.xml"};
+        var files = new[] { "file:///c:/mod/units.xml" };
         var before = RegistryWith(
             ("file:///c:/mod/units.xml", ["GameObjectType"]),
             ("file:///c:/core/other.xml", ["Faction"]));
@@ -144,7 +213,7 @@ public sealed class CrossLayerInputFingerprintTest
     [Fact]
     public void Compute_IgnoresAFileAddedToADependency()
     {
-        var files = new[] {"file:///c:/mod/units.xml"};
+        var files = new[] { "file:///c:/mod/units.xml" };
         var before = RegistryWith(("file:///c:/mod/units.xml", ["GameObjectType"]));
         var after = RegistryWith(
             ("file:///c:/mod/units.xml", ["GameObjectType"]),

@@ -82,13 +82,9 @@ public sealed class ModelBoneCatalogCache : IModelBoneCatalogCache
                     .ToArray()
             };
 
-            // Atomic write: serialize to a temp file then rename over the target, so a start that
-            // dies mid-write leaves the previous snapshot rather than a truncated one.
-            var tempPath = path + ".tmp";
-            _fileHelper.FileSystem.File.WriteAllBytes(tempPath, ModelBoneCatalogSerializer.Serialize(snapshot));
-            if (_fileHelper.FileSystem.File.Exists(path))
-                _fileHelper.FileSystem.File.Delete(path);
-            _fileHelper.FileSystem.File.Move(tempPath, path);
+            // Atomic, so a start that dies mid-write leaves the previous snapshot rather than a
+            // truncated one, and a second server starting on the same layer reads one or the other.
+            AtomicFile.WriteAllBytes(_fileHelper.FileSystem, path, ModelBoneCatalogSerializer.Serialize(snapshot));
 
             _logger.LogDebug("Saved model snapshot to '{Path}' ({Models} model(s))", path, models.Count);
         }

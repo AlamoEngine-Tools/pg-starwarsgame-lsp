@@ -16,7 +16,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Server.Assets;
- using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -57,7 +57,7 @@ public sealed class WorkspaceIndexerTest
             .ToArray();
 
         snapshot.CrossLayerFingerprint =
-            CrossLayerInputFingerprint.Compute(registry, files, config.XmlDirectories);
+            CrossLayerInputFingerprint.Compute(registry, files, layerXmlDirs, config.XmlDirectories);
     }
 
     /// <summary>
@@ -1342,6 +1342,59 @@ public sealed class WorkspaceIndexerTest
     }
 
     /// <summary>
+    ///     MEASURED 2026-10-04 on EaWX: the core layer's snapshot was discarded on four of seven
+    ///     starts ("Cross-layer inputs changed since layer 'Core Library' was cached") because the
+    ///     key folded in the workspace-wide xml-root union, which differs between "core opened
+    ///     alone" and "core under Rev", and because both contexts wrote the SAME file. Three
+    ///     starts, one shared disk: alone, under a leaf, alone again. The third start parses
+    ///     nothing, and the leaf start did not replace the dependency's snapshot.
+    /// </summary>
+    [Fact]
+    public async Task IndexDocumentsAsync_ADependencyOpenedAloneThenUnderALeaf_KeepsItsSnapshot()
+    {
+        var coreRoot = Root("core");
+        var revRoot = Root("rev");
+        var coreXml = Path.Combine(coreRoot, "data", "xml");
+        var revXml = Path.Combine(revRoot, "data", "xml");
+        var corePgproj = Path.Combine(coreRoot, "core.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var revPgproj = Path.Combine(revRoot, "rev.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(coreXml, "units.xml")] = new("<Root/>"),
+            [Path.Combine(revXml, "mod.xml")] = new("<Root/>")
+        });
+        // One disk, three server starts.
+        var cache = new FakeProjectIndexCache();
+        var coreLayer = new ProjectLayer(0, "Core", [coreXml], [], [], [], null, corePgproj);
+        var coreAlone = new WorkspaceConfiguration([coreXml], [], [], [], null) { Layers = [coreLayer] };
+        var revOverCore = new WorkspaceConfiguration([coreXml, revXml], [], [], [], null)
+        {
+            Layers = [coreLayer, new ProjectLayer(1, "Rev", [revXml], [], [], [], null, revPgproj)]
+        };
+
+        async Task<FakeIndexService> StartAsync(WorkspaceConfiguration config, params string[] roots)
+        {
+            var svc = new FakeIndexService();
+            var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+                new FakeParser());
+            indexer.PreScanMetafiles(config, roots);
+            await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+            return svc;
+        }
+
+        await StartAsync(coreAlone, coreRoot);
+        var underALeaf = await StartAsync(revOverCore, coreRoot, revRoot);
+        var aloneAgain = await StartAsync(coreAlone, coreRoot);
+
+        // The leaf start served core from the snapshot the first start wrote...
+        Assert.DoesNotContain(underALeaf.Calls, c => c.Uri.Contains("/core/", StringComparison.OrdinalIgnoreCase));
+        // ...and the third start found that snapshot untouched.
+        Assert.Empty(aloneAgain.Calls);
+        // Same registry slice, same relevant roots: one context, one file for the dependency.
+        Assert.Single(cache.SavedByContext.Keys, k => k.Pgproj == corePgproj);
+    }
+
+    /// <summary>
     ///     A dependency's OWN files changing must NOT discard a dependent layer's snapshot.
     /// </summary>
     /// <remarks>
@@ -1782,10 +1835,17 @@ public sealed class WorkspaceIndexerTest
 
     // ── fakes ────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    ///     The disk, as the indexer sees it. A snapshot SEEDED by a test (the indexer) answers for
+    ///     any context key - the test stamps its fingerprint to say whether it is current. A
+    ///     snapshot SAVED by the indexer is filed under its context key, like the real cache, so a
+    ///     test can tell "served from the snapshot of this context" from "re-parsed".
+    /// </summary>
     private sealed class FakeProjectIndexCache : IProjectIndexCache
     {
         public readonly HashSet<string> HygienePaths = [];
         public readonly Dictionary<string, ProjectIndexSnapshot> Saved = [];
+        public readonly Dictionary<(string Pgproj, string ContextKey), ProjectIndexSnapshot> SavedByContext = [];
         public readonly HashSet<string> SavedPaths = [];
         private readonly Dictionary<string, ProjectIndexSnapshot> _snapshots = [];
 
@@ -1794,15 +1854,18 @@ public sealed class WorkspaceIndexerTest
             set => _snapshots[pgprojPath] = value!;
         }
 
-        public ProjectIndexSnapshot? TryLoad(string pgprojPath)
+        public ProjectIndexSnapshot? TryLoad(string pgprojPath, string contextKey)
         {
-            return _snapshots.GetValueOrDefault(pgprojPath);
+            return SavedByContext.TryGetValue((pgprojPath, contextKey), out var saved)
+                ? saved
+                : _snapshots.GetValueOrDefault(pgprojPath);
         }
 
-        public void Save(string pgprojPath, ProjectIndexSnapshot snapshot)
+        public void Save(string pgprojPath, string contextKey, ProjectIndexSnapshot snapshot)
         {
             SavedPaths.Add(pgprojPath);
             Saved[pgprojPath] = snapshot;
+            SavedByContext[(pgprojPath, contextKey)] = snapshot;
         }
 
         public void EnsureGitHygiene(string pgprojPath)

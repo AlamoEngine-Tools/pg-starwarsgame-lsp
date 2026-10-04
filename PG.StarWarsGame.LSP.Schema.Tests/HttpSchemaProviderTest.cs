@@ -49,7 +49,7 @@ public sealed class HttpSchemaProviderTest
 
     private static SchemaHttpCache NoOpCache()
     {
-        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), NullLogger<SchemaHttpCache>.Instance);
+        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), new NullCrossProcessLock(), NullLogger<SchemaHttpCache>.Instance);
     }
 
     private static (HttpSchemaProvider provider, FakeHttpMessageHandler fake) Build(
@@ -288,7 +288,7 @@ public sealed class HttpSchemaProviderTest
 
     private static SchemaHttpCache CacheHolding(string tag, string schemaVersion = "2.1.0")
     {
-        var cache = new SchemaHttpCache(new FileHelper(new MockFileSystem()), NullLogger<SchemaHttpCache>.Instance);
+        var cache = new SchemaHttpCache(new FileHelper(new MockFileSystem()), new NullCrossProcessLock(), NullLogger<SchemaHttpCache>.Instance);
         cache.Update(ManifestJson(schemaVersion), [("tags/Unit.yaml", MassYaml)], tag: tag);
         return cache;
     }

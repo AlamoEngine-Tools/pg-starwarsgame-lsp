@@ -21,9 +21,99 @@ public sealed class SchemaHttpCacheTest
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".aetswg", "schema");
 
-    private static SchemaHttpCache BuildCache(MockFileSystem fs)
+    private static SchemaHttpCache BuildCache(MockFileSystem fs, ICrossProcessLock? processLock = null)
     {
-        return new SchemaHttpCache(new FileHelper(fs), NullLogger<SchemaHttpCache>.Instance);
+        return new SchemaHttpCache(new FileHelper(fs), processLock ?? new NullCrossProcessLock(),
+            NullLogger<SchemaHttpCache>.Instance);
+    }
+
+    // ── cross-process safety ─────────────────────────────────────────────────
+    //
+    // ~/.aetswg/schema is shared by every server process on the machine, and with one server per
+    // open project several of them start at the same moment. A plain WriteAllText let a second
+    // process read a half-written mirror. Every write goes through the atomic helper, and the
+    // whole Update runs under the cross-process lock.
+
+    [Fact]
+    public void Update_HoldsTheCrossProcessLockForTheWholeWrite()
+    {
+        var fs = new MockFileSystem();
+        var recording = new RecordingLock(fs, Path.Combine(CacheDir, "_release"));
+        var cache = BuildCache(fs, recording);
+
+        cache.Update("{}", [("tags/Unit.yaml", TagYaml)], "hash", "v1.0.0");
+
+        Assert.Single(recording.Acquired);
+        Assert.True(recording.FileWrittenWhileHeld, "the tag was written outside the lock");
+    }
+
+    [Fact]
+    public void Update_LeavesNoTemporaryFiles()
+    {
+        var fs = new MockFileSystem();
+        var cache = BuildCache(fs);
+
+        cache.Update("{}", [("tags/Unit.yaml", TagYaml), ("meta/m.yaml", MetaYaml)], "hash", "v1.0.0");
+
+        var leftovers = fs.AllFiles.Where(f => f.EndsWith(".tmp", StringComparison.Ordinal)).ToArray();
+        Assert.Empty(leftovers);
+    }
+
+    [Fact]
+    public void RecordRelease_HoldsTheCrossProcessLock()
+    {
+        var fs = new MockFileSystem();
+        var recording = new RecordingLock(fs, Path.Combine(CacheDir, "_index.json"));
+        var cache = BuildCache(fs, recording);
+
+        cache.RecordRelease("{}", "v1.0.0");
+
+        Assert.Single(recording.Acquired);
+        Assert.True(recording.FileWrittenWhileHeld, "the manifest was written outside the lock");
+    }
+
+    [Fact]
+    public void UpdateText_HoldsTheCrossProcessLock()
+    {
+        var fs = new MockFileSystem();
+        var recording = new RecordingLock(fs, Path.Combine(CacheDir, "lua/api.d.lua"));
+        var cache = BuildCache(fs, recording);
+
+        cache.UpdateText("lua/api.d.lua", "---@meta\n");
+
+        Assert.Single(recording.Acquired);
+        Assert.True(recording.FileWrittenWhileHeld, "the file was written outside the lock");
+    }
+
+    /// <summary>
+    ///     Notes whether the watched file appeared or changed between Acquire and Dispose - the
+    ///     only observable "was the write inside the lock" a unit test has.
+    /// </summary>
+    private sealed class RecordingLock(MockFileSystem fs, string watchedFile) : ICrossProcessLock
+    {
+        public readonly List<string> Acquired = [];
+        public bool FileWrittenWhileHeld { get; private set; }
+
+        public IDisposable Acquire(string name)
+        {
+            Acquired.Add(name);
+            var existedBefore = fs.File.Exists(watchedFile);
+            var contentBefore = existedBefore ? fs.File.ReadAllBytes(watchedFile) : [];
+            return new Release(() =>
+            {
+                if (fs.File.Exists(watchedFile)
+                    && (!existedBefore || !contentBefore.SequenceEqual(fs.File.ReadAllBytes(watchedFile))))
+                    FileWrittenWhileHeld = true;
+            });
+        }
+
+        private sealed class Release(Action onDispose) : IDisposable
+        {
+            public void Dispose()
+            {
+                onDispose();
+            }
+        }
     }
 
     // ── TryLoad ──────────────────────────────────────────────────────────────

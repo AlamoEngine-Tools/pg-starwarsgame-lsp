@@ -636,12 +636,14 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         // What each layer's documents read from OUTSIDE their own layer. Computed here rather than
         // per file: PreScanMetafiles has already run, so the file-type registry is complete, and
-        // the xml directory union is fixed for the scan.
+        // the xml directory union is fixed for the scan. The value is also the snapshot's CONTEXT
+        // KEY - a dependency indexed under two different leaves keeps one file per context.
         var crossLayerFingerprints = layerFileLists.ToDictionary(
             l => l.Layer,
             l => CrossLayerInputFingerprint.Compute(
                 _fileTypeRegistry,
                 l.Files.Select(_fileHelper.PathToFileUri).ToArray(),
+                l.Layer.XmlDirectories,
                 config.XmlDirectories));
 
         // (pgprojPath → OverallHash) of snapshots that survived dependency validation - when the
@@ -659,7 +661,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 // but defensive normalization ensures robustness in tests and edge cases).
                 var pgprojPath = layer.ProjectPath?.Replace('\\', '/');
 
-                var snapshot = pgprojPath is not null ? _cache.TryLoad(pgprojPath) : null;
+                var crossLayer = crossLayerFingerprints[layer];
+                var snapshot = pgprojPath is not null ? _cache.TryLoad(pgprojPath, crossLayer) : null;
 
                 // Snapshot built under a different (or pre-fingerprint) schema - discard it.
                 if (snapshot is not null && snapshot.SchemaFingerprint != schemaFingerprint)
@@ -673,10 +676,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 // Cached parses are not content-pure: what a document emits depends on inputs
                 // decided outside its own layer, so the layer's own file hashes cannot catch a
                 // change to those. The key names those inputs exactly - the file-type
-                // registrations for THIS layer's files, and the xml directory set - rather than
-                // asking the far coarser "did any dependency change at all", which discarded a
-                // whole dependent layer for one changed line in a shared core.
-                var crossLayer = crossLayerFingerprints[layer];
+                // registrations for THIS layer's files, and the xml roots that can match them -
+                // rather than asking the far coarser "did any dependency change at all", which
+                // discarded a whole dependent layer for one changed line in a shared core. The
+                // file was found BY this key, so a mismatch here is a collision of its short form
+                // in the file name - a re-parse, never a stale index.
                 if (snapshot is not null && snapshot.CrossLayerFingerprint != crossLayer)
                 {
                     _logger.LogInformation(
@@ -790,7 +794,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 SchemaFingerprint = schemaFingerprint,
                 CrossLayerFingerprint = crossLayerFingerprints[layer]
             };
-            _cache.Save(pgprojPath, newSnapshot);
+            _cache.Save(pgprojPath, crossLayerFingerprints[layer], newSnapshot);
             _cache.EnsureGitHygiene(pgprojPath);
         }
 

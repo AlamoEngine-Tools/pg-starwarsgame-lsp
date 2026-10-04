@@ -287,6 +287,10 @@ public static class ServerConfigurator
                 // pipeline runs, then drains them in order. Replaces the old PreOpenBuffer race.
                 services.AddSingleton<IStartupGate, StartupGate>();
 
+                // One server runs per open project, so several processes write the same cache
+                // files at once: ~/.aetswg and a shared dependency's .aetswg/. The named mutex is
+                // what serializes them; registered before anything that writes a cache.
+                services.AddSingleton<ICrossProcessLock, NamedMutexLock>();
                 services.AddSingleton<IProjectIndexCache, ProjectIndexCache>();
                 services.AddSingleton<IModelBoneCatalogCache, ModelBoneCatalogCache>();
                 services.AddSingleton<WorkspaceIndexer>();
@@ -338,7 +342,8 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(BaselineLoader)),
                         sp.GetRequiredService<IFileHelper>(),
                         sp.GetRequiredService<ILogger<BaselineLoader>>(),
-                        sp.GetRequiredService<ServerStatusRecorder>()));
+                        sp.GetRequiredService<ServerStatusRecorder>(),
+                        sp.GetRequiredService<ICrossProcessLock>()));
 
                 // Icon preview. The MTD reader needs PG.Commons' CRC32 hashing, and as of the 4.1.4
                 // packages nothing else supplies it: SupportDAT used to TryAdd IHashingService on
@@ -355,7 +360,8 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IconPackLoader)),
                         sp.GetRequiredService<IFileHelper>(),
                         sp.GetRequiredService<ILogger<IconPackLoader>>(),
-                        sp.GetRequiredService<ServerStatusRecorder>()));
+                        sp.GetRequiredService<ServerStatusRecorder>(),
+                        sp.GetRequiredService<ICrossProcessLock>()));
                 services.AddSingleton<IIconCatalogProvider, IconCatalogProvider>();
                 // Same instance behind both contracts: the Xml diagnostics pipeline consumes the
                 // Core-side interface, which is how it stays unaware of the server's icon catalog.

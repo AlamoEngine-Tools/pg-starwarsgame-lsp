@@ -105,7 +105,7 @@ public sealed class SchemaVersionWiringTest : IDisposable
 
     private static SchemaHttpCache NoOpCache()
     {
-        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), NullLogger<SchemaHttpCache>.Instance);
+        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), new NullCrossProcessLock(), NullLogger<SchemaHttpCache>.Instance);
     }
 
     private static HttpSchemaProvider CreateHttp(string indexJson)

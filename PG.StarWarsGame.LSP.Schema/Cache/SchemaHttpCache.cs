@@ -14,11 +14,16 @@ public sealed class SchemaHttpCache
 {
     private readonly string _dir;
     private readonly IFileHelper _fileHelper;
+    private readonly ICrossProcessLock _lock;
     private readonly ILogger<SchemaHttpCache> _logger;
 
-    public SchemaHttpCache(IFileHelper fileHelper, ILogger<SchemaHttpCache> logger)
+    public SchemaHttpCache(IFileHelper fileHelper, ICrossProcessLock processLock, ILogger<SchemaHttpCache> logger)
     {
         _fileHelper = fileHelper;
+        // The mirror under ~/.aetswg/schema is shared by every server process on the machine -
+        // one per open project - and several start at the same moment. Every write here runs
+        // under the lock, and each file is written atomically.
+        _lock = processLock;
         _logger = logger;
         _dir = _fileHelper.FileSystem.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -172,27 +177,27 @@ public sealed class SchemaHttpCache
     public void Update(string indexJson, IReadOnlyList<(string relativePath, string content)> yamlFiles,
         string? baselineHash = null, string? tag = null)
     {
-        _fileHelper.FileSystem.Directory.CreateDirectory(_dir);
-        // The tag goes first and is only written back once everything else is on disk: a write
-        // that dies half-way leaves no tag, and an untagged cache is never trusted without a fetch.
-        if (_fileHelper.FileSystem.File.Exists(TagPath))
-            _fileHelper.FileSystem.File.Delete(TagPath);
-        _fileHelper.FileSystem.File.WriteAllText(IndexPath, indexJson);
+        var fs = _fileHelper.FileSystem;
+        fs.Directory.CreateDirectory(_dir);
 
-        foreach (var (rel, content) in yamlFiles)
+        using (_lock.Acquire(_dir))
         {
-            var fullPath = _fileHelper.FileSystem.Path.Combine(_dir, rel);
-            var parentDir = _fileHelper.FileSystem.Path.GetDirectoryName(fullPath);
-            if (!string.IsNullOrEmpty(parentDir))
-                _fileHelper.FileSystem.Directory.CreateDirectory(parentDir);
-            _fileHelper.FileSystem.File.WriteAllText(fullPath, content);
+            // The tag goes first and is only written back once everything else is on disk: a
+            // write that dies half-way leaves no tag, and an untagged cache is never trusted
+            // without a fetch.
+            if (fs.File.Exists(TagPath))
+                fs.File.Delete(TagPath);
+            AtomicFile.WriteAllText(fs, IndexPath, indexJson);
+
+            foreach (var (rel, content) in yamlFiles)
+                AtomicFile.WriteAllText(fs, fs.Path.Combine(_dir, rel), content);
+
+            var hash = baselineHash ?? ComputeYamlHash(yamlFiles.Select(f => f.content));
+            AtomicFile.WriteAllText(fs, ChecksumPath, hash);
+
+            if (tag is not null)
+                AtomicFile.WriteAllText(fs, TagPath, tag);
         }
-
-        var hash = baselineHash ?? ComputeYamlHash(yamlFiles.Select(f => f.content));
-        _fileHelper.FileSystem.File.WriteAllText(ChecksumPath, hash);
-
-        if (tag is not null)
-            _fileHelper.FileSystem.File.WriteAllText(TagPath, tag);
     }
 
     /// <summary>
@@ -202,16 +207,20 @@ public sealed class SchemaHttpCache
     /// </summary>
     public void RecordRelease(string indexJson, string? tag)
     {
-        _fileHelper.FileSystem.Directory.CreateDirectory(_dir);
-        _fileHelper.FileSystem.File.WriteAllText(IndexPath, indexJson);
-        if (tag is null)
+        var fs = _fileHelper.FileSystem;
+        fs.Directory.CreateDirectory(_dir);
+        using (_lock.Acquire(_dir))
         {
-            if (_fileHelper.FileSystem.File.Exists(TagPath))
-                _fileHelper.FileSystem.File.Delete(TagPath);
-        }
-        else
-        {
-            _fileHelper.FileSystem.File.WriteAllText(TagPath, tag);
+            AtomicFile.WriteAllText(fs, IndexPath, indexJson);
+            if (tag is null)
+            {
+                if (fs.File.Exists(TagPath))
+                    fs.File.Delete(TagPath);
+            }
+            else
+            {
+                AtomicFile.WriteAllText(fs, TagPath, tag);
+            }
         }
     }
 
@@ -235,12 +244,12 @@ public sealed class SchemaHttpCache
     /// </summary>
     public void UpdateText(string relativePath, string content)
     {
-        _fileHelper.FileSystem.Directory.CreateDirectory(_dir);
-        var fullPath = _fileHelper.FileSystem.Path.Combine(_dir, relativePath);
-        var parentDir = _fileHelper.FileSystem.Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(parentDir))
-            _fileHelper.FileSystem.Directory.CreateDirectory(parentDir);
-        _fileHelper.FileSystem.File.WriteAllText(fullPath, content);
+        var fs = _fileHelper.FileSystem;
+        fs.Directory.CreateDirectory(_dir);
+        using (_lock.Acquire(_dir))
+        {
+            AtomicFile.WriteAllText(fs, fs.Path.Combine(_dir, relativePath), content);
+        }
     }
 
     // Hashes each YAML file's content in manifest order - indexJson is excluded so

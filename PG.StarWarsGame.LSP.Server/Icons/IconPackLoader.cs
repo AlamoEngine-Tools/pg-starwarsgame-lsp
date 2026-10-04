@@ -29,16 +29,18 @@ public sealed class IconPackLoader
 {
     private readonly IFileHelper _fileHelper;
     private readonly HttpClient _httpClient;
+    private readonly ICrossProcessLock _lock;
     private readonly ILogger<IconPackLoader> _logger;
     private readonly ServerStatusRecorder? _status;
 
     public IconPackLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<IconPackLoader> logger,
-        ServerStatusRecorder? status = null)
+        ServerStatusRecorder? status = null, ICrossProcessLock? processLock = null)
     {
         _httpClient = httpClient;
         _fileHelper = fileHelper;
         _logger = logger;
         _status = status;
+        _lock = processLock ?? new NullCrossProcessLock();
     }
 
     private string CacheDir => _fileHelper.FileSystem.Path.Combine(
@@ -98,8 +100,12 @@ public sealed class IconPackLoader
             if (pack is not null)
             {
                 // Only cache once confirmed loadable, so a bad download never clobbers a good copy.
-                _fileHelper.FileSystem.Directory.CreateDirectory(CacheDir);
-                await _fileHelper.FileSystem.File.WriteAllBytesAsync(cacheFile, bytes, ct);
+                // Atomic and under the lock: ~/.aetswg is shared by every server on the machine.
+                using (_lock.Acquire(CacheDir))
+                {
+                    AtomicFile.WriteAllBytes(_fileHelper.FileSystem, cacheFile, bytes);
+                }
+
                 return (pack, StatusAssetSource.Network);
             }
 
