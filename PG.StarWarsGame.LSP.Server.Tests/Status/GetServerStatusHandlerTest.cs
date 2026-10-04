@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using System.Reflection;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -203,7 +204,7 @@ public sealed class GetServerStatusHandlerTest
     }
 
     private static Task<ServerStatusDto> Extended(ServerStatusRecorder recorder, GameIndex index,
-        IWorkspaceIndexer? indexer = null)
+        IWorkspaceIndexer? indexer = null, IEnumerable<ICacheStatisticsSource>? caches = null)
     {
         var config = WorkspaceConfiguration.Empty with
         {
@@ -220,7 +221,8 @@ public sealed class GetServerStatusHandlerTest
             new FakeGameIndexService(index),
             new RootsOnly([], config),
             new FileHelper(new MockFileSystem()),
-            indexer ?? new StatsOnly(new IndexCacheStats(1, 1, 5, 2), new BoneCatalogStats(1, 2)));
+            indexer ?? new StatsOnly(new IndexCacheStats(1, 1, 5, 2), new BoneCatalogStats(1, 2)),
+            caches);
         return handler.Handle(new GetServerStatusParams { Extended = true }, CancellationToken.None);
     }
 
@@ -228,6 +230,72 @@ public sealed class GetServerStatusHandlerTest
     public async Task BasicRequest_CarriesNoExtendedSection()
     {
         Assert.Null((await Status(HealthyRecorder())).Extended);
+    }
+
+    // ── memory ───────────────────────────────────────────────────────────────
+    //
+    // MEASURED 2026-10-04: a cold start held about 300 MB more than a warm start of the same
+    // workspace, and the status could not say where. This section is the answer's raw material:
+    // the process figures, what the index holds per layer, and what every cache holds.
+
+    [Fact]
+    public async Task Extended_ReportsTheProcessMemoryFigures()
+    {
+        var memory = (await Extended(HealthyRecorder(), LayeredIndex())).Extended!.Memory;
+
+        Assert.True(memory.HeapBytes > 0);
+        Assert.True(memory.CommittedBytes >= memory.HeapBytes);
+        Assert.True(memory.WorkingSetBytes > 0);
+        Assert.True(memory.FragmentedBytes >= 0);
+        Assert.True(memory.LargeObjectHeapBytes >= 0);
+        Assert.True(memory.Gen2Collections >= 0);
+    }
+
+    [Fact]
+    public async Task Extended_CountsDocumentsSymbolsAndReferencesPerLayerRank()
+    {
+        // By RANK, never by layer name: the status is pasted into public issues.
+        var layers = (await Extended(HealthyRecorder(), LayeredIndex())).Extended!.Memory.Layers;
+
+        Assert.Equal([0, 1], layers.Select(l => l.Rank));
+        var dep = layers.Single(l => l.Rank == 0);
+        var mod = layers.Single(l => l.Rank == 1);
+        Assert.Equal((1, 1), (dep.Documents, dep.Symbols));
+        Assert.Equal((2, 3), (mod.Documents, mod.Symbols));
+        Assert.Equal(3, layers.Sum(l => l.Documents));
+    }
+
+    [Fact]
+    public async Task Extended_ListsEveryRegisteredCache_InRegistrationOrder()
+    {
+        var caches = new ICacheStatisticsSource[]
+        {
+            new FixedCache(new CacheStatistics("xml-parse", 16, null, 120, 40, 3)),
+            new FixedCache(new CacheStatistics("lua-parser-state", 1432, 2_100_000))
+        };
+
+        var listed = (await Extended(HealthyRecorder(), LayeredIndex(), caches: caches)).Extended!.Memory.Caches;
+
+        Assert.Equal(["xml-parse", "lua-parser-state"], listed.Select(c => c.Name));
+        Assert.Equal(16, listed[0].Entries);
+        Assert.Equal((120L, 40L, 3L), (listed[0].Hits, listed[0].Misses, listed[0].Evictions));
+        Assert.Null(listed[0].ApproximateBytes);
+        Assert.Equal(2_100_000L, listed[1].ApproximateBytes);
+        Assert.Null(listed[1].Hits);
+    }
+
+    [Fact]
+    public async Task Extended_WithNoCachesRegistered_ListsNone()
+    {
+        Assert.Empty((await Extended(HealthyRecorder(), LayeredIndex())).Extended!.Memory.Caches);
+    }
+
+    private sealed class FixedCache(CacheStatistics statistics) : ICacheStatisticsSource
+    {
+        public CacheStatistics Snapshot()
+        {
+            return statistics;
+        }
     }
 
     [Fact]

@@ -124,12 +124,39 @@ export function formatExtendedStats(extended: ServerStatusExtended, symbolTypes:
         + `${caches.filesReused} files reused, ${caches.filesParsed} parsed; `
         + `bone catalog ${caches.boneLayersReused} of ${caches.boneLayers} layers`);
 
+    const memory = extended.memory;
+    lines.push(`- Memory: heap ${mb(memory.heapBytes)} MB, committed ${mb(memory.committedBytes)} MB, `
+        + `fragmented ${mb(memory.fragmentedBytes)} MB; `
+        + `large object heap ${mb(memory.largeObjectHeapBytes)} MB `
+        + `(${mb(memory.largeObjectHeapFragmentedBytes)} MB fragmented); `
+        + `working set ${mb(memory.workingSetBytes)} MB; ${memory.gen2Collections} gen2 collections`);
+    lines.push(`- Layers: ${memory.layers
+        .map(l => `rank ${l.rank} ${l.documents} documents, ${l.symbols} symbols, ${l.references} references`)
+        .join('; ')}`);
+    lines.push(`- Cache entries: ${memory.caches.map(cacheEntry).join('; ')}`);
+
     if (symbolTypes) {
         lines.push('- Symbol types:');
         lines.push(...extended.symbolTypes.map(t => `  - ${t.typeName}: ${t.count}`));
     }
 
     return lines.join('\n');
+}
+
+function mb(bytes: number): number {
+    return Math.round(bytes / 1048576);
+}
+
+/** `name entries (detail)`, the detail being whatever the cache counts: bytes, or hit/miss/eviction totals. */
+function cacheEntry(cache: ServerStatusExtended['memory']['caches'][number]): string {
+    const details: string[] = [];
+    if (cache.approximateBytes !== null) {
+        details.push(`${(cache.approximateBytes / 1048576).toFixed(1)} MB`);
+    }
+    if (cache.hits !== null || cache.misses !== null || cache.evictions !== null) {
+        details.push(`${cache.hits ?? 0} hits, ${cache.misses ?? 0} misses, ${cache.evictions ?? 0} evictions`);
+    }
+    return details.length === 0 ? `${cache.name} ${cache.entries}` : `${cache.name} ${cache.entries} (${details.join(', ')})`;
 }
 
 function workspaceShape(client: BugReportClientInfo): string {

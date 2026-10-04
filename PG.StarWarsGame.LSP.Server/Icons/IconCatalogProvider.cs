@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.Files.MTD.Services;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Serialization;
@@ -40,7 +41,7 @@ public interface IIconCatalogProvider : IIconRepackStatusProvider
 ///         workspaces, each with its own mega texture and source folders.
 ///     </para>
 /// </remarks>
-public sealed class IconCatalogProvider : IIconCatalogProvider
+public sealed class IconCatalogProvider : IIconCatalogProvider, ICacheStatisticsSource
 {
     private readonly Dictionary<string, IconCatalog> _catalogs = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILspConfigurationProvider _config;
@@ -50,6 +51,12 @@ public sealed class IconCatalogProvider : IIconCatalogProvider
     private readonly IMtdService _mtdFileService;
     private readonly IconPackLoader _packLoader;
     private IconPack? _baseline;
+
+    /// <summary>Catalogs built, one per layer set seen; each holds decoded icon bytes.</summary>
+    public CacheStatistics Snapshot()
+    {
+        return new CacheStatistics("icon-catalogs", _catalogs.Count);
+    }
 
     public IconCatalogProvider(
         IconPackLoader packLoader,

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -19,7 +20,7 @@ namespace PG.StarWarsGame.LSP.Xml.Variants;
 ///     ContentHash) pair is unchanged, so the resolver can walk multi-level chains without
 ///     re-parsing, and an edit to one file never re-parses the rest of the workspace.
 /// </remarks>
-public sealed class WorkspaceVariantTagSource : IVariantTagSource
+public sealed class WorkspaceVariantTagSource : IVariantTagSource, ICacheStatisticsSource
 {
     private const string NameAttribute = "Name";
 
@@ -33,6 +34,24 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource
     {
         _parseCache = parseCache;
         _indexService = indexService;
+    }
+
+    /// <summary>
+    ///     Entries are documents with a cached tag map; the estimate is the characters of tag names
+    ///     and values held, which is what grows without bound - the maps are never pruned.
+    /// </summary>
+    public CacheStatistics Snapshot()
+    {
+        lock (_gate)
+        {
+            long chars = 0;
+            foreach (var entry in _cache.Values)
+            foreach (var tags in entry.TagsById.Values)
+            foreach (var tag in tags)
+                chars += tag.TagName.Length + (tag.Value?.Length ?? 0);
+
+            return new CacheStatistics("variant-tags", _cache.Count, chars * sizeof(char));
+        }
     }
 
     public IReadOnlyList<VariantTag>? TryGetTags(string objectId)

@@ -2,11 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
-public sealed class LuaAnnotationRepository : ILuaAnnotationRepository
+public sealed class LuaAnnotationRepository : ILuaAnnotationRepository, ICacheStatisticsSource
 {
     // name → { uri → annotation } - keeps all definitions so richest-wins can pick the best one.
     private readonly Dictionary<string, Dictionary<string, EmmyLuaAnnotations>> _functionAnnotationsMap =
@@ -27,6 +28,15 @@ public sealed class LuaAnnotationRepository : ILuaAnnotationRepository
         lock (_lock)
         {
             _store[uri] = annotations;
+        }
+    }
+
+    /// <summary>Files that contributed annotations; the entry count is the growth to watch.</summary>
+    public CacheStatistics Snapshot()
+    {
+        lock (_lock)
+        {
+            return new CacheStatistics("lua-annotations", _store.Count);
         }
     }
 

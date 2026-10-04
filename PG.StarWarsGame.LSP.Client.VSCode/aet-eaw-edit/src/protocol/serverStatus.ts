@@ -64,6 +64,29 @@ export interface ServerStatusExtended {
     };
     /** Project symbols by type, most first. */
     symbolTypes: { typeName: string; count: number }[];
+    /**
+     * The process's memory and where it goes. GC figures are read without forcing a collection;
+     * layers are by rank, never by name; caches are every in-memory cache the server registers,
+     * with nulls where a cache does not count that.
+     */
+    memory: {
+        heapBytes: number;
+        committedBytes: number;
+        fragmentedBytes: number;
+        largeObjectHeapBytes: number;
+        largeObjectHeapFragmentedBytes: number;
+        workingSetBytes: number;
+        gen2Collections: number;
+        layers: { rank: number; documents: number; symbols: number; references: number }[];
+        caches: {
+            name: string;
+            entries: number;
+            approximateBytes: number | null;
+            hits: number | null;
+            misses: number | null;
+            evictions: number | null;
+        }[];
+    };
 }
 
 /** Result of `aet/getServerStatus`, basic tier. */

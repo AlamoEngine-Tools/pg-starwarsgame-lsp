@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -20,6 +21,7 @@ public static class LuaLanguageServiceExtensions
     {
         services.AddSingleton<LuaAnnotationRepository>();
         services.AddSingleton<ILuaAnnotationRepository>(sp => sp.GetRequiredService<LuaAnnotationRepository>());
+        services.AddSingleton<ICacheStatisticsSource>(sp => sp.GetRequiredService<LuaAnnotationRepository>());
         services.AddSingleton<LuaApiSchemaProxy>();
         services.AddSingleton<ILuaApiSchemaProvider>(sp => sp.GetRequiredService<LuaApiSchemaProxy>());
         // Shared parse source: one Loretta parse per (document, content) reused by indexing,
@@ -28,7 +30,13 @@ public static class LuaLanguageServiceExtensions
             sp.GetRequiredService<IDocumentTextSource>(),
             sp.GetRequiredService<ServerOptions>().ParseCacheCapacity,
             sp.GetRequiredService<ILogger<LuaParseCache>>()));
-        services.AddSingleton<IGameDocumentParser, LuaGameDocumentParser>();
+        services.AddSingleton<ICacheStatisticsSource>(sp =>
+            (ICacheStatisticsSource)sp.GetRequiredService<ILuaParseCache>());
+        // One instance behind the parser contract and the statistics contract: the parser keeps
+        // one serialized annotation state per file, and the status reports how much that holds.
+        services.AddSingleton<LuaGameDocumentParser>();
+        services.AddSingleton<IGameDocumentParser>(sp => sp.GetRequiredService<LuaGameDocumentParser>());
+        services.AddSingleton<ICacheStatisticsSource>(sp => sp.GetRequiredService<LuaGameDocumentParser>());
         services.AddSingleton<LuaDiagnosticsPublisher>();
         services.AddSingleton<IDiagnosticsRepublisher>(sp => sp.GetRequiredService<LuaDiagnosticsPublisher>());
         return services;

@@ -43,6 +43,26 @@ public sealed class LuaGameDocumentParserTest
             repo ?? new LuaAnnotationRepository());
     }
 
+    // ── statistics ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     The parser keeps one serialized annotation state per file it ever parsed (that is what
+    ///     the snapshot persists). Exact bytes, because they are byte arrays.
+    /// </summary>
+    [Fact]
+    public async Task Snapshot_CountsParserStateEntriesAndTheirBytes()
+    {
+        var parser = Build();
+        await parser.ParseAsync("file:///c:/mod/a.lua", "---@class Foo\nlocal Foo = {}\n", 1, CancellationToken.None);
+        await parser.ParseAsync("file:///c:/mod/b.lua", "local x = 1\n", 1, CancellationToken.None);
+
+        var stats = ((PG.StarWarsGame.LSP.Core.Caching.ICacheStatisticsSource)parser).Snapshot();
+
+        Assert.Equal("lua-parser-state", stats.Name);
+        Assert.Equal(2, stats.Entries);
+        Assert.True(stats.ApproximateBytes > 0);
+    }
+
     // ── CanParse ─────────────────────────────────────────────────────────────
 
     [Fact]

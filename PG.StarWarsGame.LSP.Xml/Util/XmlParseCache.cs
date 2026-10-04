@@ -38,7 +38,7 @@ public interface IXmlParseCache
     ParsedXmlDocument? GetOrParse(string canonicalUri);
 }
 
-public sealed class XmlParseCache : IXmlParseCache
+public sealed class XmlParseCache : IXmlParseCache, ICacheStatisticsSource
 {
     private readonly ParsedDocumentCache<ParsedXmlDocument> _cache;
     private readonly IDocumentTextSource _textSource;
@@ -51,6 +51,12 @@ public sealed class XmlParseCache : IXmlParseCache
     }
 
     public (long Hits, long Misses, long Evictions) Statistics => _cache.Statistics;
+
+    public CacheStatistics Snapshot()
+    {
+        var (hits, misses, evictions) = _cache.Statistics;
+        return new CacheStatistics("xml-parse", _cache.Count, null, hits, misses, evictions);
+    }
 
     public ParsedXmlDocument GetOrParse(string canonicalUri, string text)
     {

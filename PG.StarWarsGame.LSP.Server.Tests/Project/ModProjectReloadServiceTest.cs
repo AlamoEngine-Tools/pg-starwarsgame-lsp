@@ -4,6 +4,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Assets.Icons;
@@ -57,6 +58,71 @@ public sealed class ModProjectReloadServiceTest
 
         Assert.True(status.ProjectDetected);
         Assert.Equal(ProjectProblem.BaselineRefused, status.ProjectProblem);
+    }
+
+    // ── heap trim ────────────────────────────────────────────────────────────
+    //
+    // MEASURED 2026-10-04: the parallel bulk parse left about 200 MB of fragmentation in gen2 that
+    // a cold start then idled on for the session. One compacting collection after the load, never
+    // on a request path, and not after a load that indexed nothing.
+
+    [Fact]
+    public async Task LoadAsync_AfterASuccessfulLoad_TrimsTheHeapOnce()
+    {
+        var trimmer = new RecordingHeapTrimmer();
+        var service = new ModProjectReloadService(
+            new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
+            new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(),
+            heapTrimmer: trimmer);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(["workspace load"], trimmer.Reasons);
+    }
+
+    [Fact]
+    public async Task ReloadAsync_TrimsTheHeapAgain()
+    {
+        var trimmer = new RecordingHeapTrimmer();
+        var service = new ModProjectReloadService(
+            new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
+            new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(),
+            heapTrimmer: trimmer);
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        await service.ReloadAsync(CancellationToken.None);
+
+        Assert.Equal(2, trimmer.Reasons.Count);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WhenNothingWasIndexed_DoesNotTrim()
+    {
+        var trimmer = new RecordingHeapTrimmer();
+        // No project file at all, and a project refused for want of a baseline: neither parsed anything.
+        var noProject = new ModProjectReloadService(
+            new FakeResolver(null), new RecordingIndexer(), new NullLocalisationLoader(),
+            new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(),
+            heapTrimmer: trimmer);
+        var refused = new ModProjectReloadService(
+            new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
+            new RecordingLayerMap(), new FakeGameIndexService(IndexWithBaseline(false)),
+            new RecordingUserNotifier(), new ListLogger(), heapTrimmer: trimmer);
+
+        await noProject.LoadAsync(["/ws"], CancellationToken.None);
+        await refused.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Empty(trimmer.Reasons);
+    }
+
+    private sealed class RecordingHeapTrimmer : IHeapTrimmer
+    {
+        public readonly List<string> Reasons = [];
+
+        public void TrimAfterBulkWork(string reason)
+        {
+            Reasons.Add(reason);
+        }
     }
 
     // The tests that are not about the gate still have to get past it.

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -78,7 +79,7 @@ public interface IStoryModelService
 ///     so unsaved edits shape the model; layer precedence comes from searching the xml roots
 ///     highest-rank-first, mirroring the discovery scan.
 /// </summary>
-public sealed class StoryModelService : IStoryModelService
+public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSource
 {
     private readonly IFileHelper _fileHelper;
 
@@ -95,6 +96,15 @@ public sealed class StoryModelService : IStoryModelService
     // workspace config/schema not yet published). Such an answer was served to a client, so
     // index changes must re-trigger a scan even though no chain is cached.
     private bool _servedIncompleteScan;
+
+    /// <summary>Assembled campaign models held, one per (campaign, faction) asked for.</summary>
+    public CacheStatistics Snapshot()
+    {
+        lock (_gate)
+        {
+            return new CacheStatistics("story-models", _models.Count);
+        }
+    }
 
     public StoryModelService(
         IModProjectReloadService reloadService,

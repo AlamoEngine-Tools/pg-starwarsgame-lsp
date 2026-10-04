@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 
@@ -81,6 +82,24 @@ public sealed class ModelTextureIndexTest
         // The resolver returns nothing for this one, so the answer is empty - but the point is
         // that it was ASKED, which a throwing resolver would prove by failing the test.
         Assert.Empty(Sut(new FakeResolver(null), index).TexturesOf("unscanned.alo"));
+    }
+
+    /// <summary>
+    ///     The fallback memo (models the catalog did not cover) is never cleared in production;
+    ///     its size belongs in the status. Keyed case-insensitively, so FOO.ALO is foo.alo.
+    /// </summary>
+    [Fact]
+    public void Snapshot_CountsTheFallbackEntries()
+    {
+        var sut = Sut(new FakeResolver(null));
+        sut.TexturesOf("foo.alo");
+        sut.TexturesOf("bar.alo");
+        sut.TexturesOf("FOO.ALO");
+
+        var stats = ((ICacheStatisticsSource)sut).Snapshot();
+
+        Assert.Equal("model-textures", stats.Name);
+        Assert.Equal(2, stats.Entries);
     }
 
     private sealed class ThrowingResolver : IGameAssetResolver

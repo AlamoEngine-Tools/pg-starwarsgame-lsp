@@ -7,6 +7,7 @@ using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -16,7 +17,7 @@ using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Parsing;
 
-public sealed class LuaGameDocumentParser : IGameDocumentParser
+public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatisticsSource
 {
     private readonly ILuaAnnotationRepository _annotationRepository;
 
@@ -93,6 +94,15 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
     }
 
     /// <inheritdoc />
+    /// <summary>One serialized annotation state per file ever parsed; exact bytes.</summary>
+    public CacheStatistics Snapshot()
+    {
+        long bytes = 0;
+        foreach (var state in _lastState.Values)
+            bytes += state.Length;
+        return new CacheStatistics("lua-parser-state", _lastState.Count, bytes);
+    }
+
     public byte[]? CaptureParserState(string documentUri)
     {
         return _lastState.GetValueOrDefault(_fileHelper.NormalizeUri(documentUri));
