@@ -5,12 +5,12 @@ namespace PG.StarWarsGame.LSP.Core.Caching;
 
 public sealed class NullProjectIndexCache : IProjectIndexCache
 {
-    public ProjectIndexSnapshot? TryLoad(string pgprojPath)
+    public ProjectIndexSnapshot? TryLoad(string pgprojPath, string contextKey)
     {
         return null;
     }
 
-    public void Save(string pgprojPath, ProjectIndexSnapshot snapshot)
+    public void Save(string pgprojPath, string contextKey, ProjectIndexSnapshot snapshot)
     {
     }
 

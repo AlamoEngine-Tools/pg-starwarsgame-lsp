@@ -177,7 +177,7 @@ public sealed class SchemaBootstrapperTest
             }
         });
 
-        var cache = new SchemaHttpCache(fileHelper, NullLogger<SchemaHttpCache>.Instance);
+        var cache = new SchemaHttpCache(fileHelper, new NullCrossProcessLock(), NullLogger<SchemaHttpCache>.Instance);
         var locations = new SchemaLocationResolver(
             new SchemaReleaseResolver(factory.CreateClient(nameof(SchemaReleaseResolver)),
                 NullLogger<SchemaReleaseResolver>.Instance),

@@ -19,7 +19,7 @@ public sealed class SchemaLocationResolverTest
 
     private static SchemaHttpCache EmptyCache()
     {
-        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), NullLogger<SchemaHttpCache>.Instance);
+        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), new NullCrossProcessLock(), NullLogger<SchemaHttpCache>.Instance);
     }
 
     private static SchemaHttpCache CacheWithTag(string tag)

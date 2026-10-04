@@ -9,7 +9,9 @@ namespace PG.StarWarsGame.LSP.Core.Caching;
 
 /// <summary>
 ///     Names everything a layer's documents read from OUTSIDE their own layer, so a persisted
-///     index can be kept when a dependency changed in a way that cannot affect it.
+///     index can be kept when a dependency changed in a way that cannot affect it - and so a
+///     dependency opened under different leaves keeps one snapshot per context instead of the
+///     contexts overwriting each other's.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -29,17 +31,24 @@ namespace PG.StarWarsGame.LSP.Core.Caching;
 ///             content edits invisible here.
 ///         </item>
 ///         <item>
-///             The <b>xml directory set</b>. A story manifest or thread file is indexed as a
-///             workspace-file symbol keyed by its path relative to the LONGEST matching xml root,
-///             and any layer can contribute a root - so a dependency adding a nested xml directory
-///             silently re-keys a leaf's symbols. Directory sets change only when a
-///             <c>.pgproj</c> does, so folding the whole union in costs nothing in practice.
+///             The <b>xml roots that can match this layer's files</b>. A story manifest or thread
+///             file is indexed as a workspace-file symbol keyed by its path relative to the LONGEST
+///             matching xml root, and any layer can contribute a root - so a dependency adding a
+///             nested xml directory silently re-keys a leaf's symbols. Only roots that lie inside
+///             or contain one of this layer's own xml directories can ever be that longest match;
+///             a sibling project's roots cannot, and are left out. MEASURED 2026-10-04: folding in
+///             the whole workspace union made EaWX core's key differ between "opened alone" and
+///             "under Rev", and its snapshot was discarded on four of seven starts.
 ///         </item>
 ///     </list>
 ///     <para>
 ///         Everything else the parsers touch is either covered elsewhere or carries no project
 ///         state: the schema and the story feature flag fold into <see cref="SchemaFingerprint" />;
 ///         the file helper, parse caches and loggers do not vary by layer.
+///     </para>
+///     <para>
+///         The value doubles as the snapshot's CONTEXT KEY: <see cref="ProjectIndexLocator" />
+///         puts it in the file name, so two contexts of one layer are two files.
 ///     </para>
 ///     <para>
 ///         <b>The hazard.</b> A stale index fails SILENTLY - it replays an old parse rather than
@@ -52,12 +61,14 @@ public static class CrossLayerInputFingerprint
 {
     /// <summary>
     ///     Computes the key for one layer. <paramref name="layerFileUris" /> are that layer's own
-    ///     parseable files; <paramref name="xmlDirectories" /> is the workspace-wide union.
+    ///     parseable files, <paramref name="layerXmlDirectories" /> its own xml roots, and
+    ///     <paramref name="workspaceXmlDirectories" /> the workspace-wide union they are part of.
     /// </summary>
     public static string Compute(
         IFileTypeRegistry fileTypeRegistry,
         IReadOnlyList<string> layerFileUris,
-        IReadOnlyList<string> xmlDirectories)
+        IReadOnlyList<string> layerXmlDirectories,
+        IReadOnlyList<string> workspaceXmlDirectories)
     {
         var entries = new List<string>(layerFileUris.Count);
 
@@ -86,11 +97,33 @@ public static class CrossLayerInputFingerprint
         foreach (var entry in entries)
             all.Append("f:").Append(entry).Append('\n');
 
-        foreach (var dir in xmlDirectories
-                     .Select(d => d.ToLowerInvariant())
-                     .OrderBy(d => d, StringComparer.Ordinal))
+        foreach (var dir in RelevantRoots(layerXmlDirectories, workspaceXmlDirectories))
             all.Append("x:").Append(dir).Append('\n');
 
         return ContentHasher.Hash(all.ToString()).ToString("x16");
+    }
+
+    /// <summary>
+    ///     The workspace roots that can be the longest match for a file of this layer: those that
+    ///     contain one of its own xml directories, or lie inside one. Normalized so the same
+    ///     directory spelled as a path, as a URI, or in another case is one root.
+    /// </summary>
+    private static IEnumerable<string> RelevantRoots(
+        IReadOnlyList<string> layerXmlDirectories, IReadOnlyList<string> workspaceXmlDirectories)
+    {
+        var own = layerXmlDirectories.Select(NormalizeRoot).Distinct(StringComparer.Ordinal).ToArray();
+
+        return workspaceXmlDirectories
+            .Select(NormalizeRoot)
+            .Where(root => own.Any(o =>
+                root.StartsWith(o, StringComparison.Ordinal) || o.StartsWith(root, StringComparison.Ordinal)))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(d => d, StringComparer.Ordinal);
+    }
+
+    private static string NormalizeRoot(string directory)
+    {
+        var normalized = directory.Replace('\\', '/').ToLowerInvariant();
+        return normalized.EndsWith('/') ? normalized : normalized + "/";
     }
 }

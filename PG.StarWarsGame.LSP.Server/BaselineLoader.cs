@@ -14,16 +14,18 @@ public sealed class BaselineLoader
 {
     private readonly IFileHelper _fileHelper;
     private readonly HttpClient _httpClient;
+    private readonly ICrossProcessLock _lock;
     private readonly ILogger<BaselineLoader> _logger;
     private readonly ServerStatusRecorder? _status;
 
     public BaselineLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<BaselineLoader> logger,
-        ServerStatusRecorder? status = null)
+        ServerStatusRecorder? status = null, ICrossProcessLock? processLock = null)
     {
         _httpClient = httpClient;
         _fileHelper = fileHelper;
         _logger = logger;
         _status = status;
+        _lock = processLock ?? new NullCrossProcessLock();
     }
 
     private string CacheDir => _fileHelper.FileSystem.Path.Combine(
@@ -94,9 +96,13 @@ public sealed class BaselineLoader
             if (baseline is not null)
             {
                 // Only persist to cache once confirmed loadable - a stale/incompatible download must
-                // never overwrite a previously-good cached copy that the fallback below could still use.
-                _fileHelper.FileSystem.Directory.CreateDirectory(CacheDir);
-                await _fileHelper.FileSystem.File.WriteAllBytesAsync(cacheFile, bytes, ct);
+                // never overwrite a previously-good cached copy that the fallback below could still
+                // use. Atomic and under the lock: ~/.aetswg is shared by every server on the machine.
+                using (_lock.Acquire(CacheDir))
+                {
+                    AtomicFile.WriteAllBytes(_fileHelper.FileSystem, cacheFile, bytes);
+                }
+
                 return (baseline, StatusAssetSource.Network);
             }
 
