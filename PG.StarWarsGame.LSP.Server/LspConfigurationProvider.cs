@@ -112,6 +112,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         encyclopedia = ParseEncyclopedia(elem);
 
         var workspaceRoot = TryGetString(elem, "workspaceRoot");
+        var projectPath = TryGetString(elem, "projectPath");
         var baseGamePath = TryGetString(elem, "baseGamePath");
         var expansionGamePath = TryGetString(elem, "expansionGamePath");
         var shaderPath = TryGetString(elem, "shaderPath");
@@ -130,6 +131,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         return new LspConfiguration
         {
             WorkspaceRoot = workspaceRoot,
+            ProjectPath = projectPath,
             GamePath = baseGamePath,
             ExpansionPath = expansionGamePath,
             ShaderPath = shaderPath,
@@ -226,6 +228,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             Diagnostics = overlayDiagnostics ?? file.Diagnostics,
             Encyclopedia = overlayEncyclopedia ?? file.Encyclopedia,
             WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
+            ProjectPath = overlay.ProjectPath ?? file.ProjectPath,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
             ShaderPath = overlay.ShaderPath ?? file.ShaderPath,

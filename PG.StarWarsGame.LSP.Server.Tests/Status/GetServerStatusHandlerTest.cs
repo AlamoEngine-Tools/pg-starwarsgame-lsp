@@ -73,7 +73,7 @@ public sealed class GetServerStatusHandlerTest
         Assert.Equal("Cache", status.Baseline.Source);
         Assert.Equal("Network", status.IconPack.Source);
         Assert.Equal("Complete", status.Index.State);
-        Assert.Equal(new ServerStatusWorkspaceDto(true, true, null, 0), status.Workspace);
+        Assert.Equal(new ServerStatusWorkspaceDto(true, true, null, 0, 0), status.Workspace);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed class GetServerStatusHandlerTest
 
         var status = await Status(recorder);
 
-        Assert.Equal(new ServerStatusWorkspaceDto(true, false, "Unparseable", 0), status.Workspace);
+        Assert.Equal(new ServerStatusWorkspaceDto(true, false, "Unparseable", 0, 0), status.Workspace);
     }
 
     [Fact]
@@ -230,6 +230,20 @@ public sealed class GetServerStatusHandlerTest
     public async Task BasicRequest_CarriesNoExtendedSection()
     {
         Assert.Null((await Status(HealthyRecorder())).Extended);
+    }
+
+    /// <summary>
+    ///     A root with several project files loads one and reports the rest as a COUNT - never
+    ///     their names, the status is pasted into public issues.
+    /// </summary>
+    [Fact]
+    public async Task ReportsTheOtherProjectFilesAsACount()
+    {
+        var recorder = HealthyRecorder();
+        recorder.RecordOtherProjectFiles(2);
+
+        Assert.Equal(2, (await Status(recorder)).Workspace.OtherProjectFiles);
+        Assert.Equal(0, (await Status(HealthyRecorder())).Workspace.OtherProjectFiles);
     }
 
     // ── memory ───────────────────────────────────────────────────────────────

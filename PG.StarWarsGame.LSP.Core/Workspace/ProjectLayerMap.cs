@@ -60,9 +60,12 @@ public sealed class ProjectLayerMap : IProjectLayerMap
         if (prefixes.IsDefaultOrEmpty)
             return 0;
 
+        // Folded, like every other lookup keyed by a document path: the same file arrives spelled
+        // by the file system, by the client, and by the protocol's DocumentUri (which lowercases a
+        // drive letter), and the engine calls those one file.
         var normalized = _fileHelper.NormalizeUri(fileUri);
         foreach (var (prefix, rank) in prefixes)
-            if (normalized.StartsWith(prefix, StringComparison.Ordinal))
+            if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 return rank;
 
         // Not under any known layer: treat as the top layer so ad-hoc opened files win.

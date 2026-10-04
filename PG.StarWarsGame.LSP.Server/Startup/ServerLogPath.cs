@@ -18,6 +18,12 @@ public static class ServerLogPath
     /// <summary>The directory the client asks for, normally the workspace root.</summary>
     public const string Option = "--log-dir=";
 
+    /// <summary>
+    ///     The project this server serves, for the file name: one server runs per open project, and
+    ///     a dependency that is also open writes its log into the same directory as the leaf.
+    /// </summary>
+    public const string StemOption = "--log-stem=";
+
     /// <summary>Serilog appends the date; this is the stem it rolls.</summary>
     private const string FileName = "aetswg-.log";
 
@@ -34,6 +40,20 @@ public static class ServerLogPath
 
         // Path.Combine keeps an absolute `asked` whole and anchors a relative one.
         var directory = asked.Length == 0 ? baseDirectory : Path.Combine(baseDirectory, asked);
-        return Path.Combine(Path.GetFullPath(directory), FileName);
+        return Path.Combine(Path.GetFullPath(directory), FileNameFor(args));
+    }
+
+    /// <summary><c>aetswg-&lt;stem&gt;-.log</c> when a stem is passed, <c>aetswg-.log</c> otherwise.</summary>
+    private static string FileNameFor(IReadOnlyList<string> args)
+    {
+        var option = args.LastOrDefault(a => a.StartsWith(StemOption, StringComparison.Ordinal));
+        var stem = option is null ? string.Empty : option[StemOption.Length..].Trim();
+        if (stem.Length == 0) return FileName;
+
+        // A stem is a project name the client took from a path; anything a file name cannot hold
+        // becomes an underscore rather than a crash before the first log line.
+        var invalid = Path.GetInvalidFileNameChars();
+        var safe = new string(stem.Select(c => invalid.Contains(c) || c == '/' || c == '\\' ? '_' : c).ToArray());
+        return "aetswg-" + safe + "-.log";
     }
 }

@@ -71,6 +71,26 @@ public sealed class ProjectLayerMapTest
         Assert.Equal(3, map.GetRank(Uri(Root("somewhere"), "else", "loose.xml")));
     }
 
+    /// <summary>
+    ///     The same file arrives spelled by the file system, by the client and by the protocol's
+    ///     DocumentUri, which lowercases a drive letter. A case-sensitive prefix match sent a
+    ///     dependency's document to the top rank, where it read as the project's own.
+    /// </summary>
+    [Fact]
+    public void GetRank_FoldsCaseLikeEveryOtherDocumentLookup()
+    {
+        var coreDir = Path.Combine(Root("eawx"), "data", "xml");
+        var revDir = Path.Combine(Root("rev"), "data", "xml");
+        var map = new ProjectLayerMap(Helper);
+        map.SetLayers([Layer(0, "Core", coreDir), Layer(1, "Rev", revDir)]);
+
+        var spelledByTheFileSystem = Uri(coreDir, "units.xml");
+        var spelledByTheProtocol = spelledByTheFileSystem.Replace("file:///", "file:///").ToLowerInvariant();
+
+        Assert.Equal(0, map.GetRank(spelledByTheFileSystem));
+        Assert.Equal(0, map.GetRank(spelledByTheProtocol));
+    }
+
     [Fact]
     public void GetLayerName_ReturnsNameForRank_NullForUnknown()
     {

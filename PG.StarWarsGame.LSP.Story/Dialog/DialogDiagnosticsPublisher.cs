@@ -53,12 +53,15 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         IFileHelper fileHelper,
         IDocumentTextSource textSource,
         ILogger<DialogDiagnosticsPublisher> logger,
+        // REQUIRED: the layer map names the project in every diagnostic's source, and an optional
+        // dependency is the one shape the container is free to skip without a word.
+        IProjectLayerMap layerMap,
         ServerOptions? options = null,
         IGlobalSuppressionStore? globalSuppressions = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost, scope,
             factProducer, registry, fileHelper, textSource,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds, logger,
-            globalSuppressions)
+            globalSuppressions, layerMap)
     {
     }
 
@@ -73,8 +76,9 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         IDocumentTextSource? textSource = null,
         int debounceMs = 0,
         ILogger<DialogDiagnosticsPublisher>? logger = null,
-        IGlobalSuppressionStore? globalSuppressions = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
+        IGlobalSuppressionStore? globalSuppressions = null,
+        IProjectLayerMap? layerMap = null)
+        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions, layerMap)
     {
         _indexService = indexService;
         _scope = scope;

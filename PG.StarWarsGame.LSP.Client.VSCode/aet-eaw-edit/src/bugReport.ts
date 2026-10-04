@@ -78,6 +78,9 @@ export function formatBugReport(
                 ? workspace.projectValid ? ', valid' : `, invalid - ${workspace.projectProblem ?? 'Unknown'}`
                 : ''));
         lines.push(`- Folders without a project: ${workspace.foldersWithoutProject}`);
+        if (workspace.otherProjectFiles > 0) {
+            lines.push(`- Other project files under the root: ${workspace.otherProjectFiles}`);
+        }
         lines.push(`- Index: ${server.index.state}`);
     }
 

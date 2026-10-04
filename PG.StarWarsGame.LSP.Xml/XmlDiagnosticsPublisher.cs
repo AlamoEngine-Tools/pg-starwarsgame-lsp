@@ -130,6 +130,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         // return nothing forever and every test would still pass. Required means the graph either
         // supplies it or fails at startup, where the smoke test sees it.
         IVariantTagSource variantTagSource,
+        // REQUIRED for the same reason. MEASURED 2026-10-04: this constructor never forwarded the
+        // global suppression store at all, so a globally suppressed XML diagnostic kept publishing
+        // while every unit test, built on the internal constructor, passed. The layer map is what
+        // names the project in every diagnostic's source; skipped, the tag silently reads bare.
+        IGlobalSuppressionStore globalSuppressions,
+        IProjectLayerMap layerMap,
         ServerOptions? options = null,
         IIconRepackStatusProvider? iconRepack = null,
         IModelTextureIndex? modelTextures = null,
@@ -139,8 +145,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
             variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
-            storyGraphDiagnostics, hardpointProducer, damageStageProducer, iconRepack: iconRepack,
-            modelTextures: modelTextures, iconNames: iconNames, variantTagSource: variantTagSource)
+            storyGraphDiagnostics, hardpointProducer, damageStageProducer, globalSuppressions, iconRepack,
+            modelTextures, iconNames, variantTagSource, layerMap)
     {
     }
 
@@ -170,8 +176,9 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IIconRepackStatusProvider? iconRepack = null,
         IModelTextureIndex? modelTextures = null,
         IIconNameIndex? iconNames = null,
-        IVariantTagSource? variantTagSource = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
+        IVariantTagSource? variantTagSource = null,
+        IProjectLayerMap? layerMap = null)
+        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions, layerMap)
     {
         _iconRepack = iconRepack;
         _modelTextures = modelTextures;
