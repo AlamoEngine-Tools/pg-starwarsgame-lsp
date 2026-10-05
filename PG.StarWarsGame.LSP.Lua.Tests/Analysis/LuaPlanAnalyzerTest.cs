@@ -36,7 +36,7 @@ public sealed class LuaPlanAnalyzerTest
     }
 
     [Fact]
-    public void Analyze_ForceWithoutThreadFunction_WarnsAtTheName()
+    public void Analyze_ForceWithoutThreadFunction_ErrorsAtTheName()
     {
         const string text = """
                             function Definitions()
@@ -47,7 +47,7 @@ public sealed class LuaPlanAnalyzerTest
                             """;
         var diagnostic = Assert.Single(Analyze(text));
         Assert.Equal(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString(), diagnostic.Code?.String);
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains("MainForce_Thread", diagnostic.Message);
         Assert.Equal(2, diagnostic.Range.Start.Line);
         Assert.Equal("    { \"".Length, diagnostic.Range.Start.Character);

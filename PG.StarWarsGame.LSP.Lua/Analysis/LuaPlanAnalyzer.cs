@@ -16,11 +16,12 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis;
 /// <summary>
 ///     What the engine demands of a plan script beyond parsing: one thread function per task
 ///     force. When a plan loads, the engine maps each entry of the <c>TaskForce</c> table into
-///     the script as a global and starts a thread for it by looking up a global function; a plan
-///     without that function fails to start. The function is named <c>&lt;Force&gt;_Thread</c>:
-///     measured against the vanilla corpus (248 of 250 forces; the two exceptions sit in a library
-///     whose table is consumed by the plans that require it). Where in the engine the suffix is
-///     appended is not measured yet, which is why this is a warning.
+///     the script as a global of type TaskForce and starts a coroutine on the global function
+///     named <c>&lt;Force&gt;_Thread</c>; the suffix is the engine's own, appended when it builds
+///     the function name (measured on the game's binary, 2026-10-05). A plan without that
+///     function is logged as unable to find the thread function and never runs the force. The
+///     vanilla plans agree: 248 of 250 forces, the two exceptions being the intervention library,
+///     whose table is consumed by the plans that require it and define the function themselves.
 /// </summary>
 internal static class LuaPlanAnalyzer
 {
@@ -53,8 +54,9 @@ internal static class LuaPlanAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Code = new LspDiagnosticCode(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString()),
-                Severity = LspDiagnosticSeverity.Warning,
-                Message = $"Task force '{name}' has no thread function: The engine starts '{expected}' when the plan loads.",
+                Severity = LspDiagnosticSeverity.Error,
+                Message =
+                    $"Task force '{name}' has no thread function: The engine starts '{expected}' when the plan loads and cannot run the force without it.",
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character + 1),
                     new LspPosition(start.Line, start.Character + 1 + name.Length)),

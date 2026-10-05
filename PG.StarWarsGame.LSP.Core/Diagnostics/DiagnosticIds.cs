@@ -643,8 +643,9 @@ public static class DiagnosticIds
 
     /// <summary>
     ///     A plan script declares a task force in its <c>TaskForce</c> table but defines no
-    ///     <c>&lt;Name&gt;_Thread</c> function for it. The engine starts one thread per task force
-    ///     by that name when the plan loads; without the function the plan fails.
+    ///     <c>&lt;Name&gt;_Thread</c> function for it. The engine builds that name itself and starts
+    ///     one thread per task force on it when the plan loads; without the function it logs that
+    ///     the thread function was not found and the force never runs.
     /// </summary>
     public static readonly DiagnosticId LuaPlanThreadFunctionMissing = new(DiagnosticGroup.Engine, 7);
 
