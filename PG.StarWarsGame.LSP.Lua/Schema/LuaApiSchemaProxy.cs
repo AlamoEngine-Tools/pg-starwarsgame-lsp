@@ -19,6 +19,8 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
 
     public IReadOnlySet<string> AllFunctionNames => Inner.AllFunctionNames;
 
+    public IReadOnlySet<string> DeclaredGlobalNames => Inner.DeclaredGlobalNames;
+
     public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
     {
         return Inner.GetXmlRefs(functionName);
@@ -52,6 +54,9 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
     private sealed class EmptyProvider : ILuaApiSchemaProvider
     {
         public IReadOnlySet<string> AllFunctionNames =>
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        public IReadOnlySet<string> DeclaredGlobalNames =>
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)

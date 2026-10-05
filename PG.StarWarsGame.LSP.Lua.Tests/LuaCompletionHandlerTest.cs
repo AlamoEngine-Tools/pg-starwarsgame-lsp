@@ -130,6 +130,34 @@ public sealed class LuaCompletionHandlerTest
     }
 
     [Fact]
+    public async Task Handle_InsideTextKeyStringArg_ReturnsTheLocalisationKeys()
+    {
+        var schema = new LuaApiSchemaProvider([
+            """
+            ---@param textId string
+            ---@aetref LocalisationKey
+            function Game_Message(textId) end
+            """
+        ]);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty)
+        {
+            Localisation = new StubLocalisationIndex(("TEXT_HELLO", "Hello"), ("TEXT_BYE", "Bye"))
+        };
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "Game_Message(\"TEXT\")", 1); // cursor at col 18, inside "TEXT"
+
+        var handler = BuildHandler(index, schema, host);
+        var result = await handler.Handle(CompletionAt(0, 18), CancellationToken.None);
+
+        Assert.Contains(result.Items, i => i.Label == "TEXT_HELLO" && i.Detail == "Hello");
+        Assert.Contains(result.Items, i => i.Label == "TEXT_BYE");
+    }
+
+    [Fact]
     public async Task Handle_InsideApiStringArg_FiltersOutNonMatchingTypes()
     {
         var schema = new LuaApiSchemaProvider([
@@ -226,19 +254,21 @@ public sealed class LuaCompletionHandlerTest
     // ── identifier completions ────────────────────────────────────────────────
 
     [Fact]
-    public async Task Handle_IdentifierContext_ReturnsLua51Builtins()
+    public async Task Handle_IdentifierContext_ReturnsTheBuiltinsTheStubsDeclare()
     {
         var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "pai", 1); // partial "pairs" at start of line
+        host.AddOrUpdate(LuaUri, "tab", 1); // partial "table" at start of line
         var index = new GameIndex(BaselineIndex.Empty,
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var schema = new LuaApiSchemaProvider(["---@class tablelib\ntable = {}\n"]);
+        var handler = BuildHandler(index, schema, host);
         var result = await handler.Handle(CompletionAt(0, 3), CancellationToken.None);
 
-        Assert.Contains(result.Items, i => i.Label == "pairs" && i.Kind == CompletionItemKind.Keyword);
+        Assert.Contains(result.Items, i => i.Label == "table" && i.Kind == CompletionItemKind.Keyword);
+        Assert.DoesNotContain(result.Items, i => i.Label == "math");
     }
 
     [Fact]
@@ -515,5 +545,20 @@ public sealed class LuaCompletionHandlerTest
         }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
+    }
+
+    private sealed class StubLocalisationIndex(params (string Key, string Value)[] entries) : ILocalisationIndex
+    {
+        public IEnumerable<string> Keys => entries.Select(e => e.Key);
+
+        public bool ContainsKey(string key)
+        {
+            return entries.Any(e => string.Equals(e.Key, key, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public string? GetValue(string key)
+        {
+            return entries.FirstOrDefault(e => string.Equals(e.Key, key, StringComparison.OrdinalIgnoreCase)).Value;
+        }
     }
 }

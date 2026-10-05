@@ -112,6 +112,8 @@ Scripts under the declared `scripts` directories are indexed.
 - Completion, navigation, rename
 - Code lenses, inlay hints, quick fixes
 - Hover and diagnostics _(work in progress)_
+- Engine surface from measured stub files: registered functions, wrapper classes, the standard library the game
+  opens, per-host globals; string arguments naming game objects, text keys and enum values complete and resolve
 
 ---
 

@@ -62,9 +62,10 @@ public sealed class LuaDiagnosticsPublisherTest
     }
 
     private static GameIndex IndexWithLuaRef(string documentUri, string targetId,
-        string? expectedTypeName = null, GameSymbol? resolvedSymbol = null)
+        string? expectedTypeName = null, GameSymbol? resolvedSymbol = null,
+        GameSymbolKind kind = GameSymbolKind.XmlObject, ILocalisationIndex? localisation = null)
     {
-        var reference = new GameReference(targetId, GameSymbolKind.XmlObject, expectedTypeName,
+        var reference = new GameReference(targetId, kind, expectedTypeName,
             documentUri, 0, 20, targetId.Length);
         var doc = new DocumentIndex(documentUri, 1, [], [reference]);
 
@@ -73,14 +74,72 @@ public sealed class LuaDiagnosticsPublisherTest
                 .Add(targetId, [resolvedSymbol])
             : ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty;
 
-        return new GameIndex(
+        var index = new GameIndex(
             BaselineIndex.Empty,
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(documentUri, doc),
             definitions,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+        return localisation is null ? index : index with { Localisation = localisation };
+    }
+
+    // ── text keys ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_UnknownTextKey_WarnsWithTheLocalisationId()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri, """Game_Message("TEXT_MISSING")""");
+        var index = IndexWithLuaRef(LuaUri, "TEXT_MISSING", kind: GameSymbolKind.LocalisationKey,
+            localisation: new StubLocalisationIndex("TEXT_OTHER"));
+
+        indexService.Fire(index);
+
+        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
+        Assert.Equal(DiagnosticIds.LocalisationKeyExistence.ToString(), diag.Code?.String);
+        Assert.Contains("TEXT_MISSING", diag.Message);
+    }
+
+    [Fact]
+    public void OnIndexChanged_KnownTextKey_NoDiagnostic()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri, """Game_Message("TEXT_HELLO")""");
+        var index = IndexWithLuaRef(LuaUri, "TEXT_HELLO", kind: GameSymbolKind.LocalisationKey,
+            localisation: new StubLocalisationIndex("TEXT_HELLO"));
+
+        indexService.Fire(index);
+
+        Assert.Empty(Assert.Single(published).Diagnostics!);
+    }
+
+    private sealed class StubLocalisationIndex(params string[] keys) : ILocalisationIndex
+    {
+        public IEnumerable<string> Keys => keys;
+
+        public bool ContainsKey(string key)
+        {
+            return keys.Contains(key, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public string? GetValue(string key)
+        {
+            return ContainsKey(key) ? key : null;
+        }
     }
 
     // ── shared parse (cache) ──────────────────────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_PlanWithoutThreadFunction_PublishesThePlanDiagnostic()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri, "TaskForce = { { \"MainForce\" } }\n");
+        indexService.Fire(GameIndex.Empty);
+
+        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics!);
+        Assert.Equal(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString(), diagnostic.Code?.String);
+    }
 
     [Fact]
     public void PublishForDocument_SameContentTwice_ParsesOnce()

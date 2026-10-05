@@ -21,16 +21,6 @@ internal static class LuaGlobalScopeAnalyzer
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
-    // Standard Lua 5.1 globals - never flag these as missing requires.
-    private static readonly HashSet<string> s_lua51Globals = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "pairs", "ipairs", "table", "string", "math", "type", "print", "error", "assert",
-        "pcall", "xpcall", "select", "unpack", "next", "rawget", "rawset", "setmetatable",
-        "getmetatable", "require", "tostring", "tonumber", "io", "os", "coroutine",
-        "_G", "_VERSION", "dofile", "load", "loadfile", "rawequal", "rawlen",
-        "collectgarbage", "gcinfo", "newproxy"
-    };
-
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, string text, GameIndex index, ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper)
@@ -142,8 +132,9 @@ internal static class LuaGlobalScopeAnalyzer
         {
             var name = id.Name;
 
-            if (s_lua51Globals.Contains(name)) continue;
-            if (schemaProvider.AllFunctionNames.Contains(name)) continue;
+            // What the engine itself links - its functions and the standard library it opens -
+            // comes from the stubs, never from a Lua version's list: the engine opens a subset.
+            if (schemaProvider.DeclaredGlobalNames.Contains(name)) continue;
             if (locallyBound.Contains(name)) continue;
             if (!luaGlobalsByName.TryGetValue(name, out var defUris)) continue;
             // No warning if at least one defining file is in the transitive require closure.

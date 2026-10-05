@@ -17,16 +17,6 @@ internal static class LuaLocalScopeCollector
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
-    private static readonly IReadOnlySet<string> s_lua51Globals =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "pairs", "ipairs", "table", "string", "math", "type", "print", "error", "assert",
-            "pcall", "xpcall", "select", "unpack", "next", "rawget", "rawset", "setmetatable",
-            "getmetatable", "require", "tostring", "tonumber", "io", "os", "coroutine",
-            "_G", "_VERSION", "dofile", "load", "loadfile", "rawequal", "rawlen",
-            "collectgarbage", "gcinfo", "newproxy"
-        };
-
     public static IReadOnlyList<ScopeEntry> CollectAt(
         string text,
         int line,
@@ -76,9 +66,11 @@ internal static class LuaLocalScopeCollector
             entries.Add(new ScopeEntry(name, ScopeEntryKind.EngineApi,
                 schemaProvider.GetFunctionDescription(name)));
 
-        // 5. Lua 5.1 builtins
-        foreach (var name in s_lua51Globals)
-            entries.Add(new ScopeEntry(name, ScopeEntryKind.Lua51Builtin, null));
+        // 5. The standard library the engine opens, as the stubs declare it (the functions above
+        //    are already listed, so only the remaining values count here).
+        entries.AddRange(schemaProvider.DeclaredGlobalNames
+            .Where(name => !schemaProvider.AllFunctionNames.Contains(name))
+            .Select(name => new ScopeEntry(name, ScopeEntryKind.EngineBuiltin, null)));
 
         return entries;
     }

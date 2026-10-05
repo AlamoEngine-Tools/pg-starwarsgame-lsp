@@ -37,7 +37,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="..\schema\lua\api.d.lua" Link="schema\lua\api.d.lua">
+        <Content Include="..\schema\lua\*.d.lua;..\schema\lua\_files.json" Link="schema\lua\%(Filename)%(Extension)">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
     </ItemGroup>

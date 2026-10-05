@@ -31,8 +31,129 @@ public sealed class LuaGameDocumentParserTest
             ---@param playerName string
             ---@xmlref XmlObject:Faction
             function Find_Player(playerName) end
+            ---@param textId string
+            ---@aetref LocalisationKey
+            function Game_Message(textId) end
+            ---@class GameObject
+            GameObject = {}
+            ---@param eventName string
+            ---@aetref XmlObject:SFXEvent
+            function GameObject.Play_SFX_Event(eventName) end
             """
         ]);
+    }
+
+    // ── widened reference tag ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_LocalisationKeyTag_EmitsLocalisationKeyReference()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """Game_Message("TEXT_HELLO")""",
+            1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("TEXT_HELLO", reference.TargetId);
+        Assert.Equal(GameSymbolKind.LocalisationKey, reference.ExpectedKind);
+        Assert.Null(reference.ExpectedTypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_DotCallOnAnyReceiver_EmitsTheMethodsReference()
+    {
+        // The receiver's type is not inferred; the method name alone selects the tag.
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """
+            local ship = Find_First_Object("X")
+            ship.Play_SFX_Event("SFX_Boom")
+            """,
+            1, default);
+
+        var reference = Assert.Single(result.References, r => r.TargetId == "SFX_Boom");
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Equal("SFXEvent", reference.ExpectedTypeName);
+        Assert.Equal(1, reference.Line);
+        Assert.Equal("ship.Play_SFX_Event(\"".Length, reference.Column);
+    }
+
+    [Fact]
+    public async Task ParseAsync_ColonCallOnAnyReceiver_EmitsTheMethodsReference()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """ship:Play_SFX_Event("SFX_Boom")""",
+            1, default);
+
+        var reference = Assert.Single(result.References, r => r.TargetId == "SFX_Boom");
+        Assert.Equal("SFXEvent", reference.ExpectedTypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_DotCallOfUntaggedMethod_EmitsNoLuaGlobalReference()
+    {
+        // Only a bare identifier call is a global-function call site; a member call is not.
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """ship.Get_Owner()""",
+            1, default);
+
+        Assert.Empty(result.References);
+    }
+
+    // ── task-force globals ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_TaskForceTable_DeclaresOneGlobalPerForce()
+    {
+        // A plan file's TaskForce table names the forces; the engine maps each one into the
+        // script as a global of that name, so the table is where the global is defined.
+        const string text = """
+                            function Definitions()
+                                TaskForce = {
+                                {
+                                    "MainForce"
+                                    ,"Air = 1, 5"
+                                },
+                                {
+                                    "ReserveForce"
+                                    ,"Infantry = 2"
+                                }
+                                }
+                            end
+                            """;
+
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+
+        var forces = result.Symbols.Where(s => s.Kind == GameSymbolKind.LuaGlobal && s.Id != "Definitions").ToList();
+        Assert.Equal(["MainForce", "ReserveForce"], forces.Select(s => s.Id));
+        var origin = (FileOrigin)forces[0].Origin;
+        Assert.Equal(3, origin.Line);
+        Assert.Equal("        \"".Length, origin.Column);
+    }
+
+    [Fact]
+    public async Task ParseAsync_TaskForceTable_IgnoresLaterStringsOfAnEntry()
+    {
+        const string text = """
+                            TaskForce = {
+                            { "MainForce", "DenyHeroAttach", "Air = 1, 5" }
+                            }
+                            """;
+
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+
+        var force = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
+        Assert.Equal("MainForce", force.Id);
+    }
+
+    [Fact]
+    public async Task ParseAsync_OtherTableNamedDifferently_DeclaresNothing()
+    {
+        var result = await Build().ParseAsync("file:///s.lua", """Forces = { { "MainForce" } }""", 1, default);
+
+        Assert.DoesNotContain(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
     }
 
     private static LuaGameDocumentParser Build(LuaAnnotationRepository? repo = null)

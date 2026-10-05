@@ -82,6 +82,28 @@ public sealed class LuaGlobalScopeAnalyzerTest
     }
 
     [Fact]
+    public void Analyze_NameTheStubsDeclare_IsNeverAMissingRequire()
+    {
+        // The stubs say what the engine links (here: tostring). A library file that happens to
+        // define the same name does not make the standard library something to require.
+        var schema = new LuaApiSchemaProvider(["function tostring(v) end\n"]);
+        var index = AddCurrentDoc(IndexWithLibGlobal("tostring"));
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "local s = tostring(1)", index, schema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_NameTheStubsDoNotDeclare_IsAnOrdinaryLibraryGlobal()
+    {
+        // Lua 5.1 names mean nothing by themselves: the engine links what the stubs declare, and
+        // without a declaration `math` is whatever a library file makes it.
+        var index = AddCurrentDoc(IndexWithLibGlobal("math"));
+        var result =
+            LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "local x = math.floor(1.5)", index, EmptySchema, s_fileHelper);
+        Assert.Single(result);
+    }
+
+    [Fact]
     public void Analyze_EngineGlobal_IsSkipped_NoDiagnostic()
     {
         const string text = """Find_First_Object("UNIT_REBEL")""";

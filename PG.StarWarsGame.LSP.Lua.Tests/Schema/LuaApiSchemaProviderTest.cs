@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Schema;
@@ -186,8 +187,45 @@ public sealed class LuaApiSchemaProviderTest
 
     private static LuaApiSchemaProvider BuildFromProductionFile()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "schema", "lua", "api.d.lua");
-        return new LuaApiSchemaProvider([File.ReadAllText(path)]);
+        // Every file lua/_files.json lists, the way the server loads them.
+        var dir = Path.Combine(AppContext.BaseDirectory, "schema", "lua");
+        var files = Directory.GetFiles(dir, "*.d.lua").OrderBy(f => f, StringComparer.Ordinal);
+        return new LuaApiSchemaProvider(files.Select(File.ReadAllText));
+    }
+
+    [Fact]
+    public void ProductionSchema_DeclaresTheEngineSurface()
+    {
+        var provider = BuildFromProductionFile();
+        // 119 global commands + 14 utility commands, plus the standard library functions.
+        Assert.Contains("Create_Thread", provider.AllFunctionNames);
+        Assert.Contains("GlobalValue", provider.AllFunctionNames);
+        Assert.Contains("_ScriptMessage", provider.AllFunctionNames);
+        Assert.Contains("tostring", provider.DeclaredGlobalNames);
+        Assert.Contains("string", provider.DeclaredGlobalNames);
+        Assert.Contains("Script", provider.DeclaredGlobalNames);
+        Assert.Contains("Object", provider.DeclaredGlobalNames);
+        Assert.DoesNotContain("math", provider.DeclaredGlobalNames);
+        Assert.DoesNotContain("io", provider.DeclaredGlobalNames);
+    }
+
+    [Fact]
+    public void ProductionSchema_WrapperMethodCarriesItsTag()
+    {
+        var provider = BuildFromProductionFile();
+        var entry = Assert.Single(provider.GetXmlRefs("Play_SFX_Event"));
+        Assert.Equal(0, entry.ParamIndex);
+        Assert.Equal(ReferenceKind.XmlObject, entry.Kind);
+        Assert.Equal("SFXEvent", entry.ExpectedTypeName);
+        Assert.Contains("Play_SFX_Event", provider.GetMembersOf("GameObject").Select(m => m.Name));
+    }
+
+    [Fact]
+    public void ProductionSchema_TextKeyParametersAreTagged()
+    {
+        var provider = BuildFromProductionFile();
+        var entry = Assert.Single(provider.GetXmlRefs("Game_Message"));
+        Assert.Equal(ReferenceKind.LocalisationKey, entry.Kind);
     }
 
     [Fact]
@@ -210,12 +248,135 @@ public sealed class LuaApiSchemaProviderTest
     }
 
     [Fact]
-    public void ProductionSchema_FindFirstObject_HasXmlRef()
+    public void ProductionSchema_FindFirstObject_NamesAGameObjectType()
     {
         var provider = BuildFromProductionFile();
         var entry = Assert.Single(provider.GetXmlRefs("Find_First_Object"));
         Assert.Equal(0, entry.ParamIndex);
+        Assert.Equal(ReferenceKind.XmlObject, entry.Kind);
+        Assert.Equal("GameObjectType", entry.ExpectedTypeName);
+    }
+
+    // ── @aetref: the widened reference tag ───────────────────────────────────
+
+    [Fact]
+    public void GetXmlRefs_AetrefXmlObjectWithType_IsAnXmlObjectRefWithThatType()
+    {
+        const string content = """
+                               ---@param eventName string
+                               ---@aetref XmlObject:SFXEvent
+                               function Play_SFX(eventName) end
+                               """;
+        var entry = Assert.Single(Build(content).GetXmlRefs("Play_SFX"));
+        Assert.Equal(0, entry.ParamIndex);
+        Assert.Equal(ReferenceKind.XmlObject, entry.Kind);
+        Assert.Equal("SFXEvent", entry.ExpectedTypeName);
+    }
+
+    [Fact]
+    public void GetXmlRefs_AetrefLocalisationKey_CarriesThatKind()
+    {
+        const string content = """
+                               ---@param textId string
+                               ---@aetref LocalisationKey
+                               function Game_Message(textId) end
+                               """;
+        var entry = Assert.Single(Build(content).GetXmlRefs("Game_Message"));
+        Assert.Equal(ReferenceKind.LocalisationKey, entry.Kind);
         Assert.Null(entry.ExpectedTypeName);
+    }
+
+    [Fact]
+    public void GetXmlRefs_LegacyXmlrefTag_IsAnXmlObjectRef()
+    {
+        const string content = """
+                               ---@param factionName string
+                               ---@xmlref XmlObject:Faction
+                               function Find_Player(factionName) end
+                               """;
+        var entry = Assert.Single(Build(content).GetXmlRefs("Find_Player"));
+        Assert.Equal(ReferenceKind.XmlObject, entry.Kind);
+        Assert.Equal("Faction", entry.ExpectedTypeName);
+    }
+
+    [Fact]
+    public void GetXmlRefs_AetrefOnClassMethod_FoundByMethodName()
+    {
+        // Wrapper methods are declared dot-style on their class table. A call site only knows the
+        // method name (the receiver's type is not inferred on our side), so the lookup is by it.
+        const string content = """
+                               ---@class GameObject
+                               GameObject = {}
+
+                               ---@param eventName string
+                               ---@aetref XmlObject:SFXEvent
+                               function GameObject.Play_SFX_Event(eventName) end
+                               """;
+        var provider = Build(content);
+        var entry = Assert.Single(provider.GetXmlRefs("Play_SFX_Event"));
+        Assert.Equal(0, entry.ParamIndex);
+        Assert.Equal(ReferenceKind.XmlObject, entry.Kind);
+        Assert.Equal("SFXEvent", entry.ExpectedTypeName);
+    }
+
+    [Fact]
+    public void GetXmlRefs_AetrefOnClassMethod_DoesNotMakeItAGlobalFunction()
+    {
+        const string content = """
+                               ---@param eventName string
+                               ---@aetref XmlObject:SFXEvent
+                               function GameObject.Play_SFX_Event(eventName) end
+                               """;
+        Assert.DoesNotContain("Play_SFX_Event", Build(content).AllFunctionNames);
+    }
+
+    [Fact]
+    public void GetXmlRefs_AetrefUnknownKind_IsIgnored()
+    {
+        const string content = """
+                               ---@param x string
+                               ---@aetref Nonsense:Thing
+                               function Foo(x) end
+                               """;
+        Assert.Empty(Build(content).GetXmlRefs("Foo"));
+    }
+
+    // ── DeclaredGlobalNames: values the stubs declare besides functions ──────
+
+    [Fact]
+    public void DeclaredGlobalNames_ContainsTypedGlobalsAndTables()
+    {
+        const string content = """
+                               ---@type Script
+                               Script = nil
+                               ---@type string
+                               LUA_PATH = nil
+
+                               ---@class stringlib
+                               string = {}
+
+                               function tostring(v) end
+                               """;
+        var provider = Build(content);
+        Assert.Contains("Script", provider.DeclaredGlobalNames);
+        Assert.Contains("LUA_PATH", provider.DeclaredGlobalNames);
+        Assert.Contains("string", provider.DeclaredGlobalNames);
+        Assert.Contains("tostring", provider.DeclaredGlobalNames);
+        Assert.Contains("script", provider.DeclaredGlobalNames, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DeclaredGlobalNames_IgnoresClassMethodsAndLocals()
+    {
+        const string content = """
+                               ---@class GameObject
+                               GameObject = {}
+                               function GameObject.Is_Valid() end
+                               local helper = 1
+                               """;
+        var provider = Build(content);
+        Assert.DoesNotContain("Is_Valid", provider.DeclaredGlobalNames);
+        Assert.DoesNotContain("helper", provider.DeclaredGlobalNames);
     }
 
     // ── GetClassDefinition ────────────────────────────────────────────────────
