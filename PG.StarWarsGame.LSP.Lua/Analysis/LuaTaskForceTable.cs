@@ -19,6 +19,9 @@ internal static class LuaTaskForceTable
 {
     public const string TableName = "TaskForce";
 
+    /// <summary>The wrapper class the engine maps each force in as; its method table is in the stubs.</summary>
+    public const string WrapperTypeName = "TaskForce";
+
     /// <summary>Every declared force, in source order, with the token holding its name.</summary>
     public static IReadOnlyList<(string Name, SyntaxToken Token)> Forces(SyntaxNode root)
     {

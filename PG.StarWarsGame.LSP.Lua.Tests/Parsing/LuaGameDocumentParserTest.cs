@@ -128,6 +128,7 @@ public sealed class LuaGameDocumentParserTest
 
         var forces = result.Symbols.Where(s => s.Kind == GameSymbolKind.LuaGlobal && s.Id != "Definitions").ToList();
         Assert.Equal(["MainForce", "ReserveForce"], forces.Select(s => s.Id));
+        Assert.All(forces, s => Assert.Equal("TaskForce", s.TypeName));
         var origin = (FileOrigin)forces[0].Origin;
         Assert.Equal(3, origin.Line);
         Assert.Equal("        \"".Length, origin.Column);

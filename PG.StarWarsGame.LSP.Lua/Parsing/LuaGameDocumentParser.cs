@@ -194,15 +194,15 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
                     annotations.Add(ann);
             }
 
-        // A plan's task forces are globals the engine creates from the TaskForce table, so each
-        // name is a symbol defined at the string that declares it.
+        // A plan's task forces are globals the engine creates from the TaskForce table, each a
+        // TaskForce wrapper, so each name is a symbol defined at the string that declares it.
         foreach (var (name, token) in LuaTaskForceTable.Forces(root))
         {
             var position = token.GetLocation().GetLineSpan().StartLinePosition;
             symbols.Add(new GameSymbol(
                 name,
                 GameSymbolKind.LuaGlobal,
-                null,
+                LuaTaskForceTable.WrapperTypeName,
                 new FileOrigin(documentUri, position.Line, position.Character + 1), // after the quote
                 null));
         }
