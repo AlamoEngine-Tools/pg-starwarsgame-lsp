@@ -55,7 +55,9 @@ public sealed class XmlCodeActionProviderRegistrationTest
         // load, for the repairs that land on a different tag than the one reported (turning off a
         // child flag, exchanging two values). The value-anchored repairs still go through
         // FixSuggestionCodeActionProvider, which already replaces the diagnostic's own range.
-        const int expectedProviderCount = 7;
+        // 7 -> 8: XmlStructureRepairCodeActionProvider added - the repair for a structural finding
+        // at the diagnostic's own position, plus fix-all for the file.
+        const int expectedProviderCount = 8;
         Assert.Equal(expectedProviderCount, RegisteredProviderTypes().Count);
     }
 

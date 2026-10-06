@@ -40,6 +40,26 @@ public sealed class XmlStructureHandler : XmlDiagnosticsHandler<XmlStructureFact
                 (DiagnosticIds.XmlCommentInsideValue, XmlDiagnosticSeverity.Warning)
         };
 
+    /// <summary>The category a published diagnostic code stands for; false for any other code.</summary>
+    public static bool TryGetCategory(string? code, out XmlStrictnessCategory category)
+    {
+        foreach (var (c, (id, _)) in ByCategory)
+            if (string.Equals(id.ToString(), code, StringComparison.OrdinalIgnoreCase))
+            {
+                category = c;
+                return true;
+            }
+
+        category = default;
+        return false;
+    }
+
+    /// <summary>The id a category is published under.</summary>
+    public static DiagnosticId IdOf(XmlStrictnessCategory category)
+    {
+        return ByCategory[category].Id;
+    }
+
     /// <inheritdoc />
     /// <remarks>Every result carries its own id; this is only the registry's fallback.</remarks>
     public override DiagnosticId? DefaultId => DiagnosticIds.XmlStrictOnly;
