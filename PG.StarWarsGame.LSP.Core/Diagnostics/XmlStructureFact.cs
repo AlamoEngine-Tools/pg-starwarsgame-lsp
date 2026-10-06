@@ -12,4 +12,5 @@ public sealed record XmlStructureFact(
     int Line,
     int Column,
     int Length,
-    string Reason) : XmlFact(DocumentUri, Line, Column, Length);
+    string Reason,
+    XmlStrictnessCategory Category = XmlStrictnessCategory.StrictOnly) : XmlFact(DocumentUri, Line, Column, Length);

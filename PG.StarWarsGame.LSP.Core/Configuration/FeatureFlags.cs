@@ -35,6 +35,13 @@ public record XmlFeatureFlags
     public bool CodeActions { get; init; } = true;
     public bool LinkedEditing { get; init; } = true;
     public bool AutoCloseTag { get; init; } = true;
+
+    /// <summary>
+    ///     XML the game reads that standard XML tools reject, or that the game reads differently
+    ///     from what the document shows (the XML strictness group). A file the game drops is
+    ///     reported regardless.
+    /// </summary>
+    public bool Strictness { get; init; } = true;
 }
 
 /// <summary>Flags for Lua language capabilities.</summary>

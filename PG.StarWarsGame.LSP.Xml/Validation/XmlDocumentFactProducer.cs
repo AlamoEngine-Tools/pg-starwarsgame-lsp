@@ -26,7 +26,8 @@ public sealed class XmlDocumentFactProducer(
         var facts = new List<XmlFact>();
 
         foreach (var error in structuralValidator.Validate(document.Text))
-            facts.Add(new XmlStructureFact(documentUri, error.Line, error.Column, 1, error.Reason));
+            facts.Add(new XmlStructureFact(documentUri, error.Line, error.Column, error.Length, error.Reason,
+                error.Category));
 
         var doc = document.Html;
         var lineIndex = document.LineIndex;

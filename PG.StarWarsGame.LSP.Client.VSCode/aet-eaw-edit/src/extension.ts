@@ -368,6 +368,7 @@ function resolveFeatureFlags() {
             codeActions: flag('xml.codeActions', true),
             linkedEditing: flag('xml.linkedEditing', true),
             autoCloseTag: flag('xml.autoCloseTag', true),
+            strictness: flag('xml.strictness', true),
         },
         lua: {
             completion: flag('lua.completion', true),

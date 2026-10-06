@@ -74,7 +74,7 @@ public sealed class IncomeSplitRuleTest
     [InlineData("No", "No")]
     public void The_share_is_unchecked_unless_both_flags_are_on(string favors, string allies)
     {
-        var body = "<Income_Stream_Ability Name='I'>"
+        var body = "<Income_Stream_Ability Name=\"I\">"
                    + $"<Split_Favors_Owner>{favors}</Split_Favors_Owner>"
                    + $"<Split_Income_With_Allies>{allies}</Split_Income_With_Allies>"
                    + "<Owner_Income_Percentage>5.0</Owner_Income_Percentage>"
@@ -90,7 +90,7 @@ public sealed class IncomeSplitRuleTest
     [Fact]
     public void A_favoured_split_with_no_allies_split_is_reported()
     {
-        var body = "<Income_Stream_Ability Name='I'>\n"
+        var body = "<Income_Stream_Ability Name=\"I\">\n"
                    + "    <Split_Favors_Owner>Yes</Split_Favors_Owner>\n"
                    + "    <Owner_Income_Percentage>0.5</Owner_Income_Percentage>\n"
                    + "</Income_Stream_Ability>";
@@ -110,7 +110,7 @@ public sealed class IncomeSplitRuleTest
     [Fact]
     public void The_repair_only_touches_tags_that_are_there()
     {
-        var body = "<Income_Stream_Ability Name='I'>"
+        var body = "<Income_Stream_Ability Name=\"I\">"
                    + "<Split_Favors_Owner>Yes</Split_Favors_Owner></Income_Stream_Ability>";
 
         var fact = Assert.Single(Facts(body, new SplitFavorsOwnerIgnoredRule())
@@ -129,7 +129,7 @@ public sealed class IncomeSplitRuleTest
     [Fact]
     public void Favouring_the_owner_while_paying_everyone_in_full_is_reported()
     {
-        var body = "<Income_Stream_Ability Name='I'>"
+        var body = "<Income_Stream_Ability Name=\"I\">"
                    + "<Split_Favors_Owner>Yes</Split_Favors_Owner>"
                    + "<Split_Income_With_Allies>Yes</Split_Income_With_Allies>"
                    + "<Full_Amount_To_Everyone>Yes</Full_Amount_To_Everyone>"
@@ -151,7 +151,7 @@ public sealed class IncomeSplitRuleTest
     [Fact]
     public void The_conflict_is_not_reported_when_the_flag_was_already_disarmed()
     {
-        var body = "<Income_Stream_Ability Name='I'>"
+        var body = "<Income_Stream_Ability Name=\"I\">"
                    + "<Split_Favors_Owner>Yes</Split_Favors_Owner>"
                    + "<Full_Amount_To_Everyone>Yes</Full_Amount_To_Everyone>"
                    + "</Income_Stream_Ability>";
@@ -161,7 +161,7 @@ public sealed class IncomeSplitRuleTest
 
     private static string Splitting(string percentage)
     {
-        return "<Income_Stream_Ability Name='I'>"
+        return "<Income_Stream_Ability Name=\"I\">"
                + "<Split_Favors_Owner>Yes</Split_Favors_Owner>"
                + "<Split_Income_With_Allies>Yes</Split_Income_With_Allies>"
                + $"<Owner_Income_Percentage>{percentage}</Owner_Income_Percentage>"
@@ -193,7 +193,7 @@ public sealed class IncomeSplitRuleTest
 
         return
         [
-            .. producer.Produce("<Root>\n" + body + "\n</Root>", Uri)
+            .. producer.Produce("<?xml version=\"1.0\"?>\n<Root>\n" + body + "\n</Root>", Uri)
                 .Where(f => f is not XmlUnregisteredFileFact)
         ];
     }

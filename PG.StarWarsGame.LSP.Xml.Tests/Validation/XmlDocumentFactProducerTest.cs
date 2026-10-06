@@ -419,7 +419,7 @@ public sealed class XmlDocumentFactProducerTest
     [Fact]
     public void Well_formed_xml_emits_no_XmlStructureFact()
     {
-        const string xml = "<Root><Max_Speed>5.0</Max_Speed></Root>";
+        const string xml = "<?xml version=\"1.0\"?>\n<Root><Max_Speed>5.0</Max_Speed></Root>";
         var facts = Build().Produce(xml, Uri);
         Assert.Empty(facts.OfType<XmlStructureFact>());
     }
@@ -427,7 +427,7 @@ public sealed class XmlDocumentFactProducerTest
     [Fact]
     public void Mismatched_closing_tag_emits_XmlStructureFact()
     {
-        const string xml = "<Foo><Bar></Foo>";
+        const string xml = "<?xml version=\"1.0\"?>\n<Foo><Bar></Foo>";
         var facts = Build().Produce(xml, Uri);
         var sf = Assert.Single(facts.OfType<XmlStructureFact>());
         Assert.Equal(Uri, sf.DocumentUri);
@@ -453,7 +453,7 @@ public sealed class XmlDocumentFactProducerTest
     [Fact]
     public void XmlStructureFact_carries_nonnegative_line_and_column()
     {
-        const string xml = "<Foo>\n  <Bar>\n</Foo>";
+        const string xml = "<?xml version=\"1.0\"?>\n<Foo>\n  <Bar>\n</Foo>";
         var facts = Build().Produce(xml, Uri);
         var sf = Assert.Single(facts.OfType<XmlStructureFact>());
         Assert.True(sf.Line >= 0);
