@@ -384,6 +384,8 @@ public static class DiagnosticIds
     ///     the rest in <see cref="DiagnosticGroup.XmlStrictness" />. A suppression naming this id
     ///     now silences nothing, which is harmless; reusing it would silence the wrong thing.
     /// </summary>
+    [Obsolete(
+        "Deprecated since 0.5.0: no longer emitted. Structural findings carry per-category ids (Syntax 3001-3009, XML strictness 1-6). Never reuse the number.")]
     public static readonly DiagnosticId XmlStructure = new(DiagnosticGroup.Structure, 8);
 
     // Notes carried by an enum VALUE that a file names. New in schema 2.0.0: until then only a
