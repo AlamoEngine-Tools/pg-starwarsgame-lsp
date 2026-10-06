@@ -60,7 +60,7 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
         _store = new SidecarStore<SuppressionsDocument.Payload>(
             "suppressions.json", SuppressionsDocument.TypeName, SuppressionsDocument.Version,
             SuppressionsDocument.Migrations, _locator, fileHelper, logger,
-            () => new SuppressionsDocument.Payload());
+            SuppressionsDocument.Default);
     }
 
     public IReadOnlyList<SuppressionMatcher> GetAll()
