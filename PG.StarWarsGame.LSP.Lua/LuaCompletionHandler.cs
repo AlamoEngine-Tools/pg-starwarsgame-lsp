@@ -6,6 +6,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
@@ -107,10 +108,16 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
                 if (refEntry is null) return new CompletionList();
 
-                _logger.LogDebug("Lua completion: {Function} param {Index} -> type {Type}",
-                    fn, param, refEntry.Value.ExpectedTypeName ?? "*");
+                _logger.LogDebug("Lua completion: {Function} param {Index} -> {Kind} {Type}",
+                    fn, param, refEntry.Value.Kind, refEntry.Value.ExpectedTypeName ?? "*");
 
-                return new CompletionList(BuildXmlRefCompletions(index, refEntry.Value.ExpectedTypeName));
+                return refEntry.Value.Kind switch
+                {
+                    ReferenceKind.XmlObject => new CompletionList(
+                        BuildXmlRefCompletions(index, refEntry.Value.ExpectedTypeName)),
+                    ReferenceKind.LocalisationKey => new CompletionList(BuildTextKeyCompletions(index)),
+                    _ => new CompletionList()
+                };
             }
 
             case IdentifierContext { AtStatementStart: var atStart }:
@@ -179,6 +186,16 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
                 Detail = detail
             };
         }
+    }
+
+    private static IEnumerable<CompletionItem> BuildTextKeyCompletions(GameIndex index)
+    {
+        return index.Localisation.Keys.Select(key => new CompletionItem
+        {
+            Label = key,
+            Detail = index.Localisation.GetValue(key),
+            Kind = CompletionItemKind.Text
+        });
     }
 
     private static IEnumerable<CompletionItem> BuildXmlRefCompletions(GameIndex index, string? expectedTypeName)

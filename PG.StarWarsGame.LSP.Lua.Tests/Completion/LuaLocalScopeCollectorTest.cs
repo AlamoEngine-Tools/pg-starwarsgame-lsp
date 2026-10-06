@@ -21,13 +21,13 @@ public sealed class LuaLocalScopeCollectorTest
 
     private static IReadOnlyList<ScopeEntry> Collect(
         string text, int line = 0, int character = 0,
-        GameIndex? index = null, string? docUri = null)
+        GameIndex? index = null, string? docUri = null, ILuaApiSchemaProvider? schema = null)
     {
         return LuaLocalScopeCollector.CollectAt(
             text, line, character,
             docUri ?? DocUri,
             index ?? GameIndex.Empty,
-            Schema,
+            schema ?? Schema,
             FileHelper);
     }
 
@@ -174,14 +174,18 @@ public sealed class LuaLocalScopeCollectorTest
         Assert.Contains(entries, e => e.Name == "Find_Player" && e.Kind == ScopeEntryKind.EngineApi);
     }
 
-    // ── Lua 5.1 builtins ─────────────────────────────────────────────────────
+    // ── the engine's built-ins ───────────────────────────────────────────────
 
     [Fact]
-    public void Lua51Builtins_AreInScope()
+    public void EngineBuiltins_AreTheValuesTheStubsDeclare_NotALuaVersionsList()
     {
-        var entries = Collect("");
-        Assert.Contains(entries, e => e.Name == "pairs" && e.Kind == ScopeEntryKind.Lua51Builtin);
-        Assert.Contains(entries, e => e.Name == "table" && e.Kind == ScopeEntryKind.Lua51Builtin);
+        // `table` is declared as a value, `pairs` as a function (so it is engine API, not a
+        // builtin entry); `math` is not declared at all because the engine never opens it.
+        var schema = new LuaApiSchemaProvider(["---@class tablelib\ntable = {}\nfunction pairs(t) end\n"]);
+        var entries = Collect("", schema: schema);
+        Assert.Contains(entries, e => e.Name == "table" && e.Kind == ScopeEntryKind.EngineBuiltin);
+        Assert.Contains(entries, e => e.Name == "pairs" && e.Kind == ScopeEntryKind.EngineApi);
+        Assert.DoesNotContain(entries, e => e.Name == "math");
     }
 
     // ── @type annotation extraction ───────────────────────────────────────────
@@ -251,6 +255,8 @@ public sealed class LuaLocalScopeCollectorTest
     {
         public IReadOnlySet<string> AllFunctionNames { get; } =
             new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+
+        public IReadOnlySet<string> DeclaredGlobalNames => AllFunctionNames;
 
         public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
         {

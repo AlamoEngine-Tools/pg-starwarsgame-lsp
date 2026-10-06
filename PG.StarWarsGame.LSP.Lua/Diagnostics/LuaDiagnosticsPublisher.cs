@@ -100,6 +100,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, parsed.Tree, index.Documents, _fileHelper));
         diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, parsed.Tree, index, _schemaProvider, _fileHelper));
         diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(parsed.Tree, uri));
+        diagnostics.AddRange(LuaPlanAnalyzer.Analyze(uri, parsed.Tree));
 
         // Applied once, on the way out, so every analyzer above is covered without any of them
         // having to know about scopes - and using the parse already in hand.
@@ -155,28 +156,53 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 
         foreach (var reference in docIndex.References)
         {
-            if (reference.ExpectedKind != GameSymbolKind.XmlObject) continue;
-
-            var resolved = index.Resolve(reference.TargetId);
-            var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName, resolved);
-            if (eval is null) continue;
-
             var range = new LspRange(
                 new LspPosition(reference.Line, reference.Column),
                 new LspPosition(reference.Line, reference.Column + reference.Length));
 
-            diagnostics.Add(new LspDiagnostic
+            switch (reference.ExpectedKind)
             {
-                // Same id the XML side uses: an unresolved reference is the same kind of problem
-                // whichever language names the target. Taken from the evaluator rather than named
-                // here, so the two cannot disagree once this side is taught about indexed types -
-                // it passes none today, so every id it sees is still UnresolvedReference.
-                Code = new LspDiagnosticCode(eval.Value.Id.ToString()),
-                Severity = eval.Value.Severity.ToLsp(),
-                Message = eval.Value.Message,
-                Range = range,
-                Source = AppProperties.LspServerId
-            });
+                case GameSymbolKind.XmlObject:
+                {
+                    var resolved = index.Resolve(reference.TargetId);
+                    var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName,
+                        resolved);
+                    if (eval is null) continue;
+
+                    diagnostics.Add(new LspDiagnostic
+                    {
+                        // Same id the XML side uses: an unresolved reference is the same kind of
+                        // problem whichever language names the target. Taken from the evaluator
+                        // rather than named here, so the two cannot disagree once this side is
+                        // taught about indexed types - it passes none today, so every id it sees
+                        // is still UnresolvedReference.
+                        Code = new LspDiagnosticCode(eval.Value.Id.ToString()),
+                        Severity = eval.Value.Severity.ToLsp(),
+                        Message = eval.Value.Message,
+                        Range = range,
+                        Source = AppProperties.LspServerId
+                    });
+                    break;
+                }
+                case GameSymbolKind.LocalisationKey:
+                    if (index.Localisation.ContainsKey(reference.TargetId)) continue;
+
+                    // Same id and wording as the XML side's text-key check.
+                    diagnostics.Add(new LspDiagnostic
+                    {
+                        Code = new LspDiagnosticCode(DiagnosticIds.LocalisationKeyExistence.ToString()),
+                        Severity = LspDiagnosticSeverity.Warning,
+                        Message =
+                            $"Localisation key '{reference.TargetId}' was not found in the loaded translation databases.",
+                        Range = range,
+                        Source = AppProperties.LspServerId
+                    });
+                    break;
+                default:
+                    // LuaGlobal call sites are rename data, not something to resolve; assets and
+                    // workspace files have no Lua-side check yet.
+                    continue;
+            }
         }
     }
 }

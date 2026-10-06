@@ -64,7 +64,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
         var root = tree.GetRoot(ct);
 
         var (symbols, annotations, functionAnnotations) = CollectSymbols(root, canonicalUri);
-        var references = CollectReferences(root, canonicalUri, tree);
+        var references = CollectReferences(root, canonicalUri);
         var requireArgs = CollectRequireArgs(root);
 
         // Index the script as a navigable file-symbol keyed by its extensionless name, so a
@@ -194,6 +194,19 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
                     annotations.Add(ann);
             }
 
+        // A plan's task forces are globals the engine creates from the TaskForce table, each a
+        // TaskForce wrapper, so each name is a symbol defined at the string that declares it.
+        foreach (var (name, token) in LuaTaskForceTable.Forces(root))
+        {
+            var position = token.GetLocation().GetLineSpan().StartLinePosition;
+            symbols.Add(new GameSymbol(
+                name,
+                GameSymbolKind.LuaGlobal,
+                LuaTaskForceTable.WrapperTypeName,
+                new FileOrigin(documentUri, position.Line, position.Character + 1), // after the quote
+                null));
+        }
+
         return (symbols, annotations, functionAnnotations);
     }
 
@@ -208,70 +221,90 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
         return LuaDocCommentScanner.CollectLeadingDocLines(node);
     }
 
-    private List<GameReference> CollectReferences(
-        SyntaxNode root, string documentUri, SyntaxTree tree)
+    private List<GameReference> CollectReferences(SyntaxNode root, string documentUri)
     {
         var references = new List<GameReference>();
 
         foreach (var node in root.DescendantNodes())
-        {
-            if (node is not FunctionCallExpressionSyntax call)
-                continue;
-
-            // Callee must be a simple identifier (global function call).
-            if (call.Expression is not IdentifierNameSyntax callee)
-                continue;
-
-            var functionName = callee.Name;
-
-            // require() is tracked separately in CollectRequireArgs.
-            if (string.Equals(functionName, "require", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var entries = _schemaProvider.GetXmlRefs(functionName);
-            if (entries.Count > 0)
+            switch (node)
             {
-                // Known EaW API function - emit XML object refs for the relevant arguments.
-                foreach (var entry in entries)
+                case FunctionCallExpressionSyntax { Expression: IdentifierNameSyntax callee } call:
                 {
-                    if (TryExtractStringArgument(call, entry.ParamIndex) is not { } value)
+                    var functionName = callee.Name;
+
+                    // require() is tracked separately in CollectRequireArgs.
+                    if (string.Equals(functionName, "require", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    if (TryGetArgumentLocation(call, entry.ParamIndex, tree) is not { } loc)
-                        continue;
+                    var entries = _schemaProvider.GetXmlRefs(functionName);
+                    if (entries.Count > 0)
+                    {
+                        AddTaggedArguments(entries, call.Argument, documentUri, references);
+                    }
+                    else
+                    {
+                        // User-defined or unknown function - track the call site as a LuaGlobal
+                        // reference so rename can locate all callers via the index (O(1) lookup).
+                        var calleeSpan = callee.GetLocation().GetLineSpan().StartLinePosition;
+                        references.Add(new GameReference(
+                            functionName,
+                            GameSymbolKind.LuaGlobal,
+                            null,
+                            documentUri,
+                            calleeSpan.Line,
+                            calleeSpan.Character,
+                            functionName.Length));
+                    }
 
-                    references.Add(new GameReference(
-                        value,
-                        GameSymbolKind.XmlObject,
-                        entry.ExpectedTypeName,
-                        documentUri,
-                        loc.Line,
-                        loc.Column,
-                        value.Length));
+                    break;
                 }
+                // obj.Method("x") and obj:Method("x"): the receiver's type is not inferred here, so
+                // the method name alone selects the tags. An untagged member call is no reference at
+                // all - it is not a global function call site either.
+                case FunctionCallExpressionSyntax { Expression: MemberAccessExpressionSyntax member } call:
+                    AddTaggedArguments(_schemaProvider.GetXmlRefs(member.MemberName.Text), call.Argument,
+                        documentUri, references);
+                    break;
+                case MethodCallExpressionSyntax method:
+                    AddTaggedArguments(_schemaProvider.GetXmlRefs(method.Identifier.Text), method.Argument,
+                        documentUri, references);
+                    break;
             }
-            else
-            {
-                // User-defined or unknown function - track the call site as a LuaGlobal
-                // reference so rename can locate all callers via the index (O(1) lookup).
-                var calleeSpan = callee.GetLocation().GetLineSpan().StartLinePosition;
-                references.Add(new GameReference(
-                    functionName,
-                    GameSymbolKind.LuaGlobal,
-                    null,
-                    documentUri,
-                    calleeSpan.Line,
-                    calleeSpan.Character,
-                    functionName.Length));
-            }
-        }
 
         return references;
     }
 
-    private static string? TryExtractStringArgument(FunctionCallExpressionSyntax call, int paramIndex)
+    private static void AddTaggedArguments(
+        IReadOnlyList<XmlRefEntry> entries, FunctionArgumentSyntax argument, string documentUri,
+        List<GameReference> references)
     {
-        switch (call.Argument)
+        foreach (var entry in entries)
+        {
+            // A kind the index holds no symbol for (an enum value, a bone) is completion data for
+            // the analyzer side, never a reference to resolve.
+            if (GameSymbolKinds.FromReferenceKind(entry.Kind) is not { } kind)
+                continue;
+
+            if (TryExtractStringArgument(argument, entry.ParamIndex) is not { } value)
+                continue;
+
+            if (TryGetArgumentLocation(argument, entry.ParamIndex) is not { } loc)
+                continue;
+
+            references.Add(new GameReference(
+                value,
+                kind,
+                entry.ExpectedTypeName,
+                documentUri,
+                loc.Line,
+                loc.Column,
+                value.Length));
+        }
+    }
+
+    private static string? TryExtractStringArgument(FunctionArgumentSyntax argument, int paramIndex)
+    {
+        switch (argument)
         {
             case ExpressionListFunctionArgumentSyntax exprList:
             {
@@ -291,11 +324,11 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
     }
 
     private static (int Line, int Column)? TryGetArgumentLocation(
-        FunctionCallExpressionSyntax call, int paramIndex, SyntaxTree tree)
+        FunctionArgumentSyntax argument, int paramIndex)
     {
         LiteralExpressionSyntax? lit = null;
 
-        switch (call.Argument)
+        switch (argument)
         {
             case ExpressionListFunctionArgumentSyntax exprList:
             {

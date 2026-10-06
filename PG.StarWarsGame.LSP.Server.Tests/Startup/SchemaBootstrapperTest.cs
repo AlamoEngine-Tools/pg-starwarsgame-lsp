@@ -157,6 +157,113 @@ public sealed class SchemaBootstrapperTest
         Assert.DoesNotContain(handler.Urls, u => u.Contains(ApiHost));
     }
 
+    // ── the Lua stub files ───────────────────────────────────────────────────
+    // The schema repository's lua/ directory holds several stub files, listed by lua/_files.json.
+    // Every listed file is read, from the same release as the XML schema; a release from before
+    // the manifest existed still has api.d.lua alone.
+
+    private static RoutingHttpHandler StubServer(IReadOnlyDictionary<string, string> luaFiles, bool manifest = true)
+    {
+        return new RoutingHttpHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/lua/_files.json"))
+                return manifest
+                    ? Ok($$"""{ "files": [{{string.Join(", ", luaFiles.Keys.Select(k => $"\"{k}\""))}}] }""")
+                    : new HttpResponseMessage(HttpStatusCode.NotFound);
+            foreach (var (name, content) in luaFiles)
+                if (path.EndsWith("/lua/" + name))
+                    return Ok(content);
+            return path.EndsWith("_index.json")
+                ? Ok("""{ "tags": [] }""")
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        static HttpResponseMessage Ok(string body)
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) };
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_Http_ReadsEveryStubFileTheManifestLists()
+    {
+        var handler = StubServer(new Dictionary<string, string>
+        {
+            ["api.d.lua"] = "function Find_Player(name) end\n",
+            ["stdlib.d.lua"] = "function tostring(v) end\n"
+        });
+        var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _,
+            luaProxy: out var lua);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Contains(handler.Urls, u => u.EndsWith("/lua/_files.json"));
+        Assert.Contains("Find_Player", lua.AllFunctionNames);
+        Assert.Contains("tostring", lua.AllFunctionNames);
+    }
+
+    [Fact]
+    public async Task LoadAsync_Http_NoManifest_ReadsTheApiFileAlone()
+    {
+        var handler = StubServer(new Dictionary<string, string>
+        {
+            ["api.d.lua"] = "function Find_Player(name) end\n"
+        }, manifest: false);
+        var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _,
+            luaProxy: out var lua);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Contains(handler.Urls, u => u.EndsWith("/lua/api.d.lua"));
+        Assert.Contains("Find_Player", lua.AllFunctionNames);
+    }
+
+    // The disk loader is exercised directly: the local XML provider around it needs a file-system
+    // watcher the mock file system does not have, and the stubs do not depend on it.
+    [Fact]
+    public void LoadLuaSchemaFromDisk_ReadsEveryStubFileTheManifestLists()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile(@"C:\schema\lua\_files.json", new MockFileData("""{ "files": ["api.d.lua", "stdlib.d.lua"] }"""));
+        fs.AddFile(@"C:\schema\lua\api.d.lua", new MockFileData("function Find_Player(name) end\n"));
+        fs.AddFile(@"C:\schema\lua\stdlib.d.lua", new MockFileData("function tostring(v) end\n"));
+        var bootstrapper = Build(new FakeHttpClientFactory(StubServer(new Dictionary<string, string>())),
+            new RecordingUserNotifier(), out _, out var lua, fileSystem: fs);
+
+        bootstrapper.LoadLuaSchemaFromDisk(@"C:\schema\eaw");
+
+        Assert.Contains("Find_Player", lua.AllFunctionNames);
+        Assert.Contains("tostring", lua.AllFunctionNames);
+    }
+
+    [Fact]
+    public void LoadLuaSchemaFromDisk_NoManifest_ReadsTheApiFileAlone()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile(@"C:\schema\lua\api.d.lua", new MockFileData("function Find_Player(name) end\n"));
+        var bootstrapper = Build(new FakeHttpClientFactory(StubServer(new Dictionary<string, string>())),
+            new RecordingUserNotifier(), out _, out var lua, fileSystem: fs);
+
+        bootstrapper.LoadLuaSchemaFromDisk(@"C:\schema\eaw");
+
+        Assert.Contains("Find_Player", lua.AllFunctionNames);
+    }
+
+    [Fact]
+    public void LoadLuaSchemaFromDisk_ListedFileMissing_LoadsTheOthers()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile(@"C:\schema\lua\_files.json", new MockFileData("""{ "files": ["api.d.lua", "stdlib.d.lua"] }"""));
+        fs.AddFile(@"C:\schema\lua\api.d.lua", new MockFileData("function Find_Player(name) end\n"));
+        var bootstrapper = Build(new FakeHttpClientFactory(StubServer(new Dictionary<string, string>())),
+            new RecordingUserNotifier(), out _, out var lua, fileSystem: fs);
+
+        bootstrapper.LoadLuaSchemaFromDisk(@"C:\schema\eaw");
+
+        Assert.Contains("Find_Player", lua.AllFunctionNames);
+    }
+
     private static SchemaBootstrapper Build(IHttpClientFactory factory)
     {
         return Build(factory, new RecordingUserNotifier(), out _);
@@ -166,11 +273,20 @@ public sealed class SchemaBootstrapperTest
         IHttpClientFactory factory, IUserNotifier notifier, out SchemaProviderProxy proxy,
         string url = "https://example.com/eaw/", ServerStatusRecorder? recorder = null)
     {
-        var fs = new MockFileSystem();
+        return Build(factory, notifier, out proxy, out _, url, recorder);
+    }
+
+    private static SchemaBootstrapper Build(
+        IHttpClientFactory factory, IUserNotifier notifier, out SchemaProviderProxy proxy,
+        out LuaApiSchemaProxy luaProxy,
+        string url = "https://example.com/eaw/", ServerStatusRecorder? recorder = null,
+        MockFileSystem? fileSystem = null, SchemaSourceConfig? source = null)
+    {
+        var fs = fileSystem ?? new MockFileSystem();
         var fileHelper = new FileHelper(fs);
         var config = new FakeConfigProvider(new LspConfiguration
         {
-            SchemaSource = new SchemaSourceConfig
+            SchemaSource = source ?? new SchemaSourceConfig
             {
                 Type = SchemaSourceType.Http,
                 Url = url
@@ -184,10 +300,11 @@ public sealed class SchemaBootstrapperTest
             cache, NullLogger<SchemaLocationResolver>.Instance);
 
         proxy = new SchemaProviderProxy();
+        luaProxy = new LuaApiSchemaProxy();
         return new SchemaBootstrapper(
             config,
             proxy,
-            new LuaApiSchemaProxy(),
+            luaProxy,
             fs,
             fileHelper,
             factory,

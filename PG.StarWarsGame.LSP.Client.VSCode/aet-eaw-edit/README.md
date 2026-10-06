@@ -135,6 +135,12 @@ Scripts under the declared `scripts` directories are indexed and checked.
 - Rename, including XML objects referenced from Lua
 - Code lenses, inlay hints, quick fixes
 - Hover and diagnostics _(work in progress)_
+- **Engine surface from measured stubs** - the 133 registered engine functions, the 9 wrapper classes with their
+  methods, the standard library the game opens (Lua 5.0: no `math`, `io` or `os`) and the globals each script
+  host maps in, as `---@meta` files in the [schema repository](https://github.com/AlamoEngine-Tools/eaw-schema)
+  - String arguments that name a game object, a faction, a sound or music event, a text key or a movie complete
+    and resolve against the workspace; ability types, animations and reward types complete from the schema enums
+  - A plan script's task forces are globals; a force without its `<Name>_Thread` function is reported (`Engine7`)
 
 ---
 

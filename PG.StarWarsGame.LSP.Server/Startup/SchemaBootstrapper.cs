@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -152,65 +153,125 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         }
     }
 
-    private void LoadLuaSchemaFromDisk(string eawLocalPath)
+    // ── the Lua stub files ───────────────────────────────────────────────────
+    // The schema repository's lua/ directory holds several ---@meta files - the engine API, the
+    // standard library it opens, the per-script globals - listed in lua/_files.json in load order.
+    // A schema release from before that manifest existed has api.d.lua alone, so a missing
+    // manifest means exactly that list.
+
+    private const string LuaManifestName = "_files.json";
+    private const string LuaApiFileName = "api.d.lua";
+    private static readonly JsonSerializerOptions LuaManifestJsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    internal void LoadLuaSchemaFromDisk(string eawLocalPath)
     {
-        var luaSchemaPath = DeriveLuaLocalPath(eawLocalPath);
-        if (_fileHelper.FileSystem.File.Exists(luaSchemaPath))
+        var luaDir = DeriveLuaLocalDirectory(eawLocalPath);
+        var fs = _fileHelper.FileSystem;
+        var manifestPath = Path.Combine(luaDir, LuaManifestName);
+        var files = fs.File.Exists(manifestPath)
+            ? ParseLuaManifest(fs.File.ReadAllText(manifestPath))
+            : [LuaApiFileName];
+
+        var contents = new List<string>();
+        foreach (var file in files)
         {
-            _luaProxy.Configure(new LuaApiSchemaProvider([_fileHelper.FileSystem.File.ReadAllText(luaSchemaPath)]));
-            _logger.LogInformation("Lua schema loaded from {Path}", luaSchemaPath);
+            var path = Path.Combine(luaDir, file);
+            if (fs.File.Exists(path))
+                contents.Add(fs.File.ReadAllText(path));
+            else
+                _logger.LogWarning("Lua stub file not found at {Path}", path);
         }
-        else
-        {
-            _logger.LogWarning("Lua schema not found at {Path}", luaSchemaPath);
-        }
+
+        _luaProxy.Configure(new LuaApiSchemaProvider(contents));
+        _logger.LogInformation("Lua schema loaded from {Dir}: {Count} of {Listed} files", luaDir, contents.Count,
+            files.Count);
     }
 
-    private async Task LoadLuaSchemaFromHttpAsync(string luaUrl, CancellationToken ct)
+    private async Task LoadLuaSchemaFromHttpAsync(string luaBaseUrl, CancellationToken ct)
     {
-        _logger.LogInformation("Loading Lua schema from {Url}", luaUrl);
-        const string cacheKey = "lua/api.d.lua";
+        _logger.LogInformation("Loading Lua schema from {Url}", luaBaseUrl);
         var http = _httpClientFactory.CreateClient("LuaSchema");
 
-        // Apply any cached version immediately so the parser has a schema while downloading.
-        string? cached = null;
-        if (_cache.TryLoadText(cacheKey, out var existing))
-        {
-            cached = existing;
-            _luaProxy.Configure(new LuaApiSchemaProvider([existing]));
-        }
-
+        IReadOnlyList<string> files;
         try
         {
-            var fresh = await http.GetStringAsync(luaUrl, ct);
-            _cache.UpdateText(cacheKey, fresh);
-            _luaProxy.Configure(new LuaApiSchemaProvider([fresh]));
-            _logger.LogInformation("Lua schema loaded from {Url}", luaUrl);
+            files = ParseLuaManifest(await http.GetStringAsync(luaBaseUrl + LuaManifestName, ct));
         }
         catch (Exception ex)
         {
-            if (cached is { Length: > 0 })
-                _logger.LogWarning(ex, "Failed to download Lua schema from {Url}; using cached version", luaUrl);
-            else
-                _logger.LogWarning(ex,
-                    "Failed to download Lua schema from {Url}; Lua XML references will not be validated", luaUrl);
+            _logger.LogInformation(ex, "No Lua stub manifest at {Url}; reading {File} alone", luaBaseUrl,
+                LuaApiFileName);
+            files = [LuaApiFileName];
+        }
+
+        // Apply whatever is cached immediately so the parser has a schema while downloading.
+        var cached = new List<string>();
+        foreach (var file in files)
+            if (_cache.TryLoadText("lua/" + file, out var existing))
+                cached.Add(existing);
+        if (cached.Count > 0)
+            _luaProxy.Configure(new LuaApiSchemaProvider(cached));
+
+        var fresh = await Task.WhenAll(files.Select(async file =>
+        {
+            try
+            {
+                var content = await http.GetStringAsync(luaBaseUrl + file, ct);
+                _cache.UpdateText("lua/" + file, content);
+                return content;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to download Lua stub file {Url}", luaBaseUrl + file);
+                return null;
+            }
+        }));
+
+        var loaded = fresh.Where(c => c is not null).Select(c => c!).ToList();
+        if (loaded.Count == files.Count)
+        {
+            _luaProxy.Configure(new LuaApiSchemaProvider(loaded));
+            _logger.LogInformation("Lua schema loaded from {Url}: {Count} files", luaBaseUrl, loaded.Count);
+        }
+        else if (cached.Count > 0)
+        {
+            _logger.LogWarning("Lua schema download incomplete; using the cached version");
+        }
+        else if (loaded.Count > 0)
+        {
+            _luaProxy.Configure(new LuaApiSchemaProvider(loaded));
+            _logger.LogWarning("Lua schema download incomplete; {Count} of {Listed} files loaded", loaded.Count,
+                files.Count);
+        }
+        else
+        {
+            _logger.LogWarning("Failed to download the Lua schema from {Url}; Lua XML references will not be validated",
+                luaBaseUrl);
         }
 
         _logger.LogInformation("Loading Lua schema completed.");
     }
 
-    private static string DeriveLuaLocalPath(string eawLocalPath)
+    private static IReadOnlyList<string> ParseLuaManifest(string json)
+    {
+        var manifest = JsonSerializer.Deserialize<LuaStubManifest>(json, LuaManifestJsonOptions);
+        return manifest?.Files is { Count: > 0 } files ? files : [LuaApiFileName];
+    }
+
+    private static string DeriveLuaLocalDirectory(string eawLocalPath)
     {
         var trimmed = eawLocalPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var parent = Path.GetDirectoryName(trimmed) ?? trimmed;
-        return Path.Combine(parent, "lua", "api.d.lua");
+        return Path.Combine(parent, "lua");
     }
 
     private static string DeriveLuaHttpUrl(string eawUrl)
     {
-        // Treat eawUrl as a base URI and resolve "../lua/api.d.lua" relative to it.
-        // e.g. "https://host/main/eaw/" → "https://host/main/lua/api.d.lua"
+        // Treat eawUrl as a base URI and resolve "../lua/" relative to it.
+        // e.g. "https://host/main/eaw/" -> "https://host/main/lua/"
         var baseUri = new Uri(eawUrl.EndsWith('/') ? eawUrl : eawUrl + '/');
-        return new Uri(baseUri, "../lua/api.d.lua").ToString();
+        return new Uri(baseUri, "../lua/").ToString();
     }
+
+    private sealed record LuaStubManifest(List<string>? Files);
 }

@@ -17,7 +17,7 @@ internal static class LuaIdentifierCompletionProvider
                 ScopeEntryKind.Parameter => CompletionItemKind.Variable,
                 ScopeEntryKind.OwnGlobal or ScopeEntryKind.RequiredGlobal => CompletionItemKind.Function,
                 ScopeEntryKind.EngineApi => CompletionItemKind.Function,
-                ScopeEntryKind.Lua51Builtin => CompletionItemKind.Keyword,
+                ScopeEntryKind.EngineBuiltin => CompletionItemKind.Keyword,
                 _ => CompletionItemKind.Text
             };
             yield return new CompletionItem

@@ -641,6 +641,14 @@ public static class DiagnosticIds
     // is why it sits in this group rather than with the structural notes.
     public static readonly DiagnosticId EnumValueBuggedInEngine = new(DiagnosticGroup.Engine, 6);
 
+    /// <summary>
+    ///     A plan script declares a task force in its <c>TaskForce</c> table but defines no
+    ///     <c>&lt;Name&gt;_Thread</c> function for it. The engine builds that name itself and starts
+    ///     one thread per task force on it when the plan loads; without the function it logs that
+    ///     the thread function was not found and the force never runs.
+    /// </summary>
+    public static readonly DiagnosticId LuaPlanThreadFunctionMissing = new(DiagnosticGroup.Engine, 7);
+
     // ── Syntax ──
     // Lua's parse errors come from Loretta already numbered and are mapped across by
     // LorettaDiagnosticIds, which owns 1-2999 of this group. Anything declared here must start at
