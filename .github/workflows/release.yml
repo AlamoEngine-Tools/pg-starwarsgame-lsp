@@ -108,7 +108,7 @@ jobs:
         $schema = (Get-Content schema/eaw/_index.json -Raw | ConvertFrom-Json).schemaVersion
         gh release view "v$schema" -R AlamoEngine-Tools/eaw-schema --json tagName | Out-Null
         if ($LASTEXITCODE -ne 0) {
-          Write-Output "::error::Schema v$schema is not released - merge it to eaw-schema main first; its release workflow publishes it"
+          Write-Output "::error::Schema v$schema is not released - run Prepare Release and Release in eaw-schema first"
           exit 1
         }
         "Schema v$schema is released" | Add-Content $env:GITHUB_STEP_SUMMARY

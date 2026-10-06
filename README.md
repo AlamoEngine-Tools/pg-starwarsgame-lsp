@@ -379,7 +379,7 @@ dotnet build PG.StarWarsGame.LSP.slnx
 5. **Approve** - one approval in the `release` environment publishes everything: GitHub release with the changelog section as notes, tag, Marketplace
    - All or nothing: a draft release first, the Marketplace next, the draft made public last; a failure removes the draft
 
-- **Schema first** - the schema version the server is built against must already be released; a merge to eaw-schema `main` publishes it
+- **Schema first** - the schema version the server is built against must already be released; eaw-schema releases the same way, Prepare Release then Release, and nothing publishes on a merge
 - **Nothing automatic** - no step starts the next; the release branch reaches `master` only through the merge
 
 ---
