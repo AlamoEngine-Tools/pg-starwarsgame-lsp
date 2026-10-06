@@ -37,12 +37,18 @@ public static class XmlGameReader
         return new XmlGameReadResult(error, reader.Tolerances);
     }
 
-    private sealed class Fail(XmlStrictnessCategory category, int position, int length, string reason)
+    private sealed class Fail(
+        XmlStrictnessCategory category,
+        int position,
+        int length,
+        string reason,
+        XmlRepair? repair = null)
         : Exception(reason)
     {
         public XmlStrictnessCategory Category { get; } = category;
         public int Position { get; } = position;
         public int Length { get; } = length;
+        public XmlRepair? Repair { get; } = repair;
     }
 
     private sealed class Reader(string s)
@@ -59,16 +65,24 @@ public static class XmlGameReader
             catch (Fail f)
             {
                 var (line, col) = Position(f.Position);
-                return new XmlStructureError(line, col, f.Message, f.Category, Math.Max(1, f.Length));
+                return new XmlStructureError(line, col, f.Message, f.Category, Math.Max(1, f.Length), f.Repair);
             }
         }
+
+        private string Eol => s.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
 
         private void ReadDocument()
         {
             var pos = s.IndexOf('<');
             if (pos < 0 || pos + 1 >= s.Length || s[pos + 1] != '?')
+            {
+                // After a byte order mark, which must stay first.
+                var at = s.Length > 0 && s[0] == '﻿' ? 1 : 0;
                 throw new Fail(XmlStrictnessCategory.MissingDeclaration, Math.Max(0, pos), 1,
-                    "No XML declaration: The game requires '<?xml ...?>' before the root element and drops the whole file");
+                    "No XML declaration: The game requires '<?xml ...?>' before the root element and drops the whole file",
+                    Single("Insert the XML declaration", at, 0, "<?xml version=\"1.0\"?>" + Eol));
+            }
+
             pos = s.IndexOf('>', pos);
             if (pos < 0)
                 throw new Fail(XmlStrictnessCategory.UnexpectedEndOfFile, s.Length, 1,
@@ -101,8 +115,13 @@ public static class XmlGameReader
                 }
 
                 if (StartsWith(pos, "</"))
+                {
+                    var gt = s.IndexOf('>', pos);
                     throw new Fail(XmlStrictnessCategory.StrayEndTag, pos, 2,
-                        "End tag outside any element: The game drops the whole file");
+                        "End tag outside any element: The game drops the whole file",
+                        gt < 0 ? null : Single("Remove the end tag", pos, gt + 1 - pos, ""));
+                }
+
                 if (rootSeen)
                     throw new Fail(XmlStrictnessCategory.MultipleRoots, pos, NameLength(pos + 1) + 1,
                         "Second root element: The game reads one root per file and drops the whole file");
@@ -159,7 +178,7 @@ public static class XmlGameReader
             }
 
             var hasChildren = false;
-            var valueEnd = ReadValue(ref pos);
+            var valueEnd = ReadValue(ref pos, start);
             while (true)
             {
                 if (pos >= s.Length)
@@ -200,7 +219,8 @@ public static class XmlGameReader
                     var from = SkipSpace(cd);
                     var to = TrimEnd(cd, pos);
                     Tolerate(XmlStrictnessCategory.CharacterDataAfterChild, from, to - from,
-                        "Text after a child element: The game skips it; values must come before the first child");
+                        "Text after a child element: The game skips it; values must come before the first child",
+                        Single("Remove the text the game skips", from, to - from, ""));
                 }
             }
         }
@@ -210,7 +230,7 @@ public static class XmlGameReader
         ///     comment, with comments inside it cut out. Returns the offset just past the value's
         ///     last character, or -1 when the element has no text.
         /// </summary>
-        private int ReadValue(ref int pos)
+        private int ReadValue(ref int pos, int elementStart)
         {
             var lastText = -1;
             pos = SkipTo(pos, '<', ref lastText);
@@ -238,7 +258,8 @@ public static class XmlGameReader
                 if (lastText >= 0)
                     foreach (var (start, end) in comments)
                         Tolerate(XmlStrictnessCategory.CommentInsideValue, start, end - start,
-                            "Comment inside a value: The game cuts it out and joins the text on both sides, but standard XML readers return two separate text nodes, so other tools may read a different value");
+                            "Comment inside a value: The game cuts it out and joins the text on both sides, but standard XML readers return two separate text nodes, so other tools may read a different value",
+                            MoveCommentAbove(start, end, elementStart));
                 lastText = textAfter;
                 pos = next;
             }
@@ -254,7 +275,50 @@ public static class XmlGameReader
             var c = s[i];
             if (char.IsWhiteSpace(c) && !IsSpace(c))
                 Tolerate(XmlStrictnessCategory.UntrimmedValueCharacter, i, 1,
-                    $"Value ends in U+{(int)c:X4}: The game trims only space, tab, CR and LF, so the character is part of the value it reads");
+                    $"Value ends in U+{(int)c:X4}: The game trims only space, tab, CR and LF, so the character is part of the value it reads",
+                    Single($"Remove U+{(int)c:X4} from the end of the value", i, 1, ""));
+        }
+
+        /// <summary>
+        ///     Moves a comment out of a value to its own line above the element. The game reads the
+        ///     same value either way, since it cuts the comment out; standard readers then see one
+        ///     text node. A comment alone on its line takes the line with it.
+        /// </summary>
+        private XmlRepair MoveCommentAbove(int start, int end, int elementStart)
+        {
+            var comment = s[start..end];
+            var lineStart = LineStart(start);
+            var lineEnd = s.IndexOf('\n', end);
+            var aloneOnLine = OnlySpaceOrTab(lineStart, start) && lineEnd >= 0 && OnlySpaceOrTab(end, lineEnd);
+            var removal = aloneOnLine
+                ? new XmlTextEdit(lineStart, lineEnd + 1 - lineStart, "")
+                : new XmlTextEdit(start, end - start, "");
+
+            var elementLine = LineStart(elementStart);
+            var indent = s[elementLine..elementStart];
+            var insertion = OnlySpaceOrTab(elementLine, elementStart)
+                ? new XmlTextEdit(elementLine, 0, indent + comment + Eol)
+                : new XmlTextEdit(elementStart, 0, comment + Eol);
+            return new XmlRepair("Move the comment above the element", [insertion, removal]);
+        }
+
+        private int LineStart(int pos)
+        {
+            var nl = pos == 0 ? -1 : s.LastIndexOf('\n', pos - 1);
+            return nl + 1;
+        }
+
+        private bool OnlySpaceOrTab(int from, int to)
+        {
+            for (var i = from; i < to; i++)
+                if (s[i] is not (' ' or '\t' or '\r'))
+                    return false;
+            return true;
+        }
+
+        private static XmlRepair Single(string title, int start, int length, string newText)
+        {
+            return new XmlRepair(title, [new XmlTextEdit(start, length, newText)]);
         }
 
         private void ReadAttribute(ref int pos, string element)
@@ -267,11 +331,22 @@ public static class XmlGameReader
                 throw new Fail(XmlStrictnessCategory.AttributeSyntax, nameStart, Math.Max(1, attr.Length),
                     $"Attribute {attr} on <{element}> has no '=': The game drops the whole file");
             pos = SkipSpace(pos + 1);
+            if (pos < s.Length && s[pos] == '\'')
+            {
+                // Double quotes fix it, unless the value holds one itself.
+                var closeSingle = s.IndexOf('\'', pos + 1);
+                var repair = closeSingle < 0 || s.AsSpan(pos + 1, closeSingle - pos - 1).Contains('"')
+                    ? null
+                    : new XmlRepair("Use double quotes",
+                        [new XmlTextEdit(pos, 1, "\""), new XmlTextEdit(closeSingle, 1, "\"")]);
+                throw new Fail(XmlStrictnessCategory.AttributeSyntax, nameStart, Math.Max(1, attr.Length),
+                    $"Attribute {attr} on <{element}> uses single quotes: The game requires double quotes and drops the whole file",
+                    repair);
+            }
+
             if (pos >= s.Length || s[pos] != '"')
                 throw new Fail(XmlStrictnessCategory.AttributeSyntax, nameStart, Math.Max(1, attr.Length),
-                    pos < s.Length && s[pos] == '\''
-                        ? $"Attribute {attr} on <{element}> uses single quotes: The game requires double quotes and drops the whole file"
-                        : $"Attribute {attr} on <{element}> has no opening '\"': The game drops the whole file");
+                    $"Attribute {attr} on <{element}> has no opening '\"': The game drops the whole file");
             var close = s.IndexOf('"', pos + 1);
             if (close < 0)
                 throw new Fail(XmlStrictnessCategory.UnexpectedEndOfFile, s.Length, 1,
@@ -296,7 +371,8 @@ public static class XmlGameReader
                         ? XmlStrictnessCategory.EndTagCaseMismatch
                         : XmlStrictnessCategory.EndTagMismatch,
                     tagStart, close + 1 - tagStart,
-                    $"End tag </{endName}> does not match <{name}>: The game compares them byte for byte and drops the whole file");
+                    $"End tag </{endName}> does not match <{name}>: The game compares them byte for byte and drops the whole file",
+                    Single($"Rename the end tag to </{name}>", en, endName.Length, name));
             pos = close + 1;
         }
 
@@ -310,7 +386,8 @@ public static class XmlGameReader
             var dd = s.IndexOf("--", body, StringComparison.Ordinal);
             if (dd >= 0 && dd < end)
                 throw new Fail(XmlStrictnessCategory.CommentSyntax, dd, 2,
-                    "'--' inside a comment: The game drops the whole file");
+                    "'--' inside a comment: The game drops the whole file",
+                    Single("Separate the hyphens", dd, 2, "- -"));
             return end + 3;
         }
 
@@ -323,10 +400,11 @@ public static class XmlGameReader
             return end + terminator.Length;
         }
 
-        private void Tolerate(XmlStrictnessCategory category, int position, int length, string reason)
+        private void Tolerate(XmlStrictnessCategory category, int position, int length, string reason,
+            XmlRepair? repair)
         {
             var (line, col) = Position(position);
-            Tolerances.Add(new XmlStructureError(line, col, reason, category, Math.Max(1, length)));
+            Tolerances.Add(new XmlStructureError(line, col, reason, category, Math.Max(1, length), repair));
         }
 
         private int SkipTo(int pos, char c)

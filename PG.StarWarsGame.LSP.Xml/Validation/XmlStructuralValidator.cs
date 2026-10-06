@@ -47,10 +47,21 @@ public sealed class XmlStructuralValidator : IXmlStructuralValidator
             var line = Math.Max(0, ex.LineNumber - 1);
             var col = Math.Max(0, ex.LinePosition - 1);
             var (category, reason) = Categorize(ex.Message, line);
-            return new XmlStructureError(line, col, reason, category);
+            var repair = category == XmlStrictnessCategory.MalformedDeclaration ? DeclarationRepair(text) : null;
+            return new XmlStructureError(line, col, reason, category, Repair: repair);
         }
 
         return null;
+    }
+
+    // The game skips the declaration to its first '>', so a '?' before that '>' changes nothing it reads.
+    private static XmlRepair? DeclarationRepair(string text)
+    {
+        var open = text.IndexOf("<?", StringComparison.Ordinal);
+        if (open < 0) return null;
+        var close = text.IndexOf('>', open);
+        if (close < 0 || text[close - 1] == '?') return null;
+        return new XmlRepair("End the declaration with '?>'", [new XmlTextEdit(close, 0, "?")]);
     }
 
     // XmlException carries no error code, so the category comes from its message. The game read

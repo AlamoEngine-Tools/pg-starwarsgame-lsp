@@ -61,6 +61,31 @@ public sealed class XmlStructuralValidatorCorpusTest
         Assert.Equal(10, findingsPerCategory[XmlStrictnessCategory.CharacterDataAfterChild]);
     }
 
+    [Fact]
+    public void ShippedFiles_AfterFixAll_OnlyCategoriesWithoutARepairRemain()
+    {
+        if (Environment.GetEnvironmentVariable(OptInVariable) is not "1")
+            Assert.Skip($"Set {OptInVariable}=1 to sweep the extracted game trees.");
+
+        var roots = CorpusRoots();
+        if (roots.Count == 0)
+            Assert.Skip("No extracted game tree found next to the repository root.");
+
+        var validator = new XmlStructuralValidator();
+        var left = new List<string>();
+        foreach (var root in roots)
+        foreach (var path in Directory.EnumerateFiles(root, "*.xml", SearchOption.AllDirectories))
+        {
+            var (fixedText, iterations) = XmlStructureRepairs.FixAll(File.ReadAllText(path), validator, _ => true);
+            Assert.True(iterations < XmlStructureRepairs.DefaultIterationCap, $"{path}: fix-all hit the cap");
+            left.AddRange(validator.Validate(fixedText)
+                .Where(f => f.Repair is not null)
+                .Select(f => $"{path}:{f.Line + 1} {f.Category}"));
+        }
+
+        Assert.Empty(left);
+    }
+
     /// <summary>The <c>Data/Xml</c> folders of the <c>eaw/</c> and <c>foc/</c> trees at the repository root.</summary>
     private static List<string> CorpusRoots()
     {

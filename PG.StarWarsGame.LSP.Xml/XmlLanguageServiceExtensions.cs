@@ -321,6 +321,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeActionProvider, SquadronSyncCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveRedundantOverrideCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveEarlierDuplicatesCodeActionProvider>();
+        services.AddSingleton<IXmlCodeActionProvider, XmlStructureRepairCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, SuppressDiagnosticCodeActionProvider>();
         // Actions on what is under the cursor, with no diagnostic behind them.
         services.AddSingleton<IXmlCursorCodeActionProvider, PreviewModelCodeActionProvider>();
