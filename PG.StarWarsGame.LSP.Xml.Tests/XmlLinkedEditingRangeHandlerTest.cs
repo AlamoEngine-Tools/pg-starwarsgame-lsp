@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -152,6 +153,45 @@ public sealed class XmlLinkedEditingRangeHandlerTest
 
         Assert.NotNull(result);
         Assert.NotNull(result!.WordPattern);
+    }
+
+    // ── nested and malformed documents ──────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_NestedIndentedElement_RangesAreExact()
+    {
+        // line 2: "\t\t<Max_Speed>1</Max_Speed>" - start name at 3, end name at 3+9+1+1+2 = 17
+        const string text = "<Root>\n\t<Unit>\n\t\t<Max_Speed>1</Max_Speed>\n\t</Unit>\n</Root>";
+        var result = await Build(text).Handle(At(2, 5), CancellationToken.None);
+
+        var ranges = result!.Ranges.OrderBy(r => r.Start.Character).ToList();
+        Assert.Equal(new Range(2, 3, 2, 12), ranges[0]);
+        Assert.Equal(new Range(2, 16, 2, 25), ranges[1]);
+    }
+
+    [Fact]
+    public async Task Handle_ElementWithoutCloseTag_ReturnsNull()
+    {
+        const string text = "<Root>\n\t<A>\n\t<B>1</B>\n</Root>";
+        Assert.Null(await Build(text).Handle(At(1, 2), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_InMalformedDocument_OtherPairsStillLink()
+    {
+        const string text = "<Root>\n\t<A>\n\t<B>1</B>\n</Root>";
+        var result = await Build(text).Handle(At(2, 2), CancellationToken.None);
+
+        var ranges = result!.Ranges.OrderBy(r => r.Start.Character).ToList();
+        Assert.Equal(new Range(2, 2, 2, 3), ranges[0]);
+        Assert.Equal(new Range(2, 7, 2, 8), ranges[1]);
+    }
+
+    [Fact]
+    public async Task Handle_EndTagNamingAnotherElement_ReturnsNull()
+    {
+        const string text = "<Root>\n\t<A>1</B>\n</Root>";
+        Assert.Null(await Build(text).Handle(At(1, 2), CancellationToken.None));
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
