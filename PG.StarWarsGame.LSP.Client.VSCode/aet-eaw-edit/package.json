@@ -850,6 +850,12 @@
             "default": true,
             "markdownDescription": "Automatically inserts the matching closing tag when you type the `>` that ends an XML opening tag.\n\nRequires VS Code's `#editor.formatOnType#` setting to be enabled to take effect.\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.xml.strictness": {
+            "order": 1060,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Reports XML the game reads but standard XML tools reject, or that the game reads differently from what the file shows. A file the game drops is reported regardless.\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.lua.completion": {
             "order": 1100,
             "type": "boolean",

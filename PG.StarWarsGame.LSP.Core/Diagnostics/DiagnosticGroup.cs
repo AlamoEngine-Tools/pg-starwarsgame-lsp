@@ -84,10 +84,10 @@ public enum DiagnosticGroup
     Preview = 14,
 
     /// <summary>
-    ///     Well-formedness the engine's lenient parser tolerates and a strict XML parser rejects:
-    ///     one id per defect category from the corpus survey. Separate from <see cref="Structure" />
-    ///     and <see cref="Syntax" /> because it is a WARNING tier with a repair, and an author who
-    ///     silences it must keep seeing the errors both parsers agree on.
+    ///     XML the game reads that standard XML tools reject, or that the game reads differently
+    ///     from what the document shows: one id per category from the corpus survey. Separate from
+    ///     <see cref="Syntax" />, where a file the game drops is reported, because it is a WARNING
+    ///     tier and an author who silences it must keep seeing every lost file.
     /// </summary>
     XmlStrictness = 15,
 

@@ -376,6 +376,16 @@ public static class DiagnosticIds
     public static readonly DiagnosticId TypeMismatch = new(DiagnosticGroup.Structure, 5);
     public static readonly DiagnosticId XmlDuplicateTag = new(DiagnosticGroup.Structure, 6);
     public static readonly DiagnosticId XmlNotes = new(DiagnosticGroup.Structure, 7);
+
+    /// <summary>
+    ///     RETIRED in 0.5.0 - never reuse the number. It was the single always-Error diagnostic of
+    ///     the strict XML pass; the game's own reader now decides, and the findings carry one id per
+    ///     category: file-level read errors in the Syntax group from <see cref="XmlMissingDeclaration" />,
+    ///     the rest in <see cref="DiagnosticGroup.XmlStrictness" />. A suppression naming this id
+    ///     now silences nothing, which is harmless; reusing it would silence the wrong thing.
+    /// </summary>
+    [Obsolete(
+        "Deprecated since 0.5.0: no longer emitted. Structural findings carry per-category ids (Syntax 3001-3009, XML strictness 1-6). Never reuse the number.")]
     public static readonly DiagnosticId XmlStructure = new(DiagnosticGroup.Structure, 8);
 
     // Notes carried by an enum VALUE that a file names. New in schema 2.0.0: until then only a
@@ -656,6 +666,67 @@ public static class DiagnosticIds
 
     /// <summary>A line of a dialog script that does not parse.</summary>
     public static readonly DiagnosticId DialogParseError = new(DiagnosticGroup.Syntax, 3000);
+
+    // An XML file the game's own reader rejects: the game drops the whole file, every object in it
+    // with it. Where EaW and FoC differ (a mismatched end tag) the stricter FoC rule applies.
+
+    /// <summary>No <c>&lt;?xml ...?&gt;</c> before the root element.</summary>
+    public static readonly DiagnosticId XmlMissingDeclaration = new(DiagnosticGroup.Syntax, 3001);
+
+    /// <summary>An end tag naming a different element than its start tag.</summary>
+    public static readonly DiagnosticId XmlEndTagMismatch = new(DiagnosticGroup.Syntax, 3002);
+
+    /// <summary>An end tag differing from its start tag in case only; the game compares byte for byte.</summary>
+    public static readonly DiagnosticId XmlEndTagCaseMismatch = new(DiagnosticGroup.Syntax, 3003);
+
+    /// <summary>An end tag where the root's start tag is expected.</summary>
+    public static readonly DiagnosticId XmlStrayEndTag = new(DiagnosticGroup.Syntax, 3004);
+
+    /// <summary>No root element, or a root element without child elements.</summary>
+    public static readonly DiagnosticId XmlEmptyRoot = new(DiagnosticGroup.Syntax, 3005);
+
+    /// <summary>A second root element.</summary>
+    public static readonly DiagnosticId XmlMultipleRoots = new(DiagnosticGroup.Syntax, 3006);
+
+    /// <summary>An attribute without <c>=</c> or without a double-quoted value.</summary>
+    public static readonly DiagnosticId XmlAttributeSyntax = new(DiagnosticGroup.Syntax, 3007);
+
+    /// <summary><c>--</c> inside a comment, or a comment never closed.</summary>
+    public static readonly DiagnosticId XmlCommentSyntax = new(DiagnosticGroup.Syntax, 3008);
+
+    /// <summary>The file ends inside markup or before an element is closed.</summary>
+    public static readonly DiagnosticId XmlUnexpectedEndOfFile = new(DiagnosticGroup.Syntax, 3009);
+
+    // ── XML strictness ──
+    // The game reads the file. Either standard XML tools reject it, or the game reads less or
+    // something else than the document shows. Warnings, so silencing the group keeps every lost
+    // file above visible.
+
+    /// <summary>The declaration ends in <c>&gt;</c> instead of <c>?&gt;</c>; the game skips to the first <c>&gt;</c>.</summary>
+    public static readonly DiagnosticId XmlMalformedDeclaration = new(DiagnosticGroup.XmlStrictness, 1);
+
+    /// <summary>
+    ///     An <c>&amp;</c> that starts no entity. The game reads values as raw text, so escaping it
+    ///     to <c>&amp;amp;</c> would change the value: there is no repair.
+    /// </summary>
+    public static readonly DiagnosticId XmlStrayAmpersand = new(DiagnosticGroup.XmlStrictness, 2);
+
+    /// <summary>Any other construct standard XML rejects and the game reads.</summary>
+    public static readonly DiagnosticId XmlStrictOnly = new(DiagnosticGroup.XmlStrictness, 3);
+
+    /// <summary>Text after a child element; the game skips it with a message.</summary>
+    public static readonly DiagnosticId XmlCharacterDataAfterChild = new(DiagnosticGroup.XmlStrictness, 4);
+
+    /// <summary>A value ending in whitespace the game does not trim (it trims space, tab, CR, LF only).</summary>
+    public static readonly DiagnosticId XmlUntrimmedValueCharacter = new(DiagnosticGroup.XmlStrictness, 5);
+
+    /// <summary>
+    ///     A comment inside a value. The game cuts it out and joins the text around it; standard XML
+    ///     readers return two text nodes, so other tools may read a different value. Common practice
+    ///     in mods, so OFF by default: a project's <c>.aetswg/suppressions.json</c> carries it from
+    ///     the start, and removing that entry turns it on.
+    /// </summary>
+    public static readonly DiagnosticId XmlCommentInsideValue = new(DiagnosticGroup.XmlStrictness, 6);
 
     // ── Suppression ──
     // Suppression reporting on itself. These are the only diagnostics a user can silence into

@@ -69,7 +69,8 @@ public sealed class XmlDiagnosticsPublisherTest
         FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null,
             FakeFileTypeRegistry? registry = null,
             ILspConfigurationProvider? config = null,
-            IStoryChainProblemStore? storyChainProblems = null)
+            IStoryChainProblemStore? storyChainProblems = null,
+            bool withStructure = false)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -92,6 +93,9 @@ public sealed class XmlDiagnosticsPublisherTest
             new StoryParamEnumHandler(),
             new StoryParamUnknownSlotHandler()
         ];
+        // Opt-in: most fixtures here are bare fragments without an XML declaration, which the
+        // game's reader rejects; only the structure tests want that reported.
+        if (withStructure) handlers = [.. handlers, new XmlStructureHandler()];
 
         var fileHelper = new FileHelper(new MockFileSystem());
         var publisher = new XmlDiagnosticsPublisher(
@@ -442,7 +446,11 @@ public sealed class XmlDiagnosticsPublisherTest
         {
             Tag = "Old_Tag",
             ValueType = XmlValueType.Float,
-            Notes = [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { ["en"] = "Never used in vanilla." })]
+            Notes =
+            [
+                new SchemaNote(SchemaNoteKind.Remark,
+                    new Dictionary<string, string> { ["en"] = "Never used in vanilla." })
+            ]
         });
         var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
 
@@ -476,6 +484,72 @@ public sealed class XmlDiagnosticsPublisherTest
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///A.xml");
         Assert.NotNull(pub);
         Assert.Contains(pub.Diagnostics!, d => d.Message.Contains("UNIT_A"));
+    }
+
+    // ── XML strictness ──────────────────────────────────────────────────────
+
+    private const string StrayAmpersandDoc = "<?xml version=\"1.0\"?>\n<Root>\n\t<A>Tom & Jerry</A>\n</Root>";
+    private const string DroppedFileDoc = "<?xml version=\"1.0\"?>\n<Root>\n\t<A>1</B>\n</Root>";
+
+    private static FakeLspConfigurationProvider StrictnessOff()
+    {
+        return FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Strictness = false } });
+    }
+
+    [Fact]
+    public void Strictness_On_ReportsAStrictOnlyFindingAsAWarning()
+    {
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(withStructure: true);
+        workspaceHost.Set("file:///a.xml", StrayAmpersandDoc);
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        var d = Assert.Single(published.Last().Diagnostics!,
+            x => x.Code?.String == DiagnosticIds.XmlStrayAmpersand.ToString());
+        Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(2, d.Range.Start.Line);
+    }
+
+    [Fact]
+    public void Strictness_Off_DropsTheStrictnessGroup()
+    {
+        var (_, published, indexService, workspaceHost) =
+            BuildSubscribed(config: StrictnessOff(), withStructure: true);
+        workspaceHost.Set("file:///a.xml", StrayAmpersandDoc);
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        Assert.DoesNotContain(published.Last().Diagnostics!,
+            x => x.Code?.String?.StartsWith("aetswg-015-", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public void Strictness_Off_StillReportsAFileTheGameDrops()
+    {
+        var (_, published, indexService, workspaceHost) =
+            BuildSubscribed(config: StrictnessOff(), withStructure: true);
+        workspaceHost.Set("file:///a.xml", DroppedFileDoc);
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        var d = Assert.Single(published.Last().Diagnostics!,
+            x => x.Code?.String == DiagnosticIds.XmlEndTagMismatch.ToString());
+        Assert.Equal(DiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Fact]
+    public void Strictness_SuppressionCommentSilencesTheWarning()
+    {
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(withStructure: true);
+        var doc = "<?xml version=\"1.0\"?>\n<Root>\n\t<!-- aetswg:suppress " + DiagnosticIds.XmlStrayAmpersand +
+                  " -->\n\t<A>Tom & Jerry</A>\n</Root>";
+        workspaceHost.Set("file:///a.xml", doc);
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        Assert.DoesNotContain(published.Last().Diagnostics!,
+            x => x.Code?.String == DiagnosticIds.XmlStrayAmpersand.ToString());
     }
 
     // ── suppression directives ───────────────────────────────────────────────

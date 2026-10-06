@@ -45,12 +45,51 @@ public sealed class GlobalSuppressionStoreTest
         return (store, fs);
     }
 
+    // A comment inside a value is common practice in mods; its diagnostic is off until a project
+    // removes this entry. It lives in the file itself so the project can see and change it.
+    private static readonly SuppressionMatcher CommentInsideValue =
+        SuppressionMatcher.ForId(DiagnosticIds.XmlCommentInsideValue);
+
     [Fact]
-    public void NoSidecar_YieldsNoSuppressions()
+    public void NoSidecar_SuppressesOnlyTheDefaultOffDiagnostics()
     {
         var (store, _) = Build();
 
+        Assert.Equal([CommentInsideValue], store.GetAll());
+    }
+
+    [Fact]
+    public void Version1File_GainsTheDefaultEntryOnce_AndIsWrittenBack()
+    {
+        var (store, fs) = Build(existingJson:
+            """{ "_type": "aetswg.Suppressions", "_typeVersion": "aetswg-1.0.0", "entries": [ { "id": "aetswg-010-0001" } ] }""");
+
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), CommentInsideValue], store.GetAll());
+
+        var written = JsonNode.Parse(fs.File.ReadAllText(SidecarPath))!.AsObject();
+        Assert.Equal(SuppressionsDocument.Version.ToString(), (string?)written["_typeVersion"]);
+        Assert.Equal(2, written["entries"]!.AsArray().Count);
+    }
+
+    [Fact]
+    public void Version1File_AlreadyListingTheEntry_KeepsOneCopy()
+    {
+        var (store, _) = Build(existingJson:
+            "{ \"_type\": \"aetswg.Suppressions\", \"_typeVersion\": \"aetswg-1.0.0\", \"entries\": [ { \"id\": \""
+            + DiagnosticIds.XmlCommentInsideValue + "\" } ] }");
+
+        Assert.Equal([CommentInsideValue], store.GetAll());
+    }
+
+    [Fact]
+    public void CurrentFileWithoutTheEntry_HasOptedIn_AndIsNotChanged()
+    {
+        var json = "{ \"_type\": \"aetswg.Suppressions\", \"_typeVersion\": \"" + SuppressionsDocument.Version
+            + "\", \"entries\": [] }";
+        var (store, fs) = Build(existingJson: json);
+
         Assert.Empty(store.GetAll());
+        Assert.Equal(json, fs.File.ReadAllText(SidecarPath));
     }
 
     [Fact]
@@ -70,7 +109,7 @@ public sealed class GlobalSuppressionStoreTest
             new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance);
 
         Assert.Equal(
-            [SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], reread.GetAll());
+            [CommentInsideValue, SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], reread.GetAll());
     }
 
     // The "suppress everywhere" quick fix can be invoked twice on the same diagnostic; the second
@@ -82,7 +121,7 @@ public sealed class GlobalSuppressionStoreTest
         store.Add(SuppressionMatcher.ForGroup(DiagnosticGroup.Assets));
         store.Add(SuppressionMatcher.ForGroup(DiagnosticGroup.Assets));
 
-        Assert.Single(store.GetAll());
+        Assert.Equal([CommentInsideValue, SuppressionMatcher.ForGroup(DiagnosticGroup.Assets)], store.GetAll());
     }
 
     [Fact]
@@ -92,7 +131,7 @@ public sealed class GlobalSuppressionStoreTest
         store.Add(SuppressionMatcher.ForId(DiagnosticIds.StoryChain));
         store.Remove(SuppressionMatcher.ForId(DiagnosticIds.StoryChain));
 
-        Assert.Empty(store.GetAll());
+        Assert.Equal([CommentInsideValue], store.GetAll());
         Assert.DoesNotContain("aetswg-009", fs.File.ReadAllText(SidecarPath));
     }
 
@@ -103,17 +142,18 @@ public sealed class GlobalSuppressionStoreTest
 
         store.Remove(SuppressionMatcher.ForId(DiagnosticIds.StoryChain));
 
-        Assert.Empty(store.GetAll());
+        Assert.Equal([CommentInsideValue], store.GetAll());
     }
 
     // Failing open - reporting everything - is the safe direction: a corrupt file must not silence
     // diagnostics wholesale, which would look exactly like "the mod is clean".
     [Fact]
-    public void CorruptSidecar_SuppressesNothing()
+    // The project's own choices cannot be read, so only the defaults apply.
+    public void CorruptSidecar_SuppressesOnlyTheDefaults()
     {
         var (store, _) = Build(existingJson: "{ this is not json");
 
-        Assert.Empty(store.GetAll());
+        Assert.Equal([CommentInsideValue], store.GetAll());
     }
 
     // One unreadable entry must not discard the entries around it.
@@ -186,7 +226,7 @@ public sealed class GlobalSuppressionStoreTest
 
         store.Add(SuppressionMatcher.ForId(DiagnosticIds.StoryChain));
 
-        Assert.Single(store.GetAll());
+        Assert.Equal([CommentInsideValue, SuppressionMatcher.ForId(DiagnosticIds.StoryChain)], store.GetAll());
         Assert.False(fs.File.Exists(SidecarPath));
     }
 
@@ -216,7 +256,7 @@ public sealed class GlobalSuppressionStoreTest
             """
             {
               "_type": "aetswg.Suppressions",
-              "_typeVersion": "aetswg-1.0.0",
+              "_typeVersion": "aetswg-2.0.0",
               "entries": [ { "id": "aetswg-010-0001" } ]
             }
             """);
@@ -227,13 +267,13 @@ public sealed class GlobalSuppressionStoreTest
     // Enforced upgrading, and the half of it that protects the file: an older build suppresses
     // nothing rather than guessing, and must not write its empty view over the newer document.
     [Fact]
-    public void NewerFile_SuppressesNothingAndIsLeftIntact()
+    public void NewerFile_SuppressesOnlyTheDefaultsAndIsLeftIntact()
     {
         const string newer =
             """{ "_type": "aetswg.Suppressions", "_typeVersion": "aetswg-99.0.0", "entries": [] }""";
         var (store, fs) = Build(existingJson: newer);
 
-        Assert.Empty(store.GetAll());
+        Assert.Equal([CommentInsideValue], store.GetAll());
         store.Add(SuppressionMatcher.ForId(DiagnosticIds.StoryChain));
 
         Assert.Equal(newer, fs.File.ReadAllText(SidecarPath));

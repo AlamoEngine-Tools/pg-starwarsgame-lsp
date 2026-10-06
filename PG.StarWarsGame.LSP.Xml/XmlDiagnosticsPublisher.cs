@@ -275,12 +275,20 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (IsStoryParserDocument(uri))
             Phase("story", () => facts.AddRange(_storyProducer.Produce(parsed, uri)));
 
+        // The strictness flag removes the XML strictness group only: a file the game drops is a
+        // Syntax error and stays reported whatever the flag says.
+        var strictness = _configProvider?.Current.Features.Xml.Strictness ?? true;
+        var strictnessGroup = (int)DiagnosticGroup.XmlStrictness;
+
         var allDiags = new List<Diagnostic>();
         Phase("dispatch", () =>
         {
             foreach (var fact in facts)
             foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
+            {
+                if (!strictness && result.Id?.Group == strictnessGroup) continue;
                 allDiags.Add(ToLspDiagnostic(fact, result));
+            }
         });
 
         Phase("hardcodedRefs", () => allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index)));
