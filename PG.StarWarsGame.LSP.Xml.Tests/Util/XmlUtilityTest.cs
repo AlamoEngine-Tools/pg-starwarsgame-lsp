@@ -7,6 +7,26 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Util;
 
 public sealed class XmlUtilityTest
 {
+    // ── game XML is not HTML ─────────────────────────────────────────────────
+    // HtmlAgilityPack parses some tag names by HTML rules: <base> is void, <title> is raw text.
+    // A game file uses those names as ordinary elements (vanilla <Base>0.0</Base>), so the value
+    // must be read like any other.
+
+    [Fact]
+    public void CreateHtmlDocument_ElementNamedLikeAnHtmlVoidElement_KeepsItsValue()
+    {
+        var doc = XmlUtility.CreateHtmlDocument("<Root><Base>0.0</Base></Root>");
+        Assert.Equal("0.0", doc.DocumentNode.SelectSingleNode("//base")!.InnerText);
+    }
+
+    [Fact]
+    public void CreateHtmlDocument_ElementNamedLikeAnHtmlRawTextElement_KeepsItsChildren()
+    {
+        var doc = XmlUtility.CreateHtmlDocument("<Root><Title><A>1</A></Title></Root>");
+        var title = doc.DocumentNode.SelectSingleNode("//title")!;
+        Assert.Single(title.ChildNodes, n => n.NodeType == HtmlAgilityPack.HtmlNodeType.Element);
+    }
+
     // ── SplitListWithOffsets ─────────────────────────────────────────────────
 
     [Fact]
