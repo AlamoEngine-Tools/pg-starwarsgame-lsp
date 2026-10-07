@@ -77,7 +77,7 @@ public static class XmlGameReader
             if (pos < 0 || pos + 1 >= s.Length || s[pos + 1] != '?')
             {
                 // After a byte order mark, which must stay first.
-                var at = s.Length > 0 && s[0] == '﻿' ? 1 : 0;
+                var at = s.Length > 0 && s[0] == (char)0xFEFF ? 1 : 0;
                 throw new Fail(XmlStrictnessCategory.MissingDeclaration, Math.Max(0, pos), 1,
                     "No XML declaration: The game requires '<?xml ...?>' before the root element and drops the whole file",
                     Single("Insert the XML declaration", at, 0, "<?xml version=\"1.0\"?>" + Eol));

@@ -5,7 +5,7 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 /// <summary>
 ///     Server fixture that sends a partial <c>features</c> node in <c>initializationOptions</c>,
-///     turning off <c>xml.completion</c>, <c>xml.diagnostics</c>, and <c>tools.localisation</c>
+///     turning off <c>xml.completion</c>, <c>xml.diagnostics</c>, <c>xml.formatting</c> and <c>tools.localisation</c>
 ///     while leaving every other flag (e.g. <c>xml.goToDefinition</c>) at its server-side default of
 ///     <c>true</c> - this is what proves the flags are selective rather than an all-or-nothing kill
 ///     switch. Uses the EaW workspace so go-to-definition has real cross-file data to resolve.
@@ -27,7 +27,7 @@ public sealed class FeatureFlagsServerFixture : LspServerFixture
             locale = LspTestEnvironment.Locale,
             features = new
             {
-                xml = new { completion = false, diagnostics = false },
+                xml = new { completion = false, diagnostics = false, formatting = false },
                 tools = new { localisation = false }
             }
         };

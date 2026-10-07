@@ -856,6 +856,12 @@
             "default": true,
             "markdownDescription": "Reports XML the game reads but standard XML tools reject, or that the game reads differently from what the file shows. A file the game drops is reported regardless.\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.xml.formatting": {
+            "order": 1070,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Formats EaW XML files and selections: re-indents the whitespace between tags and comments, and changes nothing the game reads. Well-formed files only. Off, the server offers no formatter, so another XML formatter can take the files.\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.lua.completion": {
             "order": 1100,
             "type": "boolean",

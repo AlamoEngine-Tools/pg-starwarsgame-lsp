@@ -49,7 +49,8 @@ public static class XmlStructureRepairs
         return (text, iterations);
     }
 
-    private static string Apply(string text, IEnumerable<XmlTextEdit> edits)
+    /// <summary>The text with non-overlapping <paramref name="edits" /> applied, offsets against the original.</summary>
+    public static string Apply(string text, IEnumerable<XmlTextEdit> edits)
     {
         // Back to front, so earlier offsets stay valid; at one offset, the later-listed edit first.
         var ordered = edits.Select((e, i) => (Edit: e, Index: i))

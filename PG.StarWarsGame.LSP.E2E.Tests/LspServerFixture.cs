@@ -323,7 +323,11 @@ public class LspServerFixture : IAsyncLifetime
                 {
                     ContentFormat = new Container<MarkupKind>(MarkupKind.Markdown)
                 },
-                PublishDiagnostics = new PublishDiagnosticsCapability()
+                PublishDiagnostics = new PublishDiagnosticsCapability(),
+                // As VS Code asks for them: formatting arrives by dynamic registration, not in the
+                // initialize answer, so the flag tests cover the path the editor takes.
+                Formatting = new DocumentFormattingCapability { DynamicRegistration = true },
+                RangeFormatting = new DocumentRangeFormattingCapability { DynamicRegistration = true }
             }
         };
         // Registered here (before From() returns) so the notification is never missed.

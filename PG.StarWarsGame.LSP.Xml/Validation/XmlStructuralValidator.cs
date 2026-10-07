@@ -33,7 +33,11 @@ public sealed class XmlStructuralValidator : IXmlStructuralValidator
         return results;
     }
 
-    private static XmlStructureError? StrictFirstError(string text)
+    /// <summary>
+    ///     The first error standard XML tools report for <paramref name="text" />, read as a whole
+    ///     document; null when it is well-formed. Line and position are 1-based.
+    /// </summary>
+    public static XmlException? StrictReadError(string text)
     {
         using var reader = XmlReader.Create(new StringReader(text), Settings);
         try
@@ -43,6 +47,16 @@ public sealed class XmlStructuralValidator : IXmlStructuralValidator
             }
         }
         catch (XmlException ex)
+        {
+            return ex;
+        }
+
+        return null;
+    }
+
+    private static XmlStructureError? StrictFirstError(string text)
+    {
+        if (StrictReadError(text) is { } ex)
         {
             var line = Math.Max(0, ex.LineNumber - 1);
             var col = Math.Max(0, ex.LinePosition - 1);

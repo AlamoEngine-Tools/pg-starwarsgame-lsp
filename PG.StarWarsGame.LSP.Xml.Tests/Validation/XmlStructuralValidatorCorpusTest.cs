@@ -87,7 +87,7 @@ public sealed class XmlStructuralValidatorCorpusTest
     }
 
     /// <summary>The <c>Data/Xml</c> folders of the <c>eaw/</c> and <c>foc/</c> trees at the repository root.</summary>
-    private static List<string> CorpusRoots()
+    internal static List<string> CorpusRoots()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "eaw", "Data")))
