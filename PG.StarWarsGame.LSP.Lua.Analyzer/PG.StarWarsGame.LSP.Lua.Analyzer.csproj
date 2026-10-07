@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="OmniSharp.Extensions.LanguageClient"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Core\PG.StarWarsGame.LSP.Core.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua\PG.StarWarsGame.LSP.Lua.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="PG.StarWarsGame.LSP.Lua.Analyzer.Tests"/>
+    </ItemGroup>
+
+</Project>

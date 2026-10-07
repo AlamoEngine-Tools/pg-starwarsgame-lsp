@@ -135,7 +135,7 @@ jobs:
       shell: bash
       run: |
         failed=""
-        for p in Core Schema Assets Xml Lua Lua.Debug Server Story; do
+        for p in Core Schema Assets Xml Lua Lua.Analyzer Lua.Debug Server Story; do
           echo "::group::$p tests"
           if ! dotnet test "PG.StarWarsGame.LSP.$p.Tests/PG.StarWarsGame.LSP.$p.Tests.csproj" --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github; then
             failed="$failed $p"

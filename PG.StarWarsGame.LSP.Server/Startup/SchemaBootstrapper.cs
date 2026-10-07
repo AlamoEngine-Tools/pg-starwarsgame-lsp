@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
@@ -37,6 +38,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     private readonly IUserNotifier _notifier;
     private readonly SchemaProviderProxy _proxy;
     private readonly ServerStatusRecorder? _status;
+    private readonly LuaStubLocation? _luaStubs;
 
     public SchemaBootstrapper(
         ILspConfigurationProvider config,
@@ -51,9 +53,12 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         ILogger<SchemaBootstrapper> logger,
         ILogger<LocalFileSchemaProvider> localLogger,
         ILogger<HttpSchemaProvider> httpLogger,
-        ServerStatusRecorder? status = null)
+        ServerStatusRecorder? status = null,
+        // Optional: the Lua analyzer reads the stubs from the directory recorded here.
+        LuaStubLocation? luaStubs = null)
     {
         _status = status;
+        _luaStubs = luaStubs;
         _config = config;
         _proxy = proxy;
         _luaProxy = luaProxy;
@@ -183,6 +188,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         }
 
         _luaProxy.Configure(new LuaApiSchemaProvider(contents));
+        if (_luaStubs is not null) _luaStubs.Directory = luaDir;
         _logger.LogInformation("Lua schema loaded from {Dir}: {Count} of {Listed} files", luaDir, contents.Count,
             files.Count);
     }
@@ -249,6 +255,8 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
                 luaBaseUrl);
         }
 
+        // Downloaded stubs are kept in the cache, which is where the analyzer reads them from.
+        if (_luaStubs is not null && (cached.Count > 0 || loaded.Count > 0)) _luaStubs.Directory = _cache.PathOf("lua");
         _logger.LogInformation("Loading Lua schema completed.");
     }
 

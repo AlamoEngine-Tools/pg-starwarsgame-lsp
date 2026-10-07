@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Globalization;
 using System.IO.Abstractions;
 using System.Reflection;
 using AnakinRaW.CommonUtilities.Hashing;
@@ -26,6 +27,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
+using PG.StarWarsGame.LSP.Lua.Analyzer;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
@@ -320,6 +322,24 @@ public static class ServerConfigurator
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();
                 services.AddSingleton<IProjectConfigurationResolver, ProjectConfigurationResolver>();
                 services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
+
+                // The Lua analyzer sidecar (emmylua_ls): one process per server, started by the
+                // project load once the layers are known, its configuration in a directory of this
+                // process's own. Absent executable or flag off: never started, every call a no-op.
+                services.AddSingleton<LuaStubLocation>();
+                services.AddSingleton(sp => new LuaAnalyzerHost(new LuaAnalyzerOptions
+                {
+                    Command = ResolveLuaAnalyzer(sp) ?? "",
+                    ConfigDirectory = Path.Combine(Path.GetTempPath(), "aetswg-emmylua",
+                        Environment.ProcessId.ToString(CultureInfo.InvariantCulture))
+                }, sp.GetRequiredService<ILogger<LuaAnalyzerHost>>()));
+                services.AddSingleton<ILuaAnalyzer>(sp => sp.GetRequiredService<LuaAnalyzerHost>());
+                services.AddSingleton<ILuaAnalyzerStarter>(sp => new LuaAnalyzerStarter(
+                    sp.GetRequiredService<LuaAnalyzerHost>(),
+                    sp.GetRequiredService<ILspConfigurationProvider>(),
+                    sp.GetRequiredService<LuaStubLocation>(),
+                    ResolveLuaAnalyzer(sp) is not null,
+                    sp.GetRequiredService<ILogger<LuaAnalyzerStarter>>()));
                 // One compacting collection after each workspace load: the parallel bulk parse
                 // leaves the heap fragmented (MEASURED about 200 MB on a two-layer workspace) and
                 // nothing else ever compacts it.
@@ -600,6 +620,13 @@ public static class ServerConfigurator
             if (document) r.AddHandler<XmlDocumentFormattingHandler>();
             if (range) r.AddHandler<XmlDocumentRangeFormattingHandler>();
         });
+    }
+
+    private static string? ResolveLuaAnalyzer(IServiceProvider sp)
+    {
+        var fs = sp.GetRequiredService<IFileSystem>();
+        return LuaAnalyzerExecutable.Resolve(AppContext.BaseDirectory, Environment.GetEnvironmentVariable,
+            fs.File.Exists);
     }
 
     // Builds the scan roots: start from protocol-level workspace folders or RootUri, then always

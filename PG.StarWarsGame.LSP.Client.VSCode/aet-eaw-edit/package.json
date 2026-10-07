@@ -916,6 +916,12 @@
             "default": false,
             "markdownDescription": "Enables the Lua debugger: the *Empire at War Lua* debug type, which attaches to a running debug build of the game or launches it with the project's mod chain.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.lua.analyzer": {
+            "order": 1830,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Runs the Lua analyzer (`emmylua_ls`) behind the language server, with the open Lua scripts mirrored to it. Needs the analyzer executable: the `AET_EMMYLUA_LS` environment variable, or an `emmylua` folder beside the server.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.story.discovery": {
             "order": 1850,
             "type": "boolean",
