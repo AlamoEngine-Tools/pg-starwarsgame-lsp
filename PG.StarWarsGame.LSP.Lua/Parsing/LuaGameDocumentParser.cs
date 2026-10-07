@@ -288,6 +288,10 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
             if (TryExtractStringArgument(argument, entry.ParamIndex) is not { } value)
                 continue;
 
+            // A value the parameter's type names itself (Find_Player("local")) names no object.
+            if (entry.Literals?.Contains(value, StringComparer.Ordinal) == true)
+                continue;
+
             if (TryGetArgumentLocation(argument, entry.ParamIndex) is not { } loc)
                 continue;
 

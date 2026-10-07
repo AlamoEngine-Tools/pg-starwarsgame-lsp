@@ -697,6 +697,7 @@ Lua:
 | `aet-eaw-edit.features.lua.inlayHints` | `true` | Inlay hints |
 | `aet-eaw-edit.features.lua.codeActions` | `true` | Code actions (quick fixes) |
 | `aet-eaw-edit.features.lua.debugger` | `false` | Lua debugger: debug type, Lua Scripts view, `aet-eaw-edit.game.*` _(work in progress)_ |
+| `aet-eaw-edit.features.lua.analyzer` | `false` | Lua analyzer (`emmylua_ls`) behind the server, open scripts mirrored to it; needs `AET_EMMYLUA_LS` or an `emmylua` folder beside the server _(work in progress)_ |
 
 Story mode:
 

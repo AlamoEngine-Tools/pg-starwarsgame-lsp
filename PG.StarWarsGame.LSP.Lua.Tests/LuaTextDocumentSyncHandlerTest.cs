@@ -35,6 +35,61 @@ public sealed class LuaTextDocumentSyncHandlerTest
         return (new LuaTextDocumentSyncHandler(host, index, fileHelper, gate), host, index);
     }
 
+    // ── analyzer mirror ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task OpenChangeAndClose_AreMirroredToTheAnalyzer()
+    {
+        var analyzer = new RecordingLuaAnalyzer();
+        var gate = new StartupGate();
+        await gate.OpenAsync();
+        var handler = new LuaTextDocumentSyncHandler(new FakeGameWorkspaceHost(), new FakeGameIndexService(),
+            new FileHelper(new MockFileSystem()), gate, analyzer);
+
+        await handler.Handle(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem { Uri = TestUri, Text = "x = 1", LanguageId = "lua", Version = 1 }
+        }, CancellationToken.None);
+        await handler.Handle(new DidChangeTextDocumentParams
+        {
+            TextDocument = new OptionalVersionedTextDocumentIdentifier { Uri = TestUri, Version = 2 },
+            ContentChanges =
+                new Container<TextDocumentContentChangeEvent>(new TextDocumentContentChangeEvent { Text = "x = 2" })
+        }, CancellationToken.None);
+        await handler.Handle(new DidCloseTextDocumentParams { TextDocument = new TextDocumentIdentifier(TestUri) },
+            CancellationToken.None);
+
+        Assert.Equal([$"open {TestUri} v1 x = 1", $"change {TestUri} v2 x = 2", $"close {TestUri}"], analyzer.Calls);
+    }
+
+    private sealed class RecordingLuaAnalyzer : ILuaAnalyzer
+    {
+        public List<string> Calls { get; } = [];
+
+        public bool IsRunning => true;
+
+        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished
+        {
+            add { }
+            remove { }
+        }
+
+        public void DidOpen(string uri, string text, int version)
+        {
+            Calls.Add($"open {uri} v{version} {text}");
+        }
+
+        public void DidChange(string uri, string text, int version)
+        {
+            Calls.Add($"change {uri} v{version} {text}");
+        }
+
+        public void DidClose(string uri)
+        {
+            Calls.Add($"close {uri}");
+        }
+    }
+
     // ── DidOpen ──────────────────────────────────────────────────────────────
 
     [Fact]

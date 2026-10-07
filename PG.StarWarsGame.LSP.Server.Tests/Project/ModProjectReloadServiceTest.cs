@@ -81,6 +81,31 @@ public sealed class ModProjectReloadServiceTest
     }
 
     [Fact]
+    public async Task LoadAsync_HandsTheLayersToTheLuaAnalyzer()
+    {
+        var analyzer = new RecordingAnalyzerStarter();
+        var service = new ModProjectReloadService(
+            new FakeResolver(SampleConfig), new RecordingIndexer(), new NullLocalisationLoader(),
+            new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(),
+            luaAnalyzer: analyzer);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Same(SampleConfig.Layers, Assert.Single(analyzer.Configured));
+    }
+
+    private sealed class RecordingAnalyzerStarter : PG.StarWarsGame.LSP.Lua.Analyzer.ILuaAnalyzerStarter
+    {
+        public List<IReadOnlyList<ProjectLayer>> Configured { get; } = [];
+
+        public Task ConfigureAsync(IReadOnlyList<ProjectLayer> layers)
+        {
+            Configured.Add(layers);
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
     public async Task ReloadAsync_TrimsTheHeapAgain()
     {
         var trimmer = new RecordingHeapTrimmer();

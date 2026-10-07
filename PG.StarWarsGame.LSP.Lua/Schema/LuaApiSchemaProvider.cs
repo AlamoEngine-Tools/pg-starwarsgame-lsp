@@ -90,6 +90,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         // is tracked as @param lines go by.
         var refs = new List<XmlRefEntry>();
         var paramCount = 0;
+        IReadOnlyList<string> paramLiterals = [];
 
         foreach (var rawLine in content.Split('\n'))
         {
@@ -99,11 +100,12 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
             {
                 commentLines.Add(line[3..].TrimStart(' ', '\t'));
                 paramCount++;
+                paramLiterals = ParamLiterals(line);
             }
             else if (line.StartsWith("---@aetref", StringComparison.Ordinal) ||
                      line.StartsWith("---@xmlref", StringComparison.Ordinal))
             {
-                if (paramCount > 0 && TryParseReferenceTag(line, paramCount - 1) is { } entry)
+                if (paramCount > 0 && TryParseReferenceTag(line, paramCount - 1, paramLiterals) is { } entry)
                     refs.Add(entry);
 
                 // Feed to parser as-is so it silently skips the custom tag (Tier 3)
@@ -190,7 +192,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
 
     // `---@aetref <ReferenceKind>[:<referenceType>]`; `---@xmlref` is the older spelling of the
     // same thing and is read identically. An unknown kind drops the tag rather than guessing.
-    private static XmlRefEntry? TryParseReferenceTag(string line, int paramIndex)
+    private static XmlRefEntry? TryParseReferenceTag(string line, int paramIndex, IReadOnlyList<string> literals)
     {
         var token = line[3..].Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         var rawToken = token.Length > 1 ? token[1].Trim() : "";
@@ -213,8 +215,21 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
 
         if (!Enum.TryParse<ReferenceKind>(kindName, true, out var kind) || kind == ReferenceKind.None)
             return null;
-        return new XmlRefEntry(paramIndex, typeConstraint?.Length == 0 ? null : typeConstraint, kind);
+        return new XmlRefEntry(paramIndex, typeConstraint?.Length == 0 ? null : typeConstraint, kind,
+            literals.Count == 0 ? null : literals);
     }
+
+    // The string literals of a `---@param <name> <type> [doc]` line's type: `string|"local"` gives
+    // ["local"]. Only the type token is read, so a quoted word in the description is not one.
+    private static IReadOnlyList<string> ParamLiterals(string line)
+    {
+        var parts = line[3..].Trim().Split((char[])[' ', '\t'], 4, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3) return [];
+        return [.. ParamLiteral().Matches(parts[2]).Select(m => m.Groups["value"].Value)];
+    }
+
+    [GeneratedRegex("\"(?<value>[^\"]*)\"")]
+    private static partial Regex ParamLiteral();
 
     [GeneratedRegex(@"^function\s+(?<name>[A-Za-z_]\w*)\s*\(")]
     private static partial Regex FunctionDeclRegex();

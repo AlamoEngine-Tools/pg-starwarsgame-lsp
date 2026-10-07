@@ -28,7 +28,7 @@ public sealed class LuaGameDocumentParserTest
             ---@param typeName string
             ---@xmlref XmlObject
             function Find_All_Objects_Of_Type(typeName) end
-            ---@param playerName string
+            ---@param playerName string|"local"
             ---@xmlref XmlObject:Faction
             function Find_Player(playerName) end
             ---@param textId string
@@ -41,6 +41,28 @@ public sealed class LuaGameDocumentParserTest
             function GameObject.Play_SFX_Event(eventName) end
             """
         ]);
+    }
+
+    // ── values the parameter's type names (#61) ─────────────────────────────
+
+    /// <summary>
+    ///     <c>Find_Player("local")</c> names the local player, which no XML declares; the stub types
+    ///     the parameter <c>string|"local"</c>, and a value the type names is no reference.
+    /// </summary>
+    [Fact]
+    public async Task ParseAsync_AValueTheParameterTypeNames_IsNoReference()
+    {
+        var result = await Build().ParseAsync("file:///s.lua", """Find_Player("local")""", 1, default);
+
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_AnyOtherValueOfThatParameter_IsStillAReference()
+    {
+        var result = await Build().ParseAsync("file:///s.lua", """Find_Player("Empire")""", 1, default);
+
+        Assert.Equal("Empire", Assert.Single(result.References).TargetId);
     }
 
     // ── widened reference tag ────────────────────────────────────────────────

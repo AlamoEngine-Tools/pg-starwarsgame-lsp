@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <OutputType>Exe</OutputType>
+        <IsTestable>true</IsTestable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="xunit.v3.mtp-v2"/>
+        <PackageReference Include="Microsoft.Testing.Platform"/>
+        <PackageReference Include="xunit.runner.visualstudio">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="coverlet.collector">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="GitHubActionsTestLogger"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua.Analyzer\PG.StarWarsGame.LSP.Lua.Analyzer.csproj"/>
+        <!-- Built and copied beside the tests, which start it as 'dotnet <dll>'. -->
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua.Analyzer.Fake\PG.StarWarsGame.LSP.Lua.Analyzer.Fake.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="..\schema\lua\*.d.lua;..\schema\lua\_files.json" Link="schema\lua\%(Filename)%(Extension)">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+</Project>

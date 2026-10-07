@@ -383,6 +383,7 @@ function resolveFeatureFlags() {
             inlayHints: flag('lua.inlayHints', true),
             codeActions: flag('lua.codeActions', true),
             debugger: flag('lua.debugger', false),
+            analyzer: flag('lua.analyzer', false),
         },
         tools: {
             localisation: flag('tools.localisation', false),

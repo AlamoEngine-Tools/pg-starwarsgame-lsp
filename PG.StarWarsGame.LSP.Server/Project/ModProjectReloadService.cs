@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analyzer;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -33,6 +34,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
 
     private readonly IIconCatalogProvider? _icons;
     private readonly IHeapTrimmer _heapTrimmer;
+    private readonly ILuaAnalyzerStarter? _luaAnalyzer;
     private List<string>? _lastRoots;
 
     // refresh is optional so the many minimal test setups can omit it; production always wires it.
@@ -57,10 +59,13 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         ServerStatusRecorder? status = null,
         // Optional for the same reason again. Production wires the compacting trimmer; without it
         // the bulk parse's fragmentation stays for the session (MEASURED: about 200 MB).
-        IHeapTrimmer? heapTrimmer = null)
+        IHeapTrimmer? heapTrimmer = null,
+        // Optional like the rest: started (or restarted) with every project load in production.
+        ILuaAnalyzerStarter? luaAnalyzer = null)
     {
         _status = status;
         _heapTrimmer = heapTrimmer ?? new NullHeapTrimmer();
+        _luaAnalyzer = luaAnalyzer;
         _resolver = resolver;
         _indexer = indexer;
         _localisation = localisation;
@@ -131,6 +136,8 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // Publish layer precedence before indexing so each document is stamped with its rank
         // (indexing itself stays parallel - correctness comes from the rank, not insertion order).
         _layerMap.SetLayers(config.Layers);
+        // Started beside the indexing, not before it: the analyzer reads the files itself.
+        if (_luaAnalyzer is not null) _ = StartLuaAnalyzerAsync(config.Layers);
         _indexer.PreScanMetafiles(config, roots);
         await _indexer.IndexDocumentsAsync(config, ct);
         _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories);
@@ -205,5 +212,18 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // and nothing about the open documents changed, so the client has no reason to re-request
         // them on its own (#45). Ask it to.
         _refresh?.RefreshDerivedState();
+    }
+
+    // A failed analyzer start must never fail the project load it rides along with.
+    private async Task StartLuaAnalyzerAsync(IReadOnlyList<ProjectLayer> layers)
+    {
+        try
+        {
+            await _luaAnalyzer!.ConfigureAsync(layers);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            _logger.LogWarning(ex, "Lua analyzer could not be started");
+        }
     }
 }

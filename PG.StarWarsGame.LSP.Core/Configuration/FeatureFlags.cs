@@ -67,6 +67,13 @@ public record LuaFeatureFlags
     ///     client the debug adapter itself. Off by default in the client while the feature is new.
     /// </summary>
     public bool Debugger { get; init; } = true;
+
+    /// <summary>
+    ///     Runs the Lua analyzer (emmylua_ls) behind this server, with the open Lua documents
+    ///     mirrored to it. Off by default in the client while the feature is new; it needs the
+    ///     analyzer executable either way.
+    /// </summary>
+    public bool Analyzer { get; init; } = true;
 }
 
 /// <summary>Flags for story-mode capabilities.</summary>

@@ -71,10 +71,15 @@ public interface ILuaApiSchemaProvider
 ///     the older <c>---@xmlref</c> spelling is read the same way) and, for an XML object, the
 ///     object type it must have.
 /// </summary>
+/// <param name="Literals">
+///     String literals the parameter's declared type names (<c>string|"local"</c>): values the
+///     engine takes as they are, which name no object and are no reference.
+/// </param>
 public readonly record struct XmlRefEntry(
     int ParamIndex,
     string? ExpectedTypeName,
-    ReferenceKind Kind = ReferenceKind.XmlObject);
+    ReferenceKind Kind = ReferenceKind.XmlObject,
+    IReadOnlyList<string>? Literals = null);
 
 /// <summary>Describes one member of an engine-exposed Lua type.</summary>
 public readonly record struct LuaTypeMember(
