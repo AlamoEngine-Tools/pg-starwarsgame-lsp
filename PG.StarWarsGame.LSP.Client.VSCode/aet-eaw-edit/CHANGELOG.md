@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- **XML structure judged by the game's reader** - a file the game drops is an error, XML the game reads but standard
+  tools reject is a warning ([#199](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/199))
+  - Comments inside values read as the game reads them: cut out, the text around them joined
+  - Where EaW and FoC differ (a mismatched end tag), the stricter FoC rule
+  - Vanilla: 7 EaW files flagged as dropped under that rule; their FoC copies are clean
+  - Comment inside a value off by default, through the project's `.aetswg/suppressions.json`
+- **Repairs for structural findings** - a quick fix per category, and **Fix all repairable XML structure problems in
+  this file** ([#200](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/200))
+  - No repair where the edit would change what the game reads, such as a stray `&`
+- **Folding, expand selection, matching-tag highlight** - for XML, on malformed files too
+  ([#201](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/201))
+- **XML formatter** - Format Document and Format Selection; re-indents, changes nothing the game reads
+  ([#202](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/202))
+  - Well-formed files only; a refused file names its line and column
+  - Vanilla: 993 well-formed files format with unchanged diagnostics and line endings
+- **Feature flags** - `aet-eaw-edit.features.xml.strictness`, `aet-eaw-edit.features.xml.formatting`
+  ([#203](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/203))
+  - Formatting off: no formatter offered, so another XML formatter takes the files
+
+### Fixes
+
+- **`<Base>` values** - read; the HTML parser underneath treated `<Base>` as an empty element (2 vanilla files)
+- **Panel refreshes during startup** - model preview, story graph and localisation editor refresh once when the scan
+  completes, not after every scan stage
+
+### Diagnostic IDs
+
+- **New** - `Syntax3001` to `Syntax3009` (files the game drops), `XmlStrictness1` to `XmlStrictness6`
+- **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
+
+### Breaking changes
+
+- **`aetswg-006-0008` suppressions** - silence nothing; structural findings carry the per-category IDs above
+- **`.aetswg/suppressions.json`** - document version 2, migrated once on load; the migration adds `aetswg-015-0006`
+
 ## 0.4.1
 
 Requires server 0.4.1. A 0.4.0 server reads schema 2.2.0 without three tags and reports them as unknown.

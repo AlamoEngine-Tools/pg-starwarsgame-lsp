@@ -102,6 +102,13 @@ The extension's README documents every node.
   - Reference-count code lenses
 - **Code actions** - quick fixes, including creating a missing localisation key
 - **Variant inheritance** - **Show Effective Object** opens the merged result of a `Variant_Of_Existing_Type` object, each tag annotated with its source
+- **XML structure** - judged by the game's own reader: a file the game drops is an error, XML it reads but standard
+  tools reject is a warning; repairs per finding and a fix-all
+- **Editor structure** - folding, expand selection, matching-tag highlight, on malformed files too
+- **Formatting** - re-indents and changes nothing the game reads; well-formed files only
+
+Severity policy, IDs, repairs and formatter guarantees:
+[extension README, XML structure](PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#xml-structure).
 
 ---
 
@@ -255,8 +262,9 @@ A scope with no target covers its own line only. Project-wide suppressions live 
 | `aetswg-009-*` | Story and campaigns |
 | `aetswg-010-*` | Symbols and layers: duplicates, shadowing |
 | `aetswg-011-*` | Engine constraints |
-| `aetswg-012-*` | Syntax errors |
+| `aetswg-012-*` | Syntax errors, and XML files the game drops |
 | `aetswg-013-*` | Suppression comments themselves |
+| `aetswg-015-*` | XML strictness: XML the game reads that standard tools reject, or reads differently |
 
 ### When a directive is wrong
 
