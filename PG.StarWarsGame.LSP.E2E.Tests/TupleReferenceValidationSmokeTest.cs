@@ -33,7 +33,9 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
                 : l)
             .ToArray();
 
-        var received = _fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
+        // Settled, not the first publish: both tests open this file at version 1, so a publish still
+        // in flight from the other test is indistinguishable from this one's.
+        var received = _fixture.WaitForSettledDiagnosticsAsync(uri, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30));
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -47,6 +49,7 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
         });
 
         var diags = await received;
+        Assert.NotNull(diags);
         Assert.Contains(diags.Diagnostics,
             d => d.Message.Contains("HARD_POINT_WEAPON_LASER_NO_COMMA", StringComparison.OrdinalIgnoreCase)
                  || d.Message.Contains("hard point", StringComparison.OrdinalIgnoreCase));
@@ -61,7 +64,9 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var lines = await File.ReadAllLinesAsync(filePath);
 
-        var received = _fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
+        // Settled, not the first publish: both tests open this file at version 1, so a publish still
+        // in flight from the other test is indistinguishable from this one's.
+        var received = _fixture.WaitForSettledDiagnosticsAsync(uri, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30));
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -75,6 +80,7 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
         });
 
         var diags = await received;
+        Assert.NotNull(diags);
         Assert.DoesNotContain(diags.Diagnostics,
             d => d.Message.Contains("hard point", StringComparison.OrdinalIgnoreCase)
                  || d.Message.Contains("HardPoint", StringComparison.OrdinalIgnoreCase));

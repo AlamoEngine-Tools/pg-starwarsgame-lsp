@@ -131,4 +131,22 @@ public sealed class StartupGateTest
 
         Assert.True(gate.IsOpen);
     }
+
+    [Fact]
+    public async Task Opened_IsRaisedOnce_AfterTheBufferDrainedAndTheGateIsOpen()
+    {
+        var gate = new StartupGate();
+        var order = new List<string>();
+        await gate.RunOrBufferAsync(_ =>
+        {
+            order.Add("buffered");
+            return Task.CompletedTask;
+        }, CancellationToken.None);
+        gate.Opened += () => order.Add(gate.IsOpen ? "opened" : "opened-while-closed");
+
+        await gate.OpenAsync();
+        await gate.OpenAsync();
+
+        Assert.Equal(["buffered", "opened"], order);
+    }
 }

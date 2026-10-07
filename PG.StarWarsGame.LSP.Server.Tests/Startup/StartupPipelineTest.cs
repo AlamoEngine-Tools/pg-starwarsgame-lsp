@@ -200,7 +200,7 @@ public sealed class StartupPipelineTest
         await pipeline.RunAsync(["/ws"], CancellationToken.None);
 
         Assert.Contains("gate.open", log.Entries);
-        Assert.True(gate.Opened);
+        Assert.True(gate.IsOpen);
     }
 
     [Fact]
@@ -373,8 +373,9 @@ public sealed class StartupPipelineTest
             _log = log;
         }
 
-        public bool Opened { get; private set; }
-        public bool IsOpen => Opened;
+        public bool IsOpen { get; private set; }
+
+        public event Action? Opened;
 
         public Task RunOrBufferAsync(Func<CancellationToken, Task> action, CancellationToken ct)
         {
@@ -383,7 +384,8 @@ public sealed class StartupPipelineTest
 
         public Task OpenAsync()
         {
-            Opened = true;
+            IsOpen = true;
+            Opened?.Invoke();
             _log.Add("gate.open");
             return Task.CompletedTask;
         }

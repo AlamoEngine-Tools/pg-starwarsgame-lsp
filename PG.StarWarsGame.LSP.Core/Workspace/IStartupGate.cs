@@ -17,6 +17,13 @@ public interface IStartupGate
     bool IsOpen { get; }
 
     /// <summary>
+    ///     Raised once, on the thread that opens the gate, after the buffer has drained and
+    ///     <see cref="IsOpen" /> is true. A subscriber that held work back while startup ran
+    ///     releases it here, before <see cref="OpenAsync" /> returns.
+    /// </summary>
+    event Action? Opened;
+
+    /// <summary>
     ///     Runs <paramref name="action" /> immediately when the gate is open; otherwise buffers it
     ///     for replay during <see cref="OpenAsync" /> and returns without running it.
     /// </summary>

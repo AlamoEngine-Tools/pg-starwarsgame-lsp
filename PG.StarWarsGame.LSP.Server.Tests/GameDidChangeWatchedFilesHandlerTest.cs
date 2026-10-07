@@ -867,6 +867,8 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     {
         public bool IsOpen => true;
 
+        public event Action? Opened { add { } remove { } }
+
         public Task RunOrBufferAsync(Func<CancellationToken, Task> action, CancellationToken ct)
         {
             return action(ct);

@@ -249,6 +249,7 @@ public static class ServerConfigurator
                 services.AddSingleton<StoryGraphChangeNotifier>(sp =>
                     new StoryGraphChangeNotifier(
                         sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStartupGate>(),
                         sp.GetRequiredService<IStoryModelService>(),
                         sp.GetRequiredService<ILspConfigurationProvider>(),
                         p => sp.GetRequiredService<ILanguageServerFacade>()
@@ -452,6 +453,7 @@ public static class ServerConfigurator
                 services.AddSingleton<LocalisationIndexChangedNotifier>(sp =>
                     new LocalisationIndexChangedNotifier(
                         sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStartupGate>(),
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<LocalisationIndexChangedNotifier>>()));
 
@@ -461,6 +463,7 @@ public static class ServerConfigurator
                 services.AddSingleton<PreviewSceneChangeNotifier>(sp =>
                     new PreviewSceneChangeNotifier(
                         sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStartupGate>(),
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<PreviewSceneChangeNotifier>>()));
 
