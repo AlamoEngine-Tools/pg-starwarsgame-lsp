@@ -62,6 +62,36 @@ public sealed class XmlStructuralValidatorTest
         Assert.Equal(2, e.Line);
     }
 
+    // Classified by the text at the error, not by the reader's message: each form below words its
+    // error differently, and a name right after the '&' reads as an unterminated entity.
+    [Theory]
+    [InlineData("Tom & Jerry")]
+    [InlineData("A&B_no")]
+    [InlineData("AT&T")]
+    [InlineData("R&D;x")]
+    [InlineData("&")]
+    public void StrayAmpersand_InAnyForm_IsStrayAmpersand(string value)
+    {
+        var e = Assert.Single(Sut.Validate(Decl + "<Root>\n\t<A>" + value + "</A>\n</Root>"));
+        Assert.Equal(XmlStrictnessCategory.StrayAmpersand, e.Category);
+        Assert.Equal(2, e.Line);
+    }
+
+    [Theory]
+    [InlineData("<?xml version=\"1.0\">")]
+    [InlineData("<?xml version=\"1.0\" >")]
+    [InlineData("<?xml version=\"1.0\" encoding=\"utf-8\" >")]
+    public void DeclarationWithoutQuestionMark_InAnyForm_IsMalformedDeclaration_WithItsRepair(string declaration)
+    {
+        var text = declaration + "\n<Root><A>1</A></Root>";
+
+        var e = Assert.Single(Sut.Validate(text));
+
+        Assert.Equal(XmlStrictnessCategory.MalformedDeclaration, e.Category);
+        var repaired = XmlStructureRepairs.Apply(text, e.Repair!);
+        Assert.Empty(Sut.Validate(repaired));
+    }
+
     [Fact]
     public void TextOutsideTheRoot_IsStrictOnly()
     {

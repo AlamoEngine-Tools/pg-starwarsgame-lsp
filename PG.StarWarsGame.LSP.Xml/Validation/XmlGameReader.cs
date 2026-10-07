@@ -53,6 +53,9 @@ public static class XmlGameReader
 
     private sealed class Reader(string s)
     {
+        private readonly List<(string Name, int Start)> _open = [];
+        private ((string Name, int Start) Outer, int Inner)? _selfNesting;
+
         public List<XmlStructureError> Tolerances { get; } = [];
 
         public XmlStructureError? Run()
@@ -177,16 +180,21 @@ public static class XmlGameReader
                 ReadAttribute(ref pos, name);
             }
 
+            // Below the root, an element inside one of its own name is where an end tag went missing:
+            // the later end tags then pair one level off. Remembered for the repair at the file's end.
+            if (_selfNesting is null && _open.Count >= 2 && _open[^1].Name == name)
+                _selfNesting = (_open[^1], start);
+            _open.Add((name, start));
             var hasChildren = false;
             var valueEnd = ReadValue(ref pos, start);
             while (true)
             {
                 if (pos >= s.Length)
-                    throw new Fail(XmlStrictnessCategory.UnexpectedEndOfFile, start, name.Length + 1,
-                        $"<{name}> is never closed: The game drops the whole file");
+                    throw UnclosedAtEndOfFile();
                 if (StartsWith(pos, "</"))
                 {
                     ReadEndTag(ref pos, name);
+                    _open.RemoveAt(_open.Count - 1);
                     if (valueEnd >= 0) CheckUntrimmed(valueEnd);
                     return hasChildren;
                 }
@@ -366,14 +374,76 @@ public static class XmlGameReader
                 throw new Fail(XmlStrictnessCategory.UnexpectedEndOfFile, tagStart, ee - tagStart,
                     $"End tag </{endName}> has no '>': The game drops the whole file");
             if (!string.Equals(endName, name, StringComparison.Ordinal))
-                throw new Fail(
-                    string.Equals(endName, name, StringComparison.OrdinalIgnoreCase)
-                        ? XmlStrictnessCategory.EndTagCaseMismatch
-                        : XmlStrictnessCategory.EndTagMismatch,
-                    tagStart, close + 1 - tagStart,
-                    $"End tag </{endName}> does not match <{name}>: The game compares them byte for byte and drops the whole file",
-                    Single($"Rename the end tag to </{name}>", en, endName.Length, name));
+                throw MismatchedEndTag(name, endName, tagStart, en, close + 1);
             pos = close + 1;
+        }
+
+        private Fail UnclosedAtEndOfFile()
+        {
+            if (_selfNesting is { } nesting)
+            {
+                var (outer, inner) = nesting;
+                return new Fail(XmlStrictnessCategory.UnexpectedEndOfFile, outer.Start, outer.Name.Length + 1,
+                    $"<{outer.Name}> is never closed: The game pairs every later end tag one level off and drops the whole file",
+                    new XmlRepair($"Close <{outer.Name}>", XmlUnclosedElementRepair.Plan(s, [outer], inner, Eol)));
+            }
+
+            var unclosed = _open.ToList();
+            var (name, start) = unclosed[^1];
+            var names = unclosed.AsEnumerable().Reverse().Select(o => $"<{o.Name}>").ToList();
+            return new Fail(XmlStrictnessCategory.UnexpectedEndOfFile, start, name.Length + 1,
+                $"<{name}> is never closed: The game drops the whole file",
+                new XmlRepair(CloseTitle(names), XmlUnclosedElementRepair.Plan(s, unclosed, s.Length, Eol)));
+        }
+
+        private static string CloseTitle(IReadOnlyList<string> names)
+        {
+            return names.Count == 1
+                ? $"Close {names[0]}"
+                : $"Close {string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}";
+        }
+
+        // The game drops the file either way; what differs is the likely cause, and so the repair.
+        // An end tag naming an element still open further up is right where it is: the elements in
+        // between were never closed. One naming nothing open is a typo, or a tag too many.
+        private Fail MismatchedEndTag(string name, string endName, int tagStart, int nameStart, int tagEnd)
+        {
+            if (string.Equals(endName, name, StringComparison.OrdinalIgnoreCase))
+                return new Fail(XmlStrictnessCategory.EndTagCaseMismatch, tagStart, tagEnd - tagStart,
+                    $"End tag </{endName}> does not match <{name}>: The game compares them byte for byte and drops the whole file",
+                    Single($"Rename the end tag to </{name}>", nameStart, endName.Length, name));
+
+            var ancestor = _open.Count < 2 ? -1 : _open.FindLastIndex(_open.Count - 2, o => o.Name == endName);
+            if (ancestor >= 0)
+            {
+                var unclosed = _open.Skip(ancestor + 1).ToList();
+                var edits = XmlUnclosedElementRepair.Plan(s, unclosed, tagStart, Eol);
+                var names = unclosed.AsEnumerable().Reverse().Select(o => $"<{o.Name}>").ToList();
+                var title = CloseTitle(names);
+                var (innerName, innerStart) = unclosed[^1];
+                return new Fail(XmlStrictnessCategory.EndTagMismatch, innerStart, innerName.Length + 1,
+                    $"<{innerName}> is never closed: The game reads </{endName}> where it expects </{innerName}> and drops the whole file",
+                    new XmlRepair(title, edits));
+            }
+
+            var rename = Single($"Rename the end tag to </{name}>", nameStart, endName.Length, name);
+            var remove = Single("Remove the end tag", tagStart, tagEnd - tagStart, "");
+            return new Fail(XmlStrictnessCategory.EndTagMismatch, tagStart, tagEnd - tagStart,
+                $"End tag </{endName}> does not match <{name}>: The game compares them byte for byte and drops the whole file",
+                ReadsFurther(remove, rename) ? remove : rename);
+        }
+
+        // Whether the game's reader gets further through the text with the first repair than with
+        // the second; a repair after which it reads the whole file counts as furthest.
+        private bool ReadsFurther(XmlRepair first, XmlRepair second)
+        {
+            return Reach(first) > Reach(second);
+
+            int Reach(XmlRepair repair)
+            {
+                var error = XmlGameReader.Read(XmlStructureRepairs.Apply(s, repair)).Error;
+                return error is null ? int.MaxValue : error.Line * 100_000 + error.Column;
+            }
         }
 
         private int SkipComment(int pos)

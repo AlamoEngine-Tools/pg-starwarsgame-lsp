@@ -123,6 +123,81 @@ Indexes the full EaW/FoC object graph across the workspace.
 - **Auto-close tags** - on `>` (needs `editor.formatOnType`)
 - **Linked editing** - opening and closing tag renamed together (needs `editor.linkedEditing`)
 - **Variant inheritance** - **Show Effective Object** opens the merged XML of a `Variant_Of_Existing_Type` object
+- **XML structure** - judged by the game's own reader, with repairs; see [XML structure](#xml-structure)
+- **Folding, expand selection, matching-tag highlight** - on malformed files too
+- **Formatting** - re-indents, changes nothing the game reads; see [Formatting](#formatting)
+
+---
+
+## XML structure
+
+Every EaW XML file is read as the game reads it and, when the game keeps it, as standard XML.
+
+| The game | Standard XML tools | Severity | IDs |
+|---|---|---|---|
+| Drops the whole file | - | Error | `aetswg-012-3001` to `aetswg-012-3009` |
+| Reads the file | Reject it | Warning | `aetswg-015-0001` to `aetswg-015-0003` |
+| Reads less than the file shows, or something else | Accept it | Warning | `aetswg-015-0004` to `aetswg-015-0006` |
+
+- **One error per dropped file** - the first point the game's reader stops at
+- **EaW and FoC** - where they differ (a mismatched end tag), the stricter FoC rule applies
+- **Comments inside values** - read as the game reads them: the comment is cut out, the text around it joined
+
+| ID | Finding | Repair |
+|---|---|---|
+| `aetswg-012-3001` | No `<?xml ...?>` declaration | Insert the XML declaration |
+| `aetswg-012-3002` | End tag naming another element | Close the element left open; rename a misspelled end tag; remove one too many |
+| `aetswg-012-3003` | End tag differing in case only | Rename the end tag |
+| `aetswg-012-3004` | End tag where the root element is expected | Remove the end tag |
+| `aetswg-012-3005` | No root element, or a root without child elements | - |
+| `aetswg-012-3006` | A second root element | - |
+| `aetswg-012-3007` | Attribute without `=` or without double quotes | Use double quotes, unless the value holds `"` |
+| `aetswg-012-3008` | `--` inside a comment, or a comment never closed | Separate the hyphens - `--` only |
+| `aetswg-012-3009` | File ends inside markup, or with an element open | Close the element left open |
+| `aetswg-015-0001` | Declaration ending in `>` instead of `?>` | End the declaration with `?>` |
+| `aetswg-015-0002` | `&` that starts no entity | - escaping changes the value the game reads |
+| `aetswg-015-0003` | Anything else standard XML tools reject | - |
+| `aetswg-015-0004` | Text after a child element, skipped by the game | Remove the text the game skips |
+| `aetswg-015-0005` | Value ending in whitespace other than space, tab, CR or LF, which the game keeps | Remove the character |
+| `aetswg-015-0006` | Comment inside a value - off by default | Move the comment above the element |
+
+- **An element left open** - the end tag goes where the file shows the element ends
+  - An element with a value closes right after it
+  - Never past the next element of the same name
+  - Otherwise where the indentation puts it, or, with nothing indented deeper, as the other elements of that name are
+    built
+  - Vanilla: 24,922 of 24,941 deleted end tags restored to the original tree
+- **Fix all** - lightbulb **Fix all repairable XML structure problems in this file**
+  - Repeats until nothing repairable is left, at most 50 passes
+  - Skips IDs suppressed project-wide; directives in the file do not stop it
+- **`aetswg-015-0006` off by default** - common practice in mods; standard XML readers return two text nodes, so
+  other tools may read a different value
+  - Carried by `.aetswg/suppressions.json`: in a new project from the start, in an existing one once, on upgrade
+  - Deleting that entry turns it on
+- **`aet-eaw-edit.features.xml.strictness`** off - drops `aetswg-015-*`; a file the game drops is reported regardless
+
+### Editor structure
+
+- **Folding** - elements over several lines, multi-line comments
+- **Expand selection** - tag name, element, then each enclosing element (`Shift+Alt+Right`)
+- **Matching-tag highlight** - on a tag name, both names of its element
+- **Malformed files** - an unclosed element gets no fold and highlights alone; every other pair keeps working
+
+### Formatting
+
+**Format Document** and **Format Selection** re-indent EaW XML files. Nothing the game reads changes.
+
+- **Scope** - whitespace between tags and comments, in elements with no text of their own
+  - Trailing whitespace removed; more than one blank line becomes one
+  - Indentation from the editor: tabs, or the configured number of spaces
+- **Kept as written** - values, comments, attributes, entities, same-line layout, line endings (CRLF, LF, mixed)
+  - A leaf's whitespace-only value is a value and stays
+  - An element with text stays whole: the game joins the text around a comment
+- **Well-formed files only** - a file standard XML tools reject is refused with its line and column
+- **Checked** - the result is compared with the original before it applies; a changed result is refused
+- **Vanilla** - all 993 well-formed shipped files format with unchanged diagnostics and line endings; a second pass
+  changes nothing
+- **`aet-eaw-edit.features.xml.formatting`** off - no formatter offered, so another XML formatter takes the files
 
 ---
 
@@ -276,8 +351,9 @@ Several ids per directive, comma-separated; a note after `reason::`:
 | `aetswg-009-*` | Story and campaigns |
 | `aetswg-010-*` | Symbols and layers: duplicates, shadowing |
 | `aetswg-011-*` | Engine constraints |
-| `aetswg-012-*` | Syntax errors |
+| `aetswg-012-*` | Syntax errors, and XML files the game drops |
 | `aetswg-013-*` | Suppression comments themselves |
+| `aetswg-015-*` | XML strictness: XML the game reads that standard tools reject, or reads differently |
 
 Groups classify the problem, not the language: `aetswg-001-*` covers XML and Lua alike.
 
@@ -605,6 +681,8 @@ XML:
 | `aet-eaw-edit.features.xml.codeActions` | `true` | Code actions (quick fixes) |
 | `aet-eaw-edit.features.xml.linkedEditing` | `true` | Linked editing of tag pairs (needs `editor.linkedEditing`) |
 | `aet-eaw-edit.features.xml.autoCloseTag` | `true` | Auto-close tag on `>` (needs `editor.formatOnType`) |
+| `aet-eaw-edit.features.xml.strictness` | `true` | XML strictness warnings, `aetswg-015-*`; files the game drops are reported regardless |
+| `aet-eaw-edit.features.xml.formatting` | `true` | Format Document and Format Selection; off, no formatter is offered |
 
 Lua:
 

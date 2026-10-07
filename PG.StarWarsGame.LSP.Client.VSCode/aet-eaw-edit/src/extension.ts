@@ -94,6 +94,8 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
         'foldingRange',
         'selectionRange',
         'linkedEditingRange',
+        'formatting',
+        'rangeFormatting',
         'onTypeFormatting',
         'inlayHint',
     ] as const;

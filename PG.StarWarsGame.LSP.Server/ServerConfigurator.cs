@@ -84,6 +84,10 @@ public static class ServerConfigurator
                        ?? "unknown").Split('+')[0]
         };
 
+        // Which formatting handlers still register once the server has started: those the client
+        // asked to receive by dynamic registration. Set in OnInitialize, read in OnStarted.
+        (bool Document, bool Range) formattingAfterStart = (false, false);
+
         return options
             .ConfigureLogging(x => x
                     .SetMinimumLevel(logLevel ?? ServerLogLevel.Default)
@@ -502,10 +506,20 @@ public static class ServerConfigurator
                 // Formatting is registered only when its flag is on, so an off flag advertises no
                 // capability and another XML formatter can take the documents. A request-time check
                 // would still claim them and answer with nothing.
+                //
+                // When is the client's choice. Registered here, a handler is in the initialize
+                // result - right for a client taking it statically, but one asking for dynamic
+                // registration is then sent the registration TWICE under one id (measured), and
+                // VS Code offers two formatters. So a dynamic client gets it once the server has
+                // started, after the library's own registration batch.
                 if (configProvider.Current.Features.Xml.Formatting)
-                    server.Register(r => r
-                        .AddHandler<XmlDocumentFormattingHandler>()
-                        .AddHandler<XmlDocumentRangeFormattingHandler>());
+                {
+                    var textDocument = request.Capabilities?.TextDocument;
+                    var documentLate = textDocument?.Formatting.Value?.DynamicRegistration == true;
+                    var rangeLate = textDocument?.RangeFormatting.Value?.DynamicRegistration == true;
+                    RegisterFormatting(server, !documentLate, !rangeLate);
+                    formattingAfterStart = (documentLate, rangeLate);
+                }
 
                 await Task.CompletedTask;
             })
@@ -569,7 +583,23 @@ public static class ServerConfigurator
                     CancellationToken.None);
 
                 await Task.CompletedTask;
+            })
+            .OnStarted(async (server, ct) =>
+            {
+                // The dynamic half of the formatting registration in OnInitialize.
+                RegisterFormatting(server, formattingAfterStart.Document, formattingAfterStart.Range);
+                await Task.CompletedTask;
             });
+    }
+
+    private static void RegisterFormatting(ILanguageServer server, bool document, bool range)
+    {
+        if (!document && !range) return;
+        server.Register(r =>
+        {
+            if (document) r.AddHandler<XmlDocumentFormattingHandler>();
+            if (range) r.AddHandler<XmlDocumentRangeFormattingHandler>();
+        });
     }
 
     // Builds the scan roots: start from protocol-level workspace folders or RootUri, then always

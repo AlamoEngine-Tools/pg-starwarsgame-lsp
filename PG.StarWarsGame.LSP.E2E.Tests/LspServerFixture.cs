@@ -324,10 +324,11 @@ public class LspServerFixture : IAsyncLifetime
                     ContentFormat = new Container<MarkupKind>(MarkupKind.Markdown)
                 },
                 PublishDiagnostics = new PublishDiagnosticsCapability(),
-                // As VS Code asks for them: formatting arrives by dynamic registration, not in the
-                // initialize answer, so the flag tests cover the path the editor takes.
-                Formatting = new DocumentFormattingCapability { DynamicRegistration = true },
-                RangeFormatting = new DocumentRangeFormattingCapability { DynamicRegistration = true }
+                // As the extension asks for them: statically, like every language feature
+                // (ForceStaticCapabilitiesFeature). The dynamic path is FormattingRegistrationSmokeTest's,
+                // on the wire, because this client files registrations by id and hides a duplicate.
+                Formatting = new DocumentFormattingCapability { DynamicRegistration = false },
+                RangeFormatting = new DocumentRangeFormattingCapability { DynamicRegistration = false }
             }
         };
         // Registered here (before From() returns) so the notification is never missed.

@@ -121,7 +121,6 @@ public sealed class XmlStructureRepairTest
     [Theory]
     [InlineData("<Root>\n<!-- nothing -->\n</Root>")] // empty root
     [InlineData("<Root><A>1</A></Root>\n<Other><B>2</B></Other>")] // second root
-    [InlineData("<Root><A>1</A>")] // unclosed
     [InlineData("<Root><A>Tom & Jerry</A></Root>")] // stray ampersand: escaping would change the value
     public void CategoriesWithoutARepair_OfferNone(string body)
     {
