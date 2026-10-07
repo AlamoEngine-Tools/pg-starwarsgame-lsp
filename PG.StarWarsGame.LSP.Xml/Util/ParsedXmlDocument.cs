@@ -15,6 +15,7 @@ public sealed class ParsedXmlDocument
 {
     private LineOffsetIndex? _lineIndex;
     private string[]? _lines;
+    private XmlElementSpans? _spans;
 
     private ParsedXmlDocument(string text, HtmlDocument html)
     {
@@ -27,6 +28,9 @@ public sealed class ParsedXmlDocument
     public HtmlDocument Html { get; }
 
     public LineOffsetIndex LineIndex => _lineIndex ??= new LineOffsetIndex(Text);
+
+    /// <summary>Exact element and comment spans, for the structural editor features. Built on first use.</summary>
+    public XmlElementSpans Spans => _spans ??= XmlElementSpans.Build(Html, Text);
 
     /// <summary>Raw '\n'-split lines; entries keep a trailing '\r' on CRLF input.</summary>
     public string[] Lines => _lines ??= Text.Split('\n');

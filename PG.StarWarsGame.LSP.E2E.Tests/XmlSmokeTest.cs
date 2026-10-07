@@ -153,6 +153,47 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    [Fact]
+    public async Task StructureRequests_OnARealFile_FoldSelectAndHighlight()
+    {
+        RequireWorkspace();
+
+        var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
+        var uri = DocumentUri.FromFileSystemPath(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath);
+
+        _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+            {
+                Uri = uri, LanguageId = "xml", Version = 1, Text = string.Join(Environment.NewLine, lines)
+            }
+        });
+
+        var doc = new TextDocumentIdentifier { Uri = uri };
+        var (line, col) = FindFirstChildElementPosition(lines);
+
+        var folds = await PollUntilAsync<Container<FoldingRange>>(
+            async ct => await _fixture.Client.RequestFoldingRange(new FoldingRangeRequestParam { TextDocument = doc },
+                ct),
+            r => r is not null && r.Any());
+        Assert.Contains(folds!, f => f.StartLine == line);
+
+        var selection = await _fixture.Client.RequestSelectionRange(new SelectionRangeParams
+        {
+            TextDocument = doc, Positions = new Container<Position>(new Position(line, col))
+        });
+        var name = Assert.Single(selection!);
+        Assert.Equal(new Position(line, col), name.Range.Start);
+        Assert.NotNull(name.Parent);
+
+        var marks = await _fixture.Client.RequestDocumentHighlight(new DocumentHighlightParams
+        {
+            TextDocument = doc, Position = new Position(line, col)
+        });
+        Assert.Equal(2, marks!.Count());
+    }
+
     /// <summary>
     ///     Polls an LSP request until it answers with an indexed result, or the timeout expires. The
     ///     server indexes an opened document asynchronously, so the first answer after didOpen is
