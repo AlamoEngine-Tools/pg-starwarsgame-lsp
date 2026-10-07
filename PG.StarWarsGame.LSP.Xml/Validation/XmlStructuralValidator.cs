@@ -3,6 +3,7 @@
 
 using System.Xml;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -60,7 +61,8 @@ public sealed class XmlStructuralValidator : IXmlStructuralValidator
         {
             var line = Math.Max(0, ex.LineNumber - 1);
             var col = Math.Max(0, ex.LinePosition - 1);
-            var (category, reason) = Categorize(ex.Message, line);
+            var at = XmlUtility.PositionToOffset(text, line, col);
+            var (category, reason) = Categorize(ex.Message, text, line, at);
             var repair = category == XmlStrictnessCategory.MalformedDeclaration ? DeclarationRepair(text) : null;
             return new XmlStructureError(line, col, reason, category, Repair: repair);
         }
@@ -78,19 +80,38 @@ public sealed class XmlStructuralValidator : IXmlStructuralValidator
         return new XmlRepair("End the declaration with '?>'", [new XmlTextEdit(close, 0, "?")]);
     }
 
-    // XmlException carries no error code, so the category comes from its message. The game read
-    // the file, so every message here is one standard XML tools give and the game does not.
-    private static (XmlStrictnessCategory, string) Categorize(string message, int line)
+    // XmlException carries no error code, and its message words one construct several ways (a
+    // declaration ending in '" >' is "Name cannot begin with '>'", a name after '&' is "expected
+    // ';'"), so the category comes from the TEXT at the error. The game read the file, so every
+    // error here is one standard XML tools give and the game does not.
+    private static (XmlStrictnessCategory, string) Categorize(string message, string text, int line, int at)
     {
         var detail = message.Split(" Line ", 2)[0].TrimEnd('.');
-        if (line == 0 && message.Contains("'?>'", StringComparison.Ordinal))
+        if (line == 0 && DeclarationRepair(text) is not null)
             return (XmlStrictnessCategory.MalformedDeclaration,
                 "XML declaration must end in '?>': The game reads it, standard XML tools reject the file");
-        if (message.Contains("EntityName", StringComparison.Ordinal) ||
+        if (InsideEntityReference(text, at) ||
             message.Contains("undeclared entity", StringComparison.Ordinal))
             return (XmlStrictnessCategory.StrayAmpersand,
                 "'&' that starts no entity: The game reads it as a plain character, standard XML tools reject the file");
         return (XmlStrictnessCategory.StrictOnly,
             $"Invalid XML ({detail}): The game reads the file, standard XML tools reject it");
+    }
+
+    // True when the error sits in an unterminated reference: an '&' at the error, or one reached
+    // walking back over the name the reader was collecting. A ';', whitespace or markup ends the walk.
+    private static bool InsideEntityReference(string text, int at)
+    {
+        if (text.Length == 0) return false;
+        var i = Math.Min(at, text.Length - 1);
+        if (text[i] == '&') return true;
+        for (i--; i >= 0; i--)
+        {
+            var c = text[i];
+            if (c == '&') return true;
+            if (c is ';' or '<' or '>' or '"' or '\'' || char.IsWhiteSpace(c)) return false;
+        }
+
+        return false;
     }
 }
