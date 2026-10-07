@@ -146,14 +146,14 @@ Every EaW XML file is read as the game reads it and, when the game keeps it, as 
 | ID | Finding | Repair |
 |---|---|---|
 | `aetswg-012-3001` | No `<?xml ...?>` declaration | Insert the XML declaration |
-| `aetswg-012-3002` | End tag naming another element | Rename the end tag |
+| `aetswg-012-3002` | End tag naming another element | Close the element left open; rename a misspelled end tag; remove one too many |
 | `aetswg-012-3003` | End tag differing in case only | Rename the end tag |
 | `aetswg-012-3004` | End tag where the root element is expected | Remove the end tag |
 | `aetswg-012-3005` | No root element, or a root without child elements | - |
 | `aetswg-012-3006` | A second root element | - |
 | `aetswg-012-3007` | Attribute without `=` or without double quotes | Use double quotes, unless the value holds `"` |
 | `aetswg-012-3008` | `--` inside a comment, or a comment never closed | Separate the hyphens - `--` only |
-| `aetswg-012-3009` | File ends inside markup | - |
+| `aetswg-012-3009` | File ends inside markup, or with an element open | Close the element left open |
 | `aetswg-015-0001` | Declaration ending in `>` instead of `?>` | End the declaration with `?>` |
 | `aetswg-015-0002` | `&` that starts no entity | - escaping changes the value the game reads |
 | `aetswg-015-0003` | Anything else standard XML tools reject | - |
@@ -161,6 +161,12 @@ Every EaW XML file is read as the game reads it and, when the game keeps it, as 
 | `aetswg-015-0005` | Value ending in whitespace other than space, tab, CR or LF, which the game keeps | Remove the character |
 | `aetswg-015-0006` | Comment inside a value - off by default | Move the comment above the element |
 
+- **An element left open** - the end tag goes where the file shows the element ends
+  - An element with a value closes right after it
+  - Never past the next element of the same name
+  - Otherwise where the indentation puts it, or, with nothing indented deeper, as the other elements of that name are
+    built
+  - Vanilla: 24,922 of 24,941 deleted end tags restored to the original tree
 - **Fix all** - lightbulb **Fix all repairable XML structure problems in this file**
   - Repeats until nothing repairable is left, at most 50 passes
   - Skips IDs suppressed project-wide; directives in the file do not stop it
