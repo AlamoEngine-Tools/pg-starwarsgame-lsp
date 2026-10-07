@@ -91,6 +91,28 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     protected abstract void PublishForDocument(string uri, string text, GameIndex index);
 
     /// <summary>
+    ///     Republishes one document against the current index, when it is open. For an input the
+    ///     index does not carry - a finding arriving from outside, such as the Lua analyzer's -
+    ///     that changes one document's diagnostics and no other.
+    /// </summary>
+    protected void RepublishDocument(string uri)
+    {
+        if (!DiagnosticsEnabled || !_workspaceHost.TryGet(uri, out var doc)) return;
+
+        lock (_publishLock)
+        {
+            try
+            {
+                PublishForDocument(doc.Uri, doc.Text, _indexService.Current);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled exception republishing diagnostics for {Uri}", doc.Uri);
+            }
+        }
+    }
+
+    /// <summary>
     ///     Drops every diagnostic silenced by <paramref name="ranges" /> or by a project-wide
     ///     suppression. This is where "suppressed" is defined for all languages - the merge with the
     ///     global store and the fail-safe on unnameable diagnostics live here, so a language decides

@@ -354,6 +354,7 @@ Several ids per directive, comma-separated; a note after `reason::`:
 | `aetswg-012-*` | Syntax errors, and XML files the game drops |
 | `aetswg-013-*` | Suppression comments themselves |
 | `aetswg-015-*` | XML strictness: XML the game reads that standard tools reject, or reads differently |
+| `aetswg-016-*` | Lua analyzer: findings that hold for any Lua - unused or redefined locals, unreachable code, annotation errors |
 
 Groups classify the problem, not the language: `aetswg-001-*` covers XML and Lua alike.
 

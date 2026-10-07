@@ -265,6 +265,7 @@ A scope with no target covers its own line only. Project-wide suppressions live 
 | `aetswg-012-*` | Syntax errors, and XML files the game drops |
 | `aetswg-013-*` | Suppression comments themselves |
 | `aetswg-015-*` | XML strictness: XML the game reads that standard tools reject, or reads differently |
+| `aetswg-016-*` | Lua analyzer: findings that hold for any Lua - unused or redefined locals, unreachable code, annotation errors |
 
 ### When a directive is wrong
 

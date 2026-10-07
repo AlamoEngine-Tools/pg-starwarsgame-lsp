@@ -41,7 +41,11 @@ public sealed class LuaAnalyzerStarter(
             return;
         }
 
-        await host.StartAsync(EmmyrcWriter.Plan(layers, stubs.Directory));
+        // In the file system's own spelling: the analyzer compares paths as written (measured live).
+        var plan = EmmyrcWriter.Plan(layers, stubs.Directory);
+        await host.StartAsync(new AnalyzerPlan(
+            plan.WorkspaceRoots.Select(PathCasing.OnDisk).ToList(),
+            plan.Library.Select(PathCasing.OnDisk).ToList()));
     }
 }
 
@@ -55,7 +59,8 @@ public static class LuaAnalyzerExecutable
     public static string? Resolve(string serverDirectory, Func<string, string?> environment, Func<string, bool> exists)
     {
         if (environment(Variable) is { Length: > 0 } explicitPath && exists(explicitPath)) return explicitPath;
-        var beside = Path.Combine(serverDirectory, "emmylua", OperatingSystem.IsWindows() ? "emmylua_ls.exe" : "emmylua_ls");
+        var beside = Path.Combine(serverDirectory, "emmylua",
+            OperatingSystem.IsWindows() ? "emmylua_ls.exe" : "emmylua_ls");
         return exists(beside) ? beside : null;
     }
 }

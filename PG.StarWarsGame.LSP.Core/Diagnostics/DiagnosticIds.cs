@@ -697,6 +697,12 @@ public static class DiagnosticIds
     /// <summary>The file ends inside markup or before an element is closed.</summary>
     public static readonly DiagnosticId XmlUnexpectedEndOfFile = new(DiagnosticGroup.Syntax, 3009);
 
+    /// <summary>
+    ///     A Lua script that does not parse, as the Lua analyzer reads it. While the analyzer runs it
+    ///     is the one voice on Lua syntax; without it, this server's own parser reports (1-2999).
+    /// </summary>
+    public static readonly DiagnosticId LuaSyntaxError = new(DiagnosticGroup.Syntax, 3010);
+
     // ── XML strictness ──
     // The game reads the file. Either standard XML tools reject it, or the game reads less or
     // something else than the document shows. Warnings, so silencing the group keeps every lost
@@ -859,4 +865,40 @@ public static class DiagnosticIds
     /// </remarks>
     public static readonly DiagnosticId PreviewHardpointUnreachable =
         new(DiagnosticGroup.Preview, 21);
+
+    // ── Lua analyzer ──
+    // What the Lua analyzer (emmylua_ls) reports that holds for any Lua, whatever the engine binds:
+    // one id per analyzer rule, numbered in the order a rule was adopted, never renumbered. A rule
+    // that rests on the engine stubs' types stays out until the stubs carry it (measured on vanilla
+    // FoC: those are the bulk, and noise). LuaAnalyzerRulePolicy holds the mapping.
+
+    /// <summary>A local, parameter or loop variable that is never read.</summary>
+    public static readonly DiagnosticId LuaAnalyzerUnused = new(DiagnosticGroup.LuaAnalyzer, 1);
+
+    /// <summary>A local declared again in the same scope, hiding the first.</summary>
+    public static readonly DiagnosticId LuaAnalyzerRedefinedLocal = new(DiagnosticGroup.LuaAnalyzer, 2);
+
+    /// <summary>A label declared twice.</summary>
+    public static readonly DiagnosticId LuaAnalyzerRedefinedLabel = new(DiagnosticGroup.LuaAnalyzer, 3);
+
+    /// <summary>Code after a return, break or error that never runs.</summary>
+    public static readonly DiagnosticId LuaAnalyzerUnreachableCode = new(DiagnosticGroup.LuaAnalyzer, 4);
+
+    /// <summary>A multiple assignment with more targets than values.</summary>
+    public static readonly DiagnosticId LuaAnalyzerUnbalancedAssignments = new(DiagnosticGroup.LuaAnalyzer, 5);
+
+    /// <summary>A table constructor giving one key twice; the second wins.</summary>
+    public static readonly DiagnosticId LuaAnalyzerDuplicateIndex = new(DiagnosticGroup.LuaAnalyzer, 6);
+
+    /// <summary>A for loop's control variable assigned inside the loop.</summary>
+    public static readonly DiagnosticId LuaAnalyzerIterVariableReassign = new(DiagnosticGroup.LuaAnalyzer, 7);
+
+    /// <summary>A malformed annotation comment (<c>---@</c>).</summary>
+    public static readonly DiagnosticId LuaAnalyzerDocSyntaxError = new(DiagnosticGroup.LuaAnalyzer, 8);
+
+    /// <summary>A <c>---@param</c> naming no parameter of the function.</summary>
+    public static readonly DiagnosticId LuaAnalyzerUndefinedDocParam = new(DiagnosticGroup.LuaAnalyzer, 9);
+
+    /// <summary>A <c>---@field</c> declared twice on one class.</summary>
+    public static readonly DiagnosticId LuaAnalyzerDuplicateDocField = new(DiagnosticGroup.LuaAnalyzer, 10);
 }

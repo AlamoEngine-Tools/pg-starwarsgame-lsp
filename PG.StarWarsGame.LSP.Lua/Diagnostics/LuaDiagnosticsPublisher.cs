@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Concurrent;
 using Loretta.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -35,6 +36,12 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
     private readonly ILogger<LuaDiagnosticsPublisher> _logger;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
+    private readonly ILuaAnalyzer? _analyzer;
+    private readonly IGameWorkspaceHost _workspaceHost;
+
+    // The analyzer's latest findings per document, already mapped to this server's ids.
+    private readonly ConcurrentDictionary<string, IReadOnlyList<LspDiagnostic>> _analyzerFindings =
+        new(DocumentUris.Comparer);
 
     public LuaDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -49,11 +56,12 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         // dependency is the one shape the container is free to skip without a word.
         IProjectLayerMap layerMap,
         ServerOptions? options = null,
-        IGlobalSuppressionStore? globalSuppressions = null)
+        IGlobalSuppressionStore? globalSuppressions = null,
+        ILuaAnalyzer? analyzer = null)
         : this(p => server.TextDocument.PublishDiagnostics(p),
             indexService, workspaceHost, fileHelper, schemaProvider, logger,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            parseCache, configProvider, globalSuppressions, layerMap)
+            parseCache, configProvider, globalSuppressions, layerMap, analyzer)
     {
     }
 
@@ -68,7 +76,8 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILuaParseCache? parseCache = null,
         ILspConfigurationProvider? configProvider = null,
         IGlobalSuppressionStore? globalSuppressions = null,
-        IProjectLayerMap? layerMap = null)
+        IProjectLayerMap? layerMap = null,
+        ILuaAnalyzer? analyzer = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions, layerMap)
     {
         _fileHelper = fileHelper;
@@ -78,6 +87,24 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         _parseCache = parseCache ?? new LuaParseCache(
             new DocumentTextSource(workspaceHost, fileHelper, NullLogger<DocumentTextSource>.Instance),
             ServerOptions.Default.ParseCacheCapacity);
+        _analyzer = analyzer;
+        _workspaceHost = workspaceHost;
+        if (analyzer is not null) analyzer.DiagnosticsPublished += OnAnalyzerPublished;
+    }
+
+    // The analyzer reports on its own schedule, per document: keep the kept findings and publish
+    // that document again, so the editor sees one set from one server.
+    private void OnAnalyzerPublished(LspPublishParams p)
+    {
+        // The analyzer spells URIs its own way; the open document keeps the editor's spelling, and
+        // that is the key it is published under.
+        var analyzerUri = _fileHelper.NormalizeUri(p.Uri.ToString());
+        var uri = _workspaceHost.All.FirstOrDefault(d => DocumentUris.Same(d.Uri, analyzerUri))?.Uri ?? analyzerUri;
+        _analyzerFindings[uri] = p.Diagnostics
+            .Select(LuaAnalyzerRulePolicy.Map)
+            .OfType<LspDiagnostic>()
+            .ToList();
+        RepublishDocument(uri);
     }
 
     protected override string FileExtension => ".lua";
@@ -95,7 +122,17 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         // handler touching the same content.
         var parsed = _parseCache.GetOrParse(_fileHelper.NormalizeUri(uri), text);
 
-        CollectSyntaxErrors(parsed.Tree, diagnostics);
+        // One voice on syntax: the analyzer's while it runs, this server's own parser otherwise.
+        if (_analyzer is { IsRunning: true })
+        {
+            if (_analyzerFindings.TryGetValue(_fileHelper.NormalizeUri(uri), out var found))
+                diagnostics.AddRange(found);
+        }
+        else
+        {
+            CollectSyntaxErrors(parsed.Tree, diagnostics);
+        }
+
         CollectReferenceErrors(uri, index, diagnostics);
         diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, parsed.Tree, index.Documents, _fileHelper));
         diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, parsed.Tree, index, _schemaProvider, _fileHelper));
