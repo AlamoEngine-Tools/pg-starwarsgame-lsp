@@ -18,7 +18,7 @@ public sealed class PreviewSceneChangeNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new PreviewSceneChangeNotifier(
-            indexService, m => sent.Add(m),
+            indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
 
         indexService.Raise(GameIndex.Empty);
@@ -37,7 +37,7 @@ public sealed class PreviewSceneChangeNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new PreviewSceneChangeNotifier(
-            indexService, m => sent.Add(m),
+            indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
 
         indexService.Raise(GameIndex.Empty);
@@ -56,7 +56,7 @@ public sealed class PreviewSceneChangeNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new PreviewSceneChangeNotifier(
-            indexService, m => sent.Add(m),
+            indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 40);
 
         for (var at = 0; at < 20; at++) indexService.Raise(GameIndex.Empty);
@@ -72,7 +72,7 @@ public sealed class PreviewSceneChangeNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new PreviewSceneChangeNotifier(
-            indexService, m => sent.Add(m),
+            indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 40);
 
         indexService.Raise(GameIndex.Empty);
@@ -93,7 +93,7 @@ public sealed class PreviewSceneChangeNotifierTest
     {
         var indexService = new RaisableIndexService();
         _ = new PreviewSceneChangeNotifier(
-            indexService, _ => throw new InvalidOperationException("boom"),
+            indexService, StartupGates.Open(), _ => throw new InvalidOperationException("boom"),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
 
         var ex = Record.Exception(() => indexService.Raise(GameIndex.Empty));
@@ -111,10 +111,50 @@ public sealed class PreviewSceneChangeNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new PreviewSceneChangeNotifier(
-            indexService, m => sent.Add(m),
+            indexService, StartupGates.Open(), m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
 
         indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
+
+        Assert.Empty(sent);
+    }
+
+    /// <summary>
+    ///     Startup rewrites the index stage by stage; a push per stage would rebuild every open
+    ///     preview for content that is not final yet, and a late one landed after scan complete.
+    /// </summary>
+    [Fact]
+    public async Task IndexChanged_WhileStartupRuns_IsHeldThenSentOnceWhenTheGateOpens()
+    {
+        var sent = new List<string>();
+        var indexService = new RaisableIndexService();
+        var gate = StartupGates.Closed();
+        _ = new PreviewSceneChangeNotifier(
+            indexService, gate, m => sent.Add(m),
+            NullLogger<PreviewSceneChangeNotifier>.Instance, 40);
+
+        for (var at = 0; at < 5; at++) indexService.Raise(GameIndex.Empty);
+        await Task.Delay(150);
+        Assert.Empty(sent);
+
+        await gate.OpenAsync();
+
+        // Sent while the gate opens, not after a debounce: nothing is in flight afterwards.
+        Assert.Equal(["aet/previewSceneChanged"], sent);
+        await Task.Delay(150);
+        Assert.Single(sent);
+    }
+
+    [Fact]
+    public async Task NoIndexChange_WhileStartupRuns_NothingSentWhenTheGateOpens()
+    {
+        var sent = new List<string>();
+        var gate = StartupGates.Closed();
+        _ = new PreviewSceneChangeNotifier(
+            new RaisableIndexService(), gate, m => sent.Add(m),
+            NullLogger<PreviewSceneChangeNotifier>.Instance, 0);
+
+        await gate.OpenAsync();
 
         Assert.Empty(sent);
     }

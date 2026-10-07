@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Notifications;
 
@@ -30,11 +31,14 @@ namespace PG.StarWarsGame.LSP.Server.Notifications;
 public abstract class DebouncedIndexNotifier
 {
     private readonly int _debounceMs;
+    private readonly StartupHeldNotification _startup;
     private int _pendingVersion;
 
-    protected DebouncedIndexNotifier(IGameIndexService indexService, int debounceMs)
+    protected DebouncedIndexNotifier(IGameIndexService indexService, IStartupGate gate, int debounceMs)
     {
         _debounceMs = debounceMs;
+        // While startup runs, no timer starts: every change is held and sent once as the gate opens.
+        _startup = new StartupHeldNotification(gate, Notify);
         indexService.IndexChanged += OnIndexChanged;
     }
 
@@ -50,6 +54,8 @@ public abstract class DebouncedIndexNotifier
 
     private void OnIndexChanged(GameIndex index)
     {
+        if (!_startup.PassesNow()) return;
+
         if (_debounceMs <= 0)
         {
             Notify();

@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Notifications;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
@@ -23,12 +24,13 @@ public sealed class StoryGraphChangeNotifier : DebouncedIndexNotifier
 
     public StoryGraphChangeNotifier(
         IGameIndexService indexService,
+        IStartupGate gate,
         IStoryModelService modelService,
         ILspConfigurationProvider config,
         Action<StoryGraphChangedParams> send,
         ILogger<StoryGraphChangeNotifier> logger,
         int debounceMs = 100)
-        : base(indexService, debounceMs)
+        : base(indexService, gate, debounceMs)
     {
         _modelService = modelService;
         _config = config;

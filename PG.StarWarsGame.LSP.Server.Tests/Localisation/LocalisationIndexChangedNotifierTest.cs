@@ -18,7 +18,7 @@ public sealed class LocalisationIndexChangedNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new LocalisationIndexChangedNotifier(
-            indexService,
+            indexService, StartupGates.Open(),
             m => sent.Add(m),
             NullLogger<LocalisationIndexChangedNotifier>.Instance);
 
@@ -33,7 +33,7 @@ public sealed class LocalisationIndexChangedNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new LocalisationIndexChangedNotifier(
-            indexService,
+            indexService, StartupGates.Open(),
             m => sent.Add(m),
             NullLogger<LocalisationIndexChangedNotifier>.Instance);
 
@@ -45,11 +45,31 @@ public sealed class LocalisationIndexChangedNotifierTest
     }
 
     [Fact]
+    public async Task LocalisationChanged_WhileStartupRuns_IsHeldThenSentOnceWhenTheGateOpens()
+    {
+        var sent = new List<string>();
+        var indexService = new RaisableIndexService();
+        var gate = StartupGates.Closed();
+        _ = new LocalisationIndexChangedNotifier(
+            indexService, gate,
+            m => sent.Add(m),
+            NullLogger<LocalisationIndexChangedNotifier>.Instance);
+
+        indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
+        indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
+        Assert.Empty(sent);
+
+        await gate.OpenAsync();
+
+        Assert.Equal(["aet/localisationIndexUpdated"], sent);
+    }
+
+    [Fact]
     public void LocalisationChanged_SenderThrows_ExceptionDoesNotPropagate()
     {
         var indexService = new RaisableIndexService();
         _ = new LocalisationIndexChangedNotifier(
-            indexService,
+            indexService, StartupGates.Open(),
             _ => throw new InvalidOperationException("boom"),
             NullLogger<LocalisationIndexChangedNotifier>.Instance);
 
@@ -78,7 +98,7 @@ public sealed class LocalisationIndexChangedNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new LocalisationIndexChangedNotifier(
-            indexService,
+            indexService, StartupGates.Open(),
             m => sent.Add(m),
             NullLogger<LocalisationIndexChangedNotifier>.Instance);
 

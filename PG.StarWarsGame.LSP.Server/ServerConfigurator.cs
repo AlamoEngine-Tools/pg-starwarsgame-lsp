@@ -249,6 +249,7 @@ public static class ServerConfigurator
                 services.AddSingleton<StoryGraphChangeNotifier>(sp =>
                     new StoryGraphChangeNotifier(
                         sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStartupGate>(),
                         sp.GetRequiredService<IStoryModelService>(),
                         sp.GetRequiredService<ILspConfigurationProvider>(),
                         p => sp.GetRequiredService<ILanguageServerFacade>()
@@ -452,6 +453,7 @@ public static class ServerConfigurator
                 services.AddSingleton<LocalisationIndexChangedNotifier>(sp =>
                     new LocalisationIndexChangedNotifier(
                         sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStartupGate>(),
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<LocalisationIndexChangedNotifier>>()));
 
@@ -461,6 +463,7 @@ public static class ServerConfigurator
                 services.AddSingleton<PreviewSceneChangeNotifier>(sp =>
                     new PreviewSceneChangeNotifier(
                         sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStartupGate>(),
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<PreviewSceneChangeNotifier>>()));
 
@@ -496,6 +499,14 @@ public static class ServerConfigurator
                 configProvider.LoadFrom(request.InitializationOptions);
                 logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
 
+                // Formatting is registered only when its flag is on, so an off flag advertises no
+                // capability and another XML formatter can take the documents. A request-time check
+                // would still claim them and answer with nothing.
+                if (configProvider.Current.Features.Xml.Formatting)
+                    server.Register(r => r
+                        .AddHandler<XmlDocumentFormattingHandler>()
+                        .AddHandler<XmlDocumentRangeFormattingHandler>());
+
                 await Task.CompletedTask;
             })
             .OnInitialized(async (server, request, response, ct) =>
@@ -508,11 +519,12 @@ public static class ServerConfigurator
                 // The library advertises the capability by default with nothing behind it, and the
                 // client then sends notifications that are dropped. Say what is true.
                 response.Capabilities.Workspace ??= new WorkspaceServerCapabilities();
-                response.Capabilities.Workspace.WorkspaceFolders = new DidChangeWorkspaceFolderRegistrationOptions.StaticOptions
-                {
-                    Supported = false,
-                    ChangeNotifications = false
-                };
+                response.Capabilities.Workspace.WorkspaceFolders =
+                    new DidChangeWorkspaceFolderRegistrationOptions.StaticOptions
+                    {
+                        Supported = false,
+                        ChangeNotifications = false
+                    };
 
                 var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
 

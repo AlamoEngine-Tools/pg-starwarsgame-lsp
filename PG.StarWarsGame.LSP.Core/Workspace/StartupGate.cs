@@ -36,6 +36,8 @@ public sealed class StartupGate : IStartupGate
         return action(ct);
     }
 
+    public event Action? Opened;
+
     public async Task OpenAsync()
     {
         while (true)
@@ -46,8 +48,9 @@ public sealed class StartupGate : IStartupGate
                 if (_pending.Count == 0)
                 {
                     // Flip to open under the lock once the queue is empty so no late arrival is missed.
+                    if (_open) return;
                     _open = true;
-                    return;
+                    break;
                 }
 
                 next = _pending.Dequeue();
@@ -57,5 +60,8 @@ public sealed class StartupGate : IStartupGate
             // land in _pending and are picked up by the next loop iteration.
             await next(CancellationToken.None);
         }
+
+        // Outside the lock, once: a subscriber may send to the client from here.
+        Opened?.Invoke();
     }
 }

@@ -154,6 +154,34 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     // ── helpers ──────────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task Formatting_OnAGameXmlFile_IsAdvertisedAndAnswers()
+    {
+        RequireWorkspace();
+        Assert.True(await AdvertisedMethods.WaitForAsync(_fixture.Client, AdvertisedMethods.Formatting));
+        Assert.True(await AdvertisedMethods.WaitForAsync(_fixture.Client, AdvertisedMethods.RangeFormatting));
+
+        var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "AetFormattingProbe.xml");
+        var uri = DocumentUri.FromFileSystemPath(filePath);
+        const string text = "<?xml version=\"1.0\"?>\n<Root>\n<A>1</A>\n</Root>";
+        _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem { Uri = uri, LanguageId = "xml", Version = 1, Text = text }
+        });
+
+        var edits = await PollUntilAsync<TextEditContainer>(
+            async ct => await _fixture.Client.RequestDocumentFormatting(new DocumentFormattingParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = uri },
+                Options = new FormattingOptions { TabSize = 4, InsertSpaces = false }
+            }, ct),
+            r => r is not null && r.Any());
+
+        var edit = Assert.Single(edits!);
+        Assert.Equal(new Position(2, 0), edit.Range.Start);
+        Assert.Equal("\t", edit.NewText);
+    }
+
+    [Fact]
     public async Task StructureRequests_OnARealFile_FoldSelectAndHighlight()
     {
         RequireWorkspace();

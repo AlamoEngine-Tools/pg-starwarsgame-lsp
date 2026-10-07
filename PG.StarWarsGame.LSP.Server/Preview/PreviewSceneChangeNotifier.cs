@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Notifications;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
@@ -31,10 +32,11 @@ public sealed class PreviewSceneChangeNotifier : DebouncedIndexNotifier
 
     public PreviewSceneChangeNotifier(
         IGameIndexService indexService,
+        IStartupGate gate,
         Action<string> send,
         ILogger<PreviewSceneChangeNotifier> logger,
         int debounceMs = 100)
-        : base(indexService, debounceMs)
+        : base(indexService, gate, debounceMs)
     {
         _send = send;
         _logger = logger;

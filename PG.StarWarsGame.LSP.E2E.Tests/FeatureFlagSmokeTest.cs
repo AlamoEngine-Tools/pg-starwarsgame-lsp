@@ -29,6 +29,17 @@ public sealed class FeatureFlagSmokeTest : IClassFixture<FeatureFlagsServerFixtu
     }
 
     [Fact]
+    public async Task Formatting_XmlFormattingFlagOff_NotAdvertised()
+    {
+        // Dynamic registrations follow the initialize answer; by scan completion they have landed.
+        RequireEawWorkspace();
+        await WaitForFullScanAsync();
+
+        Assert.False(AdvertisedMethods.Advertises(_fixture.Client, AdvertisedMethods.Formatting));
+        Assert.False(AdvertisedMethods.Advertises(_fixture.Client, AdvertisedMethods.RangeFormatting));
+    }
+
+    [Fact]
     public async Task Completion_XmlCompletionFlagOff_ReturnsEmpty()
     {
         RequireEawWorkspace();

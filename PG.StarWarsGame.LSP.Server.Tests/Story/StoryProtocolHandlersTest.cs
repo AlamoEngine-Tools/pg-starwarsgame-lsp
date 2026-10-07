@@ -838,7 +838,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var index = new FiringIndexService();
         var sent = new List<StoryGraphChangedParams>();
-        _ = new StoryGraphChangeNotifier(index, Models(["GC"]), Config(),
+        _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(["GC"]), Config(),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
         index.Fire();
@@ -851,7 +851,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var index = new FiringIndexService();
         var sent = new List<StoryGraphChangedParams>();
-        _ = new StoryGraphChangeNotifier(index, Models(), Config(),
+        _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(), Config(),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
         index.Fire();
@@ -864,7 +864,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var index = new FiringIndexService();
         var sent = new List<StoryGraphChangedParams>();
-        _ = new StoryGraphChangeNotifier(index, Models(["GC"]), Config(false),
+        _ = new StoryGraphChangeNotifier(index, StartupGates.Open(), Models(["GC"]), Config(false),
             sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
         index.Fire();
