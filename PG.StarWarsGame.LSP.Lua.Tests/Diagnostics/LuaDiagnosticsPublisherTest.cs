@@ -177,6 +177,11 @@ public sealed class LuaDiagnosticsPublisherTest
         {
         }
 
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        {
+            return Task.FromResult<T?>(null);
+        }
+
         public void DidClose(string uri)
         {
         }

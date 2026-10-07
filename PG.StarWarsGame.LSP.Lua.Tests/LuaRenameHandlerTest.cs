@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Parsing;
+using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
@@ -84,7 +85,8 @@ public sealed class LuaRenameHandlerTest
         return new DocumentIndex(uri, 1, syms, refs);
     }
 
-    private static LuaRenameHandler MakeHandler(FakeWorkspaceHost? host = null, FakeSchemaProvider? schema = null)
+    private static LuaRenameHandler MakeHandler(FakeWorkspaceHost? host = null, FakeSchemaProvider? schema = null,
+        ILuaApiSchemaProvider? luaSchema = null)
     {
         var textSource = new DocumentTextSource(
             host ?? new FakeWorkspaceHost(),
@@ -94,7 +96,51 @@ public sealed class LuaRenameHandlerTest
             new LuaParseCache(textSource, 16),
             textSource,
             schema ?? new FakeSchemaProvider(),
-            NullLogger<LuaRenameHandler>.Instance);
+            NullLogger<LuaRenameHandler>.Instance,
+            luaSchema);
+    }
+
+    // ── Claims: what is ours to rename (#154) ────────────────────────────────
+
+    private static bool ClaimsAt(string text, int line, int character, GameIndex index,
+        ILuaApiSchemaProvider? luaSchema = null)
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, text, 1);
+        return MakeHandler(host, luaSchema: luaSchema).Claims(LuaUri, line, character, index);
+    }
+
+    [Fact]
+    public void ALocal_IsNotOurs()
+    {
+        Assert.False(ClaimsAt("local abc = 1\nprint(abc)", 1, 7, BuildIndex()));
+    }
+
+    [Fact]
+    public void AnXmlObjectString_IsOurs()
+    {
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("Empire", [XmlSymbolAt("Empire", XmlUri, 0, "Faction")]);
+
+        Assert.True(ClaimsAt("Find_Player(\"Empire\")", 0, 15, BuildIndex(defs: defs)));
+    }
+
+    [Fact]
+    public void AWorkspaceGlobal_IsOurs()
+    {
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("Foo", [LuaGlobal("Foo", OtherLuaUri)]);
+
+        Assert.True(ClaimsAt("Foo()", 0, 1, BuildIndex(defs: defs)));
+    }
+
+    /// <summary>The game binds it; a rename by the analyzer would break every script calling it.</summary>
+    [Fact]
+    public void AnEngineName_IsOurs()
+    {
+        var engine = new LuaApiSchemaProvider(["---@param name string\nfunction Find_Player(name) end"]);
+
+        Assert.True(ClaimsAt("Find_Player(\"x\")", 0, 3, BuildIndex(), engine));
     }
 
     // ── HandleRename: XmlObject string path ──────────────────────────────────

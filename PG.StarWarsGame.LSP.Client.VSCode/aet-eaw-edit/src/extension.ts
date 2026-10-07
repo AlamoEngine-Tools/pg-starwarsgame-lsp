@@ -98,6 +98,7 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
         'rangeFormatting',
         'onTypeFormatting',
         'inlayHint',
+        'semanticTokens',
     ] as const;
 
     fillClientCapabilities(capabilities: ClientCapabilities): void {

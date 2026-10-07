@@ -84,6 +84,30 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
             { TextDocument = new TextDocumentIdentifier(DocumentUri.From(Uri)), Position = new Position(0, 0) };
     }
 
+    /// <summary>The handlers ask by method name; the answer comes back typed.</summary>
+    [Fact]
+    public async Task ARequestByMethodName_ComesBackTyped()
+    {
+        var host = Host();
+        await host.StartAsync(Plan());
+        host.DidOpen(Uri, "x = 1", 1);
+
+        ILuaAnalyzer analyzer = host;
+        var hover = await analyzer.RequestAsync<Hover>("textDocument/hover", HoverAt(), CancellationToken.None);
+
+        Assert.StartsWith("args=", hover!.Contents.MarkupContent!.Value, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ARequestByMethodName_TheAnalyzerNeverAnswers_IsNull()
+    {
+        var host = Host(new Dictionary<string, string> { ["FAKE_HANG_HOVER"] = "1" });
+        await host.StartAsync(Plan());
+
+        ILuaAnalyzer analyzer = host;
+        Assert.Null(await analyzer.RequestAsync<Hover>("textDocument/hover", HoverAt(), CancellationToken.None));
+    }
+
     [Fact]
     public async Task OpenAndChange_AreMirroredWithFullText()
     {
