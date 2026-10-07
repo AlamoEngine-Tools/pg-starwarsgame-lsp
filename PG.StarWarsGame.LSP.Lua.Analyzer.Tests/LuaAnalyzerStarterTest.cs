@@ -59,6 +59,32 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
         Assert.Equal(0, _host.Starts);
     }
 
+    /// <summary>
+    ///     The layers keep their roots lower-cased; the analyzer compares paths as written, so a root
+    ///     in the wrong case leaves every document the editor opens outside its workspace (measured
+    ///     live: no findings at all).
+    /// </summary>
+    [Fact]
+    public void ARootIsHandedOverInItsCaseOnDisk()
+    {
+        if (!OperatingSystem.IsWindows()) Assert.Skip("Case-insensitive file systems only.");
+        var root = Path.Combine(Path.GetTempPath(), "AetCaseProbe" + Guid.NewGuid().ToString("N")[..6], "Data",
+            "Scripts");
+        Directory.CreateDirectory(root);
+
+        var resolved = PathCasing.OnDisk(root.ToLowerInvariant());
+
+        Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(resolved));
+        Assert.Equal(root.TrimEnd(Path.DirectorySeparatorChar), resolved.TrimEnd(Path.DirectorySeparatorChar),
+            StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void ARootNotOnDisk_IsHandedOverAsGiven()
+    {
+        Assert.Equal<string>("D:/no/such/root", PathCasing.OnDisk("D:/no/such/root"));
+    }
+
     [Theory]
     [InlineData("C:/bin/emmylua_ls.exe", true, "C:/bin/emmylua_ls.exe")] // the variable wins
     [InlineData(null, true, "beside")] // then the folder beside the server
@@ -66,7 +92,8 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
     public void TheExecutable_IsTheVariable_ThenTheFolderBesideTheServer(string? variable, bool besideExists,
         string? expected)
     {
-        var beside = Path.Combine("C:/server", "emmylua", OperatingSystem.IsWindows() ? "emmylua_ls.exe" : "emmylua_ls");
+        var beside = Path.Combine("C:/server", "emmylua",
+            OperatingSystem.IsWindows() ? "emmylua_ls.exe" : "emmylua_ls");
         var resolved = LuaAnalyzerExecutable.Resolve("C:/server", _ => variable,
             path => path == variable || (besideExists && path == beside));
 

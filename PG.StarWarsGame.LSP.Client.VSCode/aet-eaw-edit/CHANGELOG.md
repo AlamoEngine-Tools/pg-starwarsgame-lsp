@@ -33,6 +33,8 @@
 ### Diagnostic IDs
 
 - **New** - `Syntax3001` to `Syntax3009` (files the game drops), `XmlStrictness1` to `XmlStrictness6`
+- **New, Lua analyzer** - `Syntax3010` (a Lua syntax error, while the analyzer runs), `LuaAnalyzer1` to
+  `LuaAnalyzer10` (one per analyzer rule kept)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 
 ### Breaking changes

@@ -46,6 +46,151 @@ public sealed class LuaDiagnosticsPublisherTest
         return (publisher, published, indexService, workspaceHost);
     }
 
+    // ── the analyzer's findings, folded in (#153) ───────────────────────────
+
+    private static (List<PublishDiagnosticsParams> published, FakeGameWorkspaceHost host, FakeAnalyzer analyzer,
+        FakeGameIndexService index) BuildWithAnalyzer(bool running = true)
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var index = new FakeGameIndexService();
+        var host = new FakeGameWorkspaceHost();
+        var analyzer = new FakeAnalyzer { IsRunning = running };
+        _ = new LuaDiagnosticsPublisher(p => published.Add(p), index, host, new FileHelper(new MockFileSystem()),
+            new LuaApiSchemaProvider([]), NullLogger<LuaDiagnosticsPublisher>.Instance, analyzer: analyzer);
+        return (published, host, analyzer, index);
+    }
+
+    private static Diagnostic AnalyzerFinding(string rule, int line = 0)
+    {
+        return new Diagnostic
+        {
+            Code = rule, Severity = DiagnosticSeverity.Warning, Message = rule + " here",
+            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(line, 0, line, 1)
+        };
+    }
+
+    private static List<string> Codes(PublishDiagnosticsParams p)
+    {
+        return p.Diagnostics.Select(d => d.Code?.String ?? "").ToList();
+    }
+
+    [Fact]
+    public void AnAnalyzerPublish_ForAnOpenDocument_IsFoldedIntoOnePublish_UnderOurIds()
+    {
+        var (published, host, analyzer, _) = BuildWithAnalyzer();
+        host.Set(LuaUri, "local x = 1");
+
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused"), AnalyzerFinding("param-type-mismatch"));
+
+        var last = published.Last(p => p.Uri.ToString() == LuaUri);
+        Assert.Contains(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(last));
+        Assert.DoesNotContain("param-type-mismatch", Codes(last));
+        Assert.DoesNotContain("unused", Codes(last));
+    }
+
+    /// <summary>
+    ///     The analyzer writes URIs its own way (case, escaping); the open document keeps the
+    ///     editor's. Measured live: matched exactly, not one finding arrived.
+    /// </summary>
+    [Fact]
+    public void AnAnalyzerPublish_InAnotherCase_ReachesTheOpenDocument()
+    {
+        var (published, host, analyzer, _) = BuildWithAnalyzer();
+        host.Set("file:///Mods/MyMod/Data/Scripts/Script.lua", "local x = 1");
+
+        analyzer.Raise("file:///mods/mymod/data/scripts/script.lua", AnalyzerFinding("unused"));
+
+        var last = published.Last();
+        Assert.Equal("file:///Mods/MyMod/Data/Scripts/Script.lua", last.Uri.ToString());
+        Assert.Contains(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(last));
+    }
+
+    [Fact]
+    public void AnAnalyzerPublish_ForAClosedDocument_PublishesNothing()
+    {
+        var (published, _, analyzer, _) = BuildWithAnalyzer();
+
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused"));
+
+        Assert.Empty(published);
+    }
+
+    [Fact]
+    public void AnAnalyzerFinding_StaysThroughTheNextIndexRepublish()
+    {
+        var (published, host, analyzer, index) = BuildWithAnalyzer();
+        host.Set(LuaUri, "local x = 1");
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused"));
+
+        index.Fire(GameIndex.Empty);
+
+        Assert.Contains(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(published.Last()));
+    }
+
+    [Fact]
+    public void WithTheAnalyzerRunning_ItsSyntaxErrorIsTheOnlyOne()
+    {
+        var (published, host, analyzer, index) = BuildWithAnalyzer();
+        host.Set(LuaUri, "local broken = {1 2}");
+        analyzer.Raise(LuaUri, AnalyzerFinding("syntax-error"));
+
+        index.Fire(GameIndex.Empty);
+
+        var codes = Codes(published.Last());
+        Assert.Equal([DiagnosticIds.LuaSyntaxError.ToString()], codes);
+    }
+
+    [Fact]
+    public void WithoutTheAnalyzer_OurOwnParserStillReportsSyntaxErrors()
+    {
+        var (published, host, _, index) = BuildWithAnalyzer(running: false);
+        host.Set(LuaUri, "local broken = {1 2}");
+
+        index.Fire(GameIndex.Empty);
+
+        Assert.NotEmpty(published.Last().Diagnostics);
+        Assert.DoesNotContain(DiagnosticIds.LuaSyntaxError.ToString(), Codes(published.Last()));
+    }
+
+    [Fact]
+    public void AnAnalyzerFinding_IsSilencedByAnInlineSuppression()
+    {
+        var (published, host, analyzer, _) = BuildWithAnalyzer();
+        host.Set(LuaUri, $"-- aetswg:suppress {DiagnosticIds.LuaAnalyzerUnused}\nlocal x = 1");
+
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused", line: 1));
+
+        Assert.DoesNotContain(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(published.Last()));
+    }
+
+    private sealed class FakeAnalyzer : ILuaAnalyzer
+    {
+        public bool IsRunning { get; set; }
+
+        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
+
+        public void DidOpen(string uri, string text, int version)
+        {
+        }
+
+        public void DidChange(string uri, string text, int version)
+        {
+        }
+
+        public void DidClose(string uri)
+        {
+        }
+
+        public void Raise(string uri, params Diagnostic[] diagnostics)
+        {
+            DiagnosticsPublished?.Invoke(new PublishDiagnosticsParams
+            {
+                Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(uri),
+                Diagnostics = new Container<Diagnostic>(diagnostics)
+            });
+        }
+    }
+
     // ── feature flag ─────────────────────────────────────────────────────────
 
     [Fact]
