@@ -13,7 +13,7 @@ using OmniSharp.Extensions.LanguageServer.Server;
 
 // A stand-in for emmylua_ls: full document sync, a diagnostic per open and change that echoes
 // what arrived, and a hover that reports how the process was started. Behaviour switches:
-//   FAKE_CRASH_ONCE_FILE  exit after the first didOpen, unless that file exists (it is created first)
+//   FAKE_CRASH_ONCE_FILE  exit shortly after the first didOpen, unless that file exists (it is created first)
 //   FAKE_HANG_HOVER=1     hover never answers
 
 var server = await LanguageServer.From(options => options
@@ -61,7 +61,13 @@ internal sealed class FakeSync(ILanguageServerFacade server) : TextDocumentSyncH
             !File.Exists(marker))
         {
             File.WriteAllText(marker, "crashed");
-            Environment.Exit(3);
+            // Later, not now: the publish above is written asynchronously, and exiting at once lost
+            // it on a slower machine (CI), so the test saw nothing before the crash.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(500);
+                Environment.Exit(3);
+            });
         }
 
         return Unit.Task;
