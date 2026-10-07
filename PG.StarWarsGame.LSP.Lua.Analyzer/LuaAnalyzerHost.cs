@@ -167,10 +167,11 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzer, IAsyncDisposable, IDisposabl
     ///     <paramref name="timeout" /> (or the configured default), or fails.
     /// </summary>
     public async Task<T?> RequestAsync<T>(Func<ILanguageClient, CancellationToken, Task<T>> request,
-        TimeSpan? timeout = null) where T : class
+        TimeSpan? timeout = null, CancellationToken ct = default) where T : class
     {
         if (_session is not { } session || _disposed) return null;
-        using var cts = new CancellationTokenSource(timeout ?? _options.RequestTimeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout ?? _options.RequestTimeout);
         try
         {
             return await request(session.Client, cts.Token).WaitAsync(cts.Token);
@@ -185,6 +186,11 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzer, IAsyncDisposable, IDisposabl
             _logger.LogDebug(ex, "Lua analyzer request failed");
             return null;
         }
+    }
+
+    public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+    {
+        return RequestAsync((client, token) => client.SendRequest(method, parameters).Returning<T>(token), ct: ct);
     }
 
     private async Task StartSessionAsync()

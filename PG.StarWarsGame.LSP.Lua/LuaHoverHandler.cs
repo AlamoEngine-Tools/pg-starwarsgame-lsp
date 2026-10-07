@@ -22,6 +22,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
+    private readonly ILuaAnalyzer? _analyzer;
     private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -35,7 +36,9 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILuaAnnotationRepository annotationRepository,
-        ILogger<LuaHoverHandler> logger)
+        ILogger<LuaHoverHandler> logger,
+        // Optional: with the analyzer running, its card follows ours.
+        ILuaAnalyzer? analyzer = null)
     {
         _indexService = indexService;
         _parseCache = parseCache;
@@ -43,9 +46,20 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         _schemaProvider = schemaProvider;
         _annotationRepository = annotationRepository;
         _logger = logger;
+        _analyzer = analyzer;
     }
 
-    public Task<Hover?> Handle(HoverParams request, CancellationToken ct)
+    public async Task<Hover?> Handle(HoverParams request, CancellationToken ct)
+    {
+        var ours = await HandleOurs(request);
+        if (_analyzer is null ||
+            !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            return ours;
+        var theirs = await _analyzer.RequestAsync<Hover>("textDocument/hover", request, ct);
+        return LuaAnalyzerAnswers.MergeHover(ours, theirs);
+    }
+
+    private Task<Hover?> HandleOurs(HoverParams request)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))

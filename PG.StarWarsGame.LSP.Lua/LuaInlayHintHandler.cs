@@ -22,6 +22,7 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
     private readonly ILuaAnnotationRepository _annotationRepository;
+    private readonly ILuaAnalyzer? _analyzer;
     private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -36,7 +37,9 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
         ILuaApiSchemaProvider schemaProvider,
         ILuaAnnotationRepository annotationRepository,
         ILogger<LuaInlayHintHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        // Optional: with the analyzer running, its hints follow ours.
+        ILuaAnalyzer? analyzer = null)
     {
         _indexService = indexService;
         _parseCache = parseCache;
@@ -45,9 +48,24 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
         _annotationRepository = annotationRepository;
         _logger = logger;
         _config = config;
+        _analyzer = analyzer;
     }
 
-    public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
+    public override async Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
+    {
+        var ours = await HandleOurs(request);
+        if (_analyzer is null || !_config.Current.Features.Lua.InlayHints ||
+            !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            return ours;
+
+        var theirs = await _analyzer.RequestAsync<InlayHintContainer>("textDocument/inlayHint", request, ct);
+        if (theirs is null || !theirs.Any()) return ours;
+        // One hint per position: ours know the engine's parameter names.
+        var taken = new HashSet<Position>(ours?.Select(h => h.Position) ?? []);
+        return new InlayHintContainer((ours ?? []).Concat(theirs.Where(h => taken.Add(h.Position))));
+    }
+
+    private Task<InlayHintContainer?> HandleOurs(InlayHintParams request)
     {
         if (!_config.Current.Features.Lua.InlayHints)
             return Task.FromResult<InlayHintContainer?>(null);

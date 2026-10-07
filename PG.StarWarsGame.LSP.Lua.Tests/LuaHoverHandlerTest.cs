@@ -34,7 +34,8 @@ public sealed class LuaHoverHandlerTest
         GameIndex index,
         ILuaApiSchemaProvider schema,
         FakeWorkspaceHost? host = null,
-        ILuaAnnotationRepository? repo = null)
+        ILuaAnnotationRepository? repo = null,
+        ILuaAnalyzer? analyzer = null)
     {
         var svc = new FakeIndexService { Current = index };
         return new LuaHoverHandler(
@@ -43,7 +44,8 @@ public sealed class LuaHoverHandlerTest
             new FileHelper(new MockFileSystem()),
             schema,
             repo ?? new LuaAnnotationRepository(),
-            NullLogger<LuaHoverHandler>.Instance);
+            NullLogger<LuaHoverHandler>.Instance,
+            analyzer);
     }
 
     private static string GetMarkdown(Hover hover)
@@ -67,6 +69,73 @@ public sealed class LuaHoverHandlerTest
         var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]));
         var result = await handler.Handle(HoverAt(0, 0), CancellationToken.None);
         Assert.Null(result);
+    }
+
+    // ── the analyzer's hover, merged (#154) ──────────────────────────────────
+
+    private const string EngineStub = "---Finds a player.\n---@param name string\nfunction Find_Player(name) end";
+
+    private static Hover Theirs(string markdown)
+    {
+        return new Hover
+        {
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                { Kind = MarkupKind.Markdown, Value = markdown })
+        };
+    }
+
+    private static async Task<string?> HoverWith(string text, int character, ScriptedLuaAnalyzer analyzer)
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, text, 1);
+        var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([EngineStub]), host, analyzer: analyzer);
+        var result = await handler.Handle(HoverAt(0, character), CancellationToken.None);
+        return result is null ? null : GetMarkdown(result);
+    }
+
+    [Fact]
+    public async Task BothAnswer_OneCard_OursFirst()
+    {
+        var text = await HoverWith("Find_Player(\"Empire\")", 3,
+            new ScriptedLuaAnalyzer().Answer("textDocument/hover", Theirs("THEIRS: function Find_Player")));
+
+        Assert.NotNull(text);
+        var ours = text.IndexOf("Finds a player", StringComparison.Ordinal);
+        var theirs = text.IndexOf("THEIRS", StringComparison.Ordinal);
+        Assert.InRange(ours, 0, theirs - 1);
+        Assert.Contains("---", text[ours..theirs]);
+    }
+
+    [Fact]
+    public async Task OnlyTheAnalyzerAnswers_ItsCardAlone()
+    {
+        var text = await HoverWith("local abc = 1", 7,
+            new ScriptedLuaAnalyzer().Answer("textDocument/hover", Theirs("THEIRS: local abc: integer")));
+
+        Assert.Equal("THEIRS: local abc: integer", text);
+    }
+
+    [Fact]
+    public async Task TheAnalyzerSilent_OursAlone()
+    {
+        var text = await HoverWith("Find_Player(\"Empire\")", 3, new ScriptedLuaAnalyzer());
+
+        Assert.NotNull(text);
+        Assert.Contains("Finds a player", text);
+        Assert.DoesNotContain("---\n", text.Replace("\r", "", StringComparison.Ordinal));
+    }
+
+    /// <summary>Measured in the spike: the analyzer renders our reference tag as text.</summary>
+    [Fact]
+    public async Task TheAnalyzersRenderingOfOurReferenceTag_IsDropped()
+    {
+        var text = await HoverWith("local abc = 1", 7,
+            new ScriptedLuaAnalyzer().Answer("textDocument/hover",
+                Theirs("function Find_Player(name)\n\n@*aetref* XmlObject:Faction\n\n@*xmlref* XmlObject")));
+
+        Assert.DoesNotContain("aetref", text);
+        Assert.DoesNotContain("xmlref", text);
+        Assert.Contains("function Find_Player(name)", text);
     }
 
     // ── XML reference hover ───────────────────────────────────────────────────

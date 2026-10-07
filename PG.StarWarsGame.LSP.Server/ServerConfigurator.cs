@@ -142,6 +142,12 @@ public static class ServerConfigurator
             .WithHandler<XmlOnTypeFormattingHandler>()
             .WithHandler<XmlInlayHintHandler>()
             .WithHandler<LuaInlayHintHandler>()
+            // The Lua analyzer's, passed through (#154); each answers with nothing while it is not running.
+            .WithHandler<LuaReferencesHandler>()
+            .WithHandler<LuaDocumentSymbolHandler>()
+            .WithHandler<LuaSignatureHelpHandler>()
+            .WithHandler<LuaFoldingRangeHandler>()
+            .WithHandler<LuaSemanticTokensHandler>()
             .WithHandler<RevalidateWorkspaceCommandHandler>()
             .WithHandler<RevalidateDocumentCommandHandler>()
             .WithHandler<ReloadProjectCommandHandler>()

@@ -84,6 +84,11 @@ public sealed class LuaTextDocumentSyncHandlerTest
             Calls.Add($"change {uri} v{version} {text}");
         }
 
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        {
+            return Task.FromResult<T?>(null);
+        }
+
         public void DidClose(string uri)
         {
             Calls.Add($"close {uri}");
