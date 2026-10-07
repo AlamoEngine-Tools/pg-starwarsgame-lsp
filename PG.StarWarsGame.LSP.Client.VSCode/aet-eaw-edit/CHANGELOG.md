@@ -7,14 +7,13 @@
 - **XML structure judged by the game's reader** - a file the game drops is an error, XML the game reads but standard
   tools reject is a warning ([#199](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/199))
   - Comments inside values read as the game reads them: cut out, the text around them joined
-  - Where EaW and FoC differ (a mismatched end tag), the stricter FoC rule
+  - Where EaW and FoC differ (a mismatched end tag), the stricter FoC rule applies
   - Vanilla: 7 EaW files flagged as dropped under that rule; their FoC copies are clean
   - Comment inside a value off by default, through the project's `.aetswg/suppressions.json`
 - **Repairs for structural findings** - a quick fix per category, and **Fix all repairable XML structure problems in
   this file** ([#200](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/200))
   - No repair where the edit would change what the game reads, such as a stray `&`
-  - An element left open is closed where the file shows it ends, not by renaming its parent's end tag;
-    vanilla: 24,922 of 24,941 deleted end tags restored to the original tree
+  - An element left open is closed where the file shows it ends, not by renaming its parent's end tag
 - **Folding, expand selection, matching-tag highlight** - for XML, on malformed files too
   ([#201](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/201))
 - **XML formatter** - Format Document and Format Selection; re-indents, changes nothing the game reads
