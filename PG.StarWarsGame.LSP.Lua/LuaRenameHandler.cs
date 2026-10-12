@@ -5,10 +5,12 @@ using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -26,6 +28,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
     private readonly ILuaApiSchemaProvider? _luaSchema;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaSandboxProvider? _sandbox;
+    private readonly IFileHelper? _fileHelper;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
 
@@ -39,7 +42,9 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         // Optional: names the engine binds are claimed too, so the analyzer never renames them.
         ILuaApiSchemaProvider? luaSchema = null,
         // Optional: a Lua global is renamed within the script's own state, an XML object everywhere.
-        ILuaSandboxProvider? sandbox = null)
+        ILuaSandboxProvider? sandbox = null,
+        // Optional: state names are renamed where the script's state machine library is the game's.
+        IFileHelper? fileHelper = null)
     {
         _parseCache = parseCache;
         _textSource = textSource;
@@ -47,6 +52,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         _logger = logger;
         _luaSchema = luaSchema;
         _sandbox = sandbox;
+        _fileHelper = fileHelper;
     }
 
     public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
@@ -64,6 +70,11 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
             return XmlObjectRenameBuilder.Build(xmlObjectId, request.NewName, index, _schema, _textSource, _logger);
         }
 
+        // A state name: the library looks states up by the string, so every literal of it moves (#252).
+        if (StateNameAt(uri, parsed.Tree, request.Position.Line, request.Position.Character, index) is
+            { } state)
+            return state.Machine is { } machine ? RenameState(uri, machine, state.Hit.State, request.NewName) : null;
+
         // Fall back to Lua global (cursor on an identifier that is a known LuaGlobal).
         var luaGlobalId = FindLuaGlobalAtCursor(parsed.Tree, request.Position.Line, request.Position.Character,
             index);
@@ -74,6 +85,40 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
                 InScope(uri, luaGlobalId, index));
 
         return null;
+    }
+
+    // The state name under the position, where the script's library keeps the game's contract.
+    // Machine is null for a story event's state: its name is the story XML's, not the script's.
+    private (LuaStateHit Hit, LuaStateMachine? Machine)? StateNameAt(string uri, Loretta.CodeAnalysis.SyntaxTree tree,
+        int line, int character, GameIndex index)
+    {
+        var machine = LuaStateMachine.Read(tree.GetRoot());
+        if (machine.IsEmpty || machine.At(line, character) is not { Kind: LuaStateHitKind.STATE_NAME } hit) return null;
+        if (_fileHelper is null ||
+            !LuaStateMachineContract.For(uri, index.Documents, _parseCache, _fileHelper).StateMachine) return null;
+        var storyEvent = machine.Registrations.Any(r => r.Name == hit.State &&
+                                                        r.Source == LuaStateSource.STORY_MODE_EVENTS);
+        return (hit, storyEvent ? null : machine);
+    }
+
+    private static WorkspaceEdit RenameState(string uri, LuaStateMachine machine, string state, string newName)
+    {
+        var edits = machine.Registrations.Where(r => r.Name == state).Select(r => r.NameLocation)
+            .Concat(machine.Transitions.Where(t => t.Name == state).Select(t => t.NameLocation))
+            .Select(location => location.GetLineSpan())
+            .OrderBy(span => span.StartLinePosition.Line).ThenBy(span => span.StartLinePosition.Character)
+            .Select(span => new TextEdit
+            {
+                NewText = newName,
+                Range = new LspRange(
+                    new Position(span.StartLinePosition.Line, span.StartLinePosition.Character),
+                    new Position(span.EndLinePosition.Line, span.EndLinePosition.Character))
+            })
+            .ToList();
+        return new WorkspaceEdit
+        {
+            Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>> { [DocumentUri.From(uri)] = edits }
+        };
     }
 
     private bool IsEngineEntryPoint(string name)
@@ -97,6 +142,16 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
 
     public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
     {
+        if (_parseCache.GetOrParse(uri) is { } stateParse &&
+            StateNameAt(uri, stateParse.Tree, line, character, index) is { } state)
+        {
+            if (state.Machine is null) return null;
+            var span = state.Hit.Location.GetLineSpan();
+            return new RangeOrPlaceholderRange(new LspRange(
+                new Position(span.StartLinePosition.Line, span.StartLinePosition.Character),
+                new Position(span.EndLinePosition.Line, span.EndLinePosition.Character)));
+        }
+
         // LuaGlobal path - requires document in the index.
         if (index.Documents.TryGetValue(uri, out var docIndex))
         {
@@ -128,6 +183,9 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
 
     public bool Claims(string uri, int line, int character, GameIndex index)
     {
+        if (_parseCache.GetOrParse(uri) is { } stateParse &&
+            StateNameAt(uri, stateParse.Tree, line, character, index) is not null)
+            return true;
         if (index.Documents.TryGetValue(uri, out var docIndex) &&
             LuaPositionResolver.FindAtPosition(docIndex, line, character) is not null)
             return true;

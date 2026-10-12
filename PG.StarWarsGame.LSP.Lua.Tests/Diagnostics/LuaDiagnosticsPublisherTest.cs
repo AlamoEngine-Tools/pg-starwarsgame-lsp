@@ -245,6 +245,28 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Equal(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString(), diagnostic.Code?.String);
     }
 
+    // The state machine rules hold where the script's state loads a library with the contract (#252).
+    [Fact]
+    public void OnIndexChanged_TransitionToAnUnregisteredState_PublishesTheStateMachineDiagnostic()
+    {
+        const string library = "file:///library/pgstatemachine.lua";
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri, "require(\"PGStateMachine\")\nSet_Next_State(\"Nowhere\")\n");
+        workspaceHost.Set(library, "function Define_State(s, f) end\n" +
+                                   "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
+                                   "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end\n");
+        var documents = ImmutableDictionary<string, DocumentIndex>.Empty
+            .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [], ["PGStateMachine"]))
+            .Add(library, new DocumentIndex(library, 1, [], []));
+
+        indexService.Fire(new GameIndex(BaselineIndex.Empty, documents,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty));
+
+        var diagnostics = published.Single(p => p.Uri.ToString() == LuaUri).Diagnostics!;
+        Assert.Single(diagnostics, d => d.Code?.String == DiagnosticIds.LuaStateTransitionUnregistered.ToString());
+    }
+
     [Fact]
     public void PublishForDocument_SameContentTwice_ParsesOnce()
     {

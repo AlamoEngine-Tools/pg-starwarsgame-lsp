@@ -48,6 +48,16 @@
   ([#251](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/251))
   - The script's text is unchanged; an annotation the script already has wins
   - Open scripts only
+- **The game's state machine** - scripts held to the contract of its state machine and story libraries
+  ([#252](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/252))
+  - Hover on a state handler, its message and a state's name; a handler's message typed `OnEnter`, `OnUpdate` or
+    `OnExit`
+  - State names: go to the handler, completion in `Set_Next_State`, rename; a story event's name is not renamed
+  - Diagnostics: a transition to an unregistered state, a registration of a non-function, a story event naming an
+    undefined function, a state registered twice, a handler not taking one parameter, a message compared with
+    anything else
+  - Vanilla: 8 EaW story events name a function defined nowhere and never fire; one handler takes no parameter
+  - Silent where a mod ships its own state machine library that changes the contract
 
 ### Fixes
 
@@ -62,6 +72,7 @@
 - **New** - `Syntax3001` to `Syntax3009` (files the game drops), `XmlStrictness1` to `XmlStrictness6`
 - **New, Lua analyzer** - `Syntax3010` (a Lua syntax error, while the analyzer runs), `LuaAnalyzer1` to
   `LuaAnalyzer10` (one per analyzer rule kept)
+- **New, state machine** - `Engine8` to `Engine13` (`aetswg-011-0008` to `aetswg-011-0013`)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 
 ### Breaking changes

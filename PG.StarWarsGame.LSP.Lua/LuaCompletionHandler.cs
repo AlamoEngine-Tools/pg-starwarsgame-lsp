@@ -102,6 +102,9 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
                 when string.Equals(fn, "require", StringComparison.OrdinalIgnoreCase):
                 return new CompletionList(BuildRequireCompletions(uri, index));
 
+            case { FunctionName: "Set_Next_State", ParamIndex: 0 }:
+                return new CompletionList(BuildStateCompletions(uri, index));
+
             case { FunctionName: var fn, ParamIndex: var param }:
             {
                 var xmlRefs = _schemaProvider.GetXmlRefs(fn);
@@ -133,6 +136,26 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             default:
                 return new CompletionList();
         }
+    }
+
+    // The states the script registers, where its state machine library keeps the game's contract.
+    private IEnumerable<CompletionItem> BuildStateCompletions(string uri, GameIndex index)
+    {
+        if (_parseCache.GetOrParse(uri) is not { } parsed) return [];
+        var contract = LuaStateMachineContract.For(uri, index.Documents, _parseCache, _fileHelper);
+        if (!contract.StateMachine) return [];
+
+        var states = LuaStateMachine.Read(parsed.Tree.GetRoot()).Registrations
+            .Where(r => r.Source == LuaStateSource.DEFINE_STATE || contract.StoryMode)
+            .Select(r => (r.Name, Detail: (r.Value as Loretta.CodeAnalysis.Lua.Syntax.IdentifierNameSyntax)?.Name))
+            .ToList();
+        if (contract.StoryMode) states.Insert(0, (LuaStateMachine.StoryInitState, null));
+        return states.DistinctBy(s => s.Name).Select(s => new CompletionItem
+        {
+            Label = s.Name,
+            Kind = CompletionItemKind.EnumMember,
+            Detail = s.Detail is null ? "state" : $"state - handler {s.Detail}"
+        });
     }
 
     private IEnumerable<CompletionItem> BuildRequireCompletions(string currentUri, GameIndex index)

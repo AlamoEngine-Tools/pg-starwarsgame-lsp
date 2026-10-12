@@ -4,6 +4,7 @@
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Microsoft.Extensions.Logging;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -103,6 +104,11 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         if (parsed is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
+        // Path C: a state name - the handler registered under it (#252).
+        if (StateHandlerLink(parsed.Tree.GetRoot(), uri, line, character, index) is { } stateLink)
+            return Task.FromResult<LocationOrLocationLinks?>(
+                new LocationOrLocationLinks(new LocationOrLocationLink(stateLink)));
+
         var resolved = TryResolveRequireAtPosition(parsed.Tree.GetRoot(), line, character, index.Documents, _fileHelper,
             uri);
         if (resolved is null)
@@ -119,6 +125,30 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         _logger.LogDebug("Go-to-def (require): -> {Uri}", resolved.Value.Target);
         return Task.FromResult<LocationOrLocationLinks?>(
             new LocationOrLocationLinks(new LocationOrLocationLink(targetLink)));
+    }
+
+    private LocationLink? StateHandlerLink(SyntaxNode root, string uri, int line, int character, GameIndex index)
+    {
+        var machine = LuaStateMachine.Read(root);
+        if (machine.IsEmpty || machine.At(line, character) is not { Kind: LuaStateHitKind.STATE_NAME } hit ||
+            hit.Registration?.Handler is not { } handler)
+            return null;
+        if (!LuaStateMachineContract.For(uri, index.Documents, _parseCache, _fileHelper).StateMachine) return null;
+
+        static LspRange RangeOf(Loretta.CodeAnalysis.Location location)
+        {
+            var span = location.GetLineSpan();
+            return new LspRange(new Position(span.StartLinePosition.Line, span.StartLinePosition.Character),
+                new Position(span.EndLinePosition.Line, span.EndLinePosition.Character));
+        }
+
+        return new LocationLink
+        {
+            TargetUri = DocumentUri.From(uri),
+            TargetRange = RangeOf(handler.NameLocation),
+            TargetSelectionRange = RangeOf(handler.NameLocation),
+            OriginSelectionRange = RangeOf(hit.Location)
+        };
     }
 
     // The index holds every script's globals; one in another script's state is a different global

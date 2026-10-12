@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis.Generated;
 /// <summary>What one source of knowledge wants inserted above a script's functions.</summary>
 public interface ILuaAnnotationSource
 {
-    IEnumerable<LuaAnnotationInsertion> For(SyntaxTree tree);
+    IEnumerable<LuaAnnotationInsertion> For(SyntaxTree tree, string uri);
 }
 
 /// <summary>
@@ -20,7 +20,7 @@ public interface ILuaAnnotationSource
 /// </summary>
 public sealed class StubOverrideAnnotations(ILuaApiSchemaProvider schema) : ILuaAnnotationSource
 {
-    public IEnumerable<LuaAnnotationInsertion> For(SyntaxTree tree)
+    public IEnumerable<LuaAnnotationInsertion> For(SyntaxTree tree, string uri)
     {
         var text = tree.GetText();
         foreach (var function in tree.GetRoot().DescendantNodes().OfType<FunctionDeclarationStatementSyntax>())

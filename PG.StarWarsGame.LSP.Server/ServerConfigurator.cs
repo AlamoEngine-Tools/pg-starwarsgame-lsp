@@ -30,6 +30,7 @@ using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Analysis.Generated;
 using PG.StarWarsGame.LSP.Lua.Analyzer;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
@@ -345,7 +346,11 @@ public static class ServerConfigurator
                 // server knows, inserted above the script's functions in the text the analyzer reads.
                 services.AddSingleton<ILuaAnalyzer>(sp => new GeneratedAnalyzerDocuments(
                     sp.GetRequiredService<LuaAnalyzerHost>(),
-                    [new StubOverrideAnnotations(sp.GetRequiredService<ILuaApiSchemaProvider>())],
+                    [
+                        new StubOverrideAnnotations(sp.GetRequiredService<ILuaApiSchemaProvider>()),
+                        new StateHandlerAnnotations(sp.GetRequiredService<IGameIndexService>(),
+                            sp.GetRequiredService<ILuaParseCache>(), sp.GetRequiredService<IFileHelper>())
+                    ],
                     sp.GetRequiredService<IFileHelper>()));
                 services.AddSingleton<ILuaAnalyzerStarter>(sp => new LuaAnalyzerStarter(
                     sp.GetRequiredService<LuaAnalyzerHost>(),

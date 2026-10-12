@@ -100,7 +100,7 @@ public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
         try
         {
             var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
-            insertions = _sources.SelectMany(s => s.For(tree)).ToList();
+            insertions = _sources.SelectMany(s => s.For(tree, key)).ToList();
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {

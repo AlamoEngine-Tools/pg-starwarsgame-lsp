@@ -99,7 +99,8 @@ public sealed class LuaRenameHandlerTest
             schema ?? new FakeSchemaProvider(),
             NullLogger<LuaRenameHandler>.Instance,
             luaSchema,
-            sandbox);
+            sandbox,
+            new FileHelper(new MockFileSystem()));
     }
 
     // ── Claims: what is ours to rename (#154) ────────────────────────────────
@@ -463,6 +464,50 @@ public sealed class LuaRenameHandlerTest
         Assert.Null(handler.HandleRename(LuaUri, RenameAt(0, 10, "Run"), index));
         Assert.Null(handler.HandlePrepare(LuaUri, 0, 10, index));
         Assert.True(handler.Claims(LuaUri, 0, 10, index));
+    }
+
+    // ── state names (#252) ───────────────────────────────────────────────────
+
+    private const string MachineLibraryUri = "file:///data/scripts/library/pgstatemachine.lua";
+
+    private static (LuaRenameHandler Handler, GameIndex Index) InMachine(string script)
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, script, 1);
+        host.AddOrUpdate(MachineLibraryUri, "function Define_State(s, f) end\n" +
+                                            "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
+                                            "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end",
+            1);
+        var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty
+            .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [], ["PGStateMachine"]))
+            .Add(MachineLibraryUri, new DocumentIndex(MachineLibraryUri, 1, [], [])));
+        return (MakeHandler(host), index);
+    }
+
+    // The library looks a state up by the string: every Define_State and Set_Next_State of it moves.
+    [Fact]
+    public void AStateName_IsRenamedInEveryRegistrationAndTransition()
+    {
+        var (handler, index) = InMachine("Define_State(\"Attack\", A)\nSet_Next_State(\"Attack\")\n" +
+                                         "Set_Next_State(\"Other\")\nfunction A(message) end");
+
+        Assert.True(handler.Claims(LuaUri, 1, 18, index));
+        Assert.NotNull(handler.HandlePrepare(LuaUri, 1, 18, index));
+        var edit = handler.HandleRename(LuaUri, RenameAt(1, 18, "Assault"), index);
+
+        var edits = edit!.Changes![DocumentUri.From(LuaUri)].ToList();
+        Assert.Equal([(0, 14), (1, 16)], edits.Select(e => (e.Range.Start.Line, e.Range.Start.Character)));
+        Assert.All(edits, e => Assert.Equal("Assault", e.NewText));
+    }
+
+    // A story event's name is the story XML's: renamed here alone, the event would stop reaching it.
+    [Fact]
+    public void AStoryEventState_IsNotRenamed()
+    {
+        var (handler, index) = InMachine("StoryModeEvents = { Demo_Start = S }\nfunction S(message) end");
+
+        Assert.Null(handler.HandleRename(LuaUri, RenameAt(0, 22, "Begin"), index));
+        Assert.Null(handler.HandlePrepare(LuaUri, 0, 22, index));
     }
 
     // An XML object is the game's, not a script's: its rename reaches every script naming it (#249).
