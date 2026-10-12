@@ -43,6 +43,11 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         return Inner.GetFunctionParams(functionName);
     }
 
+    public LuaEntryPoint? GetEntryPoint(string functionName)
+    {
+        return Inner.GetEntryPoint(functionName);
+    }
+
     private sealed class EmptyProvider : ILuaApiSchemaProvider
     {
         public IReadOnlySet<string> AllFunctionNames =>
@@ -71,6 +76,11 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName)
         {
             return [];
+        }
+
+        public LuaEntryPoint? GetEntryPoint(string functionName)
+        {
+            return null;
         }
     }
 }

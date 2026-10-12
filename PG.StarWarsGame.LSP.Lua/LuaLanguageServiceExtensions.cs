@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
@@ -29,6 +30,8 @@ public static class LuaLanguageServiceExtensions
         services.AddSingleton<ICacheStatisticsSource>(sp =>
             (ICacheStatisticsSource)sp.GetRequiredService<ILuaParseCache>());
         services.AddSingleton<IGameDocumentParser, LuaGameDocumentParser>();
+        // Which scripts share a Lua state: the scope of a Lua global in navigation and rename.
+        services.AddSingleton<ILuaSandboxProvider, LuaSandboxProvider>();
         services.AddSingleton<LuaDiagnosticsPublisher>();
         services.AddSingleton<IDiagnosticsRepublisher>(sp => sp.GetRequiredService<LuaDiagnosticsPublisher>());
         return services;

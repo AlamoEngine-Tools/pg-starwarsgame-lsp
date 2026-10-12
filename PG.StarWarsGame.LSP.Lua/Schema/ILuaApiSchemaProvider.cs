@@ -52,6 +52,12 @@ public interface ILuaApiSchemaProvider
     IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName);
 
     /// <summary>
+    ///     The entry point of that name - a function a script defines for the game or a library to
+    ///     call - or <c>null</c>. Not a declared global. Lookup is case-insensitive.
+    /// </summary>
+    LuaEntryPoint? GetEntryPoint(string functionName);
+
+    /// <summary>
     ///     A hash of the stub text this provider was built from. The stubs decide which string
     ///     arguments a script's index records as references, so a cached index is only valid under
     ///     the stubs it was built with; empty when no stubs are loaded.

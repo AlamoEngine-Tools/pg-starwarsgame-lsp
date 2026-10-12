@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Xml;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -45,7 +46,8 @@ public sealed class GameRenameHandlerTest
         ILuaRenameProvider? luaProvider = null,
         ILspConfigurationProvider? config = null,
         ILuaAnalyzer? analyzer = null,
-        IProjectLayerMap? layers = null)
+        IProjectLayerMap? layers = null,
+        ILuaSandboxProvider? sandbox = null)
     {
         return new GameRenameHandler(
             new FakeIndexService(),
@@ -54,7 +56,8 @@ public sealed class GameRenameHandlerTest
             new FileHelper(new MockFileSystem()),
             config ?? new FakeLspConfigurationProvider(),
             analyzer,
-            layers);
+            layers,
+            sandbox);
     }
 
     private static ProjectLayerMap Layers()
@@ -116,6 +119,51 @@ public sealed class GameRenameHandlerTest
             handler.Handle(RenameAt(ModScript), CancellationToken.None));
 
         Assert.StartsWith("Rename refused: ", refusal.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>Two story scripts are two states: renaming a global in one leaves the other alone (#249).</summary>
+    [Fact]
+    public async Task TheAnalyzersRename_InAnotherScriptsState_IsDropped()
+    {
+        const string otherScript = "file:///c:/mods/mymod/data/scripts/story/b.lua";
+        var documents = ImmutableDictionary.CreateRange(new[]
+        {
+            KeyValuePair.Create(ModScript, new DocumentIndex(ModScript, 1, [], [])),
+            KeyValuePair.Create(otherScript, new DocumentIndex(otherScript, 1, [], []))
+        });
+        var sandbox = new OneSandbox(LuaSandbox.Build(documents, new FileHelper(new MockFileSystem())));
+        var analyzer = new AnswerOnce("textDocument/rename", EditOf(ModScript, otherScript));
+
+        var result = await BuildHandler(luaProvider: new ClaimsNothing(), analyzer: analyzer, layers: Layers(),
+            sandbox: sandbox).Handle(RenameAt(ModScript), CancellationToken.None);
+
+        Assert.Equal([ModScript], result!.Changes!.Keys.Select(k => k.ToString()));
+    }
+
+    /// <summary>A library both scripts load names the global: the rename is every such script's.</summary>
+    [Fact]
+    public async Task TheAnalyzersRename_ThroughASharedLibrary_KeepsEveryScriptLoadingIt()
+    {
+        const string otherScript = "file:///c:/mods/mymod/data/scripts/story/b.lua";
+        const string library = "file:///c:/mods/mymod/data/scripts/library/mylib.lua";
+        var documents = ImmutableDictionary.CreateRange(new[]
+        {
+            KeyValuePair.Create(ModScript, new DocumentIndex(ModScript, 1, [], [], ["MyLib"])),
+            KeyValuePair.Create(otherScript, new DocumentIndex(otherScript, 1, [], [], ["MyLib"])),
+            KeyValuePair.Create(library, new DocumentIndex(library, 1, [], []))
+        });
+        var sandbox = new OneSandbox(LuaSandbox.Build(documents, new FileHelper(new MockFileSystem())));
+        var analyzer = new AnswerOnce("textDocument/rename", EditOf(ModScript, otherScript, library));
+
+        var result = await BuildHandler(luaProvider: new ClaimsNothing(), analyzer: analyzer, layers: Layers(),
+            sandbox: sandbox).Handle(RenameAt(ModScript), CancellationToken.None);
+
+        Assert.Equal(3, result!.Changes!.Count);
+    }
+
+    private sealed class OneSandbox(LuaSandbox sandbox) : ILuaSandboxProvider
+    {
+        public LuaSandbox Current => sandbox;
     }
 
     // ── feature flags ──────────────────────────────────────────────────────────

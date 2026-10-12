@@ -342,6 +342,56 @@ public sealed class LuaHoverHandlerTest
         Assert.Contains("Finds the first game object", content);
     }
 
+    // ── definitions of names the schema knows (#249) ────────────────────────
+    // Measured on emmylua 0.25.1: a script function defining a global the stubs declare gets
+    // neither the stub's documentation nor its types, so the stub card is ours to give.
+
+    private static async Task<string?> HoverOn(string text, int line, int character, LuaApiSchemaProvider schema)
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, text, 1);
+        var result = await BuildHandler(GameIndex.Empty, schema, host)
+            .Handle(HoverAt(line, character), CancellationToken.None);
+        return result is null ? null : GetMarkdown(result);
+    }
+
+    [Fact]
+    public async Task AScriptDefiningAStubGlobal_GetsTheStubsCard()
+    {
+        var text = await HoverOn("function Find_Player(name)\nend", 0, 12, new LuaApiSchemaProvider([EngineStub]));
+
+        Assert.Contains("Finds a player", text);
+    }
+
+    private static LuaApiSchemaProvider WithEntryPoints()
+    {
+        return new LuaApiSchemaProvider([], [
+            new LuaEntryPoint("main", LuaEntryPointCaller.ENGINE, [], ["object", "story"], "The script's thread."),
+            new LuaEntryPoint("Definitions", LuaEntryPointCaller.LIBRARY, ["PGStateMachine"], ["object"],
+                "The script's own setup.")
+        ]);
+    }
+
+    [Fact]
+    public async Task AnEntryPointsDefinition_SaysWhatCallsItAndWhen()
+    {
+        var text = await HoverOn("function main()\nend", 0, 10, WithEntryPoints());
+
+        Assert.Contains("The script's thread.", text);
+        Assert.Contains("Called by the game", text);
+        Assert.Contains("object, story", text);
+    }
+
+    // The library's own call: the same card, naming the library.
+    [Fact]
+    public async Task ACallToALibraryCalledEntryPoint_NamesTheLibrary()
+    {
+        var text = await HoverOn("if Definitions then\n  Definitions()\nend", 1, 4, WithEntryPoints());
+
+        Assert.Contains("The script's own setup.", text);
+        Assert.Contains("PGStateMachine", text);
+    }
+
     // ── richer hover content ──────────────────────────────────────────────────
 
     [Fact]

@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using Newtonsoft.Json.Linq;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -23,13 +24,22 @@ internal static class LuaAnalyzerPassThrough
     }
 }
 
-public sealed class LuaReferencesHandler(ILuaAnalyzer analyzer) : ReferencesHandlerBase
+/// <summary>
+///     The analyzer's references, less those in a state the requesting script does not share: it
+///     sees one namespace, the game one per script (#249).
+/// </summary>
+public sealed class LuaReferencesHandler(ILuaAnalyzer analyzer, ILuaSandboxProvider? sandbox = null)
+    : ReferencesHandlerBase
 {
-    public override Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken ct)
+    public override async Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken ct)
     {
-        return LuaAnalyzerPassThrough.IsLua(request.TextDocument)
-            ? analyzer.RequestAsync<LocationContainer>("textDocument/references", request, ct)
-            : Task.FromResult<LocationContainer?>(null);
+        if (!LuaAnalyzerPassThrough.IsLua(request.TextDocument)) return null;
+        var theirs = await analyzer.RequestAsync<LocationContainer>("textDocument/references", request, ct);
+        if (theirs is null || sandbox is null) return theirs;
+
+        var current = sandbox.Current;
+        var from = request.TextDocument.Uri.ToString();
+        return new LocationContainer(theirs.Where(l => current.ShareAState(from, l.Uri.ToString())));
     }
 
     protected override ReferenceRegistrationOptions CreateRegistrationOptions(
@@ -119,7 +129,8 @@ public sealed class LuaInlayHintHandler(ILuaAnalyzer analyzer) : InlayHintsHandl
 }
 
 /// <summary>The analyzer's lenses: sent without a command, which its resolve fills (measured, 0.25.1).</summary>
-public sealed class LuaCodeLensHandler(ILuaAnalyzer analyzer) : CodeLensHandlerBase
+public sealed class LuaCodeLensHandler(ILuaAnalyzer analyzer, ILuaSandboxProvider? sandbox = null)
+    : CodeLensHandlerBase
 {
     // The router's own key rides in the lens data, and with it present the analyzer resolves
     // nothing (measured, 0.25.1), so the analyzer is sent its data alone.
@@ -142,7 +153,23 @@ public sealed class LuaCodeLensHandler(ILuaAnalyzer analyzer) : CodeLensHandlerB
 
         // The editor's command takes typed arguments the protocol cannot carry, and the analyzer's
         // extension is not installed; ours takes them as sent - document, position, locations.
-        return resolved with { Command = command with { Name = "aet-eaw-edit.lsp.showReferences" } };
+        return resolved with { Command = InOwnState(command) with { Name = "aet-eaw-edit.lsp.showReferences" } };
+    }
+
+    // The arguments are (document, position, locations), measured; the count in the title is the
+    // number of locations. Recounted over the document's own state (#249).
+    private Command InOwnState(Command command)
+    {
+        if (sandbox is null || command.Arguments is not { Count: 3 } arguments
+                            || arguments[0] is not { Type: JTokenType.String } document
+                            || arguments[2] is not JArray locations)
+            return command;
+
+        var current = sandbox.Current;
+        var kept = new JArray(locations.Where(l =>
+            l["uri"]?.Value<string>() is not { } uri || current.ShareAState(document.Value<string>()!, uri)));
+        var title = kept.Count == 1 ? "1 usage" : $"{kept.Count} usages";
+        return command with { Title = title, Arguments = new JArray(document, arguments[1], kept) };
     }
 
     protected override CodeLensRegistrationOptions CreateRegistrationOptions(

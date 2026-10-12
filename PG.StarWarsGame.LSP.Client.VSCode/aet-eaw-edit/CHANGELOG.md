@@ -36,6 +36,13 @@
   [#155](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/155))
   - Engine knowledge from the measured `---@meta` stubs; game-object completion, navigation and rename stay this
     server's
+- **Lua globals scoped to the script** - references, code lens counts and go to definition stay within the script
+  and the libraries it requires, as the game runs every script in a state of its own
+  ([#249](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/249))
+  - Rename of a global reaches every script sharing a library that defines or calls it
+  - Entry points on hover: the functions the game or a library calls by name, per kind of script
+  - Hover on a script's own definition of an engine function: the engine's documentation
+  - An entry point the game calls is not renamed
 
 ### Fixes
 

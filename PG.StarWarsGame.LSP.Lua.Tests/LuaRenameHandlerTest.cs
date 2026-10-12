@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -86,7 +87,7 @@ public sealed class LuaRenameHandlerTest
     }
 
     private static LuaRenameHandler MakeHandler(FakeWorkspaceHost? host = null, FakeSchemaProvider? schema = null,
-        ILuaApiSchemaProvider? luaSchema = null)
+        ILuaApiSchemaProvider? luaSchema = null, ILuaSandboxProvider? sandbox = null)
     {
         var textSource = new DocumentTextSource(
             host ?? new FakeWorkspaceHost(),
@@ -97,7 +98,8 @@ public sealed class LuaRenameHandlerTest
             textSource,
             schema ?? new FakeSchemaProvider(),
             NullLogger<LuaRenameHandler>.Instance,
-            luaSchema);
+            luaSchema,
+            sandbox);
     }
 
     // ── Claims: what is ours to rename (#154) ────────────────────────────────
@@ -334,6 +336,162 @@ public sealed class LuaRenameHandlerTest
         Assert.Equal(9, defEdit.Range.Start.Character);
         Assert.Equal(12, defEdit.Range.End.Character);
         Assert.Equal("Bar", defEdit.NewText);
+    }
+
+    // A Lua global lives in the script's own state (#249): the same name in another script - a game
+    // script in a lower layer among them - is a different global, neither renamed nor in the way.
+    [Fact]
+    public void HandleRename_LuaGlobal_StaysInTheScriptsOwnState()
+    {
+        const string mine = "file:///mod/data/scripts/gameobject/interdictor.lua";
+        const string theGames = "file:///game/data/scripts/gameobject/darthvader.lua";
+        var mySym = LuaGlobal("Definitions", mine);
+        var myRef = LuaGlobalRef("Definitions", mine, 2, 0, 11);
+        var theirSym = LuaGlobal("Definitions", theGames);
+        var theirRef = LuaGlobalRef("Definitions", theGames, 2, 0, 11);
+        var docs = ImmutableDictionary<string, DocumentIndex>.Empty
+            .Add(mine, new DocumentIndex(mine, 1, [mySym], [myRef], LayerRank: 1))
+            .Add(theGames, new DocumentIndex(theGames, 1, [theirSym], [theirRef], LayerRank: 0));
+        var index = BuildIndex(docs,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Definitions", [mySym, theirSym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Definitions", [myRef, theirRef]));
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(mine, "function Definitions()\nend\nDefinitions()", 1);
+        host.AddOrUpdate(theGames, "function Definitions()\nend\nDefinitions()", 1);
+        var sandbox = new FixedSandbox(LuaSandbox.Build(docs, new FileHelper(new MockFileSystem())));
+
+        var result = MakeHandler(host, sandbox: sandbox).HandleRename(mine, RenameAt(2, 3, "Setup", mine), index);
+
+        Assert.Equal([mine], result!.Changes!.Keys.Select(k => k.ToString()));
+        Assert.Equal(2, result.Changes[DocumentUri.From(mine)].Count());
+    }
+
+    // The state machine calls Definitions: one text in every script's state that loads it, so the
+    // rename reaches every such script, or the library stops calling theirs.
+    [Fact]
+    public void HandleRename_LuaGlobal_ASharedLibraryNamingIt_TakesInEveryScriptLoadingIt()
+    {
+        const string mine = "file:///mod/data/scripts/gameobject/interdictor.lua";
+        const string another = "file:///mod/data/scripts/gameobject/darthvader.lua";
+        const string library = "file:///mod/data/scripts/library/pgstatemachine.lua";
+        var mySym = LuaGlobal("Definitions", mine);
+        var theirSym = LuaGlobal("Definitions", another);
+        var call = LuaGlobalRef("Definitions", library, 1, 1, 11);
+        var docs = ImmutableDictionary<string, DocumentIndex>.Empty
+            .Add(mine, new DocumentIndex(mine, 1, [mySym], [], ["PGStateMachine"]))
+            .Add(another, new DocumentIndex(another, 1, [theirSym], [], ["PGStateMachine"]))
+            .Add(library, new DocumentIndex(library, 1, [], [call]));
+        var index = BuildIndex(docs,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Definitions", [mySym, theirSym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Definitions", [call]));
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(mine, "function Definitions()\nend", 1);
+        host.AddOrUpdate(another, "function Definitions()\nend", 1);
+        host.AddOrUpdate(library, "if Definitions then\n Definitions()\nend", 1);
+        var sandbox = new FixedSandbox(LuaSandbox.Build(docs, new FileHelper(new MockFileSystem())));
+
+        var result = MakeHandler(host, sandbox: sandbox).HandleRename(mine, RenameAt(0, 10, "Setup", mine), index);
+
+        Assert.Equal([another, mine, library], result!.Changes!.Keys.Select(k => k.ToString()).Order());
+    }
+
+    // A leaf script redefining a global of a library it loads: in its state the library's definition
+    // and calls are the same global.
+    private static (GameIndex Index, FakeWorkspaceHost Host, FixedSandbox Sandbox) LeafRedefinesLibraryGlobal(
+        int libraryRank, out string mine, out string library, out string another)
+    {
+        mine = "file:///mod/data/scripts/gameobject/interdictor.lua";
+        library = "file:///lib/data/scripts/library/pgcommands.lua";
+        another = "file:///lib/data/scripts/gameobject/darthvader.lua";
+        var libDef = LuaGlobal("Fire_Weapons", library);
+        var libCall = LuaGlobalRef("Fire_Weapons", library, 3, 1, 12);
+        var myDef = LuaGlobal("Fire_Weapons", mine);
+        var docs = ImmutableDictionary<string, DocumentIndex>.Empty
+            .Add(mine, new DocumentIndex(mine, 1, [myDef], [], ["PGCommands"], LayerRank: 1))
+            .Add(library, new DocumentIndex(library, 1, [libDef], [libCall], LayerRank: libraryRank))
+            .Add(another, new DocumentIndex(another, 1, [], [], ["PGCommands"], LayerRank: libraryRank));
+        var index = BuildIndex(docs,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("Fire_Weapons", [libDef, myDef]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("Fire_Weapons", [libCall]));
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(mine, "function Fire_Weapons()\nend", 1);
+        host.AddOrUpdate(library, "function Fire_Weapons()\nend\nfunction Go()\n Fire_Weapons()\nend", 1);
+        host.AddOrUpdate(another, "", 1);
+        return (index, host, new FixedSandbox(LuaSandbox.Build(docs, new FileHelper(new MockFileSystem()))));
+    }
+
+    // Renaming the leaf's copy alone would stop it overriding the library's; the library is a
+    // dependency, not the project's to edit - refused, no partial edit.
+    [Fact]
+    public void HandleRename_LeafRedefiningALowerLayerLibraryGlobal_IsRefused()
+    {
+        var (index, host, sandbox) = LeafRedefinesLibraryGlobal(0, out var mine, out _, out _);
+        var handler = MakeHandler(host, sandbox: sandbox);
+
+        Assert.Null(handler.HandleRename(mine, RenameAt(0, 10, "Fire", mine), index));
+        Assert.Null(handler.HandlePrepare(mine, 0, 10, index));
+    }
+
+    // The library in the project too: one global across the library, the leaf and every other script
+    // loading the library.
+    [Fact]
+    public void HandleRename_LeafRedefiningALeafLibraryGlobal_RenamesTheLibraryAndEveryScriptLoadingIt()
+    {
+        var (index, host, sandbox) = LeafRedefinesLibraryGlobal(1, out var mine, out var library, out _);
+
+        var result = MakeHandler(host, sandbox: sandbox).HandleRename(mine, RenameAt(0, 10, "Fire", mine), index);
+
+        Assert.Equal([library, mine], result!.Changes!.Keys.Select(k => k.ToString()).Order());
+        Assert.Equal(2, result.Changes[DocumentUri.From(library)].Count());
+    }
+
+    // The game calls main by name: renamed, the script's thread never starts. Refused, and not the
+    // analyzer's to rename either.
+    [Fact]
+    public void HandleRename_AnEntryPointTheGameCalls_IsRefused()
+    {
+        var sym = LuaGlobal("main", LuaUri);
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, MakeDoc(LuaUri, sym)),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("main", [sym]));
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "function main()\nend", 1);
+        var entryPoints = new LuaApiSchemaProvider([],
+            [new LuaEntryPoint("main", LuaEntryPointCaller.ENGINE, [], ["object"], "The script's thread.")]);
+        var handler = MakeHandler(host, luaSchema: entryPoints);
+
+        Assert.Null(handler.HandleRename(LuaUri, RenameAt(0, 10, "Run"), index));
+        Assert.Null(handler.HandlePrepare(LuaUri, 0, 10, index));
+        Assert.True(handler.Claims(LuaUri, 0, 10, index));
+    }
+
+    // An XML object is the game's, not a script's: its rename reaches every script naming it (#249).
+    [Fact]
+    public void HandleRename_XmlObject_ReachesEveryScript_WhateverTheirState()
+    {
+        const string mine = "file:///mod/data/scripts/story/a.lua";
+        const string another = "file:///mod/data/scripts/story/b.lua";
+        var sym = XmlSymbolAt("UNIT_A", XmlUri, 0);
+        var myRef = LuaRef("UNIT_A", mine, 0, 7, 6);
+        var theirRef = LuaRef("UNIT_A", another, 0, 7, 6);
+        var docs = ImmutableDictionary<string, DocumentIndex>.Empty
+            .Add(XmlUri, MakeDoc(XmlUri, sym)).Add(mine, MakeDoc(mine, r: myRef))
+            .Add(another, MakeDoc(another, r: theirRef));
+        var index = BuildIndex(docs,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [myRef, theirRef]));
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
+        host.AddOrUpdate(mine, "Spawn(\"UNIT_A\")", 1);
+        host.AddOrUpdate(another, "Spawn(\"UNIT_A\")", 1);
+        var schema = new FakeSchemaProvider();
+        schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
+        var sandbox = new FixedSandbox(LuaSandbox.Build(docs, new FileHelper(new MockFileSystem())));
+
+        var result = MakeHandler(host, schema, sandbox: sandbox)
+            .HandleRename(mine, RenameAt(0, 7, "UNIT_B", mine), index);
+
+        Assert.Equal([mine, another, XmlUri], result!.Changes!.Keys.Select(k => k.ToString()).Order());
     }
 
     [Fact]

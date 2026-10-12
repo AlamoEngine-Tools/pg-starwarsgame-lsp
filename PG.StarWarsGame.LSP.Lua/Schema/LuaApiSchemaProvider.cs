@@ -17,8 +17,14 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     // `obj.Play_SFX_Event("x")` and nothing about obj's type, so the method name is the key.
     private readonly IReadOnlyDictionary<string, IReadOnlyList<XmlRefEntry>> _memberRefs;
 
-    public LuaApiSchemaProvider(IEnumerable<string> fileContents)
+    // Entry points are documentation, kept apart from the stubs: no declared global, no fingerprint
+    // (nothing an index records depends on them).
+    private readonly IReadOnlyDictionary<string, LuaEntryPoint> _entryPoints;
+
+    public LuaApiSchemaProvider(IEnumerable<string> fileContents, IEnumerable<LuaEntryPoint>? entryPoints = null)
     {
+        _entryPoints = (entryPoints ?? []).GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
         var contents = fileContents.ToList();
         var functions = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
         var memberRefs = new Dictionary<string, List<XmlRefEntry>>(StringComparer.OrdinalIgnoreCase);
@@ -63,6 +69,11 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName)
     {
         return _functions.TryGetValue(functionName, out var entry) ? entry.Params : [];
+    }
+
+    public LuaEntryPoint? GetEntryPoint(string functionName)
+    {
+        return _entryPoints.GetValueOrDefault(functionName);
     }
 
     private static void ParseContent(

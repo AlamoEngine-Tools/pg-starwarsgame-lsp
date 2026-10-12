@@ -14,11 +14,14 @@ namespace PG.StarWarsGame.LSP.Lua.Rename;
 
 public static class LuaGlobalRenameBuilder
 {
+    // inScope: which files the global's state spans (#249) - a definition or reference elsewhere
+    // is another script's global of the same name. Null spans every file.
     public static WorkspaceEdit? Build(
         string id, string newName, GameIndex index,
-        ILuaParseCache parseCache, ILogger logger)
+        ILuaParseCache parseCache, ILogger logger, Func<string, bool>? inScope = null)
     {
-        if (!index.IsLeafOwned(id))
+        inScope ??= _ => true;
+        if (!IsLeafOwned(id, index, inScope))
         {
             logger.LogDebug("Rename blocked: {Id} is not exclusively defined in the leaf layer", id);
             return null;
@@ -31,7 +34,7 @@ public static class LuaGlobalRenameBuilder
             foreach (var sym in defs)
             {
                 if (sym.Kind != GameSymbolKind.LuaGlobal) continue;
-                if (sym.Origin is not FileOrigin fo) continue;
+                if (sym.Origin is not FileOrigin fo || !inScope(fo.Uri)) continue;
                 var parsed = parseCache.GetOrParse(fo.Uri);
                 if (parsed is null) continue;
                 var range = FindFunctionNameRange(parsed.Tree, id);
@@ -43,7 +46,7 @@ public static class LuaGlobalRenameBuilder
         if (index.WorkspaceReferences.TryGetValue(id, out var refs))
             foreach (var r in refs)
             {
-                if (r.ExpectedKind != GameSymbolKind.LuaGlobal) continue;
+                if (r.ExpectedKind != GameSymbolKind.LuaGlobal || !inScope(r.DocumentUri)) continue;
                 AddEdit(changes, r.DocumentUri, new TextEdit
                 {
                     NewText = newName,
@@ -61,6 +64,14 @@ public static class LuaGlobalRenameBuilder
         {
             Changes = changes.ToDictionary(kvp => kvp.Key, kvp => (IEnumerable<TextEdit>)kvp.Value)
         };
+    }
+
+    /// <summary>Every definition in scope is a file in the leaf layer - the project's own to edit.</summary>
+    public static bool IsLeafOwned(string id, GameIndex index, Func<string, bool> inScope)
+    {
+        if (!index.WorkspaceDefinitions.TryGetValue(id, out var defs)) return false;
+        var mine = defs.Where(s => s.Origin is not FileOrigin fo || inScope(fo.Uri)).ToList();
+        return mine.Count > 0 && mine.All(s => s.Origin is FileOrigin && index.IsLeafSymbol(s));
     }
 
     internal static LspRange? FindFunctionNameRange(SyntaxTree tree, string globalName)
