@@ -16,27 +16,26 @@ Editor support for **Star Wars: Empire at War** and **Forces of Corruption** mod
 
 - Visual Studio Code 1.107 or later
 - Windows 11 (x64); Windows 10 is unsupported (end of mainstream support October 2025)
-- The PG.StarWarsGame.LSP server binary, self-contained; no .NET runtime needed
+
+Nothing else to install: the language server and the Lua analyzer ship inside the extension, self-contained, with
+no .NET runtime needed. The extension is published for Windows x64 only.
 
 ---
 
 ## Getting started
 
-### 1. Download the server
+### 1. Install the extension
 
-From the [Releases](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases) page:
+From the Marketplace, or `aet-eaw-edit-x.x.x.vsix` from the
+[Releases](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases) page (*Extensions* view, `...` menu,
+*Install from VSIX...*).
 
-- `aet-eaw-edit-x.x.x.vsix` - the extension, for manual installs
-- `PG.StarWarsGame.LSP.Server-x.x.x-win-x64.zip` - the language server; extract to a permanent folder, e.g. `C:\tools\aet-lsp\`
+### 2. Enable the language server
 
-### 2. Configure the extension
+Set `aet-eaw-edit.lsp.enabled` to `true` (*File* > *Preferences* > *Settings*, search for `aet-eaw-edit.lsp.enabled`).
 
-| Setting | Value |
-|---|---|
-| `aet-eaw-edit.lsp.executable` | Full path to `PG.StarWarsGame.LSP.Server.exe` |
-| `aet-eaw-edit.lsp.enabled` | `true` |
-
-Activation: an open XML or Lua file, or a `.pgproj` in the workspace. A missing or mismatched server binary is reported with a link to the matching release.
+Activation: an open XML or Lua file, or a `.pgproj` in the workspace. The bundled server runs unless
+`aet-eaw-edit.lsp.executable` names another one.
 
 ### 3. Create a mod project file
 
@@ -210,15 +209,35 @@ Scripts under the declared `scripts` directories are indexed and checked.
 - Rename, including XML objects referenced from Lua
 - Quick fixes
 - Hover and diagnostics _(work in progress)_
-- **Lua analyzer** (`aet-eaw-edit.features.lua.analyzer`) - identifier and member completion, the workspace's own
-  functions and types on hover, references, symbols, signature help, folding, semantic highlighting, code lenses
-  and inlay hints _(work in progress)_
+- **Lua analyzer** - identifier and member completion, the workspace's own functions and types on hover,
+  references, symbols, signature help, folding, semantic highlighting, code lenses and inlay hints; see
+  [Lua analyzer](#lua-analyzer)
 - **Engine surface from measured stubs** - the 133 registered engine functions, the 9 wrapper classes with their
   methods, the standard library the game opens (Lua 5.0: no `math`, `io` or `os`) and the globals each script
   host maps in, as `---@meta` files in the [schema repository](https://github.com/AlamoEngine-Tools/eaw-schema)
   - String arguments that name a game object, a faction, a sound or music event, a text key or a movie complete
     and resolve against the workspace; ability types, animations and reward types complete from the schema enums
   - A plan script's task forces are globals; a force without its `<Name>_Thread` function is reported (`Engine7`)
+
+### Lua analyzer
+
+[EmmyLua Analyzer](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) (`emmylua_ls` 0.25.1, MIT) runs behind the
+language server, bundled and on by default. The editor talks only to this server; it mirrors the open scripts to the
+analyzer and merges both answers.
+
+- **Scope** - the project's own scripts are the analyzer's workspace; dependency layers and the engine stubs are its
+  library, read but never edited
+- **Engine stubs** - the `---@meta` files from the schema repository; `---@aetref` tags on their parameters stay this
+  server's, for game-object completion, navigation and rename
+- **Ours where both answer** - hover shows this server's card first; completion keeps this server's item for a label
+  both offer; a rename of an engine name or a game object stays this server's, and an analyzer rename that would edit
+  a file outside the project's scripts is refused
+- **Diagnostics** - one list per script. Kept from the analyzer: rules that hold for any Lua, as `LuaAnalyzer1` to
+  `LuaAnalyzer10` (`aetswg-016-*`); a syntax error is `Syntax3010`. Dropped: rules that depend on the stubs being
+  complete (missing or mismatched parameters, undefined fields), and every rule a future analyzer version adds
+- **Off** - `aet-eaw-edit.features.lua.analyzer` = `false`: string-argument completion, engine hover, navigation and
+  rename remain
+- **Another copy** - `aet-eaw-edit.lua.analyzerPath` runs a different `emmylua_ls`
 
 ---
 
@@ -576,7 +595,8 @@ Flag column: the feature-flag id without its common prefix.
 | Setting | Default | Description |
 |---|---|---|
 | `aet-eaw-edit.lsp.enabled` | `false` | Enable the language server |
-| `aet-eaw-edit.lsp.executable` | _(empty)_ | Path to `PG.StarWarsGame.LSP.Server.exe` |
+| `aet-eaw-edit.lsp.executable` | _(empty)_ | A server to run instead of the bundled one; empty = bundled |
+| `aet-eaw-edit.lua.analyzerPath` | _(empty)_ | An `emmylua_ls` to run instead of the bundled one; empty = bundled |
 | `aet-eaw-edit.lsp.locale` | `en` | Language of hover text and diagnostics (`en`, `de`, `fr`, `es`, `it`, `pl`, `ru`) |
 | `aet-eaw-edit.lsp.localisation.language` | `ENGLISH` | Game language for displayed localisation text (hovers, inlay hints, encyclopedia card) |
 | `aet-eaw-edit.lsp.debug.traceServer` | `off` | `messages` or `verbose`: LSP traffic in the EaWEdit output channel |
@@ -699,7 +719,7 @@ Lua:
 | `aet-eaw-edit.features.lua.rename` | `true` | Symbol rename, including XML objects referenced from Lua |
 | `aet-eaw-edit.features.lua.codeActions` | `true` | Code actions (quick fixes) |
 | `aet-eaw-edit.features.lua.debugger` | `false` | Lua debugger: debug type, Lua Scripts view, `aet-eaw-edit.game.*` _(work in progress)_ |
-| `aet-eaw-edit.features.lua.analyzer` | `false` | Lua analyzer (`emmylua_ls`) behind the server, open scripts mirrored to it; needs `AET_EMMYLUA_LS` or an `emmylua` folder beside the server _(work in progress)_ |
+| `aet-eaw-edit.features.lua.analyzer` | `true` | [Lua analyzer](#lua-analyzer) (`emmylua_ls`, bundled) behind the server, open scripts mirrored to it |
 
 Story mode:
 
@@ -748,11 +768,11 @@ Three data sources; nothing else is sent or received. No telemetry.
 
 ## Troubleshooting
 
-**No diagnostics.** `aet-eaw-edit.lsp.enabled` must be `true` and `aet-eaw-edit.lsp.executable` must point to `PG.StarWarsGame.LSP.Server.exe`; then **EaWEdit: Restart LSP Server**.
+**No diagnostics.** `aet-eaw-edit.lsp.enabled` must be `true`, and `aet-eaw-edit.lsp.executable` empty (the bundled server) or pointing to a `PG.StarWarsGame.LSP.Server.exe`; then **EaWEdit: Restart LSP Server**.
 
 **"LSP server failed to start".** Windows may have blocked the downloaded executable: Properties > **Unblock** on `PG.StarWarsGame.LSP.Server.exe`, then restart the server. Otherwise **Show Output** in the notification.
 
-**Version mismatch.** Server and extension must match; download the matching server from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases).
+**Version mismatch.** Reported only for a server set in `aet-eaw-edit.lsp.executable`; the bundled one always matches. Clear the setting to use it.
 
 **Features work in some files only.** Only directories listed in the `.pgproj` are indexed; add the paths to `directories.xml` or `directories.scripts`.
 
@@ -781,6 +801,9 @@ Three data sources; nothing else is sent or received. No telemetry.
 ## Acknowledgements
 
 **EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, for [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) - the Python client that documented the game's Lua debug server protocol. The [Lua debugger](#lua-debugger) here was built against that description.
+
+**CppCXY** and the [EmmyLua](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) contributors, for the
+[Lua analyzer](#lua-analyzer) this extension ships unmodified. Its licence is in `ThirdPartyNotices.txt`.
 
 ---
 

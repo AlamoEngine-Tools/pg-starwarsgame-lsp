@@ -22,31 +22,21 @@ Visual Studio Code extension and language server for **Star Wars: Empire at War*
 
 ## Installation
 
-### 1. Download the release
+The extension carries the language server and the Lua analyzer; it is published for Windows x64 only.
 
-From [Releases](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases):
+### 1. Install the extension
 
-- `aet-eaw-edit-x.x.x.vsix` - the extension
-- `PG.StarWarsGame.LSP.Server-x.x.x.zip` - the language server
-
-### 2. Install the extension
-
-Command Palette (`Ctrl+Shift+P`) > **Extensions: Install from VSIX...**, or:
+From the Marketplace, or `aet-eaw-edit-x.x.x.vsix` from
+[Releases](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases): Command Palette (`Ctrl+Shift+P`) >
+**Extensions: Install from VSIX...**, or:
 
 ```
 code --install-extension aet-eaw-edit-x.x.x.vsix
 ```
 
-### 3. Extract the language server
+### 2. Enable the language server
 
-Unzip to a permanent location, e.g. `C:\tools\aet-lsp\`.
-
-### 4. Point the extension at the server
-
-| Setting | Value |
-|---|---|
-| `aet-eaw-edit.lsp.executable` | Full path to `PG.StarWarsGame.LSP.Server.exe` |
-| `aet-eaw-edit.lsp.enabled` | `true` |
+`aet-eaw-edit.lsp.enabled` = `true`. The bundled server runs unless `aet-eaw-edit.lsp.executable` names another one.
 
 Activation: an open XML or Lua file, or a `.pgproj` in the workspace.
 
@@ -119,7 +109,7 @@ Scripts under the declared `scripts` directories are indexed.
 - Completion, navigation, rename
 - Quick fixes
 - Hover and diagnostics _(work in progress)_
-- Lua analyzer: identifier completion, references, symbols, code lenses, inlay hints _(work in progress)_
+- Lua analyzer (bundled EmmyLua): identifier completion, references, symbols, code lenses, inlay hints
 - Engine surface from measured stub files: registered functions, wrapper classes, the standard library the game
   opens, per-host globals; string arguments naming game objects, text keys and enum values complete and resolve
 
@@ -346,9 +336,9 @@ Two data sources plus the on-demand shader sources; nothing else is sent or rece
 
 ## Troubleshooting
 
-**No diagnostics.** `aet-eaw-edit.lsp.enabled` = `true` and `aet-eaw-edit.lsp.executable` set; then **EaWEdit: Restart LSP Server**.
+**No diagnostics.** `aet-eaw-edit.lsp.enabled` = `true`; then **EaWEdit: Restart LSP Server**.
 
-**Version mismatch on startup.** Server and extension must match; download the matching server from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases).
+**Version mismatch on startup.** Only for a server set in `aet-eaw-edit.lsp.executable`; clear it to use the bundled one.
 
 **Features work in some files only.** Only directories declared in the `.pgproj` are indexed.
 
@@ -375,7 +365,8 @@ dotnet build PG.StarWarsGame.LSP.slnx
   - A repo with uncommitted changes or on another branch is left alone and reported
 - **State without changes** - `./setup-workspace.sh check`
 - **E2E data** - `--groups build,e2e` adds `baseline/`; the game files in `eaw/` and `foc/` are not distributable
-- **Cross-repo changes** - a schema or baseline branch named like the LSP branch; CI on the pull request builds against it
+- **Cross-repo changes** - a schema or baseline branch named like the LSP branch, only when that repo changes; CI on the pull request builds against it, and against the default branch otherwise
+- **Package** - `pwsh ./scripts/stage-bundled-executables.ps1` puts the server and the pinned Lua analyzer into the extension's `server/` folder, then `npx @vscode/vsce package --no-dependencies --target win32-x64` in the extension folder; an extension run from source also picks up a staged server
 - **External update** - the wanted commit checked out in `../ModVerify` or `../PetroglyphTools`, then `./setup-workspace.sh record` and a commit of `workspace.deps`
 
 ### Releasing
@@ -403,6 +394,8 @@ dotnet build PG.StarWarsGame.LSP.slnx
 ## Acknowledgements
 
 **EvilBobTheBob** ([@andrewfullard](https://github.com/andrewfullard)), of Phoenix Rising and EaWX, for [`eaw-lua-debugger`](https://github.com/andrewfullard/eaw-lua-debugger) - the Python client that documented the game's Lua debug server protocol. The [Lua debugger](#lua-debugger) here was built against that description.
+
+**CppCXY** and the [EmmyLua](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) contributors, for the Lua analyzer the extension ships unmodified.
 
 ---
 

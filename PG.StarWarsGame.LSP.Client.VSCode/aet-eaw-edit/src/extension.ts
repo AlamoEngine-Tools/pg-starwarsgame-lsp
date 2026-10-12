@@ -42,7 +42,8 @@ import {vscodeMessageSink} from './lsp/vscodeMessageSink';
 import {LUA_DEBUG_TYPE, LuaDebugAdapterDescriptorFactory} from './luaDebug/luaDebugAdapterFactory';
 import {LuaDebugConfigurationProvider} from './luaDebug/luaDebugConfigurationProvider';
 import {LuaScriptsTreeItem, LuaScriptsViewProvider} from './luaDebug/luaScriptsViewProvider';
-import {resolveServerCommand} from './serverCommand';
+import {resolveServerCommand, resolveServerEnvironment} from './serverCommand';
+import {serverProblem} from './serverLaunch';
 import {
     ConvertLocalisationFormatResult, ExportLocalisationToDatResult, GetEffectiveObjectResult,
     GetEncyclopediaEntryResult, GetLocalisationProjectsResult, GetRootLocalisationConfigResult,
@@ -59,7 +60,6 @@ import {
 
 const CLIENT_ID = 'aet.pg.swg.lsp';
 const CLIENT_NAME = 'Alamo Engine Tools - Empire at War Edit';
-const RELEASES_URL = 'https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases';
 const REQUIRED_SERVER_VERSION = '0.4.1';
 
 /**
@@ -382,7 +382,7 @@ function resolveFeatureFlags() {
             rename: flag('lua.rename', true),
             codeActions: flag('lua.codeActions', true),
             debugger: flag('lua.debugger', false),
-            analyzer: flag('lua.analyzer', false),
+            analyzer: flag('lua.analyzer', true),
         },
         tools: {
             localisation: flag('tools.localisation', false),
@@ -408,40 +408,17 @@ function resolveFeatureFlags() {
     };
 }
 
-function validateConfiguration(): boolean {
+function validateConfiguration(extensionPath: string): boolean {
     if (!cfg('lsp').get<boolean>('enabled')) {
         return true;
     }
 
     let valid = true;
-    const devMode = cfg('lsp.devMode').get<boolean>('enabled', false);
 
-    if (!devMode) {
-        const serverExePath = cfg('lsp').get<string>('executable');
-        if (!serverExePath) {
-            void vscode.window.showErrorMessage(
-                'EaWEdit: LSP is enabled but no server executable is configured. ' +
-                `Download version ${REQUIRED_SERVER_VERSION} from the releases page, ` +
-                'then set "aet-eaw-edit.lsp.executable".',
-                'Download'
-            ).then(choice => {
-                if (choice === 'Download') {
-                    void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
-                }
-            });
-            valid = false;
-        } else if (!fs.existsSync(serverExePath)) {
-            void vscode.window.showErrorMessage(
-                `EaWEdit: LSP server not found at "${serverExePath}". ` +
-                `Download version ${REQUIRED_SERVER_VERSION} from the releases page.`,
-                'Download'
-            ).then(choice => {
-                if (choice === 'Download') {
-                    void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
-                }
-            });
-            valid = false;
-        }
+    const serverMissing = serverProblem(resolveServerCommand(extensionPath, []), fs.existsSync);
+    if (serverMissing) {
+        void vscode.window.showErrorMessage(serverMissing);
+        valid = false;
     }
 
     if (cfg('lsp.source.baseline').get<string>('type') === 'local' &&
@@ -507,7 +484,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     // startup lines are not lost. It does NOT record the process (`_serverProcess` stays unset),
     // which is the trade: no library-side cleanup at all, and all of it ours.
     const serverOptions: ServerOptions = async () => {
-        const child = spawn(serverExe, serverArgs, {stdio: ['pipe', 'pipe', 'pipe']});
+        const child = spawn(serverExe, serverArgs, {stdio: ['pipe', 'pipe', 'pipe'], env: resolveServerEnvironment()});
         serverProcess = child;
         // Only clear if this is still the current one - a restart may already have replaced it.
         child.on('exit', () => {
@@ -676,15 +653,11 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 
         const serverVersion = lspClient?.initializeResult?.serverInfo?.version;
         logLine(`Server version reported: ${serverVersion ?? '(none)'}`);
-        if (serverVersion !== REQUIRED_SERVER_VERSION) {
-            const msg = serverVersion
-                ? `EaWEdit: Server version ${serverVersion} does not match the expected version ${REQUIRED_SERVER_VERSION}. Some features may not work correctly.`
-                : `EaWEdit: The server did not report a version. Download version ${REQUIRED_SERVER_VERSION} from the releases page.`;
-            void vscode.window.showWarningMessage(msg, 'Download').then(choice => {
-                if (choice === 'Download') {
-                    void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
-                }
-            });
+        // The bundled server is this release's by construction; only a configured one can differ.
+        if (!server.bundled && serverVersion !== REQUIRED_SERVER_VERSION) {
+            void vscode.window.showWarningMessage(serverVersion
+                ? `EaWEdit: Server version ${serverVersion} does not match the expected version ${REQUIRED_SERVER_VERSION}. Clear "aet-eaw-edit.lsp.executable" to use the bundled server`
+                : `EaWEdit: The server did not report a version. Clear "aet-eaw-edit.lsp.executable" to use the bundled server`);
         }
 
         // vscode-languageclient's hookConfigurationChanged reads aet.pg.swg.lsp.trace.server
@@ -706,13 +679,10 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
         }
         void vscode.window.showErrorMessage(
             'EaWEdit: LSP server failed to start. Check the EaWEdit output channel for details.',
-            'Show Output',
-            'Download'
+            'Show Output'
         ).then(choice => {
             if (choice === 'Show Output') {
                 log?.show(true);
-            } else if (choice === 'Download') {
-                void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
             }
         });
     });
@@ -1360,12 +1330,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logLine('Extension activated.');
     logLine(`  lsp.enabled      = ${cfg('lsp').get<boolean>('enabled')}`);
     logLine(`  lsp.devMode      = ${cfg('lsp.devMode').get<boolean>('enabled', false)}`);
-    logLine(`  lsp.executable   = ${cfg('lsp').get<string>('executable') ?? '(not set)'}`);
+    logLine(`  lsp.executable   = ${cfg('lsp').get<string>('executable') || '(bundled)'}`);
     logLine(`  lsp.projectPath  = ${cfg('lsp.devMode').get<string>('projectPath') ?? '(not set)'}`);
 
     const restartServer = async () => {
         await stopLspClient();
-        if (cfg('lsp').get<boolean>('enabled') === true && validateConfiguration()) {
+        if (cfg('lsp').get<boolean>('enabled') === true && validateConfiguration(context.extensionPath)) {
             await startLspClient(context);
         }
     };
@@ -1381,15 +1351,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
             if (!enabled && lspClient) {
                 await stopLspClient();
-            } else if (enabled && !lspClient && validateConfiguration()) {
+            } else if (enabled && !lspClient && validateConfiguration(context.extensionPath)) {
                 logLine('Starting LSP server after configuration change.');
                 await startLspClient(context);
-            } else if (lspClient && e.affectsConfiguration('aet-eaw-edit.features')) {
-                // Feature flags travel once via initializationOptions - restart to apply them.
-                logLine('Feature flags changed - restarting LSP server.');
+            } else if (lspClient && (e.affectsConfiguration('aet-eaw-edit.features') ||
+                e.affectsConfiguration('aet-eaw-edit.lsp.executable') ||
+                e.affectsConfiguration('aet-eaw-edit.lua.analyzerPath'))) {
+                // Feature flags travel once via initializationOptions, and the two executables are
+                // picked when the process starts - restart to apply any of them.
+                logLine('Feature flags or executables changed - restarting LSP server.');
                 await restartServer();
             } else {
-                validateConfiguration();
+                validateConfiguration(context.extensionPath);
             }
         })
     );
@@ -1397,13 +1370,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(
         vscode.commands.registerCommand('aet-eaw-edit.lsp.debug.forceStartup', async () => {
             await stopLspClient();
-            const devMode = cfg('lsp.devMode').get<boolean>('enabled', false);
-            if (devMode || cfg('lsp').get<string>('executable')) {
-                await startLspClient(context);
+            const serverMissing = serverProblem(resolveServerCommand(context.extensionPath, []), fs.existsSync);
+            if (serverMissing) {
+                void vscode.window.showErrorMessage(serverMissing);
             } else {
-                vscode.window.showErrorMessage(
-                    'EaWEdit: No LSP executable configured. Set "aet-eaw-edit.lsp.executable".'
-                );
+                await startLspClient(context);
             }
         }),
         vscode.commands.registerCommand('aet-eaw-edit.lsp.restartServer', restartServer),
@@ -1809,7 +1780,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         })
     );
 
-    if (cfg('lsp').get<boolean>('enabled') === true && validateConfiguration()) {
+    if (cfg('lsp').get<boolean>('enabled') === true && validateConfiguration(context.extensionPath)) {
         logLine('LSP enabled - starting server.');
         void startLspClient(context);
     } else if (cfg('lsp').get<boolean>('enabled') !== true) {

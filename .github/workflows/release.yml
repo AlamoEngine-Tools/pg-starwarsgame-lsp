@@ -5,7 +5,7 @@ name: Release
 #
 #   guard        version files agree, tag v<version> does not exist yet
 #   test         the full test workflow; it also produces the two SBOMs
-#   build        Windows: workspace, schema-release check, server publish + zip, VSIX
+#   build        Windows: workspace, schema-release check, win32-x64 VSIX with the server and Lua analyzer
 #   publish      ONE approval (environment "release") for everything public, all or nothing:
 #                token check -> draft GitHub release -> Marketplace -> draft made public (tag)
 #
@@ -113,31 +113,28 @@ jobs:
         }
         "Schema v$schema is released" | Add-Content $env:GITHUB_STEP_SUMMARY
 
-    - name: Publish the server
-      run: |
-        dotnet publish PG.StarWarsGame.LSP.Server/PG.StarWarsGame.LSP.Server.csproj `
-          --configuration Release --runtime win-x64 --self-contained true `
-          -p:PublishSingleFile=true -p:DebugType=None --output dist/server
-        if ($LASTEXITCODE -ne 0) { exit 1 }
-        Compress-Archive -Path dist/server/* -DestinationPath "dist/PG.StarWarsGame.LSP.Server-$env:VERSION-win-x64.zip"
+    # The VSIX carries the server and the Lua analyzer; there is no separate server download.
+    - name: Stage the bundled executables
+      run: ./scripts/stage-bundled-executables.ps1
 
     - name: Package the extension
       working-directory: PG.StarWarsGame.LSP/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
       run: |
         npm ci
         if ($LASTEXITCODE -ne 0) { exit 1 }
-        $vsceArgs = @('package', '--no-dependencies', '--out', "../../dist/aet-eaw-edit-$env:VERSION.vsix")
+        $vsceArgs = @('package', '--no-dependencies', '--target', 'win32-x64', '--out', "../../dist/aet-eaw-edit-$env:VERSION.vsix")
         if ('${{ inputs.prerelease }}' -eq 'true') { $vsceArgs += '--pre-release' }
         npx --yes @vscode/vsce @vsceArgs
         if ($LASTEXITCODE -ne 0) { exit 1 }
+
+    - name: Check the package
+      run: ./scripts/check-vsix.ps1 "dist/aet-eaw-edit-$env:VERSION.vsix"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: release-files
-        path: |
-          PG.StarWarsGame.LSP/dist/*.zip
-          PG.StarWarsGame.LSP/dist/*.vsix
+        path: PG.StarWarsGame.LSP/dist/*.vsix
         if-no-files-found: error
 
   # Everything that becomes public, behind one approval and in an order that keeps it all or

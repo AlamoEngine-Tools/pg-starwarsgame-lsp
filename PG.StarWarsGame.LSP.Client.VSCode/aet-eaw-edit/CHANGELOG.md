@@ -23,12 +23,27 @@
 - **Feature flags** - `aet-eaw-edit.features.xml.strictness`, `aet-eaw-edit.features.xml.formatting`
   ([#203](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/203))
   - Formatting off: no formatter offered, so another XML formatter takes the files
+- **Server and Lua analyzer in the extension** - nothing to download or configure; the language server and
+  [EmmyLua Analyzer](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) 0.25.1 ship inside a Windows x64 VSIX
+  ([#156](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/156))
+  - `aet-eaw-edit.lsp.executable` and the new `aet-eaw-edit.lua.analyzerPath` run another copy; empty = bundled
+  - Changing either restarts the server
+- **Lua analyzer, on by default** - identifier and member completion, hover for the workspace's own functions and
+  types, references, symbols, signature help, folding, semantic highlighting, code lenses and inlay hints, merged
+  with this server's answers ([#152](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/152),
+  [#153](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/153),
+  [#154](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/154),
+  [#155](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/155))
+  - Engine knowledge from the measured `---@meta` stubs; game-object completion, navigation and rename stay this
+    server's
 
 ### Fixes
 
 - **`<Base>` values** - read; the HTML parser underneath treated `<Base>` as an empty element (2 vanilla files)
 - **Panel refreshes during startup** - model preview, story graph and localisation editor refresh once when the scan
   completes, not after every scan stage
+- **Lua analyzer and a scripts folder not created yet** - the analyzer's workspace keeps the case on disk of the part
+  that exists; it was handed over lower-cased, and no script in it was analyzed
 
 ### Diagnostic IDs
 
@@ -41,6 +56,12 @@
 
 - **`aetswg-006-0008` suppressions** - silence nothing; structural findings carry the per-category IDs above
 - **`.aetswg/suppressions.json`** - document version 2, migrated once on load; the migration adds `aetswg-015-0006`
+- **Windows x64 only** - the extension is published for `win32-x64` alone; the separate server archive is gone
+- **Lua without the analyzer** - completion covers string arguments only (game objects, text keys, modules); no code
+  lenses, no inlay hints, no hover for the workspace's own functions and types
+- **Settings removed** - `aet-eaw-edit.features.lua.codeLens`, `aet-eaw-edit.features.lua.inlayHints`; both come
+  from the analyzer
+- **`---@xmlref`** - no longer read; the tag is `---@aetref`
 
 ## 0.4.1
 

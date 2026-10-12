@@ -146,3 +146,29 @@ jobs:
           echo "::error::Test projects failed:$failed"
           exit 1
         fi
+
+    # The client, and the package a release would ship: built here so a missing bundled file or a
+    # failing client check shows on the pull request, not in the release run. Windows only - the
+    # package is win32-x64. Packaging also type-checks (vscode:prepublish).
+    - name: Client checks
+      if: runner.os == 'Windows'
+      working-directory: PG.StarWarsGame.LSP/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
+      shell: pwsh
+      run: |
+        npm ci
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        npm run lint
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        npm run test:unit
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+    - name: Package the extension
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        ./scripts/stage-bundled-executables.ps1
+        Push-Location PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
+        npx --yes @vscode/vsce package --no-dependencies --target win32-x64 --out ../../dist/aet-eaw-edit-check.vsix
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        Pop-Location
+        ./scripts/check-vsix.ps1 dist/aet-eaw-edit-check.vsix

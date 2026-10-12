@@ -1,9 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 
 import {resolveServerCommand} from '../serverCommand';
+import {serverProblem} from '../serverLaunch';
 
 export const LUA_DEBUG_TYPE = 'eaw-lua';
 
@@ -33,9 +35,9 @@ export class LuaDebugAdapterDescriptorFactory implements vscode.DebugAdapterDesc
         }
 
         const command = resolveServerCommand(this._extensionPath, ['--debug-adapter']);
-        if (!command.command) {
-            void vscode.window.showErrorMessage(
-                'No server executable is configured. Set "aet-eaw-edit.lsp.executable" before starting the Lua debugger');
+        const serverMissing = serverProblem(command, fs.existsSync);
+        if (serverMissing) {
+            void vscode.window.showErrorMessage(serverMissing);
             return undefined;
         }
 
