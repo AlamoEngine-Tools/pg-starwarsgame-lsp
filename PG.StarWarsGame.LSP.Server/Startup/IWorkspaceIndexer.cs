@@ -23,7 +23,7 @@ public interface IWorkspaceIndexer
     Task<int> IndexDocumentsAsync(WorkspaceConfiguration config, CancellationToken ct,
         Action<int, int>? progress = null);
 
-    void ApplyAssetCatalog(IReadOnlyList<string> roots);
+    void ApplyAssetCatalog(WorkspaceConfiguration config);
 
     void ApplyModelBoneCatalog(WorkspaceConfiguration config);
 

@@ -45,6 +45,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly ILogger<WorkspaceIndexer> _logger;
     private readonly ILuaApiSchemaProvider? _luaSchema;
     private readonly IMegEntryReader _megEntries;
+    private readonly MegArchiveLoadOrder _megLoadOrder;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
     private readonly IStoryChainProblemStore _storyChainProblems;
@@ -55,6 +56,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         IStoryChainProblemStore storyChainProblems,
         ILspConfigurationProvider configProvider,
         IMegEntryReader megEntries,
+        MegArchiveLoadOrder megLoadOrder,
         IModelBoneCatalogCache boneCache,
         ILogger<WorkspaceIndexer> logger,
         // Optional so minimal setups can omit it; production injects the loaded stubs.
@@ -71,6 +73,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _storyChainProblems = storyChainProblems;
         _configProvider = configProvider;
         _megEntries = megEntries;
+        _megLoadOrder = megLoadOrder;
         _logger = logger;
         _luaSchema = luaSchema;
     }
@@ -153,23 +156,32 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     }
 
     /// <summary>
-    ///     Collects the workspace's asset files (textures, models, audio, maps) under the given
-    ///     roots - loose on disk AND packed into the workspace's own MEG archives - normalises them
-    ///     relative to their root, unions with the baseline catalog, and publishes the merged
+    ///     Collects the workspace's asset files (textures, models, audio, maps) - loose under its
+    ///     asset roots AND packed into the archives the game loads from its project folders -
+    ///     normalises them game-relative, unions with the baseline catalog, and publishes the merged
     ///     <see cref="IAssetFileIndex" /> on the GameIndex.
     /// </summary>
     /// <remarks>
-    ///     The archives are not optional. A mod ships its assets packed, so globbing loose files
-    ///     alone reported every reference into a mod's own archives as a missing file, and the
-    ///     shipped game escaped only because its baseline was built from its archives.
+    ///     <para>
+    ///         The archives are not optional. A mod ships its assets packed, so globbing loose files
+    ///         alone reported every reference into a mod's own archives as a missing file, and the
+    ///         shipped game escaped only because its baseline was built from its archives.
+    ///     </para>
+    ///     <para>
+    ///         Which archives is the game's rule, <see cref="MegArchiveLoadOrder" />: the ones its
+    ///         <c>Data\MegaFiles.xml</c> names plus the patch and sound archives, each name taken from
+    ///         the first project folder that has it. A mod keeps them in <c>Data\</c>, beside its art
+    ///         and audio roots, so a search of those roots found none of them. Archives that resolve to
+    ///         the game folders are left to the baseline.
+    ///     </para>
     /// </remarks>
-    public void ApplyAssetCatalog(IReadOnlyList<string> roots)
+    public void ApplyAssetCatalog(WorkspaceConfiguration config)
     {
         var baseline = _indexService.Current.Baseline.AssetFiles;
         var workspace = new List<string>();
         var packed = 0;
 
-        foreach (var root in roots)
+        foreach (var root in config.AssetRoots)
         {
             if (!_fileHelper.FileSystem.Directory.Exists(root)) continue;
             foreach (var file in _fileHelper.FileSystem.Directory
@@ -183,20 +195,21 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                     continue;
                 workspace.Add(GameRelativePath(file, root));
             }
+        }
 
-            foreach (var megPath in MegArchiveDiscovery.Under(_fileHelper.FileSystem, root))
-            foreach (var entry in _megEntries.EnumerateEntryPaths(megPath))
-            {
-                // Through the baseline builder's own rules, so a packed asset is spelled the same
-                // whether it reached the catalog from the shipped game or from the workspace.
-                var normalized = MegAssetCatalogBuilder.ApplySfxConventions(
-                    MegAssetCatalogBuilder.NormalizeMegPath(entry),
-                    _fileHelper.FileSystem.Path.GetFileName(megPath));
-                if (!MegAssetCatalogBuilder.IsAssetExtension(Path.GetExtension(normalized)))
-                    continue;
-                workspace.Add(normalized);
-                packed++;
-            }
+        var archives = _megLoadOrder.SearchOrder(MegArchiveRoots.For(config, _configProvider.Current));
+        foreach (var archive in archives.Where(a => a.Source == MegArchiveSource.Mod))
+        foreach (var entry in _megEntries.EnumerateEntryPaths(archive.Path))
+        {
+            // Through the baseline builder's own rules, so a packed asset is spelled the same
+            // whether it reached the catalog from the shipped game or from the workspace.
+            var normalized = MegAssetCatalogBuilder.ApplySfxConventions(
+                MegAssetCatalogBuilder.NormalizeMegPath(entry),
+                _fileHelper.FileSystem.Path.GetFileName(archive.Path));
+            if (!MegAssetCatalogBuilder.IsAssetExtension(Path.GetExtension(normalized)))
+                continue;
+            workspace.Add(normalized);
+            packed++;
         }
 
         _logger.LogInformation(

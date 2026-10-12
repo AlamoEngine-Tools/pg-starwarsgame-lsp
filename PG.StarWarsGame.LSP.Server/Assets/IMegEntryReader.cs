@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.Files.MEG.Services;
 
@@ -53,28 +52,5 @@ public sealed class NoMegEntries : IMegEntryReader
     public IEnumerable<string> EnumerateEntryPaths(string megFilePath)
     {
         return [];
-    }
-}
-
-/// <summary>Finds the MEG archives under a set of roots. Extracted so the walk is tested once.</summary>
-public static class MegArchiveDiscovery
-{
-    public static IEnumerable<string> Under(IFileSystem fileSystem, string root)
-    {
-        if (!fileSystem.Directory.Exists(root))
-            return [];
-
-        try
-        {
-            return fileSystem.Directory.GetFiles(root, "*.meg", SearchOption.AllDirectories);
-        }
-        catch (IOException)
-        {
-            return [];
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return [];
-        }
     }
 }

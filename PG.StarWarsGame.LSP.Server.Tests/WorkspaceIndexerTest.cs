@@ -26,6 +26,27 @@ public sealed class WorkspaceIndexerTest
         return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub);
     }
 
+    /// <summary>One project at <paramref name="projectRoot" /> whose asset roots are <paramref name="assetRoots" />.</summary>
+    private static WorkspaceConfiguration AssetProject(string projectRoot, params string[] assetRoots)
+    {
+        return new WorkspaceConfiguration([], [], [], assetRoots, null)
+        {
+            Layers = [AssetLayer(0, projectRoot, assetRoots)]
+        };
+    }
+
+    private static ProjectLayer AssetLayer(int rank, string projectRoot, params string[] assetRoots)
+    {
+        return new ProjectLayer(rank, $"layer{rank}", [], [], [], assetRoots, null,
+            Path.Combine(projectRoot, "mod.pgproj"));
+    }
+
+    private static string MegaFiles(params string[] entries)
+    {
+        return "<?xml version=\"1.0\" ?>\n<Mega_Files>\n" +
+               string.Concat(entries.Select(e => $"\t<File> {e} </File>\n")) + "</Mega_Files>";
+    }
+
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) Build(
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         IProjectIndexCache? cache = null,
@@ -101,6 +122,7 @@ public sealed class WorkspaceIndexerTest
             storyProblems ?? new StoryChainProblemStore(),
             config ?? new FakeLspConfigurationProvider(),
             megReader ?? NoMegEntries.Instance,
+            new MegArchiveLoadOrder(fh),
             boneCache ?? new NullModelBoneCatalogCache(),
             NullLogger<WorkspaceIndexer>.Instance);
         return (indexer, ctx);
@@ -576,7 +598,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
 
-        indexer.ApplyAssetCatalog([root]);
+        indexer.ApplyAssetCatalog(AssetProject(root, root));
 
         Assert.NotNull(svc.AppliedAssetFiles);
         Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/local.tga"));
@@ -607,7 +629,7 @@ public sealed class WorkspaceIndexerTest
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
 
         // The asset ROOT is the audio directory itself, which is how a .pgproj declares it.
-        indexer.ApplyAssetCatalog([audioRoot]);
+        indexer.ApplyAssetCatalog(AssetProject(root, audioRoot));
 
         Assert.NotNull(svc.AppliedAssetFiles);
         Assert.True(svc.AppliedAssetFiles!.Contains("data/audio/announcer/destroyed_eng.wav"),
@@ -629,37 +651,100 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService(GameIndex.Empty);
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
 
-        indexer.ApplyAssetCatalog([root]);
+        indexer.ApplyAssetCatalog(AssetProject(root, root));
 
         Assert.NotNull(svc.AppliedAssetFiles);
         Assert.True(svc.AppliedAssetFiles!.Contains("extra/stray.tga"));
     }
 
     /// <summary>
-    ///     What a workspace archive holds counts as present.
+    ///     What a project's archive holds counts as present, with no loose copy anywhere (#220).
     /// </summary>
     /// <remarks>
-    ///     The catalog used to glob loose files only, so a mod that ships its assets packed - which
-    ///     is how a mod ships - had every reference into its own archives reported missing. The
-    ///     shipped game is spared only because the baseline was built from its archives.
+    ///     A mod ships its assets packed in <c>Data\</c>, beside its art and audio folders rather
+    ///     than under them, and names the archives in its own <c>Data\MegaFiles.xml</c>. Only the
+    ///     art and audio roots were searched for archives, so every reference into a mod's own
+    ///     archives read as a missing file.
     /// </remarks>
     [Fact]
-    public void ApplyAssetCatalog_ReadsWorkspaceMegArchives()
+    public void ApplyAssetCatalog_ReadsTheArchivesTheProjectsListNames()
     {
         var root = Root("ws");
-        var meg = Path.Combine(root, "Data", "mod.meg");
+        var art = Path.Combine(root, "Data", "Art");
+        var meg = Path.Combine(root, "Data", "ModTextures.meg");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
+            [Path.Combine(root, "Data", "MegaFiles.xml")] = new(MegaFiles(@"Data\ModTextures.meg")),
+            [meg] = new("not a real archive - the reader is the seam")
+        });
+        fs.AddDirectory(art);
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = BuildWithMegReader(fs, svc,
+            new FakeMegEntryReader((meg, [@"DATA\ART\TEXTURES\PACKED.TGA"])));
+
+        indexer.ApplyAssetCatalog(AssetProject(root, art));
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/packed.tga"));
+    }
+
+    /// <summary>The game loads no archive its list does not name, so neither does the catalog.</summary>
+    [Fact]
+    public void ApplyAssetCatalog_AnArchiveNoListNames_IsNotRead()
+    {
+        var root = Root("ws");
+        var meg = Path.Combine(root, "Data", "Art", "Stray.meg");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "Data", "MegaFiles.xml")] = new(MegaFiles(@"Data\ModTextures.meg")),
             [meg] = new("not a real archive - the reader is the seam")
         });
         var svc = new FakeIndexService(GameIndex.Empty);
         var (indexer, _) = BuildWithMegReader(fs, svc,
-            new FakeMegEntryReader(meg, [@"DATA\ART\TEXTURES\PACKED.TGA"]));
+            new FakeMegEntryReader((meg, [@"DATA\ART\TEXTURES\STRAY.TGA"])));
 
-        indexer.ApplyAssetCatalog([root]);
+        indexer.ApplyAssetCatalog(AssetProject(root, Path.Combine(root, "Data", "Art")));
 
         Assert.NotNull(svc.AppliedAssetFiles);
-        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/packed.tga"));
+        Assert.False(svc.AppliedAssetFiles!.Contains("data/art/textures/stray.tga"));
+    }
+
+    /// <summary>
+    ///     A dependency's archives count too, its list read when the leaf has none, and a leaf
+    ///     archive of a listed name replaces the dependency's.
+    /// </summary>
+    [Fact]
+    public void ApplyAssetCatalog_ReadsTheDependencysArchives_InLayerOrder()
+    {
+        var leaf = Root("leaf");
+        var dependency = Root("dependency");
+        var shared = Path.Combine(dependency, "Data", "Shared.meg");
+        var dependencyModels = Path.Combine(dependency, "Data", "Models.meg");
+        var leafModels = Path.Combine(leaf, "Data", "Models.meg");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(dependency, "Data", "MegaFiles.xml")] =
+                new(MegaFiles(@"Data\Shared.meg", @"Data\Models.meg")),
+            [shared] = new(""),
+            [dependencyModels] = new(""),
+            [leafModels] = new("")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = BuildWithMegReader(fs, svc, new FakeMegEntryReader(
+            (shared, [@"DATA\ART\TEXTURES\SHARED.TGA"]),
+            (dependencyModels, [@"DATA\ART\MODELS\REPLACED.ALO"]),
+            (leafModels, [@"DATA\ART\MODELS\LEAF.ALO"])));
+        var config = new WorkspaceConfiguration([], [], [], [], null)
+        {
+            Layers = [AssetLayer(0, dependency), AssetLayer(1, leaf)]
+        };
+
+        indexer.ApplyAssetCatalog(config);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/shared.tga"));
+        Assert.True(svc.AppliedAssetFiles.Contains("data/art/models/leaf.alo"));
+        Assert.False(svc.AppliedAssetFiles.Contains("data/art/models/replaced.alo"));
     }
 
     /// <summary>
@@ -677,9 +762,9 @@ public sealed class WorkspaceIndexerTest
         });
         var svc = new FakeIndexService(GameIndex.Empty);
         var (indexer, _) = BuildWithMegReader(fs, svc,
-            new FakeMegEntryReader(meg, ["U000_SPD0101_ENG.WAV"]));
+            new FakeMegEntryReader((meg, ["U000_SPD0101_ENG.WAV"])));
 
-        indexer.ApplyAssetCatalog([root]);
+        indexer.ApplyAssetCatalog(AssetProject(root, Path.Combine(root, "Data", "Audio")));
 
         Assert.NotNull(svc.AppliedAssetFiles);
         Assert.True(svc.AppliedAssetFiles!.Contains("data/audio/sfx/u000_spd0101_eng.wav"));
@@ -1288,7 +1373,8 @@ public sealed class WorkspaceIndexerTest
         var fh = new FileHelper(fs);
         var indexer = new WorkspaceIndexer(fh, [new FakeParser()], new FakeIndexService(), new FileTypeRegistry(),
             new FakeSchemaProvider(), new EaWXmlContext(fh), cache, new StoryChainProblemStore(),
-            new FakeLspConfigurationProvider(), NoMegEntries.Instance, new NullModelBoneCatalogCache(),
+            new FakeLspConfigurationProvider(), NoMegEntries.Instance, new MegArchiveLoadOrder(fh),
+            new NullModelBoneCatalogCache(),
             NullLogger<WorkspaceIndexer>.Instance, new LuaApiSchemaProvider([luaStub]));
         var config = ConfigWithLayer(xmlDir, pgproj);
         indexer.PreScanMetafiles(config, [root]);
@@ -1889,12 +1975,14 @@ public sealed class WorkspaceIndexerTest
     }
 
     /// <summary>An archive whose entry table is whatever the test says it is.</summary>
-    private sealed class FakeMegEntryReader(string megFilePath, IReadOnlyList<string> entryPaths)
+    private sealed class FakeMegEntryReader(params (string Path, IReadOnlyList<string> Entries)[] archives)
         : IMegEntryReader
     {
         public IEnumerable<string> EnumerateEntryPaths(string path)
         {
-            return path.Equals(megFilePath, StringComparison.OrdinalIgnoreCase) ? entryPaths : [];
+            var normalized = path.Replace('/', '\\');
+            return archives.FirstOrDefault(a => a.Path.Equals(normalized, StringComparison.OrdinalIgnoreCase))
+                .Entries ?? [];
         }
     }
 
