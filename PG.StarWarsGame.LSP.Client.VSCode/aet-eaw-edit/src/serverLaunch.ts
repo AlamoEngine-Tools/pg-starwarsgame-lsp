@@ -18,6 +18,10 @@ export interface ServerChoice {
     readonly args: readonly string[];
     /** True when the VSIX's own server is used, so its version matches the extension by construction. */
     readonly bundled: boolean;
+    /** True when the server runs from source (`dotnet run`). */
+    readonly devMode: boolean;
+    /** The file that has to exist for the command to start: the exe, the `.dll`, or the project. */
+    readonly requires: string;
     /** A one-line description for the log. */
     readonly description: string;
 }
@@ -56,6 +60,8 @@ export function chooseServerCommand(input: ServerChoiceInput): ServerChoice {
             command: "dotnet",
             args,
             bundled: false,
+            devMode: true,
+            requires: projectPath,
             description: `Dev mode: dotnet ${args.join(" ")}`,
         };
     }
@@ -67,6 +73,8 @@ export function chooseServerCommand(input: ServerChoiceInput): ServerChoice {
             command,
             args,
             bundled: true,
+            devMode: false,
+            requires: command,
             description: `Bundled: ${command} ${args.join(" ")}`,
         };
     }
@@ -80,21 +88,27 @@ export function chooseServerCommand(input: ServerChoiceInput): ServerChoice {
         command,
         args,
         bundled: false,
+        devMode: false,
+        requires: input.executable,
         description: `${command} ${args.join(" ")}`,
     };
 }
 
-/** Why the chosen server cannot start, or undefined when it can; `dotnet` is not checked on disk. */
+/** Why the chosen server cannot start, or undefined when it can. */
 export function serverProblem(
     choice: ServerChoice,
     exists: (file: string) => boolean,
 ): string | undefined {
-    if (choice.command === "dotnet" || exists(choice.command)) {
+    if (exists(choice.requires)) {
         return undefined;
     }
+    if (choice.devMode) {
+        // The default project path is right only when the extension runs from its source folder.
+        return `EaWEdit: Dev mode project not found - ${choice.requires}. Set "aet-eaw-edit.lsp.devMode.projectPath", or turn dev mode off`;
+    }
     return choice.bundled
-        ? `EaWEdit: The bundled server is missing - ${choice.command}. Reinstall the extension, or set "aet-eaw-edit.lsp.executable"`
-        : `EaWEdit: LSP server not found - ${choice.command}`;
+        ? `EaWEdit: The bundled server is missing - ${choice.requires}. Reinstall the extension, or set "aet-eaw-edit.lsp.executable"`
+        : `EaWEdit: LSP server not found - ${choice.requires}`;
 }
 
 /**

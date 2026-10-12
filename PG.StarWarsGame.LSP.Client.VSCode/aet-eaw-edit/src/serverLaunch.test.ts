@@ -106,7 +106,22 @@ test("a missing configured server names its path", () => {
     );
 });
 
-test("dotnet is not checked on disk", () => {
+// The default project path only exists when the extension runs from its source folder; an
+// installed copy resolves it next to the extensions folder, where `dotnet run` exits at once.
+test("dev mode without its project names the path", () => {
+    const command = chooseServerCommand({
+        extensionPath,
+        devMode: true,
+        executable: "",
+        extraArgs: [],
+    });
+    const problem = serverProblem(command, () => false);
+    assert.match(problem ?? "", /dev mode project not found/i);
+    assert.match(problem ?? "", /PG\.StarWarsGame\.LSP\.Server\.csproj/);
+    assert.match(problem ?? "", /aet-eaw-edit\.lsp\.devMode\.projectPath/);
+});
+
+test("dev mode with its project is no problem", () => {
     const command = chooseServerCommand({
         extensionPath,
         devMode: true,
@@ -114,8 +129,21 @@ test("dotnet is not checked on disk", () => {
         extraArgs: [],
     });
     assert.equal(
-        serverProblem(command, () => false),
+        serverProblem(command, () => true),
         undefined,
+    );
+});
+
+test("a configured dll is checked on disk, not dotnet", () => {
+    const command = chooseServerCommand({
+        extensionPath,
+        devMode: false,
+        executable: "d:/s/Server.dll",
+        extraArgs: [],
+    });
+    assert.equal(
+        serverProblem(command, (file) => file !== "d:/s/Server.dll"),
+        "EaWEdit: LSP server not found - d:/s/Server.dll",
     );
 });
 
