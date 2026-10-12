@@ -75,6 +75,18 @@
   - A long comment with `=` levels over several lines too: Lua 5.0 reads `--[=[` as a line comment, the rest as
     code
   - Vanilla: none; 13 mods: two, in one test file
+- **Several projects in one window** - every `.pgproj` under the open folders gets a language server of its own
+  ([#228](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/228),
+  [#229](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/229),
+  [#230](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/230))
+  - A file goes to the project whose directory holds it; a dependency outside every folder to the first project
+    that references it, so no file is diagnosed twice
+  - A `.pgproj` inside another project's directory is served as that project's dependency
+  - Folders and project files added or removed start and stop only the servers concerned
+  - Commands act on the project of the document in front, else the last picked; **EaWEdit: Select Project**
+  - Story and localisation navigators grouped by project; story graphs and model previews filed per project
+  - Per project: output channel, protocol trace, log file in the project directory, Lua debug layers
+  - A single project behaves as before
 
 ### Fixes
 
