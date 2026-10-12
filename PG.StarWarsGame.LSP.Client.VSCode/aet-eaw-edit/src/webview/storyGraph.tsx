@@ -2906,9 +2906,9 @@ const VIRTUAL_DESCRIPTIONS: Record<string, string> = {
     TacticalPlot: 'Battle - opens its own graph',
     GalacticPortal: 'Galactic event - opens the campaign graph on it',
     StagingAnd: 'Not yet attached - wire event outputs into this, then drag its output onto the '
-        + "event that should require all of them together. Nothing is saved until then.",
+        + 'event that should require all of them together. Nothing is saved until then.',
     StagingOr: 'Not yet attached - wire event outputs into this, then drag its output onto the '
-        + "event that any one of them should arm. Nothing is saved until then.",
+        + 'event that any one of them should arm. Nothing is saved until then.',
 };
 
 /** AND/OR/Portal/TacticalPlot - nothing on them is editable, so they keep the old compact shape. */
@@ -6849,20 +6849,8 @@ function SwimlaneCanvas(props: {
 function TacticalCreateBar(props: {
     threads: string[];
     initialType: string | null;
-    onCreate(threadUri
-             :
-             string, newName
-             :
-             string, value
-             :
-                 'land' | 'space', file
-             :
-             string
-    ):
-        void;
-    onClose()
-        :
-        void;
+    onCreate(threadUri: string, newName: string, value: 'land' | 'space', file: string): void;
+    onClose(): void;
 }): React.JSX.Element {
     const [name, setName] = useState('New_Tactical_Link');
     const [thread, setThread] = useState(props.threads[0] ?? '');

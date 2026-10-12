@@ -51,10 +51,10 @@ export function upsertParams(
 ): { position: number; value: string }[] {
     const byPosition = new Map(existing.map(p => [p.position, p.value]));
     for (const edit of edits) {
+        // null or empty removes the slot
         if (!edit.value) {
             byPosition.delete(edit.position);
-        } // null or empty removes the slot
-        else {
+        } else {
             byPosition.set(edit.position, edit.value);
         }
     }

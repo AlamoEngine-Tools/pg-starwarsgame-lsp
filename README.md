@@ -366,6 +366,7 @@ dotnet build PG.StarWarsGame.LSP.slnx
 - **State without changes** - `./setup-workspace.sh check`
 - **E2E data** - `--groups build,e2e` adds `baseline/`; the game files in `eaw/` and `foc/` are not distributable
 - **Cross-repo changes** - a schema or baseline branch named like the LSP branch, only when that repo changes; CI on the pull request builds against it, and against the default branch otherwise
+- **Formatting** - Rider's Reformat Code; CI checks C# with JetBrains' command-line cleanup (`dotnet tool restore`, then `dotnet jb cleanupcode` as in `.github/workflows/test.yml`) and TypeScript with the stylistic rules in the extension's `eslint.config.mjs` (`npm run lint`)
 - **Package** - `pwsh ./scripts/stage-bundled-executables.ps1` puts the server and the pinned Lua analyzer into the extension's `server/` folder, then `npx @vscode/vsce package --no-dependencies --target win32-x64` in the extension folder; an extension run from source also picks up a staged server
 - **External update** - the wanted commit checked out in `../ModVerify` or `../PetroglyphTools`, then `./setup-workspace.sh record` and a commit of `workspace.deps`
 

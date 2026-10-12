@@ -1134,6 +1134,7 @@
     "serialize-javascript": "^7.0.5"
   },
   "devDependencies": {
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
