@@ -115,7 +115,10 @@ jobs:
 
     # The VSIX carries the server and the Lua analyzer; there is no separate server download.
     - name: Stage the bundled executables
-      run: ./scripts/stage-bundled-executables.ps1
+      run: |
+        ./scripts/stage-bundled-executables.ps1
+        # vsce does not create the folder it writes to; the server publish used to.
+        New-Item dist -ItemType Directory -Force | Out-Null
 
     - name: Package the extension
       working-directory: PG.StarWarsGame.LSP/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit

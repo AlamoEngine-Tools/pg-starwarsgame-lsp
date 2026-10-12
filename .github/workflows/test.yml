@@ -167,6 +167,8 @@ jobs:
       shell: pwsh
       run: |
         ./scripts/stage-bundled-executables.ps1
+        # vsce does not create the folder it writes to.
+        New-Item dist -ItemType Directory -Force | Out-Null
         Push-Location PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
         npx --yes @vscode/vsce package --no-dependencies --target win32-x64 --out ../../dist/aet-eaw-edit-check.vsix
         if ($LASTEXITCODE -ne 0) { exit 1 }
