@@ -83,6 +83,14 @@
   completes, not after every scan stage
 - **Lua analyzer and a scripts folder not created yet** - the analyzer's workspace keeps the case on disk of the part
   that exists; it was handed over lower-cased, and no script in it was analyzed
+- **A project's packed assets** - read from the archives the game loads: those its `Data\MegaFiles.xml` names, the
+  patch and the sound archives, each name taken from the first project folder that has it
+  ([#219](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/219),
+  [#220](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/220),
+  [#221](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/221))
+  - A packed texture with no loose copy: no missing-file diagnostic, no missing-texture marker in the model preview
+  - A project's own `Data\MegaFiles.xml` replaces the game's list; dependencies count, the leaf project first
+  - Model preview with the expansion configured: the base game's loose files rank below every archive, as in the game
 
 ### Diagnostic IDs
 
@@ -104,6 +112,8 @@
 - **Settings removed** - `aet-eaw-edit.features.lua.codeLens`, `aet-eaw-edit.features.lua.inlayHints`; both come
   from the analyzer
 - **`---@xmlref`** - no longer read; the tag is `---@aetref`
+- **Archives no list names** - no longer count as present; an archive under an art or audio folder that no
+  `MegaFiles.xml` names is never loaded by the game
 
 ## 0.4.1
 

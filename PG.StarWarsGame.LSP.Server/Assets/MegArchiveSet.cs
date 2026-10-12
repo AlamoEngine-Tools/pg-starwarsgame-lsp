@@ -1,55 +1,51 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.Files.MEG.Data.EntryLocations;
 using PG.StarWarsGame.Files.MEG.Services;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Assets;
 
 /// <summary>
-///     The MEG archives of the configured game directories, indexed on first use.
+///     The archives the game loads - the workspace's projects' and the configured game folders' -
+///     indexed on first use.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         Lazy on purpose. Indexing every archive of a full install means opening a dozen files and
 ///         reading tens of thousands of entry records, and most editing sessions never open a preview -
-///         the same reasoning that keeps <c>IconCatalogProvider</c> lazy.
+///         the same reasoning that keeps <c>IconCatalogProvider</c> lazy. The index is rebuilt when the
+///         project folders or the configured game folders change.
 ///     </para>
 ///     <para>
-///         Load order is the engine's, via <see cref="MegLoadOrderResolver" />: base game archives
-///         first, then expansion archives on top, and within each the non-patch archives before
-///         <c>patch.meg</c>, <c>patch2.meg</c> and <c>64patch.meg</c>. A later archive overrides an
-///         earlier one, so the index simply overwrites - last writer wins, which IS the engine rule.
+///         Which archives, and in which order, is the game's rule, <see cref="MegArchiveLoadOrder" />:
+///         the archives the list names, the patch and the sound archives, searched in the game's
+///         order. The first archive that holds a name answers - the one the game would open.
+///     </para>
+///     <para>
+///         Entries are keyed the way the asset catalog spells them, sound archives' flat names under
+///         <c>data/audio/sfx/</c> included, so whatever the catalog reports present resolves here.
 ///     </para>
 /// </remarks>
 public sealed class MegArchiveSet(
-    IFileSystem fileSystem,
     ILspConfigurationProvider config,
+    IModProjectReloadService? projects,
+    MegArchiveLoadOrder loadOrder,
     IMegService megFileService,
     ILogger<MegArchiveSet> logger) : IMegArchiveSet
 {
     private readonly Lock _gate = new();
-    private int _archiveCount;
-    private Dictionary<string, MegDataEntryLocationReference>? _entries;
+    private Index? _index;
 
-    public int ArchiveCount
-    {
-        get
-        {
-            EnsureIndexed();
-            return _archiveCount;
-        }
-    }
+    public int ArchiveCount => EnsureIndexed().ArchiveCount;
 
     public byte[]? TryRead(string normalizedPath)
     {
-        EnsureIndexed();
-
-        if (_entries is null || !_entries.TryGetValue(normalizedPath, out var location))
+        if (!EnsureIndexed().Entries.TryGetValue(normalizedPath, out var location))
             return null;
 
         try
@@ -67,67 +63,50 @@ public sealed class MegArchiveSet(
         }
     }
 
-    private void EnsureIndexed()
+    private Index EnsureIndexed()
     {
-        if (_entries is not null)
-            return;
+        var roots = MegArchiveRoots.For(projects?.LastWorkspaceConfig, config.Current);
+        var key = string.Join('|', [.. roots.ModRoots, roots.GameRoot ?? "", roots.BaseGameRoot ?? ""]);
+        if (_index is { } current && current.Key == key)
+            return current;
 
         lock (_gate)
         {
-            if (_entries is not null)
-                return;
+            if (_index is { } raced && raced.Key == key)
+                return raced;
 
-            var entries = new Dictionary<string, MegDataEntryLocationReference>(
-                StringComparer.OrdinalIgnoreCase);
+            var entries = new Dictionary<string, MegDataEntryLocationReference>(StringComparer.OrdinalIgnoreCase);
             var archives = 0;
 
-            foreach (var megPath in OrderedArchivePaths())
+            foreach (var archive in loadOrder.SearchOrder(roots))
                 try
                 {
-                    var megFile = megFileService.LoadFile(megPath);
+                    var megFile = megFileService.LoadFile(archive.Path);
+                    var megName = Path.GetFileName(archive.Path);
                     foreach (var entry in megFile.Archive)
-                        entries[MegAssetCatalogBuilder.NormalizeMegPath(entry.Path)] =
-                            new MegDataEntryLocationReference(megFile, entry);
+                    {
+                        var path = MegAssetCatalogBuilder.ApplySfxConventions(
+                            MegAssetCatalogBuilder.NormalizeMegPath(entry.Path), megName);
+                        // First in search order wins: the archive the game searches first answers.
+                        entries.TryAdd(path, new MegDataEntryLocationReference(megFile, entry));
+                    }
 
                     archives++;
                 }
                 catch (Exception e)
                 {
-                    logger.LogWarning(e, "Could not load MEG archive {Path}", megPath);
+                    logger.LogWarning(e, "Could not load MEG archive {Path}", archive.Path);
                 }
-
-            _archiveCount = archives;
-            _entries = entries;
 
             logger.LogInformation("Indexed {Entries} entries from {Archives} MEG archive(s)",
                 entries.Count, archives);
+
+            return _index = new Index(key, entries, archives);
         }
     }
 
-    /// <summary>
-    ///     Every archive of the configured directories, base game first so the expansion overrides it.
-    /// </summary>
-    private List<string> OrderedArchivePaths()
-    {
-        var ordered = new List<string>();
-
-        // Base game first, expansion second: later entries win, and FoC layers over EaW.
-        foreach (var root in new[] { config.Current.GamePath, config.Current.ExpansionPath })
-        {
-            if (string.IsNullOrWhiteSpace(root) || !fileSystem.Directory.Exists(root))
-                continue;
-
-            try
-            {
-                var found = fileSystem.Directory.GetFiles(root, "*.meg", SearchOption.AllDirectories);
-                ordered.AddRange(MegLoadOrderResolver.Resolve(found, root));
-            }
-            catch (Exception e)
-            {
-                logger.LogWarning(e, "Could not enumerate MEG archives under {Root}", root);
-            }
-        }
-
-        return ordered;
-    }
+    private sealed record Index(
+        string Key,
+        Dictionary<string, MegDataEntryLocationReference> Entries,
+        int ArchiveCount);
 }

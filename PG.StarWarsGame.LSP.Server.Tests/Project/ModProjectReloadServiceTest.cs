@@ -471,7 +471,7 @@ public sealed class ModProjectReloadServiceTest
             DynamicEnumCatalogApplied = true;
         }
 
-        public void ApplyAssetCatalog(IReadOnlyList<string> roots)
+        public void ApplyAssetCatalog(WorkspaceConfiguration config)
         {
             AssetCatalogApplied = true;
         }

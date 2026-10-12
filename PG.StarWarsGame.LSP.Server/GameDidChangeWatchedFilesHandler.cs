@@ -181,7 +181,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         }
 
         if (assetsChanged)
-            _indexer.ApplyAssetCatalog(_reloadService.LastAssetRoots ?? []);
+            _indexer.ApplyAssetCatalog(_reloadService.LastWorkspaceConfig ?? WorkspaceConfiguration.Empty);
 
         if (dynamicEnumsChanged)
             _indexer.ApplyDynamicEnumCatalog(_reloadService.LastWorkspaceConfig?.XmlDirectories ?? []);

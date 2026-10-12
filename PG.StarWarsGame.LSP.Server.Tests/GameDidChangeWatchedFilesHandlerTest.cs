@@ -68,6 +68,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             new StoryChainProblemStore(),
             new FakeLspConfigurationProvider(),
             NoMegEntries.Instance,
+            new MegArchiveLoadOrder(fileHelper),
             new NullModelBoneCatalogCache(),
             NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
