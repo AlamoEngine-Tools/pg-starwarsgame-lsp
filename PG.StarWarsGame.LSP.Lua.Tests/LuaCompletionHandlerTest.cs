@@ -34,7 +34,8 @@ public sealed class LuaCompletionHandlerTest
         GameIndex index,
         ILuaApiSchemaProvider schema,
         FakeWorkspaceHost? host = null,
-        ILspConfigurationProvider? config = null)
+        ILspConfigurationProvider? config = null,
+        ILuaAnalyzer? analyzer = null)
     {
         var svc = new FakeIndexService { Current = index };
         return new LuaCompletionHandler(
@@ -44,7 +45,81 @@ public sealed class LuaCompletionHandlerTest
             schema,
             new LuaAnnotationRepository(),
             NullLogger<LuaCompletionHandler>.Instance,
-            config ?? new FakeLspConfigurationProvider());
+            config ?? new FakeLspConfigurationProvider(),
+            analyzer);
+    }
+
+    // ── the analyzer's items, merged (#154) ─────────────────────────────────
+
+    private static readonly string[] EngineStub =
+        ["--- Finds a player.\n---@param name string\nfunction Find_Player(name) end"];
+
+    private static LuaCompletionHandler WithAnalyzer(string text, ScriptedLuaAnalyzer analyzer)
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, text, 1);
+        return BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider(EngineStub), host, analyzer: analyzer);
+    }
+
+    private static CompletionList TheirList(params CompletionItem[] items)
+    {
+        return new CompletionList(items);
+    }
+
+    [Fact]
+    public async Task BothAnswer_TheUnion_OursWinningALabelBothOffer()
+    {
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/completion", TheirList(
+            new CompletionItem { Label = "Find_Player", Detail = "theirs" },
+            new CompletionItem { Label = "local_thing", Detail = "theirs" }));
+
+        var result = await WithAnalyzer("Fin", analyzer).Handle(CompletionAt(0, 3), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("local_thing", labels);
+        var findPlayer = Assert.Single(result.Items, i => i.Label == "Find_Player");
+        Assert.NotEqual("theirs", findPlayer.Detail);
+    }
+
+    [Fact]
+    public async Task AnAnalyzerItem_IsResolvedByTheAnalyzer_WithItsOwnData()
+    {
+        var analyzer = new ScriptedLuaAnalyzer()
+            .Answer("textDocument/completion", TheirList(new CompletionItem { Label = "local_thing", Data = 42 }))
+            .Answer("completionItem/resolve", new CompletionItem { Label = "local_thing", Detail = "resolved" });
+        var handler = WithAnalyzer("loc", analyzer);
+        var item = (await handler.Handle(CompletionAt(0, 3), CancellationToken.None)).Items
+            .Single(i => i.Label == "local_thing");
+
+        var resolved = await handler.Handle(item, CancellationToken.None);
+
+        Assert.Equal("resolved", resolved.Detail);
+        var (method, parameters) = analyzer.Requests.Last();
+        Assert.Equal("completionItem/resolve", method);
+        Assert.Equal(42, ((CompletionItem)parameters).Data!.ToObject<int>());
+    }
+
+    [Fact]
+    public async Task OurItem_IsNotSentToTheAnalyzerToResolve()
+    {
+        var analyzer = new ScriptedLuaAnalyzer();
+        var handler = WithAnalyzer("Fin", analyzer);
+        var item = (await handler.Handle(CompletionAt(0, 3), CancellationToken.None)).Items
+            .Single(i => i.Label == "Find_Player");
+
+        var resolved = await handler.Handle(item, CancellationToken.None);
+
+        Assert.Same(item, resolved);
+        Assert.DoesNotContain(analyzer.Requests, r => r.Method == "completionItem/resolve");
+    }
+
+    [Fact]
+    public async Task TheAnalyzerSilent_OursAlone()
+    {
+        var result = await WithAnalyzer("Fin", new ScriptedLuaAnalyzer())
+            .Handle(CompletionAt(0, 3), CancellationToken.None);
+
+        Assert.Contains(result.Items, i => i.Label == "Find_Player");
     }
 
     // ── feature flag ──────────────────────────────────────────────────────────

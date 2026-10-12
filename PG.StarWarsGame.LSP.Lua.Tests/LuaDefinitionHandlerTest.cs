@@ -30,14 +30,56 @@ public sealed class LuaDefinitionHandlerTest
     }
 
     private static LuaDefinitionHandler BuildHandler(GameIndex index, FakeWorkspaceHost? host = null,
-        ILspConfigurationProvider? config = null)
+        ILspConfigurationProvider? config = null, ILuaAnalyzer? analyzer = null)
     {
         return new LuaDefinitionHandler(
             new FakeIndexService { Current = index },
             TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             NullLogger<LuaDefinitionHandler>.Instance,
-            config ?? new FakeLspConfigurationProvider());
+            config ?? new FakeLspConfigurationProvider(),
+            analyzer);
+    }
+
+    // ── ours, else the analyzer's (#154) ─────────────────────────────────────
+
+    private static LocationOrLocationLinks TheirLocation()
+    {
+        return new LocationOrLocationLinks(new Location
+        {
+            Uri = DocumentUri.From(LuaUri),
+            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(7, 6, 7, 9)
+        });
+    }
+
+    [Fact]
+    public async Task NothingOfOurs_TheAnalyzersDefinition()
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "local abc = 1\nprint(abc)", 1);
+        var index = MakeIndex(documents: (LuaUri, new DocumentIndex(LuaUri, 1, [], [])));
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/definition", TheirLocation());
+
+        var result = await BuildHandler(index, host, analyzer: analyzer)
+            .Handle(RequestAt(1, 7), CancellationToken.None);
+
+        Assert.Equal(7, Assert.Single(result!).Location!.Range.Start.Line);
+    }
+
+    [Fact]
+    public async Task OursFound_TheAnalyzerIsNotAsked()
+    {
+        var reference = new GameReference("Foo", GameSymbolKind.LuaGlobal, null, LuaUri, 0, 0, 3);
+        var symbol = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null, new FileOrigin(LibUri, 5, 9), null);
+        var index = MakeIndex([("Foo", ImmutableArray.Create(symbol))],
+            (LuaUri, new DocumentIndex(LuaUri, 1, [], [reference])),
+            (LibUri, new DocumentIndex(LibUri, 1, [symbol], [])));
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/definition", TheirLocation());
+
+        var result = await BuildHandler(index, analyzer: analyzer).Handle(RequestAt(0, 1), CancellationToken.None);
+
+        Assert.Equal(LibUri, Assert.Single(result!).LocationLink!.TargetUri.ToString());
+        Assert.Empty(analyzer.Requests);
     }
 
     // ── feature flag ──────────────────────────────────────────────────────────

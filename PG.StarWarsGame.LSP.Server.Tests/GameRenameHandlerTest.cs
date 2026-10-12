@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Xml;
 
@@ -36,14 +37,133 @@ public sealed class GameRenameHandlerTest
     private static GameRenameHandler BuildHandler(
         IXmlRenameProvider? xmlProvider = null,
         ILuaRenameProvider? luaProvider = null,
-        ILspConfigurationProvider? config = null)
+        ILspConfigurationProvider? config = null,
+        ILuaAnalyzer? analyzer = null,
+        IProjectLayerMap? layers = null)
     {
         return new GameRenameHandler(
             new FakeIndexService(),
             xmlProvider ?? new NullXmlProvider(),
             luaProvider ?? new NullLuaProvider(),
             new FileHelper(new MockFileSystem()),
-            config ?? new FakeLspConfigurationProvider());
+            config ?? new FakeLspConfigurationProvider(),
+            analyzer,
+            layers);
+    }
+
+    // ── what we do not claim is the analyzer's (#154) ───────────────────────
+
+    private const string ModScript = "file:///c:/mods/mymod/data/scripts/story/a.lua";
+    private const string BaseScript = "file:///c:/games/eaw/data/scripts/library/pgbase.lua";
+
+    private static ProjectLayerMap Layers()
+    {
+        var map = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
+        map.SetLayers([
+            new ProjectLayer(0, "EaW", [], ["c:/games/eaw/data/scripts"], [], [], null),
+            new ProjectLayer(1, "Mod", [], ["c:/mods/mymod/data/scripts"], [], [], null)
+        ]);
+        return map;
+    }
+
+    private static WorkspaceEdit EditOf(params string[] uris)
+    {
+        return new WorkspaceEdit
+        {
+            Changes = uris.ToDictionary(u => DocumentUri.From(u), _ => (IEnumerable<TextEdit>)
+            [
+                new TextEdit
+                {
+                    NewText = "renamed",
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(0, 0, 0, 1)
+                }
+            ])
+        };
+    }
+
+    [Fact]
+    public async Task NotOurs_TheAnalyzersRename()
+    {
+        var analyzer = new AnswerOnce("textDocument/rename", EditOf(ModScript));
+
+        var result = await BuildHandler(luaProvider: new ClaimsNothing(), analyzer: analyzer, layers: Layers())
+            .Handle(RenameAt(ModScript), CancellationToken.None);
+
+        Assert.Equal([ModScript], result!.Changes!.Keys.Select(k => k.ToString()));
+    }
+
+    [Fact]
+    public async Task Ours_TheAnalyzerIsNotAsked_EvenWhenWeRefuse()
+    {
+        var analyzer = new AnswerOnce("textDocument/rename", EditOf(ModScript));
+
+        var result = await BuildHandler(luaProvider: new NullLuaProvider(), analyzer: analyzer, layers: Layers())
+            .Handle(RenameAt(ModScript), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.False(analyzer.Asked);
+    }
+
+    /// <summary>The analyzer reads lower layers and the stubs as library; this server never edits them.</summary>
+    [Fact]
+    public async Task TheAnalyzersRename_ReachingOutsideTheProject_IsRefused()
+    {
+        var analyzer = new AnswerOnce("textDocument/rename", EditOf(ModScript, BaseScript));
+        var handler = BuildHandler(luaProvider: new ClaimsNothing(), analyzer: analyzer, layers: Layers());
+
+        var refusal = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.Handle(RenameAt(ModScript), CancellationToken.None));
+
+        Assert.StartsWith("Rename refused: ", refusal.Message, StringComparison.Ordinal);
+    }
+
+    private sealed class ClaimsNothing : ILuaRenameProvider
+    {
+        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
+        {
+            throw new InvalidOperationException("not claimed, never asked");
+        }
+
+        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        {
+            throw new InvalidOperationException("not claimed, never asked");
+        }
+
+        public bool Claims(string uri, int line, int character, GameIndex index)
+        {
+            return false;
+        }
+    }
+
+    internal sealed class AnswerOnce(string method, object answer) : ILuaAnalyzer
+    {
+        public bool Asked { get; private set; }
+
+        public bool IsRunning => true;
+
+        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished
+        {
+            add { }
+            remove { }
+        }
+
+        public void DidOpen(string uri, string text, int version)
+        {
+        }
+
+        public void DidChange(string uri, string text, int version)
+        {
+        }
+
+        public void DidClose(string uri)
+        {
+        }
+
+        public Task<T?> RequestAsync<T>(string asked, object parameters, CancellationToken ct) where T : class
+        {
+            Asked = true;
+            return Task.FromResult(asked == method ? answer as T : null);
+        }
     }
 
     // ── feature flags ──────────────────────────────────────────────────────────

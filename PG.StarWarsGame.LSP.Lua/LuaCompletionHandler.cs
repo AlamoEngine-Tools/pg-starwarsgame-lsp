@@ -19,6 +19,7 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaCompletionHandler : CompletionHandlerBase
 {
+    private readonly ILuaAnalyzer? _analyzer;
     private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
@@ -34,7 +35,9 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         ILuaApiSchemaProvider schemaProvider,
         ILuaAnnotationRepository annotationRepository,
         ILogger<LuaCompletionHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        // Optional: with the analyzer running, its items join ours.
+        ILuaAnalyzer? analyzer = null)
     {
         _indexService = indexService;
         _parseCache = parseCache;
@@ -43,9 +46,21 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         _annotationRepository = annotationRepository;
         _logger = logger;
         _config = config;
+        _analyzer = analyzer;
     }
 
-    public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
+    public override async Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
+    {
+        var ours = await HandleOurs(request);
+        if (_analyzer is null || !_config.Current.Features.Lua.Completion ||
+            !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            return ours;
+
+        var theirs = await _analyzer.RequestAsync<CompletionList>("textDocument/completion", request, ct);
+        return LuaAnalyzerAnswers.MergeCompletion(ours, theirs);
+    }
+
+    private Task<CompletionList> HandleOurs(CompletionParams request)
     {
         if (!_config.Current.Features.Lua.Completion)
             return Task.FromResult(new CompletionList());
@@ -66,9 +81,11 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         return Task.FromResult(BuildCompletions(ctx, uri, parsed, line, character, index));
     }
 
-    public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
+    public override async Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
     {
-        return Task.FromResult(request);
+        // Only the analyzer's own items are its to resolve; ours are complete as sent.
+        if (_analyzer is null || LuaAnalyzerAnswers.AnalyzerItem(request) is not { } original) return request;
+        return await _analyzer.RequestAsync<CompletionItem>("completionItem/resolve", original, ct) ?? request;
     }
 
     protected override CompletionRegistrationOptions CreateRegistrationOptions(
@@ -77,8 +94,10 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         return new CompletionRegistrationOptions
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("lua"),
-            TriggerCharacters = new Container<string>("\"", "'", ".", ":"),
-            ResolveProvider = false
+            // Ours, then the analyzer's (measured, 0.25.1) less the space: it would open the list
+            // after every word.
+            TriggerCharacters = new Container<string>("\"", "'", ".", ":", "(", "[", "@", "\\", "/", "|", "#", "?"),
+            ResolveProvider = true
         };
     }
 

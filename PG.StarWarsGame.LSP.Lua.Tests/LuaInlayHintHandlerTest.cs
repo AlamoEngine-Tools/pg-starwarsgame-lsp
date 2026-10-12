@@ -37,7 +37,8 @@ public sealed class LuaInlayHintHandlerTest
         ILuaAnnotationRepository? repo = null,
         string docText = "",
         string docUri = LuaUri,
-        ILspConfigurationProvider? config = null)
+        ILspConfigurationProvider? config = null,
+        ILuaAnalyzer? analyzer = null)
     {
         var host = new FakeWorkspaceHost();
         if (docText.Length > 0) host.AddOrUpdate(docUri, docText, 1);
@@ -49,7 +50,42 @@ public sealed class LuaInlayHintHandlerTest
             schema ?? new LuaApiSchemaProvider([]),
             repo ?? new LuaAnnotationRepository(),
             NullLogger<LuaInlayHintHandler>.Instance,
-            config ?? new FakeLspConfigurationProvider());
+            config ?? new FakeLspConfigurationProvider(),
+            analyzer);
+    }
+
+    // ── ours, then the analyzer's (#154) ────────────────────────────────────
+
+    private static InlayHint TheirHint(int line, int character, string label)
+    {
+        return new InlayHint
+            { Position = new Position(line, character), Label = new StringOrInlayHintLabelParts(label) };
+    }
+
+    [Fact]
+    public async Task BothAnswer_OursThenTheirs_TheirsDroppedWhereWeAlreadyHintThePosition()
+    {
+        var schema = new LuaApiSchemaProvider(["---@param name string\nfunction Find_Player(name) end"]);
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/inlayHint", new InlayHintContainer(
+            TheirHint(0, 12, "name:"), TheirHint(1, 9, ": integer")));
+        var handler = BuildHandler(schema: schema, docText: "Find_Player(\"Empire\")\nlocal x = 1", analyzer: analyzer);
+
+        var hints = (await handler.Handle(RequestAt(0, 1), CancellationToken.None))!.ToList();
+
+        Assert.Single(hints, h => h.Position == new Position(0, 12));
+        Assert.Contains(hints, h => h.Label.String == ": integer");
+    }
+
+    [Fact]
+    public async Task OnlyTheAnalyzerHints_ItsHintsAlone()
+    {
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/inlayHint",
+            new InlayHintContainer(TheirHint(0, 7, ": integer")));
+        var handler = BuildHandler(docText: "local x = 1", analyzer: analyzer);
+
+        var hint = Assert.Single((await handler.Handle(RequestAt(0, 0), CancellationToken.None))!);
+
+        Assert.Equal(": integer", hint.Label.String);
     }
 
     // ── feature flag ──────────────────────────────────────────────────────────
