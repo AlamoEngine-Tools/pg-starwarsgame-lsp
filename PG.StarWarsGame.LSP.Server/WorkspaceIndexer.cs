@@ -14,6 +14,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Story.Discovery;
@@ -42,6 +43,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<WorkspaceIndexer> _logger;
+    private readonly ILuaApiSchemaProvider? _luaSchema;
     private readonly IMegEntryReader _megEntries;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
@@ -54,7 +56,9 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         ILspConfigurationProvider configProvider,
         IMegEntryReader megEntries,
         IModelBoneCatalogCache boneCache,
-        ILogger<WorkspaceIndexer> logger)
+        ILogger<WorkspaceIndexer> logger,
+        // Optional so minimal setups can omit it; production injects the loaded stubs.
+        ILuaApiSchemaProvider? luaSchema = null)
     {
         _boneCache = boneCache;
         _fileHelper = fileHelper;
@@ -68,6 +72,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _configProvider = configProvider;
         _megEntries = megEntries;
         _logger = logger;
+        _luaSchema = luaSchema;
     }
 
     /// <summary>
@@ -615,6 +620,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         var schemaFingerprint = SchemaFingerprint.Compute(_schema);
         if (!_configProvider.Current.Features.Story.Symbols)
             schemaFingerprint += ";story-symbols-off";
+        // The Lua stubs decide which string arguments a script's index records as references.
+        // Measured: an index cached under the released stubs (---@xmlref, no longer read) held no
+        // Lua reference at all, and a server on the current stubs replayed it.
+        if (_luaSchema?.Fingerprint is { Length: > 0 } luaFingerprint)
+            schemaFingerprint += ";lua:" + luaFingerprint;
 
         // (pgprojPath → overallHash), used to skip a redundant re-save of an unchanged snapshot.
         // Folded: a dependency is looked up here by the path a DIFFERENT project spelled in its

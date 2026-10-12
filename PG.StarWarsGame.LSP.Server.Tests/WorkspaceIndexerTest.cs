@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -1257,6 +1258,44 @@ public sealed class WorkspaceIndexerTest
         var saved = cache.Saved[pgproj];
         Assert.Equal(SchemaFingerprint.Compute(schema), saved.SchemaFingerprint);
         Assert.NotEqual(string.Empty, saved.SchemaFingerprint);
+    }
+
+    /// <summary>
+    ///     The Lua stubs decide which string arguments a script's index records as references, so a
+    ///     snapshot written under one set must not be replayed under another. Measured: a session on
+    ///     the released schema (stubs still spelled <c>---@xmlref</c>, no longer read) cached Lua
+    ///     indices without a single reference, and a server on the current stubs replayed them.
+    /// </summary>
+    [Fact]
+    public async Task IndexDocumentsAsync_LuaStubsChanged_SnapshotFingerprintChanges()
+    {
+        const string current = "---@param name string\n---@aetref XmlObject\nfunction Find_Object_Type(name) end";
+        const string released = "---@param name string\n---@xmlref XmlObject\nfunction Find_Object_Type(name) end";
+
+        Assert.NotEqual(await SavedFingerprint(current), await SavedFingerprint(released));
+    }
+
+    private static async Task<string> SavedFingerprint(string luaStub)
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
+        });
+        var cache = new FakeProjectIndexCache();
+        var fh = new FileHelper(fs);
+        var indexer = new WorkspaceIndexer(fh, [new FakeParser()], new FakeIndexService(), new FileTypeRegistry(),
+            new FakeSchemaProvider(), new EaWXmlContext(fh), cache, new StoryChainProblemStore(),
+            new FakeLspConfigurationProvider(), NoMegEntries.Instance, new NullModelBoneCatalogCache(),
+            NullLogger<WorkspaceIndexer>.Instance, new LuaApiSchemaProvider([luaStub]));
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        return cache.Saved[pgproj].SchemaFingerprint;
     }
 
     [Fact]

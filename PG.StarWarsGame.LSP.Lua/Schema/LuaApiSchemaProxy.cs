@@ -21,6 +21,8 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
 
     public IReadOnlySet<string> DeclaredGlobalNames => Inner.DeclaredGlobalNames;
 
+    public string Fingerprint => Inner.Fingerprint;
+
     public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
     {
         return Inner.GetXmlRefs(functionName);
@@ -48,6 +50,8 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
 
         public IReadOnlySet<string> DeclaredGlobalNames =>
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        public string Fingerprint => "";
 
         public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
         {

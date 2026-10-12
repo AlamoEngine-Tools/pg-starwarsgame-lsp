@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
@@ -17,11 +19,15 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
 
     public LuaApiSchemaProvider(IEnumerable<string> fileContents)
     {
+        var contents = fileContents.ToList();
         var functions = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
         var memberRefs = new Dictionary<string, List<XmlRefEntry>>(StringComparer.OrdinalIgnoreCase);
         var declaredGlobals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var content in fileContents)
+        foreach (var content in contents)
             ParseContent(content, functions, memberRefs, declaredGlobals);
+        Fingerprint = contents.Count == 0
+            ? ""
+            : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\0', contents))));
         _functions = functions;
         _memberRefs = memberRefs.ToDictionary(
             kvp => kvp.Key,
@@ -35,6 +41,8 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     public IReadOnlySet<string> AllFunctionNames { get; }
 
     public IReadOnlySet<string> DeclaredGlobalNames { get; }
+
+    public string Fingerprint { get; }
 
     public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
     {
