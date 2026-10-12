@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    clipPlanes, fitDistance, frameSphere, sphereFromBounds, type BoundingSphere,
-} from './framing';
+import {type BoundingSphere, clipPlanes, fitDistance, frameSphere, sphereFromBounds,} from './framing';
 
 const FOV = 50;
 
@@ -53,7 +51,7 @@ describe('fitDistance', () => {
 });
 
 describe('frameSphere', () => {
-    const sphere: BoundingSphere = { center: { x: 5, y: -2, z: 3 }, radius: 20 };
+    const sphere: BoundingSphere = {center: {x: 5, y: -2, z: 3}, radius: 20};
 
     it('looks at the centre of the model, not the origin', () => {
         // Models are not authored around their own origin; aiming at it points the camera at empty
@@ -120,7 +118,7 @@ describe('clipPlanes', () => {
     it('keeps the depth range tight enough to resolve a coplanar overlay', () => {
         for (const radius of [1, 10, 67, 500, 5000]) {
             const planes = clipPlanes(
-                { center: { x: 0, y: 0, z: 0 }, radius }, radius * 3);
+                {center: {x: 0, y: 0, z: 0}, radius}, radius * 3);
 
             assert.ok(planes.far / planes.near < 4000,
                 `radius ${radius}: far/near is ${(planes.far / planes.near).toFixed(0)}`);
@@ -130,21 +128,21 @@ describe('clipPlanes', () => {
     it('still lets the reader get close to a surface before it clips', () => {
         // The other half of the trade: too large a near plane and dollying in to look at a hardpoint
         // slices the hull open. A hundredth of the radius is closer than anyone needs to get.
-        const planes = clipPlanes({ center: { x: 0, y: 0, z: 0 }, radius: 67 }, 190);
+        const planes = clipPlanes({center: {x: 0, y: 0, z: 0}, radius: 67}, 190);
 
         assert.ok(planes.near <= 67 / 100, `near is ${planes.near}`);
     });
 
     it('scales both planes with the model', () => {
-        const small = clipPlanes({ center: { x: 0, y: 0, z: 0 }, radius: 1 }, 10);
-        const large = clipPlanes({ center: { x: 0, y: 0, z: 0 }, radius: 5000 }, 20000);
+        const small = clipPlanes({center: {x: 0, y: 0, z: 0}, radius: 1}, 10);
+        const large = clipPlanes({center: {x: 0, y: 0, z: 0}, radius: 5000}, 20000);
 
         assert.ok(large.near > small.near);
         assert.ok(large.far > small.far);
     });
 
     it('always encloses the whole model', () => {
-        const sphere = { center: { x: 0, y: 0, z: 0 }, radius: 100 };
+        const sphere = {center: {x: 0, y: 0, z: 0}, radius: 100};
         const distance = fitDistance(sphere.radius, FOV, 1);
 
         const planes = clipPlanes(sphere, distance);
@@ -154,7 +152,7 @@ describe('clipPlanes', () => {
     });
 
     it('keeps the near plane off zero for a degenerate model', () => {
-        assert.ok(clipPlanes({ center: { x: 0, y: 0, z: 0 }, radius: 0 }, 1).near > 0);
+        assert.ok(clipPlanes({center: {x: 0, y: 0, z: 0}, radius: 0}, 1).near > 0);
     });
 
     /**
@@ -164,7 +162,7 @@ describe('clipPlanes', () => {
      * the effect stopping rather than as the camera not seeing it.
      */
     it('reaches past an effect that flies far beyond the model', () => {
-        const boba = { center: { x: 0, y: 0, z: 0 }, radius: 7 };
+        const boba = {center: {x: 0, y: 0, z: 0}, radius: 7};
         const distance = fitDistance(boba.radius, FOV, 1);
 
         const tight = clipPlanes(boba, distance);
@@ -175,7 +173,7 @@ describe('clipPlanes', () => {
     });
 
     it('ignores a reach the model already covers', () => {
-        const sphere = { center: { x: 0, y: 0, z: 0 }, radius: 500 };
+        const sphere = {center: {x: 0, y: 0, z: 0}, radius: 500};
         const distance = fitDistance(sphere.radius, FOV, 1);
 
         assert.equal(clipPlanes(sphere, distance, 5).far, clipPlanes(sphere, distance).far);
@@ -183,7 +181,7 @@ describe('clipPlanes', () => {
 
     /** The multiplier is the reader's override, for the trails a fit cannot know about. */
     it('takes a draw-distance multiplier', () => {
-        const sphere = { center: { x: 0, y: 0, z: 0 }, radius: 10 };
+        const sphere = {center: {x: 0, y: 0, z: 0}, radius: 10};
 
         const once = clipPlanes(sphere, 40, 0, 1).far;
         const further = clipPlanes(sphere, 40, 0, 4).far;
@@ -194,15 +192,15 @@ describe('clipPlanes', () => {
 
 describe('sphereFromBounds', () => {
     it('centres between the corners and reaches them', () => {
-        const sphere = sphereFromBounds({ x: -1, y: -2, z: -3 }, { x: 1, y: 2, z: 3 });
+        const sphere = sphereFromBounds({x: -1, y: -2, z: -3}, {x: 1, y: 2, z: 3});
 
-        assert.deepEqual(sphere.center, { x: 0, y: 0, z: 0 });
+        assert.deepEqual(sphere.center, {x: 0, y: 0, z: 0});
         assert.ok(Math.abs(sphere.radius - Math.sqrt(1 + 4 + 9)) < 1e-6);
     });
 
     it('handles an off-centre box', () => {
-        const sphere = sphereFromBounds({ x: 10, y: 10, z: 10 }, { x: 20, y: 20, z: 20 });
+        const sphere = sphereFromBounds({x: 10, y: 10, z: 10}, {x: 20, y: 20, z: 20});
 
-        assert.deepEqual(sphere.center, { x: 15, y: 15, z: 15 });
+        assert.deepEqual(sphere.center, {x: 15, y: 15, z: 15});
     });
 });

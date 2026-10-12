@@ -31,7 +31,8 @@ let sizes: PanelLayout = {};
 /** Keys the reader has changed this session; the host's stored layout must not overwrite these. */
 let touched = new Set<string>();
 
-let report: PanelSizeReporter = () => { /* replaced by the webview's own poster */ };
+let report: PanelSizeReporter = () => { /* replaced by the webview's own poster */
+};
 
 /**
  * Validates a stored layout entry by entry, and never throws.
@@ -41,7 +42,9 @@ let report: PanelSizeReporter = () => { /* replaced by the webview's own poster 
  * pixels leaves the reader no way back.
  */
 export function panelLayoutFrom(value: unknown): PanelLayout {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) { return {}; }
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return {};
+    }
 
     const layout: PanelLayout = {};
     for (const [key, size] of Object.entries(value as Record<string, unknown>)) {
@@ -78,7 +81,9 @@ export function writePanelSize(key: string, value: number): void {
  */
 export function applyStoredLayout(value: unknown): void {
     for (const [key, size] of Object.entries(panelLayoutFrom(value))) {
-        if (!touched.has(key)) { sizes[key] = size; }
+        if (!touched.has(key)) {
+            sizes[key] = size;
+        }
     }
 }
 
@@ -86,5 +91,6 @@ export function applyStoredLayout(value: unknown): void {
 export function resetPanelLayoutForTests(reporter?: PanelSizeReporter): void {
     sizes = {};
     touched = new Set<string>();
-    report = reporter ?? (() => { /* nothing is listening */ });
+    report = reporter ?? (() => { /* nothing is listening */
+    });
 }

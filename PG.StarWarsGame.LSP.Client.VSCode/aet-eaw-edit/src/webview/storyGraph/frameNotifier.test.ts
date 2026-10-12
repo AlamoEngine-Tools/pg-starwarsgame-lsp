@@ -2,19 +2,23 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { FrameNotifier } from './frameNotifier';
+import {FrameNotifier} from './frameNotifier';
 
 /** A hand-cranked frame scheduler, so a test can decide when the frame happens. */
 function manualFrames(): { schedule: (fn: () => void) => void; run: () => void } {
     let queued: (() => void)[] = [];
     return {
-        schedule: fn => { queued.push(fn); },
+        schedule: fn => {
+            queued.push(fn);
+        },
         run: () => {
             const due = queued;
             queued = [];
-            for (const fn of due) { fn(); }
+            for (const fn of due) {
+                fn();
+            }
         },
     };
 }
@@ -24,7 +28,9 @@ describe('FrameNotifier', () => {
         const frames = manualFrames();
         const notifier = new FrameNotifier(frames.schedule);
         let calls = 0;
-        notifier.subscribe(() => { calls++; });
+        notifier.subscribe(() => {
+            calls++;
+        });
 
         notifier.schedule();
         assert.equal(calls, 0, 'must not fire before the frame');
@@ -39,9 +45,13 @@ describe('FrameNotifier', () => {
         const frames = manualFrames();
         const notifier = new FrameNotifier(frames.schedule);
         let calls = 0;
-        notifier.subscribe(() => { calls++; });
+        notifier.subscribe(() => {
+            calls++;
+        });
 
-        for (let i = 0; i < 50; i++) { notifier.schedule(); }
+        for (let i = 0; i < 50; i++) {
+            notifier.schedule();
+        }
         frames.run();
 
         assert.equal(calls, 1);
@@ -51,7 +61,9 @@ describe('FrameNotifier', () => {
         const frames = manualFrames();
         const notifier = new FrameNotifier(frames.schedule);
         let calls = 0;
-        notifier.subscribe(() => { calls++; });
+        notifier.subscribe(() => {
+            calls++;
+        });
 
         notifier.schedule();
         frames.run();
@@ -69,7 +81,9 @@ describe('FrameNotifier', () => {
         let calls = 0;
         notifier.subscribe(() => {
             calls++;
-            if (calls === 1) { notifier.schedule(); }
+            if (calls === 1) {
+                notifier.schedule();
+            }
         });
 
         notifier.schedule();
@@ -83,7 +97,9 @@ describe('FrameNotifier', () => {
         const frames = manualFrames();
         const notifier = new FrameNotifier(frames.schedule);
         let calls = 0;
-        const off = notifier.subscribe(() => { calls++; });
+        const off = notifier.subscribe(() => {
+            calls++;
+        });
 
         off();
         notifier.schedule();
@@ -98,8 +114,13 @@ describe('FrameNotifier', () => {
         const notifier = new FrameNotifier(frames.schedule);
         const seen: string[] = [];
 
-        const off = notifier.subscribe(() => { seen.push('first'); off(); });
-        notifier.subscribe(() => { seen.push('second'); });
+        const off = notifier.subscribe(() => {
+            seen.push('first');
+            off();
+        });
+        notifier.subscribe(() => {
+            seen.push('second');
+        });
 
         notifier.schedule();
         frames.run();
@@ -122,23 +143,34 @@ describe('FrameNotifier', () => {
      */
     function browserLikeRaf(): { install: () => () => void; run: () => void } {
         let queued: (() => void)[] = [];
+
         function raf(this: unknown, fn: () => void): void {
             if (this !== undefined && this !== globalThis) {
                 throw new TypeError('Illegal invocation');
             }
             queued.push(fn);
         }
+
         return {
             install: () => {
                 const had = 'requestAnimationFrame' in globalThis;
                 const previous = (globalThis as Record<string, unknown>).requestAnimationFrame;
                 (globalThis as Record<string, unknown>).requestAnimationFrame = raf;
                 return () => {
-                    if (had) { (globalThis as Record<string, unknown>).requestAnimationFrame = previous; }
-                    else { delete (globalThis as Record<string, unknown>).requestAnimationFrame; }
+                    if (had) {
+                        (globalThis as Record<string, unknown>).requestAnimationFrame = previous;
+                    } else {
+                        delete (globalThis as Record<string, unknown>).requestAnimationFrame;
+                    }
                 };
             },
-            run: () => { const due = queued; queued = []; for (const fn of due) { fn(); } },
+            run: () => {
+                const due = queued;
+                queued = [];
+                for (const fn of due) {
+                    fn();
+                }
+            },
         };
     }
 
@@ -148,7 +180,9 @@ describe('FrameNotifier', () => {
         try {
             const notifier = new FrameNotifier();
             let calls = 0;
-            notifier.subscribe(() => { calls++; });
+            notifier.subscribe(() => {
+                calls++;
+            });
 
             notifier.schedule();
             frames.run();
@@ -166,17 +200,23 @@ describe('FrameNotifier', () => {
         let failNext = true;
         const queued: (() => void)[] = [];
         const notifier = new FrameNotifier(fn => {
-            if (failNext) { throw new Error('scheduler unavailable'); }
+            if (failNext) {
+                throw new Error('scheduler unavailable');
+            }
             queued.push(fn);
         });
         let calls = 0;
-        notifier.subscribe(() => { calls++; });
+        notifier.subscribe(() => {
+            calls++;
+        });
 
         assert.throws(() => notifier.schedule(), /scheduler unavailable/);
 
         failNext = false;
         notifier.schedule();
-        for (const fn of queued) { fn(); }
+        for (const fn of queued) {
+            fn();
+        }
 
         assert.equal(calls, 1, 'a later schedule must still be able to fire');
     });
@@ -187,8 +227,12 @@ describe('FrameNotifier', () => {
         const geometry = new FrameNotifier(frames.schedule);
         let areaCalls = 0;
         let geometryCalls = 0;
-        area.subscribe(() => { areaCalls++; });
-        geometry.subscribe(() => { geometryCalls++; });
+        area.subscribe(() => {
+            areaCalls++;
+        });
+        geometry.subscribe(() => {
+            geometryCalls++;
+        });
 
         area.schedule();
         frames.run();

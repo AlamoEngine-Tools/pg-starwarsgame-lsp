@@ -16,9 +16,9 @@
 // eighty-eight pixels to the left; and a folded body is unmounted rather than hidden, because a
 // folded section has no business holding a slider that still answers to the keyboard.
 
-import { ReactNode } from 'react';
+import {ReactNode} from 'react';
 
-import { Icon } from './Icon';
+import {Icon} from './Icon';
 
 export interface DockSectionProps {
     title: string;
@@ -49,14 +49,14 @@ export interface DockSectionProps {
 }
 
 export function DockSection({
-    title, count, end, id, collapsed = false, onToggle, children,
-}: DockSectionProps): React.JSX.Element {
+                                title, count, end, id, collapsed = false, onToggle, children,
+                            }: DockSectionProps): React.JSX.Element {
     const foldable = id !== undefined && onToggle !== undefined;
     const folded = foldable && collapsed;
 
     const heading = (
         <>
-            {foldable && <Icon name={folded ? 'collapsed' : 'expanded'} size={13} />}
+            {foldable && <Icon name={folded ? 'collapsed' : 'expanded'} size={13}/>}
             <span className="dock-section-name">{title}</span>
 
             {/* ONE auto margin, and it lives on this wrapper. */}

@@ -14,23 +14,23 @@
 // The shell is the model preview's stage flyout (`stageFlyoutCss`), on purpose: the same panel,
 // opened the same way, from the same kind of corner plate.
 
-import { IconButton } from '../shared/Button';
-import { DockSection } from '../shared/DockSection';
+import {IconButton} from '../shared/Button';
+import {DockSection} from '../shared/DockSection';
 
-import type { BranchKeyEntry } from './colourKey';
-import { EDGE_KINDS, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN } from './palette';
+import type {BranchKeyEntry} from './colourKey';
+import {EDGE_KINDS, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN} from './palette';
 
 export interface ColourKeyFlyoutProps {
     branches: readonly BranchKeyEntry[];
     onClose: () => void;
 }
 
-export function ColourKeyFlyout({ branches, onClose }: ColourKeyFlyoutProps): React.JSX.Element {
+export function ColourKeyFlyout({branches, onClose}: ColourKeyFlyoutProps): React.JSX.Element {
     return (
         <div className="stage-flyout from-bottom on-right colour-key" role="dialog" aria-label="Colour key">
             <div className="stage-flyout-head">
                 Colour key
-                <IconButton icon="close" title="Close" onClick={onClose} />
+                <IconButton icon="close" title="Close" onClick={onClose}/>
             </div>
             <div className="stage-flyout-body">
                 <DockSection title="Nodes">
@@ -38,17 +38,17 @@ export function ColourKeyFlyout({ branches, onClose }: ColourKeyFlyoutProps): Re
                         {/* Generated from the same mapping the node borders are, so a swatch cannot
                             come to disagree with the node it describes. */}
                         <li>
-                            <span className="swatch" style={{ borderColor: `var(${UNKNOWN_LIFECYCLE_TOKEN})` }} />
+                            <span className="swatch" style={{borderColor: `var(${UNKNOWN_LIFECYCLE_TOKEN})`}}/>
                             <span className="key-label">Inactive</span>
                         </li>
                         {Object.entries(LIFECYCLE_TOKENS).map(([lifecycle, token]) => (
                             <li key={lifecycle}>
-                                <span className="swatch" style={{ borderColor: `var(${token})` }} />
+                                <span className="swatch" style={{borderColor: `var(${token})`}}/>
                                 <span className="key-label">{lifecycle}</span>
                             </li>
                         ))}
-                        <li><span className="shape-diamond" /><span className="key-label">OR</span></li>
-                        <li><span className="shape-circle" /><span className="key-label">AND</span></li>
+                        <li><span className="shape-diamond"/><span className="key-label">OR</span></li>
+                        <li><span className="shape-circle"/><span className="key-label">AND</span></li>
                     </ul>
                 </DockSection>
 

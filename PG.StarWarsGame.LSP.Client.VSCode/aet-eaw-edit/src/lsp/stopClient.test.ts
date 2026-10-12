@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {STOP_TIMEOUT_MS, StoppableClient, stopClient} from './stopClient';
+import {STOP_TIMEOUT_MS, stopClient, StoppableClient} from './stopClient';
 
 function logger(): StopLog {
     const lines: string[] = [];

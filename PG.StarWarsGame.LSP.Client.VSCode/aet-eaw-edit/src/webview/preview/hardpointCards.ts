@@ -11,9 +11,9 @@
 // What is left over is the weapons without hardpoints - a fighter's guns are on the unit - and
 // those keep a list of their own, because putting them under Hardpoints would be a lie.
 
-import { type PreviewHardpoint, type PreviewTurret } from '../../protocol/modelPreview';
-import { healthColour } from './reticles';
-import { type WeaponRow, type WeaponScene, weaponRows } from './weaponRows';
+import {type PreviewHardpoint, type PreviewTurret} from '../../protocol/modelPreview';
+import {healthColour} from './reticles';
+import {type WeaponRow, weaponRows, type WeaponScene} from './weaponRows';
 
 /** One hardpoint, with everything the card shows. */
 export interface HardpointCard {

@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { problemLook, problemTag, problemWhere } from './problemLook';
+import {problemLook, problemTag, problemWhere} from './problemLook';
 
 describe('problemLook', () => {
     it('keeps the three severities the server sends apart', () => {

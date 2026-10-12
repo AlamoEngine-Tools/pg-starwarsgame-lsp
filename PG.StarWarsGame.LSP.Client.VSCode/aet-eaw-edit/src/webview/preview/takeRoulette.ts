@@ -15,7 +15,7 @@
 // The roll comes in from the caller rather than being taken here, so the whole thing is a pure
 // function of a number and the panel is the only part that needs `Math.random`.
 
-import { type AnimationTake } from './animationNames';
+import {type AnimationTake} from './animationNames';
 
 /**
  * How much more often take zero comes up than any other.

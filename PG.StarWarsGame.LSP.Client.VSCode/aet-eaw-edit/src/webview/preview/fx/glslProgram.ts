@@ -10,7 +10,11 @@
 import {translateHlslBody} from './hlsl';
 import {bindField} from './attributes';
 import {
-    fillEmptyFunctions, fixBooleanConditions, fixReturnWidths, fixVectorTruncation, zeroFor,
+    fillEmptyFunctions,
+    fixBooleanConditions,
+    fixReturnWidths,
+    fixVectorTruncation,
+    zeroFor,
     zeroStructCasts,
 } from './truncation';
 

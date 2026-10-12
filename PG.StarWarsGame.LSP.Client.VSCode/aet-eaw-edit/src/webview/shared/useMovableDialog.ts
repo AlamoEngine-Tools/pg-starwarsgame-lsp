@@ -11,12 +11,18 @@
 // somewhere it was previously put. Only then does it take an explicit position, so a dialog that has
 // never been moved is untouched by any of this.
 
-import { CSSProperties, PointerEvent as ReactPointerEvent, useCallback, useRef, useState } from 'react';
+import {CSSProperties, PointerEvent as ReactPointerEvent, useCallback, useRef, useState} from 'react';
 
-import { rememberedGeometry, rememberGeometry } from './dialogGeometryStore';
+import {rememberedGeometry, rememberGeometry} from './dialogGeometryStore';
 import {
-    centredPosition, clampPosition, fromStoredGeometry, Rect, resizeRect, ResizeDirection,
-    Size, toStoredGeometry,
+    centredPosition,
+    clampPosition,
+    fromStoredGeometry,
+    Rect,
+    ResizeDirection,
+    resizeRect,
+    Size,
+    toStoredGeometry,
 } from './modalGeometry';
 
 /** Every edge and corner, in the order the handles are rendered. */
@@ -44,19 +50,21 @@ export function useMovableDialog(dialogId?: string): MovableDialog {
     // Restored on the first render rather than in an effect, so a remembered dialog is painted where
     // it belongs instead of appearing centred and then jumping.
     const [rect, setRect] = useState<Rect | null>(() => {
-        if (dialogId === undefined) { return null; }
+        if (dialogId === undefined) {
+            return null;
+        }
 
         const stored = rememberedGeometry(dialogId);
         return stored === undefined
             ? null
-            : fromStoredGeometry(stored, { width: window.innerWidth, height: window.innerHeight });
+            : fromStoredGeometry(stored, {width: window.innerWidth, height: window.innerHeight});
     });
 
     const element = useRef<HTMLElement | null>(null);
     const drag = useRef<DragState | null>(null);
 
     const viewport = (): { width: number; height: number } =>
-        ({ width: window.innerWidth, height: window.innerHeight });
+        ({width: window.innerWidth, height: window.innerHeight});
 
     /**
      * The dialog's current geometry, measured when a drag starts.
@@ -65,15 +73,17 @@ export function useMovableDialog(dialogId?: string): MovableDialog {
      * so both have to be read off the element, or the first drag would jump.
      */
     const measure = useCallback((): Rect => {
-        if (rect !== null) { return rect; }
+        if (rect !== null) {
+            return rect;
+        }
 
         const bounds = element.current?.getBoundingClientRect();
         if (!bounds) {
-            const empty: Size = { width: 0, height: 0 };
-            return { ...centredPosition(empty, viewport()), ...empty };
+            const empty: Size = {width: 0, height: 0};
+            return {...centredPosition(empty, viewport()), ...empty};
         }
 
-        return { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height };
+        return {x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height};
     }, [rect]);
 
     const begin = useCallback((
@@ -90,22 +100,26 @@ export function useMovableDialog(dialogId?: string): MovableDialog {
 
     const onPointerDownMove = useCallback((e: ReactPointerEvent<HTMLElement>) => {
         // Not from a control inside the title bar - a close button there must still be clickable.
-        if ((e.target as HTMLElement).closest('button, input, select, textarea, a')) { return; }
+        if ((e.target as HTMLElement).closest('button, input, select, textarea, a')) {
+            return;
+        }
 
-        begin(e, base => ({ kind: 'move', pointerX: e.clientX, pointerY: e.clientY, base }));
+        begin(e, base => ({kind: 'move', pointerX: e.clientX, pointerY: e.clientY, base}));
     }, [begin]);
 
     const onPointerMove = useCallback((e: ReactPointerEvent<HTMLElement>) => {
         const state = drag.current;
-        if (state === null) { return; }
+        if (state === null) {
+            return;
+        }
 
         const dx = e.clientX - state.pointerX;
         const dy = e.clientY - state.pointerY;
 
         if (state.kind === 'move') {
             const moved = clampPosition(
-                { x: state.base.x + dx, y: state.base.y + dy }, state.base, viewport());
-            setRect({ ...state.base, ...moved });
+                {x: state.base.x + dx, y: state.base.y + dy}, state.base, viewport());
+            setRect({...state.base, ...moved});
             return;
         }
 
@@ -124,18 +138,20 @@ export function useMovableDialog(dialogId?: string): MovableDialog {
             setRect(current => {
                 if (current !== null) {
                     rememberGeometry(dialogId, toStoredGeometry(
-                        current, { width: window.innerWidth, height: window.innerHeight }));
+                        current, {width: window.innerWidth, height: window.innerHeight}));
                 }
                 return current;
             });
         }
     }, [dialogId]);
 
-    const dragging = { onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag };
+    const dragging = {onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag};
 
     return {
         dialogProps: {
-            ref: (el: HTMLElement | null) => { element.current = el; },
+            ref: (el: HTMLElement | null) => {
+                element.current = el;
+            },
             style: rect === null
                 ? undefined
                 : {
@@ -155,7 +171,7 @@ export function useMovableDialog(dialogId?: string): MovableDialog {
                     maxHeight: 'none',
                 },
         },
-        dragHandleProps: { onPointerDown: onPointerDownMove, ...dragging },
+        dragHandleProps: {onPointerDown: onPointerDownMove, ...dragging},
         resizeHandleProps: (direction: ResizeDirection) => ({
             onPointerDown: (e: ReactPointerEvent<HTMLElement>) =>
                 begin(e, base => ({

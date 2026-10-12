@@ -7,8 +7,8 @@
 // is exactly the framing an icon wants. The other 87% declare none, and say so rather than dropping
 // the control: a reader who never sees the entry never learns the feature is there.
 
-import { type PreviewCamera } from '../../protocol/modelPreview';
-import { type ChoiceOption } from '../shared/choice';
+import {type PreviewCamera} from '../../protocol/modelPreview';
+import {type ChoiceOption} from '../shared/choice';
 
 /** One selectable camera, or the one disabled entry that stands in for none. */
 export type ModelCameraEntry = ChoiceOption<string> & {
@@ -147,10 +147,10 @@ export function cameraPose(camera: {
             ? null
             // Alamo (x, y, z) -> scene (x, z, -y). The `+ 0` normalises the negative zero that
             // -0 produces, which reads as a real value everywhere it surfaces.
-            : { x: v[0], y: v[2], z: -v[1] + 0 };
+            : {x: v[0], y: v[2], z: -v[1] + 0};
 
     const position = at(camera.position);
     const target = at(camera.target);
 
-    return position === null || target === null ? null : { position, target };
+    return position === null || target === null ? null : {position, target};
 }

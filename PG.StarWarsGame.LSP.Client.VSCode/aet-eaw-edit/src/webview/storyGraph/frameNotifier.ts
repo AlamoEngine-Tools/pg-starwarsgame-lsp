@@ -32,16 +32,21 @@ export class FrameNotifier {
      * and since the flag below is raised before the call, both notifiers then went silently dead
      * and the story graph stopped rendering.
      */
-    constructor(private readonly _schedule: (fn: () => void) => void = fn => requestAnimationFrame(fn)) {}
+    constructor(private readonly _schedule: (fn: () => void) => void = fn => requestAnimationFrame(fn)) {
+    }
 
     subscribe(callback: () => void): Unsubscribe {
         this._subscribers.add(callback);
-        return () => { this._subscribers.delete(callback); };
+        return () => {
+            this._subscribers.delete(callback);
+        };
     }
 
     /** Asks for a notification. Repeated calls before the frame fires collapse into one. */
     schedule(): void {
-        if (this._scheduled) { return; }
+        if (this._scheduled) {
+            return;
+        }
         this._scheduled = true;
 
         try {
@@ -62,7 +67,9 @@ export class FrameNotifier {
             this._scheduled = false;
             // Copied, so a subscriber that unsubscribes itself while being notified does not
             // mutate the set being iterated.
-            for (const callback of [...this._subscribers]) { callback(); }
+            for (const callback of [...this._subscribers]) {
+                callback();
+            }
         });
     }
 }

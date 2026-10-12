@@ -2,14 +2,18 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import * as THREE from 'three';
 
 import {
-    applyBaseMapColourSpace, applyBlend, applyColourScale, applyDepth, shadowCatcherOpacity,
+    applyBaseMapColourSpace,
+    applyBlend,
+    applyColourScale,
+    applyDepth,
+    shadowCatcherOpacity,
 } from './materialState';
-import { type FxDepthFunc } from './fx/renderState';
+import {type FxDepthFunc} from './fx/renderState';
 
 const material = (): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial();
 
@@ -78,7 +82,7 @@ describe('applyBlend', () => {
 describe('applyDepth', () => {
     const state = (over: Partial<{
         depthTest: boolean; depthWrite: boolean; depthFunc: FxDepthFunc;
-    }> = {}) => ({ depthTest: true, depthWrite: true, depthFunc: 'lessEqual' as FxDepthFunc, ...over });
+    }> = {}) => ({depthTest: true, depthWrite: true, depthFunc: 'lessEqual' as FxDepthFunc, ...over});
 
     it('honours the comparison the effect declared', () => {
         // Parsed into FxMaterialState since the beginning and then dropped on the floor: nothing
@@ -86,14 +90,14 @@ describe('applyDepth', () => {
         // LESSEQUAL, and both are gated off as non-visual, so it has been inert rather than wrong -
         // but a mod shader declaring GREATER would have been silently ignored.
         const m = material();
-        applyDepth(m, state({ depthFunc: 'greater' }));
+        applyDepth(m, state({depthFunc: 'greater'}));
 
         assert.equal(m.depthFunc, THREE.GreaterDepth);
     });
 
     it('carries depth test and write across', () => {
         const m = material();
-        applyDepth(m, state({ depthTest: false, depthWrite: false }));
+        applyDepth(m, state({depthTest: false, depthWrite: false}));
 
         assert.equal(m.depthTest, false);
         assert.equal(m.depthWrite, false);

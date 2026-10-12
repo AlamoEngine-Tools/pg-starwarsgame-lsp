@@ -2,12 +2,19 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { TurretSweep } from './deathClone';
+import type {TurretSweep} from './deathClone';
 
 import {
-    aimText, atStop, axisRange, clampAim, clampAxis, dragToAim, handlesForShownArcs, turretEnvelopes,
+    aimText,
+    atStop,
+    axisRange,
+    clampAim,
+    clampAxis,
+    dragToAim,
+    handlesForShownArcs,
+    turretEnvelopes,
     turretHandles,
 } from './turretHandles';
 
@@ -17,14 +24,14 @@ function sweep(over: Partial<TurretSweep> = {}): TurretSweep {
         partId: 'HP_Turret',
         turretBone: 'TURRET_01',
         barrelBone: 'BARREL_01',
-        turret: { rotateExtentDegrees: 45, elevateExtentDegrees: 30 },
+        turret: {rotateExtentDegrees: 45, elevateExtentDegrees: 30},
         ...over,
     };
 }
 
 function handle(rotate: number | null, elevate: number | null) {
     return turretHandles(
-        [sweep({ turret: { rotateExtentDegrees: rotate, elevateExtentDegrees: elevate } })],
+        [sweep({turret: {rotateExtentDegrees: rotate, elevateExtentDegrees: elevate}})],
         new Set(['hardpoint:HP_Turret']))[0];
 }
 
@@ -32,10 +39,10 @@ describe('axisRange', () => {
     // The engine's gate is `extent < 180.0 && extent > 0.0`, so the clamping band is OPEN at both
     // ends. Everything here is that one comparison read back.
     it('clamps inside the band, to plus and minus the extent', () => {
-        assert.deepEqual(axisRange('yaw', 45), { axis: 'yaw', free: false, limitDegrees: 45 });
-        assert.deepEqual(axisRange('pitch', 90), { axis: 'pitch', free: false, limitDegrees: 90 });
+        assert.deepEqual(axisRange('yaw', 45), {axis: 'yaw', free: false, limitDegrees: 45});
+        assert.deepEqual(axisRange('pitch', 90), {axis: 'pitch', free: false, limitDegrees: 90});
         assert.deepEqual(
-            axisRange('yaw', 179.9), { axis: 'yaw', free: false, limitDegrees: 179.9 });
+            axisRange('yaw', 179.9), {axis: 'yaw', free: false, limitDegrees: 179.9});
     });
 
     // 180 is the threshold itself and is NOT less than 180, so it is already the free case - which
@@ -78,7 +85,7 @@ describe('turretHandles', () => {
     // 2 of 19 models name a turret bone and no barrel; both axes then sit on the one bone.
     it('keeps a null barrel bone null rather than guessing a name', () => {
         const [only] = turretHandles(
-            [sweep({ barrelBone: null })], new Set(['hardpoint:HP_Turret']));
+            [sweep({barrelBone: null})], new Set(['hardpoint:HP_Turret']));
 
         assert.equal(only.barrelBone, null);
     });
@@ -86,8 +93,8 @@ describe('turretHandles', () => {
     it('reads each axis off its own extent', () => {
         const only = handle(45, 30);
 
-        assert.deepEqual(only.yaw, { axis: 'yaw', free: false, limitDegrees: 45 });
-        assert.deepEqual(only.pitch, { axis: 'pitch', free: false, limitDegrees: 30 });
+        assert.deepEqual(only.yaw, {axis: 'yaw', free: false, limitDegrees: 45});
+        assert.deepEqual(only.pitch, {axis: 'pitch', free: false, limitDegrees: 30});
     });
 });
 
@@ -107,7 +114,7 @@ describe('clamping an aim', () => {
 
     it('clamps the two axes independently', () => {
         assert.deepEqual(
-            clampAim(handle(45, 180), { yaw: 90, pitch: 200 }), { yaw: 45, pitch: -160 });
+            clampAim(handle(45, 180), {yaw: 90, pitch: 200}), {yaw: 45, pitch: -160});
     });
 });
 
@@ -130,44 +137,44 @@ describe('atStop', () => {
 describe('dragToAim', () => {
     it('turns screen X into yaw and screen Y into pitch', () => {
         assert.deepEqual(
-            dragToAim(handle(180, 180), { yaw: 0, pitch: 0 }, 10, 0, 0.5),
-            { yaw: 5, pitch: 0 });
+            dragToAim(handle(180, 180), {yaw: 0, pitch: 0}, 10, 0, 0.5),
+            {yaw: 5, pitch: 0});
     });
 
     // Dragging UP raises the barrel, matching the viewport's nose-up convention.
     it('inverts Y so that dragging up raises the barrel', () => {
         assert.equal(
-            dragToAim(handle(180, 180), { yaw: 0, pitch: 0 }, 0, -20, 0.5).pitch, 10);
+            dragToAim(handle(180, 180), {yaw: 0, pitch: 0}, 0, -20, 0.5).pitch, 10);
     });
 
     it('measures from where the drag started, not from rest', () => {
         assert.equal(
-            dragToAim(handle(180, 180), { yaw: 30, pitch: 0 }, 10, 0, 0.5).yaw, 35);
+            dragToAim(handle(180, 180), {yaw: 30, pitch: 0}, 10, 0, 0.5).yaw, 35);
     });
 
     // The handle cannot be dragged past a stop - the clamp is in the same call, so there is no
     // frame in which the bone is somewhere the engine would not allow.
     it('cannot be dragged past a stop', () => {
-        assert.equal(dragToAim(handle(45, 30), { yaw: 40, pitch: 0 }, 100, 0, 0.5).yaw, 45);
+        assert.equal(dragToAim(handle(45, 30), {yaw: 40, pitch: 0}, 100, 0, 0.5).yaw, 45);
     });
 });
 
 describe('aimText', () => {
     it('reads out both axes, in degrees', () => {
         assert.equal(
-            aimText(handle(45, 30), { yaw: 12.34, pitch: -5 }),
+            aimText(handle(45, 30), {yaw: 12.34, pitch: -5}),
             'Yaw 12.3 deg, Pitch -5 deg');
     });
 
     it('says when an axis is at its stop rather than leaving it to be inferred', () => {
         assert.equal(
-            aimText(handle(45, 30), { yaw: 45, pitch: 0 }),
+            aimText(handle(45, 30), {yaw: 45, pitch: 0}),
             'Yaw 45 deg (at stop), Pitch 0 deg');
     });
 
     it('says when an axis has no stops at all', () => {
         assert.equal(
-            aimText(handle(360, 30), { yaw: 100, pitch: 0 }),
+            aimText(handle(360, 30), {yaw: 100, pitch: 0}),
             'Yaw 100 deg (free), Pitch 0 deg');
     });
 });
@@ -228,13 +235,13 @@ describe('handlesForShownArcs', () => {
 
     it('gives nothing to a turret whose arc is switched off', () => {
         assert.deepEqual(handlesForShownArcs(
-            [{ id: 'weapon:A', partId: 'hull', turret: { turretBone: 'B_Turret', rotateExtentDegrees: 360 } }],
+            [{id: 'weapon:A', partId: 'hull', turret: {turretBone: 'B_Turret', rotateExtentDegrees: 360}}],
             new Set()), []);
     });
 
     it('gives nothing to a weapon that names no turret bone', () => {
         assert.deepEqual(handlesForShownArcs(
-            [{ id: 'weapon:A', partId: 'hull', turret: null }],
+            [{id: 'weapon:A', partId: 'hull', turret: null}],
             new Set(['weapon:A'])), []);
     });
 });

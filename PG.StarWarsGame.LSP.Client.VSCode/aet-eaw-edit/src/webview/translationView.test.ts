@@ -2,13 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { LocRow } from './loc/locRow';
-import { countDuplicateKeys, nextSort, sortRows } from './translationView';
+import {LocRow} from './loc/locRow';
+import {countDuplicateKeys, nextSort, sortRows} from './translationView';
 
 function row(index: number, key: string, ...values: [string, string][]): LocRow {
-    return { index, key, values: values.map(([language, value]) => ({ language, value })) };
+    return {index, key, values: values.map(([language, value]) => ({language, value}))};
 }
 
 function keysOf(rows: LocRow[]): string[] {
@@ -31,13 +31,13 @@ describe('sortRows', () => {
     });
 
     it('sorts by key ascending', () => {
-        const sorted = sortRows(rows, { column: 'key', direction: 'asc' });
+        const sorted = sortRows(rows, {column: 'key', direction: 'asc'});
 
         assert.deepEqual(keysOf(sorted), ['A_KEY', 'B_KEY', 'C_KEY']);
     });
 
     it('sorts by key descending', () => {
-        const sorted = sortRows(rows, { column: 'key', direction: 'desc' });
+        const sorted = sortRows(rows, {column: 'key', direction: 'desc'});
 
         assert.deepEqual(keysOf(sorted), ['C_KEY', 'B_KEY', 'A_KEY']);
     });
@@ -45,7 +45,7 @@ describe('sortRows', () => {
     // Sorting a language column is how an untranslated row gets found, so an empty cell has to sort
     // to one end rather than being scattered among the translated ones.
     it('sorts by a language column with empty cells first ascending', () => {
-        const sorted = sortRows(rows, { column: 'GERMAN', direction: 'asc' });
+        const sorted = sortRows(rows, {column: 'GERMAN', direction: 'asc'});
 
         assert.deepEqual(keysOf(sorted), ['B_KEY', 'A_KEY', 'C_KEY']);
     });
@@ -56,7 +56,7 @@ describe('sortRows', () => {
             row(1, 'LACKS', ['ENGLISH', 'y']),
         ];
 
-        const sorted = sortRows(mixed, { column: 'FRENCH', direction: 'asc' });
+        const sorted = sortRows(mixed, {column: 'FRENCH', direction: 'asc'});
 
         assert.deepEqual(keysOf(sorted), ['LACKS', 'HAS']);
     });
@@ -70,7 +70,7 @@ describe('sortRows', () => {
             row(2, 'SAME', ['ENGLISH', 'second']),
         ];
 
-        const sorted = sortRows(duplicates, { column: 'key', direction: 'asc' });
+        const sorted = sortRows(duplicates, {column: 'key', direction: 'asc'});
 
         // OTHER sorts first; the point is that the two SAME rows stay in document order behind it.
         assert.deepEqual(indicesOf(sorted), [1, 0, 2]);
@@ -82,7 +82,7 @@ describe('sortRows', () => {
             row(1, 'TEXT_ITEM_2', ['ENGLISH', 'two']),
         ];
 
-        const sorted = sortRows(numbered, { column: 'key', direction: 'asc' });
+        const sorted = sortRows(numbered, {column: 'key', direction: 'asc'});
 
         assert.deepEqual(keysOf(sorted), ['TEXT_ITEM_2', 'TEXT_ITEM_10']);
     });
@@ -90,7 +90,7 @@ describe('sortRows', () => {
     it('does not mutate the rows it is given', () => {
         const original = [...rows];
 
-        sortRows(rows, { column: 'key', direction: 'asc' });
+        sortRows(rows, {column: 'key', direction: 'asc'});
 
         assert.deepEqual(keysOf(rows), keysOf(original));
     });
@@ -98,25 +98,25 @@ describe('sortRows', () => {
 
 describe('nextSort', () => {
     it('starts a column ascending', () => {
-        assert.deepEqual(nextSort(null, 'key'), { column: 'key', direction: 'asc' });
+        assert.deepEqual(nextSort(null, 'key'), {column: 'key', direction: 'asc'});
     });
 
     it('turns ascending into descending on the same column', () => {
         assert.deepEqual(
-            nextSort({ column: 'key', direction: 'asc' }, 'key'),
-            { column: 'key', direction: 'desc' });
+            nextSort({column: 'key', direction: 'asc'}, 'key'),
+            {column: 'key', direction: 'desc'});
     });
 
     // A third click restores document order rather than cycling back to ascending: in a keyed file
     // that is the order on disk, and there would otherwise be no way back to it.
     it('clears the sort on the third click', () => {
-        assert.equal(nextSort({ column: 'key', direction: 'desc' }, 'key'), null);
+        assert.equal(nextSort({column: 'key', direction: 'desc'}, 'key'), null);
     });
 
     it('starts a different column ascending again', () => {
         assert.deepEqual(
-            nextSort({ column: 'key', direction: 'desc' }, 'GERMAN'),
-            { column: 'GERMAN', direction: 'asc' });
+            nextSort({column: 'key', direction: 'desc'}, 'GERMAN'),
+            {column: 'GERMAN', direction: 'asc'});
     });
 });
 

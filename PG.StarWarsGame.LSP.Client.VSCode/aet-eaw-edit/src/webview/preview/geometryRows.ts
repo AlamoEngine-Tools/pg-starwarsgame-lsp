@@ -11,8 +11,8 @@
 // 3814 faces - it stopped being the reader's problem. This module holds what has arrived, says what
 // to ask for next, and says when the scroller is close enough to its end to want it.
 
-import { geometryTable } from './inspector';
-import { type GeometryTable, type SubMeshGeometryPage } from '../../protocol/modelPreview';
+import {geometryTable} from './inspector';
+import {type GeometryTable, type SubMeshGeometryPage} from '../../protocol/modelPreview';
 
 /**
  * Rows per request.
@@ -28,7 +28,7 @@ const TABLES: readonly { id: GeometryTable; label: string; title: string }[] = [
         id: 'vertices', label: 'Vertices',
         title: 'Position, normal, UVs, tangents, colour and bone binding, per vertex',
     },
-    { id: 'faces', label: 'Faces', title: 'Each triangle as the three vertex indices it draws' },
+    {id: 'faces', label: 'Faces', title: 'Each triangle as the three vertex indices it draws'},
     {
         id: 'boneMapping', label: 'Bone mapping',
         title: 'Which model bone each local bone slot of this sub-mesh resolves to',
@@ -99,7 +99,7 @@ export function appendPage(
         columns: view.columns,
         rows: view.rows,
         total,
-        ...(view.note === undefined ? {} : { note: view.note }),
+        ...(view.note === undefined ? {} : {note: view.note}),
     };
 
     if (current === null || current.table !== table) {
@@ -115,7 +115,7 @@ export function appendPage(
     return {
         ...current,
         total,
-        ...(view.note === undefined ? {} : { note: view.note }),
+        ...(view.note === undefined ? {} : {note: view.note}),
         rows: tail.length === 0 ? current.rows : [...current.rows, ...tail],
     };
 }

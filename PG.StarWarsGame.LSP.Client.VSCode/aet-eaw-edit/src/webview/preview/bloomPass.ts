@@ -164,18 +164,18 @@ export class BloomPass {
     private readonly size = new THREE.Vector2();
 
     constructor() {
-        const flat = { depthTest: false, depthWrite: false };
+        const flat = {depthTest: false, depthWrite: false};
 
         this.bright = new THREE.ShaderMaterial({
             ...flat,
-            uniforms: { tScene: { value: null }, uCutoff: { value: BLOOM_CUTOFF } },
+            uniforms: {tScene: {value: null}, uCutoff: {value: BLOOM_CUTOFF}},
             vertexShader: QUAD_VERTEX_SHADER,
             fragmentShader: BRIGHT_FRAGMENT_SHADER,
         });
 
         this.blur = new THREE.ShaderMaterial({
             ...flat,
-            uniforms: { tScene: { value: null }, uDelta: { value: new THREE.Vector2() } },
+            uniforms: {tScene: {value: null}, uDelta: {value: new THREE.Vector2()}},
             vertexShader: QUAD_VERTEX_SHADER,
             fragmentShader: BLUR_FRAGMENT_SHADER,
         });
@@ -184,7 +184,7 @@ export class BloomPass {
         // this can be added straight over the canvas without blowing the highlights to flat white.
         this.combine = new THREE.ShaderMaterial({
             ...flat,
-            uniforms: { tScene: { value: null }, uStrength: { value: BLOOM_STRENGTH } },
+            uniforms: {tScene: {value: null}, uStrength: {value: BLOOM_STRENGTH}},
             vertexShader: QUAD_VERTEX_SHADER,
             fragmentShader: COMBINE_FRAGMENT_SHADER,
             transparent: true,

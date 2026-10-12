@@ -45,7 +45,9 @@ export class StagedRenames {
         for (let i = 0; i < MAX_CHAIN; i++) {
             const next = this._chain.get(current.toLowerCase());
             // A self-rename is a fixed point, not a link: following it would spin until the bound.
-            if (next === undefined || next === current) { break; }
+            if (next === undefined || next === current) {
+                break;
+            }
             current = next;
         }
 

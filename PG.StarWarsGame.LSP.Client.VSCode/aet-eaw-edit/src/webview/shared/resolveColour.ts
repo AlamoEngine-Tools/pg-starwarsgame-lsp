@@ -21,7 +21,7 @@
 // if step 1 does turn out to be a no-op is therefore the same colour by a longer route, never a
 // missing one.
 
-import { colourTokens } from './tokens';
+import {colourTokens} from './tokens';
 
 const BY_NAME = new Map(colourTokens.map(token => [token.name, token]));
 

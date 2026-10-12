@@ -10,7 +10,7 @@
 //
 // The same shape the story graph uses for its events and rewards.
 
-import { type HardpointCard } from './hardpointCards';
+import {type HardpointCard} from './hardpointCards';
 
 /** One heading and the cards under it. */
 export interface HardpointGroup {
@@ -54,7 +54,7 @@ export function groupHardpoints(
         const group = groups.get(type);
 
         if (group === undefined) {
-            groups.set(type, { type, label: typeLabel(card.type), cards: [card] });
+            groups.set(type, {type, label: typeLabel(card.type), cards: [card]});
         } else {
             group.cards.push(card);
         }

@@ -6,7 +6,7 @@
 // Pointer capture rather than window listeners: the drag keeps following the pointer outside the
 // handle, and there is nothing to unsubscribe if the component unmounts mid-drag.
 
-import { PointerEvent as ReactPointerEvent, useRef, useState } from 'react';
+import {PointerEvent as ReactPointerEvent, useRef, useState} from 'react';
 
 /**
  * @param axis Which edge the handle sits on - 'e' and 'w' resize width, 'n' resizes height upward.
@@ -26,10 +26,12 @@ export function useEdgeResize(
             onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => {
                 e.preventDefault();
                 e.currentTarget.setPointerCapture(e.pointerId);
-                drag.current = { start: horizontal ? e.clientX : e.clientY, base: size };
+                drag.current = {start: horizontal ? e.clientX : e.clientY, base: size};
             },
             onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => {
-                if (!drag.current) { return; }
+                if (!drag.current) {
+                    return;
+                }
                 const delta = axis === 'e' ? e.clientX - drag.current.start
                     : axis === 'w' ? drag.current.start - e.clientX
                         : drag.current.start - e.clientY;
@@ -37,7 +39,9 @@ export function useEdgeResize(
                 setSize(next);
                 persist(next);
             },
-            onPointerUp: () => { drag.current = null; },
+            onPointerUp: () => {
+                drag.current = null;
+            },
         },
     };
 }

@@ -6,7 +6,10 @@ using PG.StarWarsGame.LSP.Story.Graph;
 
 namespace PG.StarWarsGame.LSP.Story.Sim;
 
-/// <summary>One script's PGStateMachine: the state it is in, the one it will enter on the next service pass, and who asked.</summary>
+/// <summary>
+///     One script's PGStateMachine: the state it is in, the one it will enter on the next service pass, and who
+///     asked.
+/// </summary>
 public sealed record LuaScriptState(string? Current, string? Next, string? TriggeredBy, int EnteredTick)
 {
     public static readonly LuaScriptState Idle = new(null, null, null, 0);

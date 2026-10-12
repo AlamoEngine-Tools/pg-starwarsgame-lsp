@@ -1263,31 +1263,6 @@ file sealed class SlottedTagSchemaProvider : ISchemaProvider
         ]
     };
 
-    public XmlTagDefinition? GetTag(string tagName)
-    {
-        return AllTags.FirstOrDefault(t => t.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public EnumDefinition? GetEnum(string _)
-    {
-        return null;
-    }
-
     private static readonly XmlTagDefinition Icons = new()
     {
         Tag = "Icons", ValueType = XmlValueType.TupleList,
@@ -1319,6 +1294,31 @@ file sealed class SlottedTagSchemaProvider : ISchemaProvider
         Tag = "Variant_Of_Existing_Type", ValueType = XmlValueType.NameReference,
         SemanticType = TagSemanticType.VariantParent
     };
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return AllTags.FirstOrDefault(t => t.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
 
     public IReadOnlyList<XmlTagDefinition> AllTags => [Pairs, Music, Icons, Map, ModelMap, VariantOf];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];

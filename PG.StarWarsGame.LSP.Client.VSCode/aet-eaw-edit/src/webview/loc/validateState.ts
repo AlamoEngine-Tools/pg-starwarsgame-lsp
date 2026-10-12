@@ -8,7 +8,7 @@
 // nothing staged at all - a duplicate key it was saved with - and re-checking is always a
 // reasonable thing to ask for.
 
-import { ValidationState } from './useLocPanel';
+import {ValidationState} from './useLocPanel';
 
 /**
  * The state the tag shows: the highest level anything reported.
@@ -22,9 +22,15 @@ import { ValidationState } from './useLocPanel';
  * visible, and neither reading it as clean nor softening it to information would show it honestly.
  */
 export function worstSeverity(problems: readonly { severity: string }[]): ValidationState {
-    if (problems.some(p => p.severity === 'error')) { return 'error'; }
-    if (problems.some(p => p.severity !== 'info')) { return 'warning'; }
-    if (problems.length > 0) { return 'info'; }
+    if (problems.some(p => p.severity === 'error')) {
+        return 'error';
+    }
+    if (problems.some(p => p.severity !== 'info')) {
+        return 'warning';
+    }
+    if (problems.length > 0) {
+        return 'info';
+    }
     return 'ok';
 }
 

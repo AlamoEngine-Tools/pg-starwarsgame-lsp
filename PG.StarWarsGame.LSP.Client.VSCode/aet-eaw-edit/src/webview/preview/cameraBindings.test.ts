@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { bindingFor, type CameraBinding, type PreviewSubject } from './cameraBindings';
+import {bindingFor, type CameraBinding, type PreviewSubject} from './cameraBindings';
 
 const subject: PreviewSubject = {
     objectId: 'Rebel_Xwing',
@@ -13,7 +13,7 @@ const subject: PreviewSubject = {
 };
 
 const bind = (kind: CameraBinding['kind'], value: string, presetId: string): CameraBinding =>
-    ({ id: `${kind}:${value}`, kind, value, presetId });
+    ({id: `${kind}:${value}`, kind, value, presetId});
 
 describe('bindingFor', () => {
     it('finds nothing when nothing is bound', () => {
@@ -73,7 +73,7 @@ describe('bindingFor', () => {
     it('binds nothing to a bare model, which has no game object at all', () => {
         // Previewing an .alo directly: there is no id, no type and no category to match on, and a
         // rule that fired anyway would be framing a shot for a unit that is not there.
-        const bare: PreviewSubject = { objectId: null, objectType: null, categories: [] };
+        const bare: PreviewSubject = {objectId: null, objectType: null, categories: []};
 
         assert.equal(bindingFor(bare, [bind('type', 'Fighter', 'p')]), null);
     });

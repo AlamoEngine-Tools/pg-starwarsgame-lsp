@@ -4,11 +4,16 @@
 // Fixtures written for these tests. Nothing is reproduced from Petroglyph's sources.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
-    attributeFor, collectSamplerTextures, collectSemantics, collectUniformDefaults,
-    collectUniformTypes, fitToUniform, uniformSourceFor,
+    attributeFor,
+    collectSamplerTextures,
+    collectSemantics,
+    collectUniformDefaults,
+    collectUniformTypes,
+    fitToUniform,
+    uniformSourceFor,
 } from './semantics';
 
 describe('collectSemantics', () => {
@@ -62,49 +67,49 @@ describe('attributeFor', () => {
 
 describe('uniformSourceFor', () => {
     it('names where each matrix comes from', () => {
-        assert.deepEqual(uniformSourceFor('WORLDVIEWPROJECTION'), { kind: 'matrix', of: 'worldViewProjection' });
-        assert.deepEqual(uniformSourceFor('WORLDVIEWINVERSE'), { kind: 'matrix', of: 'worldViewInverse' });
-        assert.deepEqual(uniformSourceFor('WORLD'), { kind: 'matrix', of: 'world' });
+        assert.deepEqual(uniformSourceFor('WORLDVIEWPROJECTION'), {kind: 'matrix', of: 'worldViewProjection'});
+        assert.deepEqual(uniformSourceFor('WORLDVIEWINVERSE'), {kind: 'matrix', of: 'worldViewInverse'});
+        assert.deepEqual(uniformSourceFor('WORLD'), {kind: 'matrix', of: 'world'});
     });
 
     it('distinguishes the eye position in world space from the one in object space', () => {
         // Both are supplied; a shader working in object space uses the second and would be lit from
         // the wrong side by the first.
-        assert.deepEqual(uniformSourceFor('EYE_POSITION'), { kind: 'eye', space: 'world' });
-        assert.deepEqual(uniformSourceFor('EYE_OBJ_POSITION'), { kind: 'eye', space: 'object' });
+        assert.deepEqual(uniformSourceFor('EYE_POSITION'), {kind: 'eye', space: 'world'});
+        assert.deepEqual(uniformSourceFor('EYE_OBJ_POSITION'), {kind: 'eye', space: 'object'});
     });
 
     it('separates each light`s direction, colour and specular', () => {
         assert.deepEqual(
             uniformSourceFor('DIR_LIGHT_VEC_0'),
-            { kind: 'light', index: 0, channel: 'vector', space: 'world' });
+            {kind: 'light', index: 0, channel: 'vector', space: 'world'});
         assert.deepEqual(
             uniformSourceFor('DIR_LIGHT_OBJ_VEC_2'),
-            { kind: 'light', index: 2, channel: 'vector', space: 'object' });
+            {kind: 'light', index: 2, channel: 'vector', space: 'object'});
         assert.deepEqual(
             uniformSourceFor('DIR_LIGHT_DIFFUSE_1'),
-            { kind: 'light', index: 1, channel: 'diffuse', space: 'world' });
+            {kind: 'light', index: 1, channel: 'diffuse', space: 'world'});
         assert.deepEqual(
             uniformSourceFor('DIR_LIGHT_SPECULAR_0'),
-            { kind: 'light', index: 0, channel: 'specular', space: 'world' });
+            {kind: 'light', index: 0, channel: 'specular', space: 'world'});
     });
 
     it('knows the scalars the engine supplies per frame', () => {
-        assert.deepEqual(uniformSourceFor('TIME'), { kind: 'time' });
-        assert.deepEqual(uniformSourceFor('RESOLUTION_CONSTANTS'), { kind: 'resolution' });
+        assert.deepEqual(uniformSourceFor('TIME'), {kind: 'time'});
+        assert.deepEqual(uniformSourceFor('RESOLUTION_CONSTANTS'), {kind: 'resolution'});
     });
 
     it('treats the engine`s own textures as a named role', () => {
         // Fog of war and the cloud layer are engine state the preview has none of; the viewport
         // substitutes a neutral texture so the shader still runs.
-        assert.deepEqual(uniformSourceFor('FOW_TEXTURE'), { kind: 'texture', role: 'fogOfWar' });
-        assert.deepEqual(uniformSourceFor('SKY_CUBE_TEXTURE'), { kind: 'texture', role: 'skyCube' });
+        assert.deepEqual(uniformSourceFor('FOW_TEXTURE'), {kind: 'texture', role: 'fogOfWar'});
+        assert.deepEqual(uniformSourceFor('SKY_CUBE_TEXTURE'), {kind: 'texture', role: 'skyCube'});
     });
 
     it('binds the bone palette, which every skinned effect asks for', () => {
         // Missed by the hand-written list below and found by sweeping the real corpus - all eleven
         // RSkin* effects declare it, and without a source every one of them would render unskinned.
-        assert.deepEqual(uniformSourceFor('SKINMATRIXARRAY'), { kind: 'skinMatrices' });
+        assert.deepEqual(uniformSourceFor('SKINMATRIXARRAY'), {kind: 'skinMatrices'});
     });
 
     it('admits when a semantic has no source, rather than inventing one', () => {

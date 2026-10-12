@@ -55,8 +55,8 @@ export type AnimationStance = 'normal' | 'crouched' | 'deployed';
  * modder would search their XML for rather than the word the exporter happened to use.
  */
 const STANCES: readonly { prefix: string; stance: AnimationStance; label: string }[] = [
-    { prefix: 'crouch', stance: 'crouched', label: 'spread out' },
-    { prefix: 'deployed_', stance: 'deployed', label: 'deployed' },
+    {prefix: 'crouch', stance: 'crouched', label: 'spread out'},
+    {prefix: 'deployed_', stance: 'deployed', label: 'deployed'},
 ];
 
 /**
@@ -311,7 +311,7 @@ export function groupAnimations(model: string, files: readonly string[]): Animat
             family,
             label: FAMILY_LABELS[family],
             actions: [...(byFamily.get(family) ?? new Map()).values()]
-                .map(action => ({ ...action, takes: [...action.takes].sort(byTake) })),
+                .map(action => ({...action, takes: [...action.takes].sort(byTake)})),
         }));
 }
 

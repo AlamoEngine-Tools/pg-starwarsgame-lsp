@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
-using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 

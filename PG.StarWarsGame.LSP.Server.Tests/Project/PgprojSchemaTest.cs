@@ -20,6 +20,9 @@ public sealed class PgprojSchemaTest
     private static readonly JsonSchema Schema = JsonSchema.FromFile(
         Path.Combine(RepoRoot, "PG.StarWarsGame.LSP.Core", "Resources", "pgproj.schema.json"));
 
+    private static string ClientRoot =>
+        Path.Combine(RepoRoot, "PG.StarWarsGame.LSP.Client.VSCode", "aet-eaw-edit");
+
     [Theory]
     [InlineData("eaw/empire-at-war-vanilla.pgproj")]
     [InlineData("foc/forces-of-corruption-vanilla.pgproj")]
@@ -294,9 +297,6 @@ public sealed class PgprojSchemaTest
         var parsed = JsonSerializer.Deserialize<JsonElement>(jsonc, options);
         Assert.Equal("Mod", parsed.GetProperty("name").GetString());
     }
-
-    private static string ClientRoot =>
-        Path.Combine(RepoRoot, "PG.StarWarsGame.LSP.Client.VSCode", "aet-eaw-edit");
 
     private static JsonElement ClientManifest()
     {

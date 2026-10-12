@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Story.Graph;
-using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Story.Sim;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
@@ -35,7 +34,10 @@ public sealed record StorySimKey(string Campaign, string Faction, string? Scope 
 
 public interface IStorySimulationService
 {
-    /// <summary><paramref name="options" /> apply to a galactic session and every battle entered from it; a battle started on its own takes them itself.</summary>
+    /// <summary>
+    ///     <paramref name="options" /> apply to a galactic session and every battle entered from it; a battle started on
+    ///     its own takes them itself.
+    /// </summary>
     (StorySimStateDto? State, string? Error) Start(StorySimKey key, StorySimOptions? options = null);
 
     (StorySimStateDto? State, string? Error) Stop(StorySimKey key);
@@ -495,7 +497,10 @@ public sealed class StorySimulationService(
                    { PendingBattle: not null, PendingBattleChoice: StoryBattleChoice.Fight };
     }
 
-    /// <summary>The unresolved battle session of a campaign faction other than <paramref name="except" />, if any. Called under the gate.</summary>
+    /// <summary>
+    ///     The unresolved battle session of a campaign faction other than <paramref name="except" />, if any. Called
+    ///     under the gate.
+    /// </summary>
     private Session? RunningBattle(StoryModelKey model, StorySimKey? except)
     {
         return _sessions.Values.FirstOrDefault(s =>

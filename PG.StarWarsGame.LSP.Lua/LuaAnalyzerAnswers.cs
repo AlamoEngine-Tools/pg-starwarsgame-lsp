@@ -10,6 +10,9 @@ namespace PG.StarWarsGame.LSP.Lua;
 /// <summary>How the Lua analyzer's answers are combined with this server's.</summary>
 public static partial class LuaAnalyzerAnswers
 {
+    // Marks an item as the analyzer's, around its own data, so resolve goes back to it.
+    private const string AnalyzerItemMarker = "aet.analyzer";
+
     /// <summary>
     ///     One hover card: this server's first - it knows the engine and the XML - then a rule, then
     ///     the analyzer's. Either alone when the other has nothing.
@@ -27,9 +30,6 @@ public static partial class LuaAnalyzerAnswers
             Range = ours.Range ?? theirs!.Range
         };
     }
-
-    // Marks an item as the analyzer's, around its own data, so resolve goes back to it.
-    private const string AnalyzerItemMarker = "aet.analyzer";
 
     /// <summary>
     ///     Our items, then every analyzer item whose label is not already ours - ours know the engine

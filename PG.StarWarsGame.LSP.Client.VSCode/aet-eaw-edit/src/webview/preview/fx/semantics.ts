@@ -89,27 +89,27 @@ const MATRICES: Record<string, AlamoMatrix> = {
 };
 
 const SIMPLE: Record<string, UniformSource> = {
-    EYE_POSITION: { kind: 'eye', space: 'world' },
-    EYE_OBJ_POSITION: { kind: 'eye', space: 'object' },
-    GLOBAL_AMBIENT: { kind: 'ambient' },
-    LIGHT_SCALE: { kind: 'lightScale' },
-    SKINMATRIXARRAY: { kind: 'skinMatrices' },
-    SPH_LIGHT_ALL: { kind: 'sphericalHarmonics', set: 'all' },
-    SPH_LIGHT_FILL: { kind: 'sphericalHarmonics', set: 'fill' },
-    TIME: { kind: 'time' },
-    RESOLUTION_CONSTANTS: { kind: 'resolution' },
-    FOG_VALS: { kind: 'fog' },
-    DISTANCE_FADE_VALS: { kind: 'distanceFade' },
-    SHADOW_EXTRUSION_DISTANCE: { kind: 'shadowExtrusion' },
-    WIND_BEND_VECTOR: { kind: 'wind', of: 'bend' },
-    WIND_GRASS_PARAMS: { kind: 'wind', of: 'grass' },
-    FOW_TEXTURE: { kind: 'texture', role: 'fogOfWar' },
-    CLOUD_TEXTURE: { kind: 'texture', role: 'cloud' },
-    SKY_CUBE_TEXTURE: { kind: 'texture', role: 'skyCube' },
-    FOW_TEX_U: { kind: 'projectedTexcoord', role: 'fogOfWar', axis: 'u' },
-    FOW_TEX_V: { kind: 'projectedTexcoord', role: 'fogOfWar', axis: 'v' },
-    CLOUD_TEX_U: { kind: 'projectedTexcoord', role: 'cloud', axis: 'u' },
-    CLOUD_TEX_V: { kind: 'projectedTexcoord', role: 'cloud', axis: 'v' },
+    EYE_POSITION: {kind: 'eye', space: 'world'},
+    EYE_OBJ_POSITION: {kind: 'eye', space: 'object'},
+    GLOBAL_AMBIENT: {kind: 'ambient'},
+    LIGHT_SCALE: {kind: 'lightScale'},
+    SKINMATRIXARRAY: {kind: 'skinMatrices'},
+    SPH_LIGHT_ALL: {kind: 'sphericalHarmonics', set: 'all'},
+    SPH_LIGHT_FILL: {kind: 'sphericalHarmonics', set: 'fill'},
+    TIME: {kind: 'time'},
+    RESOLUTION_CONSTANTS: {kind: 'resolution'},
+    FOG_VALS: {kind: 'fog'},
+    DISTANCE_FADE_VALS: {kind: 'distanceFade'},
+    SHADOW_EXTRUSION_DISTANCE: {kind: 'shadowExtrusion'},
+    WIND_BEND_VECTOR: {kind: 'wind', of: 'bend'},
+    WIND_GRASS_PARAMS: {kind: 'wind', of: 'grass'},
+    FOW_TEXTURE: {kind: 'texture', role: 'fogOfWar'},
+    CLOUD_TEXTURE: {kind: 'texture', role: 'cloud'},
+    SKY_CUBE_TEXTURE: {kind: 'texture', role: 'skyCube'},
+    FOW_TEX_U: {kind: 'projectedTexcoord', role: 'fogOfWar', axis: 'u'},
+    FOW_TEX_V: {kind: 'projectedTexcoord', role: 'fogOfWar', axis: 'v'},
+    CLOUD_TEX_U: {kind: 'projectedTexcoord', role: 'cloud', axis: 'u'},
+    CLOUD_TEX_V: {kind: 'projectedTexcoord', role: 'cloud', axis: 'v'},
 };
 
 /**
@@ -138,7 +138,7 @@ export function uniformSourceFor(semantic: string): UniformSource | null {
 
     const matrix = MATRICES[name];
     if (matrix !== undefined) {
-        return { kind: 'matrix', of: matrix };
+        return {kind: 'matrix', of: matrix};
     }
 
     const directional = DIRECTIONAL.exec(name);

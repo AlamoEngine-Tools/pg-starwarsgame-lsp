@@ -14,8 +14,8 @@
 
 import * as THREE from 'three';
 
-import { resolveMaterial, type MaterialExtras } from './materials';
-import type { EmissionMesh } from './meshEmission';
+import {type MaterialExtras, resolveMaterial} from './materials';
+import type {EmissionMesh} from './meshEmission';
 
 /** How far up the graph a proxy bone may look for the geometry it belongs to. */
 const MAX_CLIMB = 8;
@@ -48,7 +48,7 @@ export function emissionMeshFor(
         const subMeshes = meshesOn(node).map(mesh => subMeshOf(mesh, toLocal));
 
         if (subMeshes.length > 0) {
-            return { subMeshes };
+            return {subMeshes};
         }
 
         if (node === stopAt) {
@@ -102,7 +102,7 @@ function subMeshOf(
         }
     }
 
-    return { positions, normals, indices: indicesOf(mesh.geometry, positions.length / 3) };
+    return {positions, normals, indices: indicesOf(mesh.geometry, positions.length / 3)};
 }
 
 /**

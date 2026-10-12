@@ -2,15 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import * as THREE from 'three';
 
-import type { AlamoEmitter, AlamoEmitterProperties } from '../../protocol/modelPreview';
-import { emitter, properties, testSystem, volume } from './particleFixture';
-import {
-    blendingFor, tailGeometry, HEAT_LAYER, ParticleSystemInstance,
-} from './particleRenderer';
+import type {AlamoEmitter, AlamoEmitterProperties} from '../../protocol/modelPreview';
+import {emitter, properties, testSystem, volume} from './particleFixture';
+import {blendingFor, HEAT_LAYER, ParticleSystemInstance, tailGeometry,} from './particleRenderer';
 
 describe('blendingFor', () => {
     /**
@@ -118,14 +116,14 @@ describe('following the emitter', () => {
 
         const system = testSystem([emitter({
             name: 'trail',
-            properties: properties({ particlesPerSecond: 10, lifetime: 100, ...over }),
+            properties: properties({particlesPerSecond: 10, lifetime: 100, ...over}),
         })]);
 
         const instance = new ParticleSystemInstance('test', system, new Map(), 1, null, space);
         space.add(instance.root);
         instance.attachTo(bone);
 
-        return { bone, instance };
+        return {bone, instance};
     }
 
     /** What three asks before it draws anything: the object and every ancestor of it. */
@@ -150,7 +148,7 @@ describe('following the emitter', () => {
      */
     it('keeps drawing when the piece its bone belongs to is hidden', () => {
         const piece = new THREE.Object3D();
-        const { instance } = rig({}, piece);
+        const {instance} = rig({}, piece);
 
         instance.update(0.5);
         assert.ok(instance.emitterParticles(0).length > 0, 'nothing was thrown');
@@ -181,7 +179,7 @@ describe('following the emitter', () => {
      * does nothing at all). Hanging the sprites off the bone made every one of them ride along.
      */
     it('leaves a world-space effect behind when the emitter moves', () => {
-        const { bone, instance } = rig({ linkToSystem: false });
+        const {bone, instance} = rig({linkToSystem: false});
 
         const born = afterMoving(instance, bone);
 
@@ -195,7 +193,7 @@ describe('following the emitter', () => {
      * is what keeps an engine wash sitting in its nozzle as the ship flies.
      */
     it('carries a linked effect along', () => {
-        const { bone, instance } = rig({ linkToSystem: true });
+        const {bone, instance} = rig({linkToSystem: true});
 
         const born = afterMoving(instance, bone);
 
@@ -205,7 +203,7 @@ describe('following the emitter', () => {
 
     /** `parentLinkStrength` is a FRACTION - `Pi_damage_elec_sd00` uses 1, `P_bladeclash` 0.8. */
     it('follows part of the way for a fractional parent link', () => {
-        const { bone, instance } = rig({ linkToSystem: false, parentLinkStrength: 0.5 });
+        const {bone, instance} = rig({linkToSystem: false, parentLinkStrength: 0.5});
 
         const born = afterMoving(instance, bone);
 
@@ -218,7 +216,7 @@ describe('following the emitter', () => {
      * own motion, so debris thrown from a moving hull keeps up with it.
      */
     it('inherits the emitter`s velocity at birth', () => {
-        const { bone, instance } = rig({ linkToSystem: false, parentLinkStrength: 1 });
+        const {bone, instance} = rig({linkToSystem: false, parentLinkStrength: 1});
 
         instance.update(0.5);
         bone.position.set(0, 0, 10);
@@ -246,8 +244,8 @@ describe('following the emitter', () => {
 
         const system = testSystem([emitter({
             name: 'burst',
-            position: volume({ shape: 'Point', exactValue: { x: 0, y: 0, z: 5 } }),
-            properties: properties({ particlesPerSecond: 10, lifetime: 100 }),
+            position: volume({shape: 'Point', exactValue: {x: 0, y: 0, z: 5}}),
+            properties: properties({particlesPerSecond: 10, lifetime: 100}),
         })]);
 
         const instance = new ParticleSystemInstance('test', system, new Map(), 1, null, space);
@@ -263,7 +261,7 @@ describe('following the emitter', () => {
 
     /** Spawn positions come out of the emitter's own frame, so a moved bone spawns where it is. */
     it('spawns at the emitter, wherever the emitter has got to', () => {
-        const { bone, instance } = rig({ linkToSystem: false });
+        const {bone, instance} = rig({linkToSystem: false});
 
         bone.position.set(0, 0, 7);
         instance.update(0.5);
@@ -289,7 +287,7 @@ describe('object-space acceleration', () => {
             name: 'wash',
             properties: properties({
                 particlesPerSecond: 20, lifetime: 100,
-                acceleration: { x: 0, y: 0, z: 10 },
+                acceleration: {x: 0, y: 0, z: 10},
                 objectSpaceAcceleration: objectSpace,
             }),
         })]);
@@ -302,7 +300,7 @@ describe('object-space acceleration', () => {
             instance.update(0.1);
         }
 
-        const { x, y, z } = instance.emitterParticles(0)[0].velocity;
+        const {x, y, z} = instance.emitterParticles(0)[0].velocity;
 
         return new THREE.Vector3(x, y, z).normalize();
     }
@@ -331,7 +329,7 @@ describe('object-space acceleration', () => {
 
 describe('tailGeometry', () => {
     const kite = (over: Partial<AlamoEmitterProperties> = {}): AlamoEmitterProperties =>
-        properties({ hasTail: true, tailSize: 50, ...over });
+        properties({hasTail: true, tailSize: 50, ...over});
 
     /**
      * A kite is an ordinary quad with ONE corner pulled out behind the particle, which is how the
@@ -341,22 +339,22 @@ describe('tailGeometry', () => {
      */
     it('pulls the trailing corner out by the tail size', () => {
         // Straight across the view, so none of the speed is foreshortened away.
-        const kited = tailGeometry(kite(), { x: 10, y: 0, z: 0 }, 10)!;
+        const kited = tailGeometry(kite(), {x: 10, y: 0, z: 0}, 10)!;
 
         assert.ok(Math.abs(kited.stretch - 50 / Math.SQRT2) < 1e-6, `${kited.stretch}`);
     });
 
     /** Flying at the camera there is nothing to streak: the quad stays a quad. */
     it('leaves a particle coming straight at the camera unstretched', () => {
-        assert.equal(tailGeometry(kite(), { x: 0, y: 0, z: 10 }, 10)!.stretch, 1);
+        assert.equal(tailGeometry(kite(), {x: 0, y: 0, z: 10}, 10)!.stretch, 1);
     });
 
     /** `mult = length / 1000` when the particle inherited its emitter's motion. */
     it('scales the tail by speed for an emitter its particles are linked to', () => {
-        const linked = kite({ parentLinkStrength: 1 });
+        const linked = kite({parentLinkStrength: 1});
 
-        const slow = tailGeometry(linked, { x: 10, y: 0, z: 0 }, 10)!.stretch;
-        const fast = tailGeometry(linked, { x: 400, y: 0, z: 0 }, 400)!.stretch;
+        const slow = tailGeometry(linked, {x: 10, y: 0, z: 0}, 10)!.stretch;
+        const fast = tailGeometry(linked, {x: 400, y: 0, z: 0}, 400)!.stretch;
 
         assert.equal(slow, 1, 'a slow linked particle should have no tail worth drawing');
         assert.ok(Math.abs(fast - 50 * 0.4 / Math.SQRT2) < 1e-6, `${fast}`);
@@ -367,17 +365,17 @@ describe('tailGeometry', () => {
      * turn puts it opposite the direction of travel - the streak trails, rather than leading.
      */
     it('points the tail away from where the particle is going', () => {
-        const kited = tailGeometry(kite(), { x: 10, y: 0, z: 0 }, 10)!;
+        const kited = tailGeometry(kite(), {x: 10, y: 0, z: 0}, 10)!;
 
         assert.ok(Math.abs(kited.turns - 0.125) < 1e-6, `${kited.turns}`);
     });
 
     it('says nothing to do for an emitter without a tail', () => {
-        assert.equal(tailGeometry(properties(), { x: 10, y: 0, z: 0 }, 10), null);
+        assert.equal(tailGeometry(properties(), {x: 10, y: 0, z: 0}, 10), null);
     });
 
     it('leaves a motionless particle alone rather than dividing by zero', () => {
-        const kited = tailGeometry(kite(), { x: 0, y: 0, z: 0 }, 0)!;
+        const kited = tailGeometry(kite(), {x: 0, y: 0, z: 0}, 0)!;
 
         assert.equal(kited.stretch, 1);
         assert.equal(kited.turns, 0);
@@ -393,8 +391,8 @@ describe('world-oriented emitters', () => {
      */
     it('tells the shader to lay the quad flat', () => {
         const instance = new ParticleSystemInstance('test', testSystem([
-            emitter({ name: 'ring', properties: properties({ worldOriented: true }) }),
-            emitter({ name: 'smoke' }),
+            emitter({name: 'ring', properties: properties({worldOriented: true})}),
+            emitter({name: 'smoke'}),
         ]));
 
         assert.equal(instance.emitterWorldOriented(0), true);
@@ -412,13 +410,13 @@ describe('chained emitters', () => {
             emitter({
                 name: 'sparks',
                 spawnDuringLife: 1,
-                position: volume({ shape: 'Point', exactValue: { x: 0, y: 0, z: 20 } }),
-                properties: properties({ particlesPerSecond: 20, lifetime: 100 }),
+                position: volume({shape: 'Point', exactValue: {x: 0, y: 0, z: 20}}),
+                properties: properties({particlesPerSecond: 20, lifetime: 100}),
                 ...over,
             }),
             emitter({
                 name: 'smoke trail',
-                properties: properties({ particlesPerSecond: 20, lifetime: 100 }),
+                properties: properties({particlesPerSecond: 20, lifetime: 100}),
             }),
         ]));
     }
@@ -430,7 +428,7 @@ describe('chained emitters', () => {
      */
     it('does not let a trail emitter spawn on its own', () => {
         // The parent spawns nothing, so neither should its child.
-        const instance = trailing({ properties: properties({ particlesPerSecond: 0 }) });
+        const instance = trailing({properties: properties({particlesPerSecond: 0})});
 
         instance.update(0.1);
 
@@ -456,13 +454,13 @@ describe('chained emitters', () => {
             emitter({
                 name: 'debris',
                 spawnOnDeath: 1,
-                position: volume({ shape: 'Point', exactValue: { x: 0, y: 0, z: 7 } }),
+                position: volume({shape: 'Point', exactValue: {x: 0, y: 0, z: 7}}),
                 // Dies within the first step.
-                properties: properties({ particlesPerSecond: 20, lifetime: 0.05 }),
+                properties: properties({particlesPerSecond: 20, lifetime: 0.05}),
             }),
             emitter({
                 name: 'puff',
-                properties: properties({ particlesPerSecond: 20, lifetime: 100 }),
+                properties: properties({particlesPerSecond: 20, lifetime: 100}),
             }),
         ]));
 
@@ -479,8 +477,8 @@ describe('chained emitters', () => {
 
 describe('heat particles', () => {
     const system = testSystem([
-        emitter({ name: 'fire' }),
-        emitter({ name: 'heat', properties: properties({ isHeatParticle: true }) }),
+        emitter({name: 'fire'}),
+        emitter({name: 'heat', properties: properties({isHeatParticle: true})}),
     ]);
 
     /**
@@ -531,7 +529,7 @@ describe('emission gating', () => {
     function running(): ParticleSystemInstance {
         const system = testSystem([emitter({
             name: 'fire',
-            properties: properties({ particlesPerSecond: 20, lifetime: 100 }),
+            properties: properties({particlesPerSecond: 20, lifetime: 100}),
         })]);
 
         return new ParticleSystemInstance('test', system, new Map(), 1, null, new THREE.Object3D());
@@ -728,7 +726,7 @@ describe('the owning object Scale_Factor', () => {
      */
     const drawn = (scaleFactor?: number): { offsets: number[]; sizes: number[] } => {
         const system = testSystem([emitter({
-            properties: properties({ particlesPerSecond: 40, lifetime: 100 }),
+            properties: properties({particlesPerSecond: 40, lifetime: 100}),
         })]);
 
         const instance = new ParticleSystemInstance(

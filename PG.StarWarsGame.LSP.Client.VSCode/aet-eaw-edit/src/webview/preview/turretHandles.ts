@@ -10,9 +10,9 @@
 // Everything here is the CLAMP, not the arc. They are different envelopes and that is the whole
 // point of the feature - see `turretEnvelopes` at the bottom.
 
-import type { PreviewTurret } from '../../protocol/modelPreview';
+import type {PreviewTurret} from '../../protocol/modelPreview';
 
-import { turretSweeps, type TurretSweep } from './deathClone';
+import {type TurretSweep, turretSweeps} from './deathClone';
 
 /** The two axes a turret has. There is no third. */
 export type TurretAxis = 'yaw' | 'pitch';
@@ -66,7 +66,7 @@ export function axisRange(
     const extent = extentDegrees ?? 0;
     const free = !(extent > 0 && extent < CLAMP_BAND_MAX);
 
-    return { axis, free, limitDegrees: free ? HALF_TURN : extent };
+    return {axis, free, limitDegrees: free ? HALF_TURN : extent};
 }
 
 /** A turret the reader can drag, and the two bones that carry it. */
@@ -89,7 +89,7 @@ export interface TurretAim {
 }
 
 /** Rest: the authored pose, which is what an untouched turret reads. */
-export const TURRET_AT_REST: TurretAim = { yaw: 0, pitch: 0 };
+export const TURRET_AT_REST: TurretAim = {yaw: 0, pitch: 0};
 
 /**
  * The handles that should be on screen, which is decided by the arc toggle and nothing else.
@@ -236,8 +236,8 @@ export function turretEnvelopes(
     const yaw = fullAngle(handle.yaw);
 
     return {
-        fire: { yawDegrees: yaw, pitchDegrees: 360 },
-        rotation: { yawDegrees: yaw, pitchDegrees: fullAngle(handle.pitch) },
+        fire: {yawDegrees: yaw, pitchDegrees: 360},
+        rotation: {yawDegrees: yaw, pitchDegrees: fullAngle(handle.pitch)},
     };
 }
 

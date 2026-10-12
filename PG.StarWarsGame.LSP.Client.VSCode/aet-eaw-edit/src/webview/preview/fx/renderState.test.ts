@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { FxPass } from './fxParser';
-import { materialStateFrom } from './renderState';
+import type {FxPass} from './fxParser';
+import {materialStateFrom} from './renderState';
 
-const pass = (states: Record<string, string>): FxPass => ({ name: 'p0', states });
+const pass = (states: Record<string, string>): FxPass => ({name: 'p0', states});
 
 describe('materialStateFrom', () => {
     it('takes D3D defaults for a pass that declares nothing', () => {
@@ -25,21 +25,21 @@ describe('materialStateFrom', () => {
         // The shipped effects genuinely mix these: ZWriteEnable appears as TRUE, true and False
         // across the set, so a case-sensitive read would silently default most of them.
         for (const written of ['TRUE', 'true', 'True']) {
-            assert.equal(materialStateFrom(pass({ zwriteenable: written })).depthWrite, true,
+            assert.equal(materialStateFrom(pass({zwriteenable: written})).depthWrite, true,
                 written);
         }
 
         for (const written of ['FALSE', 'false', 'False']) {
-            assert.equal(materialStateFrom(pass({ zwriteenable: written })).depthWrite, false,
+            assert.equal(materialStateFrom(pass({zwriteenable: written})).depthWrite, false,
                 written);
         }
     });
 
     it('reads enums however they are cased', () => {
-        assert.equal(materialStateFrom(pass({ zfunc: 'Less' })).depthFunc, 'less');
-        assert.equal(materialStateFrom(pass({ zfunc: 'LESSEQUAL' })).depthFunc, 'lessEqual');
-        assert.equal(materialStateFrom(pass({ cullmode: 'none' })).cull, 'none');
-        assert.equal(materialStateFrom(pass({ cullmode: 'NONE' })).cull, 'none');
+        assert.equal(materialStateFrom(pass({zfunc: 'Less'})).depthFunc, 'less');
+        assert.equal(materialStateFrom(pass({zfunc: 'LESSEQUAL'})).depthFunc, 'lessEqual');
+        assert.equal(materialStateFrom(pass({cullmode: 'none'})).cull, 'none');
+        assert.equal(materialStateFrom(pass({cullmode: 'NONE'})).cull, 'none');
     });
 
     it('recognises ordinary alpha blending', () => {
@@ -86,12 +86,12 @@ describe('materialStateFrom', () => {
 
     it('turns D3D winding into back-face culling', () => {
         // CW culls clockwise faces, which is what a renderer calls culling the back.
-        assert.equal(materialStateFrom(pass({ cullmode: 'CW' })).cull, 'back');
-        assert.equal(materialStateFrom(pass({ cullmode: 'CCW' })).cull, 'front');
+        assert.equal(materialStateFrom(pass({cullmode: 'CW'})).cull, 'back');
+        assert.equal(materialStateFrom(pass({cullmode: 'CCW'})).cull, 'front');
     });
 
     it('scales the alpha reference out of 255', () => {
-        const state = materialStateFrom(pass({ alphatestenable: 'TRUE', alpharef: '128' }));
+        const state = materialStateFrom(pass({alphatestenable: 'TRUE', alpharef: '128'}));
 
         assert.ok(state.alphaTest !== null && Math.abs(state.alphaTest - 128 / 255) < 1e-6);
     });
@@ -104,7 +104,7 @@ describe('materialStateFrom', () => {
      */
     it('reads a hex alpha reference, which is the only form the shipped effects use', () => {
         const state = materialStateFrom(
-            pass({ alphatestenable: 'TRUE', alpharef: '0x00000080' }));
+            pass({alphatestenable: 'TRUE', alpharef: '0x00000080'}));
 
         assert.ok(state.alphaTest !== null && Math.abs(state.alphaTest - 128 / 255) < 1e-6,
             `${state.alphaTest}`);
@@ -112,16 +112,16 @@ describe('materialStateFrom', () => {
 
     it('falls back to a sane cutoff when the reference is unreadable', () => {
         assert.equal(
-            materialStateFrom(pass({ alphatestenable: 'TRUE', alpharef: 'nonsense' })).alphaTest,
+            materialStateFrom(pass({alphatestenable: 'TRUE', alpharef: 'nonsense'})).alphaTest,
             0.5);
     });
 
     it('picks a sane cutoff when alpha testing is on but unspecified', () => {
-        assert.equal(materialStateFrom(pass({ alphatestenable: 'TRUE' })).alphaTest, 0.5);
+        assert.equal(materialStateFrom(pass({alphatestenable: 'TRUE'})).alphaTest, 0.5);
     });
 
     it('leaves alpha testing off unless it is switched on', () => {
-        assert.equal(materialStateFrom(pass({ alpharef: '128' })).alphaTest, null);
+        assert.equal(materialStateFrom(pass({alpharef: '128'})).alphaTest, null);
     });
 });
 
@@ -131,41 +131,41 @@ describe('materialStateFrom', () => {
 // `VertexShader = NULL` - so nothing was doubling anything for them, and `MeshAlpha.fx` alone is
 // worn by 286 models / 1282 sub-meshes across foc, every one drawing at half its intended brightness.
 describe('materialStateFrom: the fixed-function colour scale', () => {
-    const ffPass = (states: Record<string, string>): FxPass => ({ name: 'p0', states });
+    const ffPass = (states: Record<string, string>): FxPass => ({name: 'p0', states});
 
     it('doubles a fixed-function stage 0 that asks for MODULATE2X', () => {
-        assert.equal(materialStateFrom(ffPass({ 'colorop[0]': 'MODULATE2X' })).colourScale, 2);
+        assert.equal(materialStateFrom(ffPass({'colorop[0]': 'MODULATE2X'})).colourScale, 2);
     });
 
     it('leaves an ordinary MODULATE alone', () => {
-        assert.equal(materialStateFrom(ffPass({ 'colorop[0]': 'MODULATE' })).colourScale, 1);
+        assert.equal(materialStateFrom(ffPass({'colorop[0]': 'MODULATE'})).colourScale, 1);
     });
 
     it('leaves a pass that names no stage op alone', () => {
-        assert.equal(materialStateFrom(ffPass({ zwriteenable: 'false' })).colourScale, 1);
+        assert.equal(materialStateFrom(ffPass({zwriteenable: 'false'})).colourScale, 1);
     });
 
     it('is case-insensitive, like every other state read', () => {
-        assert.equal(materialStateFrom(ffPass({ 'colorop[0]': 'modulate2x' })).colourScale, 2);
+        assert.equal(materialStateFrom(ffPass({'colorop[0]': 'modulate2x'})).colourScale, 2);
     });
 
     // D3D ignores the texture stages entirely once a pixel shader is bound, and the translated HLSL
     // does its own doubling - so honouring the declaration here would double it twice.
     it('ignores the stage op when the pass has a programmable shader', () => {
         assert.equal(materialStateFrom({
-            name: 'p0', states: { 'colorop[0]': 'MODULATE2X' }, pixelShader: 'ps_main',
+            name: 'p0', states: {'colorop[0]': 'MODULATE2X'}, pixelShader: 'ps_main',
         }).colourScale, 1);
     });
 
     it('ignores it for a vertex-shader-only pass too', () => {
         assert.equal(materialStateFrom({
-            name: 'p0', states: { 'colorop[0]': 'MODULATE2X' }, vertexShader: 'vs_main',
+            name: 'p0', states: {'colorop[0]': 'MODULATE2X'}, vertexShader: 'vs_main',
         }).colourScale, 1);
     });
 
     // Only stage 0 is read. A later stage modulates against what earlier stages produced, and
     // folding that into one scalar would be inventing a number rather than reading one.
     it('does not read a later stage as if it were the first', () => {
-        assert.equal(materialStateFrom(ffPass({ 'colorop[1]': 'MODULATE2X' })).colourScale, 1);
+        assert.equal(materialStateFrom(ffPass({'colorop[1]': 'MODULATE2X'})).colourScale, 1);
     });
 });

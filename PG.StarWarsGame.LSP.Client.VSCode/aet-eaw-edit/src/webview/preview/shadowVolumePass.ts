@@ -220,9 +220,9 @@ export class ShadowVolumePass {
 
     constructor(private readonly renderOrder = 3000) {
         const uniforms = (): Record<string, THREE.IUniform> => ({
-            uToLightObject: { value: new THREE.Vector3(0, 1, 0) },
-            uExtrusion: { value: 1 },
-            uDebugColour: { value: new THREE.Color(0, 1, 1) },
+            uToLightObject: {value: new THREE.Vector3(0, 1, 0)},
+            uExtrusion: {value: 1},
+            uDebugColour: {value: new THREE.Color(0, 1, 1)},
         });
 
         const volume = (zFail: THREE.StencilOp, side: THREE.Side): THREE.ShaderMaterial =>
@@ -271,7 +271,7 @@ export class ShadowVolumePass {
         this.back = volume(THREE.DecrementWrapStencilOp, THREE.BackSide);
 
         this.darkenMaterial = new THREE.ShaderMaterial({
-            uniforms: { uColour: { value: new THREE.Color(0.5, 0.5, 0.5) } },
+            uniforms: {uColour: {value: new THREE.Color(0.5, 0.5, 0.5)}},
             vertexShader: DARKEN_VERTEX,
             fragmentShader: DARKEN_FRAGMENT,
 

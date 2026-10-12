@@ -18,11 +18,11 @@
 // a DOM and stay with the manual smoke steps.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
+import {AutoArrangePlugin, Presets as ArrangePresets} from 'rete-auto-arrange-plugin';
 
-import { ARRANGE_OPTIONS } from './arrangeOptions';
+import {ARRANGE_OPTIONS} from './arrangeOptions';
 
 /** The three options the plugin bakes into every layout before merging ours over them. */
 const PLUGIN_BAKED_OPTIONS = {
@@ -34,20 +34,26 @@ const PLUGIN_BAKED_OPTIONS = {
 /** The smallest gap `elk.spacing.nodeNode` promises between two nodes sharing a layer. */
 const NODE_SPACING = Number(ARRANGE_OPTIONS['elk.spacing.nodeNode']);
 
-interface LaidOutNode { id: string; x: number; y: number; width: number; height: number }
+interface LaidOutNode {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number
+}
 
 /** A node as the plugin reads it: the size the DOM measured, plus its port keys. */
 function eventNode(id: string, height = 220) {
-    return { id, width: 280, height, inputs: { in: { index: 0 } }, outputs: { out: { index: 0 } } };
+    return {id, width: 280, height, inputs: {in: {index: 0}}, outputs: {out: {index: 0}}};
 }
 
 /** AND-junctions are the small boxes; two inputs, one output. */
 function junctionNode(id: string) {
-    return { id, width: 120, height: 60, inputs: { a: { index: 0 }, b: { index: 1 } }, outputs: { out: { index: 0 } } };
+    return {id, width: 120, height: 60, inputs: {a: {index: 0}, b: {index: 1}}, outputs: {out: {index: 0}}};
 }
 
 function connect(id: string, source: string, target: string, targetInput = 'in') {
-    return { id, source, sourceOutput: 'out', target, targetInput };
+    return {id, source, sourceOutput: 'out', target, targetInput};
 }
 
 /**
@@ -81,14 +87,16 @@ function branchResetGraph(chainLength: number, members: number) {
     const connections = [];
     for (let i = 0; i < chainLength; i++) {
         nodes.push(eventNode(`s${i}`, 300));
-        if (i > 0) { connections.push(connect(`sc${i}`, `s${i - 1}`, `s${i}`)); }
+        if (i > 0) {
+            connections.push(connect(`sc${i}`, `s${i - 1}`, `s${i}`));
+        }
     }
     connections.push(connect('cr', 'reset', 's0'));
     for (let i = 0; i < members; i++) {
         nodes.push(eventNode(`m${i}`, 240));
         connections.push(connect(`mr${i}`, 'reset', `m${i}`), connect(`ms${i}`, `s${chainLength - 1}`, `m${i}`));
     }
-    return { nodes, connections };
+    return {nodes, connections};
 }
 
 /** The widest vertical hole inside a single layer - layers being the columns of an elk.direction RIGHT layout. */
@@ -96,7 +104,9 @@ function largestGapInALayer(laid: readonly LaidOutNode[]): number {
     const layers = new Map<number, LaidOutNode[]>();
     for (const n of laid) {
         const key = Math.round(n.x);
-        if (!layers.has(key)) { layers.set(key, []); }
+        if (!layers.has(key)) {
+            layers.set(key, []);
+        }
         layers.get(key)!.push(n);
     }
     let worst = 0;
@@ -111,9 +121,9 @@ function largestGapInALayer(laid: readonly LaidOutNode[]): number {
 
 /** A long chain, which is what a linear campaign act actually looks like. */
 function chainGraph(length: number) {
-    const nodes = Array.from({ length }, (_, i) => eventNode(`n${i}`, 140 + (i % 4) * 60));
-    const connections = Array.from({ length: length - 1 }, (_, i) => connect(`c${i}`, `n${i}`, `n${i + 1}`));
-    return { nodes, connections };
+    const nodes = Array.from({length}, (_, i) => eventNode(`n${i}`, 140 + (i % 4) * 60));
+    const connections = Array.from({length: length - 1}, (_, i) => connect(`c${i}`, `n${i}`, `n${i + 1}`));
+    return {nodes, connections};
 }
 
 /**
@@ -131,7 +141,7 @@ async function arrange(context: ReturnType<typeof branchAndMergeGraph>): Promise
     const elk = (plugin as any).elk;
     const result = await elk.layout({
         id: 'root',
-        layoutOptions: { ...PLUGIN_BAKED_OPTIONS, ...ARRANGE_OPTIONS },
+        layoutOptions: {...PLUGIN_BAKED_OPTIONS, ...ARRANGE_OPTIONS},
         ...graph,
     });
     return (result.children ?? []) as LaidOutNode[];
@@ -236,7 +246,7 @@ describe('story graph auto-arrange', () => {
     it('lays out a graph with no connections at all', async () => {
         // A campaign whose events are all unlinked still opens, and elk is handed the empty edge
         // list rather than being skipped - so it has to survive it.
-        const laid = await arrange({ nodes: [eventNode('a'), eventNode('b'), eventNode('c')], connections: [] });
+        const laid = await arrange({nodes: [eventNode('a'), eventNode('b'), eventNode('c')], connections: []});
 
         assert.equal(laid.length, 3);
         for (let i = 0; i < laid.length; i++) {
@@ -247,7 +257,7 @@ describe('story graph auto-arrange', () => {
     });
 
     it('lays out a single node', async () => {
-        const laid = await arrange({ nodes: [eventNode('only')], connections: [] });
+        const laid = await arrange({nodes: [eventNode('only')], connections: []});
 
         assert.equal(laid.length, 1);
         assert.ok(Number.isFinite(laid[0].x) && Number.isFinite(laid[0].y));

@@ -24,7 +24,9 @@ export function facetList(
     fromNodes: (string | null | undefined)[],
     active: string,
 ): string[] {
-    if (fromServer) { return fromServer; }
+    if (fromServer) {
+        return fromServer;
+    }
 
     const found = [...new Set(fromNodes.filter((v): v is string => !!v))].sort();
     return active && !found.includes(active) ? [...found, active].sort() : found;

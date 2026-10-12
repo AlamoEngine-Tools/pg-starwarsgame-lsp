@@ -2,26 +2,26 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { languageCopyValues } from './languageCopy';
+import {languageCopyValues} from './languageCopy';
 
 const rows = [
     {
         index: 0, key: 'HEADER',
-        values: [{ language: 'ENGLISH', value: 'Lead Designer' }, { language: 'GERMAN', value: 'Chefdesigner' }],
+        values: [{language: 'ENGLISH', value: 'Lead Designer'}, {language: 'GERMAN', value: 'Chefdesigner'}],
     },
     {
         index: 1, key: 'CENTER',
-        values: [{ language: 'ENGLISH', value: 'Alice Smith' }, { language: 'GERMAN', value: '' }],
+        values: [{language: 'ENGLISH', value: 'Alice Smith'}, {language: 'GERMAN', value: ''}],
     },
     {
         index: 2, key: 'CENTER',
-        values: [{ language: 'ENGLISH', value: '[TBL]' }, { language: 'GERMAN', value: '' }],
+        values: [{language: 'ENGLISH', value: '[TBL]'}, {language: 'GERMAN', value: ''}],
     },
     {
         index: 3, key: 'CENTER',
-        values: [{ language: 'ENGLISH', value: '' }, { language: 'GERMAN', value: '' }],
+        values: [{language: 'ENGLISH', value: ''}, {language: 'GERMAN', value: ''}],
     },
 ];
 
@@ -75,7 +75,7 @@ describe('languageCopyValues', () => {
     it('treats a whitespace-only cell as unfilled', () => {
         const blank = [{
             index: 0, key: 'CENTER',
-            values: [{ language: 'ENGLISH', value: 'Bob' }, { language: 'GERMAN', value: '  ' }],
+            values: [{language: 'ENGLISH', value: 'Bob'}, {language: 'GERMAN', value: '  '}],
         }];
 
         assert.equal(languageCopyValues('ENGLISH', 'GERMAN', blank).length, 1);
@@ -84,7 +84,7 @@ describe('languageCopyValues', () => {
     // A row that has no cell at all for the target language still needs one.
     it('fills a row that has no cell for the target language yet', () => {
         const missing = [{
-            index: 0, key: 'CENTER', values: [{ language: 'ENGLISH', value: 'Bob' }],
+            index: 0, key: 'CENTER', values: [{language: 'ENGLISH', value: 'Bob'}],
         }];
 
         assert.deepEqual(

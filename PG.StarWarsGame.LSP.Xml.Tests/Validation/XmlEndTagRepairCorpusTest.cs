@@ -3,6 +3,7 @@
 
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
 using System.Xml.Linq;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -89,7 +90,7 @@ public sealed partial class XmlEndTagRepairCorpusTest
         {
             doc = XDocument.Parse(text);
         }
-        catch (System.Xml.XmlException ex)
+        catch (XmlException ex)
         {
             return "unparsable: " + ex.Message;
         }

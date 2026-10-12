@@ -9,7 +9,7 @@
 //
 // Kept free of three.js so the motion can be read against the XML it comes from.
 
-import type { PreviewBreakoffProp, PreviewHardpoint, PreviewVector3 } from '../../protocol/modelPreview';
+import type {PreviewBreakoffProp, PreviewHardpoint, PreviewVector3} from '../../protocol/modelPreview';
 
 /** Where a piece of debris is, relative to the hardpoint it came off. */
 export interface BreakoffPose {
@@ -47,14 +47,14 @@ export function breakoffAnchor(
     hullPartId: string, hardpoint: PreviewHardpoint,
 ): BreakoffAnchor {
     if (hardpoint.partId !== null && hardpoint.partId !== undefined) {
-        return { partId: hardpoint.partId };
+        return {partId: hardpoint.partId};
     }
 
     // No hardpoint model - 32 of foc's hardpoints are like this, a tractor beam or a fighter bay that
     // names a bone and nothing to stand on it. Then the hull's own bone is the place.
     return hardpoint.attachBone === null || hardpoint.attachBone === undefined
-        ? { partId: hullPartId }
-        : { partId: hullPartId, bone: hardpoint.attachBone };
+        ? {partId: hullPartId}
+        : {partId: hullPartId, bone: hardpoint.attachBone};
 }
 
 /**
@@ -151,15 +151,15 @@ export function breakoffPose(prop: PreviewBreakoffProp, seconds: number): Breako
  * about Alamo Z - the up axis, a flat yaw - comes out as a spin about glTF Y, which is also flat.
  */
 function intoSceneAxes(vector: PreviewVector3): PreviewVector3 {
-    return { x: vector.x, y: vector.z, z: -vector.y + 0 };
+    return {x: vector.x, y: vector.z, z: -vector.y + 0};
 }
 
 function scaled(vector: PreviewVector3 | null | undefined, by: number): PreviewVector3 {
     if (vector === null || vector === undefined) {
-        return { x: 0, y: 0, z: 0 };
+        return {x: 0, y: 0, z: 0};
     }
 
     // `+ 0` normalises the negative zero that -20 * 0 produces. It is never a meaningful offset,
     // and it reads as a real value everywhere it surfaces.
-    return { x: vector.x * by + 0, y: vector.y * by + 0, z: vector.z * by + 0 };
+    return {x: vector.x * by + 0, y: vector.y * by + 0, z: vector.z * by + 0};
 }

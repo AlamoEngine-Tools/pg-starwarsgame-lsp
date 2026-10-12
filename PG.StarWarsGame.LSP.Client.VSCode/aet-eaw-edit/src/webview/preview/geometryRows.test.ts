@@ -2,12 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    GEOMETRY_PAGE, appendPage, geometryTabs, nearEnd, nextOffset, type GeometryRows,
-} from './geometryRows';
-import { type SubMeshGeometryPage } from '../../protocol/modelPreview';
+import {appendPage, GEOMETRY_PAGE, type GeometryRows, geometryTabs, nearEnd, nextOffset,} from './geometryRows';
+import {type SubMeshGeometryPage} from '../../protocol/modelPreview';
 
 /** A page of `faces`, which is the table with a real total behind it. */
 function faces(offset: number, count: number, totalFaces = 1000): SubMeshGeometryPage {
@@ -21,7 +19,7 @@ function faces(offset: number, count: number, totalFaces = 1000): SubMeshGeometr
         totalFaces,
         vertices: [],
         boneMapping: [],
-        faces: Array.from({ length: count }, (_, i) => ({
+        faces: Array.from({length: count}, (_, i) => ({
             index: offset + i, v0: offset + i, v1: offset + i + 1, v2: offset + i + 2,
         })),
     };
@@ -74,7 +72,7 @@ describe('appendPage', () => {
         const start = appendPage(null, faces(0, 500));
         const swapped = appendPage(start, {
             ...faces(0, 0), table: 'boneMapping',
-            boneMapping: [{ slot: 0, boneIndex: 3, name: 'Root' }],
+            boneMapping: [{slot: 0, boneIndex: 3, name: 'Root'}],
         });
 
         assert.equal(swapped.table, 'boneMapping');
@@ -87,8 +85,8 @@ describe('appendPage', () => {
         const rows = appendPage(null, {
             ...faces(0, 0), table: 'boneMapping',
             boneMapping: [
-                { slot: 0, boneIndex: 3, name: 'Root' },
-                { slot: 1, boneIndex: 4, name: 'Body' },
+                {slot: 0, boneIndex: 3, name: 'Root'},
+                {slot: 1, boneIndex: 4, name: 'Body'},
             ],
         });
 
@@ -99,7 +97,7 @@ describe('appendPage', () => {
     it('carries the note that says why a table is empty', () => {
         // A static sub-mesh has no skin table at all - the Star Destroyer's own hull is one - and
         // saying so beats an empty grid, which reads as a request that failed.
-        const rows = appendPage(null, { ...faces(0, 0), table: 'boneMapping' });
+        const rows = appendPage(null, {...faces(0, 0), table: 'boneMapping'});
 
         assert.match(rows.note ?? '', /not skinned/i);
     });
@@ -128,19 +126,19 @@ describe('nearEnd', () => {
     // reading the rows above it and the table never visibly stops.
     it('is true within a screenful of the bottom', () => {
         // Showing 1400-1800 of 2000: 200 left below the fold, against 400 of runway.
-        assert.equal(nearEnd({ scrollTop: 1400, scrollHeight: 2000, clientHeight: 400 }), true);
+        assert.equal(nearEnd({scrollTop: 1400, scrollHeight: 2000, clientHeight: 400}), true);
     });
 
     it('is false while there is more than a screenful still to come', () => {
         // Showing 900-1300 of 2000, so 700 left - more than one viewport, and nothing to fetch yet.
-        assert.equal(nearEnd({ scrollTop: 900, scrollHeight: 2000, clientHeight: 400 }), false);
-        assert.equal(nearEnd({ scrollTop: 100, scrollHeight: 5000, clientHeight: 400 }), false);
+        assert.equal(nearEnd({scrollTop: 900, scrollHeight: 2000, clientHeight: 400}), false);
+        assert.equal(nearEnd({scrollTop: 100, scrollHeight: 5000, clientHeight: 400}), false);
     });
 
     it('is true for a table shorter than its own scroller', () => {
         // Which is how the SECOND page gets asked for at all when the first one did not fill the
         // box: no scrolling can happen, so nothing would ever ask again.
-        assert.equal(nearEnd({ scrollTop: 0, scrollHeight: 300, clientHeight: 400 }), true);
+        assert.equal(nearEnd({scrollTop: 0, scrollHeight: 300, clientHeight: 400}), true);
     });
 });
 

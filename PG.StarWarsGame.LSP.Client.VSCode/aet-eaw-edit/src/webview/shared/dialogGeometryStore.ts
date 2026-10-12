@@ -11,7 +11,7 @@
 // The host owns the actual storage (workspaceState), so the placement follows the project rather
 // than the machine, and a different mod opens with its own layout.
 
-import { StoredGeometry } from './modalGeometry';
+import {StoredGeometry} from './modalGeometry';
 
 /**
  * Identifies a dialog across sessions.

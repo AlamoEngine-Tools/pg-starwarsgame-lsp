@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { dockChromeCss, rotarySwitchCss, stageChromeCss, stageFlyoutCss } from './dockChrome';
-import { scaleCss } from './tokens';
+import {dockChromeCss, rotarySwitchCss, stageChromeCss, stageFlyoutCss} from './dockChrome';
+import {scaleCss} from './tokens';
 
 /** Every class this stylesheet defines a rule for. */
 function selectorsIn(css: string): Set<string> {

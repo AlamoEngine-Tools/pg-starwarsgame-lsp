@@ -3,7 +3,6 @@
 
 using System.Text;
 using Loretta.CodeAnalysis;
-using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;

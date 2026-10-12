@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 
@@ -96,31 +95,10 @@ public sealed class ModelTextureIndexTest
         sut.TexturesOf("bar.alo");
         sut.TexturesOf("FOO.ALO");
 
-        var stats = ((ICacheStatisticsSource)sut).Snapshot();
+        var stats = sut.Snapshot();
 
         Assert.Equal("model-textures", stats.Name);
         Assert.Equal(2, stats.Entries);
-    }
-
-    private sealed class ThrowingResolver : IGameAssetResolver
-    {
-        public GameAssetTiers Tiers => new(1, false, false, 0);
-
-        public GameAssetLocation? Locate(string gameRelativePath)
-        {
-            throw Fail();
-        }
-
-        public byte[]? Read(string gameRelativePath)
-        {
-            throw Fail();
-        }
-
-        private static InvalidOperationException Fail()
-        {
-            return new InvalidOperationException(
-                "The catalog should have answered; opening the model is the cost being removed.");
-        }
     }
 
     [Fact]
@@ -181,6 +159,27 @@ public sealed class ModelTextureIndexTest
         sut.TexturesOf("ship.alo");
 
         Assert.Equal(2, resolver.Reads);
+    }
+
+    private sealed class ThrowingResolver : IGameAssetResolver
+    {
+        public GameAssetTiers Tiers => new(1, false, false, 0);
+
+        public GameAssetLocation? Locate(string gameRelativePath)
+        {
+            throw Fail();
+        }
+
+        public byte[]? Read(string gameRelativePath)
+        {
+            throw Fail();
+        }
+
+        private static InvalidOperationException Fail()
+        {
+            return new InvalidOperationException(
+                "The catalog should have answered; opening the model is the cost being removed.");
+        }
     }
 
     /// <summary>Answers with whatever bytes the test hands it, and counts the reads.</summary>

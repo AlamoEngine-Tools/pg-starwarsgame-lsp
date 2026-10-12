@@ -8,8 +8,8 @@
 // so every message was truncated, and a list that appears and disappears there shifts the controls
 // above it.
 
-import { ProblemsPanel } from '../shared/ProblemsPanel';
-import { LocProblem } from './useLocPanel';
+import {ProblemsPanel} from '../shared/ProblemsPanel';
+import {LocProblem} from './useLocPanel';
 
 export function LocProblemsBar(props: {
     problems: LocProblem[];

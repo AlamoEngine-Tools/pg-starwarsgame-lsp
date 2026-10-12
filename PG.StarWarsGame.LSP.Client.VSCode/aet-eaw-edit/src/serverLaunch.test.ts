@@ -4,7 +4,13 @@
 import {test} from 'node:test';
 import * as assert from 'node:assert/strict';
 import * as path from 'path';
-import {ANALYZER_VARIABLE, bundledServerPath, chooseServerCommand, serverEnvironment, serverProblem} from './serverLaunch';
+import {
+    ANALYZER_VARIABLE,
+    bundledServerPath,
+    chooseServerCommand,
+    serverEnvironment,
+    serverProblem
+} from './serverLaunch';
 
 const extensionPath = path.join('c:', 'ext');
 const bundled = bundledServerPath(extensionPath);

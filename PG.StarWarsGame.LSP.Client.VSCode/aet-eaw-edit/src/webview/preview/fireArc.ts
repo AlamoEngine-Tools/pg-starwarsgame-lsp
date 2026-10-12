@@ -70,7 +70,7 @@ export function fireConePoints(
         rim.push([x * range, y * range, z * range]);
     }
 
-    return { apex: [0, 0, 0], rim };
+    return {apex: [0, 0, 0], rim};
 }
 
 /**

@@ -12,6 +12,12 @@ namespace PG.StarWarsGame.LSP.Lua.Analyzer;
 public sealed record AnalyzerPlan(IReadOnlyList<string> WorkspaceRoots, IReadOnlyList<string> Library)
 {
     /// <summary>
+    ///     2 EaW and 6 FoC scripts are Windows-1252, and the default UTF-8 drops them without a
+    ///     word (measured). One encoding per configuration, so the one every vanilla file reads in.
+    /// </summary>
+    public const string Encoding = "windows-1252";
+
+    /// <summary>
     ///     Rules the analyzer never runs. Global scope is this server's: the analyzer sees one
     ///     namespace where the game gives every script its own, so its undefined-global is a subset
     ///     of ours (measured) and the rest would be wrong. require resolution is ours too - the
@@ -24,12 +30,6 @@ public sealed record AnalyzerPlan(IReadOnlyList<string> WorkspaceRoots, IReadOnl
         "unresolved-require",
         "duplicate-require"
     ];
-
-    /// <summary>
-    ///     2 EaW and 6 FoC scripts are Windows-1252, and the default UTF-8 drops them without a
-    ///     word (measured). One encoding per configuration, so the one every vanilla file reads in.
-    /// </summary>
-    public const string Encoding = "windows-1252";
 
     /// <summary>The configuration file emmylua_ls reads through EMMYLUALS_CONFIG.</summary>
     public string ToJson()

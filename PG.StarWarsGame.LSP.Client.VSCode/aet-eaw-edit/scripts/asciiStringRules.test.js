@@ -2,13 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 const assert = require('node:assert/strict');
-const { describe, it } = require('node:test');
+const {describe, it} = require('node:test');
 
-const { stringOffences } = require('./asciiStringRules');
+const {stringOffences} = require('./asciiStringRules');
 
 /** The characters reported for a file, in order. */
 function chars(text, lang) {
-    return stringOffences(text, { lang }).map(o => o.char);
+    return stringOffences(text, {lang}).map(o => o.char);
 }
 
 describe('non-ASCII in a string literal', () => {
@@ -30,13 +30,13 @@ describe('non-ASCII in a string literal', () => {
     });
 
     it('says what to write instead, where there is an obvious answer', () => {
-        const [arrow] = stringOffences('var s = "a \u2192 b";', { lang: 'cs' });
+        const [arrow] = stringOffences('var s = "a \u2192 b";', {lang: 'cs'});
 
         assert.equal(arrow.suggestion, "'->'");
     });
 
     it('names the line the character is on', () => {
-        const [hit] = stringOffences('var a = 1;\nvar b = 2;\nvar s = "\u2192";', { lang: 'cs' });
+        const [hit] = stringOffences('var a = 1;\nvar b = 2;\nvar s = "\u2192";', {lang: 'cs'});
 
         assert.equal(hit.line, 3);
     });

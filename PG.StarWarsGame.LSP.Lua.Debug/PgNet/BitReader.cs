@@ -43,7 +43,7 @@ public sealed class BitReader
         uint value = 0;
         for (var bit = 0; bit < width; bit++)
         {
-            if ((span[_position / 8] >> (_position % 8) & 1) != 0)
+            if (((span[_position / 8] >> (_position % 8)) & 1) != 0)
                 value |= 1u << bit;
             _position++;
         }

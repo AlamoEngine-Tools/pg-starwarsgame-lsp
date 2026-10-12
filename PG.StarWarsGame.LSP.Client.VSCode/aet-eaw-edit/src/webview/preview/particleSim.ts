@@ -11,7 +11,7 @@
 // seeded from Math.random cannot be tested at all, and "the sparks go the wrong way" is otherwise
 // only ever settled by squinting at it.
 
-import type { AlamoEmitter, AlamoSpawnVolume, AlamoTrack } from '../../protocol/modelPreview';
+import type {AlamoEmitter, AlamoSpawnVolume, AlamoTrack} from '../../protocol/modelPreview';
 
 /** Named for what it is: a value in [0, 1). */
 export type Random = () => number;
@@ -179,7 +179,7 @@ export function sampleVolume(volume: AlamoSpawnVolume, random: Random): Vec3 {
 
         default:
             // Point: one exact value, not random at all.
-            return { ...volume.exactValue };
+            return {...volume.exactValue};
     }
 }
 
@@ -273,7 +273,7 @@ function onSphere(random: Random, radius: number): Vec3 {
     const angle = random() * Math.PI * 2;
     const r = Math.sqrt(Math.max(0, 1 - z * z));
 
-    return { x: Math.cos(angle) * r * radius, y: Math.sin(angle) * r * radius, z: z * radius };
+    return {x: Math.cos(angle) * r * radius, y: Math.sin(angle) * r * radius, z: z * radius};
 }
 
 function cubeRoot(v: number): number {
@@ -313,7 +313,7 @@ export class SpawnClock {
             const limit = this.emitter.properties.burstCount;
 
             while (this.elapsed >= this.nextBurst
-                && (limit === 0 || this.burstsFired < limit)) {
+            && (limit === 0 || this.burstsFired < limit)) {
                 count += this.emitter.properties.particlesPerBurst;
                 this.burstsFired++;
                 this.nextBurst += Math.max(this.emitter.properties.burstDelay, 1e-4);
@@ -337,7 +337,7 @@ export class SpawnClock {
 
 /** Creates one particle at birth, drawing everything random about it now. */
 export function spawnParticle(
-    emitter: AlamoEmitter, random: Random, wind: Vec3 = { x: 0, y: 0, z: 0 },
+    emitter: AlamoEmitter, random: Random, wind: Vec3 = {x: 0, y: 0, z: 0},
 ): Particle {
     const properties = emitter.properties;
 
@@ -355,20 +355,20 @@ export function spawnParticle(
     // square-on and the track is integrated over its life. The direction flips either way.
     const rotation = properties.randomRotation
         ? properties.randomRotationAverage
-            * (1 + (random() * 2 - 1) * properties.randomRotationVariance)
+        * (1 + (random() * 2 - 1) * properties.randomRotationVariance)
         : 0;
 
     const direction = properties.randomRotationDirection && random() < 0.5 ? -1 : 1;
 
     // Downwind, once, at birth: `if (affectedByWind) initialSpeed += GetWind()`. 484 of the
     // corpus's 1019 emitters set the flag, so half the drifting smoke in the game depends on it.
-    const blown = properties.affectedByWind ? wind : { x: 0, y: 0, z: 0 };
+    const blown = properties.affectedByWind ? wind : {x: 0, y: 0, z: 0};
 
     // The direction the particle was born in, which is what the inward terms pull along.
     const spread = Math.hypot(position.x, position.y, position.z);
     const inward = spread < 1e-6
-        ? { x: 0, y: 0, z: 0 }
-        : { x: position.x / spread, y: position.y / spread, z: position.z / spread };
+        ? {x: 0, y: 0, z: 0}
+        : {x: position.x / spread, y: position.y / spread, z: position.z / spread};
 
     return {
         position,
@@ -407,7 +407,7 @@ function colourAddition(
     const red = random() * max.x;
 
     if (properties.colorAddGrayscale) {
-        return { r: red, g: red, b: red, a: red };
+        return {r: red, g: red, b: red, a: red};
     }
 
     return {
@@ -555,7 +555,7 @@ export function integrateTrack(track: AlamoTrack, t: number): number {
             : track.interpolation === 'Smooth'
                 // The integral of the cubic ease, which is what Smooth interpolates with.
                 ? (from.value - to.value) * u ** 4 / 2 + (to.value - from.value) * u ** 3
-                    + from.value * u
+                + from.value * u
                 : u * (from.value + u * (to.value - from.value) / 2);
 
         total += area * span;

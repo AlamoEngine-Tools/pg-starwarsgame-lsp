@@ -12,15 +12,21 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Util;
 /// </summary>
 public sealed class XmlElementSpansTest
 {
-    private static XmlElementSpans Build(string text) =>
-        XmlElementSpans.Build(XmlUtility.CreateHtmlDocument(text), text);
+    private static XmlElementSpans Build(string text)
+    {
+        return XmlElementSpans.Build(XmlUtility.CreateHtmlDocument(text), text);
+    }
 
-    private static string Slice(string text, (int Start, int Length) span) => text.Substring(span.Start, span.Length);
+    private static string Slice(string text, (int Start, int Length) span)
+    {
+        return text.Substring(span.Start, span.Length);
+    }
 
     [Fact]
     public void NestedElements_NamesAndTagsAreExact()
     {
-        const string text = "<?xml version=\"1.0\"?>\n<Root>\n\t<Unit Name=\"x\">\n\t\t<Max_Speed>1</Max_Speed>\n\t</Unit>\n</Root>";
+        const string text =
+            "<?xml version=\"1.0\"?>\n<Root>\n\t<Unit Name=\"x\">\n\t\t<Max_Speed>1</Max_Speed>\n\t</Unit>\n</Root>";
         var spans = Build(text);
 
         var unit = Assert.Single(spans.Elements, e => e.Name == "Unit");

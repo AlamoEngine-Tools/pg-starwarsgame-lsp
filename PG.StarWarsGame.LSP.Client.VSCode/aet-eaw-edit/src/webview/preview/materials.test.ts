@@ -2,18 +2,26 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
-    collectTextureNames, debugColour, isShieldMesh, isStealthMesh, isVisibleAt, isVisibleAtLevel,
-    numericParams, resolveMaterial, shieldMeshOffShader, textureParam,
-    type MaterialExtras,
     castsShadowMap,
+    collectTextureNames,
+    debugColour,
+    isShieldMesh,
+    isStealthMesh,
+    isVisibleAt,
+    isVisibleAtLevel,
+    type MaterialExtras,
+    numericParams,
+    resolveMaterial,
+    shieldMeshOffShader,
+    textureParam,
 } from './materials';
 
 /** The extras the exporter writes for one sub-mesh. */
 function extras(shader: string, rest: Partial<MaterialExtras> = {}): MaterialExtras {
-    return { alamoShader: shader, alamoMesh: 'HULL', ...rest };
+    return {alamoShader: shader, alamoMesh: 'HULL', ...rest};
 }
 
 describe('resolveMaterial', () => {
@@ -165,7 +173,7 @@ describe('resolveMaterial', () => {
          */
         it('applies to an FC_ mesh on an ordinary shader', () => {
             assert.equal(
-                resolveMaterial(extras('MeshAlpha.fx', { alamoMesh: 'FC_Stripe' })).colorize, true);
+                resolveMaterial(extras('MeshAlpha.fx', {alamoMesh: 'FC_Stripe'})).colorize, true);
         });
 
         it('does not apply to an ordinary mesh on an ordinary shader', () => {
@@ -173,7 +181,7 @@ describe('resolveMaterial', () => {
         });
 
         it('never applies to geometry that is not drawn', () => {
-            const spec = resolveMaterial(extras('MeshShadowVolume.fx', { alamoMesh: 'FC_Stripe' }));
+            const spec = resolveMaterial(extras('MeshShadowVolume.fx', {alamoMesh: 'FC_Stripe'}));
 
             assert.equal(spec.colorize, false);
         });
@@ -193,13 +201,13 @@ describe('resolveMaterial', () => {
 
         /** Parameter names are not consistently cased across the shipped files and mods. */
         it('matches parameter names case-insensitively', () => {
-            const spec = resolveMaterial(extras('MeshAlpha.fx', { 'param:basetexture': 'hull.tga' }));
+            const spec = resolveMaterial(extras('MeshAlpha.fx', {'param:basetexture': 'hull.tga'}));
 
             assert.equal(spec.textures.base, 'hull.tga');
         });
 
         it('ignores a parameter that is not a texture name', () => {
-            const spec = resolveMaterial(extras('MeshAlpha.fx', { 'param:BaseTexture': 3 }));
+            const spec = resolveMaterial(extras('MeshAlpha.fx', {'param:BaseTexture': 3}));
 
             assert.equal(spec.textures.base, undefined);
         });
@@ -209,7 +217,7 @@ describe('resolveMaterial', () => {
 describe('textureParam', () => {
     it('does not confuse a shader parameter with the metadata beside it', () => {
         // Parameters are namespaced precisely so a mod may name one "alamoShader" without collision.
-        const spec = { alamoShader: 'MeshAlpha.fx', 'param:alamoShader': 'sneaky.tga' };
+        const spec = {alamoShader: 'MeshAlpha.fx', 'param:alamoShader': 'sneaky.tga'};
 
         assert.equal(textureParam(spec, 'alamoShader'), 'sneaky.tga');
     });
@@ -227,27 +235,27 @@ describe('isVisibleAt', () => {
     });
 
     it('draws a tagged mesh only at its own level', () => {
-        assert.equal(isVisibleAt({ alamoAlt: 2 }, 2, 0), true);
-        assert.equal(isVisibleAt({ alamoAlt: 2 }, 0, 0), false);
-        assert.equal(isVisibleAt({ alamoLod: 1 }, 0, 1), true);
-        assert.equal(isVisibleAt({ alamoLod: 1 }, 0, 0), false);
+        assert.equal(isVisibleAt({alamoAlt: 2}, 2, 0), true);
+        assert.equal(isVisibleAt({alamoAlt: 2}, 0, 0), false);
+        assert.equal(isVisibleAt({alamoLod: 1}, 0, 1), true);
+        assert.equal(isVisibleAt({alamoLod: 1}, 0, 0), false);
     });
 
     it('requires both levels to match when both are tagged', () => {
-        assert.equal(isVisibleAt({ alamoAlt: 2, alamoLod: 1 }, 2, 1), true);
-        assert.equal(isVisibleAt({ alamoAlt: 2, alamoLod: 1 }, 2, 0), false);
+        assert.equal(isVisibleAt({alamoAlt: 2, alamoLod: 1}, 2, 1), true);
+        assert.equal(isVisibleAt({alamoAlt: 2, alamoLod: 1}, 2, 0), false);
     });
 
     it('respects a mesh the file marks hidden', () => {
-        assert.equal(isVisibleAt({ alamoHidden: true }, 0, 0), false);
+        assert.equal(isVisibleAt({alamoHidden: true}, 0, 0), false);
     });
 });
 
 describe('collectTextureNames', () => {
     it('asks for each distinct texture once', () => {
         const names = collectTextureNames([
-            extras('MeshAlpha.fx', { 'param:BaseTexture': 'hull.tga' }),
-            extras('MeshAlpha.fx', { 'param:BaseTexture': 'hull.tga' }),
+            extras('MeshAlpha.fx', {'param:BaseTexture': 'hull.tga'}),
+            extras('MeshAlpha.fx', {'param:BaseTexture': 'hull.tga'}),
             extras('MeshBumpColorize.fx', {
                 'param:BaseTexture': 'hull.tga', 'param:NormalTexture': 'hull_b.tga',
             }),
@@ -259,7 +267,7 @@ describe('collectTextureNames', () => {
     /** A capital ship's shadow volume would otherwise pull a texture nothing ever samples. */
     it('skips textures of geometry that is not drawn', () => {
         const names = collectTextureNames([
-            extras('MeshShadowVolume.fx', { 'param:BaseTexture': 'never_drawn.tga' }),
+            extras('MeshShadowVolume.fx', {'param:BaseTexture': 'never_drawn.tga'}),
         ]);
 
         assert.deepEqual(names, []);
@@ -307,7 +315,7 @@ describe('numericParams', () => {
 
     it('ignores the extras that are not parameters at all', () => {
         assert.equal(numericParams(EXTRAS).has('alamoShader'), false);
-        assert.equal(numericParams({ alamoAlt: 2 }).size, 0);
+        assert.equal(numericParams({alamoAlt: 2}).size, 0);
     });
 
     /**
@@ -316,12 +324,12 @@ describe('numericParams', () => {
      */
     it('still reads a comma-joined string', () => {
         assert.deepEqual(
-            numericParams({ 'param:Diffuse': '1, 0.5, 0.25, 1' }).get('Diffuse'),
+            numericParams({'param:Diffuse': '1, 0.5, 0.25, 1'}).get('Diffuse'),
             [1, 0.5, 0.25, 1]);
     });
 
     it('drops an array that is not all numbers', () => {
-        assert.equal(numericParams({ 'param:Odd': [1, 'x'] }).has('Odd'), false);
+        assert.equal(numericParams({'param:Odd': [1, 'x']}).has('Odd'), false);
     });
 });
 
@@ -334,18 +342,18 @@ describe('debugColour', () => {
      */
     it('reads the collision hull`s blue off the sub-mesh', () => {
         assert.deepEqual(
-            debugColour({ alamoShader: 'MeshCollision.fx', 'param:Color': [0, 0, 1, 0.5] }),
-            { r: 0, g: 0, b: 1, a: 0.5 });
+            debugColour({alamoShader: 'MeshCollision.fx', 'param:Color': [0, 0, 1, 0.5]}),
+            {r: 0, g: 0, b: 1, a: 0.5});
     });
 
     it('reads a shadow volume`s DebugColor', () => {
         assert.deepEqual(
-            debugColour({ alamoShader: 'RSkinShadowVolume.fx', 'param:DebugColor': [0, 1, 1, 1] }),
-            { r: 0, g: 1, b: 1, a: 1 });
+            debugColour({alamoShader: 'RSkinShadowVolume.fx', 'param:DebugColor': [0, 1, 1, 1]}),
+            {r: 0, g: 1, b: 1, a: 1});
     });
 
     it('gives nothing back when the sub-mesh declares no colour', () => {
-        assert.equal(debugColour({ alamoShader: 'MeshCollision.fx' }), null);
+        assert.equal(debugColour({alamoShader: 'MeshCollision.fx'}), null);
     });
 });
 
@@ -394,23 +402,23 @@ describe('debugColour', () => {
     // writes the value explicitly and every one matches its shader's default.
     it('reads a collision hull`s colour', () => {
         assert.deepEqual(
-            debugColour({ alamoShader: 'MeshCollision.fx', 'param:Color': '0,0,1,0.5' }),
-            { r: 0, g: 0, b: 1, a: 0.5 });
+            debugColour({alamoShader: 'MeshCollision.fx', 'param:Color': '0,0,1,0.5'}),
+            {r: 0, g: 0, b: 1, a: 0.5});
     });
 
     it('reads a shadow volume`s, which uses a different parameter name', () => {
         assert.deepEqual(
-            debugColour({ alamoShader: 'MeshShadowVolume.fx', 'param:DebugColor': '0,1,1,1' }),
-            { r: 0, g: 1, b: 1, a: 1 });
+            debugColour({alamoShader: 'MeshShadowVolume.fx', 'param:DebugColor': '0,1,1,1'}),
+            {r: 0, g: 1, b: 1, a: 1});
     });
 
     it('assumes opaque when the parameter carries only three channels', () => {
         assert.deepEqual(
-            debugColour({ 'param:Color': '1,0,0' }), { r: 1, g: 0, b: 0, a: 1 });
+            debugColour({'param:Color': '1,0,0'}), {r: 1, g: 0, b: 0, a: 1});
     });
 
     it('has nothing to say about a mesh that declares neither', () => {
-        assert.equal(debugColour({ alamoShader: 'MeshBumpColorize.fx' }), null);
+        assert.equal(debugColour({alamoShader: 'MeshBumpColorize.fx'}), null);
     });
 });
 
@@ -418,20 +426,20 @@ describe('shadow volumes take over from the shadow map', () => {
     it('stops visible geometry casting a mapped shadow once the model authors a volume', () => {
         // The engine casts from the authored volume, never from the render mesh. Leaving the shadow
         // map casting as well would draw the same shadow twice, from two different silhouettes.
-        assert.equal(castsShadowMap({ hasVolumes: true, hidden: false, blend: 'opaque' }), false);
+        assert.equal(castsShadowMap({hasVolumes: true, hidden: false, blend: 'opaque'}), false);
     });
 
     it('keeps casting from the hull on the 63% of models that author no volume', () => {
-        assert.equal(castsShadowMap({ hasVolumes: false, hidden: false, blend: 'opaque' }), true);
+        assert.equal(castsShadowMap({hasVolumes: false, hidden: false, blend: 'opaque'}), true);
     });
 
     it('never casts from geometry the engine does not draw', () => {
-        assert.equal(castsShadowMap({ hasVolumes: false, hidden: true, blend: 'opaque' }), false);
+        assert.equal(castsShadowMap({hasVolumes: false, hidden: true, blend: 'opaque'}), false);
     });
 
     it('never casts from an additive or alpha pass', () => {
         // A glow has no silhouette worth casting, and an alpha card would cast its whole quad.
-        assert.equal(castsShadowMap({ hasVolumes: false, hidden: false, blend: 'additive' }), false);
+        assert.equal(castsShadowMap({hasVolumes: false, hidden: false, blend: 'additive'}), false);
     });
 });
 
@@ -441,20 +449,20 @@ describe('isVisibleAtLevel', () => {
         // asked separately, by the row chain's `inFile` link. Bundling the two here meant an
         // ability that talked the model into drawing its shield was still vetoed by the level link
         // reading the same flag. One flag, two gates, and overriding one did nothing.
-        assert.equal(isVisibleAtLevel({ alamoHidden: true }, 0, 0), true);
+        assert.equal(isVisibleAtLevel({alamoHidden: true}, 0, 0), true);
     });
 
     it('still gates on ALT and LOD', () => {
-        assert.equal(isVisibleAtLevel({ alamoAlt: 1 }, 0, 0), false);
-        assert.equal(isVisibleAtLevel({ alamoAlt: 1 }, 1, 0), true);
-        assert.equal(isVisibleAtLevel({ alamoLod: 2 }, 0, 0), false);
-        assert.equal(isVisibleAtLevel({ alamoLod: 2 }, 0, 2), true);
+        assert.equal(isVisibleAtLevel({alamoAlt: 1}, 0, 0), false);
+        assert.equal(isVisibleAtLevel({alamoAlt: 1}, 1, 0), true);
+        assert.equal(isVisibleAtLevel({alamoLod: 2}, 0, 0), false);
+        assert.equal(isVisibleAtLevel({alamoLod: 2}, 0, 2), true);
     });
 
     it('is what isVisibleAt asks once the hidden flag has passed', () => {
         // The two stay in step by construction: isVisibleAt is the hidden check plus this.
-        assert.equal(isVisibleAt({ alamoAlt: 1 }, 1, 0), isVisibleAtLevel({ alamoAlt: 1 }, 1, 0));
-        assert.equal(isVisibleAt({ alamoLod: 3 }, 0, 0), isVisibleAtLevel({ alamoLod: 3 }, 0, 0));
+        assert.equal(isVisibleAt({alamoAlt: 1}, 1, 0), isVisibleAtLevel({alamoAlt: 1}, 1, 0));
+        assert.equal(isVisibleAt({alamoLod: 3}, 0, 0), isVisibleAtLevel({alamoLod: 3}, 0, 0));
     });
 });
 
@@ -462,8 +470,8 @@ describe('isShieldMesh', () => {
     it('takes the mesh the author NAMED shield, whatever shader it is on', () => {
         // The user's rule: the name decides. Nothing in the data declares which mesh a shield
         // ability reveals, and the author naming it `shield` is the clearest word there is.
-        assert.equal(isShieldMesh({ alamoMesh: 'shield', alamoShader: 'MeshShield.fx' }), true);
-        assert.equal(isShieldMesh({ alamoMesh: 'Shield_01', alamoShader: 'MeshBumpSpecular.fx' }), true);
+        assert.equal(isShieldMesh({alamoMesh: 'shield', alamoShader: 'MeshShield.fx'}), true);
+        assert.equal(isShieldMesh({alamoMesh: 'Shield_01', alamoShader: 'MeshBumpSpecular.fx'}), true);
     });
 
     it('leaves ENGINE GLOW on the same shader alone', () => {
@@ -471,16 +479,16 @@ describe('isShieldMesh', () => {
         // `engines_big` and `engines_small`. Deciding on the shader lit the engines whenever DEFEND
         // was switched on, which is not what the ability does.
         assert.equal(
-            isShieldMesh({ alamoMesh: 'engines_big', alamoShader: 'MeshShield.fx' }), false);
+            isShieldMesh({alamoMesh: 'engines_big', alamoShader: 'MeshShield.fx'}), false);
         assert.equal(
-            isShieldMesh({ alamoMesh: 'engines_small', alamoShader: 'MeshShield.fx' }), false);
+            isShieldMesh({alamoMesh: 'engines_small', alamoShader: 'MeshShield.fx'}), false);
     });
 
     it('does not take a mesh that merely CONTAINS the word', () => {
         // `HP_Shield_Generator` is a hardpoint housing - hull geometry that must not vanish and
         // reappear with an ability. The name has to START with it.
-        assert.equal(isShieldMesh({ alamoMesh: 'HP_Shield_Generator' }), false);
-        assert.equal(isShieldMesh({ alamoMesh: 'deflector_shield' }), false);
+        assert.equal(isShieldMesh({alamoMesh: 'HP_Shield_Generator'}), false);
+        assert.equal(isShieldMesh({alamoMesh: 'deflector_shield'}), false);
     });
 
     it('says no with no name at all', () => {
@@ -494,15 +502,15 @@ describe('isStealthMesh', () => {
     // `Ui_tyber`, `Ui_tyber_in_jail`, `Ui_urai_fen`, `Uv_f9tztransport`,
     // `Uv_kraytclassdestroyer_tyber`, `W_mousedroid`.
     it('takes the shell by the name the models use', () => {
-        assert.equal(isStealthMesh({ alamoMesh: 'stealth' }), true);
-        assert.equal(isStealthMesh({ alamoMesh: 'Stealth' }), true);
+        assert.equal(isStealthMesh({alamoMesh: 'stealth'}), true);
+        assert.equal(isStealthMesh({alamoMesh: 'Stealth'}), true);
     });
 
     it('takes the LOD variants, which three of the nine ship', () => {
         // Tyber and Urai Fen carry `Stealth_LOD0/1/2`, so the suffix has to pass the name test and
         // then be gated by the ordinary LOD rules like any other mesh.
-        assert.equal(isStealthMesh({ alamoMesh: 'Stealth_LOD0' }), true);
-        assert.equal(isStealthMesh({ alamoMesh: 'stealth_LOD2' }), true);
+        assert.equal(isStealthMesh({alamoMesh: 'Stealth_LOD0'}), true);
+        assert.equal(isStealthMesh({alamoMesh: 'stealth_LOD2'}), true);
     });
 
     it('leaves a CLOAK alone, which is a garment and not this', () => {
@@ -511,13 +519,13 @@ describe('isStealthMesh', () => {
         // five heroes the moment anything went near the stealth rules.
         for (const name of ['Cloak', 'EI_Palpatine_cloak', 'RI_ObiCloak', 'NI_SandPeople_CLoak',
             'Shadow_Cloak']) {
-            assert.equal(isStealthMesh({ alamoMesh: name }), false, name);
+            assert.equal(isStealthMesh({alamoMesh: name}), false, name);
         }
     });
 
     it('needs the whole word, not a prefix of one', () => {
-        assert.equal(isStealthMesh({ alamoMesh: 'stealthy_bits' }), false);
-        assert.equal(isStealthMesh({ alamoMesh: 'basemesh' }), false);
+        assert.equal(isStealthMesh({alamoMesh: 'stealthy_bits'}), false);
+        assert.equal(isStealthMesh({alamoMesh: 'basemesh'}), false);
         assert.equal(isStealthMesh({}), false);
     });
 });
@@ -527,17 +535,17 @@ describe('shieldMeshOffShader', () => {
         // Not an error - the name decides and the author may mean it - but a bubble drawn with a
         // hull shader reads as solid geometry rather than a field, which is worth saying once.
         assert.equal(
-            shieldMeshOffShader({ alamoMesh: 'shield', alamoShader: 'MeshBumpSpecular.fx' }), true);
+            shieldMeshOffShader({alamoMesh: 'shield', alamoShader: 'MeshBumpSpecular.fx'}), true);
     });
 
     it('says nothing about a shield mesh that IS on one', () => {
         assert.equal(
-            shieldMeshOffShader({ alamoMesh: 'shield', alamoShader: 'MeshShield.fx' }), false);
+            shieldMeshOffShader({alamoMesh: 'shield', alamoShader: 'MeshShield.fx'}), false);
     });
 
     it('says nothing about a mesh that is not a shield at all', () => {
         assert.equal(
-            shieldMeshOffShader({ alamoMesh: 'engines_big', alamoShader: 'MeshShield.fx' }), false);
+            shieldMeshOffShader({alamoMesh: 'engines_big', alamoShader: 'MeshShield.fx'}), false);
     });
 });
 
@@ -550,7 +558,7 @@ describe('shieldMeshOffShader', () => {
 // `Grass.fx` at 0x08, and `BlobStencilMasked.fx` at 0x80 (used by no shipped model).
 describe('resolveMaterial: the alpha-TESTED effects', () => {
     it('gives Tree.fx the cutoff its own render state declares', () => {
-        const spec = resolveMaterial({ alamoShader: 'Tree.fx' });
+        const spec = resolveMaterial({alamoShader: 'Tree.fx'});
 
         assert.ok(spec.alphaTest !== null && Math.abs(spec.alphaTest - 0x80 / 255) < 1e-6,
             `${spec.alphaTest}`);
@@ -560,22 +568,22 @@ describe('resolveMaterial: the alpha-TESTED effects', () => {
     // effect's `_ALAMO_RENDER_PHASE = "Transparent"` as a blend would sort the foliage against the
     // hull and drop its depth writes, which is a different wrong picture.
     it('leaves Tree.fx opaque and writing depth', () => {
-        const spec = resolveMaterial({ alamoShader: 'Tree.fx' });
+        const spec = resolveMaterial({alamoShader: 'Tree.fx'});
 
         assert.equal(spec.blend, 'opaque');
         assert.equal(spec.depthWrite, true);
     });
 
     it('gives Grass.fx its own much lower cutoff', () => {
-        const spec = resolveMaterial({ alamoShader: 'Grass.fx' });
+        const spec = resolveMaterial({alamoShader: 'Grass.fx'});
 
         assert.ok(spec.alphaTest !== null && Math.abs(spec.alphaTest - 0x08 / 255) < 1e-6,
             `${spec.alphaTest}`);
     });
 
     it('asks for no cutoff on an effect that declares none', () => {
-        assert.equal(resolveMaterial({ alamoShader: 'MeshBumpColorize.fx' }).alphaTest, null);
-        assert.equal(resolveMaterial({ alamoShader: 'MeshAlpha.fx' }).alphaTest, null);
+        assert.equal(resolveMaterial({alamoShader: 'MeshBumpColorize.fx'}).alphaTest, null);
+        assert.equal(resolveMaterial({alamoShader: 'MeshAlpha.fx'}).alphaTest, null);
     });
 });
 
@@ -587,24 +595,24 @@ describe('resolveMaterial: the alpha-TESTED effects', () => {
 describe('textureParam: the None placeholder', () => {
     it('reads a real texture name', () => {
         assert.equal(
-            textureParam({ 'param:BaseTexture': 'W_Tree_Alien00.TGA' }, 'BaseTexture'),
+            textureParam({'param:BaseTexture': 'W_Tree_Alien00.TGA'}, 'BaseTexture'),
             'W_Tree_Alien00.TGA');
     });
 
     it('treats None as an empty slot', () => {
-        assert.equal(textureParam({ 'param:NormalTexture': 'None' }, 'NormalTexture'), undefined);
+        assert.equal(textureParam({'param:NormalTexture': 'None'}, 'NormalTexture'), undefined);
     });
 
     it('does not care how None is spelled', () => {
         // The format is inconsistent about casing everywhere else it is read, so this is too.
-        assert.equal(textureParam({ 'param:NormalTexture': 'none' }, 'NormalTexture'), undefined);
-        assert.equal(textureParam({ 'param:NormalTexture': ' NONE ' }, 'NormalTexture'), undefined);
+        assert.equal(textureParam({'param:NormalTexture': 'none'}, 'NormalTexture'), undefined);
+        assert.equal(textureParam({'param:NormalTexture': ' NONE '}, 'NormalTexture'), undefined);
     });
 
     // A real file that merely STARTS with those letters is not a placeholder. Only the bare word is.
     it('keeps a real texture whose name begins with none', () => {
         assert.equal(
-            textureParam({ 'param:BaseTexture': 'none_at_all.tga' }, 'BaseTexture'),
+            textureParam({'param:BaseTexture': 'none_at_all.tga'}, 'BaseTexture'),
             'none_at_all.tga');
     });
 

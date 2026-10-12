@@ -2,20 +2,18 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { PreviewBreakoffProp, PreviewHardpoint } from '../../protocol/modelPreview';
+import type {PreviewBreakoffProp, PreviewHardpoint} from '../../protocol/modelPreview';
 
-import {
-    ALAMO_FRAME_SECONDS, breakoffFor, breakoffLifetime, breakoffPose, breakoffAnchor,
-} from './breakoff';
+import {ALAMO_FRAME_SECONDS, breakoffAnchor, breakoffFor, breakoffLifetime, breakoffPose,} from './breakoff';
 
 const PROP: PreviewBreakoffProp = {
     id: 'Hardpoint_Breakoff_Star_Dest_Weapon_FL',
     modelRef: 'EV_StarDestroyer_HP00_L-F.alo',
     resolved: true,
-    movementVector: { x: 0, y: -20, z: 0 },
-    facingRotateVector: { x: 0, y: 0, z: 90 },
+    movementVector: {x: 0, y: -20, z: 0},
+    facingRotateVector: {x: 0, y: 0, z: 90},
     minLifetimeSeconds: 15,
     maxLifetimeSeconds: 25,
     attachedParticle: 'p_smoke',
@@ -47,20 +45,20 @@ describe('breakoffFor', () => {
 
     it('matches the name however either side cased it', () => {
         assert.equal(
-            breakoffFor(hardpoint({ deathBreakoffProp: 'hardpoint_breakoff_star_dest_weapon_fl' }),
+            breakoffFor(hardpoint({deathBreakoffProp: 'hardpoint_breakoff_star_dest_weapon_fl'}),
                 [PROP])?.id, PROP.id);
     });
 
     it('is nothing for a hardpoint that names none', () => {
         // 188 of the 355 do not, and they simply vanish - which is what the engine does too.
-        assert.equal(breakoffFor(hardpoint({ deathBreakoffProp: null }), [PROP]), null);
+        assert.equal(breakoffFor(hardpoint({deathBreakoffProp: null}), [PROP]), null);
     });
 
     it('is nothing when the prop is named but never defined', () => {
         // Still listed on the scene with `resolved: false`, so the author sees the typo - but there
         // is no model to drop.
-        assert.equal(breakoffFor(hardpoint(), [{ ...PROP, resolved: false }]), null);
-        assert.equal(breakoffFor(hardpoint(), [{ ...PROP, modelRef: null }]), null);
+        assert.equal(breakoffFor(hardpoint(), [{...PROP, resolved: false}]), null);
+        assert.equal(breakoffFor(hardpoint(), [{...PROP, modelRef: null}]), null);
     });
 });
 
@@ -73,12 +71,12 @@ describe('breakoffLifetime', () => {
     });
 
     it('copes with only one end declared', () => {
-        assert.equal(breakoffLifetime({ ...PROP, minLifetimeSeconds: null }), 25);
-        assert.equal(breakoffLifetime({ ...PROP, maxLifetimeSeconds: null }), 15);
+        assert.equal(breakoffLifetime({...PROP, minLifetimeSeconds: null}), 25);
+        assert.equal(breakoffLifetime({...PROP, maxLifetimeSeconds: null}), 15);
     });
 
     it('falls back to something watchable when neither is', () => {
-        const bare = { ...PROP, minLifetimeSeconds: null, maxLifetimeSeconds: null };
+        const bare = {...PROP, minLifetimeSeconds: null, maxLifetimeSeconds: null};
 
         assert.ok(breakoffLifetime(bare) > 0);
     });
@@ -113,7 +111,7 @@ describe('breakoffPose', () => {
      * is the same axis confusion that `accelerationIn` exists for on the particle side.
      */
     it('turns the Alamo up axis into the glTF one', () => {
-        const up = { ...PROP, movementVector: { x: 0, y: 0, z: 1 }, facingRotateVector: null };
+        const up = {...PROP, movementVector: {x: 0, y: 0, z: 1}, facingRotateVector: null};
 
         const pose = breakoffPose(up, ALAMO_FRAME_SECONDS);
 
@@ -123,7 +121,7 @@ describe('breakoffPose', () => {
     });
 
     it('flips the Alamo depth axis, which is what sent debris the wrong way', () => {
-        const forward = { ...PROP, movementVector: { x: 0, y: 1, z: 0 }, facingRotateVector: null };
+        const forward = {...PROP, movementVector: {x: 0, y: 1, z: 0}, facingRotateVector: null};
 
         const pose = breakoffPose(forward, ALAMO_FRAME_SECONDS);
 
@@ -139,18 +137,18 @@ describe('breakoffPose', () => {
     it('sits still where the prop declares no motion', () => {
         // A prop with no vectors is debris that simply stays where the hardpoint was, which is a
         // perfectly ordinary thing to author.
-        const still = { ...PROP, movementVector: null, facingRotateVector: null };
+        const still = {...PROP, movementVector: null, facingRotateVector: null};
         const pose = breakoffPose(still, 5);
 
-        assert.deepEqual(pose.offset, { x: 0, y: 0, z: 0 });
-        assert.deepEqual(pose.rotation, { x: 0, y: 0, z: 0 });
+        assert.deepEqual(pose.offset, {x: 0, y: 0, z: 0});
+        assert.deepEqual(pose.rotation, {x: 0, y: 0, z: 0});
     });
 
     it('is at the hardpoint at the moment it breaks off', () => {
         const pose = breakoffPose(PROP, 0);
 
-        assert.deepEqual(pose.offset, { x: 0, y: 0, z: 0 });
-        assert.deepEqual(pose.rotation, { x: 0, y: 0, z: 0 });
+        assert.deepEqual(pose.offset, {x: 0, y: 0, z: 0});
+        assert.deepEqual(pose.rotation, {x: 0, y: 0, z: 0});
     });
 });
 
@@ -168,7 +166,7 @@ describe('breakoffAnchor, where the wreck is dropped', () => {
      * with the bone's distance from the origin.
      */
     it('drops it on the HARDPOINT itself, never on a bone name inside the hardpoint', () => {
-        assert.deepEqual(breakoffAnchor('hull', hardpoint()), { partId: 'hp:HP_FL' });
+        assert.deepEqual(breakoffAnchor('hull', hardpoint()), {partId: 'hp:HP_FL'});
     });
 
     /**
@@ -181,14 +179,14 @@ describe('breakoffAnchor, where the wreck is dropped', () => {
      */
     it('falls back to the hull bone for a hardpoint with no model', () => {
         assert.deepEqual(
-            breakoffAnchor('hull', hardpoint({ partId: null })),
-            { partId: 'hull', bone: 'HP_F-L_BONE' });
+            breakoffAnchor('hull', hardpoint({partId: null})),
+            {partId: 'hull', bone: 'HP_F-L_BONE'});
     });
 
     /** A hardpoint naming neither a hardpoint nor a bone leaves the hull itself, which is recoverable. */
     it('leaves the hull for a hardpoint naming no bone either', () => {
         assert.deepEqual(
-            breakoffAnchor('hull', hardpoint({ partId: null, attachBone: undefined })),
-            { partId: 'hull' });
+            breakoffAnchor('hull', hardpoint({partId: null, attachBone: undefined})),
+            {partId: 'hull'});
     });
 });

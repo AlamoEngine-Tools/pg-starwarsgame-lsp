@@ -38,7 +38,7 @@ public sealed class SchemaReleaseResolverTest
     private static async Task<SchemaRelease?> Resolve(params object[] releases)
     {
         var (resolver, _) = Build(_ => Releases(releases));
-        return await resolver.ResolveAsync(Repository, Range);
+        return await resolver.ResolveAsync(Repository);
     }
 
     // ── choosing a release ───────────────────────────────────────────────────
@@ -69,7 +69,7 @@ public sealed class SchemaReleaseResolverTest
     [Fact]
     public async Task ADraft_IsSkipped()
     {
-        var release = await Resolve(Release("v2.3.0", draft: true), Release("v2.1.0"));
+        var release = await Resolve(Release("v2.3.0", true), Release("v2.1.0"));
 
         Assert.Equal("v2.1.0", release?.Tag);
     }
@@ -129,7 +129,7 @@ public sealed class SchemaReleaseResolverTest
     {
         var (resolver, _) = Build(_ => new HttpResponseMessage(status));
 
-        Assert.Null(await resolver.ResolveAsync(Repository, Range));
+        Assert.Null(await resolver.ResolveAsync(Repository));
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public sealed class SchemaReleaseResolverTest
             new HttpClient(new FakeFailingHttpHandler(new HttpRequestException("offline"))),
             NullLogger<SchemaReleaseResolver>.Instance);
 
-        Assert.Null(await resolver.ResolveAsync(Repository, Range));
+        Assert.Null(await resolver.ResolveAsync(Repository));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class SchemaReleaseResolverTest
             Content = new StringContent("<html>not json</html>")
         });
 
-        Assert.Null(await resolver.ResolveAsync(Repository, Range));
+        Assert.Null(await resolver.ResolveAsync(Repository));
     }
 
     [Fact]
@@ -160,8 +160,8 @@ public sealed class SchemaReleaseResolverTest
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => resolver.ResolveAsync(Repository, Range, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            resolver.ResolveAsync(Repository, Range, cts.Token));
     }
 
     // ── the request ──────────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ public sealed class SchemaReleaseResolverTest
     {
         var (resolver, fake) = Build(_ => Releases(Release("v2.1.0")));
 
-        await resolver.ResolveAsync(Repository, Range);
+        await resolver.ResolveAsync(Repository);
 
         var request = Assert.Single(fake.Requests);
         Assert.Equal("https://api.github.com/repos/AlamoEngine-Tools/eaw-schema/releases?per_page=100",
@@ -184,7 +184,7 @@ public sealed class SchemaReleaseResolverTest
     {
         var (resolver, fake) = Build(_ => Releases(Release("v2.1.0")));
 
-        await resolver.ResolveAsync(Repository, Range);
+        await resolver.ResolveAsync(Repository);
 
         var request = Assert.Single(fake.Requests);
         Assert.NotEmpty(request.Headers.UserAgent);

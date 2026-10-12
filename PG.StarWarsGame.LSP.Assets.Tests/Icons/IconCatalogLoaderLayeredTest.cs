@@ -114,7 +114,7 @@ public sealed class IconCatalogLoaderLayeredTest
     public void ADependencysMegaTextureIsUsedWhenTheLeafShipsNone()
     {
         var fileSystem = new MockFileSystem();
-        AddMegaTexture(fileSystem, Core, "I_FROM_CORE.TGA", new Rgba(1, 2, 3, 255));
+        AddMegaTexture(fileSystem, Core, "I_FROM_CORE.TGA", new Rgba(1, 2, 3));
 
         var catalog = Load(fileSystem,
             new IconLayer(Leaf, Settings()), new IconLayer(Core, Settings()));
@@ -131,8 +131,8 @@ public sealed class IconCatalogLoaderLayeredTest
     public void TheLeafsMegaTextureReplacesTheDependencys()
     {
         var fileSystem = new MockFileSystem();
-        AddMegaTexture(fileSystem, Leaf, "I_FROM_LEAF.TGA", new Rgba(9, 9, 9, 255));
-        AddMegaTexture(fileSystem, Core, "I_FROM_CORE.TGA", new Rgba(1, 2, 3, 255));
+        AddMegaTexture(fileSystem, Leaf, "I_FROM_LEAF.TGA", new Rgba(9, 9, 9));
+        AddMegaTexture(fileSystem, Core, "I_FROM_CORE.TGA", new Rgba(1, 2, 3));
 
         var catalog = Load(fileSystem,
             new IconLayer(Leaf, Settings()), new IconLayer(Core, Settings()));
@@ -146,7 +146,7 @@ public sealed class IconCatalogLoaderLayeredTest
     public void ASingleLayerBehavesAsBefore()
     {
         var fileSystem = new MockFileSystem();
-        AddMegaTexture(fileSystem, Leaf, "I_ONLY.TGA", new Rgba(4, 5, 6, 255));
+        AddMegaTexture(fileSystem, Leaf, "I_ONLY.TGA", new Rgba(4, 5, 6));
 
         var catalog = Load(fileSystem, new IconLayer(Leaf, Settings()));
 

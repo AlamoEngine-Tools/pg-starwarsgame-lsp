@@ -2,23 +2,23 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { creditsBaselineValues } from './creditsBaselineFill';
+import {creditsBaselineValues} from './creditsBaselineFill';
 
 // The game's own credits: the same line in several languages.
 const baseline = [
     {
         key: 'HEADER',
-        values: [{ language: 'ENGLISH', value: 'Lead Designer' }, { language: 'GERMAN', value: 'Chefdesigner' }],
+        values: [{language: 'ENGLISH', value: 'Lead Designer'}, {language: 'GERMAN', value: 'Chefdesigner'}],
     },
     {
         key: 'HEADER',
-        values: [{ language: 'ENGLISH', value: 'Voice Cast' }, { language: 'GERMAN', value: 'Sprecher' }],
+        values: [{language: 'ENGLISH', value: 'Voice Cast'}, {language: 'GERMAN', value: 'Sprecher'}],
     },
     {
         key: 'CENTER',
-        values: [{ language: 'ENGLISH', value: 'Petroglyph' }, { language: 'GERMAN', value: 'Petroglyph' }],
+        values: [{language: 'ENGLISH', value: 'Petroglyph'}, {language: 'GERMAN', value: 'Petroglyph'}],
     },
 ];
 
@@ -37,8 +37,8 @@ describe('creditsBaselineValues, on a file with one language', () => {
     // then reported "there is nothing left to fill in for GERMAN" - and always would have.
     it('can never fill the only language the file has', () => {
         const rows = [
-            { index: 0, key: 'HEADER', values: [{ language: 'GERMAN', value: '' }] },
-            { index: 1, key: 'CENTER', values: [{ language: 'GERMAN', value: 'Petroglyph' }] },
+            {index: 0, key: 'HEADER', values: [{language: 'GERMAN', value: ''}]},
+            {index: 1, key: 'CENTER', values: [{language: 'GERMAN', value: 'Petroglyph'}]},
         ];
 
         assert.deepEqual(creditsBaselineValues('GERMAN', rows, baseline), []);
@@ -48,11 +48,11 @@ describe('creditsBaselineValues, on a file with one language', () => {
     // when the Fill tile is not.
     it('can fill a language the file does not have yet', () => {
         const rows = [
-            { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Voice Cast' }] },
+            {index: 0, key: 'HEADER', values: [{language: 'ENGLISH', value: 'Voice Cast'}]},
         ];
 
         assert.deepEqual(creditsBaselineValues('GERMAN', rows, baseline), [
-            { index: 0, key: 'HEADER', value: 'Sprecher' },
+            {index: 0, key: 'HEADER', value: 'Sprecher'},
         ]);
     });
 });
@@ -62,18 +62,26 @@ describe('creditsBaselineValues', () => {
     // rows share, so it identifies nothing.
     it('fills a row whose text the game already translates', () => {
         const rows = [
-            { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Voice Cast' }, { language: 'GERMAN', value: '' }] },
+            {
+                index: 0,
+                key: 'HEADER',
+                values: [{language: 'ENGLISH', value: 'Voice Cast'}, {language: 'GERMAN', value: ''}]
+            },
         ];
 
         assert.deepEqual(creditsBaselineValues('GERMAN', rows, baseline), [
-            { index: 0, key: 'HEADER', value: 'Sprecher' },
+            {index: 0, key: 'HEADER', value: 'Sprecher'},
         ]);
     });
 
     // A mod's own names are not in the game's credits and cannot be filled from them.
     it('leaves a line the game does not have alone', () => {
         const rows = [
-            { index: 0, key: 'CENTER', values: [{ language: 'ENGLISH', value: 'My Mod Team' }, { language: 'GERMAN', value: '' }] },
+            {
+                index: 0,
+                key: 'CENTER',
+                values: [{language: 'ENGLISH', value: 'My Mod Team'}, {language: 'GERMAN', value: ''}]
+            },
         ];
 
         assert.deepEqual(creditsBaselineValues('GERMAN', rows, baseline), []);
@@ -81,7 +89,11 @@ describe('creditsBaselineValues', () => {
 
     it('never overwrites a translation the row already has', () => {
         const rows = [
-            { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Voice Cast' }, { language: 'GERMAN', value: 'Stimmen' }] },
+            {
+                index: 0,
+                key: 'HEADER',
+                values: [{language: 'ENGLISH', value: 'Voice Cast'}, {language: 'GERMAN', value: 'Stimmen'}]
+            },
         ];
 
         assert.deepEqual(creditsBaselineValues('GERMAN', rows, baseline), []);
@@ -89,7 +101,11 @@ describe('creditsBaselineValues', () => {
 
     it('matches the text case-insensitively and ignores surrounding space', () => {
         const rows = [
-            { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: '  voice cast ' }, { language: 'GERMAN', value: '' }] },
+            {
+                index: 0,
+                key: 'HEADER',
+                values: [{language: 'ENGLISH', value: '  voice cast '}, {language: 'GERMAN', value: ''}]
+            },
         ];
 
         assert.equal(creditsBaselineValues('GERMAN', rows, baseline)[0]?.value, 'Sprecher');
@@ -99,18 +115,22 @@ describe('creditsBaselineValues', () => {
     // into German but not French can still be filled from the game's French.
     it('matches on whichever language the row actually has', () => {
         const rows = [
-            { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: '' }, { language: 'GERMAN', value: 'Sprecher' }] },
+            {
+                index: 0,
+                key: 'HEADER',
+                values: [{language: 'ENGLISH', value: ''}, {language: 'GERMAN', value: 'Sprecher'}]
+            },
         ];
 
         assert.deepEqual(creditsBaselineValues('ENGLISH', rows, baseline), [
-            { index: 0, key: 'HEADER', value: 'Voice Cast' },
+            {index: 0, key: 'HEADER', value: 'Voice Cast'},
         ]);
     });
 
     // The blank-line marker is not text to look up; a spacer stays a spacer.
     it('does not try to translate the blank-line marker', () => {
         const rows = [
-            { index: 0, key: 'CENTER', values: [{ language: 'ENGLISH', value: '[TBL]' }, { language: 'GERMAN', value: '' }] },
+            {index: 0, key: 'CENTER', values: [{language: 'ENGLISH', value: '[TBL]'}, {language: 'GERMAN', value: ''}]},
         ];
 
         assert.deepEqual(creditsBaselineValues('GERMAN', rows, baseline), []);
@@ -118,7 +138,11 @@ describe('creditsBaselineValues', () => {
 
     it('is empty when the baseline has not loaded', () => {
         const rows = [
-            { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Voice Cast' }, { language: 'GERMAN', value: '' }] },
+            {
+                index: 0,
+                key: 'HEADER',
+                values: [{language: 'ENGLISH', value: 'Voice Cast'}, {language: 'GERMAN', value: ''}]
+            },
         ];
 
         assert.deepEqual(creditsBaselineValues('GERMAN', rows, []), []);
@@ -127,7 +151,11 @@ describe('creditsBaselineValues', () => {
     // A name spelled the same in both is still worth filling - it is what the game ships.
     it('fills a line the game translates identically', () => {
         const rows = [
-            { index: 0, key: 'CENTER', values: [{ language: 'ENGLISH', value: 'Petroglyph' }, { language: 'GERMAN', value: '' }] },
+            {
+                index: 0,
+                key: 'CENTER',
+                values: [{language: 'ENGLISH', value: 'Petroglyph'}, {language: 'GERMAN', value: ''}]
+            },
         ];
 
         assert.equal(creditsBaselineValues('GERMAN', rows, baseline)[0]?.value, 'Petroglyph');

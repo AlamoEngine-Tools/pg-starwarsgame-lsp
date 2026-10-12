@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { boneIndexOf, displayName, resolveBoneId } from './boneIds';
+import {boneIndexOf, displayName, resolveBoneId} from './boneIds';
 
 describe('the canonical bone id', () => {
     it('is what the exporter writes, and carries the index', () => {

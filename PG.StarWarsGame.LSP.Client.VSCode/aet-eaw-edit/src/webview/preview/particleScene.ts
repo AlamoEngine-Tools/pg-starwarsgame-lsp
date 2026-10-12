@@ -20,11 +20,7 @@
 // It stays a flat list of bulk switches rather than a second tree. A tree would force each system
 // into one parent, and a system genuinely can belong to two meanings at once.
 
-import {
-    PREVIEW_PARTICLE_GATE,
-    type PreviewHardpoint,
-    type PreviewParticle,
-} from '../../protocol/modelPreview';
+import {PREVIEW_PARTICLE_GATE, type PreviewHardpoint, type PreviewParticle,} from '../../protocol/modelPreview';
 
 /**
  * Where a loaded particle system came from.
@@ -151,10 +147,10 @@ const FAMILIES: readonly EffectFamily[] = [
         gates: [PREVIEW_PARTICLE_GATE.hardpointDestroyed],
         prefixes: ['p_hp'],
     },
-    { id: 'turbo', label: 'Turbo engines', prefixes: ['pte'], replaces: 'engines' },
-    { id: 'powerToWeapons', label: 'Power to weapons', prefixes: ['pptw'] },
-    { id: 'missileShield', label: 'Missile shield', prefixes: ['prs'] },
-    { id: 'gravityWell', label: 'Gravity well', prefixes: ['pgw'] },
+    {id: 'turbo', label: 'Turbo engines', prefixes: ['pte'], replaces: 'engines'},
+    {id: 'powerToWeapons', label: 'Power to weapons', prefixes: ['pptw']},
+    {id: 'missileShield', label: 'Missile shield', prefixes: ['prs']},
+    {id: 'gravityWell', label: 'Gravity well', prefixes: ['pgw']},
     // ION STUN, not "internal damage" - the user's correction, and the name was a guess from the
     // start. An ion-stunned ship is what this draws: the tag is `Projectile_Ion_Stun_On_Detonation`,
     // carried by exactly TWO shipped projectiles (`Proj_Ion_Cannon_Planetary` and
@@ -163,7 +159,7 @@ const FAMILIES: readonly EffectFamily[] = [
     //
     // The three assets agree: `Pi_damage_elec_cap00`, `_sd00` and `_small00` - electrical damage in
     // capital, Star Destroyer and small sizes, which is what a stunned hull crackles with.
-    { id: 'ionStun', label: 'Ion stun', prefixes: ['pi'] },
+    {id: 'ionStun', label: 'Ion stun', prefixes: ['pi']},
 ];
 
 /** Whether a family recognises this system, by either kind of evidence. */
@@ -256,7 +252,7 @@ export function replacedByAbility(
  * effects together. A group meaning "the rest" is not a bulk switch anyone reaches for.
  */
 export function particleGroups(context: GroupingContext): ParticleGroup[] {
-    const { particles } = context;
+    const {particles} = context;
     const groups: ParticleGroup[] = [];
     const named = new Set<string>();
 
@@ -272,7 +268,7 @@ export function particleGroups(context: GroupingContext): ParticleGroup[] {
             named.add(id);
         }
 
-        groups.push({ id: `family:${family.id}`, label: family.label, source: 'family', ids });
+        groups.push({id: `family:${family.id}`, label: family.label, source: 'family', ids});
     }
 
     // What no family recognised, gathered under the only thing that can honestly be said about it.

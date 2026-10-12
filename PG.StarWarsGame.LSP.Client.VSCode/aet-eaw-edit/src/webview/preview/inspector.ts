@@ -13,8 +13,8 @@
 // extras, so this module needs no server round trip. Kept free of three.js so the whole shape is
 // testable - the viewport supplies plain data, this decides what the panel says.
 
-import { type ModelDetail, type SubMeshGeometryPage } from '../../protocol/modelPreview';
-import { resolveMaterial, type MaterialExtras } from './materials';
+import {type ModelDetail, type SubMeshGeometryPage} from '../../protocol/modelPreview';
+import {type MaterialExtras, resolveMaterial} from './materials';
 
 /** How a value should be shown. Only `colour` carries a swatch. */
 export type InspectorValueKind =
@@ -114,14 +114,14 @@ const DECIMALS = 4;
  */
 export function formatParameter(name: string, value: unknown): InspectorRow {
     const row = (over: Partial<InspectorRow>): InspectorRow =>
-        ({ label: name, value: '', kind: 'text', ...over });
+        ({label: name, value: '', kind: 'text', ...over});
 
     if (typeof value === 'string') {
-        return row({ value, kind: 'texture' });
+        return row({value, kind: 'texture'});
     }
 
     if (typeof value === 'number' && Number.isFinite(value)) {
-        return row({ value: number_(value), kind: 'number' });
+        return row({value: number_(value), kind: 'number'});
     }
 
     if (Array.isArray(value) && value.length > 0
@@ -132,13 +132,13 @@ export function formatParameter(name: string, value: unknown): InspectorRow {
         // The alpha stays in the text even though the swatch cannot show it - a collision hull's
         // 0.5 is the entire reason its colour is worth reading.
         return COLOUR_NAME.test(name)
-            ? row({ value: text, kind: 'colour', swatch: swatchOf(parts) })
-            : row({ value: text, kind: 'vector' });
+            ? row({value: text, kind: 'colour', swatch: swatchOf(parts)})
+            : row({value: text, kind: 'vector'});
     }
 
     // A mod's own exporter can write anything into extras. Saying so costs this one row; throwing
     // would cost the whole panel.
-    return row({ value: 'unreadable value', hint: 'This parameter is not a number, vector or texture name.' });
+    return row({value: 'unreadable value', hint: 'This parameter is not a number, vector or texture name.'});
 }
 
 /** A bulk-geometry page, laid out as columns and rows of text. */
@@ -197,14 +197,14 @@ export function geometryTable(page: SubMeshGeometryPage): GeometryTableView {
             // that failed.
             note: page.boneMapping.length === 0
                 ? 'This sub-mesh is not skinned, so it has no bone mapping - every vertex rides the '
-                    + 'bone the mesh is attached to.'
+                + 'bone the mesh is attached to.'
                 : undefined,
         };
     }
 
     // A table this build does not know about, from a newer server. Nothing to draw, and nothing to
     // throw over either.
-    return { columns: [], rows: [] };
+    return {columns: [], rows: []};
 }
 
 /**
@@ -261,8 +261,8 @@ function meshPanel(source: MeshInspection, detail?: ModelDetail): InspectorPanel
         text('Damage state', extras.alamoAlt === undefined ? 'none' : String(extras.alamoAlt)),
         text('LOD', extras.alamoLod === undefined ? 'none' : String(extras.alamoLod),
             'Level of detail the sub-mesh is tagged for. 0 is the lowest in EaW.'),
-        { label: 'Triangles', value: count(source.triangleCount), kind: 'number' },
-        { label: 'Vertices', value: count(source.vertexCount), kind: 'number' },
+        {label: 'Triangles', value: count(source.triangleCount), kind: 'number'},
+        {label: 'Vertices', value: count(source.vertexCount), kind: 'number'},
     ];
 
     // The box the FILE stores, not one measured off the exported geometry - the engine culls and
@@ -280,7 +280,7 @@ function meshPanel(source: MeshInspection, detail?: ModelDetail): InspectorPanel
                 hint: 'Model units, as the file stores them. The viewport draws the subject at '
                     + 'its Scale_Factor, so these are not what you measure on screen.',
             },
-            { label: 'Bounds max', value: vector(stored.boundsMax), kind: 'vector' },
+            {label: 'Bounds max', value: vector(stored.boundsMax), kind: 'vector'},
             {
                 label: 'Sub-meshes',
                 value: String(stored.subMeshCount),
@@ -304,8 +304,8 @@ function meshPanel(source: MeshInspection, detail?: ModelDetail): InspectorPanel
         title: source.name,
         subtitle: extras.alamoShader,
         sections: [
-            { title: 'Mesh', rows: mesh },
-            { title: 'Material', rows: material },
+            {title: 'Mesh', rows: mesh},
+            {title: 'Material', rows: material},
             parameterSection(extras),
         ],
     };
@@ -343,7 +343,7 @@ function bonePanel(source: BoneInspection, detail?: ModelDetail): InspectorPanel
 
     const rows: InspectorRow[] = [
         text('Name', source.name),
-        { label: 'Index', value: String(source.index), kind: 'number' },
+        {label: 'Index', value: String(source.index), kind: 'number'},
         text('Parent', source.parentIndex < 0
             ? 'none (root)'
             : `${source.parentName} (${source.parentIndex})`),
@@ -367,11 +367,11 @@ function bonePanel(source: BoneInspection, detail?: ModelDetail): InspectorPanel
     // and the bone/mesh split, so they are not numbers the author could look up anywhere.
     if (stored !== undefined) {
         rows.push(
-            { label: 'Relative transform', value: matrix(stored.relativeTransform), kind: 'matrix' },
-            { label: 'Absolute transform', value: matrix(stored.absoluteTransform), kind: 'matrix' });
+            {label: 'Relative transform', value: matrix(stored.relativeTransform), kind: 'matrix'},
+            {label: 'Absolute transform', value: matrix(stored.absoluteTransform), kind: 'matrix'});
     }
 
-    const sections: InspectorSection[] = [{ title: 'Bone', rows }];
+    const sections: InspectorSection[] = [{title: 'Bone', rows}];
 
     // A proxy is a bone with a role - the attachment point a particle system is attached to. The
     // exporter writes none of this into the glTF, so it is unreadable without the server.
@@ -391,7 +391,7 @@ function bonePanel(source: BoneInspection, detail?: ModelDetail): InspectorPanel
         });
     }
 
-    return { title: source.name, sections };
+    return {title: source.name, sections};
 }
 
 function particlePanel(source: ParticleInspection): InspectorPanel {
@@ -402,7 +402,7 @@ function particlePanel(source: ParticleInspection): InspectorPanel {
             rows: [
                 text('Name', source.name),
                 text('Attached to bone', source.boneName === '' ? 'none' : source.boneName),
-                { label: 'Emitters', value: String(source.emitterCount), kind: 'number' },
+                {label: 'Emitters', value: String(source.emitterCount), kind: 'number'},
                 text('Playing', source.playing ? 'yes' : 'no'),
             ],
         }],
@@ -441,7 +441,7 @@ function archetypeHint(archetype: string): string | undefined {
 }
 
 function text(label: string, value: string, hint?: string): InspectorRow {
-    return { label, value, kind: 'text', hint };
+    return {label, value, kind: 'text', hint};
 }
 
 function count(value: number): string {

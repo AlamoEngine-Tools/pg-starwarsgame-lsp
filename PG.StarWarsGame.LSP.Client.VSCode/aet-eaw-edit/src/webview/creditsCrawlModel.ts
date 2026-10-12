@@ -7,7 +7,7 @@
 // The preview earns its place beyond being fun: row order and blank spacer rows are exactly what
 // the ordered model exists to preserve, and this is the only place a user can see both at once.
 
-import { LocRow } from './loc/locRow';
+import {LocRow} from './loc/locRow';
 
 export interface CrawlBlock {
     kind: 'line' | 'gap';
@@ -85,14 +85,14 @@ export function buildCrawl(rows: LocRow[], language: string): CrawlBlock[] {
         const style = row.key.trim().toLowerCase() === HEADER_DIRECTIVE ? 'header' : 'line';
 
         if (!isBlank(value)) {
-            blocks.push({ kind: 'line', style, text: value, untranslated: false });
+            blocks.push({kind: 'line', style, text: value, untranslated: false});
             continue;
         }
 
         // Blank here but filled elsewhere: a translation gap, worth showing as the key - unless
         // this row is a spacer in every language, in which case there is nothing missing.
         if (hasAnyValue(row)) {
-            blocks.push({ kind: 'line', style, text: row.key, untranslated: true });
+            blocks.push({kind: 'line', style, text: row.key, untranslated: true});
             continue;
         }
 
@@ -116,14 +116,20 @@ function hasAnyValue(row: LocRow): boolean {
 
 function pushGap(blocks: CrawlBlock[]): void {
     // One pause, however many blank rows produced it.
-    if (blocks.length > 0 && blocks[blocks.length - 1].kind === 'gap') { return; }
-    blocks.push({ kind: 'gap', style: 'line', text: '', untranslated: false });
+    if (blocks.length > 0 && blocks[blocks.length - 1].kind === 'gap') {
+        return;
+    }
+    blocks.push({kind: 'gap', style: 'line', text: '', untranslated: false});
 }
 
 function trimGaps(blocks: CrawlBlock[]): CrawlBlock[] {
     let start = 0;
     let end = blocks.length;
-    while (start < end && blocks[start].kind === 'gap') { start++; }
-    while (end > start && blocks[end - 1].kind === 'gap') { end--; }
+    while (start < end && blocks[start].kind === 'gap') {
+        start++;
+    }
+    while (end > start && blocks[end - 1].kind === 'gap') {
+        end--;
+    }
     return blocks.slice(start, end);
 }

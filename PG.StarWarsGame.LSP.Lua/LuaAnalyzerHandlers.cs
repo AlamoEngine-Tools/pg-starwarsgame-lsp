@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
@@ -120,16 +121,16 @@ public sealed class LuaInlayHintHandler(ILuaAnalyzer analyzer) : InlayHintsHandl
 /// <summary>The analyzer's lenses: sent without a command, which its resolve fills (measured, 0.25.1).</summary>
 public sealed class LuaCodeLensHandler(ILuaAnalyzer analyzer) : CodeLensHandlerBase
 {
+    // The router's own key rides in the lens data, and with it present the analyzer resolves
+    // nothing (measured, 0.25.1), so the analyzer is sent its data alone.
+    private const string RoutingKey = "$$__handler_id__$$";
+
     public override Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken ct)
     {
         return LuaAnalyzerPassThrough.IsLua(request.TextDocument)
             ? analyzer.RequestAsync<CodeLensContainer>("textDocument/codeLens", request, ct)
             : Task.FromResult<CodeLensContainer?>(null);
     }
-
-    // The router's own key rides in the lens data, and with it present the analyzer resolves
-    // nothing (measured, 0.25.1), so the analyzer is sent its data alone.
-    private const string RoutingKey = "$$__handler_id__$$";
 
     public override async Task<CodeLens> Handle(CodeLens request, CancellationToken ct)
     {
@@ -184,14 +185,6 @@ public sealed class LuaSemanticTokensHandler(ILuaAnalyzer analyzer)
             : Task.FromResult<SemanticTokens?>(null);
     }
 
-    public async Task<SemanticTokens?> Handle(SemanticTokensRangeParams request, CancellationToken ct)
-    {
-        if (!LuaAnalyzerPassThrough.IsLua(request.TextDocument)) return null;
-        var full = await analyzer.RequestAsync<SemanticTokens>("textDocument/semanticTokens/full",
-            new SemanticTokensParams { TextDocument = request.TextDocument }, ct);
-        return full is null ? null : new SemanticTokens { Data = Slice(full.Data, request.Range) };
-    }
-
     public SemanticTokensRegistrationOptions GetRegistrationOptions(SemanticTokensCapability capability,
         ClientCapabilities clientCapabilities)
     {
@@ -204,11 +197,19 @@ public sealed class LuaSemanticTokensHandler(ILuaAnalyzer analyzer)
         };
     }
 
+    public async Task<SemanticTokens?> Handle(SemanticTokensRangeParams request, CancellationToken ct)
+    {
+        if (!LuaAnalyzerPassThrough.IsLua(request.TextDocument)) return null;
+        var full = await analyzer.RequestAsync<SemanticTokens>("textDocument/semanticTokens/full",
+            new SemanticTokensParams { TextDocument = request.TextDocument }, ct);
+        return full is null ? null : new SemanticTokens { Data = Slice(full.Data, request.Range) };
+    }
+
     // Tokens are (deltaLine, deltaStart, length, type, modifiers), each relative to the one before.
     // Kept: those starting on a line inside the range; re-encoded relative to each other, the first
     // relative to the start of the document as the protocol has it.
     private static ImmutableArray<int> Slice(ImmutableArray<int> data,
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range)
+        Range range)
     {
         var result = ImmutableArray.CreateBuilder<int>();
         int line = 0, column = 0, lastLine = 0, lastColumn = 0;

@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { BY_HAND, LOG_LIMIT, appendShot, damageLine, type DamageLogEntry } from './damageLog';
+import {appendShot, BY_HAND, damageLine, type DamageLogEntry, LOG_LIMIT} from './damageLog';
 
 const entry = (over: Partial<DamageLogEntry> = {}): DamageLogEntry => ({
     source: 'Damage_Turbolaser',
@@ -30,7 +30,7 @@ describe('damageLine', () => {
     /** A target that declares no armour is not "(null)" - the brackets go with it. */
     it('leaves the brackets off where the target declares no armour', () => {
         assert.equal(
-            damageLine(entry({ armor: null })),
+            damageLine(entry({armor: null})),
             'Damage_Turbolaser did 35 damage to HP_Weapon_FL');
     });
 
@@ -38,17 +38,17 @@ describe('damageLine', () => {
      * An armor factor of 0.35 leaves a long tail nobody wants to read; the pools round the same way.
      */
     it('rounds the way the pool readout does', () => {
-        assert.match(damageLine(entry({ amount: 12.250000001 })), /did 12\.3 damage/);
+        assert.match(damageLine(entry({amount: 12.250000001})), /did 12\.3 damage/);
     });
 
     /** The shield stopping a bolt is a different event from the hull taking it. */
     it('says which pool absorbed it when it was not the hull', () => {
-        assert.match(damageLine(entry({ pool: 'shield' })), /to the shield/i);
+        assert.match(damageLine(entry({pool: 'shield'})), /to the shield/i);
     });
 
     /** A shot that finishes something says so - that is the line a reader is looking for. */
     it('marks the shot that destroyed the target', () => {
-        assert.match(damageLine(entry({ destroyed: true })), /destroyed/i);
+        assert.match(damageLine(entry({destroyed: true})), /destroyed/i);
     });
 
     /**
@@ -70,19 +70,19 @@ describe('damageLine', () => {
 
     /** Nothing got through: worth a line, because "no line at all" reads as a broken button. */
     it('says so when a shot does nothing rather than logging a silent zero', () => {
-        assert.match(damageLine(entry({ amount: 0 })), /no damage/i);
+        assert.match(damageLine(entry({amount: 0})), /no damage/i);
     });
 });
 
 describe('appendShot', () => {
     it('puts the newest first, so the last shot is the one you read', () => {
-        const log = appendShot([entry({ target: 'A' })], [entry({ target: 'B' })]);
+        const log = appendShot([entry({target: 'A'})], [entry({target: 'B'})]);
 
         assert.deepEqual(log.map(e => e.target), ['B', 'A']);
     });
 
     it('keeps every victim of one shot, in the order the blast reached them', () => {
-        const log = appendShot([], [entry({ target: 'A' }), entry({ target: 'B' })]);
+        const log = appendShot([], [entry({target: 'A'}), entry({target: 'B'})]);
 
         assert.deepEqual(log.map(e => e.target), ['A', 'B']);
     });
@@ -92,7 +92,7 @@ describe('appendShot', () => {
         let log: DamageLogEntry[] = [];
 
         for (let i = 0; i < LOG_LIMIT + 40; i++) {
-            log = appendShot(log, [entry({ target: `HP_${i}` })]);
+            log = appendShot(log, [entry({target: `HP_${i}`})]);
         }
 
         assert.equal(log.length, LOG_LIMIT);
@@ -101,7 +101,7 @@ describe('appendShot', () => {
 
     it('does not mutate the log it is given', () => {
         const before: DamageLogEntry[] = [entry()];
-        appendShot(before, [entry({ target: 'B' })]);
+        appendShot(before, [entry({target: 'B'})]);
 
         assert.equal(before.length, 1);
     });
@@ -129,14 +129,14 @@ describe('a repair line', () => {
 
     it('leaves the number out where nothing was missing', () => {
         assert.equal(
-            damageLine({ ...repair, amount: 0 }),
+            damageLine({...repair, amount: 0}),
             'The Force repaired HP_Star_Destroyer_Weapon_FL');
     });
 
     // A repair is not a shot: nothing was scaled and nothing defended against it, so the armour
     // column and the pool have nothing to say.
     it('names no armour and no pool', () => {
-        const line = damageLine({ ...repair, armor: 'Armor_Star_Destroyer', pool: 'shield' });
+        const line = damageLine({...repair, armor: 'Armor_Star_Destroyer', pool: 'shield'});
 
         assert.doesNotMatch(line, /Armor_Star_Destroyer/);
         assert.doesNotMatch(line, /shield/);

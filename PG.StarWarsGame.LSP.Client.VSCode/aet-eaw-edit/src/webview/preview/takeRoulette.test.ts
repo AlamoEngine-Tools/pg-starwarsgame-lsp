@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { FIRST_TAKE_WEIGHT, pickTake, takeWeights } from './takeRoulette';
-import { type AnimationTake } from './animationNames';
+import {FIRST_TAKE_WEIGHT, pickTake, takeWeights} from './takeRoulette';
+import {type AnimationTake} from './animationNames';
 
-const take = (n: number): AnimationTake => ({ name: `x_idle_0${n}.ala`, take: n, label: `0${n}` });
+const take = (n: number): AnimationTake => ({name: `x_idle_0${n}.ala`, take: n, label: `0${n}`});
 
 describe('takeWeights', () => {
     it('gives the first take a heavier share than the rest', () => {
@@ -65,7 +65,7 @@ describe('pickTake', () => {
         // The property the weight exists for, asserted as a property rather than as a magic number:
         // over an even sweep of the roll, take zero comes up more often than either other take and
         // the other two come up equally.
-        const rolls = Array.from({ length: 1000 }, (_, at) => at / 1000);
+        const rolls = Array.from({length: 1000}, (_, at) => at / 1000);
         const tally = [0, 0, 0];
 
         for (const roll of rolls) {

@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { clipNamingModel, groupAnimations, readClip } from './animationNames';
+import {clipNamingModel, groupAnimations, readClip} from './animationNames';
 
 const clip = (file: string) => readClip('Ei_trooper', file);
 
@@ -217,7 +217,7 @@ describe('clipNamingModel', () => {
         assert.equal(
             clipNamingModel({
                 animationSource: 'RI_INFANTRY.ALO',
-                parts: [{ origin: 'Hull', modelRef: 'NI_SandPeople_C.ALO' }],
+                parts: [{origin: 'Hull', modelRef: 'NI_SandPeople_C.ALO'}],
             }),
             'RI_INFANTRY');
     });
@@ -226,19 +226,19 @@ describe('clipNamingModel', () => {
         assert.equal(
             clipNamingModel({
                 animationSource: null,
-                parts: [{ origin: 'Hull', modelRef: 'EV_StarDestroyer.ALO' }],
+                parts: [{origin: 'Hull', modelRef: 'EV_StarDestroyer.ALO'}],
             }),
             'EV_StarDestroyer');
     });
 
     it('takes the first part when none is marked as the hull', () => {
         assert.equal(
-            clipNamingModel({ parts: [{ origin: 'Turret', modelRef: 'Turret.alo' }] }),
+            clipNamingModel({parts: [{origin: 'Turret', modelRef: 'Turret.alo'}]}),
             'Turret');
     });
 
     it('is empty when there is no scene and when there are no parts', () => {
         assert.equal(clipNamingModel(null), '');
-        assert.equal(clipNamingModel({ parts: [] }), '');
+        assert.equal(clipNamingModel({parts: []}), '');
     });
 });

@@ -2,12 +2,17 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { PreviewHardpoint, PreviewParticle } from '../../protocol/modelPreview';
+import type {PreviewHardpoint, PreviewParticle} from '../../protocol/modelPreview';
 import {
-    describeGate, effectPrefix, groupState, listedInModelTree, particleGroups, replacedByAbility,
+    describeGate,
+    effectPrefix,
     type GroupingContext,
+    groupState,
+    listedInModelTree,
+    particleGroups,
+    replacedByAbility,
 } from './particleScene';
 
 function particle(over: Partial<PreviewParticle> = {}): PreviewParticle {
@@ -27,7 +32,7 @@ function particle(over: Partial<PreviewParticle> = {}): PreviewParticle {
 function context(
     particles: readonly PreviewParticle[], hardpoints: readonly PreviewHardpoint[] = [],
 ): GroupingContext {
-    return { particles, hardpoints };
+    return {particles, hardpoints};
 }
 
 describe('effectPrefix', () => {
@@ -63,8 +68,8 @@ describe('particleGroups', () => {
     it('finds the engines by the gate the MODEL declares', () => {
         // `Engine_Particles` on the object is the model's own statement about what these are for.
         const groups = particleGroups(context([
-            particle({ id: 'a', systemRef: 'pe_homeoneengines_lrg', gate: 'HardpointAlive' }),
-            particle({ id: 'b', systemRef: 'pe_homeoneengines_sml', gate: 'HardpointAlive' }),
+            particle({id: 'a', systemRef: 'pe_homeoneengines_lrg', gate: 'HardpointAlive'}),
+            particle({id: 'b', systemRef: 'pe_homeoneengines_sml', gate: 'HardpointAlive'}),
         ]));
 
         const engines = groups.find(group => group.label === 'Engines');
@@ -77,8 +82,8 @@ describe('particleGroups', () => {
         // declares an engine hardpoint - so a gate-only rule finds no engines at all on them, which
         // is the "there is no toggle group for the engines" the reader reported.
         const groups = particleGroups(context([
-            particle({ id: 'a', systemRef: 'pe_tartanengine_lrg', gate: 'Always' }),
-            particle({ id: 'b', systemRef: 'pe_tartanengine_sml', gate: 'Always' }),
+            particle({id: 'a', systemRef: 'pe_tartanengine_lrg', gate: 'Always'}),
+            particle({id: 'b', systemRef: 'pe_tartanengine_sml', gate: 'Always'}),
         ]));
 
         const engines = groups.find(group => group.label === 'Engines');
@@ -90,7 +95,7 @@ describe('particleGroups', () => {
         // `Hardpoint damage` were two rows over the same six systems, so ticking one moved the
         // other and nothing said why. A meaning is one group however many rules recognise it.
         const groups = particleGroups(context(
-            Array.from({ length: 6 }, (_, i) => particle({
+            Array.from({length: 6}, (_, i) => particle({
                 id: `hull#${i}`,
                 systemRef: 'p_hp_stardestroyer_damage',
                 gate: 'HardpointDestroyed',
@@ -103,8 +108,8 @@ describe('particleGroups', () => {
     it('takes the UNION when the gate and the prefix disagree', () => {
         // Neither rule is the whole answer, so a system either names is in.
         const groups = particleGroups(context([
-            particle({ id: 'gated', systemRef: 'p_wash', gate: 'HardpointAlive' }),
-            particle({ id: 'named', systemRef: 'pe_engines', gate: 'Always' }),
+            particle({id: 'gated', systemRef: 'p_wash', gate: 'HardpointAlive'}),
+            particle({id: 'named', systemRef: 'pe_engines', gate: 'Always'}),
         ]));
 
         assert.deepEqual(groups.find(g => g.label === 'Engines')?.ids.sort(), ['gated', 'named']);
@@ -114,7 +119,7 @@ describe('particleGroups', () => {
         // The Nebulon-B carries a single `pe_nebulonengines`. The old floor of two dropped it, so
         // the one group a reader wanted on that ship was the one group it never showed.
         const groups = particleGroups(context([
-            particle({ id: 'a', systemRef: 'pe_nebulonengines', gate: 'HardpointAlive' }),
+            particle({id: 'a', systemRef: 'pe_nebulonengines', gate: 'HardpointAlive'}),
         ]));
 
         assert.deepEqual(groups.map(group => group.label), ['Engines']);
@@ -122,11 +127,11 @@ describe('particleGroups', () => {
 
     it('names the ability families off their own prefixes', () => {
         const groups = particleGroups(context([
-            particle({ id: 'a', systemRef: 'pte_corvetteengines', gate: 'Always' }),
-            particle({ id: 'b', systemRef: 'pptw_ptwsa', gate: 'Always' }),
-            particle({ id: 'c', systemRef: 'prs_at-aa_fx', gate: 'Always' }),
-            particle({ id: 'd', systemRef: 'pgw_grav_well', gate: 'Always' }),
-            particle({ id: 'e', systemRef: 'pi_damage_elec_SD00', gate: 'Always' }),
+            particle({id: 'a', systemRef: 'pte_corvetteengines', gate: 'Always'}),
+            particle({id: 'b', systemRef: 'pptw_ptwsa', gate: 'Always'}),
+            particle({id: 'c', systemRef: 'prs_at-aa_fx', gate: 'Always'}),
+            particle({id: 'd', systemRef: 'pgw_grav_well', gate: 'Always'}),
+            particle({id: 'e', systemRef: 'pi_damage_elec_SD00', gate: 'Always'}),
         ]));
 
         assert.deepEqual(groups.map(group => group.label), [
@@ -139,8 +144,8 @@ describe('particleGroups', () => {
         // The Corvette and the Tartan carry both. Matching on the leading characters rather than
         // the whole marker token would file every turbo effect under Engines.
         const groups = particleGroups(context([
-            particle({ id: 'a', systemRef: 'PE_Corvetteengines', gate: 'Always' }),
-            particle({ id: 'b', systemRef: 'PTE_Corvetteengines', gate: 'Always' }),
+            particle({id: 'a', systemRef: 'PE_Corvetteengines', gate: 'Always'}),
+            particle({id: 'b', systemRef: 'PTE_Corvetteengines', gate: 'Always'}),
         ]));
 
         assert.deepEqual(groups.find(g => g.label === 'Engines')?.ids, ['a']);
@@ -151,8 +156,8 @@ describe('particleGroups', () => {
         // A mod's effects, or a shipped family nobody has named yet. The prefix is all that can be
         // honestly said about them, so it is what the heading says.
         const groups = particleGroups(context([
-            particle({ id: 'a', systemRef: 'p_krayt_roar', gate: 'Always' }),
-            particle({ id: 'b', systemRef: 'p_krayt_dust', gate: 'Always' }),
+            particle({id: 'a', systemRef: 'p_krayt_roar', gate: 'Always'}),
+            particle({id: 'b', systemRef: 'p_krayt_dust', gate: 'Always'}),
         ]));
 
         const other = groups.find(group => group.source === 'prefix');
@@ -164,7 +169,7 @@ describe('particleGroups', () => {
         // The floor stays for these. `Pas_sprint` alone is one system and one row; a heading over
         // it that can only repeat its prefix is the second list the tree was meant to replace.
         assert.deepEqual(particleGroups(context([
-            particle({ id: 'a', systemRef: 'p_lonely', gate: 'Always' }),
+            particle({id: 'a', systemRef: 'p_lonely', gate: 'Always'}),
         ])), []);
     });
 
@@ -173,8 +178,8 @@ describe('particleGroups', () => {
         // was all seven of them, engines and ability effects together. A group that means "the
         // rest" is not a bulk switch anyone reaches for.
         const groups = particleGroups(context([
-            particle({ id: 'a', systemRef: 'pe_x', gate: 'Always' }),
-            particle({ id: 'b', systemRef: 'pptw_y', gate: 'Always' }),
+            particle({id: 'a', systemRef: 'pe_x', gate: 'Always'}),
+            particle({id: 'b', systemRef: 'pptw_y', gate: 'Always'}),
         ]));
 
         assert.equal(groups.some(group => /ambient/i.test(group.label)), false);
@@ -182,9 +187,9 @@ describe('particleGroups', () => {
 
     it('keeps the families in a fixed order, so the list never shuffles', () => {
         const groups = particleGroups(context([
-            particle({ id: 'a', systemRef: 'pi_damage_elec_SD00', gate: 'Always' }),
-            particle({ id: 'b', systemRef: 'pe_victoryengines', gate: 'HardpointAlive' }),
-            particle({ id: 'c', systemRef: 'p_hp_imperial_damage', gate: 'HardpointDestroyed' }),
+            particle({id: 'a', systemRef: 'pi_damage_elec_SD00', gate: 'Always'}),
+            particle({id: 'b', systemRef: 'pe_victoryengines', gate: 'HardpointAlive'}),
+            particle({id: 'c', systemRef: 'p_hp_imperial_damage', gate: 'HardpointDestroyed'}),
         ]));
 
         assert.deepEqual(groups.map(group => group.label),
@@ -197,8 +202,8 @@ describe('particleGroups', () => {
 
     it('keys groups stably, so a reload does not reset the panel', () => {
         const particles = [
-            particle({ id: 'a', gate: 'HardpointDestroyed' }),
-            particle({ id: 'b', gate: 'HardpointDestroyed' }),
+            particle({id: 'a', gate: 'HardpointDestroyed'}),
+            particle({id: 'b', gate: 'HardpointDestroyed'}),
         ];
 
         assert.deepEqual(
@@ -208,7 +213,7 @@ describe('particleGroups', () => {
 });
 
 describe('groupState', () => {
-    const group = { id: 'family:engines', label: 'Engines', source: 'family' as const, ids: ['a', 'b'] };
+    const group = {id: 'family:engines', label: 'Engines', source: 'family' as const, ids: ['a', 'b']};
 
     it('reads all when every system in it is shown', () => {
         assert.equal(groupState(group, new Set(['a', 'b'])), 'all');
@@ -225,7 +230,7 @@ describe('groupState', () => {
     });
 
     it('reads none for a group with nothing in it', () => {
-        assert.equal(groupState({ ...group, ids: [] }, new Set(['a'])), 'none');
+        assert.equal(groupState({...group, ids: []}, new Set(['a'])), 'none');
     });
 });
 
@@ -262,8 +267,8 @@ describe('listedInModelTree', () => {
 // effect. Only that pair - whether power-to-weapons replaces anything is not known and is not
 // assumed here.
 describe('replacedByAbility', () => {
-    const engines = particle({ id: 'pe', systemRef: 'PE_Corvetteengines', gate: 'Always' });
-    const turbo = particle({ id: 'pte', systemRef: 'PTE_Corvetteengines', gate: 'Always' });
+    const engines = particle({id: 'pe', systemRef: 'PE_Corvetteengines', gate: 'Always'});
+    const turbo = particle({id: 'pte', systemRef: 'PTE_Corvetteengines', gate: 'Always'});
     const proxies = new Map([['TURBO', ['pte']]]);
 
     it('holds the plain engines back while turbo is active', () => {
@@ -288,7 +293,7 @@ describe('replacedByAbility', () => {
         // An active ability claiming something else entirely must not silence the engines. The
         // Tartan carries pe_, pte_ AND pptw_ together, so this is a real arrangement, not a guard
         // against an imaginary one.
-        const weapons = particle({ id: 'pptw', systemRef: 'pptw_ptwsa', gate: 'Always' });
+        const weapons = particle({id: 'pptw', systemRef: 'pptw_ptwsa', gate: 'Always'});
         const held = replacedByAbility(
             [engines, turbo, weapons], new Map([['POWER_TO_WEAPONS', ['pptw']]]),
             new Set(['POWER_TO_WEAPONS']));
@@ -298,8 +303,8 @@ describe('replacedByAbility', () => {
 
     it('replaces only the pair the user named', () => {
         // Power to weapons replaces nothing until someone says otherwise - see the note above.
-        const weapons = particle({ id: 'pptw', systemRef: 'pptw_ptwsa', gate: 'Always' });
-        const guns = particle({ id: 'pw', systemRef: 'pe_guns', gate: 'HardpointAlive' });
+        const weapons = particle({id: 'pptw', systemRef: 'pptw_ptwsa', gate: 'Always'});
+        const guns = particle({id: 'pw', systemRef: 'pe_guns', gate: 'HardpointAlive'});
         const held = replacedByAbility(
             [weapons, guns], new Map([['POWER_TO_WEAPONS', ['pptw']]]),
             new Set(['POWER_TO_WEAPONS']));
@@ -309,8 +314,8 @@ describe('replacedByAbility', () => {
 
     it('holds back every member of the replaced family, not just the first', () => {
         // Home One carries three engine systems and the Tartan two.
-        const lrg = particle({ id: 'lrg', systemRef: 'pe_tartanengine_lrg', gate: 'Always' });
-        const sml = particle({ id: 'sml', systemRef: 'pe_tartanengine_sml', gate: 'Always' });
+        const lrg = particle({id: 'lrg', systemRef: 'pe_tartanengine_lrg', gate: 'Always'});
+        const sml = particle({id: 'sml', systemRef: 'pe_tartanengine_sml', gate: 'Always'});
         const held = replacedByAbility(
             [lrg, sml, turbo], proxies, new Set(['TURBO']));
 

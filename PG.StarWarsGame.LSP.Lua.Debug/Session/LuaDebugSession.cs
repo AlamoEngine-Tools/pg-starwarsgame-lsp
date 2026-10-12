@@ -13,22 +13,20 @@ public sealed class LuaDebugSession : ILuaDebugSession
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan GoodbyeTimeout = TimeSpan.FromSeconds(2);
+    private readonly HashSet<int> _attached = [];
+    private readonly SemaphoreSlim _commands = new(1, 1);
 
     private readonly ILuaDebugConnection _connection;
-    private readonly TimeProvider _time;
-    private readonly ILogger<LuaDebugSession> _logger;
     private readonly Lock _gate = new();
-    private readonly SemaphoreSlim _commands = new(1, 1);
-    private readonly List<Waiter> _waiters = [];
-    private readonly Dictionary<int, ScriptEntry> _scripts = [];
-    private readonly HashSet<int> _attached = [];
-    private readonly Dictionary<int, IReadOnlyList<ThreadEntry>> _threads = [];
+    private readonly ILogger<LuaDebugSession> _logger;
     private readonly StateMachine<DebugRunState, Trigger> _machine;
-
-    private DebugRunState _state = DebugRunState.Running;
+    private readonly Dictionary<int, ScriptEntry> _scripts = [];
+    private readonly Dictionary<int, IReadOnlyList<ThreadEntry>> _threads = [];
+    private readonly TimeProvider _time;
+    private readonly List<Waiter> _waiters = [];
     private Task _consumer = Task.CompletedTask;
-    private uint _nextTableRequestId;
     private Exception? _lost;
+    private uint _nextTableRequestId;
 
     public LuaDebugSession(ILuaDebugConnection connection, TimeProvider time, ILogger<LuaDebugSession> logger)
     {
@@ -38,20 +36,9 @@ public sealed class LuaDebugSession : ILuaDebugSession
         _machine = BuildMachine();
     }
 
-    private enum Trigger
-    {
-        ArmBreakAll,
-        ArmBreakThread,
-        SelectScript,
-        ArmStep,
-        Resume,
-        Suspend,
-        ContextCleared
-    }
-
     public bool IsConnected => _connection.IsConnected && _lost is null;
 
-    public DebugRunState RunState => _state;
+    public DebugRunState RunState { get; private set; } = DebugRunState.Running;
 
     public ArmedBreakKind ArmedKind { get; private set; }
 
@@ -328,7 +315,7 @@ public sealed class LuaDebugSession : ILuaDebugSession
         int scriptId;
         lock (_gate)
         {
-            if (_state != DebugRunState.Suspended || SuspendedScriptId is not { } suspended)
+            if (RunState != DebugRunState.Suspended || SuspendedScriptId is not { } suspended)
                 throw new LuaDebugStateException("Cannot select a frame: no script is suspended");
             if (level < 0 || level >= Callstack.Count)
                 throw new LuaDebugStateException(
@@ -392,7 +379,7 @@ public sealed class LuaDebugSession : ILuaDebugSession
 
     private string Refusal(Trigger trigger)
     {
-        return (trigger, _state) switch
+        return (trigger, RunState) switch
         {
             (Trigger.ArmBreakAll, DebugRunState.Suspended) =>
                 "Cannot break: a script is already suspended; continue or step first",
@@ -404,7 +391,7 @@ public sealed class LuaDebugSession : ILuaDebugSession
                 "Cannot select a script while one is suspended; continue first",
             (Trigger.ArmStep, _) => "Cannot step: no script is suspended",
             (Trigger.Resume, _) => "Cannot continue: no script is suspended",
-            _ => $"Cannot {trigger} while the debugger is {_state}"
+            _ => $"Cannot {trigger} while the debugger is {RunState}"
         };
     }
 
@@ -588,7 +575,7 @@ public sealed class LuaDebugSession : ILuaDebugSession
 
     private StateMachine<DebugRunState, Trigger> BuildMachine()
     {
-        var machine = new StateMachine<DebugRunState, Trigger>(() => _state, s => _state = s);
+        var machine = new StateMachine<DebugRunState, Trigger>(() => RunState, s => RunState = s);
 
         machine.Configure(DebugRunState.Running)
             .Permit(Trigger.ArmBreakAll, DebugRunState.BreakArmed)
@@ -615,6 +602,17 @@ public sealed class LuaDebugSession : ILuaDebugSession
         machine.OnUnhandledTrigger((state, trigger) =>
             throw new LuaDebugStateException($"Cannot {trigger} while the debugger is {state}"));
         return machine;
+    }
+
+    private enum Trigger
+    {
+        ArmBreakAll,
+        ArmBreakThread,
+        SelectScript,
+        ArmStep,
+        Resume,
+        Suspend,
+        ContextCleared
     }
 
     private sealed class Waiter(Func<LuaDebugMessage, bool> matches)

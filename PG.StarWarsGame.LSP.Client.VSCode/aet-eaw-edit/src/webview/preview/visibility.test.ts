@@ -2,51 +2,61 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
-    clearedForPlayback, deathClip, effectFacts, restingClip, resolveRow, setRow, subtreeFacts,
-    toggleRow, type RowFacts, type RowOverride, damageMeshFacts, becauseText,
+    becauseText,
+    clearedForPlayback,
+    damageMeshFacts,
+    deathClip,
+    effectFacts,
+    resolveRow,
+    restingClip,
+    type RowFacts,
+    type RowOverride,
+    setRow,
+    subtreeFacts,
+    toggleRow,
 } from './visibility';
 
 const facts = (over: Partial<RowFacts> = {}): RowFacts =>
-    ({ inFile: true, gated: false, masters: [], ...over });
+    ({inFile: true, gated: false, masters: [], ...over});
 
 describe('resolveRow, the chain in order', () => {
     it('draws what the file draws, and says the file decided', () => {
         assert.deepEqual(resolveRow(facts()),
-            { visible: true, decidedBy: 'file', because: 'file', authored: true });
+            {visible: true, decidedBy: 'file', because: 'file', authored: true});
     });
 
     it('does not draw what the file marks hidden', () => {
-        assert.deepEqual(resolveRow(facts({ inFile: false })),
-            { visible: false, decidedBy: 'file', because: 'file', authored: false });
+        assert.deepEqual(resolveRow(facts({inFile: false})),
+            {visible: false, decidedBy: 'file', because: 'file', authored: false});
     });
 
     it('does not draw what the current level gates off', () => {
-        assert.deepEqual(resolveRow(facts({ gated: true })),
-            { visible: false, decidedBy: 'level', because: 'level', authored: false });
+        assert.deepEqual(resolveRow(facts({gated: true})),
+            {visible: false, decidedBy: 'level', because: 'level', authored: false});
     });
 
     it('lets a playing clip beat the file and the level', () => {
         // The clip is the model as its author animated it, so where nobody has overridden it, it
         // decides - including switching something ON that the file marks hidden.
-        assert.deepEqual(resolveRow(facts({ inFile: false, gated: true, animated: true })),
-            { visible: true, decidedBy: 'animation', because: 'animation', authored: true });
+        assert.deepEqual(resolveRow(facts({inFile: false, gated: true, animated: true})),
+            {visible: true, decidedBy: 'animation', because: 'animation', authored: true});
     });
 
     it('lets the reader beat the clip, in both directions', () => {
-        assert.deepEqual(resolveRow(facts({ animated: true, override: 'hidden' })),
-            { visible: false, decidedBy: 'you', because: 'you', authored: true });
-        assert.deepEqual(resolveRow(facts({ animated: false, override: 'shown' })),
-            { visible: true, decidedBy: 'you', because: 'you', authored: false });
+        assert.deepEqual(resolveRow(facts({animated: true, override: 'hidden'})),
+            {visible: false, decidedBy: 'you', because: 'you', authored: true});
+        assert.deepEqual(resolveRow(facts({animated: false, override: 'shown'})),
+            {visible: true, decidedBy: 'you', because: 'you', authored: false});
     });
 
     it('lets the reader show something the level gates off', () => {
         // A collision hull and a shadow volume are both gated off, and both are exactly what
         // someone opens the model view to look at.
-        assert.deepEqual(resolveRow(facts({ inFile: false, gated: true, override: 'shown' })),
-            { visible: true, decidedBy: 'you', because: 'you', authored: false });
+        assert.deepEqual(resolveRow(facts({inFile: false, gated: true, override: 'shown'})),
+            {visible: true, decidedBy: 'you', because: 'you', authored: false});
     });
 });
 
@@ -54,21 +64,21 @@ describe('resolveRow, the vetoes', () => {
     it('lets a master toggle veto everything below it', () => {
         // A master switch is a master switch: with effects off, no per-row tick puts one back.
         assert.deepEqual(
-            resolveRow(facts({ override: 'shown', masters: [{ id: 'effects', on: false }] })),
-            { visible: false, decidedBy: 'master', because: 'master:effects', authored: false });
+            resolveRow(facts({override: 'shown', masters: [{id: 'effects', on: false}]})),
+            {visible: false, decidedBy: 'master', because: 'master:effects', authored: false});
     });
 
     it('names WHICH master vetoed it', () => {
         const resolved = resolveRow(facts({
-            masters: [{ id: 'effects', on: true }, { id: 'hardpoints', on: false }],
+            masters: [{id: 'effects', on: true}, {id: 'hardpoints', on: false}],
         }));
 
         assert.equal(resolved.because, 'master:hardpoints');
     });
 
     it('a master that is ON only declines to veto - it forces nothing on', () => {
-        assert.deepEqual(resolveRow(facts({ gated: true, masters: [{ id: 'effects', on: true }] })),
-            { visible: false, decidedBy: 'level', because: 'level', authored: false });
+        assert.deepEqual(resolveRow(facts({gated: true, masters: [{id: 'effects', on: true}]})),
+            {visible: false, decidedBy: 'level', because: 'level', authored: false});
     });
 
     it('lets a hidden ancestor veto the row', () => {
@@ -78,12 +88,12 @@ describe('resolveRow, the vetoes', () => {
             resolveRow(facts({
                 override: 'shown', ancestorHidden: 'Root', ancestorHiddenAuthored: 'Root',
             })),
-            { visible: false, decidedBy: 'ancestor', because: 'ancestor:Root', authored: false });
+            {visible: false, decidedBy: 'ancestor', because: 'ancestor:Root', authored: false});
     });
 
     it('puts a master above an ancestor, since it is the wider statement', () => {
         const resolved = resolveRow(facts({
-            ancestorHidden: 'Root', masters: [{ id: 'effects', on: false }],
+            ancestorHidden: 'Root', masters: [{id: 'effects', on: false}],
         }));
 
         assert.equal(resolved.because, 'master:effects');
@@ -99,9 +109,9 @@ describe('toggleRow', () => {
 
     it('hides the row and everything under it', () => {
         assert.deepEqual(changes(true), [
-            { row: 'bone:3', override: 'hidden' },
-            { row: 'bone:4', override: 'hidden' },
-            { row: 'mesh:x', override: 'hidden' },
+            {row: 'bone:3', override: 'hidden'},
+            {row: 'bone:4', override: 'hidden'},
+            {row: 'mesh:x', override: 'hidden'},
         ]);
     });
 
@@ -114,14 +124,14 @@ describe('toggleRow', () => {
     it('CLEARS its descendants instead of forcing them on', () => {
         // Switching a bone back on must not drag its collision hull into view with it.
         assert.deepEqual(changes(false).slice(1), [
-            { row: 'bone:4', override: null },
-            { row: 'mesh:x', override: null },
+            {row: 'bone:4', override: null},
+            {row: 'mesh:x', override: null},
         ]);
     });
 
     it('handles a row with nothing under it', () => {
         assert.deepEqual(toggleRow('mesh:x', [], true, true), [
-            { row: 'mesh:x', override: 'hidden' },
+            {row: 'mesh:x', override: 'hidden'},
         ]);
     });
 
@@ -146,13 +156,13 @@ describe('a clip playing', () => {
         // what obstructs the view of the thing being checked. A master is not a statement about the
         // model, so a reset does not touch it.
         assert.deepEqual(
-            resolveRow(facts({ animated: true, masters: [{ id: 'effects', on: false }] })),
-            { visible: false, decidedBy: 'master', because: 'master:effects', authored: false });
+            resolveRow(facts({animated: true, masters: [{id: 'effects', on: false}]})),
+            {visible: false, decidedBy: 'master', because: 'master:effects', authored: false});
     });
 
     it('otherwise lets the clip decide, with nothing overridden', () => {
-        assert.deepEqual(resolveRow(facts({ inFile: false, gated: true, animated: true })),
-            { visible: true, decidedBy: 'animation', because: 'animation', authored: true });
+        assert.deepEqual(resolveRow(facts({inFile: false, gated: true, animated: true})),
+            {visible: true, decidedBy: 'animation', because: 'animation', authored: true});
     });
 });
 
@@ -161,7 +171,7 @@ describe('what the MODEL says, ignoring the reader', () => {
     // at a ticked row that the file marks hidden can see that they are the reason it is on screen.
     // Answering that needs the chain run a second way: with the reader's word taken back out.
     it('is what the row would do if the reader had said nothing', () => {
-        const resolved = resolveRow(facts({ gated: true, override: 'shown' }));
+        const resolved = resolveRow(facts({gated: true, override: 'shown'}));
 
         assert.equal(resolved.visible, true);
         assert.equal(resolved.authored, false);
@@ -170,7 +180,7 @@ describe('what the MODEL says, ignoring the reader', () => {
     it('is not simply the inverse of the override', () => {
         // Hiding a mesh the model draws leaves it AUTHORED visible - the row is unticked, upright.
         // Only the model's own silence about a row makes it italic.
-        const resolved = resolveRow(facts({ override: 'hidden' }));
+        const resolved = resolveRow(facts({override: 'hidden'}));
 
         assert.equal(resolved.visible, false);
         assert.equal(resolved.authored, true);
@@ -199,7 +209,7 @@ describe('what the MODEL says, ignoring the reader', () => {
     it('lets a playing clip speak for the model', () => {
         // A clip IS the model as its author animated it, so a frame that hides a bone is the model
         // hiding it - even though the file's own flag says otherwise.
-        assert.equal(resolveRow(facts({ inFile: true, animated: false })).authored, false);
+        assert.equal(resolveRow(facts({inFile: true, animated: false})).authored, false);
     });
 });
 
@@ -215,9 +225,9 @@ describe('setRow, which says what it WANTS rather than what it sees', () => {
 
     it('hides the row and everything under it when asked to hide', () => {
         assert.deepEqual(changes(false), [
-            { row: 'bone:3', override: 'hidden' },
-            { row: 'bone:4', override: 'hidden' },
-            { row: 'mesh:x', override: 'hidden' },
+            {row: 'bone:3', override: 'hidden'},
+            {row: 'bone:4', override: 'hidden'},
+            {row: 'mesh:x', override: 'hidden'},
         ]);
     });
 
@@ -225,16 +235,16 @@ describe('setRow, which says what it WANTS rather than what it sees', () => {
         // Forcing the children on would drag every collision hull and shadow volume under that bone
         // into view, since those are gated off rather than absent.
         assert.deepEqual(changes(true).slice(1), [
-            { row: 'bone:4', override: null },
-            { row: 'mesh:x', override: null },
+            {row: 'bone:4', override: null},
+            {row: 'mesh:x', override: null},
         ]);
     });
 
     it('stores the reader`s word only where it DISAGREES with the model', () => {
         // A shadow volume is gated off, so asking for it is a real statement and has to be stored -
         // clearing it would leave it invisible, which is the row worth ticking in the first place.
-        assert.deepEqual(changes(true, false)[0], { row: 'bone:3', override: 'shown' });
-        assert.deepEqual(changes(false, true)[0], { row: 'bone:3', override: 'hidden' });
+        assert.deepEqual(changes(true, false)[0], {row: 'bone:3', override: 'shown'});
+        assert.deepEqual(changes(false, true)[0], {row: 'bone:3', override: 'hidden'});
     });
 
     it('GIVES THE ROW BACK to the model when the two agree', () => {
@@ -243,8 +253,8 @@ describe('setRow, which says what it WANTS rather than what it sees', () => {
         // outranks the animation, the level and the file for good, and is what let one tick on an
         // ability's effect row break that ability's switch permanently. Asking for what the model
         // already does is not a statement; it is the absence of one.
-        assert.deepEqual(changes(true, true)[0], { row: 'bone:3', override: null });
-        assert.deepEqual(changes(false, false)[0], { row: 'bone:3', override: null });
+        assert.deepEqual(changes(true, true)[0], {row: 'bone:3', override: null});
+        assert.deepEqual(changes(false, false)[0], {row: 'bone:3', override: null});
     });
 
     it('is what toggleRow does, read the other way round', () => {
@@ -266,9 +276,9 @@ describe('subtreeFacts, for a row that is a bone AND a mesh', () => {
     // with it, so the effect attached to that bone was vetoed by an ancestor and could never be
     // switched on. Every fire, smoke and explosion proxy on the model was dark.
     it('drops what the file and the level say about the MESH', () => {
-        const facts: RowFacts = { inFile: false, gated: true, masters: [] };
+        const facts: RowFacts = {inFile: false, gated: true, masters: []};
 
-        assert.deepEqual(subtreeFacts(facts), { inFile: true, gated: false, masters: [] });
+        assert.deepEqual(subtreeFacts(facts), {inFile: true, gated: false, masters: []});
     });
 
     it('keeps everything that applies to the whole subtree', () => {
@@ -281,7 +291,7 @@ describe('subtreeFacts, for a row that is a bone AND a mesh', () => {
             animated: false,
             ancestorHidden: 'Root',
             ancestorHiddenAuthored: 'Root',
-            masters: [{ id: 'effects', on: false }],
+            masters: [{id: 'effects', on: false}],
         };
 
         const subtree = subtreeFacts(facts);
@@ -289,18 +299,18 @@ describe('subtreeFacts, for a row that is a bone AND a mesh', () => {
         assert.equal(subtree.override, 'hidden');
         assert.equal(subtree.animated, false);
         assert.equal(subtree.ancestorHidden, 'Root');
-        assert.deepEqual(subtree.masters, [{ id: 'effects', on: false }]);
+        assert.deepEqual(subtree.masters, [{id: 'effects', on: false}]);
     });
 
     it('leaves a marker mesh hidden while its subtree stays live', () => {
-        const facts: RowFacts = { inFile: false, gated: false, masters: [] };
+        const facts: RowFacts = {inFile: false, gated: false, masters: []};
 
         assert.equal(resolveRow(facts).visible, false);
         assert.equal(resolveRow(subtreeFacts(facts)).visible, true);
     });
 
     it('still lets the reader hide the whole thing', () => {
-        const facts: RowFacts = { inFile: false, gated: false, override: 'hidden', masters: [] };
+        const facts: RowFacts = {inFile: false, gated: false, override: 'hidden', masters: []};
 
         assert.equal(resolveRow(subtreeFacts(facts)).visible, false);
     });
@@ -312,26 +322,26 @@ describe('the resting state, which is the idle clip when there is one', () => {
     // FILE leaves those flash meshes unhidden precisely because the animations own that state - so
     // reading the file alone puts two muzzle flashes on screen that nobody ever sees in game.
     it('lets the idle clip set the resting state', () => {
-        assert.deepEqual(resolveRow(facts({ inFile: true, resting: false })),
-            { visible: false, decidedBy: 'idle', because: 'idle', authored: false });
+        assert.deepEqual(resolveRow(facts({inFile: true, resting: false})),
+            {visible: false, decidedBy: 'idle', because: 'idle', authored: false});
     });
 
     it('falls back to the file when no idle clip says anything', () => {
-        assert.deepEqual(resolveRow(facts({ inFile: true })),
-            { visible: true, decidedBy: 'file', because: 'file', authored: true });
+        assert.deepEqual(resolveRow(facts({inFile: true})),
+            {visible: true, decidedBy: 'file', because: 'file', authored: true});
     });
 
     it('still lets the level gate come first', () => {
         // A mesh tagged for another damage state is not part of this one, whatever idle says.
-        assert.equal(resolveRow(facts({ gated: true, resting: true })).because, 'level');
+        assert.equal(resolveRow(facts({gated: true, resting: true})).because, 'level');
     });
 
     it('still lets a playing clip beat it', () => {
-        assert.equal(resolveRow(facts({ resting: false, animated: true })).because, 'animation');
+        assert.equal(resolveRow(facts({resting: false, animated: true})).because, 'animation');
     });
 
     it('carries into the subtree, being a statement about the bone', () => {
-        assert.equal(subtreeFacts(facts({ resting: false })).resting, false);
+        assert.equal(subtreeFacts(facts({resting: false})).resting, false);
     });
 });
 
@@ -437,10 +447,10 @@ describe('effectFacts, an effect answers to its own bone', () => {
      * frame is unreachable and the blast covering the chunk can never be expressed.
      */
     it('ignores an ancestor the MODEL hides', () => {
-        const chunk = effectFacts(facts({ ancestorHidden: 'Busted_00', ancestorHiddenAuthored: 'Busted_00' }));
+        const chunk = effectFacts(facts({ancestorHidden: 'Busted_00', ancestorHiddenAuthored: 'Busted_00'}));
 
         assert.deepEqual(resolveRow(chunk),
-            { visible: true, decidedBy: 'file', because: 'file', authored: true });
+            {visible: true, decidedBy: 'file', because: 'file', authored: true});
     });
 
     /**
@@ -449,17 +459,17 @@ describe('effectFacts, an effect answers to its own bone', () => {
      * looks broken - so a hide that only the READER placed still reaches down.
      */
     it('still answers to an ancestor the READER hid', () => {
-        const unticked = effectFacts(facts({ ancestorHidden: 'Busted_00' }));
+        const unticked = effectFacts(facts({ancestorHidden: 'Busted_00'}));
 
         assert.deepEqual(resolveRow(unticked),
-            { visible: false, decidedBy: 'ancestor', because: 'ancestor:Busted_00', authored: true });
+            {visible: false, decidedBy: 'ancestor', because: 'ancestor:Busted_00', authored: true});
     });
 
     /** Everything below the ancestor links is the effect's own business and is left alone. */
     it('keeps its own clip, level and rule answers', () => {
-        assert.equal(resolveRow(effectFacts(facts({ animated: false }))).visible, false);
-        assert.equal(resolveRow(effectFacts(facts({ gated: true }))).visible, false);
-        assert.equal(resolveRow(effectFacts(facts({ inFile: false }))).visible, false);
+        assert.equal(resolveRow(effectFacts(facts({animated: false}))).visible, false);
+        assert.equal(resolveRow(effectFacts(facts({gated: true}))).visible, false);
+        assert.equal(resolveRow(effectFacts(facts({inFile: false}))).visible, false);
     });
 });
 
@@ -476,13 +486,13 @@ describe('damageMeshFacts, a damage decal answers to the damage rule', () => {
      * route - the second one inverted, on while the hardpoint lives.
      */
     it('is drawn when the damage state calls for it, whatever the file says', () => {
-        assert.deepEqual(resolveRow(damageMeshFacts(facts({ inFile: false }), true)),
-            { visible: true, decidedBy: 'file', because: 'file', authored: true });
+        assert.deepEqual(resolveRow(damageMeshFacts(facts({inFile: false}), true)),
+            {visible: true, decidedBy: 'file', because: 'file', authored: true});
     });
 
     it('is not drawn while the hardpoint is whole, whatever the file says', () => {
-        assert.deepEqual(resolveRow(damageMeshFacts(facts({ inFile: true }), false)),
-            { visible: false, decidedBy: 'file', because: 'file', authored: false });
+        assert.deepEqual(resolveRow(damageMeshFacts(facts({inFile: true}), false)),
+            {visible: false, decidedBy: 'file', because: 'file', authored: false});
     });
 
     /**
@@ -492,14 +502,14 @@ describe('damageMeshFacts, a damage decal answers to the damage rule', () => {
      * damage decision.
      */
     it('still loses to a level that gates it off', () => {
-        assert.deepEqual(resolveRow(damageMeshFacts(facts({ gated: true }), true)),
-            { visible: false, decidedBy: 'level', because: 'level', authored: false });
+        assert.deepEqual(resolveRow(damageMeshFacts(facts({gated: true}), true)),
+            {visible: false, decidedBy: 'level', because: 'level', authored: false});
     });
 
     /** And the clip still beats it, like every other row: a playing clip is the model as authored. */
     it('still loses to a playing clip', () => {
         assert.equal(
-            resolveRow(damageMeshFacts(facts({ animated: false }), true)).visible, false);
+            resolveRow(damageMeshFacts(facts({animated: false}), true)).visible, false);
     });
 });
 

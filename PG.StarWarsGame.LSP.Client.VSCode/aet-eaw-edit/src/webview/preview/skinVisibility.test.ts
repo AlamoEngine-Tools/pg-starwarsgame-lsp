@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { skinHiddenByClip } from './skinVisibility';
+import {skinHiddenByClip} from './skinVisibility';
 
 /** A clip that hides exactly the named bones. */
 const clip = (...hidden: string[]) => (id: string): boolean | undefined =>

@@ -3,10 +3,10 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway } from './lsp/lspGateway';
-import { LspTreeDataProvider } from './lspTreeDataProvider';
-import { GetLocalisationProjectsResult, LocProjectInfo } from './protocol';
-import { CREDITS_CATEGORY, groupProjects, LocTreeNode } from './webview/localisationTreeModel';
+import {LspGateway} from './lsp/lspGateway';
+import {LspTreeDataProvider} from './lspTreeDataProvider';
+import {GetLocalisationProjectsResult, LocProjectInfo} from './protocol';
+import {CREDITS_CATEGORY, groupProjects, LocTreeNode} from './webview/localisationTreeModel';
 
 type LocNodeKind = 'group' | 'layer' | 'fileset' | 'file' | 'info';
 
@@ -89,7 +89,9 @@ export class LocalisationNavigatorViewProvider
     }
 
     private _toItem(node: LocTreeNode): LocTreeItem {
-        if (node.kind === 'file') { return fileItem(node); }
+        if (node.kind === 'file') {
+            return fileItem(node);
+        }
 
         // Credits are left out of set-opening: their rows are addressed by position and duplicate
         // keys are the format, so merging them by key is not defined. They stay one file per tab.
@@ -126,7 +128,7 @@ export class LocalisationNavigatorViewProvider
             item.description = node.languages.join(', ');
             item.tooltip = creditsSet
                 ? `${node.languages.length} credits files: ${node.languages.join(', ')}`
-                    + ' - open one to edit it'
+                + ' - open one to edit it'
                 : `${node.languages.length} languages: ${node.languages.join(', ')}`;
 
             // Opening the set is the point of grouping it: the whole project in one table, every
@@ -190,7 +192,9 @@ function fileItem(
 }
 
 function countFiles(node: LocTreeNode): number {
-    if (node.kind === 'file') { return 1; }
+    if (node.kind === 'file') {
+        return 1;
+    }
     return node.children.reduce((total, child) => total + countFiles(child), 0);
 }
 

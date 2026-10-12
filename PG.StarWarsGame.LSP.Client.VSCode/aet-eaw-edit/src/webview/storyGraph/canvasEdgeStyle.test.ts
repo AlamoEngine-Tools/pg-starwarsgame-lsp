@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { canvasEdgeStyle, MUTED_EDGE_TOKEN } from './canvasEdgeStyle';
-import { BRANCH_PALETTE, EDGE_KINDS, branchColours } from './palette';
+import {canvasEdgeStyle, MUTED_EDGE_TOKEN} from './canvasEdgeStyle';
+import {BRANCH_PALETTE, branchColours, EDGE_KINDS} from './palette';
 
 const colourOf = branchColours(['Act1', 'Act2']);
 const kindToken = (kind: string): string => EDGE_KINDS.find(k => k.kind === kind)!.token;

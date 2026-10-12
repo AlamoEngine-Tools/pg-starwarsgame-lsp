@@ -15,7 +15,7 @@
 // playing while you hop into Model mode to hide a mesh - so each lens carries a one-line chip
 // saying what the others are up to. Without that, a soft switch just hides state.
 
-import type { RotaryMode } from '../shared/RotaryModeSwitch';
+import type {RotaryMode} from '../shared/RotaryModeSwitch';
 
 export type PreviewMode = 'model' | 'animation' | 'gameplay';
 
@@ -55,7 +55,7 @@ export function previewModes(counts: SubjectCounts): RotaryMode<PreviewMode>[] {
             id: 'animation', icon: 'play', label: 'Animation', angle: 210,
             count: counts.animations,
         },
-        { id: 'model', icon: 'package', label: 'Model', angle: 270 },
+        {id: 'model', icon: 'package', label: 'Model', angle: 270},
         {
             // Everything the lens can act on, not only the hardpoints. It counted hardpoints alone
             // until the lens grew weapons and abilities, which read 0 on a fighter that carries its
@@ -127,7 +127,7 @@ export function otherModeChips(
     const chips: { mode: PreviewMode; text: string }[] = [];
 
     if (mode !== 'animation' && activity.playing !== null) {
-        chips.push({ mode: 'animation', text: `${activity.playing} playing` });
+        chips.push({mode: 'animation', text: `${activity.playing} playing`});
     }
 
     if (mode !== 'gameplay' && activity.destroyed > 0) {

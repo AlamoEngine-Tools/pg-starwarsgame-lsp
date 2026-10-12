@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 
-import { panelLayoutFrom, type PanelLayout } from './webview/shared/panelLayout';
+import {type PanelLayout, panelLayoutFrom} from './webview/shared/panelLayout';
 
 /**
  * How wide the reader likes each editor's dock, and how tall its drawer.
@@ -45,8 +45,11 @@ export function readPanelLayout(): PanelLayout {
  * default is a small annoyance, and an unhandled rejection from a storage write would be a worse one.
  */
 export function savePanelSize(key: string, value: number): void {
-    if (store === undefined) { return; }
+    if (store === undefined) {
+        return;
+    }
 
-    const next = panelLayoutFrom({ ...readPanelLayout(), [key]: value });
-    void Promise.resolve(store.update(KEY, next)).then(undefined, () => { /* not worth reporting */ });
+    const next = panelLayoutFrom({...readPanelLayout(), [key]: value});
+    void Promise.resolve(store.update(KEY, next)).then(undefined, () => { /* not worth reporting */
+    });
 }

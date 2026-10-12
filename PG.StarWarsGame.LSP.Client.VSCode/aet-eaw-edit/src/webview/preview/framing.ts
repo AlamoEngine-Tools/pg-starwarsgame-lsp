@@ -89,7 +89,7 @@ export function frameSphere(
             y: sphere.center.y + distance * Math.sin(elevation),
             z: sphere.center.z + horizontal * Math.cos(azimuth),
         },
-        target: { ...sphere.center },
+        target: {...sphere.center},
     };
 }
 
@@ -140,5 +140,5 @@ export function sphereFromBounds(min: Vec3, max: Vec3): BoundingSphere {
         (max.x - center.x) ** 2 + (max.y - center.y) ** 2 + (max.z - center.z) ** 2,
     );
 
-    return { center, radius };
+    return {center, radius};
 }

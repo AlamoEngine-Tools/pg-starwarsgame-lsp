@@ -2,17 +2,17 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { buildCrawl, isSpacerRow } from './creditsCrawlModel';
-import { LocRow } from './loc/locRow';
+import {buildCrawl, isSpacerRow} from './creditsCrawlModel';
+import {LocRow} from './loc/locRow';
 
 function row(index: number, key: string, value: string, language = 'ENGLISH'): LocRow {
-    return { index, key, values: [{ language, value }] };
+    return {index, key, values: [{language, value}]};
 }
 
 function multi(index: number, key: string, ...values: [string, string][]): LocRow {
-    return { index, key, values: values.map(([language, value]) => ({ language, value })) };
+    return {index, key, values: values.map(([language, value]) => ({language, value}))};
 }
 
 describe('isSpacerRow', () => {
@@ -48,7 +48,7 @@ describe('isSpacerRow', () => {
     });
 
     it('does not treat a row with no languages as a spacer', () => {
-        assert.equal(isSpacerRow({ index: 0, key: 'CENTER', values: [] }), false);
+        assert.equal(isSpacerRow({index: 0, key: 'CENTER', values: []}), false);
     });
 });
 
@@ -99,8 +99,8 @@ describe('buildCrawl', () => {
             index: 0,
             key: 'A',
             values: [
-                { language: 'ENGLISH', value: 'Directed by' },
-                { language: 'GERMAN', value: 'Regie' },
+                {language: 'ENGLISH', value: 'Directed by'},
+                {language: 'GERMAN', value: 'Regie'},
             ],
         };
 
@@ -115,8 +115,8 @@ describe('buildCrawl', () => {
             index: 0,
             key: 'CREDIT_LEAD',
             values: [
-                { language: 'ENGLISH', value: 'Lead Designer' },
-                { language: 'GERMAN', value: '' },
+                {language: 'ENGLISH', value: 'Lead Designer'},
+                {language: 'GERMAN', value: ''},
             ],
         };
 
@@ -133,7 +133,7 @@ describe('buildCrawl', () => {
         const spacer: LocRow = {
             index: 0,
             key: '',
-            values: [{ language: 'ENGLISH', value: '' }, { language: 'GERMAN', value: '' }],
+            values: [{language: 'ENGLISH', value: ''}, {language: 'GERMAN', value: ''}],
         };
         const blocks = buildCrawl(
             [row(0, 'A', 'Alpha'), spacer, row(2, 'B', 'Beta')], 'GERMAN');
@@ -199,8 +199,8 @@ describe('buildCrawl', () => {
             index: 0,
             key: 'CENTER',
             values: [
-                { language: 'ENGLISH', value: '[TBL]' },
-                { language: 'GERMAN', value: '' },
+                {language: 'ENGLISH', value: '[TBL]'},
+                {language: 'GERMAN', value: ''},
             ],
         };
 

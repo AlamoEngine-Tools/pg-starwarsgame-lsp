@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { hiddenAt, visibilityTracks } from './boneVisibility';
+import {hiddenAt, visibilityTracks} from './boneVisibility';
 
 describe('visibilityTracks', () => {
     const json = {
@@ -14,11 +14,11 @@ describe('visibilityTracks', () => {
                 extras: {
                     alamoVisibility: {
                         fps: 30,
-                        bones: { 'P_ATST_Die#12': '0011', 'MUZZLE#3': '1100' },
+                        bones: {'P_ATST_Die#12': '0011', 'MUZZLE#3': '1100'},
                     },
                 },
             },
-            { name: 'idle' },
+            {name: 'idle'},
         ],
     };
 
@@ -42,9 +42,9 @@ describe('visibilityTracks', () => {
      * boundary. A shape nobody expected must cost that one clip, never the whole preview.
      */
     it('survives anything at all in place of the extras', () => {
-        for (const bad of [null, undefined, 42, 'nope', [], { animations: 'no' },
-            { animations: [{ name: 'x', extras: { alamoVisibility: 7 } }] },
-            { animations: [{ name: 'x', extras: { alamoVisibility: { fps: 'a', bones: 1 } } }] }]) {
+        for (const bad of [null, undefined, 42, 'nope', [], {animations: 'no'},
+            {animations: [{name: 'x', extras: {alamoVisibility: 7}}]},
+            {animations: [{name: 'x', extras: {alamoVisibility: {fps: 'a', bones: 1}}}]}]) {
             assert.doesNotThrow(() => visibilityTracks(bad));
         }
     });
@@ -52,7 +52,7 @@ describe('visibilityTracks', () => {
     /** A track with no fps cannot be turned into a frame, so it is no track at all. */
     it('refuses a track with a frame rate of zero', () => {
         const tracks = visibilityTracks({
-            animations: [{ name: 'x', extras: { alamoVisibility: { fps: 0, bones: { 'a#0': '01' } } } }],
+            animations: [{name: 'x', extras: {alamoVisibility: {fps: 0, bones: {'a#0': '01'}}}}],
         });
 
         assert.equal(tracks.has('x'), false);
@@ -98,7 +98,7 @@ describe('the node names a track is keyed by', () => {
         const tracks = visibilityTracks({
             animations: [{
                 name: 'attack',
-                extras: { alamoVisibility: { fps: 30, bones: { 'MuzzleA_01#22': '1111000' } } },
+                extras: {alamoVisibility: {fps: 30, bones: {'MuzzleA_01#22': '1111000'}}},
             }],
         });
 
@@ -109,7 +109,7 @@ describe('the node names a track is keyed by', () => {
         const tracks = visibilityTracks({
             animations: [{
                 name: 'attack',
-                extras: { alamoVisibility: { fps: 30, bones: { Barrel: '0011' } } },
+                extras: {alamoVisibility: {fps: 30, bones: {Barrel: '0011'}}},
             }],
         });
 
@@ -122,7 +122,7 @@ describe('the node names a track is keyed by', () => {
         const tracks = visibilityTracks({
             animations: [{
                 name: 'attack',
-                extras: { alamoVisibility: { fps: 30, bones: { 'Flash#0': '1000', 'Flash#1': '0001' } } },
+                extras: {alamoVisibility: {fps: 30, bones: {'Flash#0': '1000', 'Flash#1': '0001'}}},
             }],
         });
 

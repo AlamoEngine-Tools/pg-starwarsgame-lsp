@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { LocalisationPanelState } from './localisationPanelState';
+import {LocalisationPanelState} from './localisationPanelState';
 
 function command(index: number): Record<string, unknown> {
-    return { kind: 'setCell', index, language: 'ENGLISH', value: `v${index}` };
+    return {kind: 'setCell', index, language: 'ENGLISH', value: `v${index}`};
 }
 
 describe('LocalisationPanelState', () => {

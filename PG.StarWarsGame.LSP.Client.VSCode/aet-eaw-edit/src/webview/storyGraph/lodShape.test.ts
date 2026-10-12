@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { JUNCTION_TOKEN, LIFECYCLE_TOKENS } from './palette';
-import { lodShape } from './lodShape';
+import {JUNCTION_TOKEN, LIFECYCLE_TOKENS} from './palette';
+import {lodShape} from './lodShape';
 
 /**
  * Zoomed out, every node was a rectangle and a junction took the colour a FIRED event takes - so

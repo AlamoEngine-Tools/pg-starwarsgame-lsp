@@ -7,8 +7,8 @@
 // plain record of what it already knows - matrices it computed with three's own maths, the light
 // rig, the clock - and this says which part of it each semantic wants.
 
-import type { Wind } from '../viewerSettings';
-import type { AlamoMatrix, UniformSource } from './semantics';
+import type {Wind} from '../viewerSettings';
+import type {AlamoMatrix, UniformSource} from './semantics';
 
 /** One directional light, as the engine's uniforms describe it. */
 export interface FrameLight {

@@ -18,9 +18,7 @@
 // preview/viewport.ts, held in a ref, because the two lifecycles do not line up: React re-renders
 // when a checkbox moves, and a render loop must not be torn down for that.
 
-import {
-    Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
-} from 'react';
+import {Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,} from 'react';
 import {createRoot} from 'react-dom/client';
 import styled from 'styled-components';
 import * as THREE from 'three';
@@ -29,13 +27,21 @@ import * as THREE from 'three';
 import {DDSLoader} from 'three/examples/jsm/loaders/DDSLoader.js';
 import {TGALoader} from 'three/examples/jsm/loaders/TGALoader.js';
 
+import type {PreviewBreakoffProp} from '../protocol/modelPreview';
 import {
-    AlamoParticleContent, GetModelDetailResult, GetModelGlbResult, GetModelTextureResult,
+    AlamoParticleContent,
+    GetModelDetailResult,
+    GetModelGlbResult,
+    GetModelTextureResult,
     GetParticleSystemResult,
     GetProjectileResult,
-    GetShaderSourceResult, PREVIEW_PARTICLE_GATE,
-    ModelDetail, PREVIEW_SCENE_KIND, PreviewParticle,
-    PreviewProblem, PreviewRgba, PreviewScene,
+    GetShaderSourceResult,
+    ModelDetail,
+    PREVIEW_SCENE_KIND,
+    PreviewParticle,
+    PreviewProblem,
+    PreviewRgba,
+    PreviewScene,
 } from '../protocol/modelPreview';
 import {worstSeverity} from './loc/validateState';
 import {collectTextureNames} from './preview/materials';
@@ -51,61 +57,196 @@ import {safeImageSource} from './shared/safeImage';
 import {Field} from './shared/Field';
 import {Icon, type IconName} from './shared/Icon';
 import {addressingFor} from './preview/textures';
+import {ancestorsOf, type BoneAttachment, type FlatBone, type LabelMode,} from './preview/skeleton';
 import {
-    DEFAULT_LIGHT_AZIMUTH_DEGREES, DEFAULT_LIGHT_ELEVATION_DEGREES,
-} from './preview/lighting';
-import {
-    ancestorsOf, type BoneAttachment, type FlatBone, type LabelMode,
-} from './preview/skeleton';
-import {
-    boneIndexOfRow, buildTree, defaultCollapsed, filterTree, selectionAfterClick, toggleSelected,
+    boneIndexOfRow,
+    buildTree,
+    defaultCollapsed,
+    filterTree,
+    selectionAfterClick,
+    toggleSelected,
     toggleTargets,
-    visibleTreeRows, withDescendants,
-    type TreeItem, type TreeKind,
+    type TreeItem,
+    type TreeKind,
+    visibleTreeRows,
+    withDescendants,
 } from './preview/previewTree';
-import {PreviewViewport, type PresetView, type ViewportStats} from './preview/viewport';
 import {
-    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, playerCss, problemsPanelCss, rightDockCss,
-    rotarySwitchCss, stageChromeCss, stageFlyoutCss,
+    BREAKOFF_ATTACHMENT,
+    type PresetView,
+    PreviewViewport,
+    VIEWPORT_BACKGROUND,
+    type ViewportStats
+} from './preview/viewport';
+import {
+    dockBodyCss,
+    dockChromeCss,
+    dockHeaderCss,
+    dockOverviewCss,
+    playerCss,
+    problemsPanelCss,
+    rightDockCss,
+    rotarySwitchCss,
+    stageChromeCss,
+    stageFlyoutCss,
 } from './shared/dockChrome';
 import {ProblemsPanel} from './shared/ProblemsPanel';
 import {affiliationColour, colorizationFor, parseHex, toHex} from './preview/colour';
-import {reviewFactionColour, type ColourFinding} from './preview/colourUsability';
+import {reviewFactionColour} from './preview/colourUsability';
 import {translateEffect} from './preview/fx/effect';
 import {lightBearing} from './preview/lightBearing';
 import {cameraPose, cameraViewOptions, modelCameraEntries} from './preview/modelCameras';
 import {becauseText, setRow} from './preview/visibility';
-import {rowEye, type EyeState} from './preview/rowEye';
+import {type EyeState, rowEye} from './preview/rowEye';
 import {
-    luaFor, nextPresetName, poseFromPreset, presetFromPose, renamePreset, type CameraPreset,
+    type CameraPreset,
+    luaFor,
+    nextPresetName,
+    poseFromPreset,
+    presetFromPose,
+    renamePreset,
 } from './preview/cameraPresets';
 import {bindingFor, type CameraBinding, type PreviewSubject} from './preview/cameraBindings';
 import {
-    CAPTURE_SIZES, captureFileName, captureSize, DEFAULT_CAPTURE_SIZE, iconFileName, MAX_SIDE,
+    CAPTURE_SIZES,
+    captureFileName,
+    captureSize,
+    DEFAULT_CAPTURE_SIZE,
+    iconFileName,
+    MAX_SIDE,
 } from './preview/capture';
 import {IntegerField} from './shared/IntegerField';
 import {parseInteger} from './shared/integerValue';
-import {BREAKOFF_ATTACHMENT, VIEWPORT_BACKGROUND} from './preview/viewport';
 import {parseFxManifest, selectTechnique} from './preview/fx/fxParser';
 import {materialStateFrom} from './preview/fx/renderState';
-import {
-    collisionMeshNames, decalNames, effectPlaysNow,
-    hardpointGateAllows, partHidden,
-} from './preview/damage';
+import {collisionMeshNames, decalNames, effectPlaysNow, hardpointGateAllows, partHidden,} from './preview/damage';
 import {passiveEffectPlaysNow, passiveEffects} from './preview/passiveSubject';
 import {
+    type DefinedLevels,
+    type LevelCost,
+    levelLabel,
+    levelSteps,
     stageForHull,
-    levelLabel, levelSteps, withDeclaredStages, type DefinedLevels, type LevelCost,
+    withDeclaredStages,
 } from './preview/levels';
 import {
-    hardpointCards, hardpointFacts, healthBar, muzzleLabel, unitWeaponFacts, unitWeapons,
+    hardpointCards,
+    hardpointFacts,
+    healthBar,
+    muzzleLabel,
+    unitWeaponFacts,
+    unitWeapons,
     weaponFacts,
 } from './preview/hardpointCards';
 import {groupHardpoints, groupOf} from './preview/hardpointGroups';
+import {countTreeNodes, searchIsOpen, treeFilterSummary, treeMinHeight,} from './preview/treeSearch';
 import {
-    countTreeNodes, searchIsOpen, treeFilterSummary, treeMinHeight,
-} from './preview/treeSearch';
-import type {PreviewBreakoffProp} from '../protocol/modelPreview';
+    groupState,
+    type GroupState,
+    type ParticleGroup,
+    particleGroups,
+    replacedByAbility,
+} from './preview/particleScene';
+import {
+    defaultMode,
+    drawsAnnotations,
+    modelTouched,
+    otherModeChips,
+    type PreviewMode,
+    previewModes,
+} from './preview/previewMode';
+import {
+    allWeaponIds,
+    boneRowIndex,
+    fireBoneTitle,
+    visibleArcs,
+    type WeaponRow,
+    weaponRows,
+    weaponTitle,
+} from './preview/weaponRows';
+import {reticleFor, reticleMarks, reticleScreenSize, type ReticleState,} from './preview/reticles';
+import {
+    armorFactor,
+    type Attacker,
+    attackerFromProjectile,
+    attackerProjectile as attackerProjectileSpec,
+    damageSwitches,
+    DEFAULT_ATTACKER,
+    fireBlast,
+    fullPools,
+    poolRows,
+    type Pools,
+    poolsFor,
+    poolSummary,
+    projectileChoices,
+    resolveHitWithWorkings,
+} from './preview/attacker';
+import {
+    abilityAllows,
+    abilityBarTitle,
+    abilityClaims,
+    abilityFacts,
+    abilityOwnership,
+    abilityProxies,
+    abilityRows,
+    clipFor,
+    gotoDefinitionTitle,
+    shieldRevealed,
+    stealthed,
+    unboundEffectIds,
+} from './preview/abilityRows';
+import {problemLook, problemTag, problemWhere} from './shared/problemLook';
+import {cloneForDamage, deathCloneRows, turretSweeps} from './preview/deathClone';
+import {aimText, handlesForShownArcs, TURRET_AT_REST, type TurretAim,} from './preview/turretHandles';
+import {spinAwayEnd, spinAwaySummary} from './preview/spinAway';
+import {appendShot, BY_HAND, damageLine, type DamageLogEntry} from './preview/damageLog';
+import {breakoffAnchor, type BreakoffAnchor, breakoffFor} from './preview/breakoff';
+import {
+    hardpointPool,
+    hullAfterHardpointDeath,
+    hullPool,
+    shieldGeneratorsDown,
+    unitDestroyed,
+    unitTargetable,
+} from './preview/unitPool';
+import {DEFAULT_HULL_CONSTRAINT, leashed} from './preview/healthPools';
+import {blastVictims, candidatesFrom} from './preview/blast';
+import {useEdgeResize} from './useEdgeResize';
+import {readPanelSize, writePanelSize} from './shared/panelLayout';
+import {
+    type AnimationAction,
+    clipNamingModel,
+    groupAnimations,
+    playheadLabel,
+    readClip,
+} from './preview/animationNames';
+import {isDeployedClip, weaponsInState} from './preview/deployedState';
+import {pickTake} from './preview/takeRoulette';
+import {AnimationTile} from './preview/AnimationTile';
+import {type ChoiceOption} from './shared/choice';
+import {ModeSelector} from './shared/ModeSelector';
+import {RotaryModeSwitch} from './shared/RotaryModeSwitch';
+import {type SubjectState, subjectStateFrom} from './preview/subjectState';
+import {
+    type BackgroundKind,
+    colourFromHex,
+    DEFAULT_LIGHTS,
+    DEFAULT_VIEWER_SETTINGS,
+    type DirectionalName,
+    type DirectionalSetting,
+    hexFromColour,
+    LIGHT_LABELS,
+    LIGHT_NAMES,
+    type LightRig,
+    viewerSettingsFrom,
+    type Wind,
+} from './preview/viewerSettings';
+import {type AttackerPreset, projectSettingsFrom} from './preview/projectSettings';
+import {shadowTintReach, type ShadowTintReach} from './preview/shadowVolumePass';
+import {RightDock} from './shared/RightDock';
+
+import {initPanelLayout} from './shared/panelLayoutBridge';
+import {SeverityTag} from './shared/SeverityTag';
 
 /**
  * Marks a GLB request as WRECKAGE rather than a scene part.
@@ -126,69 +267,6 @@ const DEATH_CLONE_PART = 'deathclone:';
 
 /** Prefix for the persistent effect a piece of wreckage trails, so it can be stopped by key. */
 const WRECK_EFFECT = 'wreckfire:';
-import {
-    describeGate, groupState, particleGroups, replacedByAbility, type GroupState,
-    type ParticleGroup,
-} from './preview/particleScene';
-import {
-    defaultMode, drawsAnnotations, modelTouched, otherModeChips, previewModes, type PreviewMode,
-} from './preview/previewMode';
-import {
-    allWeaponIds, weaponTitle, boneRowIndex, fireBoneTitle, visibleArcs, weaponRows,
-    type WeaponRow,
-} from './preview/weaponRows';
-import {
-    reticleFor, reticleMarks, reticleScreenSize, type ReticleState,
-} from './preview/reticles';
-import {
-    DEFAULT_ATTACKER, armorFactor, attackerFromProjectile,
-    attackerProjectile as attackerProjectileSpec, damageSwitches, fireBlast, poolRows,
-    fullPools, poolsFor, projectileChoices, resolveHitWithWorkings, type Attacker,
-    type Pools,
-} from './preview/attacker';
-import {
-    abilityAllows, abilityBarTitle, abilityClaims, abilityFacts, abilityOwnership, abilityProxies,
-    abilityRows, clipFor,
-    gotoDefinitionTitle, shieldRevealed, stealthed, unboundEffectIds,
-} from './preview/abilityRows';
-import {problemLook, problemTag, problemWhere} from './shared/problemLook';
-import {cloneForDamage, deathCloneRows, turretSweeps} from './preview/deathClone';
-import {
-    TURRET_AT_REST, aimText, handlesForShownArcs, type TurretAim,
-} from './preview/turretHandles';
-import {spinAwayEnd, spinAwaySummary} from './preview/spinAway';
-import {BY_HAND, appendShot, damageLine, type DamageLogEntry} from './preview/damageLog';
-import {breakoffAnchor, breakoffFor, type BreakoffAnchor} from './preview/breakoff';
-import {
-    hardpointPool, hullAfterHardpointDeath, hullPool, shieldGeneratorsDown, unitDestroyed,
-    unitTargetable,
-} from './preview/unitPool';
-import {DEFAULT_HULL_CONSTRAINT, leashed} from './preview/healthPools';
-import {blastVictims, candidatesFrom} from './preview/blast';
-import {useEdgeResize} from './useEdgeResize';
-import {readPanelSize, writePanelSize} from './shared/panelLayout';
-import {poolSummary} from './preview/attacker';
-import {
-    clipNamingModel, groupAnimations, playheadLabel, readClip, type AnimationAction,
-} from './preview/animationNames';
-import {isDeployedClip, weaponsInState} from './preview/deployedState';
-import {pickTake} from './preview/takeRoulette';
-import {AnimationTile} from './preview/AnimationTile';
-import {type ChoiceOption} from './shared/choice';
-import {ModeSelector} from './shared/ModeSelector';
-import {RotaryModeSwitch} from './shared/RotaryModeSwitch';
-import {subjectStateFrom, type SubjectState} from './preview/subjectState';
-import {
-    colourFromHex, hexFromColour, viewerSettingsFrom, DEFAULT_LIGHTS, DEFAULT_VIEWER_SETTINGS,
-    LIGHT_LABELS, LIGHT_NAMES, type DirectionalName, type DirectionalSetting, type LightRig,
-    type BackgroundKind, type Wind,
-} from './preview/viewerSettings';
-import {projectSettingsFrom, type AttackerPreset} from './preview/projectSettings';
-import {shadowTintReach, type ShadowTintReach} from './preview/shadowVolumePass';
-import {RightDock} from './shared/RightDock';
-
-import {initPanelLayout} from './shared/panelLayoutBridge';
-import {SeverityTag} from './shared/SeverityTag';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 

@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
@@ -37,7 +38,8 @@ public sealed class TupleSlotSmokeTest(E2eModServerFixture fixture) : IClassFixt
 
         var messages = (await received).Diagnostics.Select(d => d.Message).ToList();
 
-        Assert.Contains(messages, m => m.Contains("'Not_A_Terrain' is not a MapEnvironment value", StringComparison.Ordinal));
+        Assert.Contains(messages,
+            m => m.Contains("'Not_A_Terrain' is not a MapEnvironment value", StringComparison.Ordinal));
         Assert.Contains(messages, m => m.Contains("'E2E_NO_SUCH_MODEL.ALO' was not found", StringComparison.Ordinal));
         Assert.DoesNotContain(messages, m => m.Contains("EI_TROOPER", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(messages, m => m.Contains("'Arctic'", StringComparison.OrdinalIgnoreCase));
@@ -50,7 +52,7 @@ public sealed class TupleSlotSmokeTest(E2eModServerFixture fixture) : IClassFixt
         var actions = await fixture.Client.RequestCodeAction(new CodeActionParams
         {
             TextDocument = new TextDocumentIdentifier(uri),
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(line, character, line, character),
+            Range = new Range(line, character, line, character),
             Context = new CodeActionContext { Diagnostics = new Container<Diagnostic>() }
         }, cts.Token);
 

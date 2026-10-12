@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import { useEffect, useRef, useState } from 'react';
-import { IconButton } from '../shared/Button';
+import {useEffect, useRef, useState} from 'react';
+import {IconButton} from '../shared/Button';
 
 export interface LocColumnMenuProps {
     languages: string[];
@@ -28,22 +28,33 @@ export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
     const open = at !== null;
 
     const toggle = (): void => {
-        if (open) { setAt(null); return; }
+        if (open) {
+            setAt(null);
+            return;
+        }
 
         const box = buttonRef.current?.getBoundingClientRect();
-        if (box) { setAt({ top: box.bottom + 2, right: window.innerWidth - box.right }); }
+        if (box) {
+            setAt({top: box.bottom + 2, right: window.innerWidth - box.right});
+        }
     };
 
     // Any click that is not inside the flyout closes it, which is what makes it feel like a menu
     // rather than a panel you have to put away.
     useEffect(() => {
-        if (!open) { return; }
+        if (!open) {
+            return;
+        }
 
         const onDown = (e: MouseEvent): void => {
-            if (!ref.current?.contains(e.target as Node)) { setAt(null); }
+            if (!ref.current?.contains(e.target as Node)) {
+                setAt(null);
+            }
         };
         const onKey = (e: KeyboardEvent): void => {
-            if (e.key === 'Escape') { setAt(null); }
+            if (e.key === 'Escape') {
+                setAt(null);
+            }
         };
         // Pinned to the viewport, so it would otherwise sit still while the table moved under it.
         const onScrollOrResize = (): void => setAt(null);
@@ -77,7 +88,7 @@ export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
                 <div
                     className="column-flyout"
                     role="menu"
-                    style={{ top: at.top, right: at.right }}
+                    style={{top: at.top, right: at.right}}
                 >
                     <div className="column-flyout-title">
                         Columns

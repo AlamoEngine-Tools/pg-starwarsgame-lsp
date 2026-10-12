@@ -2,11 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import * as THREE from 'three';
 
-import { emissionMeshFor } from './emissionSource';
+import {emissionMeshFor} from './emissionSource';
 
 /** A triangle, so there is a face to sample as well as vertices to walk. */
 function triangle(name: string, shader = 'alDefault.fx'): THREE.Mesh {
@@ -19,7 +19,7 @@ function triangle(name: string, shader = 'alDefault.fx'): THREE.Mesh {
 
     const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
     mesh.name = name;
-    mesh.userData.alamo = { alamoShader: shader, alamoMesh: name };
+    mesh.userData.alamo = {alamoShader: shader, alamoMesh: name};
 
     return mesh;
 }
@@ -46,12 +46,12 @@ function nebulonShaped(): { engines: THREE.Object3D; proxy: THREE.Object3D; mesh
     root.add(engines);
     root.updateMatrixWorld(true);
 
-    return { engines, proxy, mesh };
+    return {engines, proxy, mesh};
 }
 
 describe('emissionMeshFor', () => {
     it('takes the geometry attached to the bone itself', () => {
-        const { engines } = nebulonShaped();
+        const {engines} = nebulonShaped();
 
         const source = emissionMeshFor(engines);
 
@@ -64,7 +64,7 @@ describe('emissionMeshFor', () => {
      * point, which is exactly the bug: the wash belongs to the engine block one bone up.
      */
     it('walks up to the nearest bone that actually carries geometry', () => {
-        const { proxy } = nebulonShaped();
+        const {proxy} = nebulonShaped();
 
         const source = emissionMeshFor(proxy);
 
@@ -76,7 +76,7 @@ describe('emissionMeshFor', () => {
      * further up has to be brought down into it or the whole cloud is born displaced.
      */
     it('expresses the geometry in the attachment`s own space', () => {
-        const { proxy } = nebulonShaped();
+        const {proxy} = nebulonShaped();
 
         const source = emissionMeshFor(proxy);
 
@@ -85,7 +85,7 @@ describe('emissionMeshFor', () => {
     });
 
     it('leaves normals as directions, unmoved by the translation', () => {
-        const { proxy } = nebulonShaped();
+        const {proxy} = nebulonShaped();
 
         const source = emissionMeshFor(proxy);
 
@@ -141,7 +141,7 @@ describe('emissionMeshFor', () => {
 
     /** Search has to end somewhere, or a proxy on an empty bone reads the whole model's geometry. */
     it('stops at the highest node it is given', () => {
-        const { proxy } = nebulonShaped();
+        const {proxy} = nebulonShaped();
 
         assert.equal(emissionMeshFor(proxy, proxy), null, 'the walk climbed past its boundary');
     });

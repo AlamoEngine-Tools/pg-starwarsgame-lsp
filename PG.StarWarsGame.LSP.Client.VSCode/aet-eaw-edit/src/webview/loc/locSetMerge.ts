@@ -61,7 +61,9 @@ export function mergeMembers(members: readonly MemberDocument[]): MergedDocument
     // address a row by its position, so the rows that were left took writes aimed at other lines.
     // A translation file lost its duplicate keys the same way, hiding the very row the validator
     // reports.
-    if (members.length === 1) { return passThrough(members[0], languages); }
+    if (members.length === 1) {
+        return passThrough(members[0], languages);
+    }
 
     // key -> language -> value, built once so the row assembly below is not quadratic in members.
     const byKey = new Map<string, Map<string, string>>();
@@ -79,7 +81,9 @@ export function mergeMembers(members: readonly MemberDocument[]): MergedDocument
             for (const value of row.values) {
                 // First member wins a language it shares with another, which only happens if a set
                 // was built from files that overlap - the merge stays deterministic either way.
-                if (!values.has(value.language)) { values.set(value.language, value.value); }
+                if (!values.has(value.language)) {
+                    values.set(value.language, value.value);
+                }
             }
         }
     }
@@ -144,7 +148,11 @@ export function partitionCommands(
     const batches = new Map<string, KeyedCommand[]>();
     const add = (filePath: string, command: KeyedCommand): void => {
         const existing = batches.get(filePath);
-        if (existing) { existing.push(command); } else { batches.set(filePath, [command]); }
+        if (existing) {
+            existing.push(command);
+        } else {
+            batches.set(filePath, [command]);
+        }
     };
 
     for (const command of commands) {
@@ -154,7 +162,9 @@ export function partitionCommands(
                 : memberForLanguage(members, command.language);
             // A value for a language no file holds has nowhere to go. Dropped rather than guessed
             // at: writing it into an arbitrary file would put German text in the French file.
-            if (owner !== undefined) { add(owner.filePath, command); }
+            if (owner !== undefined) {
+                add(owner.filePath, command);
+            }
             continue;
         }
 
@@ -172,8 +182,10 @@ export function partitionCommands(
         }
 
         if (command.kind === 'renameKey' || command.kind === 'deleteEntry') {
-            for (const member of members) { add(member.filePath, command); }
-            continue;
+            for (const member of members) {
+                add(member.filePath, command);
+            }
+
         }
 
         // addLanguage has no meaning here: in a single-language format another language is another

@@ -43,11 +43,9 @@ public sealed class EawSchemaDeprecationKindsTest
         }
 
         foreach (var rel in EawSchemaRepo.YamlFiles("tags"))
-        {
-            foreach (var tag in YamlSchemaParser.ParseTagFile(EawSchemaRepo.Read(rel)))
-            foreach (var note in tag.Notes)
-                found.Add((tag.Tag, rel, note));
-        }
+        foreach (var tag in YamlSchemaParser.ParseTagFile(EawSchemaRepo.Read(rel)))
+        foreach (var note in tag.Notes)
+            found.Add((tag.Tag, rel, note));
 
         return found;
     }

@@ -9,16 +9,14 @@
 // is a tile that opens a dialog: all three change the file as a whole, which is not something to
 // have happen the instant a control is touched.
 
-import { useState } from 'react';
+import {useState} from 'react';
 
-import { DIALOG_IDS } from '../shared/dialogGeometryStore';
-import {
-    canCopyBetweenLanguages, copyFromOptions, FillSource, nextCopyFrom, resolveFillSource,
-} from './fillLanguage';
-import { Modal } from '../shared/Modal';
-import { DockSection } from '../shared/DockSection';
-import { LocTile, LocTileGrid } from './LocTile';
-import { Field } from '../shared/Field';
+import {DIALOG_IDS} from '../shared/dialogGeometryStore';
+import {canCopyBetweenLanguages, copyFromOptions, FillSource, nextCopyFrom, resolveFillSource,} from './fillLanguage';
+import {Modal} from '../shared/Modal';
+import {DockSection} from '../shared/DockSection';
+import {LocTile, LocTileGrid} from './LocTile';
+import {Field} from '../shared/Field';
 
 /** The text formats a file can be rewritten as. DAT is not one - it is what Export produces. */
 export const CONVERTIBLE_FORMATS = ['CSV', 'XML', 'NLS'] as const;
@@ -118,7 +116,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
         && seedSources.length > 0;
     // Resolved to exactly one source, so these three cannot disagree - see resolveFillSource for
     // what went wrong when they were derived independently.
-    const source = resolveFillSource(fillSource, { canCopy, canSeed });
+    const source = resolveFillSource(fillSource, {canCopy, canSeed});
     const fromFile = source === 'file';
     const fromGame = source === 'baseline';
     const fromLanguage = source === 'language';
@@ -141,7 +139,9 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
     };
 
     const addLanguage = (): void => {
-        if (language === '') { return; }
+        if (language === '') {
+            return;
+        }
         props.onAddLanguage(language, fillFromBaseline && (fillCount ?? 0) > 0);
         close();
     };
@@ -157,7 +157,10 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                             title={props.addLanguageCreatesFile
                                 ? 'Create a file for another language beside this one'
                                 : 'Add a language column to this file'}
-                            onClick={() => { setLanguage(''); setDialog('language'); }}
+                            onClick={() => {
+                                setLanguage('');
+                                setDialog('language');
+                            }}
                         />
                     )}
                     {(props.onFillFromBaseline !== undefined || canCopy || canSeed) && (
@@ -207,9 +210,9 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     // format writes a whole new file on the spot.
                     footnote={props.addLanguageCreatesFile
                         ? 'A new file is written beside this one, carrying every key from it, '
-                          + 'ready to translate.'
+                        + 'ready to translate.'
                         : 'The column is added to every row, and nothing reaches the file '
-                          + 'until you save.'}
+                        + 'until you save.'}
                     title="Add a language"
                     confirmLabel="Add"
                     canConfirm={language !== ''}
@@ -243,28 +246,28 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                 discarded. Fill the new file from the game once it is open. */}
                             {props.baselineFillCount !== undefined
                                 && !props.addLanguageCreatesFile && (
-                                <label
-                                    className="check-field"
-                                    title="Copy the game's own text for this language into the keys it defines"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={fillFromBaseline}
-                                        disabled={fillCount === 0}
-                                        onChange={e => setFillFromBaseline(e.target.checked)}
-                                    />
-                                    <span>
+                                    <label
+                                        className="check-field"
+                                        title="Copy the game's own text for this language into the keys it defines"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={fillFromBaseline}
+                                            disabled={fillCount === 0}
+                                            onChange={e => setFillFromBaseline(e.target.checked)}
+                                        />
+                                        <span>
                                         Fill from the game's translations
-                                        {fillCount !== undefined && (
-                                            <span className="check-detail">
+                                            {fillCount !== undefined && (
+                                                <span className="check-detail">
                                                 {fillCount === 0
                                                     ? ' - the game translates none of these keys'
                                                     : ` - ${fillCount} of ${props.rowCount} entries`}
                                             </span>
-                                        )}
+                                            )}
                                     </span>
-                                </label>
-                            )}
+                                    </label>
+                                )}
 
                         </>
                     )}
@@ -279,9 +282,13 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     canConfirm={copyCount > 0}
                     onCancel={close}
                     onConfirm={() => {
-                        if (fromFile) { props.onSeedFrom?.(seedFrom, copyTo); }
-                        else if (fromGame) { props.onFillFromBaseline?.(copyTo); }
-                        else { props.onCopyLanguage?.(copyFrom, copyTo); }
+                        if (fromFile) {
+                            props.onSeedFrom?.(seedFrom, copyTo);
+                        } else if (fromGame) {
+                            props.onFillFromBaseline?.(copyTo);
+                        } else {
+                            props.onCopyLanguage?.(copyFrom, copyTo);
+                        }
                         close();
                     }}
                 >
@@ -356,14 +363,14 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     <p className="modal-note">
                         {fromFile
                             ? `${copyCount} line(s) would be copied in, in that file's order, `
-                              + `as ${copyTo} - ready to translate over.`
+                            + `as ${copyTo} - ready to translate over.`
                             : copyCount === 0
                                 ? `There is nothing left to fill in for ${copyTo}.`
                                 : props.fillsByAdding && fromGame
                                     ? `${copyCount} line(s) would be added, in the order the game `
-                                      + 'plays them. Edit or delete what you do not want afterwards.'
+                                    + 'plays them. Edit or delete what you do not want afterwards.'
                                     : `${copyCount} empty cell(s) would be filled. Anything `
-                                      + `${copyTo} already says is left alone.`}
+                                    + `${copyTo} already says is left alone.`}
                     </p>
                     {fromLanguage && (
                         <p className="modal-note">
@@ -384,7 +391,10 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     title="Convert to another format"
                     confirmLabel="Convert"
                     onCancel={close}
-                    onConfirm={() => { props.onConvertFormat(format); close(); }}
+                    onConfirm={() => {
+                        props.onConvertFormat(format);
+                        close();
+                    }}
                 >
                     <div className="choice-list">
                         {CONVERTIBLE_FORMATS.map(f => (
@@ -409,7 +419,10 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     title="Export to DAT"
                     confirmLabel="Export"
                     onCancel={close}
-                    onConfirm={() => { props.onExportDat(); close(); }}
+                    onConfirm={() => {
+                        props.onExportDat();
+                        close();
+                    }}
                 >
                     <p className="modal-note">
                         Writes the binary files the game loads, one per language, beside this file.

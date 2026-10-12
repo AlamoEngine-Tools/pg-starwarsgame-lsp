@@ -22,7 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { tokenOffences } = require('./styleTokenRules');
+const {tokenOffences} = require('./styleTokenRules');
 
 const ROOT = path.join(__dirname, '..', 'src');
 
@@ -48,15 +48,19 @@ function definedTokens() {
 
     // Declarations in the CSS blocks, plus the colour roles, which are generated from a list of
     // objects rather than written out as CSS.
-    for (const m of text.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)) { names.add(m[1]); }
-    for (const m of text.matchAll(/name:\s*'(--[a-z0-9-]+)'/g)) { names.add(m[1]); }
+    for (const m of text.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)) {
+        names.add(m[1]);
+    }
+    for (const m of text.matchAll(/name:\s*'(--[a-z0-9-]+)'/g)) {
+        names.add(m[1]);
+    }
 
     return names;
 }
 
 /** Every .ts/.tsx under src, so a styled template added anywhere is covered. */
 function sources(dir) {
-    return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    return fs.readdirSync(dir, {withFileTypes: true}).flatMap(entry => {
         const full = path.join(dir, entry.name);
 
         if (entry.isDirectory()) {
@@ -84,7 +88,11 @@ function endOfTemplate(text, from) {
             at += 2;
 
             while (at < text.length && depth > 0) {
-                if (text[at] === '{') { depth++; } else if (text[at] === '}') { depth--; }
+                if (text[at] === '{') {
+                    depth++;
+                } else if (text[at] === '}') {
+                    depth--;
+                }
                 at++;
             }
 

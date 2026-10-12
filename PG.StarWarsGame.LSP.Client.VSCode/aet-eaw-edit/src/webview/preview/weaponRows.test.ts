@@ -2,15 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { PreviewHardpoint, PreviewWeapon } from '../../protocol/modelPreview';
+import type {PreviewHardpoint, PreviewWeapon} from '../../protocol/modelPreview';
 
-import type { TreeItem } from './previewTree';
+import type {TreeItem} from './previewTree';
 
-import {
-    allWeaponIds, weaponTitle, boneRowIndex, fireBoneTitle, visibleArcs, weaponRows,
-} from './weaponRows';
+import {allWeaponIds, boneRowIndex, fireBoneTitle, visibleArcs, weaponRows, weaponTitle,} from './weaponRows';
 
 function weapon(over: Partial<PreviewWeapon> = {}): PreviewWeapon {
     return {
@@ -45,7 +43,7 @@ describe('weaponRows', () => {
         // The cone is attached to the fire bone of the ATTACHED model. Anchoring it on the hull would
         // draw a Star Destroyer's arcs from its centre, all 148 of them, in a fan.
         const rows = weaponRows(
-            { weapons: [weapon()], hardpoints: [hardpoint()] }, new Set());
+            {weapons: [weapon()], hardpoints: [hardpoint()]}, new Set());
 
         assert.equal(rows.length, 1);
         assert.equal(rows[0].partId, 'HP_Turbolaser');
@@ -71,7 +69,7 @@ describe('weaponRows', () => {
         // A hardpoint with no Model_To_Attach yields no part - 137 of them - but it still declares
         // fire bones, and those are the HULL's own bones.
         const rows = weaponRows(
-            { weapons: [weapon()], hardpoints: [hardpoint({ partId: null })] }, new Set());
+            {weapons: [weapon()], hardpoints: [hardpoint({partId: null})]}, new Set());
 
         assert.equal(rows[0].partId, 'hull');
     });
@@ -119,7 +117,7 @@ describe('weaponRows', () => {
         // The server guards this even when extents ARE authored, which vanilla does:
         // Landbombingrununits.xml ships Fires_Forward beside a 20/20 arc it never uses.
         const rows = weaponRows({
-            weapons: [weapon({ range: 500, firesForward: true })],
+            weapons: [weapon({range: 500, firesForward: true})],
             hardpoints: [hardpoint()],
         }, new Set());
 
@@ -151,21 +149,21 @@ describe('weaponRows', () => {
 
     it('draws nothing for a weapon with no reach, rather than a zero-length stub', () => {
         const rows = weaponRows(
-            { weapons: [weapon()], hardpoints: [hardpoint()] }, new Set());
+            {weapons: [weapon()], hardpoints: [hardpoint()]}, new Set());
 
         assert.deepEqual(rows[0].arcs, []);
     });
 
     it('marks a row whose hardpoint has been shot away', () => {
         const rows = weaponRows(
-            { weapons: [weapon()], hardpoints: [hardpoint()] }, new Set(['HP_Turbolaser']));
+            {weapons: [weapon()], hardpoints: [hardpoint()]}, new Set(['HP_Turbolaser']));
 
         assert.equal(rows[0].destroyed, true);
     });
 
     it('never marks a unit weapon destroyed - the hull is the subject', () => {
         const rows = weaponRows({
-            weapons: [weapon({ id: 'weapon:A', source: 'Unit', hardpointId: null })],
+            weapons: [weapon({id: 'weapon:A', source: 'Unit', hardpointId: null})],
             hardpoints: [hardpoint()],
         }, new Set(['HP_Turbolaser']));
 
@@ -175,46 +173,46 @@ describe('weaponRows', () => {
     describe('the readout on the row', () => {
         function row(over: Partial<PreviewWeapon>) {
             return weaponRows(
-                { weapons: [weapon(over)], hardpoints: [hardpoint()] }, new Set())[0];
+                {weapons: [weapon(over)], hardpoints: [hardpoint()]}, new Set())[0];
         }
 
         it('reads a full cadence as a sentence', () => {
             assert.equal(
-                row({ pulseCount: 3, pulseDelaySeconds: 0.1, rechargeSeconds: 2 }).cadence,
+                row({pulseCount: 3, pulseDelaySeconds: 0.1, rechargeSeconds: 2}).cadence,
                 '3 shots, 0.1s apart, 2s recharge');
         });
 
         it('does not pluralise a single shot, and drops a delay it cannot use', () => {
             assert.equal(
-                row({ pulseCount: 1, pulseDelaySeconds: 0.1, rechargeSeconds: 4.5 }).cadence,
+                row({pulseCount: 1, pulseDelaySeconds: 0.1, rechargeSeconds: 4.5}).cadence,
                 '1 shot, 4.5s recharge');
         });
 
         it('says only what was declared', () => {
-            assert.equal(row({ rechargeSeconds: 2 }).cadence, '2s recharge');
-            assert.equal(row({ pulseCount: 4 }).cadence, '4 shots');
+            assert.equal(row({rechargeSeconds: 2}).cadence, '2s recharge');
+            assert.equal(row({pulseCount: 4}).cadence, '4 shots');
             assert.equal(row({}).cadence, null);
         });
 
         it('carries the damage and its type together', () => {
             assert.equal(
-                row({ damage: 24, damageType: 'Damage_Normal' }).damage,
+                row({damage: 24, damageType: 'Damage_Normal'}).damage,
                 '24 damage, Damage_Normal');
-            assert.equal(row({ damage: 24 }).damage, '24 damage');
-            assert.equal(row({ damageType: 'Damage_Normal' }).damage, 'Damage_Normal');
+            assert.equal(row({damage: 24}).damage, '24 damage');
+            assert.equal(row({damageType: 'Damage_Normal'}).damage, 'Damage_Normal');
             assert.equal(row({}).damage, null);
         });
 
         it('reads a minimum range as the near end of a band', () => {
-            assert.equal(row({ range: 2000, minRange: 200 }).reach, '200-2000 units');
-            assert.equal(row({ range: 2000 }).reach, '2000 units');
+            assert.equal(row({range: 2000, minRange: 200}).reach, '200-2000 units');
+            assert.equal(row({range: 2000}).reach, '2000 units');
             assert.equal(row({}).reach, null);
         });
 
         it('states the cone, because a wide fan and a narrow one are different weapons', () => {
-            assert.equal(row({ coneWidthDegrees: 60, coneHeightDegrees: 30 }).cone,
+            assert.equal(row({coneWidthDegrees: 60, coneHeightDegrees: 30}).cone,
                 '60 x 30 deg');
-            assert.equal(row({ coneWidthDegrees: 360, coneHeightDegrees: 45 }).cone,
+            assert.equal(row({coneWidthDegrees: 360, coneHeightDegrees: 45}).cone,
                 '360 x 45 deg');
             assert.equal(row({}).cone, null);
         });
@@ -223,10 +221,12 @@ describe('weaponRows', () => {
         // all of them. 1017 of these ship and not one of them reached the card before.
         it('states the spread per target category', () => {
             assert.equal(
-                row({ inaccuracy: [
-                    { category: 'Fighter', distance: 30 },
-                    { category: 'Capital', distance: 12.5 },
-                ] }).inaccuracy,
+                row({
+                    inaccuracy: [
+                        {category: 'Fighter', distance: 30},
+                        {category: 'Capital', distance: 12.5},
+                    ]
+                }).inaccuracy,
                 'Fighter 30, Capital 12.5');
             assert.equal(row({}).inaccuracy, null);
         });
@@ -240,7 +240,7 @@ describe('weaponRows', () => {
                 source: 'Unit',
                 hardpointId: null,
                 firesForward: true,
-                inaccuracy: [{ category: 'Fighter', distance: 30 }],
+                inaccuracy: [{category: 'Fighter', distance: 30}],
             });
 
             assert.equal(forward.inaccuracy, 'None - Fires_Forward skips spread and target leading');
@@ -249,7 +249,7 @@ describe('weaponRows', () => {
         it('says so even when a Fires_Forward weapon declares no spread at all', () => {
             // The fact worth reading is that it does not LEAD, which holds with an empty list.
             assert.equal(
-                row({ source: 'Unit', hardpointId: null, firesForward: true }).inaccuracy,
+                row({source: 'Unit', hardpointId: null, firesForward: true}).inaccuracy,
                 'None - Fires_Forward skips spread and target leading');
         });
 
@@ -263,14 +263,14 @@ describe('weaponRows', () => {
             delete (stale as { inaccuracy?: unknown }).inaccuracy;
 
             assert.equal(
-                weaponRows({ weapons: [stale], hardpoints: [hardpoint()] }, new Set())[0].inaccuracy,
+                weaponRows({weapons: [stale], hardpoints: [hardpoint()]}, new Set())[0].inaccuracy,
                 null);
         });
 
         it('never writes a trailing zero at a modder', () => {
             // The XML says 2.0000 and 0.10; the row says 2 and 0.1.
-            assert.equal(row({ range: 2000.0, minRange: 0 }).reach, '2000 units');
-            assert.equal(row({ damage: 24.5 }).damage, '24.5 damage');
+            assert.equal(row({range: 2000.0, minRange: 0}).reach, '2000 units');
+            assert.equal(row({damage: 24.5}).damage, '24.5 damage');
         });
     });
 });
@@ -348,7 +348,7 @@ describe('the two envelopes a turret hardpoint keeps', () => {
 
     it('leaves a hardpoint that declares no turret alone', () => {
         const rows = weaponRows({
-            weapons: [weapon({ range: 2000, coneWidthDegrees: 60, coneHeightDegrees: 30 })],
+            weapons: [weapon({range: 2000, coneWidthDegrees: 60, coneHeightDegrees: 30})],
             hardpoints: [hardpoint()],
         }, new Set());
 
@@ -359,7 +359,7 @@ describe('the two envelopes a turret hardpoint keeps', () => {
 describe('visibleArcs', () => {
     const rows = weaponRows({
         weapons: [
-            weapon({ range: 2000, coneWidthDegrees: 60, coneHeightDegrees: 30 }),
+            weapon({range: 2000, coneWidthDegrees: 60, coneHeightDegrees: 30}),
             weapon({
                 id: 'hardpoint:HP_Missile',
                 hardpointId: 'HP_Missile',
@@ -370,7 +370,7 @@ describe('visibleArcs', () => {
                 coneHeightDegrees: 20,
             }),
         ],
-        hardpoints: [hardpoint(), hardpoint({ id: 'HP_Missile', partId: 'HP_Missile' })],
+        hardpoints: [hardpoint(), hardpoint({id: 'HP_Missile', partId: 'HP_Missile'})],
     }, new Set());
 
     it('draws every weapon when the master is on and nothing is switched off', () => {
@@ -395,7 +395,7 @@ describe('visibleArcs', () => {
         // A destroyed hardpoint's model is hidden; leaving its cone hanging in the gap would say the
         // wreck still shoots.
         const damaged = weaponRows({
-            weapons: [weapon({ range: 2000, coneWidthDegrees: 60, coneHeightDegrees: 30 })],
+            weapons: [weapon({range: 2000, coneWidthDegrees: 60, coneHeightDegrees: 30})],
             hardpoints: [hardpoint()],
         }, new Set(['HP_Turbolaser']));
 
@@ -405,7 +405,7 @@ describe('visibleArcs', () => {
 
 describe('boneRowIndex', () => {
     function bone(id: string, name: string): TreeItem {
-        return { id, kind: 'bone', name, parentId: null, visible: true, gatedOff: false };
+        return {id, kind: 'bone', name, parentId: null, visible: true, gatedOff: false};
     }
 
     it('finds a fire bone whatever case the XML wrote it in', () => {
@@ -419,7 +419,7 @@ describe('boneRowIndex', () => {
 
     it('ignores meshes and effects - a fire bone is a bone', () => {
         const index = boneRowIndex([
-            { ...bone('mesh:1', 'MuzzleA_00'), kind: 'mesh' },
+            {...bone('mesh:1', 'MuzzleA_00'), kind: 'mesh'},
             bone('bone:4', 'MuzzleA_00'),
         ]);
 
@@ -443,11 +443,11 @@ describe('boneRowIndex', () => {
 
 describe('the tooltips on a weapon row', () => {
     function row(over: Partial<PreviewWeapon>) {
-        return weaponRows({ weapons: [weapon(over)], hardpoints: [hardpoint()] }, new Set())[0];
+        return weaponRows({weapons: [weapon(over)], hardpoints: [hardpoint()]}, new Set())[0];
     }
 
     it('offers the cone when there is one to draw', () => {
-        assert.match(weaponTitle(row({ range: 2000 })), /^Draw this weapon/);
+        assert.match(weaponTitle(row({range: 2000})), /^Draw this weapon/);
     });
 
     it('explains a tick that would do nothing rather than just greying it out', () => {
@@ -456,7 +456,7 @@ describe('the tooltips on a weapon row', () => {
 
     it('says the hardpoint is gone before it says anything about cones', () => {
         const dead = weaponRows(
-            { weapons: [weapon({ range: 2000 })], hardpoints: [hardpoint()] },
+            {weapons: [weapon({range: 2000})], hardpoints: [hardpoint()]},
             new Set(['HP_Turbolaser']))[0];
 
         assert.match(weaponTitle(dead), /shot away/);
@@ -475,8 +475,8 @@ describe('naming a weapon row', () => {
         // it is what the Hardpoints list beside this one already shows.
         const rows = weaponRows({
             weapons: [
-                weapon({ id: 'hardpoint:HP_FL', hardpointId: 'HP_Star_Destroyer_Weapon_FL' }),
-                weapon({ id: 'hardpoint:HP_FR', hardpointId: 'HP_Star_Destroyer_Weapon_FR' }),
+                weapon({id: 'hardpoint:HP_FL', hardpointId: 'HP_Star_Destroyer_Weapon_FL'}),
+                weapon({id: 'hardpoint:HP_FR', hardpointId: 'HP_Star_Destroyer_Weapon_FR'}),
             ],
             hardpoints: [],
         }, new Set());
@@ -486,13 +486,13 @@ describe('naming a weapon row', () => {
     });
 
     it('keeps the type, because it is what picks the reticle and the tooltip', () => {
-        assert.equal(weaponRows({ weapons: [weapon()], hardpoints: [] }, new Set())[0].label,
+        assert.equal(weaponRows({weapons: [weapon()], hardpoints: []}, new Set())[0].label,
             'HARD_POINT_WEAPON_LASER');
     });
 
     it('names a unit weapon after the weapon, which is all it has', () => {
         const row = weaponRows({
-            weapons: [weapon({ id: 'weapon:A', source: 'Unit', hardpointId: null, label: 'Weapon A' })],
+            weapons: [weapon({id: 'weapon:A', source: 'Unit', hardpointId: null, label: 'Weapon A'})],
             hardpoints: [],
         }, new Set())[0];
 
@@ -518,14 +518,16 @@ describe('the turret on a weapon row', () => {
     });
 
     it('is null for a weapon that declares none', () => {
-        assert.equal(weaponRows({ weapons: [weapon()], hardpoints: [] }, new Set())[0].turret, null);
+        assert.equal(weaponRows({weapons: [weapon()], hardpoints: []}, new Set())[0].turret, null);
     });
 });
 
 describe('which weapons a subject opens with', () => {
     function drawable(id: string) {
-        return weapon({ id, hardpointId: id, range: 1000, coneWidthDegrees: 175,
-            coneHeightDegrees: 160 });
+        return weapon({
+            id, hardpointId: id, range: 1000, coneWidthDegrees: 175,
+            coneHeightDegrees: 160
+        });
     }
 
     it('opens with EVERY weapon off', () => {
@@ -534,7 +536,7 @@ describe('which weapons a subject opens with', () => {
         // nearly omnidirectional, so drawing them together fills the viewport however correct the
         // geometry is.
         const rows = weaponRows(
-            { weapons: [drawable('a'), drawable('b'), drawable('c')], hardpoints: [] }, new Set());
+            {weapons: [drawable('a'), drawable('b'), drawable('c')], hardpoints: []}, new Set());
 
         assert.deepEqual([...allWeaponIds(rows)].sort(), ['a', 'b', 'c']);
     });
@@ -543,7 +545,7 @@ describe('which weapons a subject opens with', () => {
         // A weapon with no reach has no cone, so there is nothing to switch either way and an id in
         // the hidden set for it would make the pill's "n of m" count lie.
         const rows = weaponRows({
-            weapons: [weapon({ id: 'no-range' }), drawable('b')],
+            weapons: [weapon({id: 'no-range'}), drawable('b')],
             hardpoints: [],
         }, new Set());
 
@@ -552,7 +554,7 @@ describe('which weapons a subject opens with', () => {
 
     it('is empty when nothing can be drawn at all', () => {
         assert.equal(allWeaponIds(weaponRows(
-            { weapons: [weapon()], hardpoints: [] }, new Set())).size, 0);
+            {weapons: [weapon()], hardpoints: []}, new Set())).size, 0);
     });
 });
 
@@ -564,13 +566,13 @@ describe('the words these strings use', () => {
     // in a turn, so the word already meant something else in the very files these rows describe.
     it('uses the game`s words, not ours', () => {
         const built = (destroyed: Set<string>, over: Partial<PreviewWeapon>) => weaponRows(
-            { weapons: [weapon(over)], hardpoints: [hardpoint()] }, destroyed)[0];
+            {weapons: [weapon(over)], hardpoints: [hardpoint()]}, destroyed)[0];
 
         const strings = [
             // Every branch of both, so a word cannot hide in the one nobody renders.
-            weaponTitle(built(new Set(['HP_Turbolaser']), { range: 2000 })),
+            weaponTitle(built(new Set(['HP_Turbolaser']), {range: 2000})),
             weaponTitle(built(new Set(), {})),
-            weaponTitle(built(new Set(), { range: 2000 })),
+            weaponTitle(built(new Set(), {range: 2000})),
             fireBoneTitle('FP_00', false),
             fireBoneTitle('MuzzleA_00', true),
         ];

@@ -9,8 +9,15 @@ export type FilterMode = 'text' | 'wildcard' | 'regex';
 /** 'all', 'key', or a language identifier. */
 export type FilterScope = string;
 
-export interface FilterValue { language: string; value: string; }
-export interface FilterRow { key: string; values: FilterValue[]; }
+export interface FilterValue {
+    language: string;
+    value: string;
+}
+
+export interface FilterRow {
+    key: string;
+    values: FilterValue[];
+}
 
 /** A pattern compiled once, plus why it could not be compiled. */
 export interface CompiledMatcher {
@@ -34,14 +41,16 @@ export interface CompiledRowFilter {
  * empty grid - and the user has no other way to tell them apart.
  */
 export function compileMatcher(pattern: string, mode: FilterMode): CompiledMatcher {
-    if (!pattern) { return { test: () => true }; }
+    if (!pattern) {
+        return {test: () => true};
+    }
 
     if (mode === 'regex') {
         try {
             const re = new RegExp(pattern, 'i');
-            return { test: text => re.test(text) };
+            return {test: text => re.test(text)};
         } catch (e) {
-            return { test: () => false, error: e instanceof Error ? e.message : String(e) };
+            return {test: () => false, error: e instanceof Error ? e.message : String(e)};
         }
     }
 
@@ -53,11 +62,11 @@ export function compileMatcher(pattern: string, mode: FilterMode): CompiledMatch
             .replace(/\*/g, '.*')
             .replace(/\?/g, '.');
         const re = new RegExp(escaped, 'i');
-        return { test: text => re.test(text) };
+        return {test: text => re.test(text)};
     }
 
     const lower = pattern.toLowerCase();
-    return { test: text => text.toLowerCase().includes(lower) };
+    return {test: text => text.toLowerCase().includes(lower)};
 }
 
 /**
@@ -74,7 +83,7 @@ export function buildRowFilter(
     const match = matcher.test;
 
     if (scope === 'key') {
-        return { test: row => match(row.key), error: matcher.error };
+        return {test: row => match(row.key), error: matcher.error};
     }
 
     if (scope !== 'all') {

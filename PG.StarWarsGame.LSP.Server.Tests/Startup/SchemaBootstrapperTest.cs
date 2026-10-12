@@ -18,6 +18,10 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Startup;
 
 public sealed class SchemaBootstrapperTest
 {
+    // ── schema releases ──────────────────────────────────────────────────────
+
+    private const string ApiHost = "api.github.com";
+
     [Fact]
     public async Task LoadAsync_HttpSource_StartsEaWAndLuaDownloadsInParallel()
     {
@@ -90,10 +94,6 @@ public sealed class SchemaBootstrapperTest
         Assert.Equal(SchemaVersionCompatibility.Unsupported, recorder.SchemaCheck?.Compatibility);
         Assert.Equal("99.0.0", recorder.SchemaCheck?.DeclaredVersion);
     }
-
-    // ── schema releases ──────────────────────────────────────────────────────
-
-    private const string ApiHost = "api.github.com";
 
     private static RoutingHttpHandler ReleaseServer(string releasesJson, string manifestJson = """{ "tags": [] }""")
     {
@@ -194,7 +194,7 @@ public sealed class SchemaBootstrapperTest
             ["stdlib.d.lua"] = "function tostring(v) end\n"
         });
         var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _,
-            luaProxy: out var lua);
+            out var lua);
 
         await bootstrapper.LoadAsync(CancellationToken.None);
 
@@ -209,9 +209,9 @@ public sealed class SchemaBootstrapperTest
         var handler = StubServer(new Dictionary<string, string>
         {
             ["api.d.lua"] = "function Find_Player(name) end\n"
-        }, manifest: false);
+        }, false);
         var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _,
-            luaProxy: out var lua);
+            out var lua);
 
         await bootstrapper.LoadAsync(CancellationToken.None);
 
@@ -328,7 +328,10 @@ public sealed class SchemaBootstrapperTest
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             lock (Urls)
+            {
                 Urls.Add(request.RequestUri!.ToString());
+            }
+
             return Task.FromResult(respond(request));
         }
     }

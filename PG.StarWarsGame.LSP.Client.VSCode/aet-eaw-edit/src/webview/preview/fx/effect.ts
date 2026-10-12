@@ -7,12 +7,10 @@
 // text and tables, everything below is three.js. Keeping the join here is what lets the whole
 // translator be tested without a GPU.
 
-import { parseFxManifest, selectTechnique } from './fxParser';
-import { buildFragmentShader, buildVertexShader } from './glslProgram';
-import { flattenIncludes } from './includes';
-import {
-    collectSamplerTextures, collectSemantics, collectUniformDefaults, collectUniformTypes,
-} from './semantics';
+import {parseFxManifest, selectTechnique} from './fxParser';
+import {buildFragmentShader, buildVertexShader} from './glslProgram';
+import {flattenIncludes} from './includes';
+import {collectSamplerTextures, collectSemantics, collectUniformDefaults, collectUniformTypes,} from './semantics';
 
 /** A translated effect, or the reason it could not be. */
 export interface TranslatedEffect {
@@ -47,7 +45,7 @@ export function translateEffect(
 ): TranslationResult {
     const flat = flattenIncludes(source, read);
     if (flat.missing.length > 0) {
-        return { effect: null, refusal: null, missingIncludes: flat.missing };
+        return {effect: null, refusal: null, missingIncludes: flat.missing};
     }
 
     const technique = selectTechnique(parseFxManifest(source));

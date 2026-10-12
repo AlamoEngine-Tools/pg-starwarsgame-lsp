@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { EncyclopediaIcon, EncyclopediaIconSource } from '../protocol/encyclopedia';
-import { encyclopediaIconTitle } from './encyclopediaIconTitle';
+import {EncyclopediaIcon, EncyclopediaIconSource} from '../protocol/encyclopedia';
+import {encyclopediaIconTitle} from './encyclopediaIconTitle';
 
 function icon(
     source: EncyclopediaIconSource,

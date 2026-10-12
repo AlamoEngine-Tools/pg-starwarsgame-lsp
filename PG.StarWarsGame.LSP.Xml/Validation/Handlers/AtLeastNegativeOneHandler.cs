@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// <remarks>
 ///     <para>
 ///         <c>Error: (%s) Percentage_Income_Modifier cannot be less than -1.0</c>
-///        . the engine's load-time validation
+///         . the engine's load-time validation
 ///         tests <c>x &lt;= -1.0 &amp;&amp; x != -1.0</c>, which is exactly
 ///         <c>x &lt; -1.0</c>, so -1.0 itself passes - a total loss of income, which is a sensible
 ///         thing to be able to write.

@@ -11,7 +11,7 @@
 //
 // Kept free of three.js so the whole shape - nesting, filtering, selection - is testable.
 
-import { type VisibilityLink } from './visibility';
+import {type VisibilityLink} from './visibility';
 
 /** What a row stands for. The filter chips are exactly these. */
 export type TreeKind = 'bone' | 'mesh' | 'particle';
@@ -126,10 +126,10 @@ export function meshPlacement(
     ownerBone: number, roots: ReadonlySet<number>, names: { bone: string; mesh: string },
 ): MeshPlacement {
     if (!roots.has(ownerBone) && names.bone.toLowerCase() === names.mesh.toLowerCase()) {
-        return { merge: ownerBone };
+        return {merge: ownerBone};
     }
 
-    return { childOf: ownerBone };
+    return {childOf: ownerBone};
 }
 
 /**
@@ -151,7 +151,7 @@ export function meshPlacement(
 export function effectPlacement(
     ownerBone: number, roots: ReadonlySet<number>, names: { bone: string; effect: string },
 ): MeshPlacement {
-    return meshPlacement(ownerBone, roots, { bone: names.bone, mesh: names.effect });
+    return meshPlacement(ownerBone, roots, {bone: names.bone, mesh: names.effect});
 }
 
 /**
@@ -165,7 +165,7 @@ export function effectPlacement(
 export function buildTree(items: readonly TreeItem[]): TreeNode[] {
     const nodes = new Map<string, TreeNode>();
     for (const item of items) {
-        nodes.set(item.id, { ...item, children: [], depth: 0 });
+        nodes.set(item.id, {...item, children: [], depth: 0});
     }
 
     const roots: TreeNode[] = [];
@@ -181,7 +181,7 @@ export function buildTree(items: readonly TreeItem[]): TreeNode[] {
         }
     }
 
-    const order: Record<TreeKind, number> = { bone: 0, mesh: 1, particle: 2 };
+    const order: Record<TreeKind, number> = {bone: 0, mesh: 1, particle: 2};
     const sortChildren = (node: TreeNode, depth: number): void => {
         node.depth = depth;
         node.children.sort((a, b) => order[a.kind] - order[b.kind]);
@@ -282,7 +282,7 @@ export function filterTree(roots: readonly TreeNode[], filter: TreeFilter): Tree
         // `TreeNode.scaffold`. A match's own children are left unmarked: they are the contents of
         // what was found rather than a path to it, and dimming them would hide the very thing the
         // filter turned up.
-        return { ...node, scaffold: !matches, children };
+        return {...node, scaffold: !matches, children};
     };
 
     return roots
@@ -315,7 +315,7 @@ export function visibleTreeRows(
 
     const walk = (node: TreeNode): void => {
         const expanded = node.scaffold === true || !collapsed.has(node.id);
-        rows.push({ node, expandable: node.children.length > 0, expanded });
+        rows.push({node, expandable: node.children.length > 0, expanded});
 
         if (expanded) {
             for (const child of node.children) {
@@ -378,7 +378,7 @@ export function selectionAfterClick(
     }
 
     if (modifiers.ctrl) {
-        return { selected: toggleSelected(selected, clicked), anchor: clicked };
+        return {selected: toggleSelected(selected, clicked), anchor: clicked};
     }
 
     // The last one standing lets go. A selection draws a box in the viewport, so there has to be a
@@ -388,10 +388,10 @@ export function selectionAfterClick(
     // Only when it is the ONLY one selected: with several picked, a plain click means "just this
     // one", which is what every list does and what a reader narrowing a multi-select expects.
     if (selected.size === 1 && selected.has(clicked)) {
-        return { selected: new Set(), anchor: clicked };
+        return {selected: new Set(), anchor: clicked};
     }
 
-    return { selected: new Set([clicked]), anchor: clicked };
+    return {selected: new Set([clicked]), anchor: clicked};
 }
 
 /**

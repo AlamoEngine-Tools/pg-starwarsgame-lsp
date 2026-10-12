@@ -95,20 +95,20 @@ import {
     galacticReturnNode,
     hangingDecision,
     paceIntervalMs,
-    selectionAnswered,
     parsePace,
     portalPickAction,
+    selectionAnswered,
     shouldResumeAfterAnswer,
     type SimPace,
 } from './storyGraph/simModel';
 import {
     type SimActions,
     SimFlyout,
-    SimViewToggles,
     SimInventory,
     type SimLenses,
     type SimSelection,
     SimTransport,
+    SimViewToggles,
     TracePanel,
 } from './storyGraph/SimDock';
 import {initPanelLayout} from './shared/panelLayoutBridge';

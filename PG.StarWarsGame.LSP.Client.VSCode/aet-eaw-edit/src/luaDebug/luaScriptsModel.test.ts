@@ -4,9 +4,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {
-    breakAvailability, type LuaScriptsResult, scriptRows, sessionSummary, threadRows,
-} from './luaScriptsModel';
+import {breakAvailability, type LuaScriptsResult, scriptRows, sessionSummary, threadRows,} from './luaScriptsModel';
 
 // A payload as the adapter answers eawLua/scripts against the fake game: two instances of the
 // same file, one of them stopped, one script under no source root, one with its threads loaded.

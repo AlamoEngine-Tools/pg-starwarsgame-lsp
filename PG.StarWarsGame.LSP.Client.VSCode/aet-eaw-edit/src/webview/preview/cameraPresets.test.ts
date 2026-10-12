@@ -5,7 +5,12 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {
-    luaFor, nextPresetName, poseFromPreset, presetFromPose, renamePreset, type CameraPreset,
+    type CameraPreset,
+    luaFor,
+    nextPresetName,
+    poseFromPreset,
+    presetFromPose,
+    renamePreset,
 } from './cameraPresets';
 
 const sphere = {center: {x: 0, y: 0, z: 0}, radius: 10};

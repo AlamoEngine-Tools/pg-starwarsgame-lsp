@@ -2,16 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { LocRow } from './loc/locRow';
-import { applyStaged, coalesce, TranslationCommand } from './translationStaging';
+import {LocRow} from './loc/locRow';
+import {applyStaged, coalesce, TranslationCommand} from './translationStaging';
 
 function rows(): LocRow[] {
     return [
-        { index: 0, key: 'TEXT_A', values: [{ language: 'ENGLISH', value: 'a' }] },
-        { index: 1, key: 'TEXT_B', values: [{ language: 'ENGLISH', value: 'b' }] },
-        { index: 2, key: 'TEXT_C', values: [{ language: 'ENGLISH', value: 'c' }] },
+        {index: 0, key: 'TEXT_A', values: [{language: 'ENGLISH', value: 'a'}]},
+        {index: 1, key: 'TEXT_B', values: [{language: 'ENGLISH', value: 'b'}]},
+        {index: 2, key: 'TEXT_C', values: [{language: 'ENGLISH', value: 'c'}]},
     ];
 }
 
@@ -20,7 +20,7 @@ function keysOf(list: LocRow[]): string[] {
 }
 
 function setValue(key: string, value: string, language = 'ENGLISH'): TranslationCommand {
-    return { kind: 'setValue', key, language, value };
+    return {kind: 'setValue', key, language, value};
 }
 
 describe('applyStaged', () => {
@@ -40,14 +40,14 @@ describe('applyStaged', () => {
         const result = applyStaged(rows(), setValue('TEXT_A', 'Alfa', 'GERMAN'));
 
         assert.deepEqual(result[0].values, [
-            { language: 'ENGLISH', value: 'a' },
-            { language: 'GERMAN', value: 'Alfa' },
+            {language: 'ENGLISH', value: 'a'},
+            {language: 'GERMAN', value: 'Alfa'},
         ]);
     });
 
     it('appends a new entry at the end', () => {
         const result = applyStaged(rows(), {
-            kind: 'addEntry', key: 'TEXT_NEW', values: [{ language: 'ENGLISH', value: 'n' }],
+            kind: 'addEntry', key: 'TEXT_NEW', values: [{language: 'ENGLISH', value: 'n'}],
         });
 
         assert.deepEqual(keysOf(result), ['TEXT_A', 'TEXT_B', 'TEXT_C', 'TEXT_NEW']);
@@ -55,7 +55,7 @@ describe('applyStaged', () => {
     });
 
     it('removes an entry by key and renumbers what is left', () => {
-        const result = applyStaged(rows(), { kind: 'deleteEntry', key: 'TEXT_A' });
+        const result = applyStaged(rows(), {kind: 'deleteEntry', key: 'TEXT_A'});
 
         assert.deepEqual(keysOf(result), ['TEXT_B', 'TEXT_C']);
         assert.deepEqual(result.map(r => r.index), [0, 1]);
@@ -71,7 +71,7 @@ describe('applyStaged', () => {
     });
 
     it('gives every row a cell when a language is added', () => {
-        const result = applyStaged(rows(), { kind: 'addLanguage', language: 'GERMAN' });
+        const result = applyStaged(rows(), {kind: 'addLanguage', language: 'GERMAN'});
 
         assert.ok(result.every(r => r.values.some(v => v.language === 'GERMAN' && v.value === '')));
     });
@@ -102,7 +102,7 @@ describe('coalesce', () => {
     it('does not fold across a rename', () => {
         const result = coalesce([
             setValue('TEXT_A', 'before'),
-            { kind: 'renameKey', key: 'TEXT_A', newKey: 'TEXT_Z' },
+            {kind: 'renameKey', key: 'TEXT_A', newKey: 'TEXT_Z'},
             setValue('TEXT_Z', 'after'),
         ]);
 
@@ -112,7 +112,7 @@ describe('coalesce', () => {
     it('does not fold across a delete', () => {
         const result = coalesce([
             setValue('TEXT_A', 'before'),
-            { kind: 'deleteEntry', key: 'TEXT_B' },
+            {kind: 'deleteEntry', key: 'TEXT_B'},
             setValue('TEXT_A', 'after'),
         ]);
 
@@ -123,9 +123,9 @@ describe('coalesce', () => {
         const queue: TranslationCommand[] = [
             setValue('TEXT_A', 'one'),
             setValue('TEXT_A', 'two'),
-            { kind: 'addEntry', key: 'TEXT_D', values: [{ language: 'ENGLISH', value: 'd' }] },
+            {kind: 'addEntry', key: 'TEXT_D', values: [{language: 'ENGLISH', value: 'd'}]},
             setValue('TEXT_D', 'dd'),
-            { kind: 'deleteEntry', key: 'TEXT_B' },
+            {kind: 'deleteEntry', key: 'TEXT_B'},
         ];
 
         const whole = queue.reduce(applyStaged, rows());

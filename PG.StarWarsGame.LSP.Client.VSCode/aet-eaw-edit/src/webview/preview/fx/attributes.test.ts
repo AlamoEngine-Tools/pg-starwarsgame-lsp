@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { bindField } from './attributes';
+import {bindField} from './attributes';
 
 describe('bindField', () => {
     it('widens a vec3 position into the float4 every entry declares', () => {

@@ -12,7 +12,7 @@
 // keeps the mark the same size when the panel is made wider, which is how the rest of the game's
 // HUD behaves. If it turns out to be width, this is the one function to change.
 
-import type { PreviewHardpoint, PreviewReticleStates, PreviewReticles } from '../../protocol/modelPreview';
+import type {PreviewHardpoint, PreviewReticles, PreviewReticleStates} from '../../protocol/modelPreview';
 
 /** Which of the seven states a hardpoint is being shown in. */
 export type ReticleState = keyof PreviewReticleStates;
@@ -25,13 +25,13 @@ export type ReticleState = keyof PreviewReticleStates;
  * for the disabled pair - a mod giving them separate art has nowhere else to see it.
  */
 export const RETICLE_STATES: readonly { id: ReticleState; label: string }[] = [
-    { id: 'enemy', label: 'Enemy' },
-    { id: 'enemyTracked', label: 'Enemy, tracked' },
-    { id: 'friendly', label: 'Friendly' },
-    { id: 'friendlyTracked', label: 'Friendly, tracked' },
-    { id: 'friendlyRepairing', label: 'Repairing' },
-    { id: 'friendlyDisabled', label: 'Disabled' },
-    { id: 'friendlyDisabledTracked', label: 'Disabled, tracked' },
+    {id: 'enemy', label: 'Enemy'},
+    {id: 'enemyTracked', label: 'Enemy, tracked'},
+    {id: 'friendly', label: 'Friendly'},
+    {id: 'friendlyTracked', label: 'Friendly, tracked'},
+    {id: 'friendlyRepairing', label: 'Repairing'},
+    {id: 'friendlyDisabled', label: 'Disabled'},
+    {id: 'friendlyDisabledTracked', label: 'Disabled, tracked'},
 ];
 
 /** One mark the viewport projects and draws. */
@@ -184,10 +184,14 @@ export function reticleMarks(
  */
 export function trackedStateOf(state: ReticleState): ReticleState {
     switch (state) {
-        case 'enemy': return 'enemyTracked';
-        case 'friendly': return 'friendlyTracked';
-        case 'friendlyDisabled': return 'friendlyDisabledTracked';
-        default: return state;
+        case 'enemy':
+            return 'enemyTracked';
+        case 'friendly':
+            return 'friendlyTracked';
+        case 'friendlyDisabled':
+            return 'friendlyDisabledTracked';
+        default:
+            return state;
     }
 }
 

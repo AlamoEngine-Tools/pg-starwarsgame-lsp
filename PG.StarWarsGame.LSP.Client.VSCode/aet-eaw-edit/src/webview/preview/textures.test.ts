@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { addressingFor } from './textures';
+import {addressingFor} from './textures';
 
 describe('addressingFor', () => {
     it('repeats a power-of-two texture, which is what the samplers ask for', () => {

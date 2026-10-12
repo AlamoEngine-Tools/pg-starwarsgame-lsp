@@ -18,9 +18,9 @@ export interface ProblemLook {
 }
 
 const LOOKS: Record<string, ProblemLook> = {
-    error: { icon: 'error', tone: 'error' },
-    warning: { icon: 'warning', tone: 'warning' },
-    info: { icon: 'info', tone: 'info' },
+    error: {icon: 'error', tone: 'error'},
+    warning: {icon: 'warning', tone: 'warning'},
+    info: {icon: 'info', tone: 'info'},
 };
 
 /**

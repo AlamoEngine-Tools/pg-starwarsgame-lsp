@@ -65,7 +65,7 @@ export function visibilityTracks(json: unknown): Map<string, VisibilityTrack> {
         }
 
         if (byNode.size > 0) {
-            tracks.set(name, { fps, bones: byNode });
+            tracks.set(name, {fps, bones: byNode});
         }
     }
 

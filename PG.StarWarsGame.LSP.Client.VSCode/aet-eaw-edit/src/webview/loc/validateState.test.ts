@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { severityIconFor, validateTitle, worstSeverity } from './validateState';
+import {severityIconFor, validateTitle, worstSeverity} from './validateState';
 
 describe('severityIconFor', () => {
     it('shows a tick when the file checked out clean', () => {
@@ -42,36 +42,36 @@ describe('worstSeverity', () => {
     });
 
     it('is a warning when only warnings were reported', () => {
-        assert.equal(worstSeverity([{ severity: 'warning' }, { severity: 'warning' }]), 'warning');
+        assert.equal(worstSeverity([{severity: 'warning'}, {severity: 'warning'}]), 'warning');
     });
 
     // Information is not a problem: a credits heading with no entries under it renders exactly as
     // written, so the tag must not colour the file as though something were wrong with it.
     it('is info when only information was reported', () => {
-        assert.equal(worstSeverity([{ severity: 'info' }, { severity: 'info' }]), 'info');
+        assert.equal(worstSeverity([{severity: 'info'}, {severity: 'info'}]), 'info');
     });
 
     it('lets a warning outrank information', () => {
-        assert.equal(worstSeverity([{ severity: 'info' }, { severity: 'warning' }]), 'warning');
+        assert.equal(worstSeverity([{severity: 'info'}, {severity: 'warning'}]), 'warning');
     });
 
     it('lets an error outrank information', () => {
-        assert.equal(worstSeverity([{ severity: 'info' }, { severity: 'error' }]), 'error');
+        assert.equal(worstSeverity([{severity: 'info'}, {severity: 'error'}]), 'error');
     });
 
     it('is an error when anything was an error', () => {
-        assert.equal(worstSeverity([{ severity: 'warning' }, { severity: 'error' }]), 'error');
+        assert.equal(worstSeverity([{severity: 'warning'}, {severity: 'error'}]), 'error');
     });
 
     // Order must not decide it - the worst wins wherever it appears in the list.
     it('is an error when the error comes first', () => {
-        assert.equal(worstSeverity([{ severity: 'error' }, { severity: 'warning' }]), 'error');
+        assert.equal(worstSeverity([{severity: 'error'}, {severity: 'warning'}]), 'error');
     });
 
     // An unrecognised severity must not silently read as clean, and must not be softened to info
     // either - a level this does not know about could be anything.
     it('treats an unknown severity as a warning rather than ignoring it', () => {
-        assert.equal(worstSeverity([{ severity: 'something-new' }]), 'warning');
+        assert.equal(worstSeverity([{severity: 'something-new'}]), 'warning');
     });
 });
 

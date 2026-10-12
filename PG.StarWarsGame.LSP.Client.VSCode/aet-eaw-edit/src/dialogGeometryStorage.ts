@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 
-import { StoredGeometry } from './webview/shared/modalGeometry';
+import {StoredGeometry} from './webview/shared/modalGeometry';
 
 /**
  * Where each dialog was last put, kept per project.
@@ -34,10 +34,13 @@ export function readDialogGeometry(): Record<string, StoredGeometry> {
  * rejection from a storage write would be a worse one.
  */
 export function saveDialogGeometry(id: string, geometry: StoredGeometry): void {
-    if (store === undefined || !isGeometry(geometry)) { return; }
+    if (store === undefined || !isGeometry(geometry)) {
+        return;
+    }
 
-    void Promise.resolve(store.update(KEY, { ...readDialogGeometry(), [id]: geometry }))
-        .then(undefined, () => { /* placement is not worth reporting a failure over */ });
+    void Promise.resolve(store.update(KEY, {...readDialogGeometry(), [id]: geometry}))
+        .then(undefined, () => { /* placement is not worth reporting a failure over */
+        });
 }
 
 /**
@@ -45,7 +48,9 @@ export function saveDialogGeometry(id: string, geometry: StoredGeometry): void {
  * come back every session and put the dialog nowhere.
  */
 function isGeometry(value: unknown): value is StoredGeometry {
-    if (value === null || typeof value !== 'object') { return false; }
+    if (value === null || typeof value !== 'object') {
+        return false;
+    }
 
     const candidate = value as Record<string, unknown>;
     return (['xRatio', 'yRatio', 'width', 'height'] as const).every(

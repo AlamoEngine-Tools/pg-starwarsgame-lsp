@@ -93,6 +93,6 @@ export function boxTargetFor(
     partId: string | null | undefined, loadedParts: ReadonlySet<string>,
 ): BoxTarget {
     return partId !== null && partId !== undefined && partId !== '' && loadedParts.has(partId)
-        ? { kind: 'part', id: partId }
-        : { kind: 'bone' };
+        ? {kind: 'part', id: partId}
+        : {kind: 'bone'};
 }

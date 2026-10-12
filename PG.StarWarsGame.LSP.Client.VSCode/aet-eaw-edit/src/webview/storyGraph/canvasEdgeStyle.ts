@@ -13,7 +13,7 @@
 // No glow, no shadow. Those are what cost the overview its frame rate before. A plain coloured stroke,
 // bucketed so each distinct style is stroked once per frame.
 
-import { type BranchColour, EDGE_KINDS } from './palette';
+import {type BranchColour, EDGE_KINDS} from './palette';
 
 /** The stroke an edge with no colour of its own takes - what every canvas edge used to be. */
 export const MUTED_EDGE_TOKEN = '--colour-muted';

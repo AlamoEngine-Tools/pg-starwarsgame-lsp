@@ -110,9 +110,20 @@ public sealed class WorkspaceIconCatalogStartupTest
         public WorkspaceConfiguration? LastWorkspaceConfig { get; init; }
         public IReadOnlyList<string>? LastWorkspaceRoots => [Root];
 
-        public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct) => Task.CompletedTask;
-        public Task ReloadAsync(CancellationToken ct) => Task.CompletedTask;
-        public Task ReloadLocalisationAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ReloadAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ReloadLocalisationAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RecordingIcons : IIconCatalogProvider

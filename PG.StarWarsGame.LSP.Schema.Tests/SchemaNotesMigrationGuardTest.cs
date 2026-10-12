@@ -1,6 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Schema.Versioning;
+
 namespace PG.StarWarsGame.LSP.Schema.Tests;
 
 /// <summary>
@@ -43,7 +48,7 @@ public sealed class SchemaNotesMigrationGuardTest
             var lines = File.ReadAllLines(Path.Combine(SchemaRoot, file));
             for (var i = 0; i < lines.Length; i++)
                 foreach (var key in RetiredKeys)
-                    if (System.Text.RegularExpressions.Regex.IsMatch(lines[i], $@"^\s*{key}\s*:"))
+                    if (Regex.IsMatch(lines[i], $@"^\s*{key}\s*:"))
                         offenders.Add($"{file}:{i + 1} {lines[i].Trim()}");
         }
 
@@ -63,7 +68,7 @@ public sealed class SchemaNotesMigrationGuardTest
             var lines = File.ReadAllLines(Path.Combine(SchemaRoot, file));
             for (var i = 0; i < lines.Length; i++)
             {
-                if (!System.Text.RegularExpressions.Regex.IsMatch(lines[i], @"^\s*notes:\s*$")) continue;
+                if (!Regex.IsMatch(lines[i], @"^\s*notes:\s*$")) continue;
 
                 var next = Array.FindIndex(lines, i + 1, l => l.Trim().Length > 0);
                 if (next < 0) continue;
@@ -81,7 +86,7 @@ public sealed class SchemaNotesMigrationGuardTest
     [Fact]
     public void EveryNoteKind_IsOneTheServerKnows()
     {
-        var known = Enum.GetNames<Core.Schema.SchemaNoteKind>();
+        var known = Enum.GetNames<SchemaNoteKind>();
         var offenders = new List<string>();
 
         foreach (var file in AllYamlFiles())
@@ -92,7 +97,7 @@ public sealed class SchemaNotesMigrationGuardTest
                 // Only kinds inside a notes block. `kinds.yaml` spells its object kinds
                 // `- kind: SpaceUnit`, the same two words meaning something else entirely - the
                 // parser tells them apart by nesting, and so must anything reading the text.
-                var notes = System.Text.RegularExpressions.Regex.Match(lines[i], @"^(\s*)notes:\s*$");
+                var notes = Regex.Match(lines[i], @"^(\s*)notes:\s*$");
                 if (!notes.Success) continue;
                 var owner = notes.Groups[1].Value.Length;
 
@@ -101,7 +106,7 @@ public sealed class SchemaNotesMigrationGuardTest
                     if (lines[j].Trim().Length == 0) continue;
                     if (lines[j].Length - lines[j].TrimStart().Length <= owner) break;
 
-                    var match = System.Text.RegularExpressions.Regex.Match(lines[j], @"^\s*-\s*kind:\s*(\S+)");
+                    var match = Regex.Match(lines[j], @"^\s*-\s*kind:\s*(\S+)");
                     if (!match.Success) continue;
                     if (!known.Contains(match.Groups[1].Value, StringComparer.OrdinalIgnoreCase))
                         offenders.Add($"{file}:{j + 1} {match.Groups[1].Value}");
@@ -123,10 +128,10 @@ public sealed class SchemaNotesMigrationGuardTest
         var manifest = Path.Combine(SchemaRoot, flavour, "_index.json");
         Assert.True(File.Exists(manifest), $"{flavour}/_index.json is missing");
 
-        var version = System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifest))
+        var version = JsonDocument.Parse(File.ReadAllText(manifest))
             .RootElement.GetProperty("schemaVersion").GetString();
 
-        Assert.Equal(Versioning.SchemaVersionCompatibility.Supported,
-            Versioning.SchemaVersionGate.Check(version).Compatibility);
+        Assert.Equal(SchemaVersionCompatibility.Supported,
+            SchemaVersionGate.Check(version).Compatibility);
     }
 }

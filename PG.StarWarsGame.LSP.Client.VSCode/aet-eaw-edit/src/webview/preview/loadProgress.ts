@@ -59,7 +59,7 @@ export function loadState(tally: LoadTally): LoadState {
     }
 
     if (tally.expectedParts === null) {
-        return { stage: 'scene', covered: true, label: 'Reading the scene', detail: null };
+        return {stage: 'scene', covered: true, label: 'Reading the scene', detail: null};
     }
 
     // A scene that resolved no parts sends no GLB request, so no part will ever arrive. Waiting on

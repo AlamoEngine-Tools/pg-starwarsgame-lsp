@@ -5,7 +5,12 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {
-    type DiagnosticReportPayload, ISSUES_URL, diagnosticSection, editorReport, gitHubIssue, issueTitle,
+    type DiagnosticReportPayload,
+    diagnosticSection,
+    editorReport,
+    gitHubIssue,
+    ISSUES_URL,
+    issueTitle,
 } from './diagnosticReport';
 
 const payload: DiagnosticReportPayload = {

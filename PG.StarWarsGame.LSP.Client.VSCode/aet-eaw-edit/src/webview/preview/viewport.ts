@@ -12,77 +12,113 @@ import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 
 import {
-    clipPlanes, frameSphere, DEFAULT_AZIMUTH_DEGREES, DEFAULT_ELEVATION_DEGREES,
     type BoundingSphere,
+    clipPlanes,
+    DEFAULT_AZIMUTH_DEGREES,
+    DEFAULT_ELEVATION_DEGREES,
+    frameSphere,
 } from './framing';
-import type {AlamoParticleContent, PreviewSpinAway} from '../../protocol/modelPreview';
+import type {
+    AlamoParticleContent,
+    PreviewBreakoffProp,
+    PreviewSpinAway,
+    PreviewTurret
+} from '../../protocol/modelPreview';
 import {spinAwayPose} from './spinAway';
 import type {NormalisedColour} from './colour';
 import {attachmentProblem, type AttachmentRequest} from './attachments';
 import {drawnConeRange, fireConeOutline, fireConeSurface, hullFrameBasis} from './fireArc';
 import type {FxMaterialState} from './fx/renderState';
 import {
-    costByLevel, definedLevels, proxyVisibleAt, type DefinedLevels, type LevelCost,
-    type LevelTagged
+    costByLevel,
+    definedLevels,
+    type DefinedLevels,
+    type LevelCost,
+    type LevelTagged,
+    proxyVisibleAt
 } from './levels';
 import {AlamoMaterial} from './alamoMaterial';
 import type {TranslatedEffect} from './fx/effect';
+import {type AlamoFrame, engineLight, type ProbeLight, sphericalHarmonics,} from './fx/uniforms';
 import {
-    engineLight, sphericalHarmonics, type AlamoFrame, type ProbeLight,
-} from './fx/uniforms';
-import {
-    castsShadowMap, debugColour, isShieldMesh, isStealthMesh, isVisibleAt, isVisibleAtLevel,
-    resolveMaterial, shieldMeshOffShader,
-    type MaterialExtras, type MaterialSpec,
+    castsShadowMap,
+    debugColour,
+    isShieldMesh,
+    isStealthMesh,
+    isVisibleAt,
+    isVisibleAtLevel,
+    type MaterialExtras,
+    type MaterialSpec,
+    resolveMaterial,
+    shieldMeshOffShader,
 } from './materials';
 import {
-    lightDirection, shadowFrustum,
-    DEFAULT_LIGHT_AZIMUTH_DEGREES, DEFAULT_LIGHT_ELEVATION_DEGREES,
+    DEFAULT_LIGHT_AZIMUTH_DEGREES,
+    DEFAULT_LIGHT_ELEVATION_DEGREES,
+    lightDirection,
+    shadowFrustum,
+    type Vector3 as Vector3Like,
 } from './lighting';
-import {
-    cancelRootCorrection, outermostRoots, splitGeometryFromBone, stampTreeKeys, treeKeyOf,
-} from './boneNodes';
+import {cancelRootCorrection, outermostRoots, splitGeometryFromBone, stampTreeKeys, treeKeyOf,} from './boneNodes';
 import {captureFrame} from './capture';
 import {meshDrawn, setMeshDrawn} from './meshVisibility';
 import {boneRowId, effectPlacement, meshPlacement, type TreeItem} from './previewTree';
-import {healthColour, reticleSizePx, type ReticleMark} from './reticles';
-import {breakoffLifetime, breakoffPose, type BreakoffAnchor} from './breakoff';
-import type {PreviewBreakoffProp} from '../../protocol/modelPreview';
+import {healthColour, type ReticleMark, reticleSizePx} from './reticles';
+import {type BreakoffAnchor, breakoffLifetime, breakoffPose} from './breakoff';
 import {sweepAngles} from './deathClone';
-import type {PreviewTurret} from '../../protocol/modelPreview';
 import {
-    TURRET_AT_REST, dragToAim, type TurretAim, type TurretAxis, type TurretAxisRange,
+    dragToAim,
+    TURRET_AT_REST,
+    type TurretAim,
+    type TurretAxis,
+    type TurretAxisRange,
     type TurretHandle,
 } from './turretHandles';
 import {knobPoint, stopTicks, trackRadius, trackSegments} from './turretTrack';
 import {type Inspection} from './inspector';
 import {emissionMeshFor} from './emissionSource';
 import {billboardLocalRotation, billboardRotation, billboardTypeOf} from './billboards';
-import {hiddenAt, visibilityTracks, type VisibilityTrack} from './boneVisibility';
+import {hiddenAt, type VisibilityTrack, visibilityTracks} from './boneVisibility';
 import {skinHiddenByClip} from './skinVisibility';
 import {drawnBounds} from './modelBounds';
 import {HeatPass} from './heatPass';
 import {BloomPass} from './bloomPass';
 import {ShadowVolumePass} from './shadowVolumePass';
 import {
-    applyBaseMapColourSpace, applyBlend, applyColourScale, applyDepth, shadowCatcherOpacity,
+    applyBaseMapColourSpace,
+    applyBlend,
+    applyColourScale,
+    applyDepth,
+    shadowCatcherOpacity,
 } from './materialState';
-import {resolveBoneId, type BoneId} from './boneIds';
+import {type BoneId, resolveBoneId} from './boneIds';
 import {type AbilityOwnership} from './abilityRows';
 import {listedInModelTree, type ParticleOrigin} from './particleScene';
 import {
-    damageMeshFacts, deathClip, effectFacts as effectRowFacts, resolveRow, restingClip, subtreeFacts,
-    type OverrideChange, type Resolution, type RowFacts, type RowOverride,
+    damageMeshFacts,
+    deathClip,
+    effectFacts as effectRowFacts,
+    type OverrideChange,
+    type Resolution,
+    resolveRow,
+    restingClip,
+    type RowFacts,
+    type RowOverride,
+    subtreeFacts,
 } from './visibility';
 import {boxRoots, boxTargetFor, rowsInBox} from './selectionBox';
-import {type Vector3 as Vector3Like} from './lighting';
 import {skyGradient, starPositions} from './backdrop';
-import {GROUND_TEXTURE_SIZE, concreteNoise} from './groundTexture';
+import {concreteNoise, GROUND_TEXTURE_SIZE} from './groundTexture';
 import {missingTexture} from './missingTexture';
 import {
-    DEFAULT_LIGHTS, DEFAULT_VIEWER_SETTINGS, type BackgroundKind, type LightRig, type Wind,
+    type BackgroundKind,
+    DEFAULT_LIGHTS,
+    DEFAULT_VIEWER_SETTINGS,
+    type LightRig,
+    type Wind,
 } from './viewerSettings';
 import {HEAT_LAYER, ParticleSystemInstance} from './particleRenderer';
+import {alamoBoneName, type BoneAttachment, type FlatBone, labelCandidates, type LabelMode,} from './skeleton';
 
 /**
  * The firing-arc gizmo's look.
@@ -384,10 +420,6 @@ export interface ParticlePlacement {
 function anchorNodeOf(entry: ParticleEntry): THREE.Object3D {
     return entry.instance.anchorNode ?? entry.instance.root;
 }
-
-import {
-    alamoBoneName, labelCandidates, type BoneAttachment, type FlatBone, type LabelMode,
-} from './skeleton';
 
 /** Vertical field of view, in degrees. Narrow enough to keep perspective distortion off a long hull. */
 const FIELD_OF_VIEW = 50;

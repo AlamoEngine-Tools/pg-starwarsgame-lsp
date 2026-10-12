@@ -10,15 +10,15 @@
 // The scroll is a single CSS transform animation rather than a per-frame JS loop: nothing to keep
 // in sync, and it stays smooth over a long roll. No external assets or fonts are used.
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {useLayoutEffect, useMemo, useRef, useState} from 'react';
 import styled from 'styled-components';
 
-import { IconButton } from './shared/Button';
-import { dockHeaderCss } from './shared/dockChrome';
-import { tokensCss } from './shared/tokens';
-import { buildCrawl } from './creditsCrawlModel';
-import { generateStars } from './starfield';
-import { LocRow } from './loc/locRow';
+import {IconButton} from './shared/Button';
+import {dockHeaderCss} from './shared/dockChrome';
+import {tokensCss} from './shared/tokens';
+import {buildCrawl} from './creditsCrawlModel';
+import {generateStars} from './starfield';
+import {LocRow} from './loc/locRow';
 
 const SPEEDS = [0.5, 1, 2, 4];
 
@@ -48,7 +48,7 @@ export function CreditsCrawl(props: {
 
     const stageRef = useRef<HTMLDivElement>(null);
     const rollRef = useRef<HTMLDivElement>(null);
-    const [travel, setTravel] = useState({ from: 0, to: 0, seconds: 1 });
+    const [travel, setTravel] = useState({from: 0, to: 0, seconds: 1});
 
     // Measured, not expressed in percentages: translateY(100%) is a percentage of the *roll*, so a
     // tall file would start hundreds of pixels below the fold and show a black screen for the first
@@ -57,7 +57,9 @@ export function CreditsCrawl(props: {
     useLayoutEffect(() => {
         const stageHeight = stageRef.current?.clientHeight ?? 0;
         const rollHeight = rollRef.current?.scrollHeight ?? 0;
-        if (stageHeight === 0 || rollHeight === 0) { return; }
+        if (stageHeight === 0 || rollHeight === 0) {
+            return;
+        }
 
         const distance = stageHeight + rollHeight;
         setTravel({
@@ -72,7 +74,11 @@ export function CreditsCrawl(props: {
             role="dialog"
             aria-label="Credits preview"
             tabIndex={-1}
-            onKeyDown={e => { if (e.key === 'Escape') { props.onClose(); } }}
+            onKeyDown={e => {
+                if (e.key === 'Escape') {
+                    props.onClose();
+                }
+            }}
             ref={el => el?.focus()}
         >
             <div className="controls">
@@ -84,7 +90,10 @@ export function CreditsCrawl(props: {
                 <IconButton
                     icon="restart"
                     title="Restart"
-                    onClick={() => { setRunId(id => id + 1); setRunning(true); }}
+                    onClick={() => {
+                        setRunId(id => id + 1);
+                        setRunning(true);
+                    }}
                 />
 
                 <select value={speed} onChange={e => setSpeed(Number(e.target.value))} title="Speed">
@@ -136,7 +145,7 @@ export function CreditsCrawl(props: {
                             }}
                         >
                             {blocks.map((block, i) => (block.kind === 'gap'
-                                ? <div key={i} className="gap" />
+                                ? <div key={i} className="gap"/>
                                 : (
                                     <div
                                         key={i}
@@ -186,6 +195,7 @@ const Overlay = styled.div`
     /* The selects only. This rule used to name button as well as select - and an element selector
        inside a class beats .icon-btn on specificity, so leaving the buttons in it would have
        quietly overridden the shared chrome the moment they started using it. */
+
     .controls select {
         background: var(--colour-action-2);
         color: var(--colour-action-2-ink);
@@ -195,10 +205,14 @@ const Overlay = styled.div`
         cursor: pointer;
     }
 
-    .count { margin-left: auto; opacity: 0.7; }
+    .count {
+        margin-left: auto;
+        opacity: 0.7;
+    }
 
     /* The sky is drawn as elements rather than tiled gradients - see starfield.ts for why. Static,
        because the crawl is what moves. */
+
     .stage {
         flex: 1;
         overflow: hidden;
@@ -218,7 +232,11 @@ const Overlay = styled.div`
         background: #fff;
     }
 
-    .empty { text-align: center; margin-top: 2em; opacity: 0.7; }
+    .empty {
+        text-align: center;
+        margin-top: 2em;
+        opacity: 0.7;
+    }
 
     .roll {
         position: absolute;
@@ -242,6 +260,7 @@ const Overlay = styled.div`
     /* The two directives the engine uses. HEADER is the label - a role or a section title - set
        smaller and lighter; CENTER is the name beneath it, larger and bold in caps. That is the
        relationship the films' credits use and the game follows. */
+
     .header {
         padding: 0.4em 2em 0;
         font-size: 0.8em;
@@ -258,6 +277,7 @@ const Overlay = styled.div`
 
     /* A row with no text in this language: shown as its key so the gap is visible, dimmed and in
        normal case so it cannot be mistaken for real credit text. */
+
     .missing {
         opacity: 0.4;
         font-style: italic;
@@ -265,20 +285,33 @@ const Overlay = styled.div`
         text-transform: none;
     }
 
-    .gap { height: 1.4em; }
+    .gap {
+        height: 1.4em;
+    }
 
     /* Pixel distances measured from the stage and the roll - see the layout effect. Percentages
        here would be relative to the roll's own height, which is what made a long file sit off
        screen for the first several seconds. */
     @keyframes crawl {
-        from { transform: translateY(var(--crawl-from, 100%)); }
-        to { transform: translateY(var(--crawl-to, -100%)); }
+        from {
+            transform: translateY(var(--crawl-from, 100%));
+        }
+        to {
+            transform: translateY(var(--crawl-to, -100%));
+        }
     }
 
     /* Someone who has asked the system for less motion gets a readable, scrollable list instead of
        a moving one. */
     @media (prefers-reduced-motion: reduce) {
-        .stage { overflow: auto; }
-        .roll { position: static; animation: none; padding: 1em 0; }
+        .stage {
+            overflow: auto;
+        }
+
+        .roll {
+            position: static;
+            animation: none;
+            padding: 1em 0;
+        }
     }
 `;

@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analyzer;
 using PG.StarWarsGame.LSP.Server.Icons;
@@ -21,20 +21,20 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 /// </summary>
 public sealed class ModProjectReloadService : IModProjectReloadService
 {
-    private readonly IWorkspaceIndexer _indexer;
+    private readonly IHeapTrimmer _heapTrimmer;
+
+    private readonly IIconCatalogProvider? _icons;
     private readonly IGameIndexService _index;
+    private readonly IWorkspaceIndexer _indexer;
     private readonly IProjectLayerMap _layerMap;
     private readonly ILocalisationLoader _localisation;
-    private readonly IUserNotifier _notifier;
     private readonly ILogger<ModProjectReloadService> _logger;
+    private readonly ILuaAnalyzerStarter? _luaAnalyzer;
     private readonly PgprojMigrationOffer? _migrationOffer;
+    private readonly IUserNotifier _notifier;
     private readonly IClientRefreshNotifier? _refresh;
     private readonly IProjectConfigurationResolver _resolver;
     private readonly ServerStatusRecorder? _status;
-
-    private readonly IIconCatalogProvider? _icons;
-    private readonly IHeapTrimmer _heapTrimmer;
-    private readonly ILuaAnalyzerStarter? _luaAnalyzer;
     private List<string>? _lastRoots;
 
     // refresh is optional so the many minimal test setups can omit it; production always wires it.
@@ -100,6 +100,55 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         }
     }
 
+    public async Task ReloadAsync(CancellationToken ct)
+    {
+        var roots = _lastRoots;
+        if (roots is null)
+        {
+            _logger.LogWarning("ReloadAsync called before LoadAsync; ignoring reload request.");
+            return;
+        }
+
+        try
+        {
+            await LoadAsync(roots, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Mod project reload failed.");
+        }
+
+        // After the reload rather than inside the load: the question is the same one startup asks,
+        // and it must not hold the index path open while the user reads a diff. A reload has no
+        // gate in front of it, so this is simply the first moment the workspace is settled again.
+        if (_migrationOffer is not null) await _migrationOffer.OfferPendingAsync(ct);
+    }
+
+    public async Task ReloadLocalisationAsync(CancellationToken ct)
+    {
+        var config = LastWorkspaceConfig;
+        if (config is null)
+        {
+            _logger.LogWarning("ReloadLocalisationAsync called before LoadAsync; ignoring reload request.");
+            return;
+        }
+
+        try
+        {
+            await _localisation.LoadAsync(config, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Localisation-only reload failed.");
+            return;
+        }
+
+        // Loca-key inlay hints and code lenses were computed against the previous translation data
+        // and nothing about the open documents changed, so the client has no reason to re-request
+        // them on its own (#45). Ask it to.
+        _refresh?.RefreshDerivedState();
+    }
+
     private async Task LoadCoreAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
     {
         var roots = workspaceRoots.ToList();
@@ -163,55 +212,6 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // is awaited by the startup pipeline before it opens the gate. Asked from here it stopped
         // the whole server until the user answered. The startup path asks once the gate is open;
         // ReloadAsync asks after the reload. Anything still queued waits for the next of those.
-    }
-
-    public async Task ReloadAsync(CancellationToken ct)
-    {
-        var roots = _lastRoots;
-        if (roots is null)
-        {
-            _logger.LogWarning("ReloadAsync called before LoadAsync; ignoring reload request.");
-            return;
-        }
-
-        try
-        {
-            await LoadAsync(roots, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Mod project reload failed.");
-        }
-
-        // After the reload rather than inside the load: the question is the same one startup asks,
-        // and it must not hold the index path open while the user reads a diff. A reload has no
-        // gate in front of it, so this is simply the first moment the workspace is settled again.
-        if (_migrationOffer is not null) await _migrationOffer.OfferPendingAsync(ct);
-    }
-
-    public async Task ReloadLocalisationAsync(CancellationToken ct)
-    {
-        var config = LastWorkspaceConfig;
-        if (config is null)
-        {
-            _logger.LogWarning("ReloadLocalisationAsync called before LoadAsync; ignoring reload request.");
-            return;
-        }
-
-        try
-        {
-            await _localisation.LoadAsync(config, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Localisation-only reload failed.");
-            return;
-        }
-
-        // Loca-key inlay hints and code lenses were computed against the previous translation data
-        // and nothing about the open documents changed, so the client has no reason to re-request
-        // them on its own (#45). Ask it to.
-        _refresh?.RefreshDerivedState();
     }
 
     // A failed analyzer start must never fail the project load it rides along with.

@@ -6,11 +6,21 @@ import * as vscode from 'vscode';
 import {LspGateway} from './lsp/lspGateway';
 import {LspTreeDataProvider} from './lspTreeDataProvider';
 import {
-    GetStoryPlotsResult, StoryCampaignDto, StoryFactionDto, StoryLuaScriptDto, StoryPlotThreadDto,
+    GetStoryPlotsResult,
+    StoryCampaignDto,
+    StoryFactionDto,
+    StoryLuaScriptDto,
+    StoryPlotThreadDto,
 } from './protocol';
 import {type BattleBranch, factionTree} from './storyBattles';
 import {
-    definitionLabel, type FactionRole, factionRole, orderedDefinitions, orderedFactions, roleLabel, setSummary,
+    definitionLabel,
+    type FactionRole,
+    factionRole,
+    orderedDefinitions,
+    orderedFactions,
+    roleLabel,
+    setSummary,
 } from './storyNavigatorModel';
 
 type StoryNodeKind = 'set' | 'campaign' | 'faction' | 'battle' | 'thread' | 'lua' | 'info';

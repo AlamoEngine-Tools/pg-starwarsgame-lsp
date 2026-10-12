@@ -62,7 +62,7 @@ public sealed class PreviewSubMeshGeometryTest
     [Fact]
     public void Vertices_ComeBackAsAPageWithTheTotalBesideThem()
     {
-        var page = PreviewSubMeshGeometry.From("m", Model(8), 0, 0, "vertices", 2, 3);
+        var page = PreviewSubMeshGeometry.From("m", Model(), 0, 0, "vertices", 2, 3);
 
         Assert.Equal(8, page.TotalVertices);
         Assert.Equal(3, page.Vertices.Count);

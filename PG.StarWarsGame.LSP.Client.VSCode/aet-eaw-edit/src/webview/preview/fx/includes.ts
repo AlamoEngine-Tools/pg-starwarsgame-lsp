@@ -56,5 +56,5 @@ export function flattenIncludes(source: string, read: ShaderReader): FlattenedSh
         });
     };
 
-    return { text: expand(source, []), included, missing };
+    return {text: expand(source, []), included, missing};
 }

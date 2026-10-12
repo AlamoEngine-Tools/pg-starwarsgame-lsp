@@ -8,35 +8,41 @@
 // content. None of that can be named by key, which is why this editor and the translation editor
 // are separate programs over a shared grid rather than one grid deciding what kind of file it has.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createRoot } from 'react-dom/client';
+import {useCallback, useEffect, useMemo, useState} from 'react';
+import {createRoot} from 'react-dom/client';
 
-import { CreditsCrawl } from './creditsCrawl';
-import { BLANK_SENTINEL_VALUE, CREDITS_DIRECTIVES, isSpacerRow } from './creditsCrawlModel';
-import { applyStaged, coalesce, LocCommand } from './creditsStaging';
+import {CreditsCrawl} from './creditsCrawl';
+import {BLANK_SENTINEL_VALUE, CREDITS_DIRECTIVES, isSpacerRow} from './creditsCrawlModel';
+import {applyStaged, coalesce, LocCommand} from './creditsStaging';
 import {
-    CREDITS_STEPS, CreditsStep, directiveOptionText, DropRow, DropTarget, dropTargetAt, stepById,
+    CREDITS_STEPS,
+    CreditsStep,
+    directiveOptionText,
+    DropRow,
+    DropTarget,
+    dropTargetAt,
+    stepById,
 } from './creditsSteps';
-import { CellInput, menuAction, RowMenuFrame } from './loc/LocCells';
-import { gridFooterLabel } from './loc/gridFooter';
-import { ConvertibleFormat, LocDockActions } from './loc/LocDockActions';
-import { LocGridMessage, LocGridShell } from './loc/LocGridShell';
-import { LocColumnMenu } from './loc/LocColumnMenu';
-import { LocDockHeader } from './loc/LocDockHeader';
-import { useLocColumns } from './loc/useLocColumns';
-import { creditsBaselineValues } from './loc/creditsBaselineFill';
-import { creditsBaselineSeed, CreditsSeedRow, creditsFileSeed } from './loc/creditsSeed';
-import { BaselineEntryDto, BaselineRow, toBaselineRows } from './translationInherited';
-import { languageCopyValues } from './loc/languageCopy';
-import { LocTile, LocTileGrid } from './loc/LocTile';
-import { LocSearch } from './loc/LocSearch';
-import { LocProblemsBar } from './loc/LocProblemsBar';
-import { LocRow } from './loc/locRow';
-import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
-import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
-import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
-import { DockSection } from './shared/DockSection';
-import { buildRowFilter, FilterMode } from './locFilter';
+import {CellInput, menuAction, RowMenuFrame} from './loc/LocCells';
+import {gridFooterLabel} from './loc/gridFooter';
+import {ConvertibleFormat, LocDockActions} from './loc/LocDockActions';
+import {LocGridMessage, LocGridShell} from './loc/LocGridShell';
+import {LocColumnMenu} from './loc/LocColumnMenu';
+import {LocDockHeader} from './loc/LocDockHeader';
+import {useLocColumns} from './loc/useLocColumns';
+import {creditsBaselineValues} from './loc/creditsBaselineFill';
+import {creditsBaselineSeed, creditsFileSeed, CreditsSeedRow} from './loc/creditsSeed';
+import {BaselineEntryDto, BaselineRow, toBaselineRows} from './translationInherited';
+import {languageCopyValues} from './loc/languageCopy';
+import {LocTile, LocTileGrid} from './loc/LocTile';
+import {LocSearch} from './loc/LocSearch';
+import {LocProblemsBar} from './loc/LocProblemsBar';
+import {LocRow} from './loc/locRow';
+import {rowSeverityClass, severityByRow} from './loc/rowSeverity';
+import {FILTER_DEBOUNCE_MS, useDebounced} from './loc/useDebounced';
+import {LocPanelMessage, LocProblem, post, useLocPanel} from './loc/useLocPanel';
+import {DockSection} from './shared/DockSection';
+import {buildRowFilter, FilterMode} from './locFilter';
 
 /**
  * The drag payload: which kind of line is being placed.
@@ -87,7 +93,9 @@ function App(): React.JSX.Element {
             return;
         }
 
-        if (msg.type !== 'requestCrawlRows') { return; }
+        if (msg.type !== 'requestCrawlRows') {
+            return;
+        }
         setPendingCrawl(msg.fullScreen ? 'fullScreen' : 'beside');
     }, []);
 
@@ -105,7 +113,7 @@ function App(): React.JSX.Element {
         setHiddenLanguages(null);
         // A different file has different siblings, and the panel re-sends them if they apply.
         setSeedSources([]);
-        post({ type: 'requestBaseline' });
+        post({type: 'requestBaseline'});
     }, []);
     // The row the caret last sat in. "Insert above/below" is meaningless without it: here position
     // is the content, so the user has to be able to say where.
@@ -117,7 +125,7 @@ function App(): React.JSX.Element {
     const [menu, setMenu] = useState<{ x: number; y: number; index: number } | null>(null);
     const [problemsOpen, setProblemsOpen] = useState(false);
 
-    const panel = useLocPanel<LocCommand>({ applyStaged, coalesce, onFileLoaded, onMessage });
+    const panel = useLocPanel<LocCommand>({applyStaged, coalesce, onFileLoaded, onMessage});
     const {
         rows, languages, setLanguages, canAddLanguage, addLanguageCreatesFile,
         supportedLanguages, error, loaded, queue,
@@ -145,7 +153,7 @@ function App(): React.JSX.Element {
             kind: 'insertRow',
             index: at,
             key: CREDITS_DIRECTIVES[0],
-            values: languages.map(language => ({ language, value })),
+            values: languages.map(language => ({language, value})),
         });
 
         // A new row is empty, so an active filter would hide the thing just created.
@@ -165,7 +173,7 @@ function App(): React.JSX.Element {
             kind: 'insertRow',
             index: at,
             key: step.key,
-            values: languages.map(language => ({ language, value: step.value })),
+            values: languages.map(language => ({language, value: step.value})),
         });
 
         // The new row is empty, so an active filter would hide the thing just placed.
@@ -175,13 +183,13 @@ function App(): React.JSX.Element {
     }, [languages, stage]);
 
     const deleteRow = useCallback((index: number) => {
-        stage({ kind: 'deleteRow', index });
+        stage({kind: 'deleteRow', index});
         setSelected(current => (current === null || current < index ? current
             : current === index ? null : current - 1));
     }, [stage]);
 
     const moveRow = useCallback((index: number, to: number) => {
-        stage({ kind: 'moveRow', index, toIndex: to });
+        stage({kind: 'moveRow', index, toIndex: to});
         setSelected(to);
         setPendingFocus(to);
     }, [stage]);
@@ -198,7 +206,9 @@ function App(): React.JSX.Element {
     // message handler so it always sends the current staged rows rather than the ones captured when
     // the listener was bound.
     useEffect(() => {
-        if (pendingCrawl === null) { return; }
+        if (pendingCrawl === null) {
+            return;
+        }
 
         if (pendingCrawl === 'fullScreen') {
             setPreviewing(true);
@@ -215,20 +225,26 @@ function App(): React.JSX.Element {
 
     // A preview beside shows what is staged, so it follows the edits rather than the file.
     useEffect(() => {
-        if (!previewOpen) { return; }
-        post({ type: 'crawlRows', open: false, rows, languages, language: crawlLanguage });
+        if (!previewOpen) {
+            return;
+        }
+        post({type: 'crawlRows', open: false, rows, languages, language: crawlLanguage});
     }, [previewOpen, rows, languages, crawlLanguage]);
 
     // A fresh validation result reopens the bar; closing it is a decision about that result, not a
     // standing preference to never see the next one.
     useEffect(() => {
-        if (problems.length > 0) { setProblemsOpen(true); }
+        if (problems.length > 0) {
+            setProblemsOpen(true);
+        }
     }, [problems]);
 
     /** Takes the user to the row a problem names, lifting any filter concealing it. */
     const jumpToProblem = useCallback((problem: LocProblem) => {
         const index = problem.index;
-        if (index === null || index === undefined || rows[index] === undefined) { return null; }
+        if (index === null || index === undefined || rows[index] === undefined) {
+            return null;
+        }
 
         return () => {
             setFilter('');
@@ -254,7 +270,9 @@ function App(): React.JSX.Element {
         .sort((a, b) => a.top - b.top);
 
     const onGridDragOver = useCallback((e: React.DragEvent) => {
-        if (!e.dataTransfer.types.includes(STEP_MIME)) { return; }
+        if (!e.dataTransfer.types.includes(STEP_MIME)) {
+            return;
+        }
         // Without this the browser refuses the drop and shows a "no entry" cursor.
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
@@ -263,7 +281,9 @@ function App(): React.JSX.Element {
 
     const onGridDrop = useCallback((e: React.DragEvent) => {
         const step = stepById(e.dataTransfer.getData(STEP_MIME));
-        if (step === null) { return; }
+        if (step === null) {
+            return;
+        }
         e.preventDefault();
 
         const target = dropTargetAt(e.clientY, rowBoundaries(), rows.length);
@@ -292,7 +312,7 @@ function App(): React.JSX.Element {
     // No focusLanguage: a credits set is never opened one language at a time, since credits stay
     // one file per tab - their rows are addressed by position, so merging them by key is not
     // defined. The default here is therefore always "hide the empty columns".
-    const { hidden, shownLanguages, columns, toggleLanguage, materialise } = useLocColumns({
+    const {hidden, shownLanguages, columns, toggleLanguage, materialise} = useLocColumns({
         rows, languages, hiddenLanguages, setHiddenLanguages, onHidden: onColumnHidden,
     });
 
@@ -312,11 +332,15 @@ function App(): React.JSX.Element {
             kind: 'insertRow',
             index: at,
             key: seed.key,
-            values: languages.map(l => ({ language: l, value: l === language ? seed.value : '' })),
+            values: languages.map(l => ({language: l, value: l === language ? seed.value : ''})),
         }));
 
-    if (error) { return <LocGridMessage>{error}</LocGridMessage>; }
-    if (!loaded) { return <LocGridMessage>Loading...</LocGridMessage>; }
+    if (error) {
+        return <LocGridMessage>{error}</LocGridMessage>;
+    }
+    if (!loaded) {
+        return <LocGridMessage>Loading...</LocGridMessage>;
+    }
 
     const overlays = (
         <>
@@ -343,7 +367,9 @@ function App(): React.JSX.Element {
                         setPreviewing(false);
                         // Leaving the preview leaves full screen with it, so Esc does not strand
                         // the user in a chromeless window.
-                        if (document.fullscreenElement) { void document.exitFullscreen(); }
+                        if (document.fullscreenElement) {
+                            void document.exitFullscreen();
+                        }
                     }}
                 />
             )}
@@ -357,7 +383,7 @@ function App(): React.JSX.Element {
                 would misdescribe it. */}
             <div className="cell">Format</div>
             {shownLanguages.map(language => <div className="cell" key={language}>{language}</div>)}
-            <LocColumnMenu languages={languages} hidden={hidden} onToggle={toggleLanguage} />
+            <LocColumnMenu languages={languages} hidden={hidden} onToggle={toggleLanguage}/>
         </>
     );
 
@@ -366,9 +392,9 @@ function App(): React.JSX.Element {
             // Nothing to edit: a spacer is a marker. Shown as one, spanning the row, and removed
             // rather than typed over.
             <div className="cell spacer-cell" tabIndex={0}>
-                <span className="spacer-rule" />
+                <span className="spacer-rule"/>
                 <span className="spacer-label">blank line</span>
-                <span className="spacer-rule" />
+                <span className="spacer-rule"/>
             </div>
         )
         : (
@@ -376,7 +402,7 @@ function App(): React.JSX.Element {
                 <div className="cell">
                     <DirectiveSelect
                         value={row.key}
-                        onCommit={next => stage({ kind: 'setKey', index: row.index, key: next })}
+                        onCommit={next => stage({kind: 'setKey', index: row.index, key: next})}
                     />
                 </div>
                 {shownLanguages.map(language => (
@@ -421,17 +447,17 @@ function App(): React.JSX.Element {
                     // file beside this one, which the host has to create because it is not an edit
                     // to this document and cannot be staged with the rest of the batch.
                     if (addLanguageCreatesFile) {
-                        post({ type: 'addLanguageFile', language });
+                        post({type: 'addLanguageFile', language});
                         return;
                     }
 
-                    stage({ kind: 'addLanguage', language });
+                    stage({kind: 'addLanguage', language});
                     setLanguages(current => [...current, language]);
 
                     // Matched by text, since a credits key names a format and not an entry.
                     if (fillFromBaseline) {
                         for (const value of creditsBaselineValues(language, rows, baseline)) {
-                            stage({ kind: 'setCell', index: value.index, language, value: value.value });
+                            stage({kind: 'setCell', index: value.index, language, value: value.value});
                         }
                     }
                     // Explicit from here on, so the column just added is not hidden for being empty.
@@ -442,7 +468,7 @@ function App(): React.JSX.Element {
                     // Positional here: a credits row is addressed by where it sits, and its key is
                     // a formatting directive that several rows share.
                     for (const copied of languageCopyValues(from, to, rows)) {
-                        stage({ kind: 'setCell', index: copied.index, language: to, value: copied.value });
+                        stage({kind: 'setCell', index: copied.index, language: to, value: copied.value});
                     }
                 }}
                 // An empty table is seeded, a populated one is filled - see fillFromBaseline.
@@ -453,7 +479,9 @@ function App(): React.JSX.Element {
                 seedSources={seedSources}
                 onSeedFrom={(filePath, language) => {
                     const source = seedSources.find(s => s.filePath === filePath);
-                    if (source === undefined) { return; }
+                    if (source === undefined) {
+                        return;
+                    }
                     seedInto(creditsFileSeed(source.rows, source.language), language);
                 }}
                 // Offered when the file is empty, or when a second language is present to match
@@ -469,12 +497,12 @@ function App(): React.JSX.Element {
                     }
 
                     for (const value of creditsBaselineValues(language, rows, baseline)) {
-                        stage({ kind: 'setCell', index: value.index, language, value: value.value });
+                        stage({kind: 'setCell', index: value.index, language, value: value.value});
                     }
                 }}
                 onConvertFormat={(format: ConvertibleFormat) =>
-                    post({ type: 'convertFormat', targetFormat: format })}
-                onExportDat={() => post({ type: 'exportDat' })}
+                    post({type: 'convertFormat', targetFormat: format})}
+                onExportDat={() => post({type: 'exportDat'})}
             />
 
             {/* The three kinds of line the format is built from, as things to pick up and place.
@@ -538,7 +566,7 @@ function App(): React.JSX.Element {
             onRowContextMenu={(row, e) => {
                 e.preventDefault();
                 setSelected(row.index);
-                setMenu({ x: e.clientX, y: e.clientY, index: row.index });
+                setMenu({x: e.clientX, y: e.clientY, index: row.index});
             }}
             focusRowIndex={pendingFocus}
             onFocused={() => setPendingFocus(null)}
@@ -564,7 +592,7 @@ function App(): React.JSX.Element {
                 // is -1, which the menu reads as "there is no row here" and offers only the two
                 // items that still mean something.
                 e.preventDefault();
-                setMenu({ x: e.clientX, y: e.clientY, index: rows.length - 1 });
+                setMenu({x: e.clientX, y: e.clientY, index: rows.length - 1});
             }}
             dockHeader={dockHeader}
             dockContent={dockContent}
@@ -623,7 +651,7 @@ function CreditsRowMenu(props: {
 
             {onRow && (
                 <>
-                    <div className="sep" />
+                    <div className="sep"/>
                     <button
                         role="menuitem"
                         disabled={props.index === 0}
@@ -639,7 +667,7 @@ function CreditsRowMenu(props: {
                         Move down
                     </button>
 
-                    <div className="sep" />
+                    <div className="sep"/>
                     <button
                         role="menuitem"
                         className="danger"
@@ -702,8 +730,7 @@ async function requestFullScreen(): Promise<void> {
 }
 
 
-
 // Examples from this file's own vocabulary.
-const PLACEHOLDERS: Record<FilterMode, string> = { text: 'Filter rows...', wildcard: 'CENTER*', regex: '^HEADER$' };
+const PLACEHOLDERS: Record<FilterMode, string> = {text: 'Filter rows...', wildcard: 'CENTER*', regex: '^HEADER$'};
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(<App/>);

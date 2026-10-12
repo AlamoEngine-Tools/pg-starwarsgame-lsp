@@ -2,13 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import * as THREE from 'three';
 
-import {
-    cancelRootCorrection, outermostRoots, splitGeometryFromBone, stampTreeKeys, treeKeyOf,
-} from './boneNodes';
+import {cancelRootCorrection, outermostRoots, splitGeometryFromBone, stampTreeKeys, treeKeyOf,} from './boneNodes';
 
 /** A bone node that also carries geometry, with a child bone attached to it. */
 function nebulonShaped(): { parent: THREE.Object3D; mesh: THREE.Mesh; child: THREE.Object3D } {
@@ -26,12 +24,12 @@ function nebulonShaped(): { parent: THREE.Object3D; mesh: THREE.Mesh; child: THR
     mesh.add(child);
     parent.add(mesh);
 
-    return { parent, mesh, child };
+    return {parent, mesh, child};
 }
 
 describe('splitGeometryFromBone', () => {
     it('leaves a bone node with no geometry of its own', () => {
-        const { mesh } = nebulonShaped();
+        const {mesh} = nebulonShaped();
 
         const bone = splitGeometryFromBone(mesh, 'COLLISION');
 
@@ -40,7 +38,7 @@ describe('splitGeometryFromBone', () => {
     });
 
     it('puts the geometry underneath as a mesh of its own', () => {
-        const { mesh } = nebulonShaped();
+        const {mesh} = nebulonShaped();
 
         const bone = splitGeometryFromBone(mesh, 'COLLISION');
 
@@ -49,7 +47,7 @@ describe('splitGeometryFromBone', () => {
     });
 
     it('takes the place of the node it replaced', () => {
-        const { parent, mesh } = nebulonShaped();
+        const {parent, mesh} = nebulonShaped();
 
         const bone = splitGeometryFromBone(mesh, 'COLLISION');
 
@@ -58,7 +56,7 @@ describe('splitGeometryFromBone', () => {
     });
 
     it('moves the children onto the bone, not the mesh', () => {
-        const { mesh, child } = nebulonShaped();
+        const {mesh, child} = nebulonShaped();
 
         const bone = splitGeometryFromBone(mesh, 'COLLISION');
 
@@ -94,7 +92,7 @@ describe('splitGeometryFromBone', () => {
      * the gate decides after.
      */
     it('leaves the bone visible whatever the node said, and starts the mesh drawn', () => {
-        const { mesh } = nebulonShaped();
+        const {mesh} = nebulonShaped();
         mesh.visible = false;
 
         const bone = splitGeometryFromBone(mesh, 'COLLISION');
@@ -110,7 +108,7 @@ describe('splitGeometryFromBone', () => {
      * billboarded bone is exactly this shape.
      */
     it('carries the node`s own data over to the bone', () => {
-        const { mesh } = nebulonShaped();
+        const {mesh} = nebulonShaped();
         mesh.userData.alamoBillboard = 'Parallel';
 
         const bone = splitGeometryFromBone(mesh, 'COLLISION');
@@ -120,7 +118,7 @@ describe('splitGeometryFromBone', () => {
     });
 
     it('keeps the original name when there is no mesh name to use', () => {
-        const { mesh } = nebulonShaped();
+        const {mesh} = nebulonShaped();
 
         splitGeometryFromBone(mesh);
 
@@ -130,8 +128,10 @@ describe('splitGeometryFromBone', () => {
 
 describe('stampTreeKeys', () => {
     /** Two bones, the second carrying two sub-meshes, which is where a name-based key falls over. */
-    function rigged(): { root: THREE.Object3D; bones: Map<number, THREE.Object3D>;
-        meshes: THREE.Mesh[]; } {
+    function rigged(): {
+        root: THREE.Object3D; bones: Map<number, THREE.Object3D>;
+        meshes: THREE.Mesh[];
+    } {
         const root = new THREE.Object3D();
         const boneA = new THREE.Object3D();
         const boneB = new THREE.Object3D();
@@ -146,7 +146,7 @@ describe('stampTreeKeys', () => {
         boneA.add(three);
         boneB.add(one, two);
 
-        return { root, bones: new Map([[3, boneA], [7, boneB]]), meshes: [three, one, two] };
+        return {root, bones: new Map([[3, boneA], [7, boneB]]), meshes: [three, one, two]};
     }
 
     /**
@@ -155,7 +155,7 @@ describe('stampTreeKeys', () => {
      * cannot do it either, because `Ai_rancor` carries two sub-meshes called `Crusher#0`.
      */
     it('keys a mesh by the bone it is attached to and its place on it', () => {
-        const { root, bones, meshes } = rigged();
+        const {root, bones, meshes} = rigged();
 
         stampTreeKeys(root, bones, 'hull');
 

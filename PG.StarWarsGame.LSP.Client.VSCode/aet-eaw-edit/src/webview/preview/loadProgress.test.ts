@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { AssetLedger, loadState, type LoadTally } from './loadProgress';
+import {AssetLedger, loadState, type LoadTally} from './loadProgress';
 
 const tally = (over: Partial<LoadTally> = {}): LoadTally => ({
     expectedParts: 4,
@@ -108,7 +108,7 @@ describe('AssetLedger', () => {
 
 describe('loadState', () => {
     it('waits on the scene before anything has been said', () => {
-        const state = loadState(tally({ expectedParts: null, arrivedParts: 0 }));
+        const state = loadState(tally({expectedParts: null, arrivedParts: 0}));
 
         assert.equal(state.stage, 'scene');
         assert.equal(state.covered, true);
@@ -119,14 +119,14 @@ describe('loadState', () => {
     // ever arrives. Waiting for parts here would cover the viewport for the rest of the session.
     it('is ready at once when the scene has no parts to load', () => {
         const state = loadState(
-            tally({ expectedParts: 0, arrivedParts: 0, requestedAssets: 0, settledAssets: 0 }));
+            tally({expectedParts: 0, arrivedParts: 0, requestedAssets: 0, settledAssets: 0}));
 
         assert.equal(state.stage, 'ready');
         assert.equal(state.covered, false);
     });
 
     it('counts the geometry in', () => {
-        const state = loadState(tally({ expectedParts: 5, arrivedParts: 2 }));
+        const state = loadState(tally({expectedParts: 5, arrivedParts: 2}));
 
         assert.equal(state.stage, 'geometry');
         assert.equal(state.covered, true);
@@ -137,7 +137,7 @@ describe('loadState', () => {
     // start until the last part is in - which is exactly why the model was appearing undressed.
     it('counts the materials in once every part has arrived', () => {
         const state = loadState(
-            tally({ expectedParts: 4, arrivedParts: 4, requestedAssets: 30, settledAssets: 12 }));
+            tally({expectedParts: 4, arrivedParts: 4, requestedAssets: 30, settledAssets: 12}));
 
         assert.equal(state.stage, 'materials');
         assert.equal(state.covered, true);
@@ -152,7 +152,7 @@ describe('loadState', () => {
     });
 
     it('is ready when a model samples no textures at all', () => {
-        const state = loadState(tally({ requestedAssets: 0, settledAssets: 0 }));
+        const state = loadState(tally({requestedAssets: 0, settledAssets: 0}));
 
         assert.equal(state.stage, 'ready');
         assert.equal(state.covered, false);
@@ -162,16 +162,16 @@ describe('loadState', () => {
     // model that is perfectly visible underneath it - a worse failure than the pop-in this fixes.
     it('gives up and shows the model when the wait is abandoned', () => {
         const state = loadState(
-            tally({ expectedParts: 9, arrivedParts: 1, settledAssets: 0, timedOut: true }));
+            tally({expectedParts: 9, arrivedParts: 1, settledAssets: 0, timedOut: true}));
 
         assert.equal(state.stage, 'ready');
         assert.equal(state.covered, false);
     });
 
     it('names what it is waiting for, in words', () => {
-        assert.match(loadState(tally({ expectedParts: null })).label, /scene/i);
-        assert.match(loadState(tally({ expectedParts: 5, arrivedParts: 1 })).label, /geometry/i);
+        assert.match(loadState(tally({expectedParts: null})).label, /scene/i);
+        assert.match(loadState(tally({expectedParts: 5, arrivedParts: 1})).label, /geometry/i);
         assert.match(
-            loadState(tally({ settledAssets: 3 })).label, /texture|material/i);
+            loadState(tally({settledAssets: 3})).label, /texture|material/i);
     });
 });

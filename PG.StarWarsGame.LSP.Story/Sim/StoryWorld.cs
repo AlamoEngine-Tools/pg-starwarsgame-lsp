@@ -54,11 +54,6 @@ public sealed record StoryWorld
     public ImmutableDictionary<string, string> BattleOutcomes { get; init; } =
         ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
-    public StoryWorld WithBattleOutcome(string battleKey, string outcome)
-    {
-        return this with { BattleOutcomes = BattleOutcomes.SetItem(battleKey, outcome) };
-    }
-
     /// <summary>
     ///     The battle a LINK_TACTICAL reward queued, while its pending-battle choice is up or the
     ///     battle runs. Measured: the engine pauses gameplay for the choice but keeps servicing
@@ -72,16 +67,6 @@ public sealed record StoryWorld
     ///     once the auto-resolve button was.
     /// </summary>
     public string? PendingBattleChoice { get; init; }
-
-    public StoryWorld WithPendingBattle(string battleKey, string? choice = null)
-    {
-        return this with { PendingBattle = battleKey, PendingBattleChoice = choice };
-    }
-
-    public StoryWorld WithoutPendingBattle()
-    {
-        return this with { PendingBattle = null, PendingBattleChoice = null };
-    }
 
     /// <summary>
     ///     The text key of the tutorial dialog a TUTORIAL_DIALOG reward put up, or null while none
@@ -97,6 +82,21 @@ public sealed record StoryWorld
 
     public ImmutableHashSet<string> Objectives { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+    public StoryWorld WithBattleOutcome(string battleKey, string outcome)
+    {
+        return this with { BattleOutcomes = BattleOutcomes.SetItem(battleKey, outcome) };
+    }
+
+    public StoryWorld WithPendingBattle(string battleKey, string? choice = null)
+    {
+        return this with { PendingBattle = battleKey, PendingBattleChoice = choice };
+    }
+
+    public StoryWorld WithoutPendingBattle()
+    {
+        return this with { PendingBattle = null, PendingBattleChoice = null };
+    }
 
     public static string UnitKey(string type, string owner, string planet)
     {

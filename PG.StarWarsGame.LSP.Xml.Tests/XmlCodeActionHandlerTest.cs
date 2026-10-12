@@ -53,17 +53,6 @@ public sealed class XmlCodeActionHandlerTest
         Assert.Empty(result!);
     }
 
-    private sealed class RecordingCursorProvider : IXmlCursorCodeActionProvider
-    {
-        public Position? Asked { get; private set; }
-
-        public IEnumerable<CommandOrCodeAction> Handle(DocumentUri documentUri, Position position)
-        {
-            Asked = position;
-            return [new CommandOrCodeAction(new CodeAction { Title = "cursor" })];
-        }
-    }
-
     // ── feature flag ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -219,6 +208,17 @@ public sealed class XmlCodeActionHandlerTest
     private static Diagnostic DiagWithCreateLocKey(LspRange range, string key)
     {
         return new Diagnostic { Range = range, Data = JToken.FromObject(new { createLocKey = key }) };
+    }
+
+    private sealed class RecordingCursorProvider : IXmlCursorCodeActionProvider
+    {
+        public Position? Asked { get; private set; }
+
+        public IEnumerable<CommandOrCodeAction> Handle(DocumentUri documentUri, Position position)
+        {
+            Asked = position;
+            return [new CommandOrCodeAction(new CodeAction { Title = "cursor" })];
+        }
     }
 
     private sealed class EmptyFixCache : IXmlFixCache

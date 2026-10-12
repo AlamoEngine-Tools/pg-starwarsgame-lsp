@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { branchKey } from './colourKey';
-import { BRANCH_PALETTE, branchColours } from './palette';
+import {branchKey} from './colourKey';
+import {BRANCH_PALETTE, branchColours} from './palette';
 
-const event = (branch: string | null | undefined) => ({ kind: 'Event', branch });
+const event = (branch: string | null | undefined) => ({kind: 'Event', branch});
 
 describe('branchKey', () => {
     /** Issue #128: a zoomed-out node is drawn in its branch colour, and nothing said which branch. */
@@ -30,7 +30,7 @@ describe('branchKey', () => {
     /** A junction inherits its owner's branch for the glow; it names no branch of its own. */
     it('takes branches from events only, and skips an event with none', () => {
         const key = branchKey([
-            { kind: 'AndJunction', branch: 'Ghost' }, event(null), event(undefined), event(''), event('Act1'),
+            {kind: 'AndJunction', branch: 'Ghost'}, event(null), event(undefined), event(''), event('Act1'),
         ], branchColours(['Act1']));
 
         assert.deepEqual(key.map(entry => entry.branch), ['Act1']);

@@ -14,7 +14,7 @@
 
 import {useEffect, useRef} from 'react';
 
-import {geometryTabs, nearEnd, nextOffset, type GeometryRows} from '../preview/geometryRows';
+import {type GeometryRows, geometryTabs, nearEnd, nextOffset} from '../preview/geometryRows';
 import {type GeometryTable} from '../../protocol/modelPreview';
 
 /**

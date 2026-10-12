@@ -2,14 +2,24 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
-    accelerationIn, appearanceOf, atlasFrame, emitterExtent, sampleTrack, sampleVolume, seededRandom,
-    SpawnClock, spawnParticle, stepParticle, systemExtent, volumeExtent,
+    accelerationIn,
+    appearanceOf,
+    atlasFrame,
+    emitterExtent,
+    sampleTrack,
+    sampleVolume,
+    seededRandom,
+    SpawnClock,
+    spawnParticle,
+    stepParticle,
+    systemExtent,
+    volumeExtent,
 } from './particleSim';
-import { emitter, properties, track, volume } from './particleFixture';
-import type { AlamoEmitterProperties } from '../../protocol/modelPreview';
+import {emitter, properties, track, volume} from './particleFixture';
+import type {AlamoEmitterProperties} from '../../protocol/modelPreview';
 
 // ── track sampling ───────────────────────────────────────────────────────────
 
@@ -72,13 +82,13 @@ describe('sampleTrack', () => {
 
 describe('sampleVolume', () => {
     it('returns the exact value for a point, ignoring the generator', () => {
-        const point = volume({ shape: 'Point', exactValue: { x: 1, y: 2, z: 3 } });
+        const point = volume({shape: 'Point', exactValue: {x: 1, y: 2, z: 3}});
 
-        assert.deepEqual(sampleVolume(point, seededRandom(1)), { x: 1, y: 2, z: 3 });
+        assert.deepEqual(sampleVolume(point, seededRandom(1)), {x: 1, y: 2, z: 3});
     });
 
     it('stays inside a box', () => {
-        const box = volume({ shape: 'Box', min: { x: -1, y: 0, z: 2 }, max: { x: 1, y: 5, z: 4 } });
+        const box = volume({shape: 'Box', min: {x: -1, y: 0, z: 2}, max: {x: 1, y: 5, z: 4}});
         const random = seededRandom(7);
 
         for (let i = 0; i < 200; i++) {
@@ -90,7 +100,7 @@ describe('sampleVolume', () => {
     });
 
     it('centres a cube on the origin', () => {
-        const cube = volume({ shape: 'Cube', sideLength: 4 });
+        const cube = volume({shape: 'Cube', sideLength: 4});
         const random = seededRandom(3);
 
         for (let i = 0; i < 200; i++) {
@@ -102,7 +112,7 @@ describe('sampleVolume', () => {
     });
 
     it('keeps a sphere sample inside its radius', () => {
-        const sphere = volume({ shape: 'Sphere', sphereRadius: 3 });
+        const sphere = volume({shape: 'Sphere', sphereRadius: 3});
         const random = seededRandom(11);
 
         for (let i = 0; i < 300; i++) {
@@ -113,7 +123,7 @@ describe('sampleVolume', () => {
 
     /** Edge-only means a shell: the engine uses it for ring and burst effects. */
     it('puts every edge-only sphere sample on the surface', () => {
-        const shell = volume({ shape: 'Sphere', sphereRadius: 3, sphereEdgeOnly: true });
+        const shell = volume({shape: 'Sphere', sphereRadius: 3, sphereEdgeOnly: true});
         const random = seededRandom(5);
 
         for (let i = 0; i < 200; i++) {
@@ -123,7 +133,7 @@ describe('sampleVolume', () => {
     });
 
     it('keeps a cylinder sample within its radius and height', () => {
-        const cylinder = volume({ shape: 'Cylinder', cylinderRadius: 2, cylinderHeight: 10 });
+        const cylinder = volume({shape: 'Cylinder', cylinderRadius: 2, cylinderHeight: 10});
         const random = seededRandom(13);
 
         for (let i = 0; i < 300; i++) {
@@ -135,7 +145,7 @@ describe('sampleVolume', () => {
 
     /** A uniform radius crowds the axis, because area grows with it. */
     it('spreads a solid cylinder by area, not by radius', () => {
-        const cylinder = volume({ shape: 'Cylinder', cylinderRadius: 1, cylinderHeight: 1 });
+        const cylinder = volume({shape: 'Cylinder', cylinderRadius: 1, cylinderHeight: 1});
         const random = seededRandom(19);
         const n = 2000;
 
@@ -179,7 +189,7 @@ describe('SpawnClock', () => {
      * frame emits nothing at all, which is the bug this carries a remainder to avoid.
      */
     it('carries the fractional remainder across frames', () => {
-        const clock = new SpawnClock(emitter({ properties: properties({ particlesPerSecond: 40 }) }));
+        const clock = new SpawnClock(emitter({properties: properties({particlesPerSecond: 40})}));
 
         let total = 0;
         for (let i = 0; i < 60; i++) {
@@ -191,7 +201,7 @@ describe('SpawnClock', () => {
 
     it('emits nothing until the initial delay has passed', () => {
         const clock = new SpawnClock(
-            emitter({ properties: properties({ particlesPerSecond: 100, initialDelay: 0.5 }) }));
+            emitter({properties: properties({particlesPerSecond: 100, initialDelay: 0.5})}));
 
         assert.equal(clock.advance(0.25), 0);
         assert.ok(clock.advance(0.5) > 0);
@@ -199,7 +209,7 @@ describe('SpawnClock', () => {
 
     it('fires a burst of the whole count at once', () => {
         const clock = new SpawnClock(emitter({
-            properties: properties({ useBursts: true, particlesPerBurst: 25, burstDelay: 1 }),
+            properties: properties({useBursts: true, particlesPerBurst: 25, burstDelay: 1}),
         }));
 
         assert.equal(clock.advance(0.01), 25);
@@ -226,7 +236,7 @@ describe('SpawnClock', () => {
     /** Zero means forever, which is how a continuous burst emitter is authored. */
     it('never finishes when the burst count is zero', () => {
         const clock = new SpawnClock(emitter({
-            properties: properties({ useBursts: true, particlesPerBurst: 1, burstDelay: 0.1 }),
+            properties: properties({useBursts: true, particlesPerBurst: 1, burstDelay: 0.1}),
         }));
 
         for (let i = 0; i < 30; i++) {
@@ -242,28 +252,28 @@ describe('SpawnClock', () => {
 describe('spawnParticle', () => {
     it('takes its velocity from the speed volume and its place from the position volume', () => {
         const p = spawnParticle(emitter({
-            speed: volume({ exactValue: { x: 0, y: 5, z: 0 } }),
-            position: volume({ exactValue: { x: 1, y: 2, z: 3 } }),
+            speed: volume({exactValue: {x: 0, y: 5, z: 0}}),
+            position: volume({exactValue: {x: 1, y: 2, z: 3}}),
         }), seededRandom(1));
 
-        assert.deepEqual(p.velocity, { x: 0, y: 5, z: 0 });
-        assert.deepEqual(p.position, { x: 1, y: 2, z: 3 });
+        assert.deepEqual(p.velocity, {x: 0, y: 5, z: 0});
+        assert.deepEqual(p.position, {x: 1, y: 2, z: 3});
     });
 
     it('falls back to the property lifetime when the volume gives none', () => {
         const p = spawnParticle(
-            emitter({ properties: properties({ lifetime: 2.5 }) }), seededRandom(1));
+            emitter({properties: properties({lifetime: 2.5})}), seededRandom(1));
 
         assert.equal(p.lifetime, 2.5);
     });
 
     it('varies the lifetime within the declared percentage', () => {
         const e = emitter({
-            properties: properties({ lifetime: 10, randomLifetimePercent: 0.5 }),
+            properties: properties({lifetime: 10, randomLifetimePercent: 0.5}),
         });
         const random = seededRandom(23);
 
-        const lifetimes = Array.from({ length: 200 }, () => spawnParticle(e, random).lifetime);
+        const lifetimes = Array.from({length: 200}, () => spawnParticle(e, random).lifetime);
 
         assert.ok(Math.min(...lifetimes) >= 5, 'shorter than the range allows');
         assert.ok(Math.max(...lifetimes) <= 15, 'longer than the range allows');
@@ -274,7 +284,7 @@ describe('spawnParticle', () => {
         // Dividing by it is how the appearance is sampled, so zero would be a division by zero on
         // every frame of a particle that should simply not exist.
         const p = spawnParticle(
-            emitter({ properties: properties({ lifetime: 0 }) }), seededRandom(1));
+            emitter({properties: properties({lifetime: 0})}), seededRandom(1));
 
         assert.ok(p.lifetime > 0);
     });
@@ -284,8 +294,8 @@ describe('stepParticle', () => {
     it('moves by its velocity', () => {
         const e = emitter();
         const p = spawnParticle(e, seededRandom(1));
-        p.velocity = { x: 1, y: 0, z: 0 };
-        p.position = { x: 0, y: 0, z: 0 };
+        p.velocity = {x: 1, y: 0, z: 0};
+        p.position = {x: 0, y: 0, z: 0};
 
         stepParticle(p, e, 0.5);
 
@@ -293,9 +303,9 @@ describe('stepParticle', () => {
     });
 
     it('pulls downwards under gravity', () => {
-        const e = emitter({ properties: properties({ gravity: 10 }) });
+        const e = emitter({properties: properties({gravity: 10})});
         const p = spawnParticle(e, seededRandom(1));
-        p.velocity = { x: 0, y: 0, z: 0 };
+        p.velocity = {x: 0, y: 0, z: 0};
 
         stepParticle(p, e, 0.1);
 
@@ -303,7 +313,7 @@ describe('stepParticle', () => {
     });
 
     it('retires a particle once it is older than its lifetime', () => {
-        const e = emitter({ properties: properties({ lifetime: 1 }) });
+        const e = emitter({properties: properties({lifetime: 1})});
         const p = spawnParticle(e, seededRandom(1));
 
         assert.equal(stepParticle(p, e, 0.5), true);
@@ -312,15 +322,15 @@ describe('stepParticle', () => {
 
     describe('ground behaviour', () => {
         function falling(behavior: AlamoEmitterProperties['groundBehavior']) {
-            const e = emitter({ properties: properties({ groundBehavior: behavior, lifetime: 10 }) });
+            const e = emitter({properties: properties({groundBehavior: behavior, lifetime: 10})});
             const p = spawnParticle(e, seededRandom(1));
-            p.position = { x: 0, y: 0.1, z: 0 };
-            p.velocity = { x: 1, y: -10, z: 0 };
-            return { e, p };
+            p.position = {x: 0, y: 0.1, z: 0};
+            p.velocity = {x: 1, y: -10, z: 0};
+            return {e, p};
         }
 
         it('bounces back up, damped', () => {
-            const { e, p } = falling('Bounce');
+            const {e, p} = falling('Bounce');
 
             stepParticle(p, e, 0.1);
 
@@ -330,16 +340,16 @@ describe('stepParticle', () => {
         });
 
         it('stops dead when it sticks', () => {
-            const { e, p } = falling('Stick');
+            const {e, p} = falling('Stick');
 
             stepParticle(p, e, 0.1);
 
-            assert.deepEqual(p.velocity, { x: 0, y: 0, z: 0 });
+            assert.deepEqual(p.velocity, {x: 0, y: 0, z: 0});
             assert.equal(p.position.y, 0);
         });
 
         it('retires the particle when it should disappear', () => {
-            const { e, p } = falling('Disappear');
+            const {e, p} = falling('Disappear');
 
             stepParticle(p, e, 0.1);
 
@@ -356,8 +366,8 @@ describe('stepParticle', () => {
          * expressed in the same local space the particle lives in.
          */
         it('measures the ground from the scene, not from the emitter', () => {
-            const { e, p } = falling('Disappear');
-            p.position = { x: 0, y: 0.1, z: 0 };
+            const {e, p} = falling('Disappear');
+            p.position = {x: 0, y: 0.1, z: 0};
 
             // The system hangs 50 units up, so the ground is 50 units BELOW the particle's origin.
             stepParticle(p, e, 0.1, -50);
@@ -368,8 +378,8 @@ describe('stepParticle', () => {
         });
 
         it('still retires a particle that reaches a raised ground', () => {
-            const { e, p } = falling('Disappear');
-            p.position = { x: 0, y: 20.1, z: 0 };
+            const {e, p} = falling('Disappear');
+            p.position = {x: 0, y: 20.1, z: 0};
 
             // Mounted 20 units DOWN, so the scene's ground sits at local +20.
             stepParticle(p, e, 0.1, 20);
@@ -378,7 +388,7 @@ describe('stepParticle', () => {
         });
 
         it('passes straight through when there is no ground behaviour', () => {
-            const { e, p } = falling('None');
+            const {e, p} = falling('None');
 
             stepParticle(p, e, 0.1);
 
@@ -399,7 +409,7 @@ describe('spin', () => {
     it('integrates the speed track rather than holding its first key', () => {
         const e = emitter({
             tracks: [track('RotationSpeed', [[0, 4], [1, 0]])],
-            properties: properties({ lifetime: 2, randomRotationDirection: false }),
+            properties: properties({lifetime: 2, randomRotationDirection: false}),
         });
 
         const p = spawnParticle(e, seededRandom(1));
@@ -413,7 +423,7 @@ describe('spin', () => {
     it('turns at the track`s rate for a constant speed', () => {
         const e = emitter({
             tracks: [track('RotationSpeed', [[0, 3], [1, 3]])],
-            properties: properties({ lifetime: 2, randomRotationDirection: false }),
+            properties: properties({lifetime: 2, randomRotationDirection: false}),
         });
 
         const p = spawnParticle(e, seededRandom(1));
@@ -425,7 +435,7 @@ describe('spin', () => {
 
     /** Every particle starts square-on unless the emitter asks for a random angle. */
     it('starts a particle unrotated', () => {
-        const e = emitter({ tracks: [track('RotationSpeed', [[0, 5], [1, 5]])] });
+        const e = emitter({tracks: [track('RotationSpeed', [[0, 5], [1, 5]])]});
 
         assert.equal(appearanceOf(spawnParticle(e, seededRandom(9)), e).rotation, 0);
     });
@@ -456,7 +466,7 @@ describe('spin', () => {
     it('spins some particles the other way when the emitter asks', () => {
         const e = emitter({
             tracks: [track('RotationSpeed', [[0, 2], [1, 2]])],
-            properties: properties({ lifetime: 1, randomRotationDirection: true }),
+            properties: properties({lifetime: 1, randomRotationDirection: true}),
         });
 
         const seen = new Set<number>();
@@ -480,8 +490,8 @@ describe('inward motion', () => {
     it('throws a particle along the direction it was born in', () => {
         const e = emitter({
             // Born at a fixed offset, so the direction is known.
-            position: volume({ shape: 'Point', exactValue: { x: 3, y: 0, z: 4 } }),
-            properties: properties({ inwardSpeed: -10 }),
+            position: volume({shape: 'Point', exactValue: {x: 3, y: 0, z: 4}}),
+            properties: properties({inwardSpeed: -10}),
         });
 
         const p = spawnParticle(e, seededRandom(1));
@@ -492,7 +502,7 @@ describe('inward motion', () => {
     });
 
     it('leaves a particle born at the origin alone rather than dividing by zero', () => {
-        const e = emitter({ properties: properties({ inwardSpeed: -10 }) });
+        const e = emitter({properties: properties({inwardSpeed: -10})});
 
         const p = spawnParticle(e, seededRandom(1));
 
@@ -508,13 +518,13 @@ describe('inward motion', () => {
      */
     it('keeps pulling along the birth direction, not the current position', () => {
         const e = emitter({
-            position: volume({ shape: 'Point', exactValue: { x: 0, y: 0, z: 1 } }),
-            properties: properties({ inwardAcceleration: -4, lifetime: 10 }),
+            position: volume({shape: 'Point', exactValue: {x: 0, y: 0, z: 1}}),
+            properties: properties({inwardAcceleration: -4, lifetime: 10}),
         });
 
         const p = spawnParticle(e, seededRandom(1));
         // Somewhere else entirely by now.
-        p.position = { x: 100, y: 0, z: -50 };
+        p.position = {x: 100, y: 0, z: -50};
 
         stepParticle(p, e, 1);
 
@@ -530,17 +540,17 @@ describe('wind', () => {
      * the smoke in the game hung in dead air.
      */
     it('throws a wind-affected particle downwind at birth', () => {
-        const e = emitter({ properties: properties({ affectedByWind: true }) });
+        const e = emitter({properties: properties({affectedByWind: true})});
 
-        const p = spawnParticle(e, seededRandom(1), { x: 3, y: 0, z: -4 });
+        const p = spawnParticle(e, seededRandom(1), {x: 3, y: 0, z: -4});
 
-        assert.deepEqual(p.velocity, { x: 3, y: 0, z: -4 });
+        assert.deepEqual(p.velocity, {x: 3, y: 0, z: -4});
     });
 
     it('leaves an emitter that ignores the wind alone', () => {
-        const p = spawnParticle(emitter(), seededRandom(1), { x: 3, y: 0, z: -4 });
+        const p = spawnParticle(emitter(), seededRandom(1), {x: 3, y: 0, z: -4});
 
-        assert.deepEqual(p.velocity, { x: 0, y: 0, z: 0 });
+        assert.deepEqual(p.velocity, {x: 0, y: 0, z: 0});
     });
 });
 
@@ -552,7 +562,7 @@ describe('acceleration axes', () => {
      */
     it('turns a file acceleration into the space the simulation runs in', () => {
         const e = emitter({
-            properties: properties({ acceleration: { x: 1, y: 2, z: 3 }, lifetime: 10 }),
+            properties: properties({acceleration: {x: 1, y: 2, z: 3}, lifetime: 10}),
         });
 
         const p = spawnParticle(e, seededRandom(1));
@@ -567,14 +577,14 @@ describe('acceleration axes', () => {
 
     /** The same turn, on its own, so the renderer can ask for it without stepping anything. */
     it('reports the acceleration it will apply', () => {
-        const p = properties({ acceleration: { x: 1, y: 2, z: 3 }, gravity: 4 });
+        const p = properties({acceleration: {x: 1, y: 2, z: 3}, gravity: 4});
 
-        assert.deepEqual(accelerationIn(p), { x: 1, y: -1, z: -2 });
+        assert.deepEqual(accelerationIn(p), {x: 1, y: -1, z: -2});
     });
 
     /** Gravity is a scalar down Alamo's Z, which is the simulation's own down. */
     it('pulls gravity straight down', () => {
-        const e = emitter({ properties: properties({ gravity: 9.8, lifetime: 10 }) });
+        const e = emitter({properties: properties({gravity: 9.8, lifetime: 10})});
 
         const p = spawnParticle(e, seededRandom(1));
 
@@ -592,7 +602,7 @@ describe('appearanceOf', () => {
                 track('Alpha', [[0, 1], [1, 0]]),
                 track('Scale', [[0, 2], [1, 6]]),
             ],
-            properties: properties({ lifetime: 2 }),
+            properties: properties({lifetime: 2}),
         });
 
         const p = spawnParticle(e, seededRandom(1));
@@ -618,7 +628,7 @@ describe('appearanceOf', () => {
     it('never jitters a particle larger than its track says', () => {
         const e = emitter({
             tracks: [track('Scale', [[0, 10], [1, 10]])],
-            properties: properties({ randomScalePercent: 0.5 }),
+            properties: properties({randomScalePercent: 0.5}),
         });
 
         for (let seed = 1; seed < 40; seed++) {
@@ -640,7 +650,7 @@ describe('appearanceOf', () => {
     it('brightens a particle by the random colour rather than dimming it', () => {
         const e = emitter({
             tracks: [track('Red', [[0, 0.5], [1, 0.5]]), track('Green', [[0, 0.5], [1, 0.5]])],
-            properties: properties({ randomColors: { x: 0.4, y: 0.4, z: 0, w: 0 } }),
+            properties: properties({randomColors: {x: 0.4, y: 0.4, z: 0, w: 0}}),
         });
 
         for (let seed = 1; seed < 40; seed++) {
@@ -654,7 +664,7 @@ describe('appearanceOf', () => {
     it('saturates rather than running past white', () => {
         const e = emitter({
             tracks: [track('Red', [[0, 0.9], [1, 0.9]])],
-            properties: properties({ randomColors: { x: 1, y: 0, z: 0, w: 0 } }),
+            properties: properties({randomColors: {x: 1, y: 0, z: 0, w: 0}}),
         });
 
         for (let seed = 1; seed < 20; seed++) {
@@ -665,7 +675,7 @@ describe('appearanceOf', () => {
     it('adds to ALPHA too, which is the channel a transparent sprite is read through', () => {
         const e = emitter({
             tracks: [track('Alpha', [[0, 0.2], [1, 0.2]])],
-            properties: properties({ randomColors: { x: 0, y: 0, z: 0, w: 0.5 } }),
+            properties: properties({randomColors: {x: 0, y: 0, z: 0, w: 0.5}}),
         });
 
         const seen = new Set<number>();
@@ -691,7 +701,7 @@ describe('appearanceOf', () => {
                 track('Blue', [[0, 0], [1, 0]]),
             ],
             properties: properties({
-                randomColors: { x: 0.5, y: 0.5, z: 0.5, w: 0 },
+                randomColors: {x: 0.5, y: 0.5, z: 0.5, w: 0},
                 colorAddGrayscale: true,
             }),
         });
@@ -715,7 +725,7 @@ describe('appearanceOf', () => {
     });
 
     it('reports a whole frame index', () => {
-        const e = emitter({ tracks: [track('TextureIndex', [[0, 0], [1, 8]])] });
+        const e = emitter({tracks: [track('TextureIndex', [[0, 0], [1, 8]])]});
         const p = spawnParticle(e, seededRandom(1));
         p.age = 0.5;
         p.lifetime = 1;
@@ -765,27 +775,27 @@ describe('atlasFrame', () => {
 
 describe('volumeExtent', () => {
     it('measures a sphere by its radius', () => {
-        assert.equal(volumeExtent(volume({ shape: 'Sphere', sphereRadius: 3 })), 3);
+        assert.equal(volumeExtent(volume({shape: 'Sphere', sphereRadius: 3})), 3);
     });
 
     it('measures a box by its furthest corner', () => {
-        const box = volume({ shape: 'Box', min: { x: -1, y: 0, z: 0 }, max: { x: 0, y: 4, z: 0 } });
+        const box = volume({shape: 'Box', min: {x: -1, y: 0, z: 0}, max: {x: 0, y: 4, z: 0}});
         assert.equal(volumeExtent(box), 4);
     });
 
     it('measures a cube to its corner, not its face', () => {
         // Half the side would put the corners outside the frame.
-        const cube = volume({ shape: 'Cube', sideLength: 2 });
+        const cube = volume({shape: 'Cube', sideLength: 2});
         assert.ok(Math.abs(volumeExtent(cube) - Math.sqrt(3)) < 1e-6);
     });
 
     it('measures a cylinder across radius and height together', () => {
-        const cylinder = volume({ shape: 'Cylinder', cylinderRadius: 3, cylinderHeight: 4 });
+        const cylinder = volume({shape: 'Cylinder', cylinderRadius: 3, cylinderHeight: 4});
         assert.equal(volumeExtent(cylinder), 5);
     });
 
     it('measures a point by how far off origin it sits', () => {
-        assert.equal(volumeExtent(volume({ exactValue: { x: 0, y: -7, z: 0 } })), 7);
+        assert.equal(volumeExtent(volume({exactValue: {x: 0, y: -7, z: 0}})), 7);
     });
 });
 
@@ -793,9 +803,9 @@ describe('emitterExtent', () => {
     it('carries the spawn offset out along the particle path', () => {
         // Spawned within 2 units, travelling 3 a second for 4 seconds: the cloud reaches 14.
         const wide = emitter({
-            position: volume({ shape: 'Sphere', sphereRadius: 2 }),
-            speed: volume({ shape: 'Sphere', sphereRadius: 3 }),
-            properties: properties({ lifetime: 4 }),
+            position: volume({shape: 'Sphere', sphereRadius: 2}),
+            speed: volume({shape: 'Sphere', sphereRadius: 3}),
+            properties: properties({lifetime: 4}),
         });
 
         assert.equal(emitterExtent(wide), 14);
@@ -803,9 +813,9 @@ describe('emitterExtent', () => {
 
     it('prefers the lifetime volume over the scalar when it has one', () => {
         const fromVolume = emitter({
-            speed: volume({ shape: 'Sphere', sphereRadius: 1 }),
-            lifetime: volume({ exactValue: { x: 10, y: 0, z: 0 } }),
-            properties: properties({ lifetime: 1 }),
+            speed: volume({shape: 'Sphere', sphereRadius: 1}),
+            lifetime: volume({exactValue: {x: 10, y: 0, z: 0}}),
+            properties: properties({lifetime: 1}),
         });
 
         assert.equal(emitterExtent(fromVolume), 10);
@@ -815,8 +825,8 @@ describe('emitterExtent', () => {
         // p_explosion_huge01's smoke travels about 14 units and then draws itself 224 across. Framing
         // the travel alone puts most of the effect outside the viewport.
         const big = emitter({
-            speed: volume({ shape: 'Sphere', sphereRadius: 1 }),
-            properties: properties({ lifetime: 1 }),
+            speed: volume({shape: 'Sphere', sphereRadius: 1}),
+            properties: properties({lifetime: 1}),
             tracks: [track('Scale', [[0, 10], [1, 100]])],
         });
 
@@ -832,8 +842,8 @@ describe('emitterExtent', () => {
 
 describe('systemExtent', () => {
     const reaching = (distance: number, sprite = 0) => emitter({
-        speed: volume({ shape: 'Sphere', sphereRadius: distance }),
-        properties: properties({ lifetime: 1 }),
+        speed: volume({shape: 'Sphere', sphereRadius: distance}),
+        properties: properties({lifetime: 1}),
         tracks: sprite > 0 ? [track('Scale', [[0, sprite], [1, sprite]])] : [],
     });
 

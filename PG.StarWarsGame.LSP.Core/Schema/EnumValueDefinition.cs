@@ -7,6 +7,7 @@ public sealed record EnumValueDefinition
 {
     public required string Name { get; init; }
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
+
     /// <summary>
     ///     Zero or more value-group keys this value belongs to. Empty means "all groups."
     ///     Used by completion providers to pre-filter suggestions when the enclosing tag

@@ -110,7 +110,7 @@ function readBlock(
         } else if (text[i] === closer) {
             depth--;
             if (depth === 0) {
-                return { body: text.slice(open + 1, i), end: i + 1 };
+                return {body: text.slice(open + 1, i), end: i + 1};
             }
         }
     }
@@ -180,7 +180,7 @@ function parseParameters(text: string): FxParameter[] {
 
     return [...withoutStructs.matchAll(declarations)]
         .filter(match => match[1] !== 'return')
-        .map(match => ({ type: match[1], name: match[2], semantic: match[3] }));
+        .map(match => ({type: match[1], name: match[2], semantic: match[3]}));
 }
 
 /**
@@ -219,7 +219,7 @@ function entryPoint(rightHandSide: string): string | undefined {
 }
 
 function parsePass(name: string, body: string): FxPass {
-    const pass: FxPass = { name, states: {} };
+    const pass: FxPass = {name, states: {}};
 
     for (const match of body.matchAll(SHADER_ASSIGNMENT)) {
         if (match[1].toLowerCase() === 'vertexshader') {
@@ -286,7 +286,7 @@ function parseTechniques(text: string): FxTechnique[] {
             }
         }
 
-        techniques.push({ name, lod, passes });
+        techniques.push({name, lod, passes});
     }
 
     return techniques;

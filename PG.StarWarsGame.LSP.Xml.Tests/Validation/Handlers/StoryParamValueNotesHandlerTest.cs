@@ -36,8 +36,8 @@ public sealed class StoryParamValueNotesHandlerTest
                 Name = "StoryFlagCompareMethod",
                 Values =
                 [
-                    new EnumValueDefinition {Name = "EQUAL_TO"},
-                    new EnumValueDefinition {Name = "NOT_EQUAL_TO", Notes = notesOnValue}
+                    new EnumValueDefinition { Name = "EQUAL_TO" },
+                    new EnumValueDefinition { Name = "NOT_EQUAL_TO", Notes = notesOnValue }
                 ]
             }
         };
@@ -47,7 +47,7 @@ public sealed class StoryParamValueNotesHandlerTest
     private static SchemaNote Note(SchemaNoteKind kind, string? text = null)
     {
         return new SchemaNote(kind,
-            text is null ? new Dictionary<string, string>() : new Dictionary<string, string> {["en"] = text});
+            text is null ? new Dictionary<string, string>() : new Dictionary<string, string> { ["en"] = text });
     }
 
     [Fact]

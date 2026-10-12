@@ -15,10 +15,10 @@
 // readout goes to the far end of the label, because it is a value someone reads a number off; and
 // the note goes UNDER the control, because it is support text and the control is the point.
 
-import { ReactNode } from 'react';
+import {ReactNode} from 'react';
 
-import { type BadgeSeverity } from './badges';
-import { InfoBadge } from './InfoBadge';
+import {type BadgeSeverity} from './badges';
+import {InfoBadge} from './InfoBadge';
 
 export interface FieldProps {
     label: ReactNode;
@@ -88,9 +88,9 @@ export interface FieldProps {
 }
 
 export function Field({
-    label, info, infoSeverity, value, valueTitle, note, warn, as = 'div', inline,
-    children,
-}: FieldProps): React.JSX.Element {
+                          label, info, infoSeverity, value, valueTitle, note, warn, as = 'div', inline,
+                          children,
+                      }: FieldProps): React.JSX.Element {
     const Box = as;
 
     const named = (

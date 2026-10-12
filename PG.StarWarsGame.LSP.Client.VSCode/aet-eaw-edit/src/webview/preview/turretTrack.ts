@@ -8,8 +8,8 @@
 // near the joint. Sharing a module would invite sharing a radius, and they are not the same
 // measurement.
 
-import type { Point } from './fireArc';
-import type { TurretAxisRange } from './turretHandles';
+import type {Point} from './fireArc';
+import type {TurretAxisRange} from './turretHandles';
 
 /**
  * The plane a track is drawn in, named by the axis it turns about.

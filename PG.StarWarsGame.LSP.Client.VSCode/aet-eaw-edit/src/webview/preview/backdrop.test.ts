@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { skyGradient, starPositions, STAR_COUNT } from './backdrop';
+import {skyGradient, STAR_COUNT, starPositions} from './backdrop';
 
 describe('starPositions', () => {
     it('puts every star on the sphere', () => {
@@ -29,7 +29,9 @@ describe('starPositions', () => {
         // the stars should fall inside it.
         let equatorial = 0;
         for (let i = 0; i < STAR_COUNT; i++) {
-            if (Math.abs(stars[i * 3 + 1]) < 0.5) { equatorial++; }
+            if (Math.abs(stars[i * 3 + 1]) < 0.5) {
+                equatorial++;
+            }
         }
 
         const share = equatorial / STAR_COUNT;

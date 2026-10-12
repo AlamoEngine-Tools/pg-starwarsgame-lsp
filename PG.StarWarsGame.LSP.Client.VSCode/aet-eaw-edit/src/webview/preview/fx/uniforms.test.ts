@@ -2,12 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { uniformSourceFor, type AlamoMatrix } from './semantics';
+import {type AlamoMatrix, uniformSourceFor} from './semantics';
 import {
-    engineLight, probeDiffuse, sphericalHarmonics, uniformValue,
-    type AlamoFrame, type ProbeLight,
+    type AlamoFrame,
+    engineLight,
+    probeDiffuse,
+    type ProbeLight,
+    sphericalHarmonics,
+    uniformValue,
 } from './uniforms';
 
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
@@ -20,7 +24,7 @@ const matrices = Object.fromEntries(([
 
 const FRAME: AlamoFrame = {
     matrices,
-    wind: { heading: 90, speed: 1 },
+    wind: {heading: 90, speed: 1},
     eyeWorld: [1, 2, 3],
     eyeObject: [4, 5, 6],
     lights: [
@@ -81,7 +85,7 @@ describe('uniformValue', () => {
     it('supplies the bone palette only when the mesh is skinned', () => {
         assert.deepEqual(valueFor('SKINMATRIXARRAY'), [1, 2, 3]);
         assert.equal(
-            uniformValue({ kind: 'skinMatrices' }, { ...FRAME, skinMatrices: null }),
+            uniformValue({kind: 'skinMatrices'}, {...FRAME, skinMatrices: null}),
             undefined);
     });
 
@@ -106,8 +110,8 @@ describe('the wind', () => {
      * turn (`alo-viewer Render.cpp:300`).
      */
     it('sways the bend vector rather than leaving trees leaning', () => {
-        const still = uniformValue({ kind: 'wind', of: 'bend' }, { ...FRAME, time: 0 });
-        const blown = uniformValue({ kind: 'wind', of: 'bend' }, { ...FRAME, time: Math.PI / 2 });
+        const still = uniformValue({kind: 'wind', of: 'bend'}, {...FRAME, time: 0});
+        const blown = uniformValue({kind: 'wind', of: 'bend'}, {...FRAME, time: Math.PI / 2});
 
         assert.ok(Array.isArray(still) && Array.isArray(blown));
         assert.deepEqual(still.slice(0, 3), [0, 0, 0], 'sin(0) is no bend at all');
@@ -116,7 +120,7 @@ describe('the wind', () => {
 
     /** The fourth component is the height normalisation, and the engine pins it at 0.002. */
     it('keeps the height factor the engine uses, not the header default', () => {
-        const bend = uniformValue({ kind: 'wind', of: 'bend' }, FRAME);
+        const bend = uniformValue({kind: 'wind', of: 'bend'}, FRAME);
 
         assert.ok(Array.isArray(bend));
         assert.equal(bend[3], 0.002);
@@ -124,7 +128,7 @@ describe('the wind', () => {
 
     /** Alamo's wind blows across its XY ground plane, which is XZ once the model is Y-up. */
     it('blows along the ground rather than into the sky', () => {
-        const bend = uniformValue({ kind: 'wind', of: 'bend' }, { ...FRAME, time: Math.PI / 2 });
+        const bend = uniformValue({kind: 'wind', of: 'bend'}, {...FRAME, time: Math.PI / 2});
 
         assert.ok(Array.isArray(bend));
         assert.equal(bend[1], 0);
@@ -132,7 +136,7 @@ describe('the wind', () => {
 
     /** Grass reads its own vector, with the speed in `w`. */
     it('supplies the grass shader its own wind', () => {
-        const grass = uniformValue({ kind: 'wind', of: 'grass' }, { ...FRAME, time: Math.PI / 2 });
+        const grass = uniformValue({kind: 'wind', of: 'grass'}, {...FRAME, time: Math.PI / 2});
 
         assert.ok(Array.isArray(grass) && grass.length === 4, `${grass}`);
         assert.ok(grass[3] > 0, 'the length is stuffed in w');
@@ -141,11 +145,11 @@ describe('the wind', () => {
     /** The heading is the reader's now, not a constant - AloViewer exposes it and so do we. */
     it('blows the way the reader set it', () => {
         const east = uniformValue(
-            { kind: 'wind', of: 'bend' },
-            { ...FRAME, time: Math.PI / 2, wind: { heading: 0, speed: 1 } });
+            {kind: 'wind', of: 'bend'},
+            {...FRAME, time: Math.PI / 2, wind: {heading: 0, speed: 1}});
         const north = uniformValue(
-            { kind: 'wind', of: 'bend' },
-            { ...FRAME, time: Math.PI / 2, wind: { heading: 90, speed: 1 } });
+            {kind: 'wind', of: 'bend'},
+            {...FRAME, time: Math.PI / 2, wind: {heading: 90, speed: 1}});
 
         assert.ok(Array.isArray(east) && Array.isArray(north));
         assert.ok(Math.abs(east[0] - 1) < 1e-6, `${east}`);
@@ -154,7 +158,7 @@ describe('the wind', () => {
 
     it('puts the wind speed in the grass vector`s w', () => {
         const strong = uniformValue(
-            { kind: 'wind', of: 'grass' }, { ...FRAME, wind: { heading: 0, speed: 3 } });
+            {kind: 'wind', of: 'grass'}, {...FRAME, wind: {heading: 0, speed: 3}});
 
         assert.ok(Array.isArray(strong));
         assert.equal(strong[3], 3);
@@ -177,7 +181,7 @@ describe('the spherical-harmonic probe', () => {
 });
 
 describe('engineLight', () => {
-    const white = { colour: [1, 1, 1] as const, intensity: 0.5 };
+    const white = {colour: [1, 1, 1] as const, intensity: 0.5};
     const vector: [number, number, number] = [0, 0.7, 0.7];
 
     it('gives the shader the engine value, not the one three needs', () => {
@@ -192,7 +196,7 @@ describe('engineLight', () => {
     });
 
     it('keeps a light its own colour', () => {
-        const fill = { colour: [0.25, 0.25, 0.5] as const, intensity: 0.5 };
+        const fill = {colour: [0.25, 0.25, 0.5] as const, intensity: 0.5};
 
         assert.deepEqual(engineLight(fill, [1, 1, 1], vector, vector).diffuse,
             [0.125, 0.125, 0.25, 1]);
@@ -210,7 +214,7 @@ const lit = (
     toLight: [number, number, number],
     colour: [number, number, number] = [1, 1, 1],
     intensity = 1,
-): ProbeLight => ({ toLight, colour, intensity });
+): ProbeLight => ({toLight, colour, intensity});
 
 const UP: [number, number, number] = [0, 1, 0];
 const DOWN: [number, number, number] = [0, -1, 0];

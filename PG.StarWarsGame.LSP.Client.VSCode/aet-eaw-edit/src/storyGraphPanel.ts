@@ -10,10 +10,19 @@ import {battleLabelOf} from './storyBattles';
 import {galacticOf, panelKey, panelTitle, type StoryGraphTarget} from './storyGraphTarget';
 import {PanelRegistry, WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
 import {
-    ApplyStoryCommandBatchResult, ExecuteStoryCommandResult, GetStoryDiagnosticsResult,
-    GetStoryGraphResult, GetStoryLayoutResult, GetStoryNodeDetailResult,
-    GetStoryParamOptionsResult, GetStorySchemaResult, GraphFilters,
-    StoryLayoutEntryDto, StoryParamOptionDto, StorySimStateResult, WorkspaceSettingsDto,
+    ApplyStoryCommandBatchResult,
+    ExecuteStoryCommandResult,
+    GetStoryDiagnosticsResult,
+    GetStoryGraphResult,
+    GetStoryLayoutResult,
+    GetStoryNodeDetailResult,
+    GetStoryParamOptionsResult,
+    GetStorySchemaResult,
+    GraphFilters,
+    StoryLayoutEntryDto,
+    StoryParamOptionDto,
+    StorySimStateResult,
+    WorkspaceSettingsDto,
 } from './protocol';
 
 /**

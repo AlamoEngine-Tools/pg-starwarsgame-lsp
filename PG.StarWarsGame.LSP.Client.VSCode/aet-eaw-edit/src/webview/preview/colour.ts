@@ -4,7 +4,7 @@
 // Faction colours, between the three forms they take: the game's 0-255 channels, the picker's hex,
 // and the renderer's 0-1.
 
-import type { PreviewFaction, PreviewRgba } from '../../protocol/modelPreview';
+import type {PreviewFaction, PreviewRgba} from '../../protocol/modelPreview';
 
 /** Normalised channels, as the renderer wants them. */
 export interface NormalisedColour {

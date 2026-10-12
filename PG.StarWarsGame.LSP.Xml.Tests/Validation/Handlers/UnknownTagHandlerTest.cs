@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -21,7 +22,7 @@ public sealed class UnknownTagHandlerTest
     private static readonly UnknownTagHandler Sut = new();
 
     private static readonly DiagnosticsContext Ctx =
-        new(new EmptySchemaProvider(), Core.Symbols.GameIndex.Empty, "file:///test.xml", "en");
+        new(new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
 
     private static XmlUnknownTagFact Fact(string? suggestion)
     {

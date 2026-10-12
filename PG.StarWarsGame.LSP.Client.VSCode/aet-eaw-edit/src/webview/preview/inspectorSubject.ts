@@ -13,8 +13,8 @@
 // glTF and the material extras arrive as parsed JSON - so the whole subject survives the structured
 // clone without a conversion step.
 
-import { type Inspection, type MeshInspection } from './inspector';
-import { type ModelDetail } from '../../protocol/modelPreview';
+import {type Inspection, type MeshInspection} from './inspector';
+import {type ModelDetail} from '../../protocol/modelPreview';
 
 /** One tree row, as everything that describes it. */
 export interface InspectorSubject {

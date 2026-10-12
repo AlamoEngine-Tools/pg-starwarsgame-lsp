@@ -2,13 +2,17 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { PreviewHardpoint, PreviewTargetDefence } from '../../protocol/modelPreview';
+import type {PreviewHardpoint, PreviewTargetDefence} from '../../protocol/modelPreview';
 
 import {
-    hardpointPool, hullPool, shieldGeneratorsDown, unitDestroyed, unitTargetable,
+    hardpointPool,
     hullAfterHardpointDeath,
+    hullPool,
+    shieldGeneratorsDown,
+    unitDestroyed,
+    unitTargetable,
 } from './unitPool';
 
 function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
@@ -49,45 +53,45 @@ const DEFENCE: PreviewTargetDefence = {
 };
 
 const HARDPOINTS = [
-    hardpoint({ id: 'A', health: 350 }),
-    hardpoint({ id: 'B', health: 375 }),
-    hardpoint({ id: 'C', health: 325 }),
+    hardpoint({id: 'A', health: 350}),
+    hardpoint({id: 'B', health: 375}),
+    hardpoint({id: 'C', health: 325}),
 ];
 
 describe('hardpointPool', () => {
     it('is the SUM of the destroyable hardpoints', () => {
         // The denominator the engine divides by in the combined hardpoint-health reading.
         // Not the hull - that is the unit's own Tactical_Health and lives in `hullPool`.
-        const pool = hardpointPool(HARDPOINTS, { A: 350, B: 375, C: 325 });
+        const pool = hardpointPool(HARDPOINTS, {A: 350, B: 375, C: 325});
 
         assert.equal(pool.max, 1050);
         assert.equal(pool.current, 1050);
     });
 
     it('drains as hardpoints take damage', () => {
-        const pool = hardpointPool(HARDPOINTS, { A: 100, B: 375, C: 0 });
+        const pool = hardpointPool(HARDPOINTS, {A: 100, B: 375, C: 0});
 
         assert.equal(pool.current, 475);
         assert.equal(pool.max, 1050);
     });
 
     it('reaches zero exactly when the last hardpoint does', () => {
-        const pool = hardpointPool(HARDPOINTS, { A: 0, B: 0, C: 0 });
+        const pool = hardpointPool(HARDPOINTS, {A: 0, B: 0, C: 0});
 
         assert.equal(pool.current, 0);
     });
 
     it('uses the unit\'s OWN health where it has no hardpoints', () => {
         // A fighter takes damage on its own pool directly, which is the other half of the rule.
-        const pool = hullPool({ ...DEFENCE, hardpointHealthTotal: null });
+        const pool = hullPool({...DEFENCE, hardpointHealthTotal: null});
 
         assert.equal(pool.max, 2000);
     });
 
     it('never counts a hardpoint that cannot die', () => {
         // An indestructible hardpoint would put a floor under the bar that nothing could remove.
-        const hardpoints = [...HARDPOINTS, hardpoint({ id: 'Fixed', isDestroyable: false, health: 999 })];
-        const pool = hardpointPool(hardpoints, { A: 350, B: 375, C: 325, Fixed: 999 });
+        const hardpoints = [...HARDPOINTS, hardpoint({id: 'Fixed', isDestroyable: false, health: 999})];
+        const pool = hardpointPool(hardpoints, {A: 350, B: 375, C: 325, Fixed: 999});
 
         assert.equal(pool.current, 1050);
     });
@@ -95,8 +99,8 @@ describe('hardpointPool', () => {
     it('treats a hardpoint with no declared health as contributing nothing', () => {
         // 210 of foc's hardpoints declare no Health at all - they are indestructible rather than
         // already dead, and reading a null as zero would show a ship starting at half strength.
-        const hardpoints = [hardpoint({ id: 'A', health: 350 }), hardpoint({ id: 'N', health: null })];
-        const pool = hardpointPool(hardpoints, { A: 350, N: null });
+        const hardpoints = [hardpoint({id: 'A', health: 350}), hardpoint({id: 'N', health: null})];
+        const pool = hardpointPool(hardpoints, {A: 350, N: null});
 
         assert.equal(pool.max, 350);
         assert.equal(pool.current, 350);
@@ -106,20 +110,20 @@ describe('hardpointPool', () => {
         // The two are one fact wearing two faces: a hardpoint ticked off in the Hardpoints list is
         // destroyed without anything ever subtracting its health, and reading the health alone left
         // the bar at full while the ship lost hardpoint after hardpoint.
-        const pool = hardpointPool(HARDPOINTS, { A: 350, B: 375, C: 325 }, new Set(['A', 'B']));
+        const pool = hardpointPool(HARDPOINTS, {A: 350, B: 375, C: 325}, new Set(['A', 'B']));
 
         assert.equal(pool.current, 325);
     });
 
     it('is empty once every hardpoint has been destroyed by hand', () => {
-        const pool = hardpointPool(HARDPOINTS, { A: 350, B: 375, C: 325 },
+        const pool = hardpointPool(HARDPOINTS, {A: 350, B: 375, C: 325},
             new Set(['A', 'B', 'C']));
 
         assert.equal(pool.current, 0);
     });
 
     it('never reports more left than it started with', () => {
-        assert.equal(hardpointPool(HARDPOINTS, { A: 9999, B: 375, C: 325 }).current, 1050);
+        assert.equal(hardpointPool(HARDPOINTS, {A: 9999, B: 375, C: 325}).current, 1050);
     });
 });
 
@@ -176,7 +180,7 @@ describe('unitDestroyed', () => {
         // The game warns about untargetable-but-destructible, and at least two mods use it as a
         // gameplay element - a ship that cannot be finished off by shooting what you can see. It
         // still has to die before the unit does.
-        const hardpoints = [hardpoint({ id: 'A' }), hardpoint({ id: 'Hidden', isTargetable: false })];
+        const hardpoints = [hardpoint({id: 'A'}), hardpoint({id: 'Hidden', isTargetable: false})];
 
         assert.equal(unitDestroyed(hardpoints, new Set(['A'])), false);
         assert.equal(unitDestroyed(hardpoints, new Set(['A', 'Hidden'])), true);
@@ -184,7 +188,7 @@ describe('unitDestroyed', () => {
 
     it('ignores an indestructible hardpoint, which could never die', () => {
         // Otherwise the unit could never die either.
-        const hardpoints = [hardpoint({ id: 'A' }), hardpoint({ id: 'Fixed', isDestroyable: false })];
+        const hardpoints = [hardpoint({id: 'A'}), hardpoint({id: 'Fixed', isDestroyable: false})];
 
         assert.equal(unitDestroyed(hardpoints, new Set(['A'])), true);
     });
@@ -192,7 +196,7 @@ describe('unitDestroyed', () => {
     it('is false for a unit with no destructible hardpoints at all', () => {
         // Nothing to finish, so this rule does not apply - a fighter dies by its own health pool.
         assert.equal(unitDestroyed([], new Set()), false);
-        assert.equal(unitDestroyed([hardpoint({ isDestroyable: false })], new Set()), false);
+        assert.equal(unitDestroyed([hardpoint({isDestroyable: false})], new Set()), false);
     });
 });
 
@@ -204,13 +208,13 @@ describe('a unit with no hardpoints dying', () => {
 
     it('dies when its hull pool is emptied', () => {
         assert.equal(
-            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 0, max: 2000 }),
+            unitDestroyed(NO_HARDPOINTS, new Set(), {current: 0, max: 2000}),
             true);
     });
 
     it('lives while it has any hull left', () => {
         assert.equal(
-            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 1, max: 2000 }),
+            unitDestroyed(NO_HARDPOINTS, new Set(), {current: 1, max: 2000}),
             false);
     });
 
@@ -219,7 +223,7 @@ describe('a unit with no hardpoints dying', () => {
         // rather than dropped: a pool with no maximum is a unit that does not use this channel, not
         // a unit at zero. Answering true would kill it the moment the preview opened.
         assert.equal(
-            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 0, max: 0 }),
+            unitDestroyed(NO_HARDPOINTS, new Set(), {current: 0, max: 0}),
             false);
     });
 
@@ -232,13 +236,13 @@ describe('a unit with no hardpoints dying', () => {
         // The hull is what dies - the direct-damage path is the only route to Kill - so a unit whose own
         // health is gone is finished whatever its hardpoints are doing. This used to assert the
         // opposite, on the reading that a unit with hardpoints could only die through them.
-        const empty = { current: 0, max: 2000 };
+        const empty = {current: 0, max: 2000};
 
         assert.equal(unitDestroyed(HARDPOINTS, new Set(['A', 'B']), empty), true);
     });
 
     it('still dies when the last destroyable hardpoint goes', () => {
-        const healthy = { current: 2000, max: 2000 };
+        const healthy = {current: 2000, max: 2000};
 
         assert.equal(unitDestroyed(HARDPOINTS, new Set(['A', 'B']), healthy), false);
         assert.equal(unitDestroyed(HARDPOINTS, new Set(['A', 'B', 'C']), healthy), true);
@@ -247,7 +251,7 @@ describe('a unit with no hardpoints dying', () => {
     it('does NOT die with its hardpoints when the tag says otherwise', () => {
         // U_Ground_Palace. Its generators are destructible scenery: shoot every one off and the
         // structure stands, because only its own health can finish it.
-        const healthy = { current: 2400, max: 2400 };
+        const healthy = {current: 2400, max: 2400};
 
         assert.equal(
             unitDestroyed(HARDPOINTS, new Set(['A', 'B', 'C']), healthy, false), false);
@@ -266,13 +270,13 @@ describe('unitTargetable', () => {
 
     it('says a unit whose only hardpoints are indestructible can', () => {
         // Nothing there can ever be destroyed, so shooting the hardpoints could never kill it.
-        assert.equal(unitTargetable([hardpoint({ isDestroyable: false })]), true);
+        assert.equal(unitTargetable([hardpoint({isDestroyable: false})]), true);
     });
 });
 
 describe('shieldGeneratorsDown', () => {
     const generator = (over: Partial<PreviewHardpoint> = {}) =>
-        hardpoint({ id: 'HP_Shield_01', type: 'HARD_POINT_SHIELD_GENERATOR', ...over });
+        hardpoint({id: 'HP_Shield_01', type: 'HARD_POINT_SHIELD_GENERATOR', ...over});
 
     /**
      * The user's rule: *"if a ship has all hardpoints of type shield generator destroyed the shields
@@ -282,13 +286,13 @@ describe('shieldGeneratorsDown', () => {
      * `Is_Destroyable` YES, so this is reachable on all of them.
      */
     it('is down once every generator is destroyed', () => {
-        const hardpoints = [generator({ id: 'A' }), generator({ id: 'B' })];
+        const hardpoints = [generator({id: 'A'}), generator({id: 'B'})];
 
         assert.equal(shieldGeneratorsDown(hardpoints, new Set(['A', 'B'])), true);
     });
 
     it('holds while one is still standing', () => {
-        const hardpoints = [generator({ id: 'A' }), generator({ id: 'B' })];
+        const hardpoints = [generator({id: 'A'}), generator({id: 'B'})];
 
         assert.equal(shieldGeneratorsDown(hardpoints, new Set(['A'])), false);
     });
@@ -300,12 +304,12 @@ describe('shieldGeneratorsDown', () => {
      */
     it('is not down for a unit that has no generators to lose', () => {
         assert.equal(shieldGeneratorsDown([], new Set()), false);
-        assert.equal(shieldGeneratorsDown([hardpoint({ id: 'W' })], new Set(['W'])), false);
+        assert.equal(shieldGeneratorsDown([hardpoint({id: 'W'})], new Set(['W'])), false);
     });
 
     /** The type is what says so, and the files are not consistent about case. */
     it('reads the type case-insensitively', () => {
-        const lower = [generator({ id: 'A', type: 'hard_point_shield_generator' })];
+        const lower = [generator({id: 'A', type: 'hard_point_shield_generator'})];
 
         assert.equal(shieldGeneratorsDown(lower, new Set(['A'])), true);
     });
@@ -316,8 +320,8 @@ describe('shieldGeneratorsDown', () => {
      */
     it('never drops while an indestructible generator stands', () => {
         const hardpoints = [
-            generator({ id: 'A' }),
-            generator({ id: 'B', isDestroyable: false }),
+            generator({id: 'A'}),
+            generator({id: 'B', isDestroyable: false}),
         ];
 
         assert.equal(shieldGeneratorsDown(hardpoints, new Set(['A', 'B'])), false);
@@ -325,7 +329,7 @@ describe('shieldGeneratorsDown', () => {
 });
 
 describe('hullAfterHardpointDeath', () => {
-    const FULL = { current: 2000, max: 2000 };
+    const FULL = {current: 2000, max: 2000};
 
     it('zeroes the hull when the last destroyable hardpoint dies', () => {
         // A flat assignment, not damage: the engine sets Health to zero and lets the hull path

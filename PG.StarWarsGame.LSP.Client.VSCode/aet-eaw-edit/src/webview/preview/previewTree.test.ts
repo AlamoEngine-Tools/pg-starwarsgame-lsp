@@ -2,20 +2,30 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
-    boneIndexOfRow, boneRowId, buildTree, defaultCollapsed, effectPlacement, filterTree,
-    meshPlacement, selectionAfterClick,
-    toggleSelected, toggleTargets, visibleTreeRows,
-    withDescendants, type TreeItem, type TreeKind,
+    boneIndexOfRow,
+    boneRowId,
+    buildTree,
+    defaultCollapsed,
+    effectPlacement,
+    filterTree,
+    meshPlacement,
+    selectionAfterClick,
+    toggleSelected,
+    toggleTargets,
+    type TreeItem,
+    type TreeKind,
+    visibleTreeRows,
+    withDescendants,
 } from './previewTree';
 
 const ALL: ReadonlySet<TreeKind> = new Set<TreeKind>(['bone', 'mesh', 'particle']);
 
 const item = (
     id: string, kind: TreeKind, name: string, parentId: string | null,
-): TreeItem => ({ id, kind, name, parentId, visible: true, gatedOff: false });
+): TreeItem => ({id, kind, name, parentId, visible: true, gatedOff: false});
 
 // A bantha-shaped model: a root bone carrying meshes, a child bone chain, and a particle system.
 const ITEMS: TreeItem[] = [
@@ -74,7 +84,7 @@ describe('filterTree', () => {
      * is right for a text SEARCH and wrong for a kind FILTER. The two are separated now.
      */
     it('never shows a kind that is not ticked, even under a match', () => {
-        const filtered = filterTree(roots, { text: '', kinds: new Set<TreeKind>(['bone']) });
+        const filtered = filterTree(roots, {text: '', kinds: new Set<TreeKind>(['bone'])});
         const rows = visibleTreeRows(filtered, new Set());
 
         assert.deepEqual(rows.map(r => r.node.kind).filter(k => k !== 'bone'), []);
@@ -113,7 +123,7 @@ describe('filterTree', () => {
     });
 
     it('keeps only the kinds asked for, plus the ancestors that lead to them', () => {
-        const filtered = filterTree(roots, { text: '', kinds: new Set<TreeKind>(['particle']) });
+        const filtered = filterTree(roots, {text: '', kinds: new Set<TreeKind>(['particle'])});
         const rows = visibleTreeRows(filtered, new Set());
 
         assert.deepEqual(rows.map(r => `${r.node.kind}:${r.node.name}`), [
@@ -123,14 +133,14 @@ describe('filterTree', () => {
 
     it('does not let a retained ancestor drag its other children back in', () => {
         // B_Head is kept only because it carries the particle system, so its mesh stays filtered out.
-        const filtered = filterTree(roots, { text: '', kinds: new Set<TreeKind>(['particle']) });
+        const filtered = filterTree(roots, {text: '', kinds: new Set<TreeKind>(['particle'])});
         const names = visibleTreeRows(filtered, new Set()).map(r => r.node.name);
 
         assert.equal(names.includes('Head#0'), false);
     });
 
     it('matches on text as well as kind', () => {
-        const filtered = filterTree(roots, { text: 'skirt', kinds: ALL });
+        const filtered = filterTree(roots, {text: 'skirt', kinds: ALL});
         const names = visibleTreeRows(filtered, new Set()).map(r => r.node.name);
 
         assert.equal(names.includes('Bantha_Skirt#0'), true);
@@ -138,11 +148,11 @@ describe('filterTree', () => {
     });
 
     it('shows nothing when every kind is unticked', () => {
-        assert.deepEqual(filterTree(roots, { text: '', kinds: new Set() }), []);
+        assert.deepEqual(filterTree(roots, {text: '', kinds: new Set()}), []);
     });
 
     it('shows everything when nothing is asked for', () => {
-        const rows = visibleTreeRows(filterTree(roots, { text: '', kinds: ALL }), new Set());
+        const rows = visibleTreeRows(filterTree(roots, {text: '', kinds: ALL}), new Set());
 
         assert.equal(rows.length, ITEMS.length);
     });
@@ -152,7 +162,7 @@ describe('filterTree', () => {
         // reachable, and those bones then rendered exactly like the thing being looked for. On a
         // model whose effects are switched off - greyed and italic - the scaffolding was the
         // LOUDER half of the list.
-        const filtered = filterTree(roots, { text: '', kinds: new Set<TreeKind>(['particle']) });
+        const filtered = filterTree(roots, {text: '', kinds: new Set<TreeKind>(['particle'])});
         const rows = visibleTreeRows(filtered, new Set());
 
         assert.deepEqual(rows.map(r => `${r.node.name}:${r.node.scaffold === true}`), [
@@ -162,7 +172,7 @@ describe('filterTree', () => {
 
     it('marks nothing when the filter asks for everything', () => {
         // No filter, no scaffolding: every row is there on its own account.
-        const rows = visibleTreeRows(filterTree(roots, { text: '', kinds: ALL }), new Set());
+        const rows = visibleTreeRows(filterTree(roots, {text: '', kinds: ALL}), new Set());
 
         assert.equal(rows.some(r => r.node.scaffold === true), false);
     });
@@ -170,7 +180,7 @@ describe('filterTree', () => {
     it('does not call a row scaffolding just because its parent matched', () => {
         // A match keeps its own children whole. Those are the CONTENTS of what was found, not a
         // path to it, and dimming them would hide the very thing the filter turned up.
-        const filtered = filterTree(roots, { text: 'B_Head', kinds: ALL });
+        const filtered = filterTree(roots, {text: 'B_Head', kinds: ALL});
         const rows = visibleTreeRows(filtered, new Set());
         const head = rows.find(r => r.node.name === 'B_Head');
 
@@ -186,7 +196,7 @@ describe('visibleTreeRows', () => {
         // that match and leaves a row whose whole purpose is now invisible - which is what a
         // filtered Star Destroyer did, showing 2 of its 22 effect rows and eighteen bones.
         const filtered = filterTree(
-            buildTree(ITEMS), { text: '', kinds: new Set<TreeKind>(['particle']) });
+            buildTree(ITEMS), {text: '', kinds: new Set<TreeKind>(['particle'])});
         const everything = new Set(ITEMS.map(item => item.id));
         const names = visibleTreeRows(filtered, everything).map(r => r.node.name);
 
@@ -196,7 +206,7 @@ describe('visibleTreeRows', () => {
     it('still folds a match, because the reader folded that one on purpose', () => {
         // The rule is about scaffolding, not about filters. A row the filter actually found keeps
         // its twisty - its children are its contents, and folding them away is a fair thing to ask.
-        const filtered = filterTree(buildTree(ITEMS), { text: 'B_Head', kinds: ALL });
+        const filtered = filterTree(buildTree(ITEMS), {text: 'B_Head', kinds: ALL});
         const rows = visibleTreeRows(filtered, new Set(['b:2']));
 
         assert.equal(rows.some(r => r.node.name === 'B_Head'), true);
@@ -221,7 +231,7 @@ describe('visibleTreeRows', () => {
 
 describe('selectionAfterClick', () => {
     const rows = visibleTreeRows(buildTree(ITEMS), new Set());
-    const plain = { ctrl: false, shift: false };
+    const plain = {ctrl: false, shift: false};
 
     it('replaces the selection on a plain click', () => {
         const after = selectionAfterClick(rows, new Set(['b:0', 'b:1']), 'b:0', 'm:c', plain);
@@ -249,11 +259,11 @@ describe('selectionAfterClick', () => {
 
     it('adds and removes one with ctrl', () => {
         const added = selectionAfterClick(
-            rows, new Set(['b:0']), 'b:0', 'm:a', { ctrl: true, shift: false });
+            rows, new Set(['b:0']), 'b:0', 'm:a', {ctrl: true, shift: false});
         assert.deepEqual([...added.selected].sort(), ['b:0', 'm:a']);
 
         const removed = selectionAfterClick(
-            rows, added.selected, 'm:a', 'b:0', { ctrl: true, shift: false });
+            rows, added.selected, 'm:a', 'b:0', {ctrl: true, shift: false});
         assert.deepEqual([...removed.selected], ['m:a']);
     });
 
@@ -263,28 +273,28 @@ describe('selectionAfterClick', () => {
         // p_smoke, Bantha#0, Bantha_Skirt#0 - and the run from the root to the last row is all of
         // them, whatever order the items were declared in.
         const after = selectionAfterClick(
-            rows, new Set(['b:0']), 'b:0', 'm:b', { ctrl: false, shift: true });
+            rows, new Set(['b:0']), 'b:0', 'm:b', {ctrl: false, shift: true});
 
         assert.deepEqual([...after.selected].sort(), rows.map(r => r.node.id).sort());
     });
 
     it('takes a partial run when the click is part-way down', () => {
         const after = selectionAfterClick(
-            rows, new Set(), 'b:1', 'm:c', { ctrl: false, shift: true });
+            rows, new Set(), 'b:1', 'm:c', {ctrl: false, shift: true});
 
         assert.deepEqual([...after.selected], ['b:1', 'b:2', 'm:c']);
     });
 
     it('keeps the anchor where it was through a shift-click', () => {
         const after = selectionAfterClick(
-            rows, new Set(['b:1']), 'b:1', 'm:c', { ctrl: false, shift: true });
+            rows, new Set(['b:1']), 'b:1', 'm:c', {ctrl: false, shift: true});
 
         assert.equal(after.anchor, 'b:1');
     });
 
     it('falls back to a plain click when there is no anchor to extend from', () => {
         const after = selectionAfterClick(
-            rows, new Set(), null, 'm:a', { ctrl: false, shift: true });
+            rows, new Set(), null, 'm:a', {ctrl: false, shift: true});
 
         assert.deepEqual([...after.selected], ['m:a']);
     });
@@ -312,7 +322,7 @@ describe('a merged mesh/bone row', () => {
      */
     const MERGED: TreeItem[] = [
         item('b:0', 'bone', 'Root', null),
-        { ...item('b:1', 'mesh', 'Bantha', 'b:0') },
+        {...item('b:1', 'mesh', 'Bantha', 'b:0')},
         item('b:2', 'bone', 'B_Head', 'b:1'),
         item('particle:s#0', 'particle', 'p_smoke', 'b:1'),
     ];
@@ -408,7 +418,7 @@ describe('withDescendants', () => {
 
 describe('meshPlacement', () => {
     const roots = new Set([0]);
-    const named = (bone: string, mesh: string) => ({ bone, mesh });
+    const named = (bone: string, mesh: string) => ({bone, mesh});
 
     /**
      * `Alttest.alo` is the worked case: every one of its seven sub-meshes is written as a node that
@@ -417,11 +427,11 @@ describe('meshPlacement', () => {
      * checkbox did anything, which is what "some checkboxes cannot be toggled" was.
      */
     it('merges a mesh that shares its bone`s name', () => {
-        assert.deepEqual(meshPlacement(3, roots, named('Teapot_ALT1', 'Teapot_ALT1')), { merge: 3 });
+        assert.deepEqual(meshPlacement(3, roots, named('Teapot_ALT1', 'Teapot_ALT1')), {merge: 3});
     });
 
     it('matches the name without regard to case', () => {
-        assert.deepEqual(meshPlacement(3, roots, named('OilTank', 'oiltank')), { merge: 3 });
+        assert.deepEqual(meshPlacement(3, roots, named('OilTank', 'oiltank')), {merge: 3});
     });
 
     /**
@@ -434,12 +444,12 @@ describe('meshPlacement', () => {
      */
     it('does not merge a mesh that merely rides the bone under another name', () => {
         assert.deepEqual(
-            meshPlacement(5, roots, named('Nebulon_parent', 'COLLISION')), { childOf: 5 });
+            meshPlacement(5, roots, named('Nebulon_parent', 'COLLISION')), {childOf: 5});
     });
 
     it('lists a differently named mesh under its bone', () => {
         // `Ai_rancor`'s `Crusher` rides `B_Foot_L`; the bone keeps its name and its toe bones.
-        assert.deepEqual(meshPlacement(38, roots, named('B_Foot_L', 'Crusher')), { childOf: 38 });
+        assert.deepEqual(meshPlacement(38, roots, named('B_Foot_L', 'Crusher')), {childOf: 38});
     });
 
     /**
@@ -447,7 +457,7 @@ describe('meshPlacement', () => {
      * Merging there labelled the whole model's root row after whichever mesh loaded first.
      */
     it('never merges into a root, even on an exact name match', () => {
-        assert.deepEqual(meshPlacement(0, roots, named('Root', 'Root')), { childOf: 0 });
+        assert.deepEqual(meshPlacement(0, roots, named('Root', 'Root')), {childOf: 0});
     });
 });
 
@@ -461,18 +471,18 @@ describe('meshPlacement', () => {
  */
 describe('effectPlacement', () => {
     const roots = new Set([0]);
-    const named = (bone: string, effect: string) => ({ bone, effect });
+    const named = (bone: string, effect: string) => ({bone, effect});
 
     it('merges an effect into the proxy bone that carries its name', () => {
         assert.deepEqual(
             effectPlacement(19, roots, named('p_explosion_empire_atat00',
-                'p_explosion_empire_atat00')), { merge: 19 });
+                'p_explosion_empire_atat00')), {merge: 19});
     });
 
     /** The AT-AT spells the bone `P_ATAT_Die` and the system `p_atat_die`. */
     it('matches the name without regard to case', () => {
         assert.deepEqual(effectPlacement(18, roots, named('P_ATAT_Die', 'p_atat_die')),
-            { merge: 18 });
+            {merge: 18});
     });
 
     /**
@@ -482,11 +492,11 @@ describe('effectPlacement', () => {
     it('lists an effect under a bone that is not its proxy', () => {
         assert.deepEqual(
             effectPlacement(7, roots, named('Nebulon_engines', 'pe_nebulonengines')),
-            { childOf: 7 });
+            {childOf: 7});
     });
 
     it('never merges into a root', () => {
-        assert.deepEqual(effectPlacement(0, roots, named('Root', 'Root')), { childOf: 0 });
+        assert.deepEqual(effectPlacement(0, roots, named('Root', 'Root')), {childOf: 0});
     });
 });
 

@@ -13,10 +13,10 @@
 // This is the one definition. `dockChrome.ts` supplies the styles it expects; a consumer
 // interpolates `rightDockCss` (and `dockChromeCss` for the sections inside it).
 
-import { ReactNode } from 'react';
+import {ReactNode} from 'react';
 
-import { useEdgeResize } from '../useEdgeResize';
-import { readPanelSize, writePanelSize } from './panelLayout';
+import {useEdgeResize} from '../useEdgeResize';
+import {readPanelSize, writePanelSize} from './panelLayout';
 
 export interface RightDockProps {
     /** Pinned above the scrolling content - mode switches, save/validate, whatever the editor needs. */
@@ -48,20 +48,22 @@ export interface RightDockProps {
 }
 
 export function RightDock({
-    header, content, overview, memoKey,
-    initialWidth = 260, minWidth = 180, maxWidth = 560, onWidthChange,
-}: RightDockProps): React.JSX.Element {
+                              header, content, overview, memoKey,
+                              initialWidth = 260, minWidth = 180, maxWidth = 560, onWidthChange,
+                          }: RightDockProps): React.JSX.Element {
     // 'w': dragging left grows a dock pinned to the right edge.
-    const { size, handleProps } = useEdgeResize(
+    const {size, handleProps} = useEdgeResize(
         memoKey === undefined ? initialWidth : readPanelSize(memoKey, initialWidth),
         minWidth, maxWidth, 'w',
         width => {
-            if (memoKey !== undefined) { writePanelSize(memoKey, width); }
+            if (memoKey !== undefined) {
+                writePanelSize(memoKey, width);
+            }
             onWidthChange?.(width);
         });
 
     return (
-        <div className="right-dock" style={{ width: size }}>
+        <div className="right-dock" style={{width: size}}>
             <div className="resize-handle-w" title="Drag to resize" {...handleProps} />
             {header !== undefined && <div className="dock-header">{header}</div>}
             <div className="dock-content">{content}</div>

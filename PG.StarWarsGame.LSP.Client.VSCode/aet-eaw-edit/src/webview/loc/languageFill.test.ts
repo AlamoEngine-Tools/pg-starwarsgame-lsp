@@ -2,27 +2,27 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { languageFillValues } from './languageFill';
+import {languageFillValues} from './languageFill';
 
 const rows = [
-    { index: 0, key: 'TEXT_A', values: [{ language: 'ENGLISH', value: 'Alpha' }] },
-    { index: 1, key: 'TEXT_B', values: [{ language: 'ENGLISH', value: 'Beta' }] },
-    { index: 2, key: 'TEXT_MINE', values: [{ language: 'ENGLISH', value: 'My own key' }] },
+    {index: 0, key: 'TEXT_A', values: [{language: 'ENGLISH', value: 'Alpha'}]},
+    {index: 1, key: 'TEXT_B', values: [{language: 'ENGLISH', value: 'Beta'}]},
+    {index: 2, key: 'TEXT_MINE', values: [{language: 'ENGLISH', value: 'My own key'}]},
 ];
 
 const baseline = [
-    { key: 'TEXT_A', values: [{ language: 'ENGLISH', value: 'Alpha' }, { language: 'GERMAN', value: 'Alfa' }] },
-    { key: 'TEXT_B', values: [{ language: 'ENGLISH', value: 'Beta' }, { language: 'GERMAN', value: 'Beta DE' }] },
-    { key: 'TEXT_UNUSED', values: [{ language: 'GERMAN', value: 'Nicht benutzt' }] },
+    {key: 'TEXT_A', values: [{language: 'ENGLISH', value: 'Alpha'}, {language: 'GERMAN', value: 'Alfa'}]},
+    {key: 'TEXT_B', values: [{language: 'ENGLISH', value: 'Beta'}, {language: 'GERMAN', value: 'Beta DE'}]},
+    {key: 'TEXT_UNUSED', values: [{language: 'GERMAN', value: 'Nicht benutzt'}]},
 ];
 
 describe('languageFillValues', () => {
     it('takes the new language from the baseline for the keys the file has', () => {
         assert.deepEqual(languageFillValues('GERMAN', rows, baseline), [
-            { key: 'TEXT_A', value: 'Alfa' },
-            { key: 'TEXT_B', value: 'Beta DE' },
+            {key: 'TEXT_A', value: 'Alfa'},
+            {key: 'TEXT_B', value: 'Beta DE'},
         ]);
     });
 
@@ -44,7 +44,7 @@ describe('languageFillValues', () => {
 
     it('skips a baseline value that is blank', () => {
         const withBlank = [
-            { key: 'TEXT_A', values: [{ language: 'GERMAN', value: '' }] },
+            {key: 'TEXT_A', values: [{language: 'GERMAN', value: ''}]},
         ];
 
         assert.deepEqual(languageFillValues('GERMAN', rows, withBlank), []);
@@ -63,7 +63,7 @@ describe('languageFillValues', () => {
     // A duplicate key in a malformed file must not produce two conflicting fills for one entry -
     // the keyed command vocabulary addresses by key, so the second would simply overwrite the first.
     it('yields one value per key even if a row repeats', () => {
-        const duplicated = [...rows, { index: 3, key: 'TEXT_A', values: [] }];
+        const duplicated = [...rows, {index: 3, key: 'TEXT_A', values: []}];
 
         assert.equal(
             languageFillValues('GERMAN', duplicated, baseline).filter(v => v.key === 'TEXT_A').length,

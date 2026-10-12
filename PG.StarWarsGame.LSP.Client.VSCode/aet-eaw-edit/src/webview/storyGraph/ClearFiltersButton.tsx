@@ -13,8 +13,8 @@
 // A control with nothing to act on is disabled and says why; it is never removed. Here that also
 // makes the column a fixed height, which is the whole of the layout fix.
 
-import type { GraphFilters } from '../../protocol/story';
-import { IconButton } from '../shared/Button';
+import type {GraphFilters} from '../../protocol/story';
+import {IconButton} from '../shared/Button';
 
 /**
  * Whether any of the four filters is set.
@@ -36,7 +36,7 @@ export interface ClearFiltersButtonProps {
 }
 
 export function ClearFiltersButton(
-    { filters, onClear }: ClearFiltersButtonProps,
+    {filters, onClear}: ClearFiltersButtonProps,
 ): React.JSX.Element {
     const active = anyFilterSet(filters);
 

@@ -10,10 +10,6 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 
 public sealed class ModProjectResolver
 {
-    private readonly IFileHelper _fileHelper;
-
-    /// <summary>The file system this resolver reads project files through; shared with the configuration resolver.</summary>
-    public IFileHelper FileHelper => _fileHelper;
     private readonly ProjectDependencyGraph _graph;
     private readonly ModProjectLoader _loader;
     private readonly ILogger<ModProjectResolver> _logger;
@@ -24,11 +20,14 @@ public sealed class ModProjectResolver
         ProjectDependencyGraph graph,
         ILogger<ModProjectResolver> logger)
     {
-        _fileHelper = fileHelper;
+        FileHelper = fileHelper;
         _loader = loader;
         _graph = graph;
         _logger = logger;
     }
+
+    /// <summary>The file system this resolver reads project files through; shared with the configuration resolver.</summary>
+    public IFileHelper FileHelper { get; }
 
     public WorkspaceConfiguration Resolve(string rootPath, ModProjectFile root)
     {

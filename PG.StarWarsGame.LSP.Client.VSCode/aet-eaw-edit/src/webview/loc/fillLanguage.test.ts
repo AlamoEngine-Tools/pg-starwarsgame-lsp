@@ -2,14 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    canCopyBetweenLanguages, copyFromOptions, FillSource, nextCopyFrom, resolveFillSource,
-} from './fillLanguage';
+import {canCopyBetweenLanguages, copyFromOptions, FillSource, nextCopyFrom, resolveFillSource,} from './fillLanguage';
 
 describe('resolveFillSource', () => {
-    const everything = { canCopy: true, canSeed: true };
+    const everything = {canCopy: true, canSeed: true};
 
     it('honours each choice the file can satisfy', () => {
         assert.equal(resolveFillSource('language', everything), 'language');
@@ -23,10 +21,10 @@ describe('resolveFillSource', () => {
     it('is only ever one thing at a time', () => {
         const choices: FillSource[] = ['language', 'baseline', 'file'];
         const offers = [
-            { canCopy: true, canSeed: true },
-            { canCopy: true, canSeed: false },
-            { canCopy: false, canSeed: true },
-            { canCopy: false, canSeed: false },
+            {canCopy: true, canSeed: true},
+            {canCopy: true, canSeed: false},
+            {canCopy: false, canSeed: true},
+            {canCopy: false, canSeed: false},
         ];
 
         for (const chosen of choices) {
@@ -43,13 +41,13 @@ describe('resolveFillSource', () => {
 
     // Sitting on a source the file cannot satisfy is what left Fill permanently disabled.
     it('falls back rather than sitting on a source that can produce nothing', () => {
-        assert.equal(resolveFillSource('language', { canCopy: false, canSeed: false }), 'baseline');
-        assert.equal(resolveFillSource('file', { canCopy: true, canSeed: false }), 'baseline');
+        assert.equal(resolveFillSource('language', {canCopy: false, canSeed: false}), 'baseline');
+        assert.equal(resolveFillSource('file', {canCopy: true, canSeed: false}), 'baseline');
     });
 
     // A one-language file that has a sibling to start from must not be forced onto the baseline.
     it('keeps a seed choice when copying between languages is impossible', () => {
-        assert.equal(resolveFillSource('file', { canCopy: false, canSeed: true }), 'file');
+        assert.equal(resolveFillSource('file', {canCopy: false, canSeed: true}), 'file');
     });
 });
 

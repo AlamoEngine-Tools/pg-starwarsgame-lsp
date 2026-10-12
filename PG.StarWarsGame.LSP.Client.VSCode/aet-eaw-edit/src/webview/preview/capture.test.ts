@@ -5,7 +5,12 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {
-    CAPTURE_SIZES, captureFileName, captureFrame, captureSize, DEFAULT_CAPTURE_SIZE, iconFileName,
+    CAPTURE_SIZES,
+    captureFileName,
+    captureFrame,
+    captureSize,
+    DEFAULT_CAPTURE_SIZE,
+    iconFileName,
 } from './capture';
 
 describe('captureSize', () => {

@@ -9,7 +9,7 @@
 // (`branchColours`), so no fixed legend can say which branch is which - the key has to be built from
 // the branches actually in the graph.
 
-import type { BranchColour } from './palette';
+import type {BranchColour} from './palette';
 
 export interface BranchKeyEntry {
     readonly branch: string;

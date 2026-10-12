@@ -19,7 +19,11 @@ public sealed class EventTypeNotesHandlerTest
         var def = new EnumValueDefinition
         {
             Name = "MY_EVENT",
-            Notes = [new SchemaNote(SchemaNoteKind.Remark, new Dictionary<string, string> { ["en"] = "Never used in vanilla." })]
+            Notes =
+            [
+                new SchemaNote(SchemaNoteKind.Remark,
+                    new Dictionary<string, string> { ["en"] = "Never used in vanilla." })
+            ]
         };
         var fact = new StoryEventFact("file:///test.xml", 1, 0, 0, "MY_EVENT", false, def);
         var results = Sut.Handle(fact, ctx).ToList();

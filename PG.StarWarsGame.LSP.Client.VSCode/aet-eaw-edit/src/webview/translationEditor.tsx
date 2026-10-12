@@ -7,40 +7,42 @@
 // no meaning the user can see, which is also why the grid can be sorted freely and why adding an
 // entry never asks where to put it.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createRoot } from 'react-dom/client';
+import {useCallback, useEffect, useMemo, useState} from 'react';
+import {createRoot} from 'react-dom/client';
 
-import { BaselineSuggestion, suggestBaselineKeys } from './baselineSuggestions';
-import { CellInput, menuAction, RowMenuFrame } from './loc/LocCells';
-import { gridFooterLabel } from './loc/gridFooter';
-import { ConvertibleFormat, LocDockActions } from './loc/LocDockActions';
-import { languageCopyValues } from './loc/languageCopy';
-import { languageFillValues } from './loc/languageFill';
-import { LocColumnMenu } from './loc/LocColumnMenu';
-import { LocDockHeader } from './loc/LocDockHeader';
-import { useLocColumns } from './loc/useLocColumns';
-import { LocGridMessage, LocGridShell } from './loc/LocGridShell';
-import { LocSearch } from './loc/LocSearch';
-import { LocProblemsBar } from './loc/LocProblemsBar';
-import { LocRow } from './loc/locRow';
-import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
-import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
-import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
-import { DIALOG_IDS } from './shared/dialogGeometryStore';
-import { ResizeHandles } from './shared/ResizeHandles';
-import { useMovableDialog } from './shared/useMovableDialog';
-import { buildRowFilter, FilterMode } from './locFilter';
+import {BaselineSuggestion, suggestBaselineKeys} from './baselineSuggestions';
+import {CellInput, menuAction, RowMenuFrame} from './loc/LocCells';
+import {gridFooterLabel} from './loc/gridFooter';
+import {ConvertibleFormat, LocDockActions} from './loc/LocDockActions';
+import {languageCopyValues} from './loc/languageCopy';
+import {languageFillValues} from './loc/languageFill';
+import {LocColumnMenu} from './loc/LocColumnMenu';
+import {LocDockHeader} from './loc/LocDockHeader';
+import {useLocColumns} from './loc/useLocColumns';
+import {LocGridMessage, LocGridShell} from './loc/LocGridShell';
+import {LocSearch} from './loc/LocSearch';
+import {LocProblemsBar} from './loc/LocProblemsBar';
+import {LocRow} from './loc/locRow';
+import {rowSeverityClass, severityByRow} from './loc/rowSeverity';
+import {FILTER_DEBOUNCE_MS, useDebounced} from './loc/useDebounced';
+import {LocPanelMessage, LocProblem, post, useLocPanel} from './loc/useLocPanel';
+import {DIALOG_IDS} from './shared/dialogGeometryStore';
+import {ResizeHandles} from './shared/ResizeHandles';
+import {useMovableDialog} from './shared/useMovableDialog';
+import {buildRowFilter, FilterMode} from './locFilter';
 import {
-    BaselineEntryDto, BaselineRow, baselineValuesFor, findInheritedKeys, hideInherited,
+    BaselineEntryDto,
+    BaselineRow,
+    baselineValuesFor,
+    findInheritedKeys,
+    hideInherited,
     toBaselineRows,
 } from './translationInherited';
-import {
-    blankDraft, draftToCommandValues, NewRowDraft, normaliseKey, validateNewKey,
-} from './translationNewRow';
-import { applyStaged, coalesce, TranslationCommand } from './translationStaging';
-import { countDuplicateKeys, nextSort, sortRows, SortState } from './translationView';
-import { Button } from './shared/Button';
-import { Field } from './shared/Field';
+import {blankDraft, draftToCommandValues, NewRowDraft, normaliseKey, validateNewKey,} from './translationNewRow';
+import {applyStaged, coalesce, TranslationCommand} from './translationStaging';
+import {countDuplicateKeys, nextSort, sortRows, SortState} from './translationView';
+import {Button} from './shared/Button';
+import {Field} from './shared/Field';
 
 function App(): React.JSX.Element {
     const [filter, setFilter] = useState('');
@@ -78,7 +80,7 @@ function App(): React.JSX.Element {
         setBaseline([]);
         setShowInherited(false);
         setSelected(null);
-        post({ type: 'requestBaseline' });
+        post({type: 'requestBaseline'});
     }, []);
 
     const onMessage = useCallback((msg: LocPanelMessage) => {
@@ -104,7 +106,7 @@ function App(): React.JSX.Element {
     /** Adds a fully formed entry from the dialog. Position is never asked for. */
     const addEntry = useCallback((draft: NewRowDraft) => {
         const key = normaliseKey(draft.key);
-        stage({ kind: 'addEntry', key, values: draftToCommandValues(draft) });
+        stage({kind: 'addEntry', key, values: draftToCommandValues(draft)});
 
         // The new entry carries real content, but a filter or sort would still decide where - or
         // whether - it appears. Both are dropped so it is simply there, at the end, in view.
@@ -116,7 +118,7 @@ function App(): React.JSX.Element {
     }, [rows.length, stage]);
 
     const deleteEntry = useCallback((key: string) => {
-        stage({ kind: 'deleteEntry', key });
+        stage({kind: 'deleteEntry', key});
         setSelected(current => (current === key ? null : current));
     }, [stage]);
 
@@ -126,7 +128,9 @@ function App(): React.JSX.Element {
      */
     const resetEntry = useCallback((key: string) => {
         const values = baselineValuesFor(key, baseline, languages);
-        if (values === null) { return; }
+        if (values === null) {
+            return;
+        }
 
         // The reset makes this entry inherited, so with inherited entries hidden it would drop off
         // screen the instant it was clicked - indistinguishable from the Delete directly beneath it
@@ -134,7 +138,7 @@ function App(): React.JSX.Element {
         setShowInherited(true);
 
         for (const value of values) {
-            stage({ kind: 'setValue', key, language: value.language, value: value.value });
+            stage({kind: 'setValue', key, language: value.language, value: value.value});
         }
     }, [baseline, languages, stage]);
 
@@ -163,7 +167,9 @@ function App(): React.JSX.Element {
     const problemKeys = useMemo(() => {
         const byKey = new Map<string, LocProblem>();
         for (const problem of problems) {
-            if (problem.key) { byKey.set(problem.key, problem); }
+            if (problem.key) {
+                byKey.set(problem.key, problem);
+            }
         }
         return byKey;
     }, [problems]);
@@ -171,7 +177,9 @@ function App(): React.JSX.Element {
     // A fresh validation result reopens the bar; closing it is a decision about that result, not a
     // standing preference to never see the next one.
     useEffect(() => {
-        if (problems.length > 0) { setProblemsOpen(true); }
+        if (problems.length > 0) {
+            setProblemsOpen(true);
+        }
     }, [problems]);
 
     /**
@@ -182,13 +190,19 @@ function App(): React.JSX.Element {
      * lifted first.
      */
     const jumpToProblem = useCallback((problem: LocProblem) => {
-        if (!problem.key) { return null; }
+        if (!problem.key) {
+            return null;
+        }
         const target = rows.find(row => row.key === problem.key);
-        if (target === undefined) { return null; }
+        if (target === undefined) {
+            return null;
+        }
 
         return () => {
             setFilter('');
-            if (inherited.has(target.key)) { setShowInherited(true); }
+            if (inherited.has(target.key)) {
+                setShowInherited(true);
+            }
             setSelected(target.key);
             setPendingFocus(target.index);
         };
@@ -200,13 +214,17 @@ function App(): React.JSX.Element {
     const onColumnHidden = useCallback(
         (language: string) => setScope(s => (s === language ? 'all' : s)), []);
 
-    const { hidden, shownLanguages, columns, toggleLanguage, materialise } = useLocColumns({
+    const {hidden, shownLanguages, columns, toggleLanguage, materialise} = useLocColumns({
         rows, languages, hiddenLanguages, setHiddenLanguages, focusLanguage,
         onHidden: onColumnHidden,
     });
 
-    if (error) { return <LocGridMessage>{error}</LocGridMessage>; }
-    if (!loaded) { return <LocGridMessage>Loading...</LocGridMessage>; }
+    if (error) {
+        return <LocGridMessage>{error}</LocGridMessage>;
+    }
+    if (!loaded) {
+        return <LocGridMessage>Loading...</LocGridMessage>;
+    }
 
     const duplicateCount = countDuplicateKeys(rows);
     // Two things can hold rows back here, and the footer says how many are doing so.
@@ -226,8 +244,8 @@ function App(): React.JSX.Element {
                     // file - there is nothing to delete or reset there.
                     onDelete={menu.key === '' ? null : () => deleteEntry(menu.key)}
                     onReset={menu.key !== ''
-                        && baselineValuesFor(menu.key, baseline, languages) !== null
-                        && !inherited.has(menu.key)
+                    && baselineValuesFor(menu.key, baseline, languages) !== null
+                    && !inherited.has(menu.key)
                         ? () => resetEntry(menu.key)
                         : null}
                 />
@@ -246,7 +264,7 @@ function App(): React.JSX.Element {
 
     const header = (
         <>
-            <HeadCell label="Key" column="key" sort={sort} onSort={setSort} />
+            <HeadCell label="Key" column="key" sort={sort} onSort={setSort}/>
             {shownLanguages.map(language => (
                 <HeadCell
                     key={language}
@@ -256,7 +274,7 @@ function App(): React.JSX.Element {
                     onSort={setSort}
                 />
             ))}
-            <LocColumnMenu languages={languages} hidden={hidden} onToggle={toggleLanguage} />
+            <LocColumnMenu languages={languages} hidden={hidden} onToggle={toggleLanguage}/>
         </>
     );
 
@@ -265,7 +283,7 @@ function App(): React.JSX.Element {
             <div className="cell">
                 <CellInput
                     value={row.key}
-                    onCommit={next => stage({ kind: 'renameKey', key: row.key, newKey: next })}
+                    onCommit={next => stage({kind: 'renameKey', key: row.key, newKey: next})}
                 />
             </div>
             {shownLanguages.map(language => (
@@ -305,11 +323,11 @@ function App(): React.JSX.Element {
                     // file beside this one, which the host has to create because it is not an edit
                     // to this document and cannot be staged with the rest of the batch.
                     if (addLanguageCreatesFile) {
-                        post({ type: 'addLanguageFile', language });
+                        post({type: 'addLanguageFile', language});
                         return;
                     }
 
-                    stage({ kind: 'addLanguage', language });
+                    stage({kind: 'addLanguage', language});
                     setLanguages(current => [...current, language]);
                     // Explicit from here on, so the column just added is not hidden for being empty.
                     materialise();
@@ -323,17 +341,19 @@ function App(): React.JSX.Element {
                         // every language - which is the definition of inherited, so with inherited
                         // entries hidden they would drop off screen the moment the column arrived.
                         // Adding a language must not look like losing most of the file.
-                        if (filled.length > 0) { setShowInherited(true); }
+                        if (filled.length > 0) {
+                            setShowInherited(true);
+                        }
 
                         for (const value of filled) {
-                            stage({ kind: 'setValue', key: value.key, language, value: value.value });
+                            stage({kind: 'setValue', key: value.key, language, value: value.value});
                         }
                     }
                 }}
                 copyLanguageCount={(from, to) => languageCopyValues(from, to, rows).length}
                 onCopyLanguage={(from, to) => {
                     for (const copied of languageCopyValues(from, to, rows)) {
-                        stage({ kind: 'setValue', key: copied.key, language: to, value: copied.value });
+                        stage({kind: 'setValue', key: copied.key, language: to, value: copied.value});
                     }
                 }}
                 onFillFromBaseline={language => {
@@ -341,14 +361,16 @@ function App(): React.JSX.Element {
                     // Same reason as the add-language fill: these entries now match the layer below
                     // in every language, so hiding inherited entries would make them vanish as they
                     // arrive.
-                    if (filled.length > 0) { setShowInherited(true); }
+                    if (filled.length > 0) {
+                        setShowInherited(true);
+                    }
                     for (const value of filled) {
-                        stage({ kind: 'setValue', key: value.key, language, value: value.value });
+                        stage({kind: 'setValue', key: value.key, language, value: value.value});
                     }
                 }}
                 onConvertFormat={(format: ConvertibleFormat) =>
-                    post({ type: 'convertFormat', targetFormat: format })}
-                onExportDat={() => post({ type: 'exportDat' })}
+                    post({type: 'convertFormat', targetFormat: format})}
+                onExportDat={() => post({type: 'exportDat'})}
             />
 
             {/* A repeated key is an error the validator reports: only one of the two would ever be
@@ -407,7 +429,7 @@ function App(): React.JSX.Element {
             onRowContextMenu={(row, e) => {
                 e.preventDefault();
                 setSelected(row.key);
-                setMenu({ x: e.clientX, y: e.clientY, key: row.key, index: row.index });
+                setMenu({x: e.clientX, y: e.clientY, key: row.key, index: row.index});
             }}
             focusRowIndex={pendingFocus}
             onFocused={() => setPendingFocus(null)}
@@ -423,7 +445,7 @@ function App(): React.JSX.Element {
             footer={gridFooterLabel(rows.length, visible.length, activeFilters)}
             onEmptyAreaContextMenu={e => {
                 e.preventDefault();
-                setMenu({ x: e.clientX, y: e.clientY, key: '', index: -1 });
+                setMenu({x: e.clientX, y: e.clientY, key: '', index: -1});
             }}
             dockHeader={dockHeader}
             dockContent={dockContent}
@@ -455,7 +477,7 @@ function TranslationRowMenu(props: {
 
             {props.onReset && (
                 <>
-                    <div className="sep" />
+                    <div className="sep"/>
                     <button
                         role="menuitem"
                         title="Replace this entry with the value the layer below it provides"
@@ -468,7 +490,7 @@ function TranslationRowMenu(props: {
 
             {props.onDelete && (
                 <>
-                    <div className="sep" />
+                    <div className="sep"/>
                     <button
                         role="menuitem"
                         className="danger"
@@ -553,38 +575,51 @@ function AddTranslationDialog(props: {
 
     const submit = (): void => {
         setTouched(true);
-        if (error === null) { props.onAdd(draft); }
+        if (error === null) {
+            props.onAdd(draft);
+        }
     };
 
     const setValue = (language: string, value: string): void => setDraft(current => ({
         ...current,
-        values: current.values.map(v => (v.language === language ? { language, value } : v)),
+        values: current.values.map(v => (v.language === language ? {language, value} : v)),
     }));
 
     /** Takes a suggestion: its key, and the inherited text as a starting point for editing. */
     const take = (suggestion: BaselineSuggestion): void => {
-        setDraft({ key: suggestion.key, values: suggestion.values });
+        setDraft({key: suggestion.key, values: suggestion.values});
         setPicked(true);
     };
 
     // Movable and resizable like every other dialog: this one carries a key, a value per language
     // and a suggestion list, so it is the one most likely to need more room - and to need moving
     // aside to read the row it is about to duplicate.
-    const { dialogProps, dragHandleProps, resizeHandleProps } =
+    const {dialogProps, dragHandleProps, resizeHandleProps} =
         useMovableDialog(DIALOG_IDS.addTranslation);
 
     return (
         <div
             className="modal-backdrop"
-            onPointerDown={e => { if (e.target === e.currentTarget) { props.onCancel(); } }}
+            onPointerDown={e => {
+                if (e.target === e.currentTarget) {
+                    props.onCancel();
+                }
+            }}
         >
             <form
                 className="modal modal-wide"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add translation"
-                onSubmit={e => { e.preventDefault(); submit(); }}
-                onKeyDown={e => { if (e.key === 'Escape') { props.onCancel(); } }}
+                onSubmit={e => {
+                    e.preventDefault();
+                    submit();
+                }}
+                onKeyDown={e => {
+                    if (e.key === 'Escape') {
+                        props.onCancel();
+                    }
+                }}
                 {...dialogProps}
             >
                 <h2 className="drag-handle" {...dragHandleProps}>Add translation</h2>
@@ -593,59 +628,59 @@ function AddTranslationDialog(props: {
                     Add is disabled - both have to stay readable while the language list scrolls,
                     or a small dialog hides the thing you are being asked to fix. */}
                 <div className="modal-pinned">
-                <Field label="Key" as="label">
-                    <input
-                        type="text"
-                        value={draft.key}
-                        autoFocus
-                        spellCheck={false}
-                        aria-invalid={touched && error !== null}
-                        onChange={e => {
-                            setPicked(false);
-                            setDraft(current => ({ ...current, key: e.target.value }));
-                        }}
-                        onBlur={() => setTouched(true)}
-                    />
-                </Field>
-                {touched && error !== null && (
-                    <p className="field-error">
-                        <span className="codicon codicon-error" aria-hidden="true" />
-                        {error}
-                    </p>
-                )}
+                    <Field label="Key" as="label">
+                        <input
+                            type="text"
+                            value={draft.key}
+                            autoFocus
+                            spellCheck={false}
+                            aria-invalid={touched && error !== null}
+                            onChange={e => {
+                                setPicked(false);
+                                setDraft(current => ({...current, key: e.target.value}));
+                            }}
+                            onBlur={() => setTouched(true)}
+                        />
+                    </Field>
+                    {touched && error !== null && (
+                        <p className="field-error">
+                            <span className="codicon codicon-error" aria-hidden="true"/>
+                            {error}
+                        </p>
+                    )}
 
-                {/* Keys the layers below define but this file does not - which is exactly what an
+                    {/* Keys the layers below define but this file does not - which is exactly what an
                     override is. Taking one fills in the inherited text to edit from. */}
-                {suggestions.length > 0 && (
-                    <ul className="suggestions">
-                        {suggestions.map(suggestion => (
-                            <li key={suggestion.key}>
-                                <button type="button" onClick={() => take(suggestion)}>
-                                    <span className="suggestion-key">{suggestion.key}</span>
-                                    <span className="suggestion-value">
+                    {suggestions.length > 0 && (
+                        <ul className="suggestions">
+                            {suggestions.map(suggestion => (
+                                <li key={suggestion.key}>
+                                    <button type="button" onClick={() => take(suggestion)}>
+                                        <span className="suggestion-key">{suggestion.key}</span>
+                                        <span className="suggestion-value">
                                         {suggestion.values.find(v => v.value)?.value ?? ''}
                                     </span>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
 
                 {/* The scrolling middle, so the title bar, the key and the buttons stay put when the
                     dialog is resized small. */}
                 <div className="modal-body">
-                <div className="languages">
-                    {props.languages.map(language => (
-                        <Field label={language} as="label" key={language}>
-                            <input
-                                type="text"
-                                value={draft.values.find(v => v.language === language)?.value ?? ''}
-                                onChange={e => setValue(language, e.target.value)}
-                            />
-                        </Field>
-                    ))}
-                </div>
+                    <div className="languages">
+                        {props.languages.map(language => (
+                            <Field label={language} as="label" key={language}>
+                                <input
+                                    type="text"
+                                    value={draft.values.find(v => v.language === language)?.value ?? ''}
+                                    onChange={e => setValue(language, e.target.value)}
+                                />
+                            </Field>
+                        ))}
+                    </div>
 
                 </div>
 
@@ -654,7 +689,7 @@ function AddTranslationDialog(props: {
                         untranslated cells are visible in the grid afterwards. On the button row so
                         it is still there when the language list has been scrolled past it. */}
                     <p className="modal-footnote">
-                        <span className="codicon codicon-info" aria-hidden="true" />
+                        <span className="codicon codicon-info" aria-hidden="true"/>
                         Languages left empty stay empty.
                     </p>
                     <Button onClick={props.onCancel}>Cancel</Button>
@@ -667,7 +702,7 @@ function AddTranslationDialog(props: {
                         Add
                     </Button>
                 </div>
-                <ResizeHandles handleProps={resizeHandleProps} />
+                <ResizeHandles handleProps={resizeHandleProps}/>
             </form>
         </div>
     );
@@ -678,8 +713,11 @@ function valueOf(row: LocRow, language: string): string {
 }
 
 
-
 // Examples from this file's own vocabulary.
-const PLACEHOLDERS: Record<FilterMode, string> = { text: 'Filter rows...', wildcard: 'TEXT_*_NAME', regex: '^TEXT_.*NAME$' };
+const PLACEHOLDERS: Record<FilterMode, string> = {
+    text: 'Filter rows...',
+    wildcard: 'TEXT_*_NAME',
+    regex: '^TEXT_.*NAME$'
+};
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(<App/>);

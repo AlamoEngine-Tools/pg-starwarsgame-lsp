@@ -2,19 +2,19 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
+    type BoneInspection,
     formatParameter,
+    geometryTable,
+    type InspectorPanel,
     inspectPanel,
     inspectPanels,
-    geometryTable,
-    type BoneInspection,
-    type InspectorPanel,
     type MeshInspection,
     type ParticleInspection,
 } from './inspector';
-import { type ModelDetail, type SubMeshGeometryPage } from '../../protocol/modelPreview';
+import {type ModelDetail, type SubMeshGeometryPage} from '../../protocol/modelPreview';
 
 const mesh = (over: Partial<MeshInspection> = {}): MeshInspection => ({
     kind: 'mesh',
@@ -23,7 +23,7 @@ const mesh = (over: Partial<MeshInspection> = {}): MeshInspection => ({
     vertexCount: 120,
     triangleCount: 40,
     drawn: true,
-    extras: { alamoShader: 'MeshBumpColorize.fx', alamoMesh: 'hull' },
+    extras: {alamoShader: 'MeshBumpColorize.fx', alamoMesh: 'hull'},
     ...over,
 });
 
@@ -87,7 +87,7 @@ describe('formatParameter', () => {
     it('says so rather than throwing on a value it cannot read', () => {
         // A mod's own exporter can write anything here. An inspector that dies takes the panel with
         // it, and a shrug in one row costs only that row.
-        const formatted = formatParameter('Weird', { nested: true } as unknown);
+        const formatted = formatParameter('Weird', {nested: true} as unknown);
 
         assert.equal(formatted.kind, 'text');
         assert.notEqual(formatted.value, '');
@@ -144,7 +144,7 @@ describe('inspectPanel for a mesh', () => {
     it('keeps the parameter section and says why when there are none', () => {
         // Disable, don't hide: a sub-mesh with no parameters is a finding, and a section that
         // vanishes leaves the reader wondering whether the panel is broken.
-        const panel = inspectPanel(mesh({ extras: { alamoShader: 'alDefault.fx' } }));
+        const panel = inspectPanel(mesh({extras: {alamoShader: 'alDefault.fx'}}));
         const section = panel.sections.find(s => s.title === 'Shader parameters');
 
         assert.equal(section?.rows.length, 0);
@@ -154,7 +154,7 @@ describe('inspectPanel for a mesh', () => {
     it('never shows an alamo key as if it were a parameter', () => {
         // The namespace exists precisely because a mod may name a parameter `alamoShader`.
         const panel = inspectPanel(mesh({
-            extras: { alamoShader: 'MeshBump.fx', alamoMesh: 'hull', 'param:alamoShader': 'x.tga' },
+            extras: {alamoShader: 'MeshBump.fx', alamoMesh: 'hull', 'param:alamoShader': 'x.tga'},
         }));
 
         const section = panel.sections.find(s => s.title === 'Shader parameters');
@@ -164,7 +164,7 @@ describe('inspectPanel for a mesh', () => {
 
     it('reports the ALT and LOD tags when the mesh carries them', () => {
         const rows = rowsOf(inspectPanel(mesh({
-            extras: { alamoShader: 'a.fx', alamoAlt: 2, alamoLod: 1 },
+            extras: {alamoShader: 'a.fx', alamoAlt: 2, alamoLod: 1},
         })), 'Mesh');
 
         assert.equal(rows['Damage state'], '2');
@@ -182,7 +182,7 @@ describe('inspectPanel for a mesh', () => {
     it('explains a mesh that is not drawn', () => {
         const hiddenInFile = inspectPanel(mesh({
             drawn: false,
-            extras: { alamoShader: 'a.fx', alamoHidden: true },
+            extras: {alamoShader: 'a.fx', alamoHidden: true},
         }));
 
         assert.match(rowsOf(hiddenInFile, 'Mesh').Drawn, /hidden in the file/i);
@@ -190,7 +190,7 @@ describe('inspectPanel for a mesh', () => {
 
     it('names the archetype for geometry the engine never shows', () => {
         const panel = inspectPanel(mesh({
-            extras: { alamoShader: 'MeshCollision.fx', alamoMesh: 'COLLISION' },
+            extras: {alamoShader: 'MeshCollision.fx', alamoMesh: 'COLLISION'},
         }));
 
         assert.equal(rowsOf(panel, 'Material').Archetype, 'collision');
@@ -200,7 +200,7 @@ describe('inspectPanel for a mesh', () => {
         // `IsCollidable` means "takes part in collision", which most visible geometry does - it is
         // not a synonym for being a collision hull.
         const rows = rowsOf(inspectPanel(mesh({
-            extras: { alamoShader: 'MeshBump.fx', alamoCollidable: true },
+            extras: {alamoShader: 'MeshBump.fx', alamoCollidable: true},
         })), 'Mesh');
 
         assert.equal(rows.Collidable, 'yes');
@@ -217,14 +217,14 @@ describe('inspectPanel for a bone', () => {
     });
 
     it('says a root has no parent instead of printing -1', () => {
-        const rows = rowsOf(inspectPanel(bone({ parentIndex: -1, parentName: '' })), 'Bone');
+        const rows = rowsOf(inspectPanel(bone({parentIndex: -1, parentName: ''})), 'Bone');
 
         assert.equal(rows.Parent, 'none (root)');
     });
 
     it('reports a billboard mode only when the bone declares one', () => {
         assert.equal(rowsOf(inspectPanel(bone()), 'Bone').Billboard, undefined);
-        assert.equal(rowsOf(inspectPanel(bone({ billboard: 'Parallel' })), 'Bone').Billboard,
+        assert.equal(rowsOf(inspectPanel(bone({billboard: 'Parallel'})), 'Bone').Billboard,
             'Parallel');
     });
 });
@@ -251,14 +251,14 @@ describe('inspectPanels', () => {
     it('shows a merged bone/mesh row as one panel carrying both', () => {
         // The ALO gives a rigid sub-mesh the same name as the bone that is its origin, and the tree
         // draws them as ONE row. Selecting it must not have to choose which half to describe.
-        const panel = inspectPanels([mesh({ name: 'engine_glow' }), bone({ name: 'engine_glow' })]);
+        const panel = inspectPanels([mesh({name: 'engine_glow'}), bone({name: 'engine_glow'})]);
 
         assert.deepEqual(panel.sections.map(s => s.title),
             ['Mesh', 'Material', 'Shader parameters', 'Bone']);
     });
 
     it('takes its title from the first source', () => {
-        assert.equal(inspectPanels([mesh({ name: 'hull' }), bone()]).title, 'hull');
+        assert.equal(inspectPanels([mesh({name: 'hull'}), bone()]).title, 'hull');
     });
 
     it('says so rather than going blank when nothing is selected', () => {
@@ -301,7 +301,7 @@ const detail = (over: Partial<ModelDetail> = {}): ModelDetail => ({
 
 describe('inspectPanels with the server detail', () => {
     it('adds the bounding box the FILE stores', () => {
-        const panel = inspectPanels([mesh({ meshIndex: 7 })], detail());
+        const panel = inspectPanels([mesh({meshIndex: 7})], detail());
         const rows = rowsOf(panel, 'Mesh');
 
         assert.equal(rows['Bounds min'], '-1, -2, -3');
@@ -313,24 +313,24 @@ describe('inspectPanels with the server detail', () => {
         // mesh's box against the other - silently, and in the author's own units.
         const twins = detail({
             meshes: [
-                { ...detail().meshes[0], index: 7, name: 'hull', boundsMin: [-1, -2, -3] },
-                { ...detail().meshes[0], index: 8, name: 'hull', boundsMin: [-9, -9, -9] },
+                {...detail().meshes[0], index: 7, name: 'hull', boundsMin: [-1, -2, -3]},
+                {...detail().meshes[0], index: 8, name: 'hull', boundsMin: [-9, -9, -9]},
             ],
         });
 
-        const rows = rowsOf(inspectPanels([mesh({ meshIndex: 8 })], twins), 'Mesh');
+        const rows = rowsOf(inspectPanels([mesh({meshIndex: 8})], twins), 'Mesh');
 
         assert.equal(rows['Bounds min'], '-9, -9, -9');
     });
 
     it('leaves the bounds out rather than guessing when the mesh is not in the detail', () => {
-        const rows = rowsOf(inspectPanels([mesh({ meshIndex: 99 })], detail()), 'Mesh');
+        const rows = rowsOf(inspectPanels([mesh({meshIndex: 99})], detail()), 'Mesh');
 
         assert.equal(rows['Bounds min'], undefined);
     });
 
     it('shows both bone transforms as four rows of four', () => {
-        const rows = rowsOf(inspectPanels([bone({ index: 3 })], detail()), 'Bone');
+        const rows = rowsOf(inspectPanels([bone({index: 3})], detail()), 'Bone');
 
         assert.equal(rows['Relative transform'],
             '1, 0, 0, 0\n0, 1, 0, 0\n0, 0, 1, 0\n10, 20, 30, 1');
@@ -349,7 +349,7 @@ describe('inspectPanels with the server detail', () => {
             }],
         });
 
-        const rows = rowsOf(inspectPanels([bone({ index: 3 })], withProxy), 'Proxy');
+        const rows = rowsOf(inspectPanels([bone({index: 3})], withProxy), 'Proxy');
 
         assert.equal(rows.Name, 'p_smoke_small');
         assert.equal(rows['Damage state'], '2');
@@ -358,7 +358,7 @@ describe('inspectPanels with the server detail', () => {
     });
 
     it('gives a bone that is not a proxy no proxy section', () => {
-        const panel = inspectPanels([bone({ index: 3 })], detail());
+        const panel = inspectPanels([bone({index: 3})], detail());
 
         assert.equal(panel.sections.find(s => s.title === 'Proxy'), undefined);
     });
@@ -378,10 +378,10 @@ describe('billboard reporting', () => {
         // Both sources carry it, and the server's is the file's own. The client's exists only
         // because the exporter writes it into a node's extras, and only when it is not Disable.
         const withBillboard = detail({
-            bones: [{ ...detail().bones[0], index: 3, billboard: 'ZAxisView' }],
+            bones: [{...detail().bones[0], index: 3, billboard: 'ZAxisView'}],
         });
 
-        const rows = rowsOf(inspectPanels([bone({ index: 3, billboard: null })], withBillboard),
+        const rows = rowsOf(inspectPanels([bone({index: 3, billboard: null})], withBillboard),
             'Bone');
 
         assert.equal(rows.Billboard, 'ZAxisView');
@@ -389,7 +389,7 @@ describe('billboard reporting', () => {
 
     it('stays quiet about the Disable that almost every bone declares', () => {
         // A row saying "Disable" on all 58 bones of a Star Destroyer is noise to read past.
-        const rows = rowsOf(inspectPanels([bone({ index: 3, billboard: null })], detail()), 'Bone');
+        const rows = rowsOf(inspectPanels([bone({index: 3, billboard: null})], detail()), 'Bone');
 
         assert.equal(rows.Billboard, undefined);
     });
@@ -424,7 +424,7 @@ describe('geometryTable', () => {
     };
 
     it('lays vertices out one column per channel', () => {
-        const table = geometryTable(page({ vertices: [vertex] }));
+        const table = geometryTable(page({vertices: [vertex]}));
 
         assert.deepEqual(table.columns,
             ['#', 'Position', 'Normal', 'UV0', 'UV1', 'Tangent', 'Binormal', 'Colour',
@@ -436,7 +436,7 @@ describe('geometryTable', () => {
     it('keeps a zero tangent visible rather than tidying it away', () => {
         // Tangents are all-zero on 69% of shipped vertices because only the U3U3 formats bind them.
         // Seeing the zero is how an author confirms that, so it is not blanked out.
-        const table = geometryTable(page({ vertices: [vertex] }));
+        const table = geometryTable(page({vertices: [vertex]}));
 
         assert.equal(table.rows[0][5], '0, 0, 0');
     });
@@ -444,7 +444,7 @@ describe('geometryTable', () => {
     it('lays faces out as their three vertex indices', () => {
         const table = geometryTable(page({
             table: 'faces',
-            faces: [{ index: 0, v0: 1, v1: 2, v2: 3 }],
+            faces: [{index: 0, v0: 1, v1: 2, v2: 3}],
         }));
 
         assert.deepEqual(table.columns, ['#', 'V0', 'V1', 'V2']);
@@ -454,7 +454,7 @@ describe('geometryTable', () => {
     it('lays the bone mapping out as slot, bone and name', () => {
         const table = geometryTable(page({
             table: 'boneMapping',
-            boneMapping: [{ slot: 0, boneIndex: 7, name: 'B_Spine' }],
+            boneMapping: [{slot: 0, boneIndex: 7, name: 'B_Spine'}],
         }));
 
         assert.deepEqual(table.columns, ['Slot', 'Bone', 'Name']);
@@ -462,7 +462,7 @@ describe('geometryTable', () => {
     });
 
     it('comes back empty for a table it does not know', () => {
-        const table = geometryTable(page({ table: 'nonsense' }));
+        const table = geometryTable(page({table: 'nonsense'}));
 
         assert.deepEqual(table.columns, []);
         assert.deepEqual(table.rows, []);
@@ -486,7 +486,7 @@ describe('geometryTable notes', () => {
     it('says nothing extra when a table has rows', () => {
         const table = geometryTable({
             ...empty('boneMapping'),
-            boneMapping: [{ slot: 0, boneIndex: 1, name: 'B_Spine' }],
+            boneMapping: [{slot: 0, boneIndex: 1, name: 'B_Spine'}],
         });
 
         assert.equal(table.note, undefined);

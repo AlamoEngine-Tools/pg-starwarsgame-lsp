@@ -2,22 +2,22 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { defaultHiddenLanguages, emptyLanguages } from './columnVisibility';
+import {defaultHiddenLanguages, emptyLanguages} from './columnVisibility';
 
 const languages = ['ENGLISH', 'GERMAN', 'FRENCH'];
 
 function row(index: number, values: Record<string, string>) {
     return {
         index, key: `TEXT_${index}`,
-        values: Object.entries(values).map(([language, value]) => ({ language, value })),
+        values: Object.entries(values).map(([language, value]) => ({language, value})),
     };
 }
 
 describe('defaultHiddenLanguages', () => {
     const populated = [
-        row(0, { ENGLISH: 'Alpha', GERMAN: 'Alfa', FRENCH: 'Alpha FR' }),
+        row(0, {ENGLISH: 'Alpha', GERMAN: 'Alfa', FRENCH: 'Alpha FR'}),
     ];
 
     // The bug this pins: the grid rendered the focus default while the column menu's first click
@@ -37,7 +37,7 @@ describe('defaultHiddenLanguages', () => {
 
     // Without a focus the rule is the other one: get emptiness out of the way, nothing else.
     it('hides only the empty columns when nothing is focused', () => {
-        const rows = [row(0, { ENGLISH: 'Alpha', GERMAN: 'Alfa', FRENCH: '' })];
+        const rows = [row(0, {ENGLISH: 'Alpha', GERMAN: 'Alfa', FRENCH: ''})];
 
         assert.deepEqual(defaultHiddenLanguages(rows, languages, null), ['FRENCH']);
         assert.deepEqual(defaultHiddenLanguages(rows, languages, undefined), ['FRENCH']);
@@ -56,8 +56,8 @@ describe('defaultHiddenLanguages', () => {
 describe('emptyLanguages', () => {
     it('names a language nothing in the file says anything in', () => {
         const rows = [
-            row(0, { ENGLISH: 'Alpha', GERMAN: 'Alfa', FRENCH: '' }),
-            row(1, { ENGLISH: 'Beta', GERMAN: 'Beta DE', FRENCH: '' }),
+            row(0, {ENGLISH: 'Alpha', GERMAN: 'Alfa', FRENCH: ''}),
+            row(1, {ENGLISH: 'Beta', GERMAN: 'Beta DE', FRENCH: ''}),
         ];
 
         assert.deepEqual(emptyLanguages(rows, languages), ['FRENCH']);
@@ -66,15 +66,15 @@ describe('emptyLanguages', () => {
     // One value is enough to make a column worth showing - that is the language being worked on.
     it('does not name a language with even a single value', () => {
         const rows = [
-            row(0, { ENGLISH: 'Alpha', GERMAN: '', FRENCH: '' }),
-            row(1, { ENGLISH: 'Beta', GERMAN: 'Beta DE', FRENCH: '' }),
+            row(0, {ENGLISH: 'Alpha', GERMAN: '', FRENCH: ''}),
+            row(1, {ENGLISH: 'Beta', GERMAN: 'Beta DE', FRENCH: ''}),
         ];
 
         assert.deepEqual(emptyLanguages(rows, languages), ['FRENCH']);
     });
 
     it('treats whitespace as empty', () => {
-        const rows = [row(0, { ENGLISH: 'Alpha', GERMAN: '   ', FRENCH: '' })];
+        const rows = [row(0, {ENGLISH: 'Alpha', GERMAN: '   ', FRENCH: ''})];
 
         assert.deepEqual(emptyLanguages(rows, languages), ['GERMAN', 'FRENCH']);
     });
@@ -83,8 +83,8 @@ describe('emptyLanguages', () => {
     // nothing but markers has no German in it.
     it('does not count the blank-line marker as content', () => {
         const rows = [
-            row(0, { ENGLISH: 'Alice', GERMAN: '[TBL]', FRENCH: '' }),
-            row(1, { ENGLISH: '[TBL]', GERMAN: '[TBL]', FRENCH: '' }),
+            row(0, {ENGLISH: 'Alice', GERMAN: '[TBL]', FRENCH: ''}),
+            row(1, {ENGLISH: '[TBL]', GERMAN: '[TBL]', FRENCH: ''}),
         ];
 
         assert.deepEqual(emptyLanguages(rows, languages), ['GERMAN', 'FRENCH']);
@@ -99,13 +99,13 @@ describe('emptyLanguages', () => {
     // Never all of them: a table with no value columns is not a view anyone wants, and the point of
     // hiding is to get the noise out of the way, not the content.
     it('never names every language', () => {
-        const rows = [row(0, { ENGLISH: '', GERMAN: '', FRENCH: '' })];
+        const rows = [row(0, {ENGLISH: '', GERMAN: '', FRENCH: ''})];
 
         assert.deepEqual(emptyLanguages(rows, languages), []);
     });
 
     it('handles a row that has no cell for a language at all', () => {
-        const rows = [row(0, { ENGLISH: 'Alpha' })];
+        const rows = [row(0, {ENGLISH: 'Alpha'})];
 
         assert.deepEqual(emptyLanguages(rows, languages), ['GERMAN', 'FRENCH']);
     });

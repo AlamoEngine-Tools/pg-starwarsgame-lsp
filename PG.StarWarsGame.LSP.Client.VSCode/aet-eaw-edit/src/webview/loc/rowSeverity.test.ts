@@ -2,13 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { LocRow } from './locRow';
-import { rowSeverityClass, severityByRow } from './rowSeverity';
+import {LocRow} from './locRow';
+import {rowSeverityClass, severityByRow} from './rowSeverity';
 
 function row(index: number, key: string): LocRow {
-    return { index, key, values: [] };
+    return {index, key, values: []};
 }
 
 const rows = [row(0, 'TEXT_A'), row(1, 'TEXT_B'), row(2, 'TEXT_A')];
@@ -20,13 +20,13 @@ describe('severityByRow', () => {
 
     // A valid row must stay unmarked, or the tint covers the whole table and means nothing.
     it('leaves rows with no finding out of the map entirely', () => {
-        const marked = severityByRow([{ severity: 'error', message: '', index: 1 }], rows);
+        const marked = severityByRow([{severity: 'error', message: '', index: 1}], rows);
 
         assert.deepEqual([...marked.keys()], [1]);
     });
 
     it('marks the row an index-addressed problem points at', () => {
-        const marked = severityByRow([{ severity: 'info', message: '', index: 2 }], rows);
+        const marked = severityByRow([{severity: 'info', message: '', index: 2}], rows);
 
         assert.equal(marked.get(2), 'info');
     });
@@ -34,16 +34,16 @@ describe('severityByRow', () => {
     // Keys are not unique - a duplicate is the point of one of these findings - so both rows the
     // key appears on have to light up, not just the first.
     it('marks every row carrying a key-addressed problem', () => {
-        const marked = severityByRow([{ severity: 'error', message: '', key: 'TEXT_A' }], rows);
+        const marked = severityByRow([{severity: 'error', message: '', key: 'TEXT_A'}], rows);
 
         assert.deepEqual([...marked.keys()].sort(), [0, 2]);
     });
 
     it('keeps the worst severity when a row has several findings', () => {
         const marked = severityByRow([
-            { severity: 'info', message: '', index: 1 },
-            { severity: 'error', message: '', index: 1 },
-            { severity: 'warning', message: '', index: 1 },
+            {severity: 'info', message: '', index: 1},
+            {severity: 'error', message: '', index: 1},
+            {severity: 'warning', message: '', index: 1},
         ], rows);
 
         assert.equal(marked.get(1), 'error');
@@ -51,8 +51,8 @@ describe('severityByRow', () => {
 
     it('does not let a milder finding arriving later downgrade a row', () => {
         const marked = severityByRow([
-            { severity: 'error', message: '', index: 0 },
-            { severity: 'info', message: '', key: 'TEXT_A' },
+            {severity: 'error', message: '', index: 0},
+            {severity: 'info', message: '', key: 'TEXT_A'},
         ], rows);
 
         assert.equal(marked.get(0), 'error');
@@ -62,13 +62,13 @@ describe('severityByRow', () => {
     it('locates a blank-key problem by its index', () => {
         const withBlank = [row(0, ''), row(1, 'TEXT_B')];
         const marked = severityByRow(
-            [{ severity: 'error', message: 'no key', key: null, index: 0 }], withBlank);
+            [{severity: 'error', message: 'no key', key: null, index: 0}], withBlank);
 
         assert.equal(marked.get(0), 'error');
     });
 
     it('ignores a problem that names neither a row nor a key', () => {
-        assert.equal(severityByRow([{ severity: 'error', message: 'file-wide' }], rows).size, 0);
+        assert.equal(severityByRow([{severity: 'error', message: 'file-wide'}], rows).size, 0);
     });
 });
 

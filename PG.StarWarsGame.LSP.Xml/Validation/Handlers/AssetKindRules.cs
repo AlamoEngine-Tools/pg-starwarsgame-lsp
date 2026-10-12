@@ -40,7 +40,8 @@ public static class AssetKindRules
         [ReferenceKind.TextureFile] =
             new AssetKindRule("Texture", [".tga", ".dds"], [".tga", ".dds"], true, XmlDiagnosticSeverity.Warning),
 
-        [ReferenceKind.AudioFile] = new AssetKindRule("Audio", [".wav", ".mp3"], [], false, XmlDiagnosticSeverity.Warning),
+        [ReferenceKind.AudioFile] =
+            new AssetKindRule("Audio", [".wav", ".mp3"], [], false, XmlDiagnosticSeverity.Warning),
 
         // An Error, not a Warning (issue #132). Measured in the 2018 build: the engine opens the
         // name as given, and on failure retries it against the resolved map path with the extension

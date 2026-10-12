@@ -2,18 +2,18 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { renderToStaticMarkup } from 'react-dom/server';
+import {renderToStaticMarkup} from 'react-dom/server';
 
-import { ColourKeyFlyout } from './ColourKeyFlyout';
-import { EDGE_KINDS, LIFECYCLE_TOKENS } from './palette';
+import {ColourKeyFlyout} from './ColourKeyFlyout';
+import {EDGE_KINDS, LIFECYCLE_TOKENS} from './palette';
 
 const noop = (): void => undefined;
 
 describe('ColourKeyFlyout', () => {
     it('is the shared stage flyout, opening upwards from the bottom-right corner', () => {
-        const html = renderToStaticMarkup(<ColourKeyFlyout branches={[]} onClose={noop} />);
+        const html = renderToStaticMarkup(<ColourKeyFlyout branches={[]} onClose={noop}/>);
 
         assert.match(html, /class="stage-flyout from-bottom on-right colour-key"/);
         assert.match(html, /class="stage-flyout-head"/);
@@ -21,7 +21,7 @@ describe('ColourKeyFlyout', () => {
     });
 
     it('keys every lifecycle and every edge kind the graph draws', () => {
-        const html = renderToStaticMarkup(<ColourKeyFlyout branches={[]} onClose={noop} />);
+        const html = renderToStaticMarkup(<ColourKeyFlyout branches={[]} onClose={noop}/>);
 
         for (const lifecycle of Object.keys(LIFECYCLE_TOKENS)) {
             assert.match(html, new RegExp(`>${lifecycle}<`), lifecycle);
@@ -36,8 +36,8 @@ describe('ColourKeyFlyout', () => {
     it('keys each branch with the token the overview draws it in', () => {
         const html = renderToStaticMarkup(<ColourKeyFlyout
             branches={[
-                { branch: 'Act1', token: '--colour-data-orange', sharedWith: [] },
-                { branch: 'Act2', token: '--colour-data-yellow', sharedWith: [] },
+                {branch: 'Act1', token: '--colour-data-orange', sharedWith: []},
+                {branch: 'Act2', token: '--colour-data-yellow', sharedWith: []},
             ]}
             onClose={noop}
         />);
@@ -53,7 +53,7 @@ describe('ColourKeyFlyout', () => {
      */
     it('says a branch colour replaces the lifecycle colour zoomed out', () => {
         const html = renderToStaticMarkup(<ColourKeyFlyout
-            branches={[{ branch: 'Act1', token: '--colour-data-green', sharedWith: [] }]}
+            branches={[{branch: 'Act1', token: '--colour-data-green', sharedWith: []}]}
             onClose={noop}
         />);
 
@@ -63,8 +63,8 @@ describe('ColourKeyFlyout', () => {
     it('names the branches that share a colour', () => {
         const html = renderToStaticMarkup(<ColourKeyFlyout
             branches={[
-                { branch: 'Act1', token: '--colour-data-red', sharedWith: ['Act3'] },
-                { branch: 'Act3', token: '--colour-data-red', sharedWith: ['Act1'] },
+                {branch: 'Act1', token: '--colour-data-red', sharedWith: ['Act3']},
+                {branch: 'Act3', token: '--colour-data-red', sharedWith: ['Act1']},
             ]}
             onClose={noop}
         />);
@@ -75,7 +75,7 @@ describe('ColourKeyFlyout', () => {
 
     /** Disable, don't hide: the section stays and says why it is empty. */
     it('keeps the branch section when nothing in view has a branch, and says so', () => {
-        const html = renderToStaticMarkup(<ColourKeyFlyout branches={[]} onClose={noop} />);
+        const html = renderToStaticMarkup(<ColourKeyFlyout branches={[]} onClose={noop}/>);
 
         assert.match(html, />Branches</);
         assert.match(html, /No event in this view names a branch/);

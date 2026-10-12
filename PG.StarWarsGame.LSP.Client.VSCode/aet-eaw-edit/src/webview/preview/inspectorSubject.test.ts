@@ -2,16 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    geometryKeyOf,
-    sameGeometryKey,
-    type InspectorSubject,
-} from './inspectorSubject';
-import {
-    type BoneInspection, type MeshInspection, type ParticleInspection,
-} from './inspector';
+import {geometryKeyOf, type InspectorSubject, sameGeometryKey,} from './inspectorSubject';
+import {type BoneInspection, type MeshInspection, type ParticleInspection,} from './inspector';
 
 const mesh = (over: Partial<MeshInspection> = {}): MeshInspection => ({
     kind: 'mesh',
@@ -20,7 +14,7 @@ const mesh = (over: Partial<MeshInspection> = {}): MeshInspection => ({
     vertexCount: 120,
     triangleCount: 40,
     drawn: true,
-    extras: { alamoShader: 'MeshBumpColorize.fx', alamoMesh: 'hull' },
+    extras: {alamoShader: 'MeshBumpColorize.fx', alamoMesh: 'hull'},
     meshIndex: 2,
     subMeshIndex: 0,
     ...over,
@@ -66,7 +60,7 @@ describe('geometryKeyOf', () => {
     it('finds the mesh among a merged row\'s sources', () => {
         // A bone and the mesh riding it are ONE row, so both facts arrive together and the
         // geometry belongs to the mesh half.
-        const merged = subject({ sources: [bone(), mesh({ meshIndex: 7, subMeshIndex: 1 })] });
+        const merged = subject({sources: [bone(), mesh({meshIndex: 7, subMeshIndex: 1})]});
 
         assert.deepEqual(geometryKeyOf(merged), {
             modelReference: 'ev_stardestroyer',
@@ -76,36 +70,36 @@ describe('geometryKeyOf', () => {
     });
 
     it('has no key without a mesh index', () => {
-        assert.equal(geometryKeyOf(subject({ sources: [mesh({ meshIndex: undefined })] })), null);
+        assert.equal(geometryKeyOf(subject({sources: [mesh({meshIndex: undefined})]})), null);
     });
 
     it('has no key without a sub-mesh index', () => {
         assert.equal(
-            geometryKeyOf(subject({ sources: [mesh({ subMeshIndex: undefined })] })), null);
+            geometryKeyOf(subject({sources: [mesh({subMeshIndex: undefined})]})), null);
     });
 
     it('has no key without a model to fetch it from', () => {
-        assert.equal(geometryKeyOf(subject({ modelReference: null })), null);
+        assert.equal(geometryKeyOf(subject({modelReference: null})), null);
     });
 
     it('has no key for a row that is only a bone', () => {
-        assert.equal(geometryKeyOf(subject({ sources: [bone()] })), null);
+        assert.equal(geometryKeyOf(subject({sources: [bone()]})), null);
     });
 
     it('has no key for a particle system', () => {
-        assert.equal(geometryKeyOf(subject({ sources: [particle()] })), null);
+        assert.equal(geometryKeyOf(subject({sources: [particle()]})), null);
     });
 
     it('has no key for a row that is gone from the model', () => {
-        assert.equal(geometryKeyOf(subject({ sources: [] })), null);
+        assert.equal(geometryKeyOf(subject({sources: []})), null);
     });
 
     // A sub-mesh index of zero is the FIRST sub-mesh and the commonest case; written because the
     // rule it replaces was a truthiness check away from dropping it.
     it('keeps a zero index, which is a real sub-mesh', () => {
-        const key = geometryKeyOf(subject({ sources: [mesh({ meshIndex: 0, subMeshIndex: 0 })] }));
+        const key = geometryKeyOf(subject({sources: [mesh({meshIndex: 0, subMeshIndex: 0})]}));
 
-        assert.deepEqual(key, { modelReference: 'ev_stardestroyer', meshIndex: 0, subMeshIndex: 0 });
+        assert.deepEqual(key, {modelReference: 'ev_stardestroyer', meshIndex: 0, subMeshIndex: 0});
     });
 });
 
@@ -120,14 +114,14 @@ describe('sameGeometryKey', () => {
     it('is false when the sub-mesh changes', () => {
         assert.equal(sameGeometryKey(
             geometryKeyOf(subject()),
-            geometryKeyOf(subject({ sources: [mesh({ subMeshIndex: 1 })] })),
+            geometryKeyOf(subject({sources: [mesh({subMeshIndex: 1})]})),
         ), false);
     });
 
     it('is false when the mesh changes', () => {
         assert.equal(sameGeometryKey(
             geometryKeyOf(subject()),
-            geometryKeyOf(subject({ sources: [mesh({ meshIndex: 9 })] })),
+            geometryKeyOf(subject({sources: [mesh({meshIndex: 9})]})),
         ), false);
     });
 
@@ -136,7 +130,7 @@ describe('sameGeometryKey', () => {
     it('is false when the model changes', () => {
         assert.equal(sameGeometryKey(
             geometryKeyOf(subject()),
-            geometryKeyOf(subject({ modelReference: 'ev_victory' })),
+            geometryKeyOf(subject({modelReference: 'ev_victory'})),
         ), false);
     });
 

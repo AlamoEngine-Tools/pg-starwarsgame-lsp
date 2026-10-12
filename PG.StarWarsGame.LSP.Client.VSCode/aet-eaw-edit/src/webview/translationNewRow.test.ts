@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    blankDraft, draftToCommandValues, foldToEngineKey, normaliseKey, validateNewKey,
-} from './translationNewRow';
+import {blankDraft, draftToCommandValues, foldToEngineKey, normaliseKey, validateNewKey,} from './translationNewRow';
 
 const EXISTING = ['TEXT_ALPHA', 'TEXT_BETA'];
 
@@ -78,7 +76,7 @@ describe('blankDraft', () => {
     it('has an entry for every loaded language', () => {
         assert.deepEqual(blankDraft(['ENGLISH', 'GERMAN']), {
             key: '',
-            values: [{ language: 'ENGLISH', value: '' }, { language: 'GERMAN', value: '' }],
+            values: [{language: 'ENGLISH', value: ''}, {language: 'GERMAN', value: ''}],
         });
     });
 });
@@ -87,12 +85,12 @@ describe('draftToCommandValues', () => {
     it('keeps every language, including the ones left empty', () => {
         const draft = {
             key: 'K',
-            values: [{ language: 'ENGLISH', value: 'hello' }, { language: 'GERMAN', value: '' }],
+            values: [{language: 'ENGLISH', value: 'hello'}, {language: 'GERMAN', value: ''}],
         };
 
         assert.deepEqual(draftToCommandValues(draft), [
-            { language: 'ENGLISH', value: 'hello' },
-            { language: 'GERMAN', value: '' },
+            {language: 'ENGLISH', value: 'hello'},
+            {language: 'GERMAN', value: ''},
         ]);
     });
 });

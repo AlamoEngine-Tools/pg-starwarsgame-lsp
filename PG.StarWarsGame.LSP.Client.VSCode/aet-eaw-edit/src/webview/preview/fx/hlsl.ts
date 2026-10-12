@@ -100,7 +100,7 @@ function readCall(text: string, open: number): { inside: string; end: number } |
         } else if (text[i] === ')') {
             depth--;
             if (depth === 0) {
-                return { inside: text.slice(open + 1, i), end: i + 1 };
+                return {inside: text.slice(open + 1, i), end: i + 1};
             }
         }
     }
@@ -124,7 +124,7 @@ function rewriteCalls(
     const pattern = new RegExp(`\\b${name}\\s*\\(`, 'g');
     let cursor = 0;
 
-    for (;;) {
+    for (; ;) {
         pattern.lastIndex = cursor;
         const match = pattern.exec(text);
         if (match === null) {

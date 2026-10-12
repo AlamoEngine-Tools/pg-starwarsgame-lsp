@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Story.Model;
+using PG.StarWarsGame.LSP.Story.Sim;
 
 namespace PG.StarWarsGame.LSP.Story.Graph;
 
@@ -73,7 +74,7 @@ public sealed record StoryRuntimeState
         ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The fact table the simulator's world changes and rewards write; empty for static analysis.</summary>
-    public Sim.StoryWorld World { get; init; } = Sim.StoryWorld.Empty;
+    public StoryWorld World { get; init; } = StoryWorld.Empty;
 
     /// <summary>
     ///     Per-event dispatch counts for the counting types (a STORY_CONQUER with a count, the
@@ -82,7 +83,15 @@ public sealed record StoryRuntimeState
     public ImmutableDictionary<string, int> Hits { get; init; } =
         ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
 
-    public StoryRuntimeState WithWorld(Sim.StoryWorld world)
+    /// <summary>Each campaign script's PGStateMachine, keyed by script uri.</summary>
+    public ImmutableDictionary<string, LuaScriptState> Scripts { get; init; } =
+        ImmutableDictionary.Create<string, LuaScriptState>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Story_Event calls a script's threads will make once their sleeps are over.</summary>
+    public ImmutableList<LuaPendingEmission> PendingEmissions { get; init; } =
+        ImmutableList<LuaPendingEmission>.Empty;
+
+    public StoryRuntimeState WithWorld(StoryWorld world)
     {
         return this with { World = world };
     }
@@ -97,15 +106,7 @@ public sealed record StoryRuntimeState
         return this with { Hits = Hits.Remove(eventNodeId) };
     }
 
-    /// <summary>Each campaign script's PGStateMachine, keyed by script uri.</summary>
-    public ImmutableDictionary<string, Sim.LuaScriptState> Scripts { get; init; } =
-        ImmutableDictionary.Create<string, Sim.LuaScriptState>(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Story_Event calls a script's threads will make once their sleeps are over.</summary>
-    public ImmutableList<Sim.LuaPendingEmission> PendingEmissions { get; init; } =
-        ImmutableList<Sim.LuaPendingEmission>.Empty;
-
-    public StoryRuntimeState WithScript(string scriptUri, Sim.LuaScriptState state)
+    public StoryRuntimeState WithScript(string scriptUri, LuaScriptState state)
     {
         return this with { Scripts = Scripts.SetItem(scriptUri, state) };
     }

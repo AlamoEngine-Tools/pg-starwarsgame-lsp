@@ -202,32 +202,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     }
 
     /// <summary>
-    ///     Where an asset sits in the GAME tree, which is the only spelling the catalog can match on.
-    /// </summary>
-    /// <remarks>
-    ///     A .pgproj declares its asset roots as <c>data/audio</c>, <c>data/art</c> and so on, so
-    ///     taking the path relative to the root that matched threw the <c>data/audio/</c> prefix
-    ///     away and stored <c>announcer/foo.wav</c>. The baseline stores <c>data/...</c>, and a
-    ///     reference is written game-relative too - EaWX writes
-    ///     <c>Data\Audio\Announcer\foo.wav</c> - so the two halves of the merged catalog never met.
-    ///     Anchoring on the LAST <c>data</c> segment is what the engine's own layering does: a mod
-    ///     root holds a <c>Data</c> directory and everything is addressed from inside it. With no
-    ///     such segment the root-relative path stands, so a root outside a game tree is not guessed
-    ///     at.
-    /// </remarks>
-    private string GameRelativePath(string absoluteFile, string root)
-    {
-        var normalized = _fileHelper.NormalizeGamePath(absoluteFile);
-        var segments = normalized.Split('/');
-        var data = Array.LastIndexOf(segments, "data");
-        if (data >= 0 && data < segments.Length - 1)
-            return string.Join('/', segments[data..]);
-
-        return _fileHelper.NormalizeGamePath(
-            _fileHelper.FileSystem.Path.GetRelativePath(root, absoluteFile));
-    }
-
-    /// <summary>
     ///     Extracts bone names from loose workspace .alo models, unions them with the baseline bone
     ///     catalog (workspace models override shipped ones of the same filename), and publishes the
     ///     merged map on the GameIndex for boneName completion.
@@ -279,69 +253,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         _indexService.ApplyModelBones(mergedBones.ToImmutable());
         _indexService.ApplyModelTextures(mergedTextures.ToImmutable());
-    }
-
-    /// <summary>
-    ///     The layers to extract bones from, dependencies first. Falls back to one synthetic layer
-    ///     over the flattened asset roots when the workspace resolved no projects (a heuristic
-    ///     scan), which cannot be cached because there is no <c>.pgproj</c> to store it beside.
-    /// </summary>
-    private static IReadOnlyList<ProjectLayer> LayersForBones(WorkspaceConfiguration config)
-    {
-        if (config.Layers.Count == 0)
-            return [new ProjectLayer(0, "(workspace)", [], [], [], config.AssetRoots, null)];
-
-        return config.Layers.OrderBy(l => l.Rank).ToArray();
-    }
-
-    /// <summary>
-    ///     One layer's models, from its persisted snapshot when the files on disk are unchanged,
-    ///     otherwise by extracting and writing a fresh snapshot.
-    /// </summary>
-    private (IReadOnlyDictionary<string, ModelCatalogEntry> Models, bool Reused) ModelsForLayer(
-        ProjectLayer layer)
-    {
-        var roots = layer.AssetRoots;
-        if (roots.Count == 0)
-            return (new Dictionary<string, ModelCatalogEntry>(), false);
-
-        // No pgproj means no place to keep a snapshot beside - extract every time, as before.
-        if (layer.ProjectPath is not { } pgprojPath)
-            return (ExtractModels(roots), false);
-
-        var fingerprint = ModelBoneFingerprint.Compute(_fileHelper, roots);
-        if (_boneCache.TryLoad(pgprojPath, fingerprint) is { } cached)
-            return (cached, true);
-
-        var extracted = ExtractModels(roots);
-        _boneCache.Save(pgprojPath, fingerprint, extracted);
-        return (extracted, false);
-    }
-
-    /// <summary>
-    ///     Bones and textures for every model under <paramref name="roots" />. A model that yields
-    ///     no bones is still recorded when it yields textures, and vice versa - the two reads fail
-    ///     independently, and a model whose skeleton will not load still has readable textures.
-    /// </summary>
-    private Dictionary<string, ModelCatalogEntry> ExtractModels(IReadOnlyList<string> roots)
-    {
-        var models = new Dictionary<string, ModelCatalogEntry>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var root in roots)
-        {
-            if (!_fileHelper.FileSystem.Directory.Exists(root)) continue;
-
-            foreach (var (path, names) in BoneNameExtractor.Extract(_fileHelper.FileSystem, root))
-                models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with { Bones = names };
-
-            foreach (var (path, textures) in BoneNameExtractor.ExtractTextures(_fileHelper.FileSystem, root))
-                models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with
-                {
-                    Textures = textures
-                };
-        }
-
-        return models;
     }
 
 
@@ -457,6 +368,95 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         _indexService.ApplyWorkspaceDynamicEnumValues(workspace);
         _indexService.ApplyWorkspaceEnumValueDefinitions(defsBuilder.ToImmutable());
+    }
+
+    /// <summary>
+    ///     Where an asset sits in the GAME tree, which is the only spelling the catalog can match on.
+    /// </summary>
+    /// <remarks>
+    ///     A .pgproj declares its asset roots as <c>data/audio</c>, <c>data/art</c> and so on, so
+    ///     taking the path relative to the root that matched threw the <c>data/audio/</c> prefix
+    ///     away and stored <c>announcer/foo.wav</c>. The baseline stores <c>data/...</c>, and a
+    ///     reference is written game-relative too - EaWX writes
+    ///     <c>Data\Audio\Announcer\foo.wav</c> - so the two halves of the merged catalog never met.
+    ///     Anchoring on the LAST <c>data</c> segment is what the engine's own layering does: a mod
+    ///     root holds a <c>Data</c> directory and everything is addressed from inside it. With no
+    ///     such segment the root-relative path stands, so a root outside a game tree is not guessed
+    ///     at.
+    /// </remarks>
+    private string GameRelativePath(string absoluteFile, string root)
+    {
+        var normalized = _fileHelper.NormalizeGamePath(absoluteFile);
+        var segments = normalized.Split('/');
+        var data = Array.LastIndexOf(segments, "data");
+        if (data >= 0 && data < segments.Length - 1)
+            return string.Join('/', segments[data..]);
+
+        return _fileHelper.NormalizeGamePath(
+            _fileHelper.FileSystem.Path.GetRelativePath(root, absoluteFile));
+    }
+
+    /// <summary>
+    ///     The layers to extract bones from, dependencies first. Falls back to one synthetic layer
+    ///     over the flattened asset roots when the workspace resolved no projects (a heuristic
+    ///     scan), which cannot be cached because there is no <c>.pgproj</c> to store it beside.
+    /// </summary>
+    private static IReadOnlyList<ProjectLayer> LayersForBones(WorkspaceConfiguration config)
+    {
+        if (config.Layers.Count == 0)
+            return [new ProjectLayer(0, "(workspace)", [], [], [], config.AssetRoots, null)];
+
+        return config.Layers.OrderBy(l => l.Rank).ToArray();
+    }
+
+    /// <summary>
+    ///     One layer's models, from its persisted snapshot when the files on disk are unchanged,
+    ///     otherwise by extracting and writing a fresh snapshot.
+    /// </summary>
+    private (IReadOnlyDictionary<string, ModelCatalogEntry> Models, bool Reused) ModelsForLayer(
+        ProjectLayer layer)
+    {
+        var roots = layer.AssetRoots;
+        if (roots.Count == 0)
+            return (new Dictionary<string, ModelCatalogEntry>(), false);
+
+        // No pgproj means no place to keep a snapshot beside - extract every time, as before.
+        if (layer.ProjectPath is not { } pgprojPath)
+            return (ExtractModels(roots), false);
+
+        var fingerprint = ModelBoneFingerprint.Compute(_fileHelper, roots);
+        if (_boneCache.TryLoad(pgprojPath, fingerprint) is { } cached)
+            return (cached, true);
+
+        var extracted = ExtractModels(roots);
+        _boneCache.Save(pgprojPath, fingerprint, extracted);
+        return (extracted, false);
+    }
+
+    /// <summary>
+    ///     Bones and textures for every model under <paramref name="roots" />. A model that yields
+    ///     no bones is still recorded when it yields textures, and vice versa - the two reads fail
+    ///     independently, and a model whose skeleton will not load still has readable textures.
+    /// </summary>
+    private Dictionary<string, ModelCatalogEntry> ExtractModels(IReadOnlyList<string> roots)
+    {
+        var models = new Dictionary<string, ModelCatalogEntry>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var root in roots)
+        {
+            if (!_fileHelper.FileSystem.Directory.Exists(root)) continue;
+
+            foreach (var (path, names) in BoneNameExtractor.Extract(_fileHelper.FileSystem, root))
+                models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with { Bones = names };
+
+            foreach (var (path, textures) in BoneNameExtractor.ExtractTextures(_fileHelper.FileSystem, root))
+                models[path] = (models.GetValueOrDefault(path) ?? ModelCatalogEntry.Empty) with
+                {
+                    Textures = textures
+                };
+        }
+
+        return models;
     }
 
     /// <summary>

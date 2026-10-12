@@ -3,7 +3,7 @@
 
 // Which param rows a node body shows, and in what order.
 
-import { StoryParamSchemaDto } from '../../protocol';
+import {StoryParamSchemaDto} from '../../protocol';
 
 /** One editable param row on an inline node body. `missing` = mandatory and still unset. */
 export interface ParamRowSpec {
@@ -43,7 +43,7 @@ export function paramRowSpecs(
 
     for (const [position, value] of byPosition) {
         // Never "missing": the schema says nothing about it, so it cannot be a mandatory gap.
-        rows.push({ position, value, missing: false });
+        rows.push({position, value, missing: false});
     }
 
     rows.sort((a, b) => a.position - b.position);

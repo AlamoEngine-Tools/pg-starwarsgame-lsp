@@ -18,6 +18,11 @@ public sealed class GlobalSuppressionStoreTest
     private static readonly string PgprojPath = Path.Combine(Rooted("ws"), "mod.pgproj");
     private static readonly string SidecarPath = Path.Combine(Rooted("ws"), ".aetswg", "suppressions.json");
 
+    // A comment inside a value is common practice in mods; its diagnostic is off until a project
+    // removes this entry. It lives in the file itself so the project can see and change it.
+    private static readonly SuppressionMatcher CommentInsideValue =
+        SuppressionMatcher.ForId(DiagnosticIds.XmlCommentInsideValue);
+
     private static string Rooted(string sub)
     {
         return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub);
@@ -44,11 +49,6 @@ public sealed class GlobalSuppressionStoreTest
             new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance, notifier);
         return (store, fs);
     }
-
-    // A comment inside a value is common practice in mods; its diagnostic is off until a project
-    // removes this entry. It lives in the file itself so the project can see and change it.
-    private static readonly SuppressionMatcher CommentInsideValue =
-        SuppressionMatcher.ForId(DiagnosticIds.XmlCommentInsideValue);
 
     [Fact]
     public void NoSidecar_SuppressesOnlyTheDefaultOffDiagnostics()

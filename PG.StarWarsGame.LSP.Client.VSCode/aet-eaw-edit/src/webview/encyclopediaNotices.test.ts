@@ -4,9 +4,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {
-    EncyclopediaTextStyle, GetEncyclopediaEntryResult,
-} from '../protocol/encyclopedia';
+import {EncyclopediaTextStyle, GetEncyclopediaEntryResult,} from '../protocol/encyclopedia';
 import {encyclopediaNotices, noticeSeverity} from './encyclopediaNotices';
 
 function style(fontName: string): EncyclopediaTextStyle {

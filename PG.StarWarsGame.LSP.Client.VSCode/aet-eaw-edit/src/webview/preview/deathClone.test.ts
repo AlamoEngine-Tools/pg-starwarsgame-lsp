@@ -2,18 +2,30 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { PreviewDeathClone, PreviewTurret } from '../../protocol/modelPreview';
+import type {PreviewDeathClone, PreviewTurret} from '../../protocol/modelPreview';
 
-import {
-    cloneForDamage, deathCloneRows, sweepAngles, turretSweeps,
-} from './deathClone';
+import {cloneForDamage, deathCloneRows, sweepAngles, turretSweeps,} from './deathClone';
 
 const CLONES: PreviewDeathClone[] = [
-    { damageType: 'Damage_Normal', objectId: 'SD_Death_Clone', modelFile: 'EV_SD_D.ALO', playsIdle: false, animations: [], particles: [] },
-    { damageType: 'Damage_Force_Lightning', objectId: 'Lightning_Clone', modelFile: 'X_D.ALO', playsIdle: true, animations: [], particles: [] },
-    { damageType: null, objectId: 'Fallback_Clone', modelFile: null, playsIdle: false, animations: [], particles: [] },
+    {
+        damageType: 'Damage_Normal',
+        objectId: 'SD_Death_Clone',
+        modelFile: 'EV_SD_D.ALO',
+        playsIdle: false,
+        animations: [],
+        particles: []
+    },
+    {
+        damageType: 'Damage_Force_Lightning',
+        objectId: 'Lightning_Clone',
+        modelFile: 'X_D.ALO',
+        playsIdle: true,
+        animations: [],
+        particles: []
+    },
+    {damageType: null, objectId: 'Fallback_Clone', modelFile: null, playsIdle: false, animations: [], particles: []},
 ];
 
 describe('cloneForDamage', () => {
@@ -93,7 +105,14 @@ describe('deathCloneRows', () => {
     it('marks a clone that is not defined rather than showing a blank row', () => {
         // A typo costs the wreck entirely and the game says nothing about it.
         const rows = deathCloneRows(
-            [{ damageType: 'Damage_Normal', objectId: 'Missing', modelFile: null, playsIdle: false, animations: [], particles: [] }],
+            [{
+                damageType: 'Damage_Normal',
+                objectId: 'Missing',
+                modelFile: null,
+                playsIdle: false,
+                animations: [],
+                particles: []
+            }],
             'Damage_Normal');
 
         assert.equal(rows[0].resolved, false);
@@ -137,7 +156,7 @@ describe('sweepAngles', () => {
     });
 
     it('is centred on the rest angle the XML gives', () => {
-        const offset = sweepAngles({ ...turret, restAngle: 180 }, 0);
+        const offset = sweepAngles({...turret, restAngle: 180}, 0);
 
         assert.equal(offset.rotate, 180);
     });
@@ -146,23 +165,23 @@ describe('sweepAngles', () => {
         // 53 of foc's weapon objects declare the extents and the rest do not. A sweep that invented
         // one would claim a traverse the unit has not got.
         const still = sweepAngles(
-            { restAngle: 0, turretBone: 'B', barrelBone: null }, 0.25);
+            {restAngle: 0, turretBone: 'B', barrelBone: null}, 0.25);
 
-        assert.deepEqual(still, { rotate: 0, elevate: 0 });
+        assert.deepEqual(still, {rotate: 0, elevate: 0});
     });
 
     it('treats a traverse of 180 or more as a continuous turn rather than a swing', () => {
         // The threshold is 180, not 360, and it comes from the engine: the motion clamp is skipped
         // entirely once the extent reaches 180 (`FLD 180.0; FCOMIP; JBE skip`), because plus or
         // minus 180 already covers the circle and there are then no end stops to swing between.
-        const full = { ...turret, rotateExtentDegrees: 180 };
+        const full = {...turret, rotateExtentDegrees: 180};
 
         assert.ok(Math.abs(sweepAngles(full, 0.25).rotate - 90) < 1e-6);
         assert.ok(Math.abs(sweepAngles(full, 0.5).rotate - 180) < 1e-6);
     });
 
     it('still turns continuously at 360, which is how the corpus writes "all round"', () => {
-        const full = { ...turret, rotateExtentDegrees: 360 };
+        const full = {...turret, rotateExtentDegrees: 360};
 
         assert.ok(Math.abs(sweepAngles(full, 0.5).rotate - 180) < 1e-6);
     });
@@ -178,7 +197,7 @@ describe('turretSweeps', () => {
         // MEASURED on the live AT-AA: its turret is `weapon:A` with B_Turret_Base / B_Missile_Launcher
         // at 360 by 45, and it has NO hardpoints at all. Reading hardpoints alone found nothing to
         // sweep on the very unit the feature exists for.
-        const sweeps = turretSweeps([], [{ id: 'weapon:A', partId: 'hull', turret: extents }]);
+        const sweeps = turretSweeps([], [{id: 'weapon:A', partId: 'hull', turret: extents}]);
 
         assert.equal(sweeps.length, 1);
         assert.equal(sweeps[0].turretBone, 'B_Turret_Base');
@@ -188,7 +207,7 @@ describe('turretSweeps', () => {
 
     it('finds one declared on a hardpoint, on that hardpoint s own part', () => {
         const sweeps = turretSweeps(
-            [{ id: 'HP_Gun', partId: 'hp:HP_Gun', turret: extents }], []);
+            [{id: 'HP_Gun', partId: 'hp:HP_Gun', turret: extents}], []);
 
         assert.equal(sweeps[0].partId, 'hp:HP_Gun');
     });
@@ -197,22 +216,22 @@ describe('turretSweeps', () => {
         // A hardpoint weapon carries the hardpoint's turret too, so the naive union sweeps the same bone
         // twice - and the second pass fights the first.
         const sweeps = turretSweeps(
-            [{ id: 'HP_Gun', partId: 'hp:HP_Gun', turret: extents }],
-            [{ id: 'hardpoint:HP_Gun', partId: 'hp:HP_Gun', turret: extents }]);
+            [{id: 'HP_Gun', partId: 'hp:HP_Gun', turret: extents}],
+            [{id: 'hardpoint:HP_Gun', partId: 'hp:HP_Gun', turret: extents}]);
 
         assert.equal(sweeps.length, 1);
     });
 
     it('leaves out a turret that declares no bone to turn', () => {
         assert.deepEqual(turretSweeps(
-            [{ id: 'HP', partId: 'hull', turret: { rotateExtentDegrees: 90 } }], []), []);
+            [{id: 'HP', partId: 'hull', turret: {rotateExtentDegrees: 90}}], []), []);
     });
 
     it('leaves out a turret with no traverse at all', () => {
         // 53 of foc's weapon objects declare the extents and the rest do not. Sweeping one that
         // declares neither would claim a reach it has not got.
         assert.deepEqual(turretSweeps(
-            [{ id: 'HP', partId: 'hull', turret: { turretBone: 'B_Turret' } }], []), []);
+            [{id: 'HP', partId: 'hull', turret: {turretBone: 'B_Turret'}}], []), []);
     });
 });
 
@@ -227,7 +246,7 @@ describe('turretSweeps, keyed back to what declared them', () => {
         const sweeps = turretSweeps([{
             id: 'HP_Turret',
             partId: 'HP_Turret',
-            turret: { turretBone: 'Turret_01', rotateExtentDegrees: 180 },
+            turret: {turretBone: 'Turret_01', rotateExtentDegrees: 180},
         }], []);
 
         assert.equal(sweeps.length, 1);
@@ -238,8 +257,8 @@ describe('turretSweeps, keyed back to what declared them', () => {
         // A hardpoint and the weapon on it can both declare the turret. They are de-duplicated by
         // part and bone, and the surviving entry must still name a source the panel can match.
         const sweeps = turretSweeps(
-            [{ id: 'HP_Turret', partId: 'p', turret: { turretBone: 'T', rotateExtentDegrees: 90 } }],
-            [{ id: 'weapon:A', partId: 'p', turret: { turretBone: 'T', rotateExtentDegrees: 90 } }]);
+            [{id: 'HP_Turret', partId: 'p', turret: {turretBone: 'T', rotateExtentDegrees: 90}}],
+            [{id: 'weapon:A', partId: 'p', turret: {turretBone: 'T', rotateExtentDegrees: 90}}]);
 
         assert.equal(sweeps.length, 1);
         assert.equal(sweeps[0].id, 'HP_Turret');

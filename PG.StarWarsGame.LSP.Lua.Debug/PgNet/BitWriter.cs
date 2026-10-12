@@ -75,7 +75,7 @@ public sealed class BitWriter
         ArgumentNullException.ThrowIfNull(buffer);
         var span = buffer.Span;
         for (var bit = 0; bit < buffer.BitCount; bit++)
-            AppendBit((span[bit / 8] >> (bit % 8) & 1) != 0);
+            AppendBit(((span[bit / 8] >> (bit % 8)) & 1) != 0);
     }
 
     public byte[] ToArray()

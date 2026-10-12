@@ -34,9 +34,9 @@ const BAND_HALF_WIDTH = 26;
 
 /** Octaves, coarsest first: the lattice period in cells, and how much each contributes. */
 const OCTAVES: readonly { period: number; weight: number }[] = [
-    { period: 4, weight: 0.5 },
-    { period: 16, weight: 0.32 },
-    { period: 64, weight: 0.18 },
+    {period: 4, weight: 0.5},
+    {period: 16, weight: 0.32},
+    {period: 64, weight: 0.18},
 ];
 
 /**
@@ -90,7 +90,7 @@ export function concreteNoise(): Uint8ClampedArray {
             let sum = 0;
             let total = 0;
 
-            for (const { period, weight } of OCTAVES) {
+            for (const {period, weight} of OCTAVES) {
                 sum += octave(u, v, period) * weight;
                 total += weight;
             }

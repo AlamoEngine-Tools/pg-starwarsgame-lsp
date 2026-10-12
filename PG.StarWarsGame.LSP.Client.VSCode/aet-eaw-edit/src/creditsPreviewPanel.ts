@@ -3,9 +3,7 @@
 
 import * as vscode from 'vscode';
 
-import {
-    PanelRegistry, panelKey, WebviewMessage, WebviewPanelHost,
-} from './webviewPanelHost';
+import {panelKey, PanelRegistry, WebviewMessage, WebviewPanelHost,} from './webviewPanelHost';
 
 /**
  * The credits crawl in its own tab beside the editor, the way a Markdown or LaTeX preview opens.
@@ -41,7 +39,9 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
                 this._pending = null;
             }
         }
-        if (msg.type === 'close') { this.dispose(); }
+        if (msg.type === 'close') {
+            this.dispose();
+        }
     }
 
     /**
@@ -78,6 +78,10 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
     }
 
     private _send(payload: unknown): void {
-        if (this._ready) { this.post(payload); } else { this._pending = payload; }
+        if (this._ready) {
+            this.post(payload);
+        } else {
+            this._pending = payload;
+        }
     }
 }

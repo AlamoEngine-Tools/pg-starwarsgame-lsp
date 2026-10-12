@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    createLabelSizer, fitLabel, labelLayout, LINE_RATIO, linesThatFit, MIN_LABEL_PX, wrapLabel,
-} from './lodLabel';
+import {createLabelSizer, fitLabel, labelLayout, LINE_RATIO, linesThatFit, MIN_LABEL_PX, wrapLabel,} from './lodLabel';
 
 describe('fitLabel', () => {
     // One character is one unit wide here, so the arithmetic is obvious in the assertions.
@@ -41,7 +39,7 @@ describe('labelLayout', () => {
     // The case that started this: a 35-character name in a node roughly 63 x 36.
     it('trades size for lines so a long name fits the node', () => {
         const name = 'Story_Empire_Intro_Capture_Alderaan';
-        const { fontPx, maxLines } = labelLayout(name, 63, 36, ADVANCE, 13);
+        const {fontPx, maxLines} = labelLayout(name, 63, 36, ADVANCE, 13);
         assert.ok(fontPx >= MIN_LABEL_PX, `font ${fontPx} below the floor`);
         const lines = wrapLabel(name, 63, maxLines, s => s.length * ADVANCE * fontPx);
         assert.equal(lines.join(''), name, `dropped text: ${JSON.stringify(lines)}`);
@@ -51,7 +49,7 @@ describe('labelLayout', () => {
     // underscores leaves every line short of the nominal capacity.
     it('accounts for the ragged ends that separator breaks leave', () => {
         const name = 'Story_Empire_Intro_Capture_Alderaan';
-        const { fontPx, maxLines } = labelLayout(name, 63, 36, ADVANCE, 13);
+        const {fontPx, maxLines} = labelLayout(name, 63, 36, ADVANCE, 13);
         const perLine = Math.floor(63 / (ADVANCE * fontPx));
         assert.ok(perLine * maxLines > name.length,
             'expected the chosen size to leave slack a grid calculation would have spent');
@@ -60,7 +58,7 @@ describe('labelLayout', () => {
     it('reports the lines that actually fit the height', () => {
         // 50 chars fit the cap exactly: 10 per line across 60 / (10 * 1.15) = 5 lines.
         assert.deepEqual(labelLayout('a'.repeat(50), 50, 60, ADVANCE, 10),
-            { fontPx: 10, maxLines: 5 });
+            {fontPx: 10, maxLines: 5});
     });
 
     // Past this the text is texture, not a label - better to truncate than to render a smudge.
@@ -107,7 +105,7 @@ describe('createLabelSizer', () => {
     it('never returns a layout taller than the box it was asked about', () => {
         const sizer = createLabelSizer(LONGEST, ADVANCE, 13);
         for (let height = 12; height <= 400; height += 7) {
-            const { fontPx, maxLines } = sizer(60, height);
+            const {fontPx, maxLines} = sizer(60, height);
             const block = (maxLines - 1) * fontPx * LINE_RATIO + fontPx;
             assert.ok(block <= Math.max(height, fontPx),
                 `${maxLines} lines at ${fontPx}px is ${block.toFixed(1)}px, inside a ${height}px box`);

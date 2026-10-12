@@ -2,19 +2,29 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { PreviewAbility, PreviewParticle } from '../../protocol/modelPreview';
+import type {PreviewAbility, PreviewParticle} from '../../protocol/modelPreview';
 
 import {
-    abilityAllows, abilityBarTitle, abilityClaims, abilityFacts, abilityOwnership, abilityProxies,
-    abilityRows, clipFor, gotoDefinitionTitle, revealsShield, revealsStealth, shieldRevealed,
+    abilityAllows,
+    abilityBarTitle,
+    abilityClaims,
+    abilityFacts,
+    abilityOwnership,
+    abilityProxies,
+    abilityRows,
+    clipFor,
+    gotoDefinitionTitle,
+    revealsShield,
+    revealsStealth,
+    shieldRevealed,
     stealthed,
     unboundEffectIds,
 } from './abilityRows';
 
 function ability(over: Partial<PreviewAbility> = {}): PreviewAbility {
-    return { type: 'TURBO', proxyNames: [], modifiers: [], ...over };
+    return {type: 'TURBO', proxyNames: [], modifiers: [], ...over};
 }
 
 function particle(id: string, bone: string, claimsAbility?: string): PreviewParticle {
@@ -72,14 +82,14 @@ describe('unboundEffectIds', () => {
     ];
 
     it('names the effects whose ability the unit never declares', () => {
-        const unbound = unboundEffectIds([ability({ type: 'POWER_TO_WEAPONS' })], TARTAN);
+        const unbound = unboundEffectIds([ability({type: 'POWER_TO_WEAPONS'})], TARTAN);
 
         assert.deepEqual([...unbound].sort(), ['lrg', 'sml']);
     });
 
     it('leaves an effect alone once the unit declares its ability', () => {
         const unbound = unboundEffectIds(
-            [ability({ type: 'POWER_TO_WEAPONS' }), ability({ type: 'TURBO' })], TARTAN);
+            [ability({type: 'POWER_TO_WEAPONS'}), ability({type: 'TURBO'})], TARTAN);
 
         assert.equal(unbound.size, 0);
     });
@@ -94,7 +104,7 @@ describe('unboundEffectIds', () => {
 
     it('never touches an ordinary effect', () => {
         // 5404 proxies claim nothing against 39 that do. A claim of null is not an unbound claim.
-        for (const declared of [[], [ability({ type: 'TURBO' })]]) {
+        for (const declared of [[], [ability({type: 'TURBO'})]]) {
             assert.equal(unboundEffectIds(declared, TARTAN).has('glow'), false);
         }
     });
@@ -102,7 +112,7 @@ describe('unboundEffectIds', () => {
     it('matches the ability type without regard to case', () => {
         // `Ev_acclamator` writes `power_to_weapons` in lower case, and the proxy names are written
         // both ways too - `pptw_2mtank` beside `PTE_Corvetteengines`.
-        const unbound = unboundEffectIds([ability({ type: 'power_to_weapons' })], TARTAN);
+        const unbound = unboundEffectIds([ability({type: 'power_to_weapons'})], TARTAN);
 
         assert.equal(unbound.has('pptw'), false);
     });
@@ -111,7 +121,7 @@ describe('unboundEffectIds', () => {
 describe('abilityProxies', () => {
     it('resolves a proxy BONE NAME to the particle ids on it', () => {
         const map = abilityProxies(
-            [ability({ type: 'TURBO', proxyNames: ['PTE_Corvetteengines'] })],
+            [ability({type: 'TURBO', proxyNames: ['PTE_Corvetteengines']})],
             [particle('p1', 'PTE_Corvetteengines'), particle('p2', 'p_engine_glow')]);
 
         assert.deepEqual(map.get('TURBO'), ['p1']);
@@ -121,7 +131,7 @@ describe('abilityProxies', () => {
         // Proxy names repeat - a Star Destroyer has twenty of one name - so a bone name is not an
         // identity. Binding only the first would leave nineteen engines dark.
         const map = abilityProxies(
-            [ability({ proxyNames: ['PTE_X'] })],
+            [ability({proxyNames: ['PTE_X']})],
             [particle('p1', 'PTE_X'), particle('p2', 'PTE_X')]);
 
         assert.deepEqual(map.get('TURBO'), ['p1', 'p2']);
@@ -129,7 +139,7 @@ describe('abilityProxies', () => {
 
     it('matches the bone name however either side cased it', () => {
         const map = abilityProxies(
-            [ability({ proxyNames: ['pte_corvetteengines'] })],
+            [ability({proxyNames: ['pte_corvetteengines']})],
             [particle('p1', 'PTE_Corvetteengines')]);
 
         assert.deepEqual(map.get('TURBO'), ['p1']);
@@ -143,7 +153,7 @@ describe('abilityProxies', () => {
 
 describe('abilityAllows', () => {
     const proxies = abilityProxies(
-        [ability({ type: 'TURBO', proxyNames: ['PTE_X'] })],
+        [ability({type: 'TURBO', proxyNames: ['PTE_X']})],
         [particle('p1', 'PTE_X'), particle('p2', 'p_smoke')]);
 
     it('holds an ability proxy off while its ability is inactive', () => {
@@ -163,8 +173,8 @@ describe('abilityAllows', () => {
 
     it('holds a proxy claimed by two abilities until ONE of them is active', () => {
         const shared = abilityProxies([
-            ability({ type: 'TURBO', proxyNames: ['PTE_X'] }),
-            ability({ type: 'SPRINT', proxyNames: ['PTE_X'] }),
+            ability({type: 'TURBO', proxyNames: ['PTE_X']}),
+            ability({type: 'SPRINT', proxyNames: ['PTE_X']}),
         ], [particle('p1', 'PTE_X')]);
 
         assert.equal(abilityAllows('p1', shared, new Set()), false);
@@ -174,8 +184,8 @@ describe('abilityAllows', () => {
 
 describe('abilityOwnership', () => {
     const proxies = abilityProxies([
-        ability({ type: 'TURBO', proxyNames: ['PTE_X'] }),
-        ability({ type: 'POWER_TO_WEAPONS', proxyNames: ['PPTW_Y'] }),
+        ability({type: 'TURBO', proxyNames: ['PTE_X']}),
+        ability({type: 'POWER_TO_WEAPONS', proxyNames: ['PPTW_Y']}),
     ], [particle('p1', 'PTE_X'), particle('p2', 'PPTW_Y'), particle('p3', 'p_smoke')]);
 
     it('names the systems the ability itself drives', () => {
@@ -235,38 +245,38 @@ describe('clipFor', () => {
     });
 
     it('takes the extension off however it was written', () => {
-        assert.equal(clipFor(ability({ deployClip: 'A_Deploy_00.ALA' }), true), 'A_Deploy_00');
+        assert.equal(clipFor(ability({deployClip: 'A_Deploy_00.ALA'}), true), 'A_Deploy_00');
     });
 
     it('leaves a name that is already a stem alone', () => {
         // Nothing guarantees a mod writes the extension, and stripping a suffix that is not there
         // must not eat part of the name.
-        assert.equal(clipFor(ability({ deployClip: 'rv_xwing_deploy_00' }), true),
+        assert.equal(clipFor(ability({deployClip: 'rv_xwing_deploy_00'}), true),
             'rv_xwing_deploy_00');
     });
 
     it('only takes off an ALA extension, not any trailing dot', () => {
-        assert.equal(clipFor(ability({ deployClip: 'weird.name_00' }), true), 'weird.name_00');
+        assert.equal(clipFor(ability({deployClip: 'weird.name_00'}), true), 'weird.name_00');
     });
 
     it('plays nothing when the model ships no clip for that direction', () => {
         // 25 models in foc ship a deploy and only 23 the matching undeploy - the X-Wing is one that
         // ships a deploy with NO undeploy - so switching it off must simply not call for a clip
         // rather than replaying the deploy backwards or throwing.
-        const oneWay = ability({ deployClip: 'x_deploy_00.ala', undeployClip: null });
+        const oneWay = ability({deployClip: 'x_deploy_00.ala', undeployClip: null});
 
         assert.equal(clipFor(oneWay, true), 'x_deploy_00');
         assert.equal(clipFor(oneWay, false), null);
         assert.equal(clipFor(ability(), true), null);
-        assert.equal(clipFor(ability({ deployClip: '   ' }), true), null);
+        assert.equal(clipFor(ability({deployClip: '   '}), true), null);
     });
 });
 
 describe('abilityRows', () => {
     it('names a row the way the command bar does, and its type otherwise', () => {
         const rows = abilityRows([
-            ability({ type: 'TURBO', name: 'Turbo Boost' }),
-            ability({ type: 'SPREAD_OUT' }),
+            ability({type: 'TURBO', name: 'Turbo Boost'}),
+            ability({type: 'SPREAD_OUT'}),
         ], new Map());
 
         assert.deepEqual(rows.map(r => r.label), ['Turbo Boost', 'SPREAD_OUT']);
@@ -279,7 +289,7 @@ describe('abilityRows', () => {
         // identifier where the reader expects the words the game shows - and it is present on 39%
         // of abilities, so it was the common case.
         const rows = abilityRows(
-            [ability({ type: 'TURBO', guiName: 'Corvette_Turbo_Ability' })], new Map());
+            [ability({type: 'TURBO', guiName: 'Corvette_Turbo_Ability'})], new Map());
 
         assert.equal(rows[0].label, 'TURBO');
     });
@@ -299,8 +309,8 @@ describe('abilityRows', () => {
         // The name is a reference, and resolving it is the server's job - the row only carries it
         // so the panel knows whether there is anything to offer.
         const [named, unnamed] = abilityRows([
-            ability({ type: 'TURBO', guiName: 'Corvette_Turbo_Ability' }),
-            ability({ type: 'SPREAD_OUT' }),
+            ability({type: 'TURBO', guiName: 'Corvette_Turbo_Ability'}),
+            ability({type: 'SPREAD_OUT'}),
         ], new Map());
 
         assert.equal(named.definition, 'Corvette_Turbo_Ability');
@@ -310,13 +320,13 @@ describe('abilityRows', () => {
     it('ignores a blank GUI name rather than offering a jump to nothing', () => {
         // The shipped data writes the tag empty in places - Groundvehicles.xml has one with only
         // whitespace between the tags.
-        assert.equal(abilityRows([ability({ guiName: '  ' })], new Map())[0].definition, null);
+        assert.equal(abilityRows([ability({guiName: '  '})], new Map())[0].definition, null);
     });
 
     it('marks a row that drives nothing on the model', () => {
         // SPREAD_OUT and HUNT are orders. Most of the 68 types are, so the row says so rather than
         // offering a switch that would visibly do nothing.
-        const rows = abilityRows([ability({ type: 'SPREAD_OUT' })], new Map());
+        const rows = abilityRows([ability({type: 'SPREAD_OUT'})], new Map());
 
         assert.equal(rows[0].drivesSomething, false);
         assert.match(rows[0].title, /nothing on this model/i);
@@ -324,7 +334,7 @@ describe('abilityRows', () => {
 
     it('counts a row as driving something when it has proxies', () => {
         const rows = abilityRows(
-            [ability({ proxyNames: ['PTE_X'] })], new Map([['TURBO', ['p1', 'p2']]]));
+            [ability({proxyNames: ['PTE_X']})], new Map([['TURBO', ['p1', 'p2']]]));
 
         assert.equal(rows[0].drivesSomething, true);
         assert.equal(rows[0].proxyCount, 2);
@@ -333,7 +343,7 @@ describe('abilityRows', () => {
 
     it('counts a clip as driving something even with no proxies at all', () => {
         // SPOILER_LOCK is the X-Wing: a clip and nothing else.
-        const rows = abilityRows([ability({ deployClip: 'x_deploy_00.ala' })], new Map());
+        const rows = abilityRows([ability({deployClip: 'x_deploy_00.ala'})], new Map());
 
         assert.equal(rows[0].drivesSomething, true);
         assert.match(rows[0].detail, /deploy/);
@@ -341,14 +351,14 @@ describe('abilityRows', () => {
 
     it('counts a bone or a declared particle as driving something', () => {
         assert.equal(abilityRows(
-            [ability({ ownerAttachmentBone: 'B_Trooper_00' })], new Map())[0].drivesSomething, true);
+            [ability({ownerAttachmentBone: 'B_Trooper_00'})], new Map())[0].drivesSomething, true);
         assert.equal(abilityRows(
-            [ability({ particleEffect: 'Home_One_Target' })], new Map())[0].drivesSomething, true);
+            [ability({particleEffect: 'Home_One_Target'})], new Map())[0].drivesSomething, true);
     });
 
     it('reads out the cadence it declares', () => {
         const rows = abilityRows(
-            [ability({ rechargeSeconds: 60, expirationSeconds: 5 })], new Map());
+            [ability({rechargeSeconds: 60, expirationSeconds: 5})], new Map());
 
         assert.match(rows[0].detail, /60s recharge/);
         assert.match(rows[0].detail, /5s/);
@@ -364,8 +374,8 @@ describe('abilityRows', () => {
         const rows = abilityRows([ability({
             type: 'DEFEND',
             modifiers: [
-                { stat: 'WEAPON_DELAY_MULTIPLIER', factor: 3 },
-                { stat: 'SPEED_MULTIPLIER', factor: 0.8 },
+                {stat: 'WEAPON_DELAY_MULTIPLIER', factor: 3},
+                {stat: 'SPEED_MULTIPLIER', factor: 0.8},
             ],
         })], new Map());
 
@@ -377,7 +387,7 @@ describe('abilityRows', () => {
         // There is nothing to show, so there is nothing to toggle. A disabled control there implied
         // the ability was broken rather than invisible.
         const rows = abilityRows([ability({
-            modifiers: [{ stat: 'SPEED_MULTIPLIER', factor: 0.8 }],
+            modifiers: [{stat: 'SPEED_MULTIPLIER', factor: 0.8}],
         })], new Map());
 
         assert.equal(rows[0].drivesSomething, false);
@@ -386,7 +396,7 @@ describe('abilityRows', () => {
 
 describe('abilityClaims', () => {
     const proxies = abilityProxies(
-        [ability({ type: 'TURBO', proxyNames: ['PTE_X'] })],
+        [ability({type: 'TURBO', proxyNames: ['PTE_X']})],
         [particle('p1', 'PTE_X'), particle('p2', 'p_smoke')]);
 
     it('says which proxies an ability owns', () => {
@@ -425,14 +435,14 @@ describe('abilities that reveal the shield mesh', () => {
     it('makes such an ability worth a switch even with no proxy or clip', () => {
         // The whole point: DEFEND declares no proxy, no bone, no particle and no clip. Without this
         // it read `drivesSomething: false` and got a dead control.
-        const rows = abilityRows([ability({ type: 'DEFEND' })], new Map());
+        const rows = abilityRows([ability({type: 'DEFEND'})], new Map());
 
         assert.equal(rows[0].drivesSomething, true);
         assert.match(rows[0].detail, /shield/i);
     });
 
     it('says nothing about the shield for an ability that does not reveal it', () => {
-        assert.doesNotMatch(abilityRows([ability({ type: 'TURBO' })], new Map())[0].detail, /shield/i);
+        assert.doesNotMatch(abilityRows([ability({type: 'TURBO'})], new Map())[0].detail, /shield/i);
     });
 });
 
@@ -442,7 +452,7 @@ describe('abilities that cloak the unit', () => {
         // `GUI_Activated_Ability_Name` and nothing else - no proxy, no bone, no particle, no clip -
         // so the key rendered disabled and the cloak could never be engaged. Exactly the shape
         // DEFEND was in before the shield got its own clause.
-        const rows = abilityRows([ability({ type: 'STEALTH' })], new Map());
+        const rows = abilityRows([ability({type: 'STEALTH'})], new Map());
 
         assert.equal(rows[0].drivesSomething, true);
         assert.match(rows[0].detail, /stealth mesh/i);
@@ -450,7 +460,7 @@ describe('abilities that cloak the unit', () => {
 
     it('does the same for the other type that cloaks', () => {
         // `Luke_Skywalker_Jedi` declares FORCE_CLOAK, which shares no word with STEALTH.
-        const rows = abilityRows([ability({ type: 'FORCE_CLOAK' })], new Map());
+        const rows = abilityRows([ability({type: 'FORCE_CLOAK'})], new Map());
 
         assert.equal(rows[0].drivesSomething, true);
         assert.match(rows[0].detail, /stealth mesh/i);
@@ -458,7 +468,7 @@ describe('abilities that cloak the unit', () => {
 
     it('says nothing about the shell for an ability that does not cloak', () => {
         assert.doesNotMatch(
-            abilityRows([ability({ type: 'TURBO' })], new Map())[0].detail, /stealth/i);
+            abilityRows([ability({type: 'TURBO'})], new Map())[0].detail, /stealth/i);
     });
 });
 
@@ -477,7 +487,7 @@ describe('shieldRevealed', () => {
 describe('gotoDefinitionTitle', () => {
     it('says what will open', () => {
         const [row] = abilityRows(
-            [ability({ type: 'TURBO', guiName: 'Corvette_Turbo_Ability' })], new Map());
+            [ability({type: 'TURBO', guiName: 'Corvette_Turbo_Ability'})], new Map());
 
         assert.match(gotoDefinitionTitle(row), /Corvette_Turbo_Ability/);
     });
@@ -485,7 +495,7 @@ describe('gotoDefinitionTitle', () => {
     it('says WHY it cannot, rather than leaving a dead control unexplained', () => {
         // The button stays on the row when there is nothing to open - a control that came and went
         // per row would teach nobody it exists - so the title is the whole of the explanation.
-        const [row] = abilityRows([ability({ type: 'SPREAD_OUT' })], new Map());
+        const [row] = abilityRows([ability({type: 'SPREAD_OUT'})], new Map());
 
         assert.match(gotoDefinitionTitle(row), /SPREAD_OUT/);
         assert.match(gotoDefinitionTitle(row), /nothing to open/i);
@@ -497,13 +507,13 @@ describe('abilityBarTitle', () => {
         // The bar draws an ICON, so the tooltip is the only place the name appears at all. The
         // type stays because it is what binds a proxy and what a modder searches for.
         const [row] = abilityRows(
-            [ability({ type: 'LUCKY_SHOT', name: 'Lucky Shot' })], new Map());
+            [ability({type: 'LUCKY_SHOT', name: 'Lucky Shot'})], new Map());
 
         assert.match(abilityBarTitle(row), /^Lucky Shot \(LUCKY_SHOT\)/);
     });
 
     it('does not repeat the type when that is all the row has', () => {
-        const [row] = abilityRows([ability({ type: 'SPREAD_OUT' })], new Map());
+        const [row] = abilityRows([ability({type: 'SPREAD_OUT'})], new Map());
 
         assert.equal(abilityBarTitle(row).split('\n')[0], 'SPREAD_OUT');
     });
@@ -521,7 +531,7 @@ describe('abilityBarTitle', () => {
     });
 
     it('says an order drives nothing, since its key is disabled and must explain itself', () => {
-        const [row] = abilityRows([ability({ type: 'SPREAD_OUT' })], new Map());
+        const [row] = abilityRows([ability({type: 'SPREAD_OUT'})], new Map());
 
         assert.match(abilityBarTitle(row), /nothing on this model/i);
     });
@@ -539,7 +549,7 @@ describe('abilityFacts', () => {
      * the modder's measurements ran together into one paragraph with no seam.
      */
     it('is a LIST of labelled values, like the hardpoint card`s', () => {
-        const facts = abilityFacts(row({ rechargeSeconds: 60, expirationSeconds: 15 }));
+        const facts = abilityFacts(row({rechargeSeconds: 60, expirationSeconds: 15}));
 
         assert.ok(facts.every(pair => pair.length === 2), 'label and value');
         assert.ok(facts.some(([label]) => /recharge/i.test(label)));
@@ -550,7 +560,7 @@ describe('abilityFacts', () => {
         // guiName is on 39% of shipped abilities and is what a jump resolves. It belongs in the
         // facts, never as the card's title - that mistake is what put Corvette_Turbo_Ability where
         // the reader expected "Turbo Boost".
-        const facts = abilityFacts(row({ guiName: 'Executor_Tractor_Beam_Attack_Ability' }));
+        const facts = abilityFacts(row({guiName: 'Executor_Tractor_Beam_Attack_Ability'}));
 
         assert.ok(facts.some(([, value]) => value === 'Executor_Tractor_Beam_Attack_Ability'));
     });

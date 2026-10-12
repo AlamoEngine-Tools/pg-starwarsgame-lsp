@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 
-import { projectSettingsFrom, type ProjectSettings } from './webview/preview/projectSettings';
+import {type ProjectSettings, projectSettingsFrom} from './webview/preview/projectSettings';
 
 /**
  * What the preview remembers about THIS PROJECT: the weapon bench, the faction and its colour.
@@ -50,5 +50,6 @@ export function saveProjectSettings(settings: unknown): void {
     }
 
     void Promise.resolve(store.update(KEY, projectSettingsFrom(settings)))
-        .then(undefined, () => { /* a saved weapon is not worth reporting a failure over */ });
+        .then(undefined, () => { /* a saved weapon is not worth reporting a failure over */
+        });
 }

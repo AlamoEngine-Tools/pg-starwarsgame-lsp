@@ -2,13 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { filterProblems, resolveProblemJump } from './problemFilter';
+import {filterProblems, resolveProblemJump} from './problemFilter';
 
-interface Row { id: string | null; message: string }
+interface Row {
+    id: string | null;
+    message: string
+}
 
-const row = (id: string | null, message = 'anything'): Row => ({ id, message });
+const row = (id: string | null, message = 'anything'): Row => ({id, message});
 
 /** The story graph's shape of predicate: a row belongs to the view when its node is on screen. */
 const inGraph = (...ids: string[]) =>

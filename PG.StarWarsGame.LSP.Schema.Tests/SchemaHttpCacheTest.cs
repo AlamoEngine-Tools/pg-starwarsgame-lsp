@@ -85,37 +85,6 @@ public sealed class SchemaHttpCacheTest
         Assert.True(recording.FileWrittenWhileHeld, "the file was written outside the lock");
     }
 
-    /// <summary>
-    ///     Notes whether the watched file appeared or changed between Acquire and Dispose - the
-    ///     only observable "was the write inside the lock" a unit test has.
-    /// </summary>
-    private sealed class RecordingLock(MockFileSystem fs, string watchedFile) : ICrossProcessLock
-    {
-        public readonly List<string> Acquired = [];
-        public bool FileWrittenWhileHeld { get; private set; }
-
-        public IDisposable Acquire(string name)
-        {
-            Acquired.Add(name);
-            var existedBefore = fs.File.Exists(watchedFile);
-            var contentBefore = existedBefore ? fs.File.ReadAllBytes(watchedFile) : [];
-            return new Release(() =>
-            {
-                if (fs.File.Exists(watchedFile)
-                    && (!existedBefore || !contentBefore.SequenceEqual(fs.File.ReadAllBytes(watchedFile))))
-                    FileWrittenWhileHeld = true;
-            });
-        }
-
-        private sealed class Release(Action onDispose) : IDisposable
-        {
-            public void Dispose()
-            {
-                onDispose();
-            }
-        }
-    }
-
     // ── TryLoad ──────────────────────────────────────────────────────────────
 
     [Fact]
@@ -357,5 +326,36 @@ public sealed class SchemaHttpCacheTest
     public void TryLoadIndexJson_ReturnsFalse_WhenNothingWasCached()
     {
         Assert.False(BuildCache(new MockFileSystem()).TryLoadIndexJson(out _));
+    }
+
+    /// <summary>
+    ///     Notes whether the watched file appeared or changed between Acquire and Dispose - the
+    ///     only observable "was the write inside the lock" a unit test has.
+    /// </summary>
+    private sealed class RecordingLock(MockFileSystem fs, string watchedFile) : ICrossProcessLock
+    {
+        public readonly List<string> Acquired = [];
+        public bool FileWrittenWhileHeld { get; private set; }
+
+        public IDisposable Acquire(string name)
+        {
+            Acquired.Add(name);
+            var existedBefore = fs.File.Exists(watchedFile);
+            var contentBefore = existedBefore ? fs.File.ReadAllBytes(watchedFile) : [];
+            return new Release(() =>
+            {
+                if (fs.File.Exists(watchedFile)
+                    && (!existedBefore || !contentBefore.SequenceEqual(fs.File.ReadAllBytes(watchedFile))))
+                    FileWrittenWhileHeld = true;
+            });
+        }
+
+        private sealed class Release(Action onDispose) : IDisposable
+        {
+            public void Dispose()
+            {
+                onDispose();
+            }
+        }
     }
 }

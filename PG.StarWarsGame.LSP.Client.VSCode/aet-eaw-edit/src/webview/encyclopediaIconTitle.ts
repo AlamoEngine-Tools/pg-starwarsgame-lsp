@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import { EncyclopediaIcon } from '../protocol/encyclopedia';
+import {EncyclopediaIcon} from '../protocol/encyclopedia';
 
 /**
  * Hover text for the card's portrait, naming where its pixels came from.

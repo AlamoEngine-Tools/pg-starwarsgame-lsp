@@ -12,7 +12,7 @@
 // `project_preview_effect_rows`. Nothing here needs to know about it beyond routing visibility
 // through the same call every other effect uses.
 
-import type { PreviewAbility, PreviewParticle } from '../../protocol/modelPreview';
+import type {PreviewAbility, PreviewParticle} from '../../protocol/modelPreview';
 
 /** One row in the Gameplay dock's Abilities section. */
 export interface AbilityRow {

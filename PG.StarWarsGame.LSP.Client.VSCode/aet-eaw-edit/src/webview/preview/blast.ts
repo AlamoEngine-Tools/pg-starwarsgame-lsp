@@ -11,7 +11,7 @@
 // 10 declare `_Dropoff` with `_Dropoff_Tiers` of 3, 4 or 5, and `_Max_Victims` appears on 2. So a
 // flat blast inside a radius is the normal case and tiered falloff is the exception.
 
-import type { PreviewProjectile } from '../../protocol/modelPreview';
+import type {PreviewProjectile} from '../../protocol/modelPreview';
 
 /** A hardpoint and how far it is from where the shot landed, in engine units. */
 export interface BlastCandidate {
@@ -79,7 +79,7 @@ export function blastVictims(
     // nothing on screen to say why. The rule above already said the target is always included.
     const withTarget = candidates.some(c => c.id === targetId)
         ? candidates
-        : [{ id: targetId, distance: 0 }, ...candidates];
+        : [{id: targetId, distance: 0}, ...candidates];
 
     // Everything in range, INCLUDING what is already destroyed. The engine collects the blast's
     // victims by `Is_Destroyable` and never asks `Is_Destroyed`, so a dead hardpoint still draws its

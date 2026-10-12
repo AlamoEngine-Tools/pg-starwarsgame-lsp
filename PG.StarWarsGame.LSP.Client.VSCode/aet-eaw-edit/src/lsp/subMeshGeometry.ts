@@ -11,8 +11,8 @@
 // Free of `vscode` on purpose: it needs the gateway and nothing else, which is what lets it be
 // tested at all.
 
-import { type LspGateway } from './lspGateway';
-import { type GetSubMeshGeometryResult } from '../protocol/modelPreview';
+import {type LspGateway} from './lspGateway';
+import {type GetSubMeshGeometryResult} from '../protocol/modelPreview';
 
 /** A message from a webview: a tagged bag whose fields are checked rather than trusted. */
 interface GeometryRequest {
@@ -48,6 +48,6 @@ export async function subMeshGeometryReply(
         // A failure travels in the same slot the page would have: the panel that asked has one
         // place to look, and a dead server reads as a stated reason instead of a table that never
         // arrives.
-        result: result.ok ? result.value : { page: null, error: result.message },
+        result: result.ok ? result.value : {page: null, error: result.message},
     };
 }

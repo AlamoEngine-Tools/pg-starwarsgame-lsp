@@ -2,31 +2,31 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { creditsBaselineSeed, creditsFileSeed } from './creditsSeed';
+import {creditsBaselineSeed, creditsFileSeed} from './creditsSeed';
 
 const baseline = [
     {
         key: 'HEADER',
-        values: [{ language: 'ENGLISH', value: 'Voice Cast' }, { language: 'GERMAN', value: 'Sprecher' }],
+        values: [{language: 'ENGLISH', value: 'Voice Cast'}, {language: 'GERMAN', value: 'Sprecher'}],
     },
     {
         key: 'CENTER',
-        values: [{ language: 'ENGLISH', value: 'Petroglyph' }, { language: 'GERMAN', value: 'Petroglyph' }],
+        values: [{language: 'ENGLISH', value: 'Petroglyph'}, {language: 'GERMAN', value: 'Petroglyph'}],
     },
     {
         key: 'CENTER',
-        values: [{ language: 'ENGLISH', value: '[TBL]' }, { language: 'GERMAN', value: '[TBL]' }],
+        values: [{language: 'ENGLISH', value: '[TBL]'}, {language: 'GERMAN', value: '[TBL]'}],
     },
 ];
 
 describe('creditsBaselineSeed', () => {
     it('takes the game\'s credits for the language, in crawl order', () => {
         assert.deepEqual(creditsBaselineSeed('GERMAN', baseline), [
-            { key: 'HEADER', value: 'Sprecher' },
-            { key: 'CENTER', value: 'Petroglyph' },
-            { key: 'CENTER', value: '[TBL]' },
+            {key: 'HEADER', value: 'Sprecher'},
+            {key: 'CENTER', value: 'Petroglyph'},
+            {key: 'CENTER', value: '[TBL]'},
         ]);
     });
 
@@ -44,12 +44,15 @@ describe('creditsBaselineSeed', () => {
     // An empty line is dropped by the export anyway, so seeding one only makes a row to delete.
     it('leaves out lines the game does not have in this language', () => {
         const partial = [
-            { key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Voice Cast' }, { language: 'GERMAN', value: '' }] },
-            { key: 'CENTER', values: [{ language: 'ENGLISH', value: 'Petroglyph' }, { language: 'GERMAN', value: 'Petroglyph' }] },
+            {key: 'HEADER', values: [{language: 'ENGLISH', value: 'Voice Cast'}, {language: 'GERMAN', value: ''}]},
+            {
+                key: 'CENTER',
+                values: [{language: 'ENGLISH', value: 'Petroglyph'}, {language: 'GERMAN', value: 'Petroglyph'}]
+            },
         ];
 
         assert.deepEqual(creditsBaselineSeed('GERMAN', partial), [
-            { key: 'CENTER', value: 'Petroglyph' },
+            {key: 'CENTER', value: 'Petroglyph'},
         ]);
     });
 
@@ -68,18 +71,18 @@ describe('creditsBaselineSeed', () => {
 
 describe('creditsFileSeed', () => {
     const english = [
-        { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Voice Cast' }] },
-        { index: 1, key: 'CENTER', values: [{ language: 'ENGLISH', value: 'ALICE' }] },
-        { index: 2, key: 'CENTER', values: [{ language: 'ENGLISH', value: '[TBL]' }] },
-        { index: 3, key: 'CENTER', values: [{ language: 'ENGLISH', value: 'BOB' }] },
+        {index: 0, key: 'HEADER', values: [{language: 'ENGLISH', value: 'Voice Cast'}]},
+        {index: 1, key: 'CENTER', values: [{language: 'ENGLISH', value: 'ALICE'}]},
+        {index: 2, key: 'CENTER', values: [{language: 'ENGLISH', value: '[TBL]'}]},
+        {index: 3, key: 'CENTER', values: [{language: 'ENGLISH', value: 'BOB'}]},
     ];
 
     it('copies every line, in the order the source file has them', () => {
         assert.deepEqual(creditsFileSeed(english, 'ENGLISH'), [
-            { key: 'HEADER', value: 'Voice Cast' },
-            { key: 'CENTER', value: 'ALICE' },
-            { key: 'CENTER', value: '[TBL]' },
-            { key: 'CENTER', value: 'BOB' },
+            {key: 'HEADER', value: 'Voice Cast'},
+            {key: 'CENTER', value: 'ALICE'},
+            {key: 'CENTER', value: '[TBL]'},
+            {key: 'CENTER', value: 'BOB'},
         ]);
     });
 
@@ -94,13 +97,13 @@ describe('creditsFileSeed', () => {
     // template, and a line it leaves blank is still a line of the running order.
     it('keeps a line the source says nothing in, so the order survives', () => {
         const withGap = [
-            { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Voice Cast' }] },
-            { index: 1, key: 'CENTER', values: [{ language: 'ENGLISH', value: '' }] },
+            {index: 0, key: 'HEADER', values: [{language: 'ENGLISH', value: 'Voice Cast'}]},
+            {index: 1, key: 'CENTER', values: [{language: 'ENGLISH', value: ''}]},
         ];
 
         assert.deepEqual(creditsFileSeed(withGap, 'ENGLISH'), [
-            { key: 'HEADER', value: 'Voice Cast' },
-            { key: 'CENTER', value: '' },
+            {key: 'HEADER', value: 'Voice Cast'},
+            {key: 'CENTER', value: ''},
         ]);
     });
 
@@ -110,13 +113,15 @@ describe('creditsFileSeed', () => {
 
     it('takes the language it was asked for out of a multi-language row', () => {
         const both = [
-            { index: 0, key: 'HEADER', values: [
-                { language: 'ENGLISH', value: 'Voice Cast' },
-                { language: 'GERMAN', value: 'Sprecher' },
-            ] },
+            {
+                index: 0, key: 'HEADER', values: [
+                    {language: 'ENGLISH', value: 'Voice Cast'},
+                    {language: 'GERMAN', value: 'Sprecher'},
+                ]
+            },
         ];
 
-        assert.deepEqual(creditsFileSeed(both, 'GERMAN'), [{ key: 'HEADER', value: 'Sprecher' }]);
+        assert.deepEqual(creditsFileSeed(both, 'GERMAN'), [{key: 'HEADER', value: 'Sprecher'}]);
     });
 
     it('is empty for a source with no rows', () => {

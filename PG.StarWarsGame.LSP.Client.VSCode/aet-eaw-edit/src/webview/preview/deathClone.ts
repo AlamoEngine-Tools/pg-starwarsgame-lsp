@@ -8,7 +8,7 @@
 // what killed it - which is the weapon built in the attacker panel - and a turret's traverse is a
 // number in the XML until something sweeps through it.
 
-import type { PreviewDeathClone, PreviewTurret } from '../../protocol/modelPreview';
+import type {PreviewDeathClone, PreviewTurret} from '../../protocol/modelPreview';
 
 /**
  * One card in the Gameplay dock's Death clone section.
@@ -126,7 +126,7 @@ export function sweepAngles(turret: PreviewTurret, phase: number): SweepPose {
     const elevateExtent = turret.elevateExtentDegrees ?? 0;
 
     if (rotateExtent <= 0 && elevateExtent <= 0) {
-        return { rotate: rest, elevate: 0 };
+        return {rotate: rest, elevate: 0};
     }
 
     const rotate = rotateExtent >= CONTINUOUS_TURN_DEGREES

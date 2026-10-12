@@ -16,7 +16,7 @@
 // This file used to sum the hardpoints and call that the hull, on the reasoning that most mods
 // author it that way. The sum is real - it is the hardpoint pool - but it was never the hull.
 
-import type { PreviewHardpoint, PreviewTargetDefence } from '../../protocol/modelPreview';
+import type {PreviewHardpoint, PreviewTargetDefence} from '../../protocol/modelPreview';
 
 /** Health left per hardpoint, keyed by hardpoint id. Null where the hardpoint declares none. */
 export type HardpointHealth = Readonly<Record<string, number | null>>;
@@ -72,7 +72,7 @@ export function hardpointPool(
         current += Math.min(Math.max(hardpointHealth[hardpoint.id] ?? 0, 0), hardpoint.health);
     }
 
-    return { current, max };
+    return {current, max};
 }
 
 /**
@@ -160,7 +160,7 @@ export function hullAfterHardpointDeath(
     const destructible = hardpoints.filter(h => h.isDestroyable);
 
     return destructible.length > 0 && destructible.every(h => destroyed.has(h.id))
-        ? { ...hull, current: 0 }
+        ? {...hull, current: 0}
         : hull;
 }
 

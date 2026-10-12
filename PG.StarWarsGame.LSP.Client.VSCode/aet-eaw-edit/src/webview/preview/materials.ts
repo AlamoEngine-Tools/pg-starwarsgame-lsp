@@ -100,6 +100,7 @@ export interface MaterialExtras {
     alamoLod?: number;
     alamoHidden?: boolean;
     alamoCollidable?: boolean;
+
     [key: string]: unknown;
 }
 
@@ -251,7 +252,7 @@ export function debugColour(
         return null;
     }
 
-    return { r: value[0], g: value[1], b: value[2], a: value[3] ?? 1 };
+    return {r: value[0], g: value[1], b: value[2], a: value[3] ?? 1};
 }
 
 /** Every texture the sub-mesh binds, in the slot the renderer uses it for. */

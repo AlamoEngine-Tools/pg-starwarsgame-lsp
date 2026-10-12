@@ -5,8 +5,17 @@ import * as vscode from 'vscode';
 
 import {LUA_DEBUG_TYPE} from './luaDebugAdapterFactory';
 import {
-    breakAvailability, LUA_BREAK_THREAD_REQUEST, LUA_REFRESH_REQUEST, LUA_SCRIPTS_CHANGED_EVENT, LUA_SCRIPTS_REQUEST,
-    LUA_SELECT_SCRIPT_REQUEST, type LuaScriptsResult, type ScriptNode, scriptRows, sessionSummary, type ThreadNode,
+    breakAvailability,
+    LUA_BREAK_THREAD_REQUEST,
+    LUA_REFRESH_REQUEST,
+    LUA_SCRIPTS_CHANGED_EVENT,
+    LUA_SCRIPTS_REQUEST,
+    LUA_SELECT_SCRIPT_REQUEST,
+    type LuaScriptsResult,
+    type ScriptNode,
+    scriptRows,
+    sessionSummary,
+    type ThreadNode,
     threadRows,
 } from './luaScriptsModel';
 

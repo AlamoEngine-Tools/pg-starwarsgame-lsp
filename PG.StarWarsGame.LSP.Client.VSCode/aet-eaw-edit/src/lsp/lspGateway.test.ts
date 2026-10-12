@@ -2,26 +2,30 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { LspGateway, LspMessageSink, LspRequestSender, SERVER_NOT_RUNNING } from './lspGateway';
+import {LspGateway, LspMessageSink, LspRequestSender, SERVER_NOT_RUNNING} from './lspGateway';
 
 function sink(): LspMessageSink & { warnings: string[]; errors: string[] } {
     const warnings: string[] = [];
     const errors: string[] = [];
     return {
         warnings, errors,
-        warn: (m: string) => { warnings.push(m); },
-        error: (m: string) => { errors.push(m); },
+        warn: (m: string) => {
+            warnings.push(m);
+        },
+        error: (m: string) => {
+            errors.push(m);
+        },
     };
 }
 
 function answering(value: unknown): LspRequestSender {
-    return { sendRequest: <T>() => Promise.resolve(value as T) };
+    return {sendRequest: <T>() => Promise.resolve(value as T)};
 }
 
 function rejecting(reason: string): LspRequestSender {
-    return { sendRequest: <T>() => Promise.reject(new Error(reason)) as Promise<T> };
+    return {sendRequest: <T>() => Promise.reject(new Error(reason)) as Promise<T>};
 }
 
 describe('LspGateway.request', () => {
@@ -48,12 +52,12 @@ describe('LspGateway.request', () => {
     });
 
     it('carries the payload through on success', async () => {
-        const gateway = new LspGateway(() => answering({ languages: ['ENGLISH'] }));
+        const gateway = new LspGateway(() => answering({languages: ['ENGLISH']}));
 
         const outcome = await gateway.request<{ languages: string[] }>('aet/getLanguages');
 
         assert.equal(outcome.ok, true);
-        assert.deepEqual(outcome.ok === true ? outcome.value : null, { languages: ['ENGLISH'] });
+        assert.deepEqual(outcome.ok === true ? outcome.value : null, {languages: ['ENGLISH']});
     });
 
     // The client is replaced on every server restart. A gateway that captured it once would keep
@@ -109,9 +113,9 @@ describe('LspGateway.requestOrReport', () => {
 
     it('reports nothing on success', async () => {
         const messages = sink();
-        const gateway = new LspGateway(() => answering({ ok: 1 }), messages);
+        const gateway = new LspGateway(() => answering({ok: 1}), messages);
 
-        assert.deepEqual(await gateway.requestOrReport('aet/x'), { ok: 1 });
+        assert.deepEqual(await gateway.requestOrReport('aet/x'), {ok: 1});
         assert.deepEqual(messages.errors, []);
         assert.deepEqual(messages.warnings, []);
     });
@@ -125,16 +129,16 @@ describe('LspGateway.requestOr', () => {
         const offline = new LspGateway(() => undefined, messages);
         const broken = new LspGateway(() => rejecting('nope'), messages);
 
-        assert.deepEqual(await offline.requestOr('aet/x', {}, { options: [] }), { options: [] });
-        assert.deepEqual(await broken.requestOr('aet/x', {}, { options: [] }), { options: [] });
+        assert.deepEqual(await offline.requestOr('aet/x', {}, {options: []}), {options: []});
+        assert.deepEqual(await broken.requestOr('aet/x', {}, {options: []}), {options: []});
         assert.deepEqual(messages.warnings, []);
         assert.deepEqual(messages.errors, []);
     });
 
     it('prefers the answer when there is one', async () => {
-        const gateway = new LspGateway(() => answering({ entries: [1, 2] }));
+        const gateway = new LspGateway(() => answering({entries: [1, 2]}));
 
-        assert.deepEqual(await gateway.requestOr('aet/x', {}, { entries: [] }), { entries: [1, 2] });
+        assert.deepEqual(await gateway.requestOr('aet/x', {}, {entries: []}), {entries: [1, 2]});
     });
 });
 
@@ -143,15 +147,15 @@ describe('LspGateway.executeCommand', () => {
         const sent: { method: string; params: unknown }[] = [];
         const gateway = new LspGateway(() => ({
             sendRequest: <T>(method: string, params: unknown) => {
-                sent.push({ method, params });
+                sent.push({method, params});
                 return Promise.resolve(null as T);
             },
         }));
 
-        assert.equal(await gateway.executeCommand('aet-eaw-edit.lsp.reloadProject', [{ a: 1 }]), true);
+        assert.equal(await gateway.executeCommand('aet-eaw-edit.lsp.reloadProject', [{a: 1}]), true);
         assert.deepEqual(sent, [{
             method: 'workspace/executeCommand',
-            params: { command: 'aet-eaw-edit.lsp.reloadProject', arguments: [{ a: 1 }] },
+            params: {command: 'aet-eaw-edit.lsp.reloadProject', arguments: [{a: 1}]},
         }]);
     });
 
@@ -169,7 +173,7 @@ describe('LspGateway.notify', () => {
         const messages = sink();
         const gateway = new LspGateway(() => rejecting('nope'), messages);
 
-        assert.equal(await gateway.notify('aet/setStoryLayout', { entries: [] }), false);
+        assert.equal(await gateway.notify('aet/setStoryLayout', {entries: []}), false);
         assert.deepEqual(messages.errors, []);
     });
 
@@ -197,7 +201,9 @@ describe('LspGateway.whenReady', () => {
         const gateway = new LspGateway(() => answering({}));
 
         const waited = gateway.whenReady(5000);
-        setTimeout(() => { gateway.markReady(); }, 20);
+        setTimeout(() => {
+            gateway.markReady();
+        }, 20);
 
         assert.equal(await waited, true);
     });

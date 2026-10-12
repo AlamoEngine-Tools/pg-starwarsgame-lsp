@@ -14,18 +14,21 @@ import {LspGateway} from './lsp/lspGateway';
 import {subMeshGeometryReply} from './lsp/subMeshGeometry';
 import {ModelInspectorPanel} from './modelInspectorPanel';
 import {
-    GetModelDetailResult, GetModelGlbResult, GetModelTextureResult, GetParticleSystemResult,
-    GetProjectileResult,
+    GetModelDetailResult,
+    GetModelGlbResult,
+    GetModelTextureResult,
+    GetParticleSystemResult,
     GetPreviewSceneResult,
+    GetProjectileResult,
     GetShaderSourceResult,
     PreviewSourceFile,
 } from './protocol/modelPreview';
 import {handoffFile, launchDetached} from './externalTool';
 import {revealDefinition} from './revealDefinition';
-import {subjectStateFrom, type SubjectState} from './webview/preview/subjectState';
+import {type SubjectState, subjectStateFrom} from './webview/preview/subjectState';
 import {readViewerSettings, saveViewerSettings} from './viewerSettingsStorage';
 import {readProjectSettings, saveProjectSettings} from './projectSettingsStorage';
-import {PanelRegistry, WebviewPanelHost, WebviewMessage, panelKey} from './webviewPanelHost';
+import {panelKey, PanelRegistry, WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
 
 /** What the preview is showing, and therefore what to ask the server for. */
 export type PreviewSubject =

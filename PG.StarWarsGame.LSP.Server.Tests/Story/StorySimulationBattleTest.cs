@@ -393,7 +393,7 @@ public sealed class StorySimulationBattleTest
     {
         var (service, _) = BuildService();
 
-        var (state, error) = service.Start(GalaxyKey, new StorySimOptions(AssumeMediaCompletes: false));
+        var (state, error) = service.Start(GalaxyKey, new StorySimOptions(false));
 
         Assert.Null(error);
         Assert.False(state!.AssumeMediaCompletes);

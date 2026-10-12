@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Diagnostics;
 
@@ -17,7 +18,7 @@ public sealed class LuaAnalyzerRulePolicyTest
             Code = rule,
             Severity = severity,
             Message = "message of " + rule,
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(1, 2, 1, 5),
+            Range = new Range(1, 2, 1, 5),
             Tags = new Container<DiagnosticTag>(DiagnosticTag.Unnecessary)
         };
     }
@@ -31,7 +32,7 @@ public sealed class LuaAnalyzerRulePolicyTest
         Assert.Equal(DiagnosticIds.LuaAnalyzerUnused.ToString(), mapped.Code!.Value.String);
         Assert.Equal(DiagnosticSeverity.Hint, mapped.Severity);
         Assert.Equal("message of unused", mapped.Message);
-        Assert.Equal(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(1, 2, 1, 5), mapped.Range);
+        Assert.Equal(new Range(1, 2, 1, 5), mapped.Range);
         Assert.Contains(DiagnosticTag.Unnecessary, mapped.Tags!.ToList());
     }
 

@@ -62,23 +62,6 @@ public sealed class StartupPipelineTest
         Assert.Equal(StatusIndexState.Failed, status.IndexState);
     }
 
-    private sealed class StubConfigurationProvider : ILspConfigurationProvider
-    {
-        public StubConfigurationProvider(bool workspaceDiagnosticsOnStartup)
-        {
-            Current = new LspConfiguration
-            {
-                Diagnostics = new DiagnosticsConfig { WorkspaceOnStartup = workspaceDiagnosticsOnStartup }
-            };
-        }
-
-        public LspConfiguration Current { get; }
-
-        public void LoadFrom(object? initializationOptions)
-        {
-        }
-    }
-
     /// <summary>
     ///     The workspace sweep is OFF unless asked for.
     ///     <para>
@@ -245,6 +228,23 @@ public sealed class StartupPipelineTest
         await pipeline.RunAsync(["/ws/a", "/ws/b"], CancellationToken.None);
 
         Assert.Equal(["/ws/a", "/ws/b"], reload.LastRoots);
+    }
+
+    private sealed class StubConfigurationProvider : ILspConfigurationProvider
+    {
+        public StubConfigurationProvider(bool workspaceDiagnosticsOnStartup)
+        {
+            Current = new LspConfiguration
+            {
+                Diagnostics = new DiagnosticsConfig { WorkspaceOnStartup = workspaceDiagnosticsOnStartup }
+            };
+        }
+
+        public LspConfiguration Current { get; }
+
+        public void LoadFrom(object? initializationOptions)
+        {
+        }
     }
 
     // ── recording fakes ──────────────────────────────────────────────────────

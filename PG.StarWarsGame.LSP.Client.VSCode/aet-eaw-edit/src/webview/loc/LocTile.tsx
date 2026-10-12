@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import { ReactNode } from 'react';
+import {ReactNode} from 'react';
 
 export interface LocTileProps {
     /** Codicon name, without the `codicon-` prefix. */
@@ -40,7 +40,7 @@ export function LocTile(props: LocTileProps): React.JSX.Element {
             onDragStart={props.onDragStart}
             onDragEnd={props.onDragEnd}
         >
-            <span className={`codicon codicon-${props.icon}`} />
+            <span className={`codicon codicon-${props.icon}`}/>
             <span className="tile-label">{props.label}</span>
             {props.badge !== undefined && <span className="tile-badge">{props.badge}</span>}
         </button>

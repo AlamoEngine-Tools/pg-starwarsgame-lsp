@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { passiveEffectPlaysNow, passiveEffects } from './passiveSubject';
-import type { PreviewParticle } from '../../protocol/modelPreview';
+import {passiveEffectPlaysNow, passiveEffects} from './passiveSubject';
+import type {PreviewParticle} from '../../protocol/modelPreview';
 
 const particle = (over: Partial<PreviewParticle> = {}): PreviewParticle => ({
     id: 'Star_Destroyer_Death_Clone#0',
@@ -22,7 +22,7 @@ describe('passiveEffects', () => {
     it('re-homes every effect onto the part that was actually loaded', () => {
         // The server describes a MODEL - it cannot know what the client will call the instance -
         // so the descriptor names the clone object and the client names the part.
-        const moved = passiveEffects([particle(), particle({ id: 'x#1' })],
+        const moved = passiveEffects([particle(), particle({id: 'x#1'})],
             'deathclone:Star_Destroyer_Death_Clone');
 
         assert.deepEqual(moved.map(p => p.partId),
@@ -40,7 +40,7 @@ describe('passiveEffects', () => {
     });
 
     it('changes nothing else about them', () => {
-        const moved = passiveEffects([particle({ alt: 2, lod: 1, startsVisible: false })], 'w:1');
+        const moved = passiveEffects([particle({alt: 2, lod: 1, startsVisible: false})], 'w:1');
 
         assert.equal(moved[0].systemRef, 'p_imperial_explosion_big00');
         assert.equal(moved[0].bone, 'p_explosion');
@@ -64,10 +64,10 @@ describe('passiveEffectPlaysNow', () => {
     });
 
     it('respects the model\'s own switch, which always has the last word', () => {
-        assert.equal(passiveEffectPlaysNow(particle({ startsVisible: false })), false);
+        assert.equal(passiveEffectPlaysNow(particle({startsVisible: false})), false);
     });
 
     it('plays a level-tagged effect too, leaving the ALT gate to decide', () => {
-        assert.equal(passiveEffectPlaysNow(particle({ alt: 1 })), true);
+        assert.equal(passiveEffectPlaysNow(particle({alt: 1})), true);
     });
 });

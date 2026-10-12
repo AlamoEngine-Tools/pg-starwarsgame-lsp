@@ -86,18 +86,6 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzer, IAsyncDisposable, IDisposabl
         DeleteConfigDirectory();
     }
 
-    private void DeleteConfigDirectory()
-    {
-        try
-        {
-            if (Directory.Exists(_options.ConfigDirectory)) Directory.Delete(_options.ConfigDirectory, true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            _logger.LogDebug(ex, "Lua analyzer configuration directory not removed");
-        }
-    }
-
     public bool IsRunning => !_disposed && _session is not null;
 
     public event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
@@ -139,6 +127,23 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzer, IAsyncDisposable, IDisposabl
         {
             TextDocument = new TextDocumentIdentifier(DocumentUri.From(uri))
         });
+    }
+
+    public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+    {
+        return RequestAsync((client, token) => client.SendRequest(method, parameters).Returning<T>(token), ct: ct);
+    }
+
+    private void DeleteConfigDirectory()
+    {
+        try
+        {
+            if (Directory.Exists(_options.ConfigDirectory)) Directory.Delete(_options.ConfigDirectory, true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogDebug(ex, "Lua analyzer configuration directory not removed");
+        }
     }
 
     /// <summary>
@@ -186,11 +191,6 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzer, IAsyncDisposable, IDisposabl
             _logger.LogDebug(ex, "Lua analyzer request failed");
             return null;
         }
-    }
-
-    public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
-    {
-        return RequestAsync((client, token) => client.SendRequest(method, parameters).Returning<T>(token), ct: ct);
     }
 
     private async Task StartSessionAsync()

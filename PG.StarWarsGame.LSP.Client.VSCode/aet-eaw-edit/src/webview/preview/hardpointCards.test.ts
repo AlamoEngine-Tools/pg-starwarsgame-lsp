@@ -2,14 +2,19 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { type PreviewHardpoint, type PreviewWeapon } from '../../protocol/modelPreview';
+import {type PreviewHardpoint, type PreviewWeapon} from '../../protocol/modelPreview';
 import {
-    hardpointCards, hardpointFacts, healthBar, muzzleLabel, unitWeaponFacts, unitWeapons,
+    hardpointCards,
+    hardpointFacts,
+    healthBar,
+    muzzleLabel,
+    unitWeaponFacts,
+    unitWeapons,
     weaponFacts,
 } from './hardpointCards';
-import { weaponRows } from './weaponRows';
+import {weaponRows} from './weaponRows';
 
 // The same shapes weaponRows.test.ts builds, so a field this join needs cannot be missing from
 // one fixture and present in the other.
@@ -53,7 +58,7 @@ describe('hardpointCards', () => {
         // 137 shipped hardpoints attach no model and some carry no weapon at all. A shield
         // generator is still a thing you shoot off, so it still needs its card.
         const cards = hardpointCards(
-            scene({ weapons: [], hardpoints: [hardpoint({ id: 'HP_Shield' })] }), new Set());
+            scene({weapons: [], hardpoints: [hardpoint({id: 'HP_Shield'})]}), new Set());
 
         assert.equal(cards.length, 1);
         assert.equal(cards[0].id, 'HP_Shield');
@@ -71,7 +76,7 @@ describe('hardpointCards', () => {
 
     it('carries the game`s own words, not just our derived ones', () => {
         const cards = hardpointCards(
-            scene({ hardpoints: [hardpoint({ tooltipText: 'Turbolaser Battery' })] }), new Set());
+            scene({hardpoints: [hardpoint({tooltipText: 'Turbolaser Battery'})]}), new Set());
 
         assert.equal(cards[0].tooltip, 'Turbolaser Battery');
         assert.equal(cards[0].type, 'HARD_POINT_WEAPON_LASER');
@@ -92,12 +97,12 @@ describe('hardpointCards', () => {
     it('marks only the cards that declare a traverse as sweepable', () => {
         const cards = hardpointCards(scene({
             hardpoints: [
-                hardpoint({ id: 'HP_Fixed' }),
-                hardpoint({ id: 'HP_Turret', turret: { rotateExtentDegrees: 180 } }),
+                hardpoint({id: 'HP_Fixed'}),
+                hardpoint({id: 'HP_Turret', turret: {rotateExtentDegrees: 180}}),
             ],
             weapons: [
-                weapon({ id: 'w1', hardpointId: 'HP_Fixed' }),
-                weapon({ id: 'w2', hardpointId: 'HP_Turret' }),
+                weapon({id: 'w1', hardpointId: 'HP_Fixed'}),
+                weapon({id: 'w2', hardpointId: 'HP_Turret'}),
             ],
         }), new Set());
 
@@ -110,7 +115,7 @@ describe('hardpointCards', () => {
         // that only read the hardpoint's own turret would call that one fixed.
         const cards = hardpointCards(scene({
             hardpoints: [hardpoint()],
-            weapons: [weapon({ turret: { rotateExtentDegrees: 90 } })],
+            weapons: [weapon({turret: {rotateExtentDegrees: 90}})],
         }), new Set());
 
         assert.equal(cards[0].sweepable, true);
@@ -122,7 +127,7 @@ describe('unitWeapons', () => {
         // A fighter's guns are on the unit itself. Those have no card to live in, so they still
         // need a list of their own - and putting them in the Hardpoints section would be a lie.
         const rows = weaponRows(scene({
-            weapons: [weapon(), weapon({ id: 'unit:A', source: 'Unit', hardpointId: null })],
+            weapons: [weapon(), weapon({id: 'unit:A', source: 'Unit', hardpointId: null})],
         }), new Set());
 
         assert.deepEqual(unitWeapons(rows).map(r => r.id), ['unit:A']);
@@ -146,14 +151,14 @@ describe('hardpointFacts', () => {
         // Is_Destroyable is off on 97 of the 355 shipped hardpoints. A disabled tick with no reason
         // beside it is the failure the disable-don`t-hide rule exists to avoid.
         const [card] = hardpointCards(
-            scene({ hardpoints: [hardpoint({ isDestroyable: false, health: null })] }), new Set());
+            scene({hardpoints: [hardpoint({isDestroyable: false, health: null})]}), new Set());
 
         assert.ok(hardpointFacts(card).includes('indestructible'));
     });
 
     it('omits what the file does not declare rather than printing a null', () => {
         const [card] = hardpointCards(
-            scene({ hardpoints: [hardpoint({ health: null, attachBone: null })] }), new Set());
+            scene({hardpoints: [hardpoint({health: null, attachBone: null})]}), new Set());
 
         assert.deepEqual(hardpointFacts(card), []);
     });
@@ -161,7 +166,7 @@ describe('hardpointFacts', () => {
     it('reports a traverse in the degrees the XML writes', () => {
         const [card] = hardpointCards(scene({
             hardpoints: [hardpoint({
-                turret: { rotateExtentDegrees: 180, elevateExtentDegrees: 30 },
+                turret: {rotateExtentDegrees: 180, elevateExtentDegrees: 30},
             })],
         }), new Set());
 
@@ -186,7 +191,7 @@ describe('the tooltip, key and text', () => {
 
     it('keeps the key when nothing resolved, so the author can still find it', () => {
         const [card] = hardpointCards(
-            scene({ hardpoints: [hardpoint({ tooltipKey: 'TEXT_MISSING' })] }), new Set());
+            scene({hardpoints: [hardpoint({tooltipKey: 'TEXT_MISSING'})]}), new Set());
 
         assert.equal(card.tooltip, null);
         assert.equal(card.tooltipKey, 'TEXT_MISSING');
@@ -195,7 +200,7 @@ describe('the tooltip, key and text', () => {
 
 describe('healthBar', () => {
     const card = (over = {}) => hardpointCards(
-        scene({ hardpoints: [hardpoint(over)] }), new Set())[0];
+        scene({hardpoints: [hardpoint(over)]}), new Set())[0];
 
     it('reads the pool the reader has actually shot down', () => {
         assert.deepEqual(healthBar(card(), 12), {
@@ -225,7 +230,7 @@ describe('healthBar', () => {
     it('shows nothing for a hardpoint that declares no health', () => {
         // 97 shipped hardpoints are indestructible and many declare no Health at all. An empty bar
         // would claim a pool that does not exist.
-        assert.equal(healthBar(card({ health: null }), null), null);
+        assert.equal(healthBar(card({health: null}), null), null);
     });
 
     it('never runs past either end of its own bar', () => {
@@ -307,7 +312,7 @@ describe('unitWeaponFacts', () => {
 
     it('omits an extent the file leaves at zero rather than printing it', () => {
         const facts = unitWeaponFacts(unit({
-            turret: { turretBone: 'B_Turret_Base', rotateExtentDegrees: 90 },
+            turret: {turretBone: 'B_Turret_Base', rotateExtentDegrees: 90},
         }));
 
         assert.deepEqual(facts, ['swings 90 deg']);

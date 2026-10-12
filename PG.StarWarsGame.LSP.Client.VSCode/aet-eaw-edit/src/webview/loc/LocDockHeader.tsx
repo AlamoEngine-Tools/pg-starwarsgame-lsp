@@ -8,10 +8,10 @@
 // (how many edits are staged, how the last validation went) that must be phrased the same way in
 // both or the same situation looks like two different ones.
 
-import { LocProblem, ValidationState } from './useLocPanel';
-import { validateTitle } from './validateState';
-import { IconButton } from '../shared/Button';
-import { SeverityTag } from '../shared/SeverityTag';
+import {LocProblem, ValidationState} from './useLocPanel';
+import {validateTitle} from './validateState';
+import {IconButton} from '../shared/Button';
+import {SeverityTag} from '../shared/SeverityTag';
 
 export function LocDockHeader(props: {
     /** The staged queue; its length is the badge on Save and disables the button when empty. */

@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { formatChoices, formatOutcome } from './localisationProjectFormat';
+import {formatChoices, formatOutcome} from './localisationProjectFormat';
 
 describe('formatChoices', () => {
     /**
@@ -37,21 +37,21 @@ describe('formatChoices', () => {
 
 describe('formatOutcome', () => {
     it('reports a refusal as an error, in the server\'s words', () => {
-        const outcome = formatOutcome({ changed: false, filesInFormat: 0, error: 'No mod project is open.' });
+        const outcome = formatOutcome({changed: false, filesInFormat: 0, error: 'No mod project is open.'});
 
         assert.equal(outcome.kind, 'error');
         assert.match(outcome.text, /No mod project is open/);
     });
 
     it('says when nothing changed', () => {
-        const outcome = formatOutcome({ changed: false, format: 'CSV', previousFormat: 'CSV', filesInFormat: 1 });
+        const outcome = formatOutcome({changed: false, format: 'CSV', previousFormat: 'CSV', filesInFormat: 1});
 
         assert.equal(outcome.kind, 'info');
         assert.match(outcome.text, /already loads CSV/);
     });
 
     it('names both formats and the file count on a change', () => {
-        const outcome = formatOutcome({ changed: true, format: 'DAT', previousFormat: 'CSV', filesInFormat: 2 });
+        const outcome = formatOutcome({changed: true, format: 'DAT', previousFormat: 'CSV', filesInFormat: 2});
 
         assert.equal(outcome.kind, 'info');
         assert.match(outcome.text, /CSV/);
@@ -61,13 +61,18 @@ describe('formatOutcome', () => {
 
     /** A switch to a format with no files on disk leaves the project loading nothing - that is a warning. */
     it('warns when the new format has no files to load', () => {
-        const outcome = formatOutcome({ changed: true, format: 'XML', previousFormat: 'CSV', filesInFormat: 0 });
+        const outcome = formatOutcome({changed: true, format: 'XML', previousFormat: 'CSV', filesInFormat: 0});
 
         assert.equal(outcome.kind, 'warning');
         assert.match(outcome.text, /no XML files/);
     });
 
     it('counts one file in the singular', () => {
-        assert.match(formatOutcome({ changed: true, format: 'CSV', previousFormat: 'DAT', filesInFormat: 1 }).text, /1 file\b/);
+        assert.match(formatOutcome({
+            changed: true,
+            format: 'CSV',
+            previousFormat: 'DAT',
+            filesInFormat: 1
+        }).text, /1 file\b/);
     });
 });

@@ -8,13 +8,12 @@
 // toggles now sit inside the box the way an editor's find widget puts them, which buys back a row,
 // and what is left is a labelled field with room to breathe.
 
-import { ReactNode } from 'react';
+import {ReactNode} from 'react';
 
-import { FilterMode } from '../locFilter';
-import { IconButton } from '../shared/Button';
-import { type ChoiceOption } from '../shared/choice';
-import { ModeSelector } from '../shared/ModeSelector';
-import { Field } from '../shared/Field';
+import {FilterMode} from '../locFilter';
+import {type ChoiceOption} from '../shared/choice';
+import {ModeSelector} from '../shared/ModeSelector';
+import {Field} from '../shared/Field';
 
 export interface LocSearchProps {
     filter: string;
@@ -45,7 +44,7 @@ export interface LocSearchProps {
 // The icons and wording the sidebar shipped with - unchanged, because users have them in their
 // fingers and this is a layout change, not a behaviour one.
 const MODES: ChoiceOption<FilterMode>[] = [
-    { id: 'text', label: 'text', icon: 'searchLiteral', title: 'Plain text search' },
+    {id: 'text', label: 'text', icon: 'searchLiteral', title: 'Plain text search'},
     {
         id: 'wildcard', label: 'wildcard', icon: 'searchWildcard',
         title: 'Wildcard: * matches any text, ? matches one character',

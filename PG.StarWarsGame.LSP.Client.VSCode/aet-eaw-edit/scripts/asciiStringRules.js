@@ -20,7 +20,7 @@
 const DIVIDER = '─';
 
 /** How each language spells a comment and a string, which is the whole of what this needs. */
-const LANGS = { cs: 'cs', ts: 'ts' };
+const LANGS = {cs: 'cs', ts: 'ts'};
 
 /** What to write instead, where there is an obvious answer. Advice only; the check is the same. */
 const SUGGESTIONS = new Map([
@@ -51,7 +51,9 @@ function withoutComments(text, lang) {
 
     const blank = (from, to) => {
         for (let k = from; k < to && k < n; k++) {
-            if (out[k] !== '\n') { out[k] = ' '; }
+            if (out[k] !== '\n') {
+                out[k] = ' ';
+            }
         }
     };
 
@@ -69,7 +71,10 @@ function withoutComments(text, lang) {
             while (i < n) {
                 if (text[i] === '"') {
                     // A doubled quote is one quote, not the end.
-                    if (text[i + 1] === '"') { i += 2; continue; }
+                    if (text[i + 1] === '"') {
+                        i += 2;
+                        continue;
+                    }
                     i++;
                     break;
                 }
@@ -84,10 +89,18 @@ function withoutComments(text, lang) {
             const quote = c;
             i++;
             while (i < n) {
-                if (text[i] === '\\') { i += 2; continue; }
-                if (text[i] === quote) { i++; break; }
+                if (text[i] === '\\') {
+                    i += 2;
+                    continue;
+                }
+                if (text[i] === quote) {
+                    i++;
+                    break;
+                }
                 // A single-quoted string does not span lines in either language; a template does.
-                if (quote !== '`' && text[i] === '\n') { break; }
+                if (quote !== '`' && text[i] === '\n') {
+                    break;
+                }
                 i++;
             }
             continue;
@@ -139,7 +152,10 @@ function literals(text, lang) {
             let k = start;
             while (k < n) {
                 if (text[k] === '"') {
-                    if (text[k + 1] === '"') { k += 2; continue; }
+                    if (text[k + 1] === '"') {
+                        k += 2;
+                        continue;
+                    }
                     break;
                 }
                 k++;
@@ -158,9 +174,17 @@ function literals(text, lang) {
             let closed = false;
 
             while (k < n) {
-                if (text[k] === '\\') { k += 2; continue; }
-                if (text[k] === quote) { closed = true; break; }
-                if (quote !== '`' && text[k] === '\n') { break; }
+                if (text[k] === '\\') {
+                    k += 2;
+                    continue;
+                }
+                if (text[k] === quote) {
+                    closed = true;
+                    break;
+                }
+                if (quote !== '`' && text[k] === '\n') {
+                    break;
+                }
                 k++;
             }
 
@@ -200,7 +224,7 @@ function blankCssComments(body) {
  * @param options.lang `cs` or `ts`.
  * @returns offences in file order, each with the character, its index and the line it is on.
  */
-function stringOffences(text, { lang }) {
+function stringOffences(text, {lang}) {
     const offences = [];
     const scanned = withoutComments(text, lang);
 
@@ -229,4 +253,4 @@ function stringOffences(text, { lang }) {
     return offences;
 }
 
-module.exports = { stringOffences, literals, withoutComments, LANGS, DIVIDER, SUGGESTIONS };
+module.exports = {stringOffences, literals, withoutComments, LANGS, DIVIDER, SUGGESTIONS};

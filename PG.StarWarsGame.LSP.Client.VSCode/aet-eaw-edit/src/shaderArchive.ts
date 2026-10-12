@@ -7,7 +7,7 @@
 // tested directly. Everything here answers a question about one archive entry or one download;
 // `shaderSources.ts` does the fetching and writing.
 
-import { createHash } from 'node:crypto';
+import {createHash} from 'node:crypto';
 import * as path from 'node:path';
 
 /** What an archive entry is allowed to become, or why it was refused. */
@@ -37,15 +37,15 @@ export function entryVerdict(entryName: string, targetDirectory: string): EntryV
     const normalised = entryName.replace(/\\/g, '/');
 
     if (normalised === '' || normalised.endsWith('/')) {
-        return { keep: false, reason: 'directory entry' };
+        return {keep: false, reason: 'directory entry'};
     }
 
     if (path.isAbsolute(normalised) || /^[A-Za-z]:/.test(normalised)) {
-        return { keep: false, reason: 'absolute path' };
+        return {keep: false, reason: 'absolute path'};
     }
 
     if (!WANTED.includes(path.extname(normalised).toLowerCase())) {
-        return { keep: false, reason: 'not a shader source' };
+        return {keep: false, reason: 'not a shader source'};
     }
 
     // Flattened deliberately: the archive nests everything under `Shaders/`, and the resolver looks
@@ -57,10 +57,10 @@ export function entryVerdict(entryName: string, targetDirectory: string): EntryV
 
     if (destination !== path.join(root, leaf)
         || !destination.startsWith(root + path.sep)) {
-        return { keep: false, reason: 'escapes the target directory' };
+        return {keep: false, reason: 'escapes the target directory'};
     }
 
-    return { keep: true, relativePath: leaf };
+    return {keep: true, relativePath: leaf};
 }
 
 /** The SHA-256 of some bytes, lower-case hex - the form the pinned constant is written in. */
@@ -85,7 +85,7 @@ export function checkArchive(
     bytes: Uint8Array, expectedSha256: string, expectedBytes?: number,
 ): ArchiveCheck {
     if (bytes.length === 0) {
-        return { ok: false, problem: 'the download was empty' };
+        return {ok: false, problem: 'the download was empty'};
     }
 
     if (expectedBytes !== undefined && bytes.length !== expectedBytes) {
@@ -104,7 +104,7 @@ export function checkArchive(
         };
     }
 
-    return { ok: true };
+    return {ok: true};
 }
 
 /**
@@ -116,6 +116,6 @@ export function checkArchive(
  */
 export function extractionVerdict(written: number): ArchiveCheck {
     return written > 0
-        ? { ok: true }
-        : { ok: false, problem: 'the archive held no .fx files' };
+        ? {ok: true}
+        : {ok: false, problem: 'the archive held no .fx files'};
 }

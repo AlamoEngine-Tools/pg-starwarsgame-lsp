@@ -94,6 +94,8 @@ export type ProblemJump = 'centre' | 'unfilter';
  *     worse than a jump that lands on an already-visible node.
  */
 export function resolveProblemJump(nodeId: string, inView: ReadonlySet<string> | null): ProblemJump {
-    if (inView === null) { return 'centre'; }
+    if (inView === null) {
+        return 'centre';
+    }
     return inView.has(nodeId) ? 'centre' : 'unfilter';
 }

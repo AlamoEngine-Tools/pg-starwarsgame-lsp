@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { markerPixels } from './missingTexture';
+import {markerPixels} from './missingTexture';
 
 /** A 2x2 glyph: opaque black top-left, transparent elsewhere - the shape the logo PNG has. */
 const glyph = new Uint8ClampedArray([

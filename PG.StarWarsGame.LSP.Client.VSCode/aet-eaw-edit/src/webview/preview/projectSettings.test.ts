@@ -2,17 +2,17 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { DEFAULT_ATTACKER } from './attacker';
-import { viewerSettingsFrom } from './viewerSettings';
-import { projectSettingsFrom, DEFAULT_PROJECT_SETTINGS } from './projectSettings';
+import {DEFAULT_ATTACKER} from './attacker';
+import {viewerSettingsFrom} from './viewerSettings';
+import {DEFAULT_PROJECT_SETTINGS, projectSettingsFrom} from './projectSettings';
 
 describe('projectSettingsFrom', () => {
     it('reads back a weapon that was saved', () => {
         const bench = projectSettingsFrom({
-            attacker: { damage: 250, damageType: 'Damage_Laser', shield: true },
-            presets: [{ id: 'a', name: 'Broadside missile', damage: 900 }],
+            attacker: {damage: 250, damageType: 'Damage_Laser', shield: true},
+            presets: [{id: 'a', name: 'Broadside missile', damage: 900}],
         });
 
         assert.equal(bench.attacker.damage, 250);
@@ -24,7 +24,7 @@ describe('projectSettingsFrom', () => {
     it('defaults field by field rather than throwing', () => {
         // The blob outlives the build that wrote it. A string where a number was expected must cost
         // the reader their weapon, not their whole bench.
-        const bench = projectSettingsFrom({ attacker: { damage: 'lots', damageType: 7 } });
+        const bench = projectSettingsFrom({attacker: {damage: 'lots', damageType: 7}});
 
         assert.equal(bench.attacker.damage, DEFAULT_ATTACKER.damage);
         assert.equal(bench.attacker.damageType, DEFAULT_ATTACKER.damageType);
@@ -37,7 +37,7 @@ describe('projectSettingsFrom', () => {
 
     it('drops a preset that cannot name itself', () => {
         const bench = projectSettingsFrom({
-            presets: [{ id: 'a', name: 'Keep' }, { id: 'b' }, 'rubbish'],
+            presets: [{id: 'a', name: 'Keep'}, {id: 'b'}, 'rubbish'],
         });
 
         assert.deepEqual(bench.presets.map(p => p.name), ['Keep']);
@@ -56,7 +56,7 @@ describe('projectSettingsFrom', () => {
 // factions the next one has never heard of - and the colour picked to match one belongs with it.
 describe('the faction and its colour', () => {
     it('reads back what this project was left set to', () => {
-        const read = projectSettingsFrom({ faction: 'Rebel', customColour: '#88ccff' });
+        const read = projectSettingsFrom({faction: 'Rebel', customColour: '#88ccff'});
 
         assert.equal(read.faction, 'Rebel');
         assert.equal(read.customColour, '#88ccff');
@@ -68,7 +68,7 @@ describe('the faction and its colour', () => {
     });
 
     it('refuses anything that is not a name', () => {
-        const read = projectSettingsFrom({ faction: 7, customColour: { r: 1 } });
+        const read = projectSettingsFrom({faction: 7, customColour: {r: 1}});
 
         assert.equal(read.faction, null);
         assert.equal(read.customColour, null);
@@ -91,8 +91,8 @@ describe('the project settings are not part of the room', () => {
         // fields on the way through rather than passing them along.
         const room = viewerSettingsFrom({
             grid: false,
-            attacker: { damage: 999, damageType: 'Damage_FromAnotherMod' },
-            attackerPresets: [{ id: 'x', name: 'Leaked' }],
+            attacker: {damage: 999, damageType: 'Damage_FromAnotherMod'},
+            attackerPresets: [{id: 'x', name: 'Leaked'}],
             faction: 'Faction_FromAnotherMod',
             customColour: '#ff0000',
         }) as unknown as Record<string, unknown>;

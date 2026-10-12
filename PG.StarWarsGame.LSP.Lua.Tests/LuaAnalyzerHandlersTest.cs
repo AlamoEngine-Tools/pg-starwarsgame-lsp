@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -131,7 +132,7 @@ public sealed class LuaAnalyzerHandlersTest
         await new LuaCodeLensHandler(analyzer).Handle(lens, CancellationToken.None);
 
         var sent = (CodeLens)Assert.Single(analyzer.Requests).Parameters;
-        Assert.Equal("""{"DeclId":"373|15"}""", sent.Data!.ToString(Newtonsoft.Json.Formatting.None));
+        Assert.Equal("""{"DeclId":"373|15"}""", sent.Data!.ToString(Formatting.None));
     }
 
     // The analyzer names the editor's command, or its own extension's under --editor vscode (both

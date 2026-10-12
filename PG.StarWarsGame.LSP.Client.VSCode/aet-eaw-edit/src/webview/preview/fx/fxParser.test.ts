@@ -5,11 +5,9 @@
 // this repository is public, so nothing from them is reproduced - only the FORMAT is followed.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    hasProgrammableShader, parseFxManifest, selectTechnique, stripComments,
-} from './fxParser';
+import {hasProgrammableShader, parseFxManifest, selectTechnique, stripComments,} from './fxParser';
 
 const EFFECT = `
 // A made-up effect, in the shape the real ones take.
@@ -245,13 +243,13 @@ describe('selectTechnique', () => {
 
     it('takes an unannotated technique only as a last resort', () => {
         // In the shipped effects those are editor-only passes like max_viewport.
-        const onlyPlain = { ...effect, techniques: [effect.techniques[0]] };
+        const onlyPlain = {...effect, techniques: [effect.techniques[0]]};
 
         assert.equal(selectTechnique(onlyPlain)?.name, 'editor_only');
     });
 
     it('returns null when there is nothing to draw with', () => {
-        assert.equal(selectTechnique({ ...effect, techniques: [] }), null);
+        assert.equal(selectTechnique({...effect, techniques: []}), null);
     });
 
     it('knows the LOD spellings the real effects actually use', () => {

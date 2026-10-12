@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import { BLANK_SENTINEL_VALUE } from '../creditsCrawlModel';
-import { LocRow } from './locRow';
+import {BLANK_SENTINEL_VALUE} from '../creditsCrawlModel';
+import {LocRow} from './locRow';
 
 /**
  * The columns hidden before the user has chosen anything.
@@ -40,7 +40,9 @@ export function defaultHiddenLanguages(
 export function emptyLanguages(rows: LocRow[], languages: string[]): string[] {
     // An empty file is not evidence about any language, and hiding on no evidence would open a new
     // file with most of its columns missing.
-    if (rows.length === 0) { return []; }
+    if (rows.length === 0) {
+        return [];
+    }
 
     const marker = BLANK_SENTINEL_VALUE.toLowerCase();
     const empty = languages.filter(language => !rows.some(row => {

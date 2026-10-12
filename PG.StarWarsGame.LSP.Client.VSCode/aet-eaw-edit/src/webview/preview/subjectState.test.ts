@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { EMPTY_SUBJECT_STATE, subjectStateFrom } from './subjectState';
+import {EMPTY_SUBJECT_STATE, subjectStateFrom} from './subjectState';
 
 describe('subjectStateFrom', () => {
     it('gives an empty state for a subject never opened this session', () => {
@@ -60,16 +60,16 @@ describe('subjectStateFrom', () => {
      * restoring a level that no longer exists is indistinguishable from a broken model.
      */
     it('drops a level the model no longer defines', () => {
-        const stored = subjectStateFrom({ alt: 2, lod: 3 });
+        const stored = subjectStateFrom({alt: 2, lod: 3});
 
-        assert.deepEqual(levelsWithin(stored, { alt: [0, 1], lod: [0, 1, 2, 3] }),
-            { alt: null, lod: 3 });
+        assert.deepEqual(levelsWithin(stored, {alt: [0, 1], lod: [0, 1, 2, 3]}),
+            {alt: null, lod: 3});
     });
 
     it('keeps a level the model still defines', () => {
-        const stored = subjectStateFrom({ alt: 1, lod: 0 });
+        const stored = subjectStateFrom({alt: 1, lod: 0});
 
-        assert.deepEqual(levelsWithin(stored, { alt: [0, 1], lod: [0, 1] }), { alt: 1, lod: 0 });
+        assert.deepEqual(levelsWithin(stored, {alt: [0, 1], lod: [0, 1]}), {alt: 1, lod: 0});
     });
 });
 

@@ -13,11 +13,11 @@
 // does not see layout, so a rule about what something LOOKS like still needs a live repro.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { renderToStaticMarkup } from 'react-dom/server';
+import {renderToStaticMarkup} from 'react-dom/server';
 
-import { DockSection } from './DockSection';
+import {DockSection} from './DockSection';
 
 const render = (element: React.JSX.Element): string => renderToStaticMarkup(element);
 
@@ -59,7 +59,7 @@ describe('DockSection', () => {
 });
 
 describe('a foldable DockSection', () => {
-    const folding = { id: 'lights', collapsed: false, onToggle: () => undefined };
+    const folding = {id: 'lights', collapsed: false, onToggle: () => undefined};
 
     it('makes the whole heading the hit area, not just the chevron', () => {
         const html = render(<DockSection title="Lights" {...folding}><p>body</p></DockSection>);

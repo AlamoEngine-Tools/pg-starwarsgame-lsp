@@ -15,13 +15,13 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
 {
+    private readonly ILuaAnalyzer? _analyzer;
     private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
+    private readonly IProjectLayerMap? _layers;
     private readonly ILuaRenameProvider _luaProvider;
     private readonly IXmlRenameProvider _xmlProvider;
-    private readonly ILuaAnalyzer? _analyzer;
-    private readonly IProjectLayerMap? _layers;
 
     public GamePrepareRenameHandler(
         IGameIndexService indexService,

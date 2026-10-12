@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { boxRoots, boxTargetFor, rowsInBox } from './selectionBox';
+import {boxRoots, boxTargetFor, rowsInBox} from './selectionBox';
 
 //   Root
 //   +- Hull
@@ -84,23 +84,23 @@ describe('boxTargetFor', () => {
     it('outlines the model a hardpoint attaches, when it has one', () => {
         assert.deepEqual(
             boxTargetFor('hp:HP_Turbolaser', new Set(['hull', 'hp:HP_Turbolaser'])),
-            { kind: 'part', id: 'hp:HP_Turbolaser' });
+            {kind: 'part', id: 'hp:HP_Turbolaser'});
     });
 
     it('falls back to the attach bone when the hardpoint attaches no model', () => {
         // 137 of foc's 355 hardpoints name no Model_To_Attach. A small cube on the bone is the
         // honest mark for those - there is no outline to draw.
-        assert.deepEqual(boxTargetFor(null, new Set(['hull'])), { kind: 'bone' });
+        assert.deepEqual(boxTargetFor(null, new Set(['hull'])), {kind: 'bone'});
     });
 
     it('falls back to the bone while the part has not loaded yet', () => {
         // Geometry arrives one part at a time. Boxing a part that is not in the scene would draw
         // nothing, which reads as a selection that did not take.
         assert.deepEqual(
-            boxTargetFor('hp:HP_Turbolaser', new Set(['hull'])), { kind: 'bone' });
+            boxTargetFor('hp:HP_Turbolaser', new Set(['hull'])), {kind: 'bone'});
     });
 
     it('treats an empty part id as no part', () => {
-        assert.deepEqual(boxTargetFor('', new Set(['hull'])), { kind: 'bone' });
+        assert.deepEqual(boxTargetFor('', new Set(['hull'])), {kind: 'bone'});
     });
 });

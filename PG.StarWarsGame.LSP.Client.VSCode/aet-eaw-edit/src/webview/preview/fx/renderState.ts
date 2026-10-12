@@ -7,7 +7,7 @@
 // their blend, depth and cull state out declaratively, so reading it gets most of the visible
 // difference for none of the HLSL risk.
 
-import type { FxPass } from './fxParser';
+import type {FxPass} from './fxParser';
 
 /** How a pass composites. */
 /**

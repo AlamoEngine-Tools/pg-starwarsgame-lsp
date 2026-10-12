@@ -60,5 +60,5 @@ export function lightDirection(azimuthDegrees: number, elevationDegrees: number)
 export function shadowFrustum(radius: number): { extent: number; near: number; far: number } {
     const extent = Math.max(radius, 1) * 1.6;
 
-    return { extent, near: 0.01 * extent, far: extent * 6 };
+    return {extent, near: 0.01 * extent, far: extent * 6};
 }

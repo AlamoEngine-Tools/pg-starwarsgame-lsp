@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { resolveColourWith } from './resolveColour';
+import {resolveColourWith} from './resolveColour';
 
 /** A stand-in computed style: every property not listed is undefined, as the browser reports it. */
 function reader(defined: Record<string, string>) {
@@ -27,7 +27,7 @@ describe('resolveColourWith', () => {
      * the theme actually wants rather than the shipped fallback.
      */
     it('falls through to the host variable when the token reads back empty', () => {
-        const read = reader({ '--vscode-charts-blue': '#222222' });
+        const read = reader({'--vscode-charts-blue': '#222222'});
 
         assert.equal(resolveColourWith(read, '--colour-data-blue'), '#222222');
     });
@@ -43,7 +43,7 @@ describe('resolveColourWith', () => {
     });
 
     it('does not confuse a whitespace-only value for a defined one', () => {
-        const read = reader({ '--colour-muted': '   ', '--vscode-descriptionForeground': '#333333' });
+        const read = reader({'--colour-muted': '   ', '--vscode-descriptionForeground': '#333333'});
 
         assert.equal(resolveColourWith(read, '--colour-muted'), '#333333');
     });

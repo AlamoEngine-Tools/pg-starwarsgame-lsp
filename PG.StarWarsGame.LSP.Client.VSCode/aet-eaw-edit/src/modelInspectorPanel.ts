@@ -14,9 +14,9 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway } from './lsp/lspGateway';
-import { subMeshGeometryReply } from './lsp/subMeshGeometry';
-import { WebviewMessage, WebviewPanelHost } from './webviewPanelHost';
+import {LspGateway} from './lsp/lspGateway';
+import {subMeshGeometryReply} from './lsp/subMeshGeometry';
+import {WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
 
 /**
  * The page CSS the inspector needs before its bundle runs.
@@ -108,14 +108,14 @@ export class ModelInspectorPanel extends WebviewPanelHost {
             return;
         }
 
-        this.post({ type: 'setSubject', subject });
+        this.post({type: 'setSubject', subject});
     }
 
     protected async onMessage(message: WebviewMessage): Promise<void> {
         switch (message.type) {
             case 'ready':
                 this.live = true;
-                this.post({ type: 'setSubject', subject: this.pending });
+                this.post({type: 'setSubject', subject: this.pending});
                 return;
 
             case 'requestSubMeshGeometry':

@@ -2,12 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { axisRange } from './turretHandles';
-import {
-    knobPoint, stopTicks, trackPlane, trackPoint, trackPoints, trackRadius, trackSegments,
-} from './turretTrack';
+import {axisRange} from './turretHandles';
+import {knobPoint, stopTicks, trackPlane, trackPoint, trackPoints, trackRadius, trackSegments,} from './turretTrack';
 
 function close(actual: number, expected: number, what: string): void {
     assert.ok(Math.abs(actual - expected) < 1e-6, `${what}: ${actual} is not ${expected}`);

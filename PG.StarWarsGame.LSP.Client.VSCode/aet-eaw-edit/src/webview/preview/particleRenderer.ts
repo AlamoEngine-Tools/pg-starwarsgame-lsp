@@ -8,16 +8,25 @@
 
 import * as THREE from 'three';
 
-import type {
-    AlamoEmitter, AlamoParticleContent, AlamoVector3,
-} from '../../protocol/modelPreview';
+import type {AlamoEmitter, AlamoParticleContent, AlamoVector3,} from '../../protocol/modelPreview';
 import {
-    emissionMultiplier, emissionPoint, offsetAlongNormal,
-    type EmissionCursor, type EmissionMesh,
+    type EmissionCursor,
+    type EmissionMesh,
+    emissionMultiplier,
+    emissionPoint,
+    offsetAlongNormal,
 } from './meshEmission';
 import {
-    accelerationIn, appearanceOf, atlasColumns, seededRandom, SpawnClock, spawnParticle,
-    stepParticle, systemExtent, type Particle, type Random,
+    accelerationIn,
+    appearanceOf,
+    atlasColumns,
+    type Particle,
+    type Random,
+    seededRandom,
+    SpawnClock,
+    spawnParticle,
+    stepParticle,
+    systemExtent,
 } from './particleSim';
 
 /**
@@ -89,7 +98,7 @@ const BUMP_ALPHA_REF = 8 / 255;
  * colour - a bright fireball came out ringed by dark squares, one per sprite quad.
  */
 export function blendingFor(mode: string): ParticleBlend {
-    const base = { blending: THREE.CustomBlending, depthWrite: false, alphaTest: 0 } as const;
+    const base = {blending: THREE.CustomBlending, depthWrite: false, alphaTest: 0} as const;
 
     switch (mode) {
         // PrimAdditive.fx, PrimDepthSpriteAdditive.fx
@@ -412,7 +421,7 @@ export function tailGeometry(
     }
 
     if (speed <= 0) {
-        return { stretch: 1, turns: 0 };
+        return {stretch: 1, turns: 0};
     }
 
     // An inherited-motion emitter measures its tail against a kilometre a second, so a spark that
@@ -438,7 +447,7 @@ function stillFrame(): EmitterFrame {
         delta: new THREE.Vector3(),
         velocity: new THREE.Vector3(),
         groundY: 0,
-        wind: { x: 0, y: 0, z: 0 },
+        wind: {x: 0, y: 0, z: 0},
     };
 }
 
@@ -463,7 +472,7 @@ class EmitterRenderer {
     private readonly viewVelocity = new THREE.Vector3();
 
     /** Where `EveryVertex` has got to. Kept across ticks, because that walk is ordered. */
-    private readonly cursor: EmissionCursor = { subMesh: 0, vertex: 0 };
+    private readonly cursor: EmissionCursor = {subMesh: 0, vertex: 0};
 
     constructor(
         private readonly emitter: AlamoEmitter,
@@ -497,20 +506,20 @@ class EmitterRenderer {
         // A heat sprite writes a normal and a strength into the heat buffer, where sprites simply
         // blend over one another - the blend mode the emitter names describes the colour it would
         // have contributed, and it contributes none.
-        const { alphaGated, alphaTest, ...blendState } = heat
+        const {alphaGated, alphaTest, ...blendState} = heat
             ? blendingFor('Transparent')
             : blendingFor(emitter.properties.blendMode);
 
         this.material = new THREE.ShaderMaterial({
             ...blendState,
             uniforms: {
-                uMap: { value: texture },
-                uHasMap: { value: texture === null ? 0 : 1 },
-                uMissing: { value: 0 },
-                uColumns: { value: atlasColumns(emitter.properties.textureSize) },
-                uAlphaGated: { value: alphaGated ? 1 : 0 },
-                uAlphaTest: { value: alphaTest },
-                uWorldOriented: { value: emitter.properties.worldOriented ? 1 : 0 },
+                uMap: {value: texture},
+                uHasMap: {value: texture === null ? 0 : 1},
+                uMissing: {value: 0},
+                uColumns: {value: atlasColumns(emitter.properties.textureSize)},
+                uAlphaGated: {value: alphaGated ? 1 : 0},
+                uAlphaTest: {value: alphaTest},
+                uWorldOriented: {value: emitter.properties.worldOriented ? 1 : 0},
             },
             vertexShader: QUAD_VERTEX_SHADER,
             fragmentShader: heat ? HEAT_FRAGMENT_SHADER : QUAD_FRAGMENT_SHADER,
@@ -756,13 +765,13 @@ class EmitterRenderer {
     private place(particle: Particle, frame: EmitterFrame): void {
         SPAWN_SCRATCH.set(particle.position.x, particle.position.y, particle.position.z)
             .applyMatrix4(frame.matrix);
-        particle.position = { x: SPAWN_SCRATCH.x, y: SPAWN_SCRATCH.y, z: SPAWN_SCRATCH.z };
+        particle.position = {x: SPAWN_SCRATCH.x, y: SPAWN_SCRATCH.y, z: SPAWN_SCRATCH.z};
 
         // The direction it was born in travels with the velocity: the inward pull is measured from
         // it for the particle's whole life, and half the corpus's emitters use one.
         SPAWN_SCRATCH.set(particle.inward.x, particle.inward.y, particle.inward.z)
             .applyMatrix3(frame.rotation);
-        particle.inward = { x: SPAWN_SCRATCH.x, y: SPAWN_SCRATCH.y, z: SPAWN_SCRATCH.z };
+        particle.inward = {x: SPAWN_SCRATCH.x, y: SPAWN_SCRATCH.y, z: SPAWN_SCRATCH.z};
 
         SPAWN_SCRATCH.set(particle.velocity.x, particle.velocity.y, particle.velocity.z)
             .applyMatrix3(frame.rotation);
@@ -834,7 +843,7 @@ class EmitterRenderer {
             .applyMatrix3(this.emitter.properties.worldOriented ? GROUND_BASIS : frame.toView);
 
         return tailGeometry(this.emitter.properties, this.viewVelocity, speed)
-            ?? { stretch: 1, turns: 0 };
+            ?? {stretch: 1, turns: 0};
     }
 
     dispose(): void {

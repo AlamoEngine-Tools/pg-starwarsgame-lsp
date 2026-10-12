@@ -10,8 +10,8 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway } from './lsp/lspGateway';
-import { ResolveReferenceResult } from './protocol/workspace';
+import {LspGateway} from './lsp/lspGateway';
+import {ResolveReferenceResult} from './protocol/workspace';
 
 /**
  * Resolves `value` and opens its definition beside the panel.
@@ -28,11 +28,15 @@ export async function revealDefinition(
     referenceType?: string,
     method = 'aet/resolveReference',
 ): Promise<void> {
-    if (!value) { return; }
+    if (!value) {
+        return;
+    }
 
     const result = await lsp.requestOrReport<ResolveReferenceResult>(
-        method, { value, referenceType }, `cannot open the definition of '${value}'`);
-    if (result === undefined) { return; }
+        method, {value, referenceType}, `cannot open the definition of '${value}'`);
+    if (result === undefined) {
+        return;
+    }
 
     if (result.error || !result.uri) {
         void vscode.window.showWarningMessage(

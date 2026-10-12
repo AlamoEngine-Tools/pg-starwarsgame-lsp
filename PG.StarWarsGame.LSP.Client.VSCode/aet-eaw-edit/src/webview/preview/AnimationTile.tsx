@@ -16,11 +16,11 @@
 // The shape, as they set it: the play state on the left, vertically centred across the card; the
 // name on the top row, left aligned; the takes on the bottom row, left aligned and filling right.
 
-import { Icon } from '../shared/Icon';
-import { type AnimationAction } from './animationNames';
+import {Icon} from '../shared/Icon';
+import {type AnimationAction} from './animationNames';
 
 export function AnimationTile(
-    { action, playing, onPlay, onPick }: {
+    {action, playing, onPlay, onPick}: {
         action: AnimationAction;
         /** The clip playing right now, so the card that owns it reads as active. */
         playing: string | null;
@@ -45,7 +45,7 @@ export function AnimationTile(
                     : `Play ${action.label}`}
                 onClick={() => onPlay(action)}
             >
-                <Icon name={mine ? 'pause' : 'play'} size={16} />
+                <Icon name={mine ? 'pause' : 'play'} size={16}/>
             </button>
 
             <span className="anim-card-body">

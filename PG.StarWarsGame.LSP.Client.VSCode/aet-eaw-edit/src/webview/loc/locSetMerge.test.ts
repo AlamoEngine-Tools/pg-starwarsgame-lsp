@@ -2,18 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    KeyedCommand, MemberDocument, memberForLanguage, mergeMembers, partitionCommands,
-} from './locSetMerge';
+import {KeyedCommand, MemberDocument, memberForLanguage, mergeMembers, partitionCommands,} from './locSetMerge';
 
 function member(filePath: string, language: string, entries: [string, string][]): MemberDocument {
     return {
         filePath,
         languages: [language],
         rows: entries.map(([key, value], index) => ({
-            index, key, values: [{ language, value }],
+            index, key, values: [{language, value}],
         })),
     };
 }
@@ -30,12 +28,12 @@ const credits: MemberDocument = {
     filePath: '/t/creditstext.csv',
     languages: ['ENGLISH'],
     rows: [
-        { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Directed by' }] },
-        { index: 1, key: 'CENTER', values: [{ language: 'ENGLISH', value: 'ALICE' }] },
-        { index: 2, key: 'CENTER', values: [{ language: 'ENGLISH', value: 'BOB' }] },
-        { index: 3, key: 'CENTER', values: [{ language: 'ENGLISH', value: '[TBL]' }] },
-        { index: 4, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Produced by' }] },
-        { index: 5, key: 'CENTER', values: [{ language: 'ENGLISH', value: 'CAROL' }] },
+        {index: 0, key: 'HEADER', values: [{language: 'ENGLISH', value: 'Directed by'}]},
+        {index: 1, key: 'CENTER', values: [{language: 'ENGLISH', value: 'ALICE'}]},
+        {index: 2, key: 'CENTER', values: [{language: 'ENGLISH', value: 'BOB'}]},
+        {index: 3, key: 'CENTER', values: [{language: 'ENGLISH', value: '[TBL]'}]},
+        {index: 4, key: 'HEADER', values: [{language: 'ENGLISH', value: 'Produced by'}]},
+        {index: 5, key: 'CENTER', values: [{language: 'ENGLISH', value: 'CAROL'}]},
     ],
 };
 
@@ -93,8 +91,8 @@ describe('mergeMembers', () => {
         const row = mergeMembers([english, german]).rows[0];
 
         assert.deepEqual(row.values, [
-            { language: 'ENGLISH', value: 'Alpha' },
-            { language: 'GERMAN', value: 'Alfa' },
+            {language: 'ENGLISH', value: 'Alpha'},
+            {language: 'GERMAN', value: 'Alfa'},
         ]);
     });
 
@@ -117,7 +115,7 @@ describe('mergeMembers', () => {
     });
 
     it('has nothing to show for no members', () => {
-        assert.deepEqual(mergeMembers([]), { languages: [], rows: [] });
+        assert.deepEqual(mergeMembers([]), {languages: [], rows: []});
     });
 });
 
@@ -136,7 +134,7 @@ describe('partitionCommands', () => {
 
     it('sends a value only to the file that owns its language', () => {
         const batches = partitionCommands(
-            [{ kind: 'setValue', key: 'TEXT_A', language: 'GERMAN', value: 'Neu' }], members);
+            [{kind: 'setValue', key: 'TEXT_A', language: 'GERMAN', value: 'Neu'}], members);
 
         assert.deepEqual([...batches.keys()], [german.filePath]);
     });
@@ -145,7 +143,7 @@ describe('partitionCommands', () => {
     // the watcher would announce a change to a file nobody edited.
     it('leaves a file with nothing to do out of the save entirely', () => {
         const batches = partitionCommands(
-            [{ kind: 'setValue', key: 'TEXT_A', language: 'ENGLISH', value: 'New' }], members);
+            [{kind: 'setValue', key: 'TEXT_A', language: 'ENGLISH', value: 'New'}], members);
 
         assert.equal(batches.has(german.filePath), false);
     });
@@ -154,7 +152,7 @@ describe('partitionCommands', () => {
     // table.
     it('renames and deletes in every file', () => {
         for (const kind of ['renameKey', 'deleteEntry']) {
-            const batches = partitionCommands([{ kind, key: 'TEXT_A', newKey: 'TEXT_Z' }], members);
+            const batches = partitionCommands([{kind, key: 'TEXT_A', newKey: 'TEXT_Z'}], members);
 
             assert.deepEqual([...batches.keys()].sort(), [english.filePath, german.filePath].sort());
         }
@@ -164,34 +162,34 @@ describe('partitionCommands', () => {
         const command: KeyedCommand = {
             kind: 'addEntry',
             key: 'TEXT_NEW',
-            values: [{ language: 'ENGLISH', value: 'New' }, { language: 'GERMAN', value: 'Neu' }],
+            values: [{language: 'ENGLISH', value: 'New'}, {language: 'GERMAN', value: 'Neu'}],
         };
 
         const batches = partitionCommands([command], members);
 
         assert.deepEqual(batches.get(english.filePath)![0].values,
-            [{ language: 'ENGLISH', value: 'New' }]);
+            [{language: 'ENGLISH', value: 'New'}]);
         assert.deepEqual(batches.get(german.filePath)![0].values,
-            [{ language: 'GERMAN', value: 'Neu' }]);
+            [{language: 'GERMAN', value: 'Neu'}]);
     });
 
     // Writing it into an arbitrary file would put one language's text in another's file.
     it('drops a value for a language no file in the set holds', () => {
         const batches = partitionCommands(
-            [{ kind: 'setValue', key: 'TEXT_A', language: 'FRENCH', value: 'Bonjour' }], members);
+            [{kind: 'setValue', key: 'TEXT_A', language: 'FRENCH', value: 'Bonjour'}], members);
 
         assert.equal(batches.size, 0);
     });
 
     // In a single-language format another language is another file, which the navigator creates.
     it('ignores addLanguage, which has no meaning for a set', () => {
-        assert.equal(partitionCommands([{ kind: 'addLanguage', language: 'FRENCH' }], members).size, 0);
+        assert.equal(partitionCommands([{kind: 'addLanguage', language: 'FRENCH'}], members).size, 0);
     });
 
     it('keeps the order edits were made in within each file', () => {
         const batches = partitionCommands([
-            { kind: 'setValue', key: 'TEXT_A', language: 'ENGLISH', value: '1' },
-            { kind: 'setValue', key: 'TEXT_B', language: 'ENGLISH', value: '2' },
+            {kind: 'setValue', key: 'TEXT_A', language: 'ENGLISH', value: '1'},
+            {kind: 'setValue', key: 'TEXT_B', language: 'ENGLISH', value: '2'},
         ], members);
 
         assert.deepEqual(batches.get(english.filePath)!.map(c => c.value), ['1', '2']);

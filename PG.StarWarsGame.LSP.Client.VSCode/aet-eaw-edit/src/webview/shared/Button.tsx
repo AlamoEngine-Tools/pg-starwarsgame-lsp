@@ -19,9 +19,9 @@
 // fired yet". A tooltip giving only the reason leaves a reader who has never opened the thing with
 // no idea what it was going to be.
 
-import { ReactNode } from 'react';
+import {ReactNode} from 'react';
 
-import { Icon, type IconName } from './Icon';
+import {Icon, type IconName} from './Icon';
 
 /**
  * Either the control always acts, or it can be disabled AND says why.
@@ -75,8 +75,8 @@ export type ButtonProps = Omit<Pressable, 'onClick'> & Enablement & {
 };
 
 export function Button({
-    title, onClick, disabled, disabledReason, compact, className, submit, children,
-}: ButtonProps): React.JSX.Element {
+                           title, onClick, disabled, disabledReason, compact, className, submit, children,
+                       }: ButtonProps): React.JSX.Element {
     return (
         <button
             type={submit ? 'submit' : 'button'}
@@ -138,9 +138,19 @@ export type IconButtonProps = Pressable & Enablement & {
 };
 
 export function IconButton({
-    icon, title, label, onClick, disabled, disabledReason, className, size, pressed, expanded,
-    badge, ref,
-}: IconButtonProps): React.JSX.Element {
+                               icon,
+                               title,
+                               label,
+                               onClick,
+                               disabled,
+                               disabledReason,
+                               className,
+                               size,
+                               pressed,
+                               expanded,
+                               badge,
+                               ref,
+                           }: IconButtonProps): React.JSX.Element {
     // There is no text to fall back on, so one string has to name the control. The reason it cannot
     // be pressed outranks both: it is the only thing worth saying while the control is dead.
     const hover = disabled ? disabledReason : title;
@@ -158,7 +168,7 @@ export function IconButton({
             disabled={disabled}
             onClick={onClick}
         >
-            <Icon name={icon} size={size} />
+            <Icon name={icon} size={size}/>
             {badge}
         </button>
     );

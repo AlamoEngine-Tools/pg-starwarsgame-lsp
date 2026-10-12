@@ -191,10 +191,10 @@ file sealed class BareSchemaProvider : ISchemaProvider
 {
     public IReadOnlyList<ScannedDirectoryDefinition> ScannedDirectories { get; init; } = [];
 
-    public IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories => ScannedDirectories;
-
     /// <summary>A tag the schema knows globally, standing in for a name shared across types.</summary>
     public XmlTagDefinition? GlobalTag { get; init; }
+
+    public IReadOnlyList<ScannedDirectoryDefinition> AllScannedDirectories => ScannedDirectories;
 
     public XmlTagDefinition? GetTag(string tagName)
     {

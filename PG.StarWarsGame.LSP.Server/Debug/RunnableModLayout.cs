@@ -29,11 +29,9 @@ public static class RunnableModLayout
 
         var dataPrefix = projectDirectory + "/Data/";
         foreach (var directory in AllDirectories(layer))
-        {
             if (!DocumentUris.StartsWith(directory + "/", dataPrefix))
                 return (null,
                     $"'{directory}' is not under '{projectDirectory}/Data', and the game only reads a mod's Data tree");
-        }
 
         return (projectDirectory, null);
     }

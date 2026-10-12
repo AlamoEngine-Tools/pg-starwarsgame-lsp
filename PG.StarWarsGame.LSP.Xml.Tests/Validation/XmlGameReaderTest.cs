@@ -14,7 +14,10 @@ public sealed class XmlGameReaderTest
 {
     private const string Decl = "<?xml version=\"1.0\"?>\n";
 
-    private static XmlGameReadResult Read(string body) => XmlGameReader.Read(Decl + body);
+    private static XmlGameReadResult Read(string body)
+    {
+        return XmlGameReader.Read(Decl + body);
+    }
 
     // ── files the game reads ────────────────────────────────────────────────
 

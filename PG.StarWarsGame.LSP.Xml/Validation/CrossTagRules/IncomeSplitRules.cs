@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
 /// <summary>
 ///     Shared plumbing for the three rules in the engine's load-time validation
-///    , all of which are gated on flags rather than stated about a tag.
+///     , all of which are gated on flags rather than stated about a tag.
 /// </summary>
 public abstract class IncomeStreamRuleBase : IXmlCrossTagRule
 {

@@ -2,11 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { renderToStaticMarkup } from 'react-dom/server';
+import {renderToStaticMarkup} from 'react-dom/server';
 
-import { Button, IconButton } from './Button';
+import {Button, IconButton} from './Button';
 
 const render = (element: React.JSX.Element): string => renderToStaticMarkup(element);
 
@@ -118,7 +118,7 @@ describe('Button', () => {
 describe('IconButton', () => {
     it('draws its glyph and carries the title as its accessible name', () => {
         const html = render(
-            <IconButton icon="close" title="Close" onClick={() => undefined} />);
+            <IconButton icon="close" title="Close" onClick={() => undefined}/>);
 
         assert.match(html, /class="icon-btn"/);
         assert.match(html, /aria-label="Close"/);
@@ -131,7 +131,7 @@ describe('IconButton', () => {
      */
     it('names itself for a screen reader as well as for the pointer', () => {
         const html = render(
-            <IconButton icon="download" title="Fetch the shader sources" onClick={() => undefined} />);
+            <IconButton icon="download" title="Fetch the shader sources" onClick={() => undefined}/>);
 
         assert.match(html, /title="Fetch the shader sources"/);
         assert.match(html, /aria-label="Fetch the shader sources"/);
@@ -159,16 +159,16 @@ describe('IconButton', () => {
      */
     it('reports a toggle state when it has one', () => {
         const on = render(
-            <IconButton icon="visible" title="Show" onClick={() => undefined} pressed />);
+            <IconButton icon="visible" title="Show" onClick={() => undefined} pressed/>);
         const off = render(
-            <IconButton icon="visible" title="Show" onClick={() => undefined} pressed={false} />);
+            <IconButton icon="visible" title="Show" onClick={() => undefined} pressed={false}/>);
 
         assert.match(on, /aria-pressed="true"/);
         assert.match(off, /aria-pressed="false"/);
     });
 
     it('says nothing about pressed state when it is a plain action', () => {
-        const html = render(<IconButton icon="close" title="Close" onClick={() => undefined} />);
+        const html = render(<IconButton icon="close" title="Close" onClick={() => undefined}/>);
 
         assert.equal(/aria-pressed/.test(html), false);
     });
@@ -176,7 +176,7 @@ describe('IconButton', () => {
     /** A disclosure - the control that opens a flyout - reports whether the flyout is open. */
     it('reports whether the thing it opens is open', () => {
         const html = render(
-            <IconButton icon="tune" title="Settings" onClick={() => undefined} expanded />);
+            <IconButton icon="tune" title="Settings" onClick={() => undefined} expanded/>);
 
         assert.match(html, /aria-expanded="true"/);
     });
@@ -205,14 +205,14 @@ describe('IconButton', () => {
 
     it('carries a count beside its glyph, inside the same hit area', () => {
         const html = render(
-            <IconButton icon="save" title="Save" onClick={() => undefined} badge=" 3" />);
+            <IconButton icon="save" title="Save" onClick={() => undefined} badge=" 3"/>);
 
         assert.match(html, /<button[^>]*>.*<\/svg>\s*3\s*<\/button>|3<\/button>/s);
     });
 
     it('takes a placement variant for the header without losing the base class', () => {
         const html = render(
-            <IconButton icon="close" title="Close" onClick={() => undefined} className="header-right" />);
+            <IconButton icon="close" title="Close" onClick={() => undefined} className="header-right"/>);
 
         assert.match(html, /class="icon-btn header-right"/);
     });

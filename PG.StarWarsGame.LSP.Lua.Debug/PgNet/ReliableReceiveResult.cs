@@ -10,9 +10,9 @@ namespace PG.StarWarsGame.LSP.Lua.Debug.PgNet;
 public sealed class ReliableReceiveResult
 {
     private readonly List<byte[]> _acks = [];
+    private readonly List<BitBuffer> _deliveries = [];
     private readonly List<byte[]> _nacks = [];
     private readonly List<byte[]> _resends = [];
-    private readonly List<BitBuffer> _deliveries = [];
 
     public IReadOnlyList<byte[]> Acks => _acks;
 

@@ -101,7 +101,7 @@ function strings(value: unknown): string[] {
 
 function indices(value: unknown): number[] {
     return Array.isArray(value)
-        && value.every(item => typeof item === 'number' && Number.isInteger(item) && item >= 0)
+    && value.every(item => typeof item === 'number' && Number.isInteger(item) && item >= 0)
         ? [...value] as number[]
         : [];
 }

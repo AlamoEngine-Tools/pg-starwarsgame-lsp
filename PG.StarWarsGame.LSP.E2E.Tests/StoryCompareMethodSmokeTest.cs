@@ -28,6 +28,14 @@ public sealed class StoryCompareMethodSmokeTest : IClassFixture<E2eModServerFixt
 {
     private const string Fixture = "Story_E2E_Compare.xml";
 
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    // Opened once for the whole class. Re-opening the same document with the same text is a no-op
+    // on the server - it logs "content unchanged" and publishes nothing - so a second test that
+    // opened it again would wait for a publish that is never coming and fail as a timeout.
+    private static readonly SemaphoreSlim OpenOnce = new(1, 1);
+    private static Task<IReadOnlyList<Diagnostic>>? _opened;
+
     private readonly E2eModServerFixture _fixture;
 
     public StoryCompareMethodSmokeTest(E2eModServerFixture fixture)
@@ -71,14 +79,6 @@ public sealed class StoryCompareMethodSmokeTest : IClassFixture<E2eModServerFixt
         Assert.DoesNotContain(diagnostics,
             d => d.Message.Contains("GREATER_THAN_EQUAL_TO", StringComparison.Ordinal));
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
-
-    // Opened once for the whole class. Re-opening the same document with the same text is a no-op
-    // on the server - it logs "content unchanged" and publishes nothing - so a second test that
-    // opened it again would wait for a publish that is never coming and fail as a timeout.
-    private static readonly SemaphoreSlim OpenOnce = new(1, 1);
-    private static Task<IReadOnlyList<Diagnostic>>? _opened;
 
     private async Task<IReadOnlyList<Diagnostic>> DiagnosticsAsync()
     {

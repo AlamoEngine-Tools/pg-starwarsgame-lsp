@@ -61,7 +61,7 @@ export function alamoBoneName(nodeName: string): { name: string; index: number }
         return null;
     }
 
-    return { name: nodeName.slice(0, hash), index };
+    return {name: nodeName.slice(0, hash), index};
 }
 
 /**
@@ -134,7 +134,7 @@ export function filterBones(roots: readonly BoneNode[], query: string): BoneNode
         }
 
         // A match keeps its own subtree collapsed away; an ancestor keeps only the path down.
-        return { ...node, children: matches ? [] : children };
+        return {...node, children: matches ? [] : children};
     };
 
     return roots.map(keep).filter((node): node is BoneNode => node !== null);
@@ -161,7 +161,7 @@ export function visibleRows(
 
     const walk = (node: BoneNode): void => {
         const expanded = !collapsed.has(node.index);
-        rows.push({ node, expandable: node.children.length > 0, expanded });
+        rows.push({node, expandable: node.children.length > 0, expanded});
 
         if (expanded) {
             for (const child of node.children) {

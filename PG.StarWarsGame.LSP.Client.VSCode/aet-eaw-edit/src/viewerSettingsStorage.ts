@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 
-import { viewerSettingsFrom, type ViewerSettings } from './webview/preview/viewerSettings';
+import {type ViewerSettings, viewerSettingsFrom} from './webview/preview/viewerSettings';
 
 /**
  * How the reader likes the preview's ROOM: the grid, the floor, the lights, the background.
@@ -49,5 +49,6 @@ export function saveViewerSettings(settings: unknown): void {
     }
 
     void Promise.resolve(store.update(KEY, viewerSettingsFrom(settings)))
-        .then(undefined, () => { /* a preference is not worth reporting a failure over */ });
+        .then(undefined, () => { /* a preference is not worth reporting a failure over */
+        });
 }

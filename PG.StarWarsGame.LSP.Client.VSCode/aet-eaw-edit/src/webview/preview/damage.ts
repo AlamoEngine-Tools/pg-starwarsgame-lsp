@@ -14,7 +14,7 @@
 //     |- once  Death_Explosion_Particles
 //     '- if Engine_Death_Hide_Engine_Particles: put the engine glow out
 
-import { PREVIEW_PARTICLE_GATE, type PreviewHardpoint } from '../../protocol/modelPreview';
+import {PREVIEW_PARTICLE_GATE, type PreviewHardpoint} from '../../protocol/modelPreview';
 
 /** The ids of the hardpoints currently blown off. */
 export type Destroyed = ReadonlySet<string>;

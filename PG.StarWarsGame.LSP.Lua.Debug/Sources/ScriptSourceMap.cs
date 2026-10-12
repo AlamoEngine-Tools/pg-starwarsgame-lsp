@@ -12,14 +12,15 @@ public sealed class ScriptSourceMap : IScriptSourceMap
     private const string ScriptsSegment = "scripts";
 
     private readonly IFileHelper _fileHelper;
-    private readonly List<string> _rootUris;
     private readonly Lock _gate = new();
+
+    /// <summary>Document URI to the spelling the game used for it. Keyed like the index.</summary>
+    private readonly Dictionary<string, string> _reportedSpelling = new(DocumentUris.Comparer);
 
     /// <summary>Game path (folded) to document URI, for paths already resolved.</summary>
     private readonly Dictionary<string, string?> _resolved = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Document URI to the spelling the game used for it. Keyed like the index.</summary>
-    private readonly Dictionary<string, string> _reportedSpelling = new(DocumentUris.Comparer);
+    private readonly List<string> _rootUris;
 
     public ScriptSourceMap(IFileHelper fileHelper, IReadOnlyList<string> sourceRoots)
     {
@@ -120,10 +121,8 @@ public sealed class ScriptSourceMap : IScriptSourceMap
             if (index < 0)
                 continue;
             foreach (var candidate in new[] { parts[index..], parts[(index + 1)..] })
-            {
                 if (candidate.Length > 0 && seen.Add(string.Join('/', candidate)))
                     yield return candidate;
-            }
         }
 
         if (seen.Add(parts[^1]))

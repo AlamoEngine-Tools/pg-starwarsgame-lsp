@@ -2,16 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { suggestBaselineKeys } from './baselineSuggestions';
-import { toBaselineRows } from './translationInherited';
+import {suggestBaselineKeys} from './baselineSuggestions';
+import {toBaselineRows} from './translationInherited';
 
 const baseline = toBaselineRows([
-    { key: 'TEXT_UNIT_XWING', translations: { ENGLISH: 'X-Wing', GERMAN: 'X-Fluegler' } },
-    { key: 'TEXT_UNIT_YWING', translations: { ENGLISH: 'Y-Wing' } },
-    { key: 'TEXT_PLANET_HOTH', translations: { ENGLISH: 'Hoth', GERMAN: 'Hoth' } },
-    { key: 'TEXT_ALREADY_MINE', translations: { ENGLISH: 'Mine' } },
+    {key: 'TEXT_UNIT_XWING', translations: {ENGLISH: 'X-Wing', GERMAN: 'X-Fluegler'}},
+    {key: 'TEXT_UNIT_YWING', translations: {ENGLISH: 'Y-Wing'}},
+    {key: 'TEXT_PLANET_HOTH', translations: {ENGLISH: 'Hoth', GERMAN: 'Hoth'}},
+    {key: 'TEXT_ALREADY_MINE', translations: {ENGLISH: 'Mine'}},
 ]);
 
 const existing = ['TEXT_ALREADY_MINE'];
@@ -61,8 +61,8 @@ describe('suggestBaselineKeys', () => {
 
     it('caps how many it returns', () => {
         const many = toBaselineRows(
-            Array.from({ length: 500 }, (_, i) => ({
-                key: `TEXT_MANY_${i}`, translations: { ENGLISH: `v${i}` },
+            Array.from({length: 500}, (_, i) => ({
+                key: `TEXT_MANY_${i}`, translations: {ENGLISH: `v${i}`},
             })));
 
         assert.ok(suggestBaselineKeys('TEXT_MANY', many, [], LANGUAGES).length <= 20);
@@ -72,8 +72,8 @@ describe('suggestBaselineKeys', () => {
         const [suggestion] = suggestBaselineKeys('XWING', baseline, existing, LANGUAGES);
 
         assert.deepEqual(suggestion.values, [
-            { language: 'ENGLISH', value: 'X-Wing' },
-            { language: 'GERMAN', value: 'X-Fluegler' },
+            {language: 'ENGLISH', value: 'X-Wing'},
+            {language: 'GERMAN', value: 'X-Fluegler'},
         ]);
     });
 
@@ -81,8 +81,8 @@ describe('suggestBaselineKeys', () => {
         const [suggestion] = suggestBaselineKeys('YWING', baseline, existing, LANGUAGES);
 
         assert.deepEqual(suggestion.values, [
-            { language: 'ENGLISH', value: 'Y-Wing' },
-            { language: 'GERMAN', value: '' },
+            {language: 'ENGLISH', value: 'Y-Wing'},
+            {language: 'GERMAN', value: ''},
         ]);
     });
 

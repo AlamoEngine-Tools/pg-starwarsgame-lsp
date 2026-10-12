@@ -13,8 +13,8 @@
 // being shown in that state - so the state is read off the clip, and the weapons are swapped once, here,
 // ahead of everything that draws an arc or clamps a handle.
 
-import type { PreviewWeapon } from '../../protocol/modelPreview';
-import type { AnimationAction } from './animationNames';
+import type {PreviewWeapon} from '../../protocol/modelPreview';
+import type {AnimationAction} from './animationNames';
 
 /**
  * Whether the clip on the playhead shows the unit deployed.

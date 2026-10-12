@@ -13,9 +13,9 @@
 // trusts what it is handed: a missing field takes its default, a wrong one is refused, and nothing
 // throws. A preview that opens blank because of a bad string in a settings file has no way back.
 
-import { type CameraBinding } from './cameraBindings';
-import { type CameraPreset } from './cameraPresets';
-import { asRecord, boolean_, names, nullableString, number_, string_ } from './storedValue';
+import {type CameraBinding} from './cameraBindings';
+import {type CameraPreset} from './cameraPresets';
+import {asRecord, boolean_, names, number_, string_} from './storedValue';
 
 /** Red, green and blue, each 0..1 - the range three.js and the effects both work in. */
 export type Colour = readonly [number, number, number];
@@ -196,10 +196,10 @@ export const DEFAULT_LIGHTS: LightRig = {
     // times the light, all of it colourless, which blew every hull out to a flat white silhouette
     // with no shading left in it. The blue fills are what put the cool tone back into the shadowed
     // faces, and they are the difference you see against AloViewer side by side.
-    sun: { azimuth: 0, elevation: 45, colour: WHITE, intensity: 0.5 },
-    fill1: { azimuth: 210, elevation: -10, colour: [0.25, 0.25, 0.5], intensity: 0.5 },
-    fill2: { azimuth: 120, elevation: -10, colour: [0.25, 0.25, 0.5], intensity: 0.5 },
-    ambient: { colour: WHITE, intensity: 0.1 },
+    sun: {azimuth: 0, elevation: 45, colour: WHITE, intensity: 0.5},
+    fill1: {azimuth: 210, elevation: -10, colour: [0.25, 0.25, 0.5], intensity: 0.5},
+    fill2: {azimuth: 120, elevation: -10, colour: [0.25, 0.25, 0.5], intensity: 0.5},
+    ambient: {colour: WHITE, intensity: 0.1},
     specular: WHITE,
 
     // AloViewer's own default, and now it means what theirs means: the stencil darken MULTIPLIES
@@ -230,7 +230,7 @@ export const DEFAULT_VIEWER_SETTINGS: ViewerSettings = {
 
     // A gentle breeze across the model rather than dead calm: the foliage shaders are only
     // interesting in motion, and zero would look like the feature is missing.
-    wind: { heading: 90, speed: 1 },
+    wind: {heading: 90, speed: 1},
     skeleton: false,
     boneLabels: 'none',
     fireArcs: false,
@@ -244,16 +244,16 @@ const BACKGROUNDS: BackgroundKind[] = ['flat', 'starfield', 'sky'];
 
 /** The ranges the controls offer, so a stored value can never put the viewer somewhere unusable. */
 const RANGES: Record<string, { min: number; max: number }> = {
-    drawDistance: { min: 1, max: 16 },
+    drawDistance: {min: 1, max: 16},
 
     // AloViewer's own range. Past it the floor is somewhere no camera fitted to a model will ever
     // look, which reads as the ground having vanished rather than as a number out of range.
-    floorLevel: { min: -10000, max: 10000 },
-    particleSpeed: { min: 0, max: 4 },
-    azimuth: { min: 0, max: 360 },
-    elevation: { min: -90, max: 90 },
-    intensity: { min: 0, max: 8 },
-    windSpeed: { min: 0, max: 20 },
+    floorLevel: {min: -10000, max: 10000},
+    particleSpeed: {min: 0, max: 4},
+    azimuth: {min: 0, max: 360},
+    elevation: {min: -90, max: 90},
+    intensity: {min: 0, max: 8},
+    windSpeed: {min: 0, max: 20},
 };
 
 /**
@@ -279,7 +279,7 @@ function presetsFrom(stored: unknown): CameraPreset[] {
 
     for (const entry of stored) {
         const raw = asRecord(entry);
-        const { id, name, distance, pitch, yaw, bone } = raw;
+        const {id, name, distance, pitch, yaw, bone} = raw;
 
         if (typeof id !== 'string' || id === '' || typeof name !== 'string'
             // A distance of zero or less is not a shot - it is a camera at the centre of the model
@@ -310,7 +310,7 @@ function bindingsFrom(stored: unknown): CameraBinding[] {
 
     for (const entry of stored) {
         const raw = asRecord(entry);
-        const { id, kind, value, presetId } = raw;
+        const {id, kind, value, presetId} = raw;
 
         // A rule nobody can evaluate is worse than no rule at all: it would sit in the list looking
         // like the subject was bound while never firing.
@@ -321,7 +321,7 @@ function bindingsFrom(stored: unknown): CameraBinding[] {
             continue;
         }
 
-        bindings.push({ id, kind: kind as CameraBinding['kind'], value, presetId });
+        bindings.push({id, kind: kind as CameraBinding['kind'], value, presetId});
     }
 
     return bindings;
@@ -351,7 +351,7 @@ export function viewerSettingsFrom(stored: unknown): ViewerSettings {
             RANGES.drawDistance),
         lights: version >= 2
             ? lights
-            : { ...lights, shadow: DEFAULT_LIGHTS.shadow },
+            : {...lights, shadow: DEFAULT_LIGHTS.shadow},
         cameraPresets: presetsFrom(raw.cameraPresets),
         cameraBindings: bindingsFrom(raw.cameraBindings),
         collapsedPanels: names(raw.collapsedPanels),

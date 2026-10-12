@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 const assert = require('node:assert/strict');
-const { describe, it } = require('node:test');
+const {describe, it} = require('node:test');
 
-const { tokenOffences, KINDS } = require('./styleTokenRules');
+const {tokenOffences, KINDS} = require('./styleTokenRules');
 
 /** Offence kinds found in a template body, in order. */
 function kinds(body, options) {
@@ -15,17 +15,17 @@ const defined = new Set(['--space-4', '--space-6', '--radius-3', '--colour-ink']
 
 describe('raw lengths on a scale property', () => {
     it('reports a padding written as a literal', () => {
-        assert.deepEqual(kinds('.a { padding: 7px; }', { defined }), [KINDS.length]);
+        assert.deepEqual(kinds('.a { padding: 7px; }', {defined}), [KINDS.length]);
     });
 
     it('reports each literal in a shorthand, since each is its own decision', () => {
         assert.deepEqual(
-            kinds('.a { padding: 4px 8px; }', { defined }),
+            kinds('.a { padding: 4px 8px; }', {defined}),
             [KINDS.length, KINDS.length]);
     });
 
     it('accepts the same property written as a token', () => {
-        assert.deepEqual(kinds('.a { padding: var(--space-4); }', { defined }), []);
+        assert.deepEqual(kinds('.a { padding: var(--space-4); }', {defined}), []);
     });
 
     /**
@@ -38,21 +38,21 @@ describe('raw lengths on a scale property', () => {
         // lengths. The shipped shadows use rgba() with an alpha, which is not a themed colour.
         const body = '.a { width: 128px; height: 78px; top: 3px;'
             + ' box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4); }';
-        assert.deepEqual(kinds(body, { defined }), []);
+        assert.deepEqual(kinds(body, {defined}), []);
     });
 
     it('leaves a negative length alone, since those are usually coupled to something else', () => {
-        assert.deepEqual(kinds('.a { margin: -14px -16px 0; }', { defined }), []);
+        assert.deepEqual(kinds('.a { margin: -14px -16px 0; }', {defined}), []);
     });
 
     it('does not read a px out of a comment', () => {
-        assert.deepEqual(kinds('/* 136px overflowed here */ .a { gap: var(--space-6); }', { defined }), []);
+        assert.deepEqual(kinds('/* 136px overflowed here */ .a { gap: var(--space-6); }', {defined}), []);
     });
 });
 
 describe('raw colours', () => {
     it('reports a hex literal', () => {
-        assert.deepEqual(kinds('.a { color: #ff0000; }', { defined }), [KINDS.colour]);
+        assert.deepEqual(kinds('.a { color: #ff0000; }', {defined}), [KINDS.colour]);
     });
 
     /**
@@ -61,12 +61,12 @@ describe('raw colours', () => {
      */
     it('accepts a hex as the fallback of a host variable', () => {
         assert.deepEqual(
-            kinds('.a { color: var(--vscode-foreground, #cccccc); }', { defined }), []);
+            kinds('.a { color: var(--vscode-foreground, #cccccc); }', {defined}), []);
     });
 
     it('accepts a raw colour where the file is allowed them', () => {
         assert.deepEqual(
-            kinds('.a { color: #ff0000; }', { defined, allowRawColours: true }), []);
+            kinds('.a { color: #ff0000; }', {defined, allowRawColours: true}), []);
     });
 });
 
@@ -78,22 +78,22 @@ describe('token references', () => {
      * from the compiler, the bundler or the browser.
      */
     it('reports a token nothing defines', () => {
-        assert.deepEqual(kinds('.a { padding: var(--space-5); }', { defined }), [KINDS.unknown]);
+        assert.deepEqual(kinds('.a { padding: var(--space-5); }', {defined}), [KINDS.unknown]);
     });
 
     it('accepts a token the layer defines', () => {
-        assert.deepEqual(kinds('.a { padding: var(--space-6); }', { defined }), []);
+        assert.deepEqual(kinds('.a { padding: var(--space-6); }', {defined}), []);
     });
 
     // The host's own variables are defined by VS Code, not by this repo, so they cannot be checked
     // against the layer - only that they look like host variables.
     it('accepts a host variable', () => {
-        assert.deepEqual(kinds('.a { color: var(--vscode-foreground); }', { defined }), []);
+        assert.deepEqual(kinds('.a { color: var(--vscode-foreground); }', {defined}), []);
     });
 
     it('accepts a property the file declares for itself', () => {
         const body = '.a { --crawl-to: 10px; transform: translateY(var(--crawl-to)); }';
-        assert.deepEqual(kinds(body, { defined }), []);
+        assert.deepEqual(kinds(body, {defined}), []);
     });
 
     // Set from JS as a computed key, which is how a component drives an animation it has measured.
@@ -101,7 +101,7 @@ describe('token references', () => {
         const body = '.a { transform: translateY(var(--crawl-to)); }';
         const alsoDeclared = new Set(['--crawl-to']);
 
-        assert.deepEqual(kinds(body, { defined, alsoDeclared }), []);
+        assert.deepEqual(kinds(body, {defined, alsoDeclared}), []);
     });
 
     /**
@@ -110,13 +110,13 @@ describe('token references', () => {
      * message says the declaration is dropped, so it must only fire where that is true.
      */
     it('accepts an undefined token that carries a fallback', () => {
-        assert.deepEqual(kinds('.a { transform: translateY(var(--nope, 100%)); }', { defined }), []);
+        assert.deepEqual(kinds('.a { transform: translateY(var(--nope, 100%)); }', {defined}), []);
     });
 });
 
 describe('reporting', () => {
     it('gives the offset and the text, so the driver can name a line', () => {
-        const [offence] = tokenOffences('.a { gap: 7px; }', { defined });
+        const [offence] = tokenOffences('.a { gap: 7px; }', {defined});
 
         assert.equal(typeof offence.index, 'number');
         assert.match(offence.text, /7px/);

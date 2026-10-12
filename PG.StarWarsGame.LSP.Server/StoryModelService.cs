@@ -97,15 +97,6 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
     // index changes must re-trigger a scan even though no chain is cached.
     private bool _servedIncompleteScan;
 
-    /// <summary>Assembled campaign models held, one per (campaign, faction) asked for.</summary>
-    public CacheStatistics Snapshot()
-    {
-        lock (_gate)
-        {
-            return new CacheStatistics("story-models", _models.Count);
-        }
-    }
-
     public StoryModelService(
         IModProjectReloadService reloadService,
         IGameIndexService indexService,
@@ -120,6 +111,15 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
         _fileHelper = fileHelper;
         _textSource = textSource;
         _logger = logger;
+    }
+
+    /// <summary>Assembled campaign models held, one per (campaign, faction) asked for.</summary>
+    public CacheStatistics Snapshot()
+    {
+        lock (_gate)
+        {
+            return new CacheStatistics("story-models", _models.Count);
+        }
     }
 
     public IReadOnlyList<string> GetCampaignNames()
@@ -228,23 +228,6 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
         return result;
     }
 
-    /// <summary>
-    ///     Whether <paramref name="documentUri" /> is the thread the manifest spells as
-    ///     <paramref name="xmlRelativeThread" />.
-    /// </summary>
-    /// <remarks>
-    ///     Anchored at a segment boundary, so <c>Story_Sith.xml</c> is never satisfied by
-    ///     <c>Alt_Story_Sith.xml</c>. Manifests spell separators either way, and case never agrees
-    ///     between shipped and mod data, so both are folded.
-    /// </remarks>
-    private static bool IsThreadOf(string documentUri, string xmlRelativeThread)
-    {
-        if (string.IsNullOrEmpty(xmlRelativeThread)) return false;
-
-        var relative = xmlRelativeThread.Replace('\\', '/').TrimStart('/');
-        return documentUri.EndsWith("/" + relative, StringComparison.OrdinalIgnoreCase);
-    }
-
     public StoryChainScanResult GetChainResult()
     {
         return GetChain().Result;
@@ -272,6 +255,23 @@ public sealed class StoryModelService : IStoryModelService, ICacheStatisticsSour
         // old names stay included so clients holding a since-renamed campaign refresh too.
         invalidated.AddRange(GetChain().Result.Campaigns.Select(c => c.Name));
         return invalidated.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="documentUri" /> is the thread the manifest spells as
+    ///     <paramref name="xmlRelativeThread" />.
+    /// </summary>
+    /// <remarks>
+    ///     Anchored at a segment boundary, so <c>Story_Sith.xml</c> is never satisfied by
+    ///     <c>Alt_Story_Sith.xml</c>. Manifests spell separators either way, and case never agrees
+    ///     between shipped and mod data, so both are folded.
+    /// </remarks>
+    private static bool IsThreadOf(string documentUri, string xmlRelativeThread)
+    {
+        if (string.IsNullOrEmpty(xmlRelativeThread)) return false;
+
+        var relative = xmlRelativeThread.Replace('\\', '/').TrimStart('/');
+        return documentUri.EndsWith("/" + relative, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── Chain scan (campaign → manifest → thread associations) ───────────────

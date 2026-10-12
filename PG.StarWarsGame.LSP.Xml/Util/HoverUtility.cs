@@ -16,6 +16,10 @@ internal static class HoverUtility
     private const string NoneMessage =
         "_No description available. Help the community by [contributing one via a PR](https://github.com/AlamoEngine-Tools/eaw-schema)._";
 
+    /// <summary>The kinds a tag hover puts in its status line, and so need not repeat below it.</summary>
+    private static readonly HashSet<SchemaNoteKind> SummarisedOnTheStatusLine =
+        [SchemaNoteKind.Since, SchemaNoteKind.Deprecated];
+
     public static string Resolve(IReadOnlyDictionary<string, string> descriptions, string locale)
     {
         if (descriptions.TryGetValue(locale, out var text))
@@ -283,10 +287,6 @@ internal static class HoverUtility
         // AppendLine per note, so the block uses the same line ending as everything above it.
         foreach (var line in lines) sb.AppendLine(line);
     }
-
-    /// <summary>The kinds a tag hover puts in its status line, and so need not repeat below it.</summary>
-    private static readonly HashSet<SchemaNoteKind> SummarisedOnTheStatusLine =
-        [SchemaNoteKind.Since, SchemaNoteKind.Deprecated];
 
     private static string NoteLabel(SchemaNoteKind kind)
     {

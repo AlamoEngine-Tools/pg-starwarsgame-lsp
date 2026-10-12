@@ -2,20 +2,20 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { groundRange, snapToZero } from './groundRange';
+import {groundRange, snapToZero} from './groundRange';
 
 describe('groundRange', () => {
     it('reaches past a Star Destroyer', () => {
         // The objection to a slider was that no ONE range suits a corpus running from a two-unit
         // trooper to a thousand-unit command centre. The answer is not to pick a range but to take
         // it from the subject.
-        assert.deepEqual(groundRange(349), { limit: 500, step: 5 });
+        assert.deepEqual(groundRange(349), {limit: 500, step: 5});
     });
 
     it('is just as usable on a trooper', () => {
-        assert.deepEqual(groundRange(2), { limit: 2, step: 0.02 });
+        assert.deepEqual(groundRange(2), {limit: 2, step: 0.02});
     });
 
     it('rounds up to a round number, so the ends of the track read as something', () => {

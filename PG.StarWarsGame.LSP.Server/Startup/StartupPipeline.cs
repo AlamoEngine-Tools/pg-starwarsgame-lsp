@@ -25,12 +25,12 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 public sealed class StartupPipeline
 {
     private readonly IBaselineBootstrapper _baseline;
+    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IStartupGate _gate;
     private readonly ILogger<StartupPipeline> _logger;
     private readonly IPgprojMigrationOffer? _migrationOffer;
     private readonly IStartupNotifier _notifier;
     private readonly IStartupProgress _progress;
-    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IModProjectReloadService _reloadService;
     private readonly IReadOnlyList<IDiagnosticsRepublisher> _republishers;
     private readonly ISchemaBootstrapper _schema;
@@ -118,7 +118,6 @@ public sealed class StartupPipeline
                 "unless a start has left the session with no diagnostics at all.");
 
             foreach (var republisher in _republishers)
-            {
                 try
                 {
                     await republisher.RepublishAllAsync(ct);
@@ -130,7 +129,6 @@ public sealed class StartupPipeline
                     _logger.LogWarning(ex, "Could not publish workspace diagnostics for {Publisher}.",
                         republisher.GetType().Name);
                 }
-            }
         }
 
         // Last, and deliberately outside everything above: the offer is a question, and nothing

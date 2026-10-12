@@ -12,13 +12,10 @@
 // point at in the tree. The master holds no opinion about which weapons are on - switch it off and
 // back on and your picks are still there.
 
-import type {
-    PreviewHardpoint, PreviewTurret, PreviewWeapon,
-} from '../../protocol/modelPreview';
-import type { TreeItem } from './previewTree';
-
-import { PREVIEW_WEAPON_SOURCE } from '../../protocol/modelPreview';
-import { axisRange, turretEnvelopes } from './turretHandles';
+import type {PreviewHardpoint, PreviewTurret, PreviewWeapon,} from '../../protocol/modelPreview';
+import {PREVIEW_WEAPON_SOURCE} from '../../protocol/modelPreview';
+import type {TreeItem} from './previewTree';
+import {axisRange, turretEnvelopes} from './turretHandles';
 
 /** One cone the viewport draws, tagged with the weapon it belongs to. */
 /**
@@ -279,7 +276,7 @@ function rotationArcsOf(weapon: PreviewWeapon, fire: readonly WeaponArc[]): Weap
         return [];
     }
 
-    const { rotation } = turretEnvelopes({
+    const {rotation} = turretEnvelopes({
         yaw: axisRange('yaw', turret.rotateExtentDegrees),
         pitch: axisRange('pitch', turret.elevateExtentDegrees),
     });

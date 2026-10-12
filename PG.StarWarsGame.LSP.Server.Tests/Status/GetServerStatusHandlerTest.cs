@@ -4,8 +4,8 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using System.Reflection;
-using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -304,14 +304,6 @@ public sealed class GetServerStatusHandlerTest
         Assert.Empty((await Extended(HealthyRecorder(), LayeredIndex())).Extended!.Memory.Caches);
     }
 
-    private sealed class FixedCache(CacheStatistics statistics) : ICacheStatisticsSource
-    {
-        public CacheStatistics Snapshot()
-        {
-            return statistics;
-        }
-    }
-
     [Fact]
     public async Task Extended_ReportsTheDependencyShapeAndLayerCount()
     {
@@ -325,7 +317,7 @@ public sealed class GetServerStatusHandlerTest
     {
         var extended = (await Extended(HealthyRecorder(), LayeredIndex())).Extended!;
 
-        Assert.Equal(new ServerStatusFilesDto(ProjectFiles: 2, DependencyFiles: 1, XmlFiles: 2, LuaFiles: 1),
+        Assert.Equal(new ServerStatusFilesDto(2, 1, 2, 1),
             extended.Files);
     }
 
@@ -334,7 +326,7 @@ public sealed class GetServerStatusHandlerTest
     {
         var extended = (await Extended(HealthyRecorder(), LayeredIndex())).Extended!;
 
-        Assert.Equal(new ServerStatusSymbolsDto(Xml: 3, Lua: 1, Baseline: 1, LocalisationKeys: 0),
+        Assert.Equal(new ServerStatusSymbolsDto(3, 1, 1, 0),
             extended.Symbols);
     }
 
@@ -344,7 +336,10 @@ public sealed class GetServerStatusHandlerTest
         var extended = (await Extended(HealthyRecorder(), LayeredIndex())).Extended!;
 
         Assert.Equal(
-            [new("SpaceUnit", 2), new("GroundInfantry", 1), new("LuaGlobal", 1)],
+            [
+                new ServerStatusTypeCountDto("SpaceUnit", 2), new ServerStatusTypeCountDto("GroundInfantry", 1),
+                new ServerStatusTypeCountDto("LuaGlobal", 1)
+            ],
             extended.SymbolTypes);
     }
 
@@ -364,7 +359,7 @@ public sealed class GetServerStatusHandlerTest
     public async Task Extended_ReportsEveryCachesOutcome()
     {
         var recorder = HealthyRecorder();
-        recorder.RecordSchema(StatusSchemaSource.Release, recorder.SchemaCheck, fromCache: true);
+        recorder.RecordSchema(StatusSchemaSource.Release, recorder.SchemaCheck, true);
 
         var caches = (await Extended(recorder, LayeredIndex())).Extended!.Caches;
 
@@ -396,6 +391,14 @@ public sealed class GetServerStatusHandlerTest
         var status = await Status(HealthyRecorder(), index: GameIndex.Empty with { Baseline = LoadedBaseline });
 
         Assert.Contains("Asset catalog: No models", status.Warnings);
+    }
+
+    private sealed class FixedCache(CacheStatistics statistics) : ICacheStatisticsSource
+    {
+        public CacheStatistics Snapshot()
+        {
+            return statistics;
+        }
     }
 
     private sealed class StatsOnly(IndexCacheStats index, BoneCatalogStats bones) : IWorkspaceIndexer

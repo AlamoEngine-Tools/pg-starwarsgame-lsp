@@ -5,9 +5,9 @@
 // the constructs they use are reproduced, in code of my own.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { splitArguments, translateHlslBody } from './hlsl';
+import {splitArguments, translateHlslBody} from './hlsl';
 
 describe('splitArguments', () => {
     it('splits at the top level only', () => {

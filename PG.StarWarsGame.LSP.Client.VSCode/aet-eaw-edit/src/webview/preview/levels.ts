@@ -7,7 +7,7 @@
 // numbers. The rule is `RenderObject::CheckAltLod`: only TAGGED things are ever switched, so an
 // untagged mesh is the hull itself and must never be hidden by a level change.
 
-import { isVisibleAtLevel, type MaterialExtras } from './materials';
+import {isVisibleAtLevel, type MaterialExtras} from './materials';
 
 /** The level tags something carries, with null meaning untagged. */
 export interface LevelTagged {
@@ -97,17 +97,19 @@ export function definedLevels(tagged: Iterable<LevelTagged>): DefinedLevels {
     // ALT fills its gaps; LOD does not. See the note above - a damage stage can exist without the
     // model drawing anything for it, and a detail level cannot.
     const stages = ascending(alt);
-    const contiguous = Array.from({ length: stages[stages.length - 1] + 1 }, (_, i) => i);
+    const contiguous = Array.from({length: stages[stages.length - 1] + 1}, (_, i) => i);
 
-    return { alt: contiguous, lod: ascending(lod) };
+    return {alt: contiguous, lod: ascending(lod)};
 }
 
 /** A slider's worth of positions over the levels a model actually defines. */
 export interface LevelSteps {
     /** How many positions the slider has. Zero when the model defines nothing to choose between. */
     count: number;
+
     /** The level shown at a slider position, clamped to the ends. */
     levelAt(position: number): number;
+
     /** Where the thumb belongs for a level, or the first position when it is not defined here. */
     positionOf(level: number): number;
 }
@@ -219,7 +221,7 @@ export function costByLevel(
     alt: number, levels: readonly number[],
 ): Map<number, LevelCost> {
     const counts = new Map<number, LevelCost>(
-        levels.map(level => [level, { meshes: 0, triangles: 0 }]));
+        levels.map(level => [level, {meshes: 0, triangles: 0}]));
 
     for (const mesh of meshes) {
         for (const level of levels) {
@@ -325,7 +327,7 @@ export function withDeclaredStages(
         ...declared.filter(stage => Number.isFinite(stage) && stage >= 0));
 
     return {
-        alt: Array.from({ length: highest + 1 }, (_, stage) => stage),
+        alt: Array.from({length: highest + 1}, (_, stage) => stage),
         lod: levels.lod,
     };
 }

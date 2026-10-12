@@ -11,8 +11,8 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway, LspOutcome } from './lsp/lspGateway';
-import { emptyNavigatorMessage } from './navigatorPlaceholder';
+import {LspGateway, LspOutcome} from './lsp/lspGateway';
+import {emptyNavigatorMessage} from './navigatorPlaceholder';
 
 /**
  * A tree view fed by one `aet/*` request.
@@ -21,7 +21,7 @@ import { emptyNavigatorMessage } from './navigatorPlaceholder';
  * @typeParam TData What the request returns for the tree to build itself from.
  */
 export abstract class LspTreeDataProvider<TItem extends vscode.TreeItem, TData>
-implements vscode.TreeDataProvider<TItem> {
+    implements vscode.TreeDataProvider<TItem> {
     private readonly _onDidChangeTreeData = new vscode.EventEmitter<TItem | undefined>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
@@ -42,7 +42,8 @@ implements vscode.TreeDataProvider<TItem> {
      */
     protected data: TData | undefined;
 
-    protected constructor(protected readonly lsp: LspGateway) {}
+    protected constructor(protected readonly lsp: LspGateway) {
+    }
 
     // ── what a subclass supplies ─────────────────────────────────────────────
 
@@ -89,7 +90,9 @@ implements vscode.TreeDataProvider<TItem> {
      */
     async preload(): Promise<void> {
         this._scanned = true;
-        if (!this.lsp.isRunning) { return; }
+        if (!this.lsp.isRunning) {
+            return;
+        }
 
         // Left uncached on any failure. The view then fetches when it is opened, which is where a
         // failure has somewhere to be shown - here there is no row to put it in.
@@ -108,13 +111,19 @@ implements vscode.TreeDataProvider<TItem> {
     }
 
     private async _loadRoot(): Promise<TItem[]> {
-        if (this.data !== undefined) { return this._present(this.data); }
+        if (this.data !== undefined) {
+            return this._present(this.data);
+        }
 
         const outcome = await this.lsp.request<TData>(this.method);
-        if (!outcome.ok) { return [this.infoItem(this.failureMessage(outcome))]; }
+        if (!outcome.ok) {
+            return [this.infoItem(this.failureMessage(outcome))];
+        }
 
         const error = this.errorOf(outcome.value);
-        if (error) { return [this.infoItem(error)]; }
+        if (error) {
+            return [this.infoItem(error)];
+        }
 
         this.data = outcome.value;
         return this._present(outcome.value);

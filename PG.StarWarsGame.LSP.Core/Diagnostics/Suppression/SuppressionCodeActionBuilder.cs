@@ -47,6 +47,12 @@ public sealed record SuppressionInsertionPoint(SuppressionScope Scope, int Line,
 /// </summary>
 public static class SuppressionCodeActionBuilder
 {
+    /// <summary>Lines kept from each end of a range longer than twice this.</summary>
+    private const int ReportLinesPerEnd = 20;
+
+    /// <summary>Characters kept of a longer source line.</summary>
+    private const int ReportLineLength = 400;
+
     /// <summary>
     ///     Actions for one diagnostic, narrowest scope first - whichever the user picks by reflex
     ///     should be the least destructive. Callers pass only the scopes that apply where the
@@ -100,12 +106,6 @@ public static class SuppressionCodeActionBuilder
             Command = new Command { Name = command, Title = title, Arguments = new JArray(report) }
         });
     }
-
-    /// <summary>Lines kept from each end of a range longer than twice this.</summary>
-    private const int ReportLinesPerEnd = 20;
-
-    /// <summary>Characters kept of a longer source line.</summary>
-    private const int ReportLineLength = 400;
 
     /// <summary>
     ///     What a report says about one diagnostic: its id, severity and message, the file NAME, and

@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { after, describe, it } from 'node:test';
+import {after, describe, it} from 'node:test';
 
-import { hasShaderSources } from './shaderLayout';
+import {hasShaderSources} from './shaderLayout';
 
 const roots: string[] = [];
 
@@ -18,7 +18,7 @@ function folderWith(...files: string[]): string {
 
     for (const file of files) {
         const full = path.join(root, file);
-        fs.mkdirSync(path.dirname(full), { recursive: true });
+        fs.mkdirSync(path.dirname(full), {recursive: true});
         fs.writeFileSync(full, '// not a real shader');
     }
 
@@ -27,7 +27,7 @@ function folderWith(...files: string[]): string {
 
 after(() => {
     for (const root of roots) {
-        fs.rmSync(root, { recursive: true, force: true });
+        fs.rmSync(root, {recursive: true, force: true});
     }
 });
 

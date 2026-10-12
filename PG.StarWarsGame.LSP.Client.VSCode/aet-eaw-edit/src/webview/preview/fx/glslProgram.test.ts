@@ -8,8 +8,14 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {
-    buildFragmentShader, buildVertexShader, declareUniforms, findEntry, findStructs,
-    neutralisePacking, resolveShaderHandle, stripFxScaffolding,
+    buildFragmentShader,
+    buildVertexShader,
+    declareUniforms,
+    findEntry,
+    findStructs,
+    neutralisePacking,
+    resolveShaderHandle,
+    stripFxScaffolding,
 } from './glslProgram';
 
 const SHADER = `

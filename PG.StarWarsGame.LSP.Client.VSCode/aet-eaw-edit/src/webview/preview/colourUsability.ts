@@ -8,7 +8,7 @@
 // sees red and green differently. The vanilla data makes the point on its own: Bothan, Hostile and
 // Sarlacc all ship 153,21,223, and Empire and Imperial both ship 54,134,242.
 
-import type { PreviewRgba } from '../../protocol/modelPreview';
+import type {PreviewRgba} from '../../protocol/modelPreview';
 
 /** CIE L*a*b*. */
 export interface Lab {
@@ -37,8 +37,8 @@ const COLLISION_DELTA_E = 12;
 
 /** The dark of space, and a mid daylight terrain, as the two backdrops a unit is seen against. */
 const BACKDROPS: { name: string; colour: PreviewRgba }[] = [
-    { name: 'the space backdrop', colour: { r: 10, g: 12, b: 20, a: 255 } },
-    { name: 'daylight terrain', colour: { r: 138, g: 132, b: 112, a: 255 } },
+    {name: 'the space backdrop', colour: {r: 10, g: 12, b: 20, a: 255}},
+    {name: 'daylight terrain', colour: {r: 138, g: 132, b: 112, a: 255}},
 ];
 
 /**
@@ -78,7 +78,7 @@ export function rgbToLab(colour: PreviewRgba): Lab {
     const f = (t: number): number =>
         t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
 
-    return { l: 116 * f(y) - 16, a: 500 * (f(x) - f(y)), b: 200 * (f(y) - f(z)) };
+    return {l: 116 * f(y) - 16, a: 500 * (f(x) - f(y)), b: 200 * (f(y) - f(z))};
 }
 
 const toRadians = (degrees: number): number => (degrees * Math.PI) / 180;

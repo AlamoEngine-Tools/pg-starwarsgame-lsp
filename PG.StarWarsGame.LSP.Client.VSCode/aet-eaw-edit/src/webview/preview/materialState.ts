@@ -16,7 +16,7 @@
 
 import * as THREE from 'three';
 
-import { type FxBlend, type FxDepthFunc, type FxMaterialState } from './fx/renderState';
+import {type FxBlend, type FxDepthFunc, type FxMaterialState} from './fx/renderState';
 
 /**
  * Puts an Alamo blend onto a three material.
@@ -204,7 +204,7 @@ export function applyColourScale(material: THREE.Material, scale: number): void 
         return;
     }
 
-    const uniform = { value: scale };
+    const uniform = {value: scale};
     data.colourScale = uniform;
 
     const earlier = material.onBeforeCompile;

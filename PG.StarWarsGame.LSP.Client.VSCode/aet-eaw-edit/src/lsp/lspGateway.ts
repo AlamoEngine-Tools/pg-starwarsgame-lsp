@@ -14,7 +14,7 @@
 
 /** The two ways a call can come back with nothing. */
 export type LspFailure =
-    /** The server is not running - nothing was sent. */
+/** The server is not running - nothing was sent. */
     | 'offline'
     /** It was sent and the request rejected, or the server answered with an error. */
     | 'failed';
@@ -34,6 +34,7 @@ export type LspOutcome<T> =
 /** Where the gateway's user-facing messages go. `vscode.window` in production. */
 export interface LspMessageSink {
     warn(message: string): void;
+
     error(message: string): void;
 }
 
@@ -63,7 +64,8 @@ export class LspGateway {
     constructor(
         private readonly _resolve: () => LspRequestSender | undefined,
         private readonly _sink?: LspMessageSink,
-    ) {}
+    ) {
+    }
 
     get isRunning(): boolean {
         return this._resolve() !== undefined;
@@ -117,7 +119,9 @@ export class LspGateway {
                 resolve(ready);
             };
 
-            const timer = setTimeout(() => { release(false); }, timeoutMs);
+            const timer = setTimeout(() => {
+                release(false);
+            }, timeoutMs);
             this._waiting.add(release);
         });
     }
@@ -129,7 +133,9 @@ export class LspGateway {
      * `if (!gateway.requireRunning()) { return; }`
      */
     requireRunning(): boolean {
-        if (this.isRunning) { return true; }
+        if (this.isRunning) {
+            return true;
+        }
         this._sink?.warn(SERVER_NOT_RUNNING);
         return false;
     }
@@ -142,13 +148,13 @@ export class LspGateway {
     async request<T>(method: string, params: unknown = {}): Promise<LspOutcome<T>> {
         const client = this._resolve();
         if (client === undefined) {
-            return { ok: false, reason: 'offline', message: SERVER_NOT_RUNNING };
+            return {ok: false, reason: 'offline', message: SERVER_NOT_RUNNING};
         }
 
         try {
-            return { ok: true, value: await client.sendRequest<T>(method, params) };
+            return {ok: true, value: await client.sendRequest<T>(method, params)};
         } catch (e) {
-            return { ok: false, reason: 'failed', message: String(e) };
+            return {ok: false, reason: 'failed', message: String(e)};
         }
     }
 
@@ -162,7 +168,9 @@ export class LspGateway {
         method: string, params: unknown = {}, context?: string,
     ): Promise<T | undefined> {
         const outcome = await this.request<T>(method, params);
-        if (outcome.ok) { return outcome.value; }
+        if (outcome.ok) {
+            return outcome.value;
+        }
 
         if (outcome.reason === 'offline') {
             this._sink?.warn(SERVER_NOT_RUNNING);
@@ -208,8 +216,10 @@ export class LspGateway {
      * @returns whether it ran, for a caller that follows up on success.
      */
     async executeCommand(command: string, args: unknown[] = [], context?: string): Promise<boolean> {
-        const outcome = await this.request(EXECUTE_COMMAND, { command, arguments: args });
-        if (outcome.ok) { return true; }
+        const outcome = await this.request(EXECUTE_COMMAND, {command, arguments: args});
+        if (outcome.ok) {
+            return true;
+        }
 
         if (outcome.reason === 'offline') {
             this._sink?.warn(SERVER_NOT_RUNNING);

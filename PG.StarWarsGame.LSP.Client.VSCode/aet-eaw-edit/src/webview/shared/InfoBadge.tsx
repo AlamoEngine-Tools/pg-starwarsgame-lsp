@@ -20,14 +20,14 @@
 // mattering once dealt with. Colouring the mark rather than the sentence means the panel can be
 // scanned for problems without reading a word.
 
-import { ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { createGlobalStyle } from 'styled-components';
+import {ReactNode, useCallback, useLayoutEffect, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
+import {createGlobalStyle} from 'styled-components';
 
-import { badgeIcon, type BadgeSeverity } from './badges';
-import { Icon } from './Icon';
-import { placeTooltip, type TooltipPlacement } from './tooltipPlace';
-import { tokensRootCss } from './tokens';
+import {badgeIcon, type BadgeSeverity} from './badges';
+import {Icon} from './Icon';
+import {placeTooltip, type TooltipPlacement} from './tooltipPlace';
+import {tokensRootCss} from './tokens';
 
 /**
  * The bubble's styles, GLOBAL rather than part of the dock's shared block.
@@ -42,12 +42,11 @@ const TooltipStyles = createGlobalStyle`
        of the custom properties interpolated there. Without this the four token references below
        resolve to nothing - and a padding that resolves to nothing is zero, not a fallback. */
     ${tokensRootCss}
-
-    /* Our own tooltip rather than the browser's, which cannot be styled, is slow to appear and
-       vanishes while you read it.
-
-       Nothing here participates in layout. Showing an explanation must not move the control it
-       explains - which is exactly what an earlier build did by unfolding the note in place. */
+        /* Our own tooltip rather than the browser's, which cannot be styled, is slow to appear and
+           vanishes while you read it.
+    
+           Nothing here participates in layout. Showing an explanation must not move the control it
+           explains - which is exactly what an earlier build did by unfolding the note in place. */
     .info-tip {
         position: fixed;
         z-index: 40;
@@ -77,14 +76,29 @@ const TooltipStyles = createGlobalStyle`
         background: var(--vscode-editorHoverWidget-background, #252526);
         border: var(--space-1) solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35));
     }
+
     /* Only the two edges facing the mark are drawn; the rest would cut a line across the bubble. */
-    .tip-above .info-tip-arrow { bottom: -5px; border-top: none; border-left: none; }
-    .tip-below .info-tip-arrow { top: -5px; border-bottom: none; border-right: none; }
+    .tip-above .info-tip-arrow {
+        bottom: -5px;
+        border-top: none;
+        border-left: none;
+    }
+
+    .tip-below .info-tip-arrow {
+        top: -5px;
+        border-bottom: none;
+        border-right: none;
+    }
 
     /* A warning keeps the same bubble and takes a coloured edge. A wholly yellow panel of text is
        an alert; this is still a note, and it says which kind it is at a glance. */
-    .info-tip.sev-warning { border-color: var(--vscode-editorWarning-foreground, #cca700); }
-    .info-tip.sev-error { border-color: var(--vscode-editorError-foreground, #f14c4c); }
+    .info-tip.sev-warning {
+        border-color: var(--vscode-editorWarning-foreground, #cca700);
+    }
+
+    .info-tip.sev-error {
+        border-color: var(--vscode-editorError-foreground, #f14c4c);
+    }
 `;
 
 export interface InfoBadgeProps {
@@ -95,7 +109,7 @@ export interface InfoBadgeProps {
     children: ReactNode;
 }
 
-export function InfoBadge({ severity = 'info', children }: InfoBadgeProps): React.JSX.Element {
+export function InfoBadge({severity = 'info', children}: InfoBadgeProps): React.JSX.Element {
     // Hover, and nothing else. Pressing used to PIN it open, which read as the tooltip refusing to
     // go away: the reader's first instinct on wanting rid of it is to move the pointer off, and
     // discovering that a second press is what closes it happens by accident if at all. A tooltip
@@ -117,8 +131,8 @@ export function InfoBadge({ severity = 'info', children }: InfoBadgeProps): Reac
 
         setAt(placeTooltip({
             anchor,
-            size: { width: bubble.current.offsetWidth, height: bubble.current.offsetHeight },
-            window: { width: window.innerWidth, height: window.innerHeight },
+            size: {width: bubble.current.offsetWidth, height: bubble.current.offsetHeight},
+            window: {width: window.innerWidth, height: window.innerHeight},
         }));
     }, []);
 
@@ -176,26 +190,26 @@ export function InfoBadge({ severity = 'info', children }: InfoBadgeProps): Reac
                     event.preventDefault();
                 }}
             >
-                <Icon name={badgeIcon(severity)} size={14} />
+                <Icon name={badgeIcon(severity)} size={14}/>
             </button>
 
             {/* Into the body, not into the label. Every panel this appears in scrolls, and a bubble
                 parented to a control inside one is clipped by it. */}
             {open && createPortal(
                 <>
-                <TooltipStyles />
-                <div
-                    ref={bubble}
-                    role="tooltip"
-                    className={`info-tip tip-${at?.side ?? 'above'} sev-${severity}`}
-                    style={at === null
-                        // Rendered to be measured, invisible until it has somewhere to be.
-                        ? { visibility: 'hidden', left: 0, top: 0 }
-                        : { left: at.left, top: at.top }}
-                >
-                    {children}
-                    <span className="info-tip-arrow" style={{ left: at?.arrowLeft ?? 0 }} />
-                </div>
+                    <TooltipStyles/>
+                    <div
+                        ref={bubble}
+                        role="tooltip"
+                        className={`info-tip tip-${at?.side ?? 'above'} sev-${severity}`}
+                        style={at === null
+                            // Rendered to be measured, invisible until it has somewhere to be.
+                            ? {visibility: 'hidden', left: 0, top: 0}
+                            : {left: at.left, top: at.top}}
+                    >
+                        {children}
+                        <span className="info-tip-arrow" style={{left: at?.arrowLeft ?? 0}}/>
+                    </div>
                 </>,
                 document.body)}
         </>

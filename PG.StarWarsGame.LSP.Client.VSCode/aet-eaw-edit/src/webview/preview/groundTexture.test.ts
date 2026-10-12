@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { GROUND_TEXTURE_SIZE, concreteNoise } from './groundTexture';
+import {concreteNoise, GROUND_TEXTURE_SIZE} from './groundTexture';
 
 const at = (pixels: Uint8ClampedArray, x: number, y: number): number =>
     pixels[(y * GROUND_TEXTURE_SIZE + x) * 4];

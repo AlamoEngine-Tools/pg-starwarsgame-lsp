@@ -2,15 +2,21 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
-    alamoBoneName, ancestorsOf, buildBoneTree, filterBones, labelCandidates, visibleRows,
-    type BoneAttachment, type FlatBone,
+    alamoBoneName,
+    ancestorsOf,
+    type BoneAttachment,
+    buildBoneTree,
+    filterBones,
+    type FlatBone,
+    labelCandidates,
+    visibleRows,
 } from './skeleton';
 
 function bone(index: number, name: string, parent: number, visible = true): FlatBone {
-    return { index, name, parent, visible };
+    return {index, name, parent, visible};
 }
 
 /** A miniature of the Star Destroyer's shape: hull, hardpoint bones, damage proxies under them. */
@@ -26,11 +32,11 @@ const DESTROYER: FlatBone[] = [
 describe('alamoBoneName', () => {
     /** The suffix exists because a hull carries twenty bones with the same name. */
     it('recovers the name the XML references from the unique node name', () => {
-        assert.deepEqual(alamoBoneName('HP_F-L_Bone#1'), { name: 'HP_F-L_Bone', index: 1 });
+        assert.deepEqual(alamoBoneName('HP_F-L_Bone#1'), {name: 'HP_F-L_Bone', index: 1});
     });
 
     it('keeps a name that itself contains a hash', () => {
-        assert.deepEqual(alamoBoneName('odd#name#7'), { name: 'odd#name', index: 7 });
+        assert.deepEqual(alamoBoneName('odd#name#7'), {name: 'odd#name', index: 7});
     });
 
     it('rejects a node name that carries no index', () => {
@@ -64,13 +70,13 @@ describe('buildBoneTree', () => {
 
     it('attaches what is attached to a bone', () => {
         const attachments = new Map<number, BoneAttachment[]>([
-            [1, [{ kind: 'hardpoint', label: 'HP_SD_Weapon_FL' }]],
+            [1, [{kind: 'hardpoint', label: 'HP_SD_Weapon_FL'}]],
         ]);
 
         const roots = buildBoneTree(DESTROYER, attachments);
         const hardpointBone = roots[0].children.find(c => c.name === 'HP_F-L_Bone')!;
 
-        assert.deepEqual(hardpointBone.attachments, [{ kind: 'hardpoint', label: 'HP_SD_Weapon_FL' }]);
+        assert.deepEqual(hardpointBone.attachments, [{kind: 'hardpoint', label: 'HP_SD_Weapon_FL'}]);
     });
 
     /**
@@ -205,7 +211,7 @@ describe('ancestorsOf', () => {
 
 describe('labelCandidates, over a selection of several', () => {
     const bones = [
-        { index: 0, name: 'Root' }, { index: 1, name: 'A' }, { index: 2, name: 'B' },
+        {index: 0, name: 'Root'}, {index: 1, name: 'A'}, {index: 2, name: 'B'},
     ] as never;
 
     it('names every selected bone, not only one of them', () => {

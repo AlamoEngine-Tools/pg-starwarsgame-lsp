@@ -14,9 +14,9 @@
 // when it was handed mounted nodes. Only the SIZES now come from the model rather than the DOM.
 // `arrangeLayout.test.ts` reaches into the plugin the same way, for the same reason.
 
-import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
+import {AutoArrangePlugin, Presets as ArrangePresets} from 'rete-auto-arrange-plugin';
 
-import { ARRANGE_OPTIONS } from './arrangeOptions';
+import {ARRANGE_OPTIONS} from './arrangeOptions';
 
 /** The three options the plugin bakes into every layout before merging ours over them. */
 const PLUGIN_BAKED_OPTIONS = {
@@ -46,21 +46,23 @@ export async function arrangePositions(
     edges: readonly ArrangeEdge[],
 ): Promise<Map<string, { x: number; y: number }>> {
     const placed = new Map<string, { x: number; y: number }>();
-    if (nodes.length === 0) { return placed; }
+    if (nodes.length === 0) {
+        return placed;
+    }
 
     const context = {
         nodes: nodes.map(node => ({
             id: node.id,
             width: node.width,
             height: node.height,
-            inputs: node.hasIn ? { in: { index: 0 } } : {},
-            outputs: node.hasOut ? { out: { index: 0 } } : {},
+            inputs: node.hasIn ? {in: {index: 0}} : {},
+            outputs: node.hasOut ? {out: {index: 0}} : {},
         })),
         // Only an edge whose endpoints both carry the socket it uses, or the plugin builds an elk
         // edge against a port that does not exist.
         connections: edges
             .filter(edge => nodes.some(n => n.id === edge.source && n.hasOut)
-                            && nodes.some(n => n.id === edge.target && n.hasIn))
+                && nodes.some(n => n.id === edge.target && n.hasIn))
             .map(edge => ({
                 id: edge.id, source: edge.source, sourceOutput: 'out', target: edge.target, targetInput: 'in',
             })),
@@ -72,12 +74,12 @@ export async function arrangePositions(
     const graph = (plugin as any).graphToElk(context, undefined);
     const laidOut = await (plugin as any).elk.layout({
         id: 'root',
-        layoutOptions: { ...PLUGIN_BAKED_OPTIONS, ...ARRANGE_OPTIONS },
+        layoutOptions: {...PLUGIN_BAKED_OPTIONS, ...ARRANGE_OPTIONS},
         ...graph,
     });
 
     for (const child of (laidOut.children ?? []) as { id: string; x?: number; y?: number }[]) {
-        placed.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
+        placed.set(child.id, {x: child.x ?? 0, y: child.y ?? 0});
     }
     return placed;
 }

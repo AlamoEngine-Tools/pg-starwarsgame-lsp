@@ -2,11 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { AlamoMaterial } from './alamoMaterial';
-import { ALPHA_TEST_OFF, ALPHA_TEST_UNIFORM } from './fx/glslProgram';
-import type { TranslatedEffect } from './fx/effect';
+import {AlamoMaterial} from './alamoMaterial';
+import {ALPHA_TEST_OFF, ALPHA_TEST_UNIFORM} from './fx/glslProgram';
+import type {TranslatedEffect} from './fx/effect';
 
 /** The smallest thing that is still a translated effect. */
 const EFFECT: TranslatedEffect = {

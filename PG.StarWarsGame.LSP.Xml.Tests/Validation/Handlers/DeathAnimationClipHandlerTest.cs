@@ -30,6 +30,11 @@ public sealed class DeathAnimationClipHandlerTest
 {
     private static readonly DeathAnimationClipHandler Sut = new();
 
+    private static readonly string[] Mandalorian = ["ni_mandalorian.alo"];
+
+    private static readonly string[] MandalorianClips =
+        ["data/art/models/ni_mandalorian_die_00.ala", "data/art/models/ni_mandalorian_move_00.ala"];
+
     private static DeathAnimationClipFact Fact(string id = "Clone")
     {
         return new DeathAnimationClipFact("file:///xml/Units.xml", 3, 30, 7, id);
@@ -48,11 +53,6 @@ public sealed class DeathAnimationClipHandlerTest
 
         return XmlHandlerTestFixtures.EmptyCtx with { Index = index, Objects = new FakeObjects("Clone", tags) };
     }
-
-    private static readonly string[] Mandalorian = ["ni_mandalorian.alo"];
-
-    private static readonly string[] MandalorianClips =
-        ["data/art/models/ni_mandalorian_die_00.ala", "data/art/models/ni_mandalorian_move_00.ala"];
 
     [Fact]
     public void A_type_the_model_has_a_clip_for_is_accepted()

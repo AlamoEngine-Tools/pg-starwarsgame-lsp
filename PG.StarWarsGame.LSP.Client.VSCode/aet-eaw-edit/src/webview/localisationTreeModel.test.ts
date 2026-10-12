@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { groupProjects, LocProjectInfo } from './localisationTreeModel';
+import {groupProjects, LocProjectInfo} from './localisationTreeModel';
 
 function project(overrides: Partial<LocProjectInfo> = {}): LocProjectInfo {
     return {
@@ -36,8 +36,8 @@ describe('groupProjects', () => {
     // Text first: it is what a modder opens every day, and credits are a rarity.
     it('puts text files before credits files', () => {
         const nodes = groupProjects([
-            project({ label: 'creditstext.csv', category: 'credits' }),
-            project({ label: 'MasterTextFile.csv' }),
+            project({label: 'creditstext.csv', category: 'credits'}),
+            project({label: 'MasterTextFile.csv'}),
         ]);
 
         assert.deepEqual(nodes.map(n => n.label), ['Text files', 'Credits files']);
@@ -54,8 +54,8 @@ describe('groupProjects', () => {
     // The common case is one project; a layer level there would be a node you always expand past.
     it('lists files directly under the group when one project contributes', () => {
         const nodes = groupProjects([
-            project({ label: 'a.csv' }),
-            project({ label: 'b.csv' }),
+            project({label: 'a.csv'}),
+            project({label: 'b.csv'}),
         ]);
 
         assert.deepEqual(nodes[0].children.map(c => c.kind), ['file', 'file']);
@@ -63,8 +63,8 @@ describe('groupProjects', () => {
 
     it('inserts a layer level when several projects contribute to one group', () => {
         const nodes = groupProjects([
-            project({ label: 'root.csv', projectName: 'Root', rank: 1 }),
-            project({ label: 'dep.csv', projectName: 'Core', rank: 0 }),
+            project({label: 'root.csv', projectName: 'Root', rank: 1}),
+            project({label: 'dep.csv', projectName: 'Core', rank: 0}),
         ]);
 
         const layers = nodes[0].children;
@@ -75,9 +75,9 @@ describe('groupProjects', () => {
 
     it('decides the layer level per group, not for the whole tree', () => {
         const nodes = groupProjects([
-            project({ label: 'root.csv', projectName: 'Root', rank: 1 }),
-            project({ label: 'dep.csv', projectName: 'Core', rank: 0 }),
-            project({ label: 'creditstext.csv', category: 'credits', projectName: 'Root', rank: 1 }),
+            project({label: 'root.csv', projectName: 'Root', rank: 1}),
+            project({label: 'dep.csv', projectName: 'Core', rank: 0}),
+            project({label: 'creditstext.csv', category: 'credits', projectName: 'Root', rank: 1}),
         ]);
 
         assert.equal(nodes[0].children[0].kind, 'layer'); // two projects
@@ -86,15 +86,15 @@ describe('groupProjects', () => {
 
     it('sorts files by label within their parent', () => {
         const nodes = groupProjects([
-            project({ label: 'zeta.csv' }),
-            project({ label: 'alpha.csv' }),
+            project({label: 'zeta.csv'}),
+            project({label: 'alpha.csv'}),
         ]);
 
         assert.deepEqual(nodes[0].children.map(c => c.label), ['alpha.csv', 'zeta.csv']);
     });
 
     it('carries the project through to the file node so a click can open it', () => {
-        const nodes = groupProjects([project({ filePath: '/ws/x.csv' })]);
+        const nodes = groupProjects([project({filePath: '/ws/x.csv'})]);
         const file = nodes[0].children[0];
 
         assert.equal(file.kind, 'file');
@@ -104,7 +104,7 @@ describe('groupProjects', () => {
     // An unrecognised category must not vanish from the tree: a file the user cannot see is a file
     // they cannot fix.
     it('treats an unknown category as text rather than dropping the file', () => {
-        const nodes = groupProjects([project({ category: 'something-new' })]);
+        const nodes = groupProjects([project({category: 'something-new'})]);
 
         assert.equal(nodes[0].label, 'Text files');
         assert.equal(nodes[0].children.length, 1);
@@ -132,8 +132,8 @@ describe('groupProjects', () => {
     // It can only tell them apart if the set says which it is.
     it('carries the category up onto the set', () => {
         const nodes = groupProjects([
-            nls('creditstext_english.properties', 'ENGLISH', { category: 'credits' }),
-            nls('creditstext_german.properties', 'GERMAN', { category: 'credits' }),
+            nls('creditstext_english.properties', 'ENGLISH', {category: 'credits'}),
+            nls('creditstext_german.properties', 'GERMAN', {category: 'credits'}),
         ]);
 
         const set = nodes[0].children[0];
@@ -146,9 +146,9 @@ describe('groupProjects', () => {
     it('names a set without the folder it lives in', () => {
         const nodes = groupProjects([
             nls('mastertextfile_english.properties', 'ENGLISH',
-                { filePath: '/mods/my mod/data/text/mastertextfile_english.properties' }),
+                {filePath: '/mods/my mod/data/text/mastertextfile_english.properties'}),
             nls('mastertextfile_german.properties', 'GERMAN',
-                { filePath: '/mods/my mod/data/text/mastertextfile_german.properties' }),
+                {filePath: '/mods/my mod/data/text/mastertextfile_german.properties'}),
         ]);
 
         assert.equal(nodes[0].children[0].label, 'mastertextfile.properties');
@@ -189,8 +189,8 @@ describe('groupProjects', () => {
     // CSV and XML hold every language in one file, so they have no siblings to gather.
     it('never groups a multi-language format', () => {
         const nodes = groupProjects([
-            project({ label: 'a_english.csv', filePath: '/ws/data/text/a_english.csv' }),
-            project({ label: 'a_german.csv', filePath: '/ws/data/text/a_german.csv' }),
+            project({label: 'a_english.csv', filePath: '/ws/data/text/a_english.csv'}),
+            project({label: 'a_german.csv', filePath: '/ws/data/text/a_german.csv'}),
         ]);
 
         assert.deepEqual(nodes[0].children.map(c => c.kind), ['file', 'file']);
@@ -200,12 +200,12 @@ describe('groupProjects', () => {
     // behind the other.
     it('does not merge sets across projects', () => {
         const nodes = groupProjects([
-            nls('mastertextfile_english.properties', 'ENGLISH', { projectName: 'Root', rank: 2 }),
-            nls('mastertextfile_german.properties', 'GERMAN', { projectName: 'Root', rank: 2 }),
+            nls('mastertextfile_english.properties', 'ENGLISH', {projectName: 'Root', rank: 2}),
+            nls('mastertextfile_german.properties', 'GERMAN', {projectName: 'Root', rank: 2}),
             nls('mastertextfile_english.properties', 'ENGLISH',
-                { projectName: 'Dep', rank: 1, filePath: '/dep/data/text/mastertextfile_english.properties' }),
+                {projectName: 'Dep', rank: 1, filePath: '/dep/data/text/mastertextfile_english.properties'}),
             nls('mastertextfile_french.properties', 'FRENCH',
-                { projectName: 'Dep', rank: 1, filePath: '/dep/data/text/mastertextfile_french.properties' }),
+                {projectName: 'Dep', rank: 1, filePath: '/dep/data/text/mastertextfile_french.properties'}),
         ]);
 
         const layers = nodes[0].children;

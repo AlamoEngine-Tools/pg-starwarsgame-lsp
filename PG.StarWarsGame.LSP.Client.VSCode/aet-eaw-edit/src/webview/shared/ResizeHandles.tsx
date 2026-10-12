@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import { ResizeDirection } from './modalGeometry';
-import { RESIZE_DIRECTIONS } from './useMovableDialog';
+import {ResizeDirection} from './modalGeometry';
+import {RESIZE_DIRECTIONS} from './useMovableDialog';
 
 export interface ResizeHandlesProps {
     handleProps: (direction: ResizeDirection) => Record<string, unknown>;

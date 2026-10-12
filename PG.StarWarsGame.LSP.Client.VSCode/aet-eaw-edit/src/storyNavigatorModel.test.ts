@@ -6,7 +6,12 @@ import {describe, it} from 'node:test';
 
 import type {StoryCampaignDto, StoryFactionDto} from './protocol';
 import {
-    definitionLabel, factionRole, orderedDefinitions, orderedFactions, roleLabel, setSummary,
+    definitionLabel,
+    factionRole,
+    orderedDefinitions,
+    orderedFactions,
+    roleLabel,
+    setSummary,
 } from './storyNavigatorModel';
 
 function faction(name: string, control?: string | null): StoryFactionDto {

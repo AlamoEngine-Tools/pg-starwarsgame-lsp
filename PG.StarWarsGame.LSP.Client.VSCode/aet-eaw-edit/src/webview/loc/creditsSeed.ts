@@ -11,8 +11,8 @@
 // Both producers answer in the same shape, so the editor has one path that turns seed rows into
 // staged inserts however they were sourced.
 
-import { LocRow } from './locRow';
-import { BaselineRow } from '../translationInherited';
+import {LocRow} from './locRow';
+import {BaselineRow} from '../translationInherited';
 
 /** One line to add: the formatting directive it uses, and what it says. */
 export interface CreditsSeedRow {
@@ -36,9 +36,11 @@ export function creditsBaselineSeed(
 
     for (const entry of baseline) {
         const value = entry.values.find(v => v.language.toUpperCase() === wanted)?.value;
-        if (value === undefined || value.trim() === '') { continue; }
+        if (value === undefined || value.trim() === '') {
+            continue;
+        }
 
-        seeded.push({ key: entry.key, value });
+        seeded.push({key: entry.key, value});
     }
 
     return seeded;

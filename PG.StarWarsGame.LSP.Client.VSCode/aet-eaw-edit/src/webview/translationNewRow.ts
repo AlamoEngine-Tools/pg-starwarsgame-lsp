@@ -10,13 +10,16 @@
 // The rules mirror what the server checks when it validates a batch. They are deliberately not
 // stricter: inventing a shape rule here would reject keys the engine accepts.
 
-import { LocValue } from './loc/locRow';
+import {LocValue} from './loc/locRow';
 
-export interface NewRowDraft { key: string; values: LocValue[]; }
+export interface NewRowDraft {
+    key: string;
+    values: LocValue[];
+}
 
 /** A draft with a field for every language the file declares. */
 export function blankDraft(languages: string[]): NewRowDraft {
-    return { key: '', values: languages.map(language => ({ language, value: '' })) };
+    return {key: '', values: languages.map(language => ({language, value: ''}))};
 }
 
 /** The key as it will be stored. Surrounding whitespace is not part of an identifier. */
@@ -63,12 +66,14 @@ export function validateNewKey(key: string, existingKeys: string[]): string | nu
     const folded = foldToEngineKey(candidate);
     const clash = existingKeys.find(existing => foldToEngineKey(existing) === folded);
 
-    if (clash === undefined) { return null; }
+    if (clash === undefined) {
+        return null;
+    }
 
     return clash === candidate
         ? `'${clash}' is already in this file. Only one row per key is ever read.`
         : `'${clash}' is already in this file, and the game cannot tell it apart from `
-          + `'${candidate}' - it reads keys as ASCII, so both become '${folded}'.`;
+        + `'${candidate}' - it reads keys as ASCII, so both become '${folded}'.`;
 }
 
 /**
@@ -76,5 +81,5 @@ export function validateNewKey(key: string, existingKeys: string[]): string | nu
  * column, or the grid would show a ragged row and later edits would have nothing to address.
  */
 export function draftToCommandValues(draft: NewRowDraft): LocValue[] {
-    return draft.values.map(value => ({ language: value.language, value: value.value }));
+    return draft.values.map(value => ({language: value.language, value: value.value}));
 }

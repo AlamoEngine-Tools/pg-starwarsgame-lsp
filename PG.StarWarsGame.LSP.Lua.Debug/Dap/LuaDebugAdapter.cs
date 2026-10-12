@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Net;
+using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Events;
@@ -31,33 +32,34 @@ public sealed partial class LuaDebugAdapter : IDisposable
     /// <summary>Frame ids carry the stop they belong to, so a stale frame from a previous stop is refused.</summary>
     private const long FramesPerStop = 1024;
 
-    private readonly ILuaDebugSessionFactory _sessions;
-    private readonly IScriptSourceMapFactory _maps;
-    private readonly ICallstackParser _callstacks;
-    private readonly IFrameLocalsProvider _locals;
-    private readonly IFileHelper _fileHelper;
-    private readonly IGameLauncher _launcher;
-    private readonly TimeProvider _time;
-    private readonly ILogger<LuaDebugAdapter> _logger;
-    private readonly Lock _gate = new();
-
     /// <summary>Breakpoints by document URI and line; each carries the id the client knows it by and whether the game has it.</summary>
     private readonly Dictionary<string, Dictionary<int, BreakpointEntry>> _breakpoints = new(DocumentUris.Comparer);
 
-    private readonly Dictionary<long, object> _handles = [];
-    private long _nextBreakpointId = 1;
+    private readonly ICallstackParser _callstacks;
     private readonly TaskCompletionSource _exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly IFileHelper _fileHelper;
+    private readonly Lock _gate = new();
+
+    private readonly Dictionary<long, object> _handles = [];
+    private readonly IGameLauncher _launcher;
+    private readonly IFrameLocalsProvider _locals;
+    private readonly ILogger<LuaDebugAdapter> _logger;
+    private readonly IScriptSourceMapFactory _maps;
+
+    private readonly ILuaDebugSessionFactory _sessions;
+    private readonly TimeProvider _time;
+    private bool _dropDuplicateOutermost = true;
+    private IReadOnlyList<CallstackFrame> _frames = [];
+    private IScriptSourceMap _map;
+    private long _nextBreakpointId = 1;
+    private long _nextHandle = 1;
+    private StoppedEventReason? _pendingReason;
+    private IGameProcess? _process;
 
     private IDebugAdapterServer? _server;
     private ILuaDebugSession? _session;
-    private IScriptSourceMap _map;
-    private IGameProcess? _process;
-    private bool _unsafeTableExpansion;
-    private bool _dropDuplicateOutermost = true;
     private long _stopSequence;
-    private long _nextHandle = 1;
-    private IReadOnlyList<CallstackFrame> _frames = [];
-    private StoppedEventReason? _pendingReason;
+    private bool _unsafeTableExpansion;
 
     public LuaDebugAdapter(
         ILuaDebugSessionFactory sessions,
@@ -100,15 +102,15 @@ public sealed partial class LuaDebugAdapter : IDisposable
         ExceptionBreakpointFilters = new Container<ExceptionBreakpointsFilter>()
     };
 
+    public void Dispose()
+    {
+        _process?.Dispose();
+    }
+
     /// <summary>Gives the adapter the server it sends events through. Called once the server is up.</summary>
     public void Bind(IDebugAdapterServer server)
     {
         _server = server;
-    }
-
-    public void Dispose()
-    {
-        _process?.Dispose();
     }
 
     // -- lifecycle ----------------------------------------------------------------------------
@@ -749,7 +751,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
         if (!IPAddress.TryParse(settings.Host, out var address))
         {
             var resolved = Dns.GetHostAddresses(settings.Host)
-                               .FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                               .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)
                            ?? throw new LuaDebugAdapterException(
                                $"Cannot resolve host '{settings.Host}' to an IPv4 address");
             address = resolved;

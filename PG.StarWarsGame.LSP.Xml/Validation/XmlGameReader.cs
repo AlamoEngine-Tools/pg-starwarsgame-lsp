@@ -11,13 +11,17 @@ public sealed record XmlGameReadResult(XmlStructureError? Error, IReadOnlyList<X
 /// <summary>
 ///     Emulates the game's own XML reader, rule for rule as measured in the game:
 ///     <list type="bullet">
-///         <item>anything before the first <c>&lt;</c> is skipped; that <c>&lt;</c> must open the
-///         declaration (<c>&lt;?</c>), which is skipped to the next <c>&gt;</c>;</item>
+///         <item>
+///             anything before the first <c>&lt;</c> is skipped; that <c>&lt;</c> must open the
+///             declaration (<c>&lt;?</c>), which is skipped to the next <c>&gt;</c>;
+///         </item>
 ///         <item>one root element, and it must have a child;</item>
 ///         <item>an attribute is <c>name="value"</c>: an <c>=</c> and a double quote are required;</item>
-///         <item>a value is the text up to the next <c>&lt;</c> that does not open a comment; a
-///         comment inside a value is cut out and the text on both sides joined; the value is
-///         trimmed of space, tab, CR and LF only;</item>
+///         <item>
+///             a value is the text up to the next <c>&lt;</c> that does not open a comment; a
+///             comment inside a value is cut out and the text on both sides joined; the value is
+///             trimmed of space, tab, CR and LF only;
+///         </item>
 ///         <item>character data after a child element is skipped with a message;</item>
 ///         <item>an end tag must repeat the start tag byte for byte;</item>
 ///         <item><c>--</c> inside a comment, or a comment left open, is an error;</item>
@@ -58,6 +62,8 @@ public static class XmlGameReader
 
         public List<XmlStructureError> Tolerances { get; } = [];
 
+        private string Eol => s.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+
         public XmlStructureError? Run()
         {
             try
@@ -71,8 +77,6 @@ public static class XmlGameReader
                 return new XmlStructureError(line, col, f.Message, f.Category, Math.Max(1, f.Length), f.Repair);
             }
         }
-
-        private string Eol => s.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
 
         private void ReadDocument()
         {
@@ -258,10 +262,8 @@ public static class XmlGameReader
                 }
 
                 if (textAfter < 0)
-                {
                     // Nothing follows: leave the cursor on the run for the element loop.
                     break;
-                }
 
                 if (lastText >= 0)
                     foreach (var (start, end) in comments)
@@ -441,7 +443,7 @@ public static class XmlGameReader
 
             int Reach(XmlRepair repair)
             {
-                var error = XmlGameReader.Read(XmlStructureRepairs.Apply(s, repair)).Error;
+                var error = Read(XmlStructureRepairs.Apply(s, repair)).Error;
                 return error is null ? int.MaxValue : error.Line * 100_000 + error.Column;
             }
         }
@@ -514,11 +516,16 @@ public static class XmlGameReader
             return i - pos;
         }
 
-        private bool StartsWith(int pos, string what) =>
-            string.CompareOrdinal(s, pos, what, 0, what.Length) == 0;
+        private bool StartsWith(int pos, string what)
+        {
+            return string.CompareOrdinal(s, pos, what, 0, what.Length) == 0;
+        }
 
         // The game's whitespace: space, tab, CR, LF.
-        private static bool IsSpace(char c) => c is ' ' or '\t' or '\r' or '\n';
+        private static bool IsSpace(char c)
+        {
+            return c is ' ' or '\t' or '\r' or '\n';
+        }
 
         private (int Line, int Column) Position(int offset)
         {

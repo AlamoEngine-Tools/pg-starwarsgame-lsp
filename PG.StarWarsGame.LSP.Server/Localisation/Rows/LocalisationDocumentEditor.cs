@@ -9,7 +9,6 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using PG.Commons.Hashing;
 using PG.StarWarsGame.Files.DAT.Data;
-using PG.StarWarsGame.Files.DAT.Files;
 using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.LSP.Core.Util;
 

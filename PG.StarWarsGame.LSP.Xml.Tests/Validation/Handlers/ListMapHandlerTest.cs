@@ -54,6 +54,9 @@ public sealed class ListMapHandlerTest
         ]
     };
 
+    private static readonly GameIndex Game = Index(("Empire", "Faction"), ("Rebel", "Faction"),
+        ("A", "GameObjectType"), ("B", "GameObjectType"), ("Idle", "GameObjectType"));
+
     private static GameIndex Index(params (string Id, string Type)[] symbols)
     {
         var map = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
@@ -61,9 +64,6 @@ public sealed class ListMapHandlerTest
             map = map.Add(id, [new GameSymbol(id, GameSymbolKind.XmlObject, type, new UnknownOrigin("test"), null)]);
         return GameIndex.Empty with { WorkspaceDefinitions = map };
     }
-
-    private static readonly GameIndex Game = Index(("Empire", "Faction"), ("Rebel", "Faction"),
-        ("A", "GameObjectType"), ("B", "GameObjectType"), ("Idle", "GameObjectType"));
 
     private static DiagnosticsContext Ctx(GameIndex? index = null)
     {
@@ -73,10 +73,12 @@ public sealed class ListMapHandlerTest
     // Items laid out on one line, ten columns apart, so a diagnostic's column names its item.
     private static ListMapOccurrence Occ(int line, params string[] items)
     {
-        return new ListMapOccurrence(line, 0, 5, items.Select((t, i) => new ListMapItem(t, line, 10 * (i + 1))).ToList());
+        return new ListMapOccurrence(line, 0, 5,
+            items.Select((t, i) => new ListMapItem(t, line, 10 * (i + 1))).ToList());
     }
 
-    private static List<XmlDiagnosticResult> Run(XmlTagDefinition tag, bool variant, params ListMapOccurrence[] occurrences)
+    private static List<XmlDiagnosticResult> Run(XmlTagDefinition tag, bool variant,
+        params ListMapOccurrence[] occurrences)
     {
         return Run(tag, variant, Ctx(), occurrences);
     }
@@ -102,7 +104,9 @@ public sealed class ListMapHandlerTest
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
         Assert.Equal(DiagnosticIds.ListMapFirstItemNotAKey, d.Id);
         Assert.Equal((3, 10), (d.OverrideLine, d.OverrideColumn));
-        Assert.Equal("<Tactical_Buildable_Objects_Multiplayer> has to start with a Faction: 'Empyre' is none. The engine drops the whole value.", d.Message);
+        Assert.Equal(
+            "<Tactical_Buildable_Objects_Multiplayer> has to start with a Faction: 'Empyre' is none. The engine drops the whole value.",
+            d.Message);
     }
 
     [Fact]
@@ -191,10 +195,14 @@ public sealed class ListMapHandlerTest
         var planet = new ObjectKindDefinition { Kind = "Planet", Behaviors = ["PLANET"] };
         var planets = Buildables with
         {
-            Slots = [Buildables.Slots[0], new TupleSlotDefinition
-            {
-                Label = "Planet", ReferenceKind = ReferenceKind.XmlObject, ReferenceTypeName = "Planet", Kind = planet
-            }]
+            Slots =
+            [
+                Buildables.Slots[0], new TupleSlotDefinition
+                {
+                    Label = "Planet", ReferenceKind = ReferenceKind.XmlObject, ReferenceTypeName = "Planet",
+                    Kind = planet
+                }
+            ]
         };
         var index = Game with
         {
@@ -217,7 +225,11 @@ public sealed class ListMapHandlerTest
     {
         var models = Buildables with
         {
-            Slots = [Buildables.Slots[0], new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }]
+            Slots =
+            [
+                Buildables.Slots[0],
+                new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }
+            ]
         };
         var index = Game with { AssetFiles = MergedAssetFileIndex.Merge([], ["data/art/models/a.alo"]) };
 

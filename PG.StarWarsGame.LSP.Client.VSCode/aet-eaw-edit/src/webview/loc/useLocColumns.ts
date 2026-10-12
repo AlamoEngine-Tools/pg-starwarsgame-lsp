@@ -8,10 +8,10 @@
 // reason it is shared rather than merely similar: if one editor ever changed the key column's
 // width, the two grids would stop lining up and nothing would catch it.
 
-import { useCallback, useMemo, useRef } from 'react';
+import {useCallback, useMemo, useRef} from 'react';
 
-import { defaultHiddenLanguages } from './columnVisibility';
-import { LocRow } from './locRow';
+import {defaultHiddenLanguages} from './columnVisibility';
+import {LocRow} from './locRow';
 
 export interface LocColumns {
     /** The languages hidden right now, whether by default or by hand. */
@@ -97,11 +97,17 @@ export function useLocColumns(options: {
             // Seeded from what is actually on screen, so ticking a second language ADDS it rather
             // than replacing the whole selection with a different default.
             const next = new Set(current ?? currentDefault());
-            if (visible) { next.delete(language); } else { next.add(language); }
+            if (visible) {
+                next.delete(language);
+            } else {
+                next.add(language);
+            }
             return next;
         });
-        if (!visible) { onHidden?.(language); }
+        if (!visible) {
+            onHidden?.(language);
+        }
     }, [setHiddenLanguages, onHidden]);
 
-    return { hidden, shownLanguages, columns, toggleLanguage, materialise };
+    return {hidden, shownLanguages, columns, toggleLanguage, materialise};
 }

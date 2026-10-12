@@ -2,12 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import * as THREE from 'three';
 
 import {
-    billboardLocalRotation, billboardTypeOf, billboardRotation, BILLBOARD_FACING, BILLBOARD_UP,
+    BILLBOARD_FACING,
+    BILLBOARD_UP,
+    billboardLocalRotation,
+    billboardRotation,
+    billboardTypeOf,
 } from './billboards';
 
 /** Where the quad's face points once `rotation` has been applied to it. */

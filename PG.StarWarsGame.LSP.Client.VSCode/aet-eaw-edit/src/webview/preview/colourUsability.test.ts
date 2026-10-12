@@ -2,13 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    contrastRatio, deltaE2000, rgbToLab, simulateColourBlindness, reviewFactionColour,
-} from './colourUsability';
+import {contrastRatio, deltaE2000, reviewFactionColour, rgbToLab, simulateColourBlindness,} from './colourUsability';
 
-const rgba = (r: number, g: number, b: number) => ({ r, g, b, a: 255 });
+const rgba = (r: number, g: number, b: number) => ({r, g, b, a: 255});
 
 describe('deltaE2000', () => {
     // Sharma, Wu and Dalal's published test data for CIEDE2000. The formula has several terms that
@@ -30,7 +28,7 @@ describe('deltaE2000', () => {
     for (const [a, b, expected] of pairs) {
         it(`matches the reference for ${expected}`, () => {
             const actual = deltaE2000(
-                { l: a[0], a: a[1], b: a[2] }, { l: b[0], a: b[1], b: b[2] });
+                {l: a[0], a: a[1], b: a[2]}, {l: b[0], a: b[1], b: b[2]});
 
             assert.ok(Math.abs(actual - expected) < 0.0002,
                 `expected ${expected}, got ${actual}`);
@@ -105,9 +103,9 @@ describe('simulateColourBlindness', () => {
 
 describe('reviewFactionColour', () => {
     // The vanilla data is the fixture: an analyser that does not flag these is wrong.
-    const empire = { name: 'Empire', color: rgba(54, 134, 242) };
-    const imperial = { name: 'Imperial', color: rgba(54, 134, 242) };
-    const rebel = { name: 'Rebel', color: rgba(190, 40, 40) };
+    const empire = {name: 'Empire', color: rgba(54, 134, 242)};
+    const imperial = {name: 'Imperial', color: rgba(54, 134, 242)};
+    const rebel = {name: 'Rebel', color: rgba(190, 40, 40)};
 
     it('flags two factions that ship the very same colour', () => {
         const findings = reviewFactionColour(empire.color, 'Empire', [imperial, rebel]);
@@ -135,7 +133,7 @@ describe('reviewFactionColour', () => {
         // Distinct to a trichromat, indistinguishable to a deuteranope - the case the naked eye and
         // a plain RGB comparison both miss.
         const findings = reviewFactionColour(
-            rgba(150, 120, 0), 'Gold', [{ name: 'Olive', color: rgba(110, 135, 0) }]);
+            rgba(150, 120, 0), 'Gold', [{name: 'Olive', color: rgba(110, 135, 0)}]);
 
         assert.ok(findings.some(f => /deuteranopia|protanopia|tritanopia/.test(f.message)),
             `expected a colour-blindness finding, got ${JSON.stringify(findings)}`);
@@ -160,7 +158,7 @@ describe('reviewFactionColour', () => {
 
     it('says nothing about a colour that is fine', () => {
         assert.deepEqual(reviewFactionColour(rgba(240, 160, 20), 'Amber', [
-            { name: 'Blue', color: rgba(30, 80, 220) },
+            {name: 'Blue', color: rgba(30, 80, 220)},
         ]), []);
     });
 });

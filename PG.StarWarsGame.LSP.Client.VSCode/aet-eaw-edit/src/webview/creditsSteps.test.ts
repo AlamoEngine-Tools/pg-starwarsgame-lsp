@@ -2,18 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { CREDITS_DIRECTIVES } from './creditsCrawlModel';
-import {
-    CREDITS_STEPS, directiveLabel, directiveOptionText, dropTargetAt, stepById,
-} from './creditsSteps';
+import {CREDITS_DIRECTIVES} from './creditsCrawlModel';
+import {CREDITS_STEPS, directiveLabel, directiveOptionText, dropTargetAt, stepById,} from './creditsSteps';
 
 /** Three rows, 20px tall, starting at y=100 - shaped like what the grid reports. */
 const rows = [
-    { index: 0, top: 100, bottom: 120 },
-    { index: 1, top: 120, bottom: 140 },
-    { index: 2, top: 140, bottom: 160 },
+    {index: 0, top: 100, bottom: 120},
+    {index: 1, top: 120, bottom: 140},
+    {index: 2, top: 140, bottom: 160},
 ];
 
 describe('CREDITS_STEPS', () => {
@@ -46,7 +44,9 @@ describe('CREDITS_STEPS', () => {
      */
     it('names its steps exactly as the Format column names their directives', () => {
         for (const step of CREDITS_STEPS) {
-            if (step.id === 'blank') { continue; }
+            if (step.id === 'blank') {
+                continue;
+            }
             assert.equal(step.label, directiveLabel(step.key),
                 `the '${step.id}' tile and the Format column disagree`);
         }
@@ -90,23 +90,23 @@ describe('directiveOptionText', () => {
 
 describe('dropTargetAt', () => {
     it('drops above a row when the pointer is in its top half', () => {
-        assert.deepEqual(dropTargetAt(125, rows, 3), { index: 1, y: 120 });
+        assert.deepEqual(dropTargetAt(125, rows, 3), {index: 1, y: 120});
     });
 
     it('drops below a row when the pointer is in its bottom half', () => {
-        assert.deepEqual(dropTargetAt(135, rows, 3), { index: 2, y: 140 });
+        assert.deepEqual(dropTargetAt(135, rows, 3), {index: 2, y: 140});
     });
 
     it('drops at the very top when the pointer is above every row', () => {
-        assert.deepEqual(dropTargetAt(40, rows, 3), { index: 0, y: 100 });
+        assert.deepEqual(dropTargetAt(40, rows, 3), {index: 0, y: 100});
     });
 
     it('appends when the pointer is below every row', () => {
-        assert.deepEqual(dropTargetAt(400, rows, 3), { index: 3, y: 160 });
+        assert.deepEqual(dropTargetAt(400, rows, 3), {index: 3, y: 160});
     });
 
     it('appends into an empty file', () => {
-        assert.deepEqual(dropTargetAt(200, [], 0), { index: 0, y: 0 });
+        assert.deepEqual(dropTargetAt(200, [], 0), {index: 0, y: 0});
     });
 
     /**
@@ -116,16 +116,16 @@ describe('dropTargetAt', () => {
      */
     it('uses the document position of the row it was dropped against', () => {
         const filtered = [
-            { index: 4, top: 100, bottom: 120 },
-            { index: 90, top: 120, bottom: 140 },
+            {index: 4, top: 100, bottom: 120},
+            {index: 90, top: 120, bottom: 140},
         ];
 
         // Above the row shown first: its own index, 4 - not 0, its position on screen.
-        assert.deepEqual(dropTargetAt(105, filtered, 200), { index: 4, y: 100 });
+        assert.deepEqual(dropTargetAt(105, filtered, 200), {index: 4, y: 100});
         // Below it: 5, the position after it in the document.
-        assert.deepEqual(dropTargetAt(115, filtered, 200), { index: 5, y: 120 });
+        assert.deepEqual(dropTargetAt(115, filtered, 200), {index: 5, y: 120});
         // Above the row shown second: 90, not 1.
-        assert.deepEqual(dropTargetAt(125, filtered, 200), { index: 90, y: 120 });
+        assert.deepEqual(dropTargetAt(125, filtered, 200), {index: 90, y: 120});
     });
 
     it('places the indicator on the boundary it will insert at', () => {

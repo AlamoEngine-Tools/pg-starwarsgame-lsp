@@ -97,7 +97,8 @@ public sealed class XmlStructureRepairCodeActionProviderTest
     [Fact]
     public void FixAll_LeavesSuppressedCategoriesAlone()
     {
-        const string text = "<?xml version=\"1.0\"?>\n<Root>\n\t<List>A,\n\t\t<!--B,-->\n\t\tC</List>\n\t<D>1</D>``\n</Root>";
+        const string text =
+            "<?xml version=\"1.0\"?>\n<Root>\n\t<List>A,\n\t\t<!--B,-->\n\t\tC</List>\n\t<D>1</D>``\n</Root>";
         var provider = Build(text, DiagnosticIds.XmlCommentInsideValue);
 
         var actions = Actions(provider, At(DiagnosticIds.XmlCharacterDataAfterChild, 5, 9, 11));
@@ -110,9 +111,18 @@ public sealed class XmlStructureRepairCodeActionProviderTest
 
     private sealed class FixedSuppressions(IReadOnlyList<SuppressionMatcher> matchers) : IGlobalSuppressionStore
     {
-        public IReadOnlyList<SuppressionMatcher> GetAll() => matchers;
-        public void Add(SuppressionMatcher matcher, string? reason = null) { }
-        public void Remove(SuppressionMatcher matcher) { }
+        public IReadOnlyList<SuppressionMatcher> GetAll()
+        {
+            return matchers;
+        }
+
+        public void Add(SuppressionMatcher matcher, string? reason = null)
+        {
+        }
+
+        public void Remove(SuppressionMatcher matcher)
+        {
+        }
     }
 }
 

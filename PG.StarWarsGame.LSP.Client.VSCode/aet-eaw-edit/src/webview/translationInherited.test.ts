@@ -2,26 +2,24 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    baselineValuesFor, findInheritedKeys, hideInherited, toBaselineRows,
-} from './translationInherited';
-import { LocRow } from './loc/locRow';
+import {baselineValuesFor, findInheritedKeys, hideInherited, toBaselineRows,} from './translationInherited';
+import {LocRow} from './loc/locRow';
 
 function row(index: number, key: string, english: string, german = ''): LocRow {
     return {
         index, key,
-        values: [{ language: 'ENGLISH', value: english }, { language: 'GERMAN', value: german }],
+        values: [{language: 'ENGLISH', value: english}, {language: 'GERMAN', value: german}],
     };
 }
 
 const LANGUAGES = ['ENGLISH', 'GERMAN'];
 
 const baseline = toBaselineRows([
-    { key: 'SHARED', translations: { ENGLISH: 'same', GERMAN: 'gleich' } },
-    { key: 'CHANGED', translations: { ENGLISH: 'original', GERMAN: 'original_de' } },
-    { key: 'ONLY_IN_BASE', translations: { ENGLISH: 'base', GERMAN: 'base_de' } },
+    {key: 'SHARED', translations: {ENGLISH: 'same', GERMAN: 'gleich'}},
+    {key: 'CHANGED', translations: {ENGLISH: 'original', GERMAN: 'original_de'}},
+    {key: 'ONLY_IN_BASE', translations: {ENGLISH: 'base', GERMAN: 'base_de'}},
 ]);
 
 describe('toBaselineRows', () => {
@@ -29,16 +27,16 @@ describe('toBaselineRows', () => {
     // out - "ENGLISH" arrives as "eNGLISH". Matching against the grid's languages without
     // normalising would find nothing in common and report every row as locally overridden.
     it('normalises camel-cased language keys', () => {
-        const rows = toBaselineRows([{ key: 'K', translations: { eNGLISH: 'v', gERMAN: 'w' } }]);
+        const rows = toBaselineRows([{key: 'K', translations: {eNGLISH: 'v', gERMAN: 'w'}}]);
 
         assert.deepEqual(rows[0].values, [
-            { language: 'ENGLISH', value: 'v' },
-            { language: 'GERMAN', value: 'w' },
+            {language: 'ENGLISH', value: 'v'},
+            {language: 'GERMAN', value: 'w'},
         ]);
     });
 
     it('tolerates an entry with no translations', () => {
-        const rows = toBaselineRows([{ key: 'K' }]);
+        const rows = toBaselineRows([{key: 'K'}]);
 
         assert.deepEqual(rows[0].values, []);
     });
@@ -72,8 +70,8 @@ describe('findInheritedKeys', () => {
     });
 
     it('treats a missing cell and an empty cell alike', () => {
-        const rows = [{ index: 0, key: 'SHARED', values: [{ language: 'ENGLISH', value: 'same' }] }];
-        const sparse = toBaselineRows([{ key: 'SHARED', translations: { ENGLISH: 'same' } }]);
+        const rows = [{index: 0, key: 'SHARED', values: [{language: 'ENGLISH', value: 'same'}]}];
+        const sparse = toBaselineRows([{key: 'SHARED', translations: {ENGLISH: 'same'}}]);
 
         assert.deepEqual([...findInheritedKeys(rows, sparse, LANGUAGES)], ['SHARED']);
     });
@@ -103,8 +101,8 @@ describe('hideInherited', () => {
 describe('baselineValuesFor', () => {
     it('returns the inherited value for each displayed language', () => {
         assert.deepEqual(baselineValuesFor('SHARED', baseline, LANGUAGES), [
-            { language: 'ENGLISH', value: 'same' },
-            { language: 'GERMAN', value: 'gleich' },
+            {language: 'ENGLISH', value: 'same'},
+            {language: 'GERMAN', value: 'gleich'},
         ]);
     });
 
@@ -113,11 +111,11 @@ describe('baselineValuesFor', () => {
     });
 
     it('yields an empty string for a language the baseline lacks', () => {
-        const sparse = toBaselineRows([{ key: 'K', translations: { ENGLISH: 'v' } }]);
+        const sparse = toBaselineRows([{key: 'K', translations: {ENGLISH: 'v'}}]);
 
         assert.deepEqual(baselineValuesFor('K', sparse, LANGUAGES), [
-            { language: 'ENGLISH', value: 'v' },
-            { language: 'GERMAN', value: '' },
+            {language: 'ENGLISH', value: 'v'},
+            {language: 'GERMAN', value: ''},
         ]);
     });
 });

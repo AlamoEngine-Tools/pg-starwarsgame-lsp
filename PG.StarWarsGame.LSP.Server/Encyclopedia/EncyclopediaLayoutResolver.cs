@@ -71,12 +71,6 @@ public sealed class EncyclopediaLayoutResolver
             DefaultUnits(7d, 1.0d)),
         EncyclopediaOffsets.Shipped);
 
-    private static double DefaultUnits(double pointSize, double scale)
-    {
-        return EncyclopediaGlyphSize.Units(pointSize, scale,
-            EncyclopediaGlyphSize.DefaultScreenWidth, EncyclopediaGlyphSize.DefaultScreenHeight);
-    }
-
     private readonly EffectiveObjectResolver _resolver;
     private readonly int _screenHeight;
     private readonly int _screenWidth;
@@ -86,7 +80,9 @@ public sealed class EncyclopediaLayoutResolver
     ///     runs on, so the preview has to be told which one to be faithful to; the defaults are the
     ///     common case.
     /// </param>
-    /// <param name="screenHeight"><inheritdoc cref="screenWidth" /></param>
+    /// <param name="screenHeight">
+    ///     <inheritdoc cref="screenWidth" />
+    /// </param>
     public EncyclopediaLayoutResolver(
         EffectiveObjectResolver resolver,
         int screenWidth = EncyclopediaGlyphSize.DefaultScreenWidth,
@@ -95,6 +91,12 @@ public sealed class EncyclopediaLayoutResolver
         _resolver = resolver;
         _screenWidth = screenWidth;
         _screenHeight = screenHeight;
+    }
+
+    private static double DefaultUnits(double pointSize, double scale)
+    {
+        return EncyclopediaGlyphSize.Units(pointSize, scale,
+            EncyclopediaGlyphSize.DefaultScreenWidth, EncyclopediaGlyphSize.DefaultScreenHeight);
     }
 
     public EncyclopediaLayout Resolve()

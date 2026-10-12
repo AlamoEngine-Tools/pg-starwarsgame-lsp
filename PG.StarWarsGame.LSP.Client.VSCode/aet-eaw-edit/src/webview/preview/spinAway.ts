@@ -19,7 +19,7 @@
 // two constants are CHOSEN, and marked as such below. Everything else on this page came out of the
 // corpus or out of the engine's own table.
 
-import type { PreviewSpinAway } from '../../protocol/modelPreview';
+import type {PreviewSpinAway} from '../../protocol/modelPreview';
 
 /**
  * The engine's tick, and the reason `Max_Speed` needs multiplying.

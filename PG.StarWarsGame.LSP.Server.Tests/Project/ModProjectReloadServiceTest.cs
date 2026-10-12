@@ -4,11 +4,12 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Project;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analyzer;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -52,7 +53,7 @@ public sealed class ModProjectReloadServiceTest
     public async Task LoadAsync_ProjectFileFound_WithoutABaseline_RecordsTheRefusal()
     {
         var status = new ServerStatusRecorder();
-        var (service, _, _, _) = BuildWithBaseline(SampleConfig, baselineLoaded: false, status: status);
+        var (service, _, _, _) = BuildWithBaseline(SampleConfig, false, status: status);
 
         await service.LoadAsync(["/ws"], CancellationToken.None);
 
@@ -94,17 +95,6 @@ public sealed class ModProjectReloadServiceTest
         Assert.Same(SampleConfig.Layers, Assert.Single(analyzer.Configured));
     }
 
-    private sealed class RecordingAnalyzerStarter : PG.StarWarsGame.LSP.Lua.Analyzer.ILuaAnalyzerStarter
-    {
-        public List<IReadOnlyList<ProjectLayer>> Configured { get; } = [];
-
-        public Task ConfigureAsync(IReadOnlyList<ProjectLayer> layers)
-        {
-            Configured.Add(layers);
-            return Task.CompletedTask;
-        }
-    }
-
     [Fact]
     public async Task ReloadAsync_TrimsTheHeapAgain()
     {
@@ -138,16 +128,6 @@ public sealed class ModProjectReloadServiceTest
         await refused.LoadAsync(["/ws"], CancellationToken.None);
 
         Assert.Empty(trimmer.Reasons);
-    }
-
-    private sealed class RecordingHeapTrimmer : IHeapTrimmer
-    {
-        public readonly List<string> Reasons = [];
-
-        public void TrimAfterBulkWork(string reason)
-        {
-            Reasons.Add(reason);
-        }
     }
 
     // The tests that are not about the gate still have to get past it.
@@ -189,7 +169,7 @@ public sealed class ModProjectReloadServiceTest
         // can only answer it wrongly: every object the game defines reads as missing. That is a
         // broken setup, so the server says so and indexes nothing rather than producing diagnostics
         // the author would have to learn to distrust.
-        var (service, indexer, _, notifier) = BuildWithBaseline(SampleConfig, baselineLoaded: false);
+        var (service, indexer, _, notifier) = BuildWithBaseline(SampleConfig, false);
 
         await service.LoadAsync(["/ws"], CancellationToken.None);
 
@@ -201,7 +181,7 @@ public sealed class ModProjectReloadServiceTest
     [Fact]
     public async Task LoadAsync_ProjectFileFound_WithABaseline_IndexesAndSaysNothing()
     {
-        var (service, indexer, _, notifier) = BuildWithBaseline(SampleConfig, baselineLoaded: true);
+        var (service, indexer, _, notifier) = BuildWithBaseline(SampleConfig, true);
 
         await service.LoadAsync(["/ws"], CancellationToken.None);
 
@@ -339,6 +319,65 @@ public sealed class ModProjectReloadServiceTest
         Assert.Equal(["Core", "Root"], layerMap.LastLayers!.Select(l => l.Name));
     }
 
+    // ── Icon catalog invalidation ────────────────────────────────────────────
+
+    /// <summary>
+    ///     Resolving the workspace again drops the cached icon catalog.
+    /// </summary>
+    /// <remarks>
+    ///     The catalog is built lazily on first request and cached against the roots it was built
+    ///     from, and <c>Invalidate</c> had NO production caller. So anything that asked for an icon
+    ///     during the workspace scan - a preview restored when the window opened - built a catalog
+    ///     from the fallback root, before any project was resolved, and that one answered for the
+    ///     rest of the session: baseline icons only. Measured as the sibling of the same fault in
+    ///     the encyclopedia layout, which reported vanilla's 262 width before the scan and the
+    ///     mod's 340 after it.
+    /// </remarks>
+    [Fact]
+    public async Task ReloadAsync_DropsTheCachedIconCatalog()
+    {
+        var icons = new CountingIconCatalogProvider();
+        var (service, _, _) = Build(SampleConfig, icons);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(1, icons.Invalidations);
+    }
+
+    /// <summary>Every reload drops it again; a later one must not be skipped as redundant.</summary>
+    [Fact]
+    public async Task ReloadAsync_DropsItOnEveryReload()
+    {
+        var icons = new CountingIconCatalogProvider();
+        var (service, _, _) = Build(SampleConfig, icons);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+        await service.ReloadAsync(CancellationToken.None);
+
+        Assert.Equal(2, icons.Invalidations);
+    }
+
+    private sealed class RecordingAnalyzerStarter : ILuaAnalyzerStarter
+    {
+        public List<IReadOnlyList<ProjectLayer>> Configured { get; } = [];
+
+        public Task ConfigureAsync(IReadOnlyList<ProjectLayer> layers)
+        {
+            Configured.Add(layers);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingHeapTrimmer : IHeapTrimmer
+    {
+        public readonly List<string> Reasons = [];
+
+        public void TrimAfterBulkWork(string reason)
+        {
+            Reasons.Add(reason);
+        }
+    }
+
     private sealed class RecordingClientRefreshNotifier : IClientRefreshNotifier
     {
         public int CallCount { get; private set; }
@@ -386,44 +425,6 @@ public sealed class ModProjectReloadServiceTest
         {
             return _config;
         }
-    }
-
-    // ── Icon catalog invalidation ────────────────────────────────────────────
-
-    /// <summary>
-    ///     Resolving the workspace again drops the cached icon catalog.
-    /// </summary>
-    /// <remarks>
-    ///     The catalog is built lazily on first request and cached against the roots it was built
-    ///     from, and <c>Invalidate</c> had NO production caller. So anything that asked for an icon
-    ///     during the workspace scan - a preview restored when the window opened - built a catalog
-    ///     from the fallback root, before any project was resolved, and that one answered for the
-    ///     rest of the session: baseline icons only. Measured as the sibling of the same fault in
-    ///     the encyclopedia layout, which reported vanilla's 262 width before the scan and the
-    ///     mod's 340 after it.
-    /// </remarks>
-    [Fact]
-    public async Task ReloadAsync_DropsTheCachedIconCatalog()
-    {
-        var icons = new CountingIconCatalogProvider();
-        var (service, _, _) = Build(SampleConfig, icons);
-
-        await service.LoadAsync(["/ws"], CancellationToken.None);
-
-        Assert.Equal(1, icons.Invalidations);
-    }
-
-    /// <summary>Every reload drops it again; a later one must not be skipped as redundant.</summary>
-    [Fact]
-    public async Task ReloadAsync_DropsItOnEveryReload()
-    {
-        var icons = new CountingIconCatalogProvider();
-        var (service, _, _) = Build(SampleConfig, icons);
-
-        await service.LoadAsync(["/ws"], CancellationToken.None);
-        await service.ReloadAsync(CancellationToken.None);
-
-        Assert.Equal(2, icons.Invalidations);
     }
 
     private sealed class CountingIconCatalogProvider : IIconCatalogProvider

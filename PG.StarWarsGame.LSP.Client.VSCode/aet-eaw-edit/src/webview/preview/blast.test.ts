@@ -2,11 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { PreviewProjectile } from '../../protocol/modelPreview';
+import type {PreviewProjectile} from '../../protocol/modelPreview';
 
-import { blastShare, blastVictims, candidatesFrom } from './blast';
+import {blastShare, blastVictims, candidatesFrom} from './blast';
 
 function projectile(over: Partial<PreviewProjectile> = {}): PreviewProjectile {
     return {
@@ -39,10 +39,10 @@ function projectile(over: Partial<PreviewProjectile> = {}): PreviewProjectile {
 }
 
 const HARDPOINTS = [
-    { id: 'target', distance: 0 },
-    { id: 'near', distance: 20 },
-    { id: 'mid', distance: 60 },
-    { id: 'far', distance: 500 },
+    {id: 'target', distance: 0},
+    {id: 'near', distance: 20},
+    {id: 'mid', distance: 60},
+    {id: 'far', distance: 500},
 ];
 
 describe('blastVictims', () => {
@@ -56,7 +56,7 @@ describe('blastVictims', () => {
 
     it('hits every hardpoint inside the range', () => {
         const hits = blastVictims(
-            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS);
+            projectile({blastAreaDamage: 30, blastAreaRange: 100}), 'target', HARDPOINTS);
 
         assert.deepEqual(hits.map(h => h.id), ['target', 'near', 'mid']);
     });
@@ -66,7 +66,7 @@ describe('blastVictims', () => {
         // FULL blast to each victim, which made a blast stronger against a ship with more
         // hardpoints; the engine divides it instead, so the total delivered is constant.
         const hits = blastVictims(
-            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS);
+            projectile({blastAreaDamage: 30, blastAreaRange: 100}), 'target', HARDPOINTS);
 
         assert.deepEqual(hits.map(h => h.blastDamage), [10, 10, 10]);
     });
@@ -76,7 +76,7 @@ describe('blastVictims', () => {
         // Projectile_Damage 0.0 with a blast of 40, so a target taking only the direct number
         // would take nothing at all from a weapon that is plainly meant to hurt.
         const hits = blastVictims(
-            projectile({ damage: 50, blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS);
+            projectile({damage: 50, blastAreaDamage: 30, blastAreaRange: 100}), 'target', HARDPOINTS);
 
         assert.equal(hits[0].directDamage, 50);
         // Its SHARE of the blast - three victims, so a third each.
@@ -86,7 +86,7 @@ describe('blastVictims', () => {
 
     it('caps the victims where the projectile says so, nearest first', () => {
         const hits = blastVictims(
-            projectile({ blastAreaDamage: 30, blastAreaRange: 100, blastAreaMaxVictims: 2 }),
+            projectile({blastAreaDamage: 30, blastAreaRange: 100, blastAreaMaxVictims: 2}),
             'target', HARDPOINTS);
 
         assert.deepEqual(hits.map(h => h.id), ['target', 'near']);
@@ -95,8 +95,8 @@ describe('blastVictims', () => {
     it('always includes the target, even past its own blast range', () => {
         // A direct hit is a direct hit. The range governs who ELSE is caught.
         const hits = blastVictims(
-            projectile({ blastAreaDamage: 30, blastAreaRange: 5 }), 'mid', [
-                { id: 'mid', distance: 0 }, { id: 'far', distance: 500 },
+            projectile({blastAreaDamage: 30, blastAreaRange: 5}), 'mid', [
+                {id: 'mid', distance: 0}, {id: 'far', distance: 500},
             ]);
 
         assert.deepEqual(hits.map(h => h.id), ['mid']);
@@ -116,9 +116,9 @@ describe('blastVictims', () => {
         });
 
         const hits = blastVictims(missile, 'a', [
-            { id: 'a', distance: 0 },
-            { id: 'b', distance: 60 },
-            { id: 'c', distance: 190 },
+            {id: 'a', distance: 0},
+            {id: 'b', distance: 60},
+            {id: 'c', distance: 190},
         ]);
 
         assert.deepEqual(hits.map(h => h.tier), [0, 1, 4]);
@@ -130,7 +130,7 @@ describe('blastVictims', () => {
         // collects victims by Is_Destroyable and never asks Is_Destroyed, so the share is drawn and
         // lost - and the blast delivers less against a ship that has already lost hardpoints.
         const hits = blastVictims(
-            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS,
+            projectile({blastAreaDamage: 30, blastAreaRange: 100}), 'target', HARDPOINTS,
             new Set(['near']));
 
         assert.deepEqual(hits.map(h => h.id), ['target', 'near', 'mid']);
@@ -165,25 +165,25 @@ describe('blastShare', () => {
 
 describe('candidatesFrom', () => {
     const positions = {
-        a: { x: 0, y: 0, z: 0 },
-        b: { x: 30, y: 40, z: 0 },
-        c: { x: 0, y: 0, z: 200 },
+        a: {x: 0, y: 0, z: 0},
+        b: {x: 30, y: 40, z: 0},
+        c: {x: 0, y: 0, z: 200},
     };
 
     it('measures every hardpoint from the one that was hit', () => {
         const from = candidatesFrom(positions, 'a');
 
         assert.deepEqual(from, [
-            { id: 'a', distance: 0 },
-            { id: 'b', distance: 50 },
-            { id: 'c', distance: 200 },
+            {id: 'a', distance: 0},
+            {id: 'b', distance: 50},
+            {id: 'c', distance: 200},
         ]);
     });
 
     it('leaves out a hardpoint whose bone never loaded', () => {
         // A hardpoint with no position cannot be measured, and guessing zero would put it at the
         // epicentre of every blast.
-        const from = candidatesFrom({ ...positions, d: null }, 'a');
+        const from = candidatesFrom({...positions, d: null}, 'a');
 
         assert.deepEqual(from.map(c => c.id), ['a', 'b', 'c']);
     });
@@ -220,14 +220,14 @@ describe('blastVictims, when nothing can be located', () => {
     });
 
     it('still hits the target when the list holds only other things', () => {
-        const hits = blastVictims(bomb, 'HP_A', [{ id: 'HP_B', distance: 50 }]);
+        const hits = blastVictims(bomb, 'HP_A', [{id: 'HP_B', distance: 50}]);
 
         assert.deepEqual(hits.map(h => h.id).sort(), ['HP_A', 'HP_B']);
         assert.equal(hits.find(h => h.id === 'HP_A')!.directDamage, 100);
     });
 
     it('does not hit the target twice when it IS in the list', () => {
-        const hits = blastVictims(bomb, 'HP_A', [{ id: 'HP_A', distance: 0 }]);
+        const hits = blastVictims(bomb, 'HP_A', [{id: 'HP_A', distance: 0}]);
 
         assert.equal(hits.filter(h => h.id === 'HP_A').length, 1);
     });
@@ -245,10 +245,10 @@ describe('a blast against a ship that has already lost hardpoints', () => {
     });
 
     const CANDIDATES = [
-        { id: 'A', distance: 0 },
-        { id: 'B', distance: 20 },
-        { id: 'C', distance: 40 },
-        { id: 'D', distance: 60 },
+        {id: 'A', distance: 0},
+        {id: 'B', distance: 20},
+        {id: 'C', distance: 40},
+        {id: 'D', distance: 60},
     ];
 
     it('still counts a destroyed hardpoint among the victims', () => {
@@ -286,10 +286,10 @@ describe('a blast dividing its damage', () => {
         // each. Repeating the full amount per victim would make a blast stronger against a ship
         // with more hardpoints, which is the opposite of what the engine does.
         const four = blastVictims(PROJECTILE, 'A', [
-            { id: 'A', distance: 0 }, { id: 'B', distance: 20 },
-            { id: 'C', distance: 40 }, { id: 'D', distance: 60 },
+            {id: 'A', distance: 0}, {id: 'B', distance: 20},
+            {id: 'C', distance: 40}, {id: 'D', distance: 60},
         ]);
-        const one = blastVictims(PROJECTILE, 'A', [{ id: 'A', distance: 0 }]);
+        const one = blastVictims(PROJECTILE, 'A', [{id: 'A', distance: 0}]);
 
         assert.equal(four.reduce((sum, h) => sum + h.blastDamage, 0), 400);
         assert.equal(one[0].blastDamage, 400);
@@ -299,7 +299,7 @@ describe('a blast dividing its damage', () => {
         // The falloff is the object's, taken once from its distance to the blast. A hardpoint's own
         // distance sets only the delay before its share lands, never the amount.
         const hits = blastVictims(PROJECTILE, 'A', [
-            { id: 'A', distance: 0 }, { id: 'B', distance: 95 },
+            {id: 'A', distance: 0}, {id: 'B', distance: 95},
         ]);
 
         assert.equal(hits.find(h => h.id === 'A')!.blastDamage, 200);

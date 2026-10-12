@@ -25,7 +25,7 @@
 //   Root excluded. `sabre_light`'s own set contains bone 0, which nothing ever hides, so counting
 //   it would stop the rule ever firing on anything at all.
 
-import { boneIndexOf, type BoneId } from './boneIds';
+import {type BoneId, boneIndexOf} from './boneIds';
 
 /**
  * Whether a clip hides a skinned mesh on this frame - or undefined, meaning it has said nothing.

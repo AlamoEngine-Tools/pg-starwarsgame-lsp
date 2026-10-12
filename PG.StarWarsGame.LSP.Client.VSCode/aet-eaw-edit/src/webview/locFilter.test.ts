@@ -2,15 +2,15 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { buildRowFilter, compileMatcher, FilterRow } from './locFilter';
+import {buildRowFilter, compileMatcher, FilterRow} from './locFilter';
 
 function row(key: string, values: Record<string, string>): FilterRow {
-    return { key, values: Object.entries(values).map(([language, value]) => ({ language, value })) };
+    return {key, values: Object.entries(values).map(([language, value]) => ({language, value}))};
 }
 
-const sample = row('TEXT_XWING', { ENGLISH: 'X-Wing Fighter', GERMAN: 'X-Fluegel Jaeger' });
+const sample = row('TEXT_XWING', {ENGLISH: 'X-Wing Fighter', GERMAN: 'X-Fluegel Jaeger'});
 
 describe('compileMatcher: pattern semantics', () => {
     it('matches everything when the pattern is empty', () => {
@@ -95,17 +95,21 @@ describe('buildRowFilter', () => {
     it('compiles the pattern once however many rows it is applied to', () => {
         const originalRegExp = globalThis.RegExp;
         let constructed = 0;
+
         class CountingRegExp extends originalRegExp {
             constructor(pattern: string | RegExp, flags?: string) {
                 super(pattern as string, flags);
                 constructed++;
             }
         }
+
         (globalThis as { RegExp: unknown }).RegExp = CountingRegExp;
         try {
             const filter = buildRowFilter('TEXT_', 'regex', 'all');
             constructed = 0;
-            for (let i = 0; i < 500; i++) { filter.test(sample); }
+            for (let i = 0; i < 500; i++) {
+                filter.test(sample);
+            }
         } finally {
             (globalThis as { RegExp: unknown }).RegExp = originalRegExp;
         }

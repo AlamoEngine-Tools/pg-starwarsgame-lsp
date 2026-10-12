@@ -2,11 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { FRAMES_PER_SECOND, spinAwayEnd, spinAwayPose, spinAwaySummary } from './spinAway';
+import {FRAMES_PER_SECOND, spinAwayEnd, spinAwayPose, spinAwaySummary} from './spinAway';
 
-const spin = { timeSeconds: 2, chance: 0.2, explosion: 'Small_Explosion_Space', maxSpeed: 4.5 };
+const spin = {timeSeconds: 2, chance: 0.2, explosion: 'Small_Explosion_Space', maxSpeed: 4.5};
 
 describe('spinAwayPose', () => {
     /**
@@ -88,7 +88,7 @@ describe('spinAwayPose', () => {
      * mod that does not.
      */
     it('still spins and still ends when the unit declares no speed', () => {
-        const still = { ...spin, maxSpeed: 0 };
+        const still = {...spin, maxSpeed: 0};
 
         assert.equal(spinAwayPose(still, 1).offset.z, 0);
         assert.ok(spinAwayPose(still, 1).roll > 0);
@@ -96,7 +96,7 @@ describe('spinAwayPose', () => {
     });
 
     it('treats a missing time as over at once rather than never ending', () => {
-        assert.equal(spinAwayPose({ ...spin, timeSeconds: 0 }, 0).done, true);
+        assert.equal(spinAwayPose({...spin, timeSeconds: 0}, 0).done, true);
     });
 });
 
@@ -110,11 +110,11 @@ describe('spinAwaySummary', () => {
      */
     it('is the time and the chance, with no prose around them', () => {
         assert.equal(spinAwaySummary(spin), '2s, 20%');
-        assert.equal(spinAwaySummary({ ...spin, chance: 0.4 }), '2s, 40%');
+        assert.equal(spinAwaySummary({...spin, chance: 0.4}), '2s, 40%');
     });
 
     /** Unsaid rather than printed as 0% or invented as 100%: the file simply does not say. */
     it('leaves an undeclared chance out rather than making one up', () => {
-        assert.equal(spinAwaySummary({ ...spin, chance: 0 }), '2s');
+        assert.equal(spinAwaySummary({...spin, chance: 0}), '2s');
     });
 });

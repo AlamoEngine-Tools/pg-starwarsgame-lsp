@@ -7,14 +7,14 @@ import {describe, it} from 'node:test';
 import {colourTokens} from '../shared/tokens';
 import {
     BRANCH_PALETTE,
+    branchColours,
+    branchToken,
     EDGE_KINDS,
     JUNCTION_TOKEN,
     LANE_PALETTE,
+    laneToken,
     LIFECYCLE_TOKENS,
     UNKNOWN_LIFECYCLE_TOKEN,
-    branchColours,
-    branchToken,
-    laneToken,
 } from './palette';
 
 const known = new Set(colourTokens.map(t => t.name));

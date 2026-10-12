@@ -23,9 +23,14 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// </summary>
 public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 {
+    /// <summary>Every diagnostic this server publishes names it, with the project when one is loaded.</summary>
+    private const string SourceName = "aetswg";
+
     private readonly int _debounceMs;
     private readonly IGlobalSuppressionStore? _globalSuppressions;
     private readonly IGameIndexService _indexService;
+
+    private readonly IProjectLayerMap? _layerMap;
     private readonly ILogger _logger;
     private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly object _publishLock = new();
@@ -37,11 +42,6 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     // different diagnostics and are skipped. Guarded by _publishLock.
     private GameIndex? _lastRunIndex;
     private int _pendingVersion;
-
-    /// <summary>Every diagnostic this server publishes names it, with the project when one is loaded.</summary>
-    private const string SourceName = "aetswg";
-
-    private readonly IProjectLayerMap? _layerMap;
 
     protected DiagnosticsPublisherBase(
         Action<PublishDiagnosticsParams> publish,

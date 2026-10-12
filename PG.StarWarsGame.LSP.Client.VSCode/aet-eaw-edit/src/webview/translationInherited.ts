@@ -10,13 +10,16 @@
 // Keyed text files only. A credits file keys every row by a formatting directive, so matching by
 // key against a baseline would pair unrelated lines.
 
-import { BaselineEntryDto } from '../protocol';
-import { LocRow, LocValue } from './loc/locRow';
+import {BaselineEntryDto} from '../protocol';
+import {LocRow, LocValue} from './loc/locRow';
 
-export interface BaselineRow { key: string; values: LocValue[]; }
+export interface BaselineRow {
+    key: string;
+    values: LocValue[];
+}
 
 // Re-exported so the editors reading a baseline need only one import for it.
-export { BaselineEntryDto };
+export {BaselineEntryDto};
 
 /**
  * Converts the server's entries into the grid's row shape.
@@ -33,7 +36,7 @@ export function toBaselineRows(entries: BaselineEntryDto[]): BaselineRow[] {
         // `?? {}` despite the contract promising a dictionary: an entry with no translations at all
         // serialises as an omitted field, and the alternative is a crash on the whole baseline.
         values: Object.entries(entry.translations ?? {})
-            .map(([language, value]) => ({ language: language.toUpperCase(), value })),
+            .map(([language, value]) => ({language: language.toUpperCase(), value})),
     }));
 }
 
@@ -47,13 +50,17 @@ export function findInheritedKeys(
     rows: LocRow[], baseline: BaselineRow[], languages: string[],
 ): Set<string> {
     const inherited = new Set<string>();
-    if (baseline.length === 0) { return inherited; }
+    if (baseline.length === 0) {
+        return inherited;
+    }
 
     const byKey = new Map(baseline.map(row => [row.key, row]));
 
     for (const row of rows) {
         const base = byKey.get(row.key);
-        if (base === undefined) { continue; }
+        if (base === undefined) {
+            continue;
+        }
         // An absent cell and an empty one are the same thing to the reader, so they compare equal.
         if (languages.every(language => valueOf(row.values, language) === valueOf(base.values, language))) {
             inherited.add(row.key);
@@ -65,7 +72,9 @@ export function findInheritedKeys(
 
 /** Drops rows that only repeat an inherited value, unless the user has asked to see them. */
 export function hideInherited(rows: LocRow[], inherited: Set<string>, show: boolean): LocRow[] {
-    if (show || inherited.size === 0) { return rows; }
+    if (show || inherited.size === 0) {
+        return rows;
+    }
     return rows.filter(row => !inherited.has(row.key));
 }
 
@@ -77,8 +86,10 @@ export function baselineValuesFor(
     key: string, baseline: BaselineRow[], languages: string[],
 ): LocValue[] | null {
     const base = baseline.find(row => row.key === key);
-    if (base === undefined) { return null; }
-    return languages.map(language => ({ language, value: valueOf(base.values, language) }));
+    if (base === undefined) {
+        return null;
+    }
+    return languages.map(language => ({language, value: valueOf(base.values, language)}));
 }
 
 function valueOf(values: LocValue[], language: string): string {

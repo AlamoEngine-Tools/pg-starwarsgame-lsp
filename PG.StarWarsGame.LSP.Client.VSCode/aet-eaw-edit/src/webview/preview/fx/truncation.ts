@@ -8,8 +8,18 @@
 // translated effects and a clean compile.
 
 import {
-    collectFunctions, collectGlobals, collectStructs, componentCount, inferType, matchingParen,
-    matrixDimension, narrowingSwizzle, splitTopLevel, type FunctionTable, type Scope, type StructTable,
+    collectFunctions,
+    collectGlobals,
+    collectStructs,
+    componentCount,
+    type FunctionTable,
+    inferType,
+    matchingParen,
+    matrixDimension,
+    narrowingSwizzle,
+    type Scope,
+    splitTopLevel,
+    type StructTable,
 } from './glslTypes';
 
 /** Wraps an expression so it can take a swizzle, parenthesising only when it must. */

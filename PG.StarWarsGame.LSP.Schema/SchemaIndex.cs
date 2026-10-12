@@ -16,10 +16,10 @@ public sealed class SchemaIndex
 
     private readonly Dictionary<string, List<XmlTagDefinition>> _allByTagName;
     private readonly Dictionary<string, EnumDefinition> _enums;
+    private readonly Dictionary<string, ObjectKindDefinition> _kinds;
     private readonly Dictionary<string, XmlTagDefinition> _tags;
     private readonly Dictionary<string, IReadOnlyList<XmlTagDefinition>> _tagsByType;
     private readonly Dictionary<string, GameObjectTypeDefinition> _types;
-    private readonly Dictionary<string, ObjectKindDefinition> _kinds;
 
     internal SchemaIndex(
         IEnumerable<(string typeName, IReadOnlyList<RawTagDefinition> tags)> tagsByType,

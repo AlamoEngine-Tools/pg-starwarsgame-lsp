@@ -22,7 +22,7 @@
 // `setRow`, which stores the reader's word only where it disagrees with the model, so showing a
 // mesh you had hidden gives the row back rather than pinning it the other way.
 
-import { type VisibilityLink } from './visibility';
+import {type VisibilityLink} from './visibility';
 
 /** What the eye shows. */
 export type EyeState = 'shown' | 'inherited' | 'hidden';

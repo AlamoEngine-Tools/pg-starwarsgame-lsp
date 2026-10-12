@@ -10,8 +10,8 @@
 
 import * as vscode from 'vscode';
 
-import { LspGateway } from './lsp/lspGateway';
-import { ModelPreviewPanel, PreviewSubject } from './modelPreviewPanel';
+import {LspGateway} from './lsp/lspGateway';
+import {ModelPreviewPanel, PreviewSubject} from './modelPreviewPanel';
 
 /**
  * A document with no content of its own.
@@ -21,7 +21,8 @@ import { ModelPreviewPanel, PreviewSubject } from './modelPreviewPanel';
  * answer to "which model is this".
  */
 class PreviewDocument implements vscode.CustomDocument {
-    constructor(readonly uri: vscode.Uri) { }
+    constructor(readonly uri: vscode.Uri) {
+    }
 
     dispose(): void {
         // Nothing held.
@@ -35,7 +36,8 @@ export class ModelPreviewEditorProvider implements vscode.CustomReadonlyEditorPr
     constructor(
         private readonly extensionUri: vscode.Uri,
         private readonly lsp: LspGateway,
-    ) { }
+    ) {
+    }
 
     static register(
         context: vscode.ExtensionContext, lsp: LspGateway,
@@ -46,7 +48,7 @@ export class ModelPreviewEditorProvider implements vscode.CustomReadonlyEditorPr
             {
                 // A GPU context and several megabytes of geometry are expensive to rebuild, and a
                 // model tab is something people switch away from and back to constantly.
-                webviewOptions: { retainContextWhenHidden: true },
+                webviewOptions: {retainContextWhenHidden: true},
                 // Two tabs on one model would mean two GPU contexts for the same picture.
                 supportsMultipleEditorsPerDocument: false,
             });
@@ -76,8 +78,8 @@ function subjectFor(uri: vscode.Uri): PreviewSubject {
     const reference = uri.toString();
 
     return uri.path.toLowerCase().endsWith('.ala')
-        ? { kind: 'animation', animationReference: reference }
-        : { kind: 'model', modelReference: reference };
+        ? {kind: 'animation', animationReference: reference}
+        : {kind: 'model', modelReference: reference};
 }
 
 function basename(uri: vscode.Uri): string {

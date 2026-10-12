@@ -7,7 +7,7 @@
 // `creditstext_english.dat` is nothing but them. Making them things you can pick up and place says
 // that far better than a menu item and a dropdown do.
 
-import { BLANK_SENTINEL_VALUE, CREDITS_DIRECTIVES } from './creditsCrawlModel';
+import {BLANK_SENTINEL_VALUE, CREDITS_DIRECTIVES} from './creditsCrawlModel';
 
 export interface CreditsStep {
     id: string;
@@ -91,7 +91,11 @@ export interface DropTarget {
     y: number;
 }
 
-export interface DropRow { index: number; top: number; bottom: number; }
+export interface DropRow {
+    index: number;
+    top: number;
+    bottom: number;
+}
 
 /**
  * Resolves a pointer position to an insertion point.
@@ -103,19 +107,25 @@ export interface DropRow { index: number; top: number; bottom: number; }
 export function dropTargetAt(
     pointerY: number, rows: DropRow[], totalRows: number,
 ): DropTarget {
-    if (rows.length === 0) { return { index: totalRows, y: 0 }; }
+    if (rows.length === 0) {
+        return {index: totalRows, y: 0};
+    }
 
     const first = rows[0];
-    if (pointerY < first.top) { return { index: first.index, y: first.top }; }
+    if (pointerY < first.top) {
+        return {index: first.index, y: first.top};
+    }
 
     for (const row of rows) {
-        if (pointerY > row.bottom) { continue; }
+        if (pointerY > row.bottom) {
+            continue;
+        }
         // The half the pointer is in decides which side of the row it goes.
         return pointerY < (row.top + row.bottom) / 2
-            ? { index: row.index, y: row.top }
-            : { index: row.index + 1, y: row.bottom };
+            ? {index: row.index, y: row.top}
+            : {index: row.index + 1, y: row.bottom};
     }
 
     const last = rows[rows.length - 1];
-    return { index: last.index + 1, y: last.bottom };
+    return {index: last.index + 1, y: last.bottom};
 }

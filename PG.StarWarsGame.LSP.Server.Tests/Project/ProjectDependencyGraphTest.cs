@@ -51,7 +51,7 @@ public sealed class ProjectDependencyGraphTest
             Project("../a/a.pgproj", "../b/b.pgproj"),
             p => files.TryGetValue(p, out var f) ? f : null, out var shape);
 
-        Assert.Equal(new ProjectDependencyShape(Direct: 2, Total: 3, Depth: 2, Unresolved: 0), shape);
+        Assert.Equal(new ProjectDependencyShape(2, 3, 2, 0), shape);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class ProjectDependencyGraphTest
         new ProjectDependencyGraph(NullLoggerFactory())
             .Build("/mods/root/root.pgproj", Project("../gone/gone.pgproj"), _ => null, out var shape);
 
-        Assert.Equal(new ProjectDependencyShape(0, 0, 0, Unresolved: 1), shape);
+        Assert.Equal(new ProjectDependencyShape(0, 0, 0, 1), shape);
     }
 
     [Fact]

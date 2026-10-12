@@ -24,7 +24,12 @@ import {GetEncyclopediaEntryResult} from '../protocol/encyclopedia';
 import {EncyclopediaCard} from './encyclopediaCard';
 import {encyclopediaNotices, noticeSeverity} from './encyclopediaNotices';
 import {
-    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
+    dockBodyCss,
+    dockChromeCss,
+    dockHeaderCss,
+    dockOverviewCss,
+    problemsPanelCss,
+    rightDockCss,
 } from './shared/dockChrome';
 import {DockSection} from './shared/DockSection';
 import {Field} from './shared/Field';

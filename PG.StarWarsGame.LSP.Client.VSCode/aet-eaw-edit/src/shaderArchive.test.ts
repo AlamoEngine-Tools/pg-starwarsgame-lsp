@@ -2,11 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import {createHash} from 'node:crypto';
 import * as path from 'node:path';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { checkArchive, entryVerdict, extractionVerdict, sha256 } from './shaderArchive';
+import {checkArchive, entryVerdict, extractionVerdict, sha256} from './shaderArchive';
 
 const TARGET = path.resolve('/tmp/aet-shaders');
 
@@ -14,7 +14,7 @@ describe('entryVerdict', () => {
     it('keeps a shader source, flattened to its base name', () => {
         const verdict = entryVerdict('Shaders/MeshBumpColorize.fx', TARGET);
 
-        assert.deepEqual(verdict, { keep: true, relativePath: 'MeshBumpColorize.fx' });
+        assert.deepEqual(verdict, {keep: true, relativePath: 'MeshBumpColorize.fx'});
     });
 
     it('keeps a header too, since the effects include them', () => {
@@ -81,7 +81,7 @@ describe('checkArchive', () => {
     const digest = createHash('sha256').update(bytes).digest('hex');
 
     it('accepts the archive that was pinned', () => {
-        assert.deepEqual(checkArchive(bytes, digest), { ok: true });
+        assert.deepEqual(checkArchive(bytes, digest), {ok: true});
     });
 
     it('is not case-sensitive about the pinned hex', () => {
@@ -120,7 +120,7 @@ describe('sha256', () => {
 
 describe('extractionVerdict', () => {
     it('accepts an extraction that produced shaders', () => {
-        assert.deepEqual(extractionVerdict(122), { ok: true });
+        assert.deepEqual(extractionVerdict(122), {ok: true});
     });
 
     it('rejects one that produced none', () => {

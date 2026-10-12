@@ -2,11 +2,15 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
-    emissionMultiplier, emissionPoint, offsetAlongNormal, vertexCount,
-    type EmissionCursor, type EmissionMesh,
+    type EmissionCursor,
+    type EmissionMesh,
+    emissionMultiplier,
+    emissionPoint,
+    offsetAlongNormal,
+    vertexCount,
 } from './meshEmission';
 
 /** Two sub-meshes, so the walk has a boundary to roll over. */
@@ -25,7 +29,7 @@ const MESH: EmissionMesh = {
     ],
 };
 
-const cursor = (): EmissionCursor => ({ subMesh: 0, vertex: 0 });
+const cursor = (): EmissionCursor => ({subMesh: 0, vertex: 0});
 const never = (): number => {
     throw new Error('EveryVertex must not consult the random source');
 };
@@ -75,13 +79,15 @@ describe('emissionPoint', () => {
 
         it('rolls over into the next sub-mesh at the boundary', () => {
             const at = cursor();
-            for (let i = 0; i < 3; i++) { emissionPoint('EveryVertex', MESH, at, never); }
+            for (let i = 0; i < 3; i++) {
+                emissionPoint('EveryVertex', MESH, at, never);
+            }
 
-            assert.deepEqual(at, { subMesh: 1, vertex: 0 });
+            assert.deepEqual(at, {subMesh: 1, vertex: 0});
         });
 
         it('recovers when the cursor is past the end of a mesh that changed', () => {
-            const at: EmissionCursor = { subMesh: 9, vertex: 99 };
+            const at: EmissionCursor = {subMesh: 9, vertex: 99};
 
             assert.equal(emissionPoint('EveryVertex', MESH, at, never)!.position.x, 0);
         });
@@ -91,7 +97,7 @@ describe('emissionPoint', () => {
         // Second sub-mesh, second vertex.
         const point = emissionPoint('RandomVertex', MESH, cursor(), seq([0.9, 0.9]));
 
-        assert.deepEqual(point!.position, { x: 6, y: 0, z: 0 });
+        assert.deepEqual(point!.position, {x: 6, y: 0, z: 0});
     });
 
     it('blends across a face for RandomMesh', () => {
@@ -111,7 +117,7 @@ describe('emissionPoint', () => {
     });
 
     it('gives nothing back for a mesh with no vertices', () => {
-        const empty: EmissionMesh = { subMeshes: [{ positions: [], normals: [], indices: [] }] };
+        const empty: EmissionMesh = {subMeshes: [{positions: [], normals: [], indices: []}]};
 
         assert.equal(emissionPoint('RandomVertex', empty, cursor(), () => 0), null);
     });
@@ -124,9 +130,9 @@ describe('offsetAlongNormal', () => {
      */
     it('lifts the point off the surface', () => {
         const lifted = offsetAlongNormal(
-            { position: { x: 1, y: 2, z: 3 }, normal: { x: 0, y: 0, z: 1 } }, 0.5);
+            {position: {x: 1, y: 2, z: 3}, normal: {x: 0, y: 0, z: 1}}, 0.5);
 
-        assert.deepEqual(lifted, { x: 1, y: 2, z: 3.5 });
+        assert.deepEqual(lifted, {x: 1, y: 2, z: 3.5});
     });
 });
 

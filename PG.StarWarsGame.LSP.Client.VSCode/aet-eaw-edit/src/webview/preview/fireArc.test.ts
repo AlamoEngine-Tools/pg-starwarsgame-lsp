@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    drawnConeRange, fireConeOutline, fireConePoints, fireConeSurface, hullFrameBasis,
-} from './fireArc';
+import {drawnConeRange, fireConeOutline, fireConePoints, fireConeSurface, hullFrameBasis,} from './fireArc';
 
 describe('fireConePoints', () => {
     const length = (p: readonly number[]) => Math.hypot(p[0], p[1], p[2]);
@@ -16,7 +14,7 @@ describe('fireConePoints', () => {
         // `range * tan(halfAngle)`, which is the plane reading - and the Nebulon B declares
         // 175 x 160 degrees, so tan(87.5) = 22.9 made a 1100-unit weapon draw a sheet 25000 units
         // across. That is what "extremely flat and long" was.
-        const { rim } = fireConePoints(175, 160, 1100, 24);
+        const {rim} = fireConePoints(175, 160, 1100, 24);
 
         for (const point of rim) {
             assert.ok(Math.abs(length(point) - 1100) < 1e-3,
@@ -27,7 +25,7 @@ describe('fireConePoints', () => {
     it('never runs away as the arc approaches a half circle', () => {
         // The old geometry needed an 89-degree clamp to stop tan() exploding. On a sphere there is
         // nothing to clamp: a 179-degree arc is simply most of a hemisphere.
-        const { rim } = fireConePoints(179, 179, 100, 16);
+        const {rim} = fireConePoints(179, 179, 100, 16);
 
         for (const point of rim) {
             assert.ok(length(point) < 101);
@@ -37,7 +35,7 @@ describe('fireConePoints', () => {
     it('opens to the half-angle the XML declares', () => {
         // A 90-degree cone reaches 45 degrees off the bone's axis, so its widest rim point sits at
         // cos(45) along X and sin(45) across.
-        const { rim } = fireConePoints(90, 90, 100, 4);
+        const {rim} = fireConePoints(90, 90, 100, 4);
         const widest = rim.reduce((a, b) => (Math.abs(b[1]) > Math.abs(a[1]) ? b : a));
 
         assert.ok(Math.abs(widest[0] - 100 * Math.cos(Math.PI / 4)) < 1e-3);
@@ -47,7 +45,7 @@ describe('fireConePoints', () => {
     it('opens width across Y and height across Z', () => {
         // A turret with a wide traverse and little elevation reads as the flat fan it actually is -
         // which is a different thing from the whole cone being flattened.
-        const { rim } = fireConePoints(120, 20, 100, 32);
+        const {rim} = fireConePoints(120, 20, 100, 32);
         const spreadY = Math.max(...rim.map(p => Math.abs(p[1])));
         const spreadZ = Math.max(...rim.map(p => Math.abs(p[2])));
 
@@ -72,7 +70,7 @@ describe('fireConePoints', () => {
 
     it('never exceeds either half-angle, on either axis', () => {
         // Both checks reject independently, so no direction inside the arc may break either.
-        const { rim } = fireConePoints(175, 160, 1100, 64);
+        const {rim} = fireConePoints(175, 160, 1100, 64);
 
         for (const point of rim) {
             assert.ok(yawOf(point) <= 175 / 2 + 0.01, `yaw ${yawOf(point)}`);
@@ -84,7 +82,7 @@ describe('fireConePoints', () => {
         // The whole difference from a rounded shape: two independent checks admit the corner where
         // yaw and elevation are both at maximum. On a 90x90 arc that corner is 60 degrees off axis
         // - acos(cos45 * cos45) - where a shape trading one angle against the other stops at 45.
-        const { rim } = fireConePoints(90, 90, 100, 64);
+        const {rim} = fireConePoints(90, 90, 100, 64);
 
         const corner = rim.find(p => Math.abs(yawOf(p) - 45) < 0.5
             && Math.abs(elevationOf(p) - 45) < 0.5);
@@ -98,7 +96,7 @@ describe('fireConePoints', () => {
     it('still reaches exactly the half-angle on each axis alone', () => {
         // The corners are wider, but the axes are not: a 120-degree traverse is 60 degrees off the
         // bone and no more, which is the number the weapon row reports.
-        const { rim } = fireConePoints(120, 40, 100, 4);
+        const {rim} = fireConePoints(120, 40, 100, 4);
 
         assert.ok(Math.abs(Math.max(...rim.map(yawOf)) - 60) < 0.01);
         assert.ok(Math.abs(Math.max(...rim.map(elevationOf)) - 20) < 0.01);
@@ -108,7 +106,7 @@ describe('fireConePoints', () => {
         // 11 shipped hardpoints declare 360 width. On a sphere that is a full ring and needs no clamp;
         // the old tan-based build had to cap it at 89.5 degrees a side, drawing a free-traversing
         // turret as though it could only fire forwards.
-        const { rim } = fireConePoints(360, 20, 100, 32);
+        const {rim} = fireConePoints(360, 20, 100, 32);
 
         assert.ok(rim.some(p => p[0] < -50), 'nothing points backwards');
         assert.ok(Math.max(...rim.map(elevationOf)) <= 10 + 0.01, 'elevation leaked');
@@ -117,7 +115,7 @@ describe('fireConePoints', () => {
     it('points down the bone s local +X', () => {
         // Measured across every FP_ bone of Ev_stardestroyer.alo: local X has a positive dot with
         // the direction away from the hull. See `AlamoFireBone.AimDirection`.
-        const { rim } = fireConePoints(20, 20, 100, 8);
+        const {rim} = fireConePoints(20, 20, 100, 8);
 
         for (const point of rim) {
             assert.ok(point[0] > 0);
@@ -182,7 +180,7 @@ describe('drawnConeRange', () => {
 
 describe('fireConeSurface', () => {
     const points = (t: number[]) =>
-        Array.from({ length: t.length / 3 }, (_, i) => [t[i * 3], t[i * 3 + 1], t[i * 3 + 2]]);
+        Array.from({length: t.length / 3}, (_, i) => [t[i * 3], t[i * 3 + 1], t[i * 3 + 2]]);
 
     /** Angle off the bone's +X axis, in degrees. */
     const offAxis = (p: number[]) =>
@@ -258,7 +256,7 @@ describe('fireConeSurface', () => {
 
 describe('fireConeOutline', () => {
     const points = (t: number[]) =>
-        Array.from({ length: t.length / 3 }, (_, i) => [t[i * 3], t[i * 3 + 1], t[i * 3 + 2]]);
+        Array.from({length: t.length / 3}, (_, i) => [t[i * 3], t[i * 3 + 1], t[i * 3 + 2]]);
 
     it('closes the rim, so the mouth of the cone reads as one edge', () => {
         const segments = 16;

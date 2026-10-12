@@ -13,19 +13,19 @@ public sealed class LuaStoryMachineExtractorTest
     public void Extract_SplitsAStateFunctionByPhase()
     {
         var machine = LuaStoryMachineExtractor.Extract("""
-            function Definitions()
-                StoryModeEvents = { Act_Begin = State_Act_Begin }
-            end
-            function State_Act_Begin(message)
-                if message == OnEnter then
-                    Story_Event("ENTERED")
-                elseif message == OnUpdate then
-                    Story_Event("UPDATED")
-                elseif message == OnExit then
-                    Story_Event("LEFT")
-                end
-            end
-            """, Uri)!;
+                                                       function Definitions()
+                                                           StoryModeEvents = { Act_Begin = State_Act_Begin }
+                                                       end
+                                                       function State_Act_Begin(message)
+                                                           if message == OnEnter then
+                                                               Story_Event("ENTERED")
+                                                           elseif message == OnUpdate then
+                                                               Story_Event("UPDATED")
+                                                           elseif message == OnExit then
+                                                               Story_Event("LEFT")
+                                                           end
+                                                       end
+                                                       """, Uri)!;
 
         var state = Assert.Single(machine.States);
         Assert.Equal("Act_Begin", state.Name);
@@ -40,20 +40,20 @@ public sealed class LuaStoryMachineExtractorTest
     public void Extract_FollowsThreadsAndSumsSleepsOnTheWayToAnEmission()
     {
         var machine = LuaStoryMachineExtractor.Extract("""
-            StoryModeEvents = { Talk = State_Talk }
-            function State_Talk(message)
-                if message == OnEnter then
-                    Sleep(1)
-                    Create_Thread("Talk_Thread")
-                end
-            end
-            function Talk_Thread()
-                Sleep(5)
-                Story_Event("LINE_ONE")
-                Sleep(2.5)
-                Story_Event("LINE_TWO")
-            end
-            """, Uri)!;
+                                                       StoryModeEvents = { Talk = State_Talk }
+                                                       function State_Talk(message)
+                                                           if message == OnEnter then
+                                                               Sleep(1)
+                                                               Create_Thread("Talk_Thread")
+                                                           end
+                                                       end
+                                                       function Talk_Thread()
+                                                           Sleep(5)
+                                                           Story_Event("LINE_ONE")
+                                                           Sleep(2.5)
+                                                           Story_Event("LINE_TWO")
+                                                       end
+                                                       """, Uri)!;
 
         var enter = Assert.Single(machine.States).OnEnter;
         Assert.Equal(["Talk_Thread"], enter.Threads);
@@ -64,25 +64,25 @@ public sealed class LuaStoryMachineExtractorTest
     public void Extract_FollowsASameFileHelperInline_AndStopsAtTheDepthLimit()
     {
         var machine = LuaStoryMachineExtractor.Extract("""
-            StoryModeEvents = { A = State_A }
-            function State_A(message)
-                if message == OnEnter then
-                    Helper()
-                    Story_Event("AFTER_HELPER")
-                end
-            end
-            function Helper()
-                Sleep(3)
-                Story_Event("FROM_HELPER")
-                Deeper()
-            end
-            function Deeper()
-                Deepest()
-            end
-            function Deepest()
-                Story_Event("TOO_DEEP")
-            end
-            """, Uri)!;
+                                                       StoryModeEvents = { A = State_A }
+                                                       function State_A(message)
+                                                           if message == OnEnter then
+                                                               Helper()
+                                                               Story_Event("AFTER_HELPER")
+                                                           end
+                                                       end
+                                                       function Helper()
+                                                           Sleep(3)
+                                                           Story_Event("FROM_HELPER")
+                                                           Deeper()
+                                                       end
+                                                       function Deeper()
+                                                           Deepest()
+                                                       end
+                                                       function Deepest()
+                                                           Story_Event("TOO_DEEP")
+                                                       end
+                                                       """, Uri)!;
 
         var enter = Assert.Single(machine.States).OnEnter;
         Assert.Equal([("FROM_HELPER", 3.0), ("AFTER_HELPER", 3.0)],
@@ -93,19 +93,19 @@ public sealed class LuaStoryMachineExtractorTest
     public void Extract_CollectsTransitionsAndSpawns_ResolvingGlobalsOnce()
     {
         var machine = LuaStoryMachineExtractor.Extract("""
-            function Definitions()
-                StoryModeEvents = { A = State_A }
-                unit_list = { "X_Wing", "Y_Wing" }
-                hoth = FindPlanet("Hoth")
-            end
-            function State_A(message)
-                if message == OnEnter then
-                    local units = SpawnList(unit_list, hoth, Find_Player("Rebel"), false, false)
-                    Spawn_Unit("Han_Solo", "Tatooine", Find_Player("Rebel"))
-                    Set_Next_State("B")
-                end
-            end
-            """, Uri)!;
+                                                       function Definitions()
+                                                           StoryModeEvents = { A = State_A }
+                                                           unit_list = { "X_Wing", "Y_Wing" }
+                                                           hoth = FindPlanet("Hoth")
+                                                       end
+                                                       function State_A(message)
+                                                           if message == OnEnter then
+                                                               local units = SpawnList(unit_list, hoth, Find_Player("Rebel"), false, false)
+                                                               Spawn_Unit("Han_Solo", "Tatooine", Find_Player("Rebel"))
+                                                               Set_Next_State("B")
+                                                           end
+                                                       end
+                                                       """, Uri)!;
 
         var enter = Assert.Single(machine.States).OnEnter;
         Assert.Equal(["B"], enter.Transitions);

@@ -137,11 +137,11 @@ export class HeatPass {
     constructor(private readonly heatLayer: number) {
         this.composite = new THREE.ShaderMaterial({
             uniforms: {
-                uScene: { value: null },
-                uHeat: { value: null },
-                uAmount: { value: DISTORTION_AMOUNT },
-                uDebug: { value: 0 },
-                uNeutral: { value: NEUTRAL_CHANNEL },
+                uScene: {value: null},
+                uHeat: {value: null},
+                uAmount: {value: DISTORTION_AMOUNT},
+                uDebug: {value: 0},
+                uNeutral: {value: NEUTRAL_CHANNEL},
             },
             vertexShader: COMPOSITE_VERTEX_SHADER,
             fragmentShader: COMPOSITE_FRAGMENT_SHADER,
@@ -222,7 +222,7 @@ export class HeatPass {
 
             // The distortion field is DATA - a normal - so it stays linear, and it has no depth
             // buffer because sprites drawn into it never test against one.
-            this.heat = new THREE.WebGLRenderTarget(width, height, { depthBuffer: false });
+            this.heat = new THREE.WebGLRenderTarget(width, height, {depthBuffer: false});
             return;
         }
 

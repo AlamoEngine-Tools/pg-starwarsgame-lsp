@@ -40,6 +40,10 @@ public sealed class XmlStructureHandler : XmlDiagnosticsHandler<XmlStructureFact
                 (DiagnosticIds.XmlCommentInsideValue, XmlDiagnosticSeverity.Warning)
         };
 
+    /// <inheritdoc />
+    /// <remarks>Every result carries its own id; this is only the registry's fallback.</remarks>
+    public override DiagnosticId? DefaultId => DiagnosticIds.XmlStrictOnly;
+
     /// <summary>The category a published diagnostic code stands for; false for any other code.</summary>
     public static bool TryGetCategory(string? code, out XmlStrictnessCategory category)
     {
@@ -59,10 +63,6 @@ public sealed class XmlStructureHandler : XmlDiagnosticsHandler<XmlStructureFact
     {
         return ByCategory[category].Id;
     }
-
-    /// <inheritdoc />
-    /// <remarks>Every result carries its own id; this is only the registry's fallback.</remarks>
-    public override DiagnosticId? DefaultId => DiagnosticIds.XmlStrictOnly;
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlStructureFact fact, DiagnosticsContext ctx)
     {

@@ -36,7 +36,7 @@ export interface TooltipPlacement {
 }
 
 export function placeTooltip(request: TooltipRequest): TooltipPlacement {
-    const { anchor, size, window: win } = request;
+    const {anchor, size, window: win} = request;
     const middle = (anchor.left + anchor.right) / 2;
 
     // Above by preference: a tooltip under a control covers the next control down, which is the one

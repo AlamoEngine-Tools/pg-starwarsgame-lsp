@@ -13,15 +13,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { promisify } from 'node:util';
+import {promisify} from 'node:util';
 
 import * as vscode from 'vscode';
 import * as yauzl from 'yauzl';
 
-import { checkArchive, entryVerdict, extractionVerdict } from './shaderArchive';
-import { hasShaderSources } from './shaderLayout';
+import {checkArchive, entryVerdict, extractionVerdict} from './shaderArchive';
+import {hasShaderSources} from './shaderLayout';
 
-export { hasShaderSources };
+export {hasShaderSources};
 
 /**
  * Petroglyph's own published download.
@@ -168,7 +168,7 @@ export async function downloadShaderSources(
         title: 'EaWEdit: Base shader sources',
         cancellable: true,
     }, async (progress, token) => {
-        progress.report({ message: 'downloading...' });
+        progress.report({message: 'downloading...'});
 
         let bytes: Uint8Array;
         try {
@@ -188,7 +188,7 @@ export async function downloadShaderSources(
             return false;
         }
 
-        progress.report({ message: 'verifying...' });
+        progress.report({message: 'verifying...'});
 
         const checked = checkArchive(bytes, SHADER_ARCHIVE_SHA256, SHADER_ARCHIVE_BYTES);
         if (!checked.ok) {
@@ -198,7 +198,7 @@ export async function downloadShaderSources(
             return false;
         }
 
-        progress.report({ message: 'extracting...' });
+        progress.report({message: 'extracting...'});
 
         const directory = managedShaderDirectory(context);
         let written: number;
@@ -238,7 +238,7 @@ async function fetchArchive(
     const cancel = token.onCancellationRequested(() => controller.abort());
 
     try {
-        const response = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+        const response = await fetch(url, {signal: controller.signal, redirect: 'follow'});
 
         if (!response.ok) {
             throw new Error(`The server answered ${response.status} ${response.statusText}.`);
@@ -257,10 +257,10 @@ async function fetchArchive(
  * zip-slip rule has exactly one home and one set of tests.
  */
 async function extractShaders(archive: Uint8Array, directory: string): Promise<number> {
-    await fs.promises.mkdir(directory, { recursive: true });
+    await fs.promises.mkdir(directory, {recursive: true});
 
     const open = promisify<Buffer, yauzl.Options, yauzl.ZipFile>(yauzl.fromBuffer);
-    const zip = await open(Buffer.from(archive), { lazyEntries: true });
+    const zip = await open(Buffer.from(archive), {lazyEntries: true});
 
     return new Promise<number>((resolve, reject) => {
         let written = 0;

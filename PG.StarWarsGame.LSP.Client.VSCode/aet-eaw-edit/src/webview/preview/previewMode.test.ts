@@ -2,13 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    defaultMode, drawsAnnotations, modelTouched, otherModeChips, previewModes,
-} from './previewMode';
+import {defaultMode, drawsAnnotations, modelTouched, otherModeChips, previewModes,} from './previewMode';
 
-const SUBJECT = { animations: 3, hardpoints: 10, particles: 4, weapons: 6, abilities: 2 };
+const SUBJECT = {animations: 3, hardpoints: 10, particles: 4, weapons: 6, abilities: 2};
 
 describe('defaultMode', () => {
     /** What you opened decides where you land: an `.ala` is an animation, whatever else it carries. */
@@ -26,7 +24,7 @@ describe('defaultMode', () => {
      * empty list IS the answer to why nothing is moving, and bouncing to Model mode would hide it.
      */
     it('stays in Animation mode even when the subject has no clips', () => {
-        assert.equal(defaultMode('Animation', { ...SUBJECT, animations: 0 }), 'animation');
+        assert.equal(defaultMode('Animation', {...SUBJECT, animations: 0}), 'animation');
     });
 });
 
@@ -44,7 +42,7 @@ describe('previewModes', () => {
      * SUBJECT: "this unit declares no hardpoints" is exactly what a preview exists to surface.
      */
     it('counts what each mode has to work with, zero included', () => {
-        const bare = previewModes({ animations: 0, hardpoints: 0, particles: 0, weapons: 0, abilities: 0 });
+        const bare = previewModes({animations: 0, hardpoints: 0, particles: 0, weapons: 0, abilities: 0});
 
         assert.equal(bare.length, 3);
         assert.deepEqual(bare.map(mode => mode.count), [0, undefined, 0]);
@@ -68,15 +66,15 @@ describe('otherModeChips', () => {
         });
 
         assert.deepEqual(chips, [
-            { mode: 'animation', text: 'fly_00 playing' },
-            { mode: 'gameplay', text: '2 hardpoints destroyed' },
+            {mode: 'animation', text: 'fly_00 playing'},
+            {mode: 'gameplay', text: '2 hardpoints destroyed'},
         ]);
     });
 
     it('says nothing about a mode that is doing nothing', () => {
         assert.deepEqual(
             otherModeChips('model',
-                { playing: null, destroyed: 0, particleSystems: 0, abilities: 0 }), []);
+                {playing: null, destroyed: 0, particleSystems: 0, abilities: 0}), []);
     });
 
     /** Never a chip for the mode you are already in - its controls are right there. */
@@ -101,7 +99,7 @@ describe('what the Gameplay dial counts', () => {
     it('counts everything the lens can act on, not just hardpoints', () => {
         // The lens grew: it holds weapons, hardpoints and abilities now. Counting only hardpoints read
         // 0 on a fighter that carries its guns on the unit itself and has three abilities.
-        const dial = previewModes({ animations: 0, hardpoints: 2, particles: 0, weapons: 4, abilities: 3 })
+        const dial = previewModes({animations: 0, hardpoints: 2, particles: 0, weapons: 4, abilities: 3})
             .find(m => m.id === 'gameplay');
 
         assert.equal(dial?.count, 9);
@@ -109,7 +107,7 @@ describe('what the Gameplay dial counts', () => {
 
     it('is absent rather than zero when the lens has nothing at all', () => {
         // A bare model. A dial position reading 0 invites a click that finds an empty panel.
-        const dial = previewModes({ animations: 0, hardpoints: 0, particles: 0, weapons: 0, abilities: 0 })
+        const dial = previewModes({animations: 0, hardpoints: 0, particles: 0, weapons: 0, abilities: 0})
             .find(m => m.id === 'gameplay');
 
         assert.ok(dial?.count === undefined || dial.count === 0);
@@ -121,7 +119,7 @@ describe('the soft-switch chips', () => {
         // The safety net: leaving a lens does not stop what it started, and an active ability is
         // holding proxies on. Without the chip that state is invisible from Model mode.
         const chips = otherModeChips('model',
-            { playing: null, destroyed: 0, particleSystems: 0, abilities: 2 });
+            {playing: null, destroyed: 0, particleSystems: 0, abilities: 2});
 
         assert.equal(chips.length, 1);
         assert.equal(chips[0].mode, 'gameplay');
@@ -130,12 +128,12 @@ describe('the soft-switch chips', () => {
 
     it('does not say it while you are already looking at it', () => {
         assert.deepEqual(otherModeChips('gameplay',
-            { playing: null, destroyed: 0, particleSystems: 0, abilities: 2 }), []);
+            {playing: null, destroyed: 0, particleSystems: 0, abilities: 2}), []);
     });
 
     it('reads as one ability rather than 1 abilities', () => {
         const chips = otherModeChips('model',
-            { playing: null, destroyed: 0, particleSystems: 0, abilities: 1 });
+            {playing: null, destroyed: 0, particleSystems: 0, abilities: 1});
 
         assert.match(chips[0].text, /1 ability\b/);
     });
@@ -160,17 +158,17 @@ describe('drawsAnnotations', () => {
 });
 
 describe('modelTouched', () => {
-    const rest = { alt: 0, lodIsHighest: true, hiddenEmitters: 0, rowOverrides: 0 };
+    const rest = {alt: 0, lodIsHighest: true, hiddenEmitters: 0, rowOverrides: 0};
 
     it('is quiet on a model still as it opened', () => {
         assert.equal(modelTouched(rest), false);
     });
 
     it('lights up for each thing the Model lens`s Reset puts back', () => {
-        assert.equal(modelTouched({ ...rest, alt: 1 }), true);
-        assert.equal(modelTouched({ ...rest, lodIsHighest: false }), true);
-        assert.equal(modelTouched({ ...rest, hiddenEmitters: 2 }), true);
-        assert.equal(modelTouched({ ...rest, rowOverrides: 1 }), true);
+        assert.equal(modelTouched({...rest, alt: 1}), true);
+        assert.equal(modelTouched({...rest, lodIsHighest: false}), true);
+        assert.equal(modelTouched({...rest, hiddenEmitters: 2}), true);
+        assert.equal(modelTouched({...rest, rowOverrides: 1}), true);
     });
 
     it('says nothing about what the Gameplay lens has done', () => {

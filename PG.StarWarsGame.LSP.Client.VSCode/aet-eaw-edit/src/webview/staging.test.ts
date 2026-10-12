@@ -6,11 +6,9 @@
 // pattern - a wrong optimistic patch shows the user an edit that will not survive Save.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    eventNodeId, optimisticEdit, PatchableEventNode, PREVIEW_KINDS, STAGED_KINDS, upsertParams,
-} from './staging';
+import {eventNodeId, optimisticEdit, PatchableEventNode, PREVIEW_KINDS, STAGED_KINDS, upsertParams,} from './staging';
 
 describe('eventNodeId', () => {
     // Must match the server's StoryGraphBuilder.EventNodeId, which lowercases - a mismatch means
@@ -28,82 +26,82 @@ describe('eventNodeId', () => {
 describe('upsertParams', () => {
     it('adds a slot and keeps positions sorted', () => {
         const result = upsertParams(
-            [{ position: 2, value: 'two' }],
-            [{ position: 0, value: 'zero' }],
+            [{position: 2, value: 'two'}],
+            [{position: 0, value: 'zero'}],
         );
 
         assert.deepEqual(result, [
-            { position: 0, value: 'zero' },
-            { position: 2, value: 'two' },
+            {position: 0, value: 'zero'},
+            {position: 2, value: 'two'},
         ]);
     });
 
     it('overwrites the value at an existing position', () => {
         const result = upsertParams(
-            [{ position: 1, value: 'old' }],
-            [{ position: 1, value: 'new' }],
+            [{position: 1, value: 'old'}],
+            [{position: 1, value: 'new'}],
         );
 
-        assert.deepEqual(result, [{ position: 1, value: 'new' }]);
+        assert.deepEqual(result, [{position: 1, value: 'new'}]);
     });
 
     // Clearing a param slot is how a user removes an argument; an empty string must delete the slot
     // rather than write an empty argument the server would then have to interpret.
     it('removes a slot when the value is empty or null', () => {
         assert.deepEqual(
-            upsertParams([{ position: 0, value: 'a' }], [{ position: 0, value: '' }]),
+            upsertParams([{position: 0, value: 'a'}], [{position: 0, value: ''}]),
             [],
         );
         assert.deepEqual(
-            upsertParams([{ position: 0, value: 'a' }], [{ position: 0, value: null }]),
+            upsertParams([{position: 0, value: 'a'}], [{position: 0, value: null}]),
             [],
         );
     });
 
     it('leaves the original list untouched', () => {
-        const existing = [{ position: 0, value: 'a' }];
-        upsertParams(existing, [{ position: 1, value: 'b' }]);
+        const existing = [{position: 0, value: 'a'}];
+        upsertParams(existing, [{position: 1, value: 'b'}]);
 
-        assert.deepEqual(existing, [{ position: 0, value: 'a' }]);
+        assert.deepEqual(existing, [{position: 0, value: 'a'}]);
     });
 });
 
 describe('optimisticEdit', () => {
     it('returns null when the payload names no event', () => {
-        assert.equal(optimisticEdit({ kind: 'setBranch', value: 'x' }), null);
+        assert.equal(optimisticEdit({kind: 'setBranch', value: 'x'}), null);
     });
 
     // Structural gestures reconcile through a server preview instead; claiming a local patch for
     // them would show the user a graph the preview then contradicts.
     it('returns null for a structural kind', () => {
-        assert.equal(optimisticEdit({ kind: 'createEvent', eventName: 'E' }), null);
+        assert.equal(optimisticEdit({kind: 'createEvent', eventName: 'E'}), null);
     });
 
     it('sets branch, and clears it when the value is empty', () => {
-        const set = optimisticEdit({ kind: 'setBranch', eventName: 'E', value: 'Rebel' });
-        assert.deepEqual(set!.apply({ branch: null }), { branch: 'Rebel' });
+        const set = optimisticEdit({kind: 'setBranch', eventName: 'E', value: 'Rebel'});
+        assert.deepEqual(set!.apply({branch: null}), {branch: 'Rebel'});
 
-        const cleared = optimisticEdit({ kind: 'setBranch', eventName: 'E', value: '' });
-        assert.deepEqual(cleared!.apply({ branch: 'Rebel' }), { branch: null });
+        const cleared = optimisticEdit({kind: 'setBranch', eventName: 'E', value: ''});
+        assert.deepEqual(cleared!.apply({branch: 'Rebel'}), {branch: null});
     });
 
     // Anything other than a literal true is false - the flag arrives from an untyped webview
     // message, so a truthy string must not be read as "on".
     it('treats perpetual as a strict boolean', () => {
-        const node: PatchableEventNode = { perpetual: false };
+        const node: PatchableEventNode = {perpetual: false};
 
-        const on = optimisticEdit({ kind: 'setPerpetual', eventName: 'E', flag: true });
+        const on = optimisticEdit({kind: 'setPerpetual', eventName: 'E', flag: true});
         assert.equal(on!.apply(node).perpetual, true);
 
-        const off = optimisticEdit({ kind: 'setPerpetual', eventName: 'E', flag: 'yes' });
+        const off = optimisticEdit({kind: 'setPerpetual', eventName: 'E', flag: 'yes'});
         assert.equal(off!.apply(node).perpetual, false);
     });
 
     // Clearing a type must drop its params too - leaving them would show arguments belonging to a
     // type the node no longer has.
     it('clears the event type and its params together', () => {
-        const edit = optimisticEdit({ kind: 'clearEventType', eventName: 'E' });
-        const next = edit!.apply({ eventType: 'T', eventParams: [{ position: 0, value: 'a' }] });
+        const edit = optimisticEdit({kind: 'clearEventType', eventName: 'E'});
+        const next = edit!.apply({eventType: 'T', eventParams: [{position: 0, value: 'a'}]});
 
         assert.equal(next.eventType, null);
         assert.deepEqual(next.eventParams, []);
@@ -112,16 +110,16 @@ describe('optimisticEdit', () => {
     it('routes setParams to the event or reward list by paramKind', () => {
         const reward = optimisticEdit({
             kind: 'setParams', eventName: 'E', paramKind: 'reward',
-            params: [{ position: 0, value: 'r' }],
+            params: [{position: 0, value: 'r'}],
         });
-        const next = reward!.apply({ eventParams: [], rewardParams: [] });
+        const next = reward!.apply({eventParams: [], rewardParams: []});
 
-        assert.deepEqual(next.rewardParams, [{ position: 0, value: 'r' }]);
+        assert.deepEqual(next.rewardParams, [{position: 0, value: 'r'}]);
         assert.deepEqual(next.eventParams, []);
     });
 
     it('carries the node id derived from the payload', () => {
-        const edit = optimisticEdit({ kind: 'setBranch', eventName: 'Evt', threadUri: 'u', value: 'b' });
+        const edit = optimisticEdit({kind: 'setBranch', eventName: 'Evt', threadUri: 'u', value: 'b'});
 
         assert.equal(edit!.nodeId, 'u#evt');
     });

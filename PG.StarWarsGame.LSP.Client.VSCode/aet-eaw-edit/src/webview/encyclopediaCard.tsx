@@ -22,8 +22,12 @@
 //     preferably by sampling again rather than by eye, which got several of them wrong.
 
 import {
-    EncyclopediaImage, EncyclopediaLayout, EncyclopediaReference, EncyclopediaRgba,
-    EncyclopediaTextStyle, GetEncyclopediaEntryResult,
+    EncyclopediaImage,
+    EncyclopediaLayout,
+    EncyclopediaReference,
+    EncyclopediaRgba,
+    EncyclopediaTextStyle,
+    GetEncyclopediaEntryResult,
 } from '../protocol/encyclopedia';
 import {cssFontStack} from './encyclopediaFonts';
 import {encyclopediaIconTitle} from './encyclopediaIconTitle';

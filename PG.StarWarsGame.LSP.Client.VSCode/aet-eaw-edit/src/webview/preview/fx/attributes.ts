@@ -12,7 +12,7 @@
 // shipped effects: POSITION as float4; NORMAL as float3 and float4; TEXCOORD0 as float2 and float3;
 // TEXCOORD1 as float2; TANGENT0 and BINORMAL0 as float3; COLOR0 as float4.
 
-import { attributeFor } from './semantics';
+import {attributeFor} from './semantics';
 
 /** An attribute the generated shader must declare, with the type the exporter writes it as. */
 export interface AttributeBinding {
@@ -48,7 +48,7 @@ export interface FieldBinding {
 }
 
 function attribute(name: string): AttributeBinding {
-    return { name, glslType: ATTRIBUTE_TYPES[name] ?? 'vec4' };
+    return {name, glslType: ATTRIBUTE_TYPES[name] ?? 'vec4'};
 }
 
 /**

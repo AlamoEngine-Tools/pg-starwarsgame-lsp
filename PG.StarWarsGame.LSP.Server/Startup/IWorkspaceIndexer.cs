@@ -12,6 +12,12 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 /// </summary>
 public interface IWorkspaceIndexer
 {
+    /// <summary>How the last scan used the index snapshots. Null before the first scan.</summary>
+    IndexCacheStats? LastIndexCache => null;
+
+    /// <summary>How the last bone catalog build used its snapshots. Null before the first build.</summary>
+    BoneCatalogStats? LastBoneCatalog => null;
+
     void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots);
 
     Task<int> IndexDocumentsAsync(WorkspaceConfiguration config, CancellationToken ct,
@@ -22,10 +28,4 @@ public interface IWorkspaceIndexer
     void ApplyModelBoneCatalog(WorkspaceConfiguration config);
 
     void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots);
-
-    /// <summary>How the last scan used the index snapshots. Null before the first scan.</summary>
-    IndexCacheStats? LastIndexCache => null;
-
-    /// <summary>How the last bone catalog build used its snapshots. Null before the first build.</summary>
-    BoneCatalogStats? LastBoneCatalog => null;
 }

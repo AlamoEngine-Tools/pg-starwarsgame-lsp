@@ -16,21 +16,6 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 /// </summary>
 public sealed class GameIndexNameHashTest
 {
-    /// <summary>Hashes by a table, so a test can make any two names collide, and counts its calls.</summary>
-    private sealed class CountingHash(params (string Name, uint Hash)[] table) : IObjectNameHash
-    {
-        public int Calls { get; private set; }
-
-        public uint Of(string name)
-        {
-            Calls++;
-            foreach (var (n, h) in table)
-                if (n.Equals(name, StringComparison.OrdinalIgnoreCase))
-                    return h;
-            return (uint)StringComparer.OrdinalIgnoreCase.GetHashCode(name) | 0x8000_0000u;
-        }
-    }
-
     private static GameSymbol Object(string id, string uri, string type = "GameObjectType")
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, type, new FileOrigin(uri, 1, null), null);
@@ -145,5 +130,20 @@ public sealed class GameIndexNameHashTest
         svc.InjectDocument(Doc("file:///a.xml", 1, alpha));
 
         Assert.True(svc.Current.WorkspaceNameHashes.IsEmpty);
+    }
+
+    /// <summary>Hashes by a table, so a test can make any two names collide, and counts its calls.</summary>
+    private sealed class CountingHash(params (string Name, uint Hash)[] table) : IObjectNameHash
+    {
+        public int Calls { get; private set; }
+
+        public uint Of(string name)
+        {
+            Calls++;
+            foreach (var (n, h) in table)
+                if (n.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    return h;
+            return (uint)StringComparer.OrdinalIgnoreCase.GetHashCode(name) | 0x8000_0000u;
+        }
     }
 }

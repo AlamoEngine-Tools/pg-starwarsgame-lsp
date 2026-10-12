@@ -10,7 +10,7 @@
 
 /** Where the text being filled in comes from. */
 export type FillSource =
-    /** Another language column of this same file. */
+/** Another language column of this same file. */
     | 'language'
     /** What the game itself ships. */
     | 'baseline'
@@ -31,8 +31,12 @@ export type FillSource =
 export function resolveFillSource(
     chosen: FillSource, offers: { canCopy: boolean; canSeed: boolean },
 ): FillSource {
-    if (chosen === 'file' && offers.canSeed) { return 'file'; }
-    if (chosen === 'language' && offers.canCopy) { return 'language'; }
+    if (chosen === 'file' && offers.canSeed) {
+        return 'file';
+    }
+    if (chosen === 'language' && offers.canCopy) {
+        return 'language';
+    }
     return 'baseline';
 }
 
@@ -57,7 +61,9 @@ export function copyFromOptions(
 
     return languages.filter(language => {
         const upper = language.toUpperCase();
-        if (upper === target || seen.has(upper)) { return false; }
+        if (upper === target || seen.has(upper)) {
+            return false;
+        }
         seen.add(upper);
         return true;
     });

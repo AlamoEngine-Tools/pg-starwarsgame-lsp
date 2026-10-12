@@ -15,7 +15,9 @@ export function gridFooterLabel(total: number, shown: number, activeFilters: num
     const parts = [`${format(total)} ${total === 1 ? 'row' : 'rows'}`];
 
     const hidden = total - shown;
-    if (hidden > 0) { parts.push(`${format(hidden)} filtered out`); }
+    if (hidden > 0) {
+        parts.push(`${format(hidden)} filtered out`);
+    }
 
     // Reported even when nothing is currently hidden: a filter that matches everything today will
     // start hiding rows the moment the file changes, and its being on is not otherwise obvious.

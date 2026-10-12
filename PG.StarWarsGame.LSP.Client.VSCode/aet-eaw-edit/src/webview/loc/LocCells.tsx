@@ -4,9 +4,9 @@
 // Grid pieces both editors use. Neither knows what a row means; they are about typing into a cell
 // and about a menu staying where it was opened.
 
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {ReactNode, useEffect, useLayoutEffect, useRef, useState} from 'react';
 
-import { MenuPlacement, placeMenu } from './menuPlacement';
+import {MenuPlacement, placeMenu} from './menuPlacement';
 
 /**
  * A cell that commits on blur or Enter and reverts on Escape.
@@ -40,8 +40,13 @@ export function CellInput(props: {
             onChange={e => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={e => {
-                if (e.key === 'Enter') { e.currentTarget.blur(); }
-                if (e.key === 'Escape') { setDraft(committed.current); e.currentTarget.blur(); }
+                if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                }
+                if (e.key === 'Escape') {
+                    setDraft(committed.current);
+                    e.currentTarget.blur();
+                }
             }}
         />
     );
@@ -62,11 +67,11 @@ export function RowMenuFrame(props: {
     onClose: () => void;
     children: ReactNode;
 }): React.JSX.Element {
-    const { anchorIndex, onClose } = props;
+    const {anchorIndex, onClose} = props;
 
     const menuRef = useRef<HTMLDivElement>(null);
     const [placement, setPlacement] = useState<MenuPlacement>(
-        { left: props.x, top: props.y, maxHeight: null });
+        {left: props.x, top: props.y, maxHeight: null});
 
     // Measured rather than estimated, because what the menu contains differs by row - a spacer
     // offers different items from an entry. A layout effect runs before paint, so the corrected
@@ -74,26 +79,32 @@ export function RowMenuFrame(props: {
     //
     // Keyed on the anchor, never on the children: the child elements are a fresh object every
     // render, so depending on them re-runs this after each reposition, which never settles.
-    const { x, y } = props;
+    const {x, y} = props;
     useLayoutEffect(() => {
         const el = menuRef.current;
-        if (el === null) { return; }
+        if (el === null) {
+            return;
+        }
 
         const box = el.getBoundingClientRect();
         const next = placeMenu(
-            { x, y },
-            { width: box.width, height: box.height },
-            { width: window.innerWidth, height: window.innerHeight });
+            {x, y},
+            {width: box.width, height: box.height},
+            {width: window.innerWidth, height: window.innerHeight});
 
         setPlacement(current => (current.left === next.left && current.top === next.top
-            && current.maxHeight === next.maxHeight
+        && current.maxHeight === next.maxHeight
             ? current
             : next));
     }, [x, y, anchorIndex]);
 
     useEffect(() => {
         const close = (): void => onClose();
-        const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') { onClose(); } };
+        const onKey = (e: KeyboardEvent): void => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
 
         // Closing on any scroll at all is too blunt. Right-clicking a row while the caret sits in
         // another one blurs that cell, and the browser scrolls the grid horizontally by a few
@@ -108,7 +119,9 @@ export function RowMenuFrame(props: {
         const onScroll = (): void => {
             const now = anchorTop();
             // Gone entirely means scrolled out of the virtualised window - close.
-            if (now === null || openedAt === null || Math.abs(now - openedAt) > 2) { onClose(); }
+            if (now === null || openedAt === null || Math.abs(now - openedAt) > 2) {
+                onClose();
+            }
         };
 
         window.addEventListener('pointerdown', close);

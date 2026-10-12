@@ -12,7 +12,7 @@
 // multiplier at `:1040`. Kept free of three.js so the walk order and the barycentric sampling can
 // be tested directly.
 
-import type { AlamoEmitFromMesh, AlamoVector3 } from '../../protocol/modelPreview';
+import type {AlamoEmitFromMesh, AlamoVector3} from '../../protocol/modelPreview';
 
 /** A source of positions and normals to emit from. Sub-meshes are kept apart, as the engine does. */
 export interface EmissionMesh {
@@ -65,8 +65,8 @@ function vertexAt(
     const at = vertex * 3;
 
     return {
-        position: { x: sub.positions[at], y: sub.positions[at + 1], z: sub.positions[at + 2] },
-        normal: { x: sub.normals[at] ?? 0, y: sub.normals[at + 1] ?? 0, z: sub.normals[at + 2] ?? 0 },
+        position: {x: sub.positions[at], y: sub.positions[at + 1], z: sub.positions[at + 2]},
+        normal: {x: sub.normals[at] ?? 0, y: sub.normals[at + 1] ?? 0, z: sub.normals[at + 2] ?? 0},
     };
 }
 
@@ -143,7 +143,7 @@ export function emissionPoint(
         z: corners.reduce((sum, c, i) => sum + pick(c).z * weights[i], 0),
     });
 
-    return { position: blend(p => p.position), normal: blend(p => p.normal) };
+    return {position: blend(p => p.position), normal: blend(p => p.normal)};
 }
 
 /**

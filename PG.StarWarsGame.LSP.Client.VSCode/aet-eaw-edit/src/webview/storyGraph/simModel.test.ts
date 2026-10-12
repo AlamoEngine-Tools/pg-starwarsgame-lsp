@@ -2,7 +2,36 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import {galacticReturnNode, hangingDecision, portalPickAction, shouldResumeAfterAnswer} from './simModel';
+import {
+    armingLines,
+    DEFAULT_PACE,
+    filterTrace,
+    galacticReturnNode,
+    groupDecisions,
+    hangingDecision,
+    labelFor,
+    paceIntervalMs,
+    parsePace,
+    pickerCandidates,
+    portalPickAction,
+    retryableBattle,
+    selectionAnswered,
+    shouldResumeAfterAnswer,
+    SPEED_STOPS,
+    speedLabel,
+    speedStopOf,
+    traceRows
+} from './simModel';
+import {describe, it} from 'node:test';
+
+import {
+    StoryGraphEdgeDto,
+    StoryGraphNodeDto,
+    StorySimInterventionDto,
+    StorySimStateDto,
+    StorySimStepDto,
+    StorySimWorldDto
+} from '../../protocol/story';
 
 // The decision that opens by itself: the battle, else the one armed last (the chain's next step),
 // else the first listed - never a listener armed at plot load ahead of the step that just came up.
@@ -89,20 +118,6 @@ describe('shouldResumeAfterAnswer', () => {
         assert.equal(shouldResumeAfterAnswer({...base, stillWaiting: true}), false);
     });
 });
-import {describe, it} from 'node:test';
-
-import {
-    StoryGraphEdgeDto,
-    StoryGraphNodeDto,
-    StorySimInterventionDto,
-    StorySimStateDto,
-    StorySimStepDto,
-    StorySimWorldDto
-} from '../../protocol/story';
-import {
-    armingLines, DEFAULT_PACE, filterTrace, groupDecisions, labelFor, paceIntervalMs, parsePace, pickerCandidates,
-    retryableBattle, selectionAnswered, SPEED_STOPS, speedLabel, speedStopOf, traceRows,
-} from './simModel';
 
 function intervention(name: string, kind: string, facet: string | null, options: string[] = []): StorySimInterventionDto {
     return {

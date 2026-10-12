@@ -21,6 +21,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     /// <summary>The schema enum a <c>Death_Clone</c>'s first slot names.</summary>
     private const string DamageTypeEnum = "DamageType";
 
+    // The game compares the value with this word case-insensitively and removes the AI instead of
+    // creating one, so it names no AIPlayerType.
+    private const string HumanControlKeyword = "Human";
+
     // Registered file-types that are referenced as workspace files by workspaceFile tags (campaign
     // *_Story_Name → StoryPlotManifest; manifest Active_Plot/Suspended_Plot → StoryParser). A doc
     // typed one of these is indexed as a navigable file-symbol so those references resolve to it.
@@ -35,10 +39,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private static readonly string?[] ForceDeploymentSlotTypes = ["Faction", "GameObjectType", "GameObjectType"];
 
     private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
-
-    // The game compares the value with this word case-insensitively and removes the AI instead of
-    // creating one, so it names no AIPlayerType.
-    private const string HumanControlKeyword = "Human";
 
     private readonly ILspConfigurationProvider? _configProvider;
     private readonly IEaWXmlContext? _eaWXmlContext;

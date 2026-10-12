@@ -46,7 +46,11 @@ public sealed class VanillaGraphScopeTest(ITestOutputHelper output)
             .ToDictionary(n => n.Id, n => n.ThreadUri, StringComparer.Ordinal);
         var junctionThread = graph.Nodes.Where(n => n.Kind is StoryNodeKind.AndJunction or StoryNodeKind.OrJunction)
             .ToDictionary(n => n.Id, n => n.ThreadUri, StringComparer.Ordinal);
-        string? ThreadOf(string id) => threadOf.GetValueOrDefault(id) ?? junctionThread.GetValueOrDefault(id);
+
+        string? ThreadOf(string id)
+        {
+            return threadOf.GetValueOrDefault(id) ?? junctionThread.GetValueOrDefault(id);
+        }
 
         var crossFilePrereqs = graph.Edges
             .Where(e => e.Kind == StoryEdgeKind.Prereq)

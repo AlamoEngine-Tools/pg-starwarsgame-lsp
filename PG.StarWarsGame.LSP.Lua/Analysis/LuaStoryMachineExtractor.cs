@@ -39,7 +39,7 @@ public static class LuaStoryMachineExtractor
         var states = new List<LuaStoryState>();
         foreach (var (stateName, functionName, inline) in entries)
         {
-            StatementListSyntax? body = inline?.Body;
+            var body = inline?.Body;
             if (body is null && functionName is not null && functions.TryGetValue(functionName, out var declared))
                 body = declared.Body;
             var phases = body is null
@@ -132,19 +132,9 @@ public static class LuaStoryMachineExtractor
         return null;
     }
 
-    // ── Statement walk ───────────────────────────────────────────────────────
-
-    private sealed class WalkState
-    {
-        public double Delay;
-        public int Depth;
-        public HashSet<string> Visited { get; } = new(StringComparer.Ordinal);
-    }
-
     private static void Walk(StatementListSyntax block, PhaseBuilder phase, FileScope scope, WalkState state)
     {
         foreach (var statement in block.Statements)
-        {
             switch (statement)
             {
                 case ExpressionStatementSyntax { Expression: FunctionCallExpressionSyntax call }:
@@ -183,7 +173,6 @@ public static class LuaStoryMachineExtractor
                 case ReturnStatementSyntax:
                     return;
             }
-        }
     }
 
     private static void Call(FunctionCallExpressionSyntax call, PhaseBuilder phase, FileScope scope, WalkState state)
@@ -246,6 +235,15 @@ public static class LuaStoryMachineExtractor
             StringFunctionArgumentSyntax single => [single.Expression],
             _ => []
         };
+    }
+
+    // ── Statement walk ───────────────────────────────────────────────────────
+
+    private sealed class WalkState
+    {
+        public double Delay;
+        public int Depth;
+        public HashSet<string> Visited { get; } = new(StringComparer.Ordinal);
     }
 
     private sealed class PhaseBuilder

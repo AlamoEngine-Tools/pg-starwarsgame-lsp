@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import {
-    countTreeNodes, searchIsOpen, treeFilterSummary, treeMinHeight,
-} from './treeSearch';
+import {countTreeNodes, searchIsOpen, treeFilterSummary, treeMinHeight,} from './treeSearch';
 
 describe('searchIsOpen', () => {
     it('is closed until the reader opens it', () => {
@@ -56,7 +54,7 @@ describe('treeFilterSummary', () => {
 });
 
 describe('countTreeNodes', () => {
-    const leaf = (id: string) => ({ id, name: id, children: [] });
+    const leaf = (id: string) => ({id, name: id, children: []});
 
     it('counts a flat list', () => {
         assert.equal(countTreeNodes([leaf('a'), leaf('b')] as never), 2);
@@ -68,7 +66,7 @@ describe('countTreeNodes', () => {
         // Star Destroyer opened claiming "50 of 58" with nothing filtered at all.
         const tree = [{
             id: 'root', name: 'root', children: [
-                { id: 'a', name: 'a', children: [leaf('a1'), leaf('a2')] },
+                {id: 'a', name: 'a', children: [leaf('a1'), leaf('a2')]},
                 leaf('b'),
             ],
         }];

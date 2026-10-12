@@ -14,6 +14,12 @@ namespace PG.StarWarsGame.LSP.Story.Model;
 /// </summary>
 public static class StoryThreadParser
 {
+    // Measured: the engine reads Prereq with its list field type (code 0x1b in the XML field
+    // table), the reader Affiliation shares, and vanilla writes Affiliation comma-separated and
+    // Prereq whitespace-separated - seven Underworld lines even one name per line with a trailing
+    // comma. So a comma is a delimiter exactly like whitespace, never part of a name.
+    private static readonly char[] ListDelimiters = [' ', '\t', '\r', '\n', ','];
+
     public static StoryThread Parse(string text, string documentUri)
     {
         return Parse(ParsedXmlDocument.Parse(text), documentUri);
@@ -128,12 +134,6 @@ public static class StoryThreadParser
         position = slot - 1;
         return true;
     }
-
-    // Measured: the engine reads Prereq with its list field type (code 0x1b in the XML field
-    // table), the reader Affiliation shares, and vanilla writes Affiliation comma-separated and
-    // Prereq whitespace-separated - seven Underworld lines even one name per line with a trailing
-    // comma. So a comma is a delimiter exactly like whitespace, never part of a name.
-    private static readonly char[] ListDelimiters = [' ', '\t', '\r', '\n', ','];
 
     private static bool IsListDelimiter(char c)
     {

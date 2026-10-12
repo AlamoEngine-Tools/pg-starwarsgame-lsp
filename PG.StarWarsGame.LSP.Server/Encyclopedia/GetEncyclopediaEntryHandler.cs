@@ -49,6 +49,10 @@ public sealed class GetEncyclopediaEntryHandler
     // this asking DI for a concrete type nothing registers.
     private readonly IWorkspaceIconCatalog? _catalog;
     private readonly ILspConfigurationProvider _config;
+
+    // Only to ask whether a project ships the conventional mega texture, which decides whether its
+    // missing icons are a missing SETTING or genuinely absent art.
+    private readonly IFileSystem _fileSystem;
     private readonly IGameIndexService _indexService;
 
     // Still needed for the ship-name catalog, which resolves its own root. The INTERFACE, not the
@@ -59,10 +63,6 @@ public sealed class GetEncyclopediaEntryHandler
 
     private readonly IShipNameCatalogProvider? _shipNames;
     private readonly IVariantTagSource _tagSource;
-
-    // Only to ask whether a project ships the conventional mega texture, which decides whether its
-    // missing icons are a missing SETTING or genuinely absent art.
-    private readonly IFileSystem _fileSystem;
 
     public GetEncyclopediaEntryHandler(IGameIndexService indexService, ISchemaProvider schema,
         IVariantTagSource tagSource, ILspConfigurationProvider config,

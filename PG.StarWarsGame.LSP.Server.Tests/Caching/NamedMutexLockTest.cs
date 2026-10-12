@@ -34,10 +34,17 @@ public sealed class NamedMutexLockTest
             var l = Build();
             using (l.Acquire(name))
             {
-                lock (sync) order.Add("first-in");
+                lock (sync)
+                {
+                    order.Add("first-in");
+                }
+
                 firstHeld.Set();
                 releaseFirst.Wait(TimeSpan.FromSeconds(10));
-                lock (sync) order.Add("first-out");
+                lock (sync)
+                {
+                    order.Add("first-out");
+                }
             }
         });
         firstHeld.Wait(TimeSpan.FromSeconds(10));
@@ -47,7 +54,10 @@ public sealed class NamedMutexLockTest
             var l = Build();
             using (l.Acquire(name))
             {
-                lock (sync) order.Add("second-in");
+                lock (sync)
+                {
+                    order.Add("second-in");
+                }
             }
         });
 

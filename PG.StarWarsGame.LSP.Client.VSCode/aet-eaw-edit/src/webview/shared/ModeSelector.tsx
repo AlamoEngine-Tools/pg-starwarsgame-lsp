@@ -17,8 +17,8 @@
 
 import * as React from 'react';
 
-import { type ChoiceOption } from './choice';
-import { Icon } from './Icon';
+import {type ChoiceOption} from './choice';
+import {Icon} from './Icon';
 
 export function ModeSelector<Id extends string>(props: {
     /**
@@ -53,7 +53,7 @@ export function ModeSelector<Id extends string>(props: {
                 >
                     {option.icon === undefined
                         ? option.label
-                        : <Icon name={option.icon} />}
+                        : <Icon name={option.icon}/>}
                 </button>
             ))}
         </span>

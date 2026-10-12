@@ -143,9 +143,9 @@ export function resolveRow(facts: RowFacts): Resolution {
     // it. Deriving it instead ("gated or not in the file") would miss the animation, which speaks
     // for the model too.
     const authored = decide(
-        { ...facts, ancestorHidden: facts.ancestorHiddenAuthored }, undefined);
+        {...facts, ancestorHidden: facts.ancestorHiddenAuthored}, undefined);
 
-    return { ...decided, authored: authored.visible };
+    return {...decided, authored: authored.visible};
 }
 
 /** The chain itself, for one reading of what the reader has said. */
@@ -156,33 +156,33 @@ function decide(
     // statement: "no effects at all" outranks "not this limb".
     for (const master of facts.masters) {
         if (!master.on) {
-            return { visible: false, decidedBy: 'master', because: `master:${master.id}` };
+            return {visible: false, decidedBy: 'master', because: `master:${master.id}`};
         }
     }
 
     if (facts.ancestorHidden !== undefined) {
-        return { visible: false, decidedBy: 'ancestor', because: `ancestor:${facts.ancestorHidden}` };
+        return {visible: false, decidedBy: 'ancestor', because: `ancestor:${facts.ancestorHidden}`};
     }
 
     if (override !== undefined) {
-        return { visible: override === 'shown', decidedBy: 'you', because: 'you' };
+        return {visible: override === 'shown', decidedBy: 'you', because: 'you'};
     }
 
     if (facts.animated !== undefined) {
-        return { visible: facts.animated, decidedBy: 'animation', because: 'animation' };
+        return {visible: facts.animated, decidedBy: 'animation', because: 'animation'};
     }
 
     if (facts.gated) {
-        return { visible: false, decidedBy: 'level', because: 'level' };
+        return {visible: false, decidedBy: 'level', because: 'level'};
     }
 
     // Below the level gate on purpose: a mesh tagged for another damage or detail state is not part
     // of this one whatever the idle clip has to say about it.
     if (facts.resting !== undefined) {
-        return { visible: facts.resting, decidedBy: 'idle', because: 'idle' };
+        return {visible: facts.resting, decidedBy: 'idle', because: 'idle'};
     }
 
-    return { visible: facts.inFile, decidedBy: 'file', because: 'file' };
+    return {visible: facts.inFile, decidedBy: 'file', because: 'file'};
 }
 
 /**
@@ -286,7 +286,7 @@ export function setRow(
         visible === authored ? null : visible ? 'shown' : 'hidden';
 
     return [
-        { row: rowId, override },
+        {row: rowId, override},
         // The subtree is unchanged: hiding an arm hides the hand explicitly, and showing it clears
         // them so each child goes back to whatever the chain says. Only the CLICKED row is the
         // reader making a statement about one thing.
@@ -336,11 +336,16 @@ export function becauseText(because: string): string {
     // this is the model's own idle clip running and its visibility track deciding the row, which is
     // why it reads as a sibling of `animation` rather than as a pose.
     switch (because) {
-        case 'you': return 'Set by hand';
-        case 'idle': return 'Set by the idle animation';
-        case 'animation': return 'Set by the animation playing';
-        case 'level': return 'Not in this damage or detail level';
-        default: return 'As the model draws it';
+        case 'you':
+            return 'Set by hand';
+        case 'idle':
+            return 'Set by the idle animation';
+        case 'animation':
+            return 'Set by the animation playing';
+        case 'level':
+            return 'Not in this damage or detail level';
+        default:
+            return 'As the model draws it';
     }
 }
 
@@ -407,11 +412,11 @@ export function effectFacts(facts: RowFacts): RowFacts {
  * which made a row's tooltip blame the level for a damage decision.
  */
 export function damageMeshFacts(facts: RowFacts, shown: boolean): RowFacts {
-    return { ...facts, inFile: shown };
+    return {...facts, inFile: shown};
 }
 
 export function subtreeFacts(facts: RowFacts): RowFacts {
     // `resting` stays: it comes from a clip's track, which names a BONE, so it is a statement about
     // the whole subtree in the same way a playing clip's is.
-    return { ...facts, inFile: true, gated: false };
+    return {...facts, inFile: true, gated: false};
 }

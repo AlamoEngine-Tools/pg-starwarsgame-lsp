@@ -22,7 +22,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.CrossTagRules;
 ///     </para>
 ///     <para>
 ///         Attributed by the xref to each message: the engine's load-time validation
-///        , the engine's load-time validation
+///         , the engine's load-time validation
 ///         and the engine's load-time validation. The third is
 ///         labelled <c>Warning</c> by the engine where the other two say <c>Error</c>, though the
 ///         stated consequence is word for word the same.

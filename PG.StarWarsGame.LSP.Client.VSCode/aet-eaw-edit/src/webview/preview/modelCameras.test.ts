@@ -2,11 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { cameraPose, cameraViewOptions, modelCameraEntries } from './modelCameras';
+import {cameraPose, cameraViewOptions, modelCameraEntries} from './modelCameras';
 
-const camera = (name: string) => ({ name, position: [0, 0, 10], target: [0, 0, 0] });
+const camera = (name: string) => ({name, position: [0, 0, 10], target: [0, 0, 0]});
 
 describe('modelCameraEntries', () => {
     it('offers one entry per camera the model declares', () => {
@@ -52,8 +52,8 @@ describe('modelCameraEntries', () => {
 
 describe('cameraViewOptions', () => {
     const presets = [
-        { view: 'threeQuarter', label: '3/4', title: 'Look from three-quarters on' },
-        { view: 'front', label: 'Front', title: 'Look from the front' },
+        {view: 'threeQuarter', label: '3/4', title: 'Look from three-quarters on'},
+        {view: 'front', label: 'Front', title: 'Look from the front'},
     ];
 
     it('is ONE list, because the camera is in one place at a time', () => {
@@ -146,16 +146,16 @@ describe('cameraPose', () => {
             target: [-87, 102, -132],
         });
 
-        assert.deepEqual(pose?.position, { x: -375, y: 213, z: 372 });
-        assert.deepEqual(pose?.target, { x: -87, y: -132, z: -102 });
+        assert.deepEqual(pose?.position, {x: -375, y: 213, z: 372});
+        assert.deepEqual(pose?.target, {x: -87, y: -132, z: -102});
     });
 
     it('is null when either end is missing, so nothing is aimed at the origin', () => {
-        assert.equal(cameraPose({ position: [1, 2, 3] }), null);
-        assert.equal(cameraPose({ target: [1, 2, 3] }), null);
+        assert.equal(cameraPose({position: [1, 2, 3]}), null);
+        assert.equal(cameraPose({target: [1, 2, 3]}), null);
     });
 
     it('is null for a pose that is not three numbers', () => {
-        assert.equal(cameraPose({ position: [1, 2], target: [1, 2, 3] }), null);
+        assert.equal(cameraPose({position: [1, 2], target: [1, 2, 3]}), null);
     });
 });

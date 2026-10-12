@@ -2,11 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import type { PreviewWeapon } from '../../protocol/modelPreview';
+import type {PreviewWeapon} from '../../protocol/modelPreview';
 
-import { isDeployedClip, weaponsInState } from './deployedState';
+import {isDeployedClip, weaponsInState} from './deployedState';
 
 describe('isDeployedClip', () => {
     /**
@@ -14,23 +14,23 @@ describe('isDeployedClip', () => {
      * (the is-deploying test). So the deploy clip counts once it has played to its end and is held there.
      */
     it('counts the deploy clip only once it is held at its end', () => {
-        assert.equal(isDeployedClip({ action: 'deploy', stance: 'normal' }, false), false);
-        assert.equal(isDeployedClip({ action: 'deploy', stance: 'normal' }, true), true);
+        assert.equal(isDeployedClip({action: 'deploy', stance: 'normal'}, false), false);
+        assert.equal(isDeployedClip({action: 'deploy', stance: 'normal'}, true), true);
     });
 
     /** Every `deployed_*` clip - the deployed idle, walk, power-up and deaths - is played in the state. */
     it('counts any clip held in the deployed stance, wherever the playhead is', () => {
-        assert.equal(isDeployedClip({ action: 'die', stance: 'deployed' }, false), true);
-        assert.equal(isDeployedClip({ action: 'powerup', stance: 'deployed' }, true), true);
+        assert.equal(isDeployedClip({action: 'die', stance: 'deployed'}, false), true);
+        assert.equal(isDeployedClip({action: 'powerup', stance: 'deployed'}, true), true);
     });
 
     it('does not count the undeploy clip at any point', () => {
-        assert.equal(isDeployedClip({ action: 'undeploy', stance: 'normal' }, false), false);
-        assert.equal(isDeployedClip({ action: 'undeploy', stance: 'normal' }, true), false);
+        assert.equal(isDeployedClip({action: 'undeploy', stance: 'normal'}, false), false);
+        assert.equal(isDeployedClip({action: 'undeploy', stance: 'normal'}, true), false);
     });
 
     it('does not count an ordinary clip or no clip at all', () => {
-        assert.equal(isDeployedClip({ action: 'idle', stance: 'normal' }, true), false);
+        assert.equal(isDeployedClip({action: 'idle', stance: 'normal'}, true), false);
         assert.equal(isDeployedClip(null, true), false);
     });
 });
@@ -83,7 +83,7 @@ describe('weaponsInState', () => {
         const hardpoint = weapon({
             deployedConeWidthDegrees: null,
             deployedConeHeightDegrees: undefined,
-            turret: { rotateExtentDegrees: 45, elevateExtentDegrees: 30 },
+            turret: {rotateExtentDegrees: 45, elevateExtentDegrees: 30},
         });
 
         const [kept] = weaponsInState([hardpoint], true);

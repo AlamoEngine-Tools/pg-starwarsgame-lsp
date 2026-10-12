@@ -2,10 +2,16 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { stageForHull,
-    costByLevel, definedLevels, levelLabel, levelSteps, proxyVisibleAt, type LevelTagged,
+import {
+    costByLevel,
+    definedLevels,
+    levelLabel,
+    levelSteps,
+    type LevelTagged,
+    proxyVisibleAt,
+    stageForHull,
     withDeclaredStages,
 } from './levels';
 
@@ -24,12 +30,12 @@ describe('proxyVisibleAt', () => {
     });
 
     it('shows a tagged proxy only at its own level', () => {
-        assert.equal(proxyVisibleAt(tagged({ alt: 2 }), 2, 0, false), true);
-        assert.equal(proxyVisibleAt(tagged({ alt: 2 }), 1, 0, false), false);
+        assert.equal(proxyVisibleAt(tagged({alt: 2}), 2, 0, false), true);
+        assert.equal(proxyVisibleAt(tagged({alt: 2}), 1, 0, false), false);
     });
 
     it('requires both levels to match when both are tagged', () => {
-        const both = tagged({ alt: 1, lod: 2 });
+        const both = tagged({alt: 1, lod: 2});
 
         assert.equal(proxyVisibleAt(both, 1, 2, false), true);
         assert.equal(proxyVisibleAt(both, 1, 3, false), false);
@@ -39,14 +45,14 @@ describe('proxyVisibleAt', () => {
     it('keeps a stay-hidden proxy out while the damage state winds down', () => {
         // The repair asymmetry, straight from RenderObject::CheckAltLod: fire lit on the way to
         // destruction must not flicker back on as the hardpoint is repaired.
-        const fire = tagged({ alt: 1, altDecreaseStayHidden: true });
+        const fire = tagged({alt: 1, altDecreaseStayHidden: true});
 
         assert.equal(proxyVisibleAt(fire, 1, 0, false), true, 'increasing');
         assert.equal(proxyVisibleAt(fire, 1, 0, true), false, 'decreasing');
     });
 
     it('ignores the descending flag for a proxy that does not set stay-hidden', () => {
-        assert.equal(proxyVisibleAt(tagged({ alt: 1 }), 1, 0, true), true);
+        assert.equal(proxyVisibleAt(tagged({alt: 1}), 1, 0, true), true);
     });
 });
 
@@ -54,9 +60,9 @@ describe('definedLevels', () => {
     it('offers no more DETAIL levels than the model defines', () => {
         // Ten sliders' worth of levels on a model with two is a lie about what the file contains.
         const levels = definedLevels([
-            tagged({ alt: 0 }),
-            tagged({ alt: 2 }),
-            tagged({ lod: 1 }),
+            tagged({alt: 0}),
+            tagged({alt: 2}),
+            tagged({lod: 1}),
         ]);
 
         // ALT runs to the highest stage without gaps - a stage can exist with no geometry of its
@@ -67,15 +73,15 @@ describe('definedLevels', () => {
     });
 
     it('always includes zero, which is the state a model opens in', () => {
-        assert.deepEqual(definedLevels([tagged({ lod: 3 })]).lod, [0, 3]);
+        assert.deepEqual(definedLevels([tagged({lod: 3})]).lod, [0, 3]);
         // And on the damage axis, everything up to the stage that IS tagged.
-        assert.deepEqual(definedLevels([tagged({ alt: 3 })]).alt, [0, 1, 2, 3]);
+        assert.deepEqual(definedLevels([tagged({alt: 3})]).alt, [0, 1, 2, 3]);
     });
 
     it('puts the close-up LOD last, because the engine numbers detail backwards', () => {
         // LOD0 is the DISTANT mesh: Ei_trooper is 282 triangles at LOD0 and 1078 at LOD2. Callers
         // default to the last entry to open a model on its detailed version rather than its crudest.
-        const levels = definedLevels([tagged({ lod: 2 }), tagged({ lod: 1 })]);
+        const levels = definedLevels([tagged({lod: 2}), tagged({lod: 1})]);
 
         assert.deepEqual(levels.lod, [0, 1, 2]);
         assert.equal(levels.lod[levels.lod.length - 1], 2);
@@ -84,17 +90,17 @@ describe('definedLevels', () => {
     it('sorts numerically rather than as text', () => {
         // 10 before 2 would put the levels in the wrong order on the slider. Asserted on LOD, the
         // axis that can still be sparse - ALT is filled in, so its order cannot go wrong.
-        const levels = definedLevels([tagged({ lod: 10 }), tagged({ lod: 2 })]);
+        const levels = definedLevels([tagged({lod: 10}), tagged({lod: 2})]);
 
         assert.deepEqual(levels.lod, [0, 2, 10]);
     });
 
     it('reports nothing beyond zero for a model with no tags at all', () => {
-        assert.deepEqual(definedLevels([tagged(), tagged()]), { alt: [0], lod: [0] });
+        assert.deepEqual(definedLevels([tagged(), tagged()]), {alt: [0], lod: [0]});
     });
 
     it('de-duplicates a level many proxies share', () => {
-        const levels = definedLevels([tagged({ alt: 1 }), tagged({ alt: 1 }), tagged({ alt: 1 })]);
+        const levels = definedLevels([tagged({alt: 1}), tagged({alt: 1}), tagged({alt: 1})]);
 
         assert.deepEqual(levels.alt, [0, 1]);
     });
@@ -168,28 +174,28 @@ describe('levelLabel', () => {
     describe('the health band, where the object declares one', () => {
         // 98 of the 161 shipped tables, and the only shape that names all four stages.
         const full = [
-            { threshold: 1, stage: 0 },
-            { threshold: 0.66, stage: 1 },
-            { threshold: 0.33, stage: 2 },
-            { threshold: 0, stage: 3 },
+            {threshold: 1, stage: 0},
+            {threshold: 0.66, stage: 1},
+            {threshold: 0.33, stage: 2},
+            {threshold: 0, stage: 3},
         ];
 
         it('reads a band from its own ceiling to the next row down', () => {
-            assert.equal(levelLabel('alt', 0, [0, 1, 2, 3], { table: full }), '0 (100-66%)');
-            assert.equal(levelLabel('alt', 1, [0, 1, 2, 3], { table: full }), '1 (66-33%)');
+            assert.equal(levelLabel('alt', 0, [0, 1, 2, 3], {table: full}), '0 (100-66%)');
+            assert.equal(levelLabel('alt', 1, [0, 1, 2, 3], {table: full}), '1 (66-33%)');
         });
 
         it('runs the last row to zero rather than to its own threshold', () => {
             // 26 shipped tables stop at `1, 0.66, 0.33` and their bottom stage covers what is left.
             const three = full.slice(0, 3);
 
-            assert.equal(levelLabel('alt', 2, [0, 1, 2], { table: three }), '2 (33-0%)');
+            assert.equal(levelLabel('alt', 2, [0, 1, 2], {table: three}), '2 (33-0%)');
         });
 
         it('writes a band with no width as the one number it is', () => {
             // A trailing `0` row is entered at exactly zero health and nowhere else. `0-0%` would
             // read as a range the stage does not have.
-            assert.equal(levelLabel('alt', 3, [0, 1, 2, 3], { table: full }), '3 (0%)');
+            assert.equal(levelLabel('alt', 3, [0, 1, 2, 3], {table: full}), '3 (0%)');
         });
 
         it('gives stage 0 the room above the highest threshold', () => {
@@ -197,27 +203,27 @@ describe('levelLabel', () => {
             // answering stage 0 above the top row. The band is real; the table just never names it.
             const topless = full.slice(1);
 
-            assert.equal(levelLabel('alt', 0, [0, 1, 2, 3], { table: topless }), '0 (100-66%)');
+            assert.equal(levelLabel('alt', 0, [0, 1, 2, 3], {table: topless}), '0 (100-66%)');
         });
 
         it('keeps the word where stage 0 is unreachable', () => {
             // 29 shipped objects declare the single row `1 -> 3`. Every health fraction is at or
             // under 1, so stage 0 is never entered and its band has no width to name.
-            const single = [{ threshold: 1, stage: 3 }];
+            const single = [{threshold: 1, stage: 3}];
 
-            assert.equal(levelLabel('alt', 0, [0, 3], { table: single }), '0 (undamaged)');
-            assert.equal(levelLabel('alt', 3, [0, 3], { table: single }), '3 (100-0%)');
+            assert.equal(levelLabel('alt', 0, [0, 3], {table: single}), '0 (undamaged)');
+            assert.equal(levelLabel('alt', 3, [0, 3], {table: single}), '3 (100-0%)');
         });
 
         it('falls back to the word for a stage the table says nothing about', () => {
             // The axis is the UNION of what the model tags and what the XML declares, so a model
             // may offer a stage the table never places.
-            assert.equal(levelLabel('alt', 4, [0, 1, 2, 3, 4], { table: full }), '4');
-            assert.equal(levelLabel('alt', 0, [0, 2], { table: [] }), '0 (undamaged)');
+            assert.equal(levelLabel('alt', 4, [0, 1, 2, 3, 4], {table: full}), '4');
+            assert.equal(levelLabel('alt', 0, [0, 2], {table: []}), '0 (undamaged)');
         });
 
         it('leaves the DETAIL axis alone - nothing in the XML has an opinion about it', () => {
-            assert.equal(levelLabel('lod', 0, [0, 1], { table: full }), '0 (distant)');
+            assert.equal(levelLabel('lod', 0, [0, 1], {table: full}), '0 (distant)');
         });
     });
 
@@ -226,37 +232,37 @@ describe('levelLabel', () => {
     // axis runs more plainly than the word does - 1,507 up to 1,882 is not ambiguous.
     describe('the triangle count, where the geometry has arrived', () => {
         it('names the count instead of the end word', () => {
-            assert.equal(levelLabel('lod', 0, [0, 1, 2], { cost: { meshes: 4, triangles: 1507 } }),
+            assert.equal(levelLabel('lod', 0, [0, 1, 2], {cost: {meshes: 4, triangles: 1507}}),
                 '0 (4 meshes, 1,507 tris)');
-            assert.equal(levelLabel('lod', 2, [0, 1, 2], { cost: { meshes: 4, triangles: 1882 } }),
+            assert.equal(levelLabel('lod', 2, [0, 1, 2], {cost: {meshes: 4, triangles: 1882}}),
                 '2 (4 meshes, 1,882 tris)');
         });
 
         it('groups thousands with ASCII commas whatever the reader locale is', () => {
             // The house rule is ASCII only, and a bare `toLocaleString` writes a non-breaking space
             // in about half the locales VS Code ships.
-            const label = levelLabel('lod', 3, [0, 3], { cost: { meshes: 1070, triangles: 103220 } });
+            const label = levelLabel('lod', 3, [0, 3], {cost: {meshes: 1070, triangles: 103220}});
 
             assert.equal(label, '3 (1,070 meshes, 103,220 tris)');
             assert.ok(/^[\x20-\x7e]*$/.test(label), label);
         });
 
         it('counts one of either as one', () => {
-            assert.equal(levelLabel('lod', 1, [0, 1], { cost: { meshes: 1, triangles: 1 } }),
+            assert.equal(levelLabel('lod', 1, [0, 1], {cost: {meshes: 1, triangles: 1}}),
                 '1 (1 mesh, 1 tri)');
         });
 
         it('keeps the word until the geometry has actually arrived', () => {
             // A level whose meshes have not loaded is not a level of zero triangles, and saying so
             // would put a wrong number on screen for the whole of a big model's load.
-            assert.equal(levelLabel('lod', 0, [0, 1], { cost: { meshes: 0, triangles: 0 } }),
+            assert.equal(levelLabel('lod', 0, [0, 1], {cost: {meshes: 0, triangles: 0}}),
                 '0 (distant)');
-            assert.equal(levelLabel('lod', 0, [0, 1], { cost: null }), '0 (distant)');
+            assert.equal(levelLabel('lod', 0, [0, 1], {cost: null}), '0 (distant)');
             assert.equal(levelLabel('lod', 1, [0, 1], {}), '1 (close-up)');
         });
 
         it('leaves the DAMAGE axis alone - a stage is not a detail level', () => {
-            assert.equal(levelLabel('alt', 0, [0, 1], { cost: { meshes: 4, triangles: 1507 } }),
+            assert.equal(levelLabel('alt', 0, [0, 1], {cost: {meshes: 4, triangles: 1507}}),
                 '0 (undamaged)');
         });
     });
@@ -266,7 +272,7 @@ describe('levelLabel', () => {
 // with. Writing a second copy here is the trap that has already cost this codebase twice.
 describe('costByLevel', () => {
     const mesh = (triangles: number, alt?: number, lod?: number) =>
-        ({ extras: { alamoAlt: alt, alamoLod: lod }, triangles });
+        ({extras: {alamoAlt: alt, alamoLod: lod}, triangles});
 
     it('counts an untagged mesh at EVERY level', () => {
         // `W_tree_alien_00_hi`, measured: 4 meshes, one of them untagged at 1336 triangles, and the
@@ -279,9 +285,9 @@ describe('costByLevel', () => {
         ], 0, [0, 1, 2]);
 
         assert.deepEqual([...counts.entries()], [
-            [0, { meshes: 2, triangles: 1507 }],
-            [1, { meshes: 2, triangles: 1688 }],
-            [2, { meshes: 2, triangles: 1882 }],
+            [0, {meshes: 2, triangles: 1507}],
+            [1, {meshes: 2, triangles: 1688}],
+            [2, {meshes: 2, triangles: 1882}],
         ]);
     });
 
@@ -291,7 +297,7 @@ describe('costByLevel', () => {
             mesh(100, 0, 0), mesh(900, 1, 0), mesh(7, undefined, 0),
         ], 0, [0]);
 
-        assert.deepEqual([...counts.entries()], [[0, { meshes: 2, triangles: 107 }]]);
+        assert.deepEqual([...counts.entries()], [[0, {meshes: 2, triangles: 107}]]);
     });
 
     it('reports the levels asked for, sparse ones included', () => {
@@ -299,23 +305,23 @@ describe('costByLevel', () => {
         const counts = costByLevel([mesh(60, undefined, 5)], 0, [0, 2, 5]);
 
         assert.deepEqual([...counts.entries()], [
-            [0, { meshes: 0, triangles: 0 }],
-            [2, { meshes: 0, triangles: 0 }],
-            [5, { meshes: 1, triangles: 60 }],
+            [0, {meshes: 0, triangles: 0}],
+            [2, {meshes: 0, triangles: 0}],
+            [5, {meshes: 1, triangles: 60}],
         ]);
     });
 
     it('answers zero rather than nothing before any geometry has arrived', () => {
         assert.deepEqual([...costByLevel([], 0, [0, 1]).entries()], [
-            [0, { meshes: 0, triangles: 0 }],
-            [1, { meshes: 0, triangles: 0 }],
+            [0, {meshes: 0, triangles: 0}],
+            [1, {meshes: 0, triangles: 0}],
         ]);
     });
 });
 
 describe('definedLevels: ALT is contiguous, LOD is not', () => {
     const tagged = (alt: number | null, lod: number | null): LevelTagged =>
-        ({ alt, lod, altDecreaseStayHidden: false });
+        ({alt, lod, altDecreaseStayHidden: false});
 
     it('fills the gaps in the DAMAGE axis', () => {
         // A damage stage is a stage whether or not the model changes for it. One may exist purely
@@ -349,7 +355,7 @@ describe('withDeclaredStages', () => {
         // 35 shipped structures declare the lone alternate 3. The geometry mentions no such stage,
         // so without the declaration the slider stopped at 0 and the reader could never reach the
         // state the building actually has.
-        const levels = withDeclaredStages({ alt: [0], lod: [0, 1] }, [3]);
+        const levels = withDeclaredStages({alt: [0], lod: [0, 1]}, [3]);
 
         assert.deepEqual(levels.alt, [0, 1, 2, 3]);
         assert.deepEqual(levels.lod, [0, 1], 'detail is not the declaration s business');
@@ -358,19 +364,19 @@ describe('withDeclaredStages', () => {
     it('keeps stage zero even when the declaration omits it', () => {
         // 7 shipped objects declare 1, 2, 3 with no zero. Zero is still where a model opens - it is
         // the undamaged state - so the axis runs from it regardless.
-        assert.deepEqual(withDeclaredStages({ alt: [0], lod: [0] }, [1, 2, 3]).alt, [0, 1, 2, 3]);
+        assert.deepEqual(withDeclaredStages({alt: [0], lod: [0]}, [1, 2, 3]).alt, [0, 1, 2, 3]);
     });
 
     it('keeps the model s own stages when they run higher than the declaration', () => {
         // Neither source is authoritative alone: the XML names stages with no geometry, and a model
         // may tag one the XML forgot. The union is what the reader can actually inspect.
-        assert.deepEqual(withDeclaredStages({ alt: [0, 1, 2, 3, 4], lod: [0] }, [2]).alt,
+        assert.deepEqual(withDeclaredStages({alt: [0, 1, 2, 3, 4], lod: [0]}, [2]).alt,
             [0, 1, 2, 3, 4]);
     });
 
     it('changes nothing when no stages are declared', () => {
         // Every space unit: the trio is a ground-structure thing.
-        const levels = { alt: [0, 1], lod: [0, 2] };
+        const levels = {alt: [0, 1], lod: [0, 2]};
 
         assert.deepEqual(withDeclaredStages(levels, []).alt, [0, 1]);
         assert.deepEqual(withDeclaredStages(levels, []).lod, [0, 2]);
@@ -387,10 +393,10 @@ describe('withDeclaredStages', () => {
 // grounds that the damage state followed from play - which it never did.
 describe('stageForHull', () => {
     const table = [
-        { threshold: 1, stage: 0 },
-        { threshold: 0.66, stage: 1 },
-        { threshold: 0.33, stage: 2 },
-        { threshold: 0, stage: 3 },
+        {threshold: 1, stage: 0},
+        {threshold: 0.66, stage: 1},
+        {threshold: 0.33, stage: 2},
+        {threshold: 0, stage: 3},
     ];
 
     it('opens undamaged at full health', () => {
@@ -417,9 +423,9 @@ describe('stageForHull', () => {
     // the last one runs to zero rather than falling back to undamaged.
     it('runs the last band to zero when the table stops short', () => {
         const short = [
-            { threshold: 1, stage: 0 },
-            { threshold: 0.66, stage: 1 },
-            { threshold: 0.33, stage: 2 },
+            {threshold: 1, stage: 0},
+            {threshold: 0.66, stage: 1},
+            {threshold: 0.33, stage: 2},
         ];
 
         assert.equal(stageForHull(short, 0.2), 2);
@@ -430,9 +436,9 @@ describe('stageForHull', () => {
     // threshold nothing is declared, and the undamaged model is what the engine opens with.
     it('is undamaged above the highest declared band', () => {
         const late = [
-            { threshold: 0.66, stage: 1 },
-            { threshold: 0.33, stage: 2 },
-            { threshold: 0, stage: 3 },
+            {threshold: 0.66, stage: 1},
+            {threshold: 0.33, stage: 2},
+            {threshold: 0, stage: 3},
         ];
 
         assert.equal(stageForHull(late, 1), 0);
@@ -443,7 +449,7 @@ describe('stageForHull', () => {
     // 35 objects declare exactly `1 -> 3`. One band with no floor covers the whole range, so they
     // sit at ALT3 from full health. Odd, and it is what the data says.
     it('covers the whole range from a single band', () => {
-        const one = [{ threshold: 1, stage: 3 }];
+        const one = [{threshold: 1, stage: 3}];
 
         assert.equal(stageForHull(one, 1), 3);
         assert.equal(stageForHull(one, 0.5), 3);

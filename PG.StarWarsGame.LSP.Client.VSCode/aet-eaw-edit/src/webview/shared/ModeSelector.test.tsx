@@ -2,17 +2,17 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { renderToStaticMarkup } from 'react-dom/server';
+import {renderToStaticMarkup} from 'react-dom/server';
 
-import { ModeSelector } from './ModeSelector';
+import {ModeSelector} from './ModeSelector';
 
 const render = (element: React.JSX.Element): string => renderToStaticMarkup(element);
 
 const VIEWS = [
-    { id: 'front', label: 'Front' },
-    { id: 'side', label: 'Side' },
+    {id: 'front', label: 'Front'},
+    {id: 'side', label: 'Side'},
 ] as const;
 
 describe('ModeSelector', () => {
@@ -23,7 +23,7 @@ describe('ModeSelector', () => {
      */
     it('is a radio group whose options are radios', () => {
         const html = render(
-            <ModeSelector label="View" value="front" options={VIEWS} onSelect={() => undefined} />);
+            <ModeSelector label="View" value="front" options={VIEWS} onSelect={() => undefined}/>);
 
         assert.match(html, /role="radiogroup"[^>]*aria-label="View"|aria-label="View"[^>]*role="radiogroup"/);
         assert.match(html, /role="radio"[^>]*aria-checked="true"/);
@@ -37,14 +37,14 @@ describe('ModeSelector', () => {
      */
     it('marks nothing chosen when the value is null', () => {
         const html = render(
-            <ModeSelector label="View" value={null} options={VIEWS} onSelect={() => undefined} />);
+            <ModeSelector label="View" value={null} options={VIEWS} onSelect={() => undefined}/>);
 
         assert.equal(/aria-checked="true"/.test(html), false, html);
     });
 
     it('shows the label when an option carries no glyph', () => {
         const html = render(
-            <ModeSelector label="View" value="front" options={VIEWS} onSelect={() => undefined} />);
+            <ModeSelector label="View" value="front" options={VIEWS} onSelect={() => undefined}/>);
 
         assert.match(html, />Front</);
     });
@@ -59,7 +59,7 @@ describe('ModeSelector', () => {
             <ModeSelector
                 label="Search in"
                 value="text"
-                options={[{ id: 'text', label: 'Plain text', icon: 'searchLiteral' }]}
+                options={[{id: 'text', label: 'Plain text', icon: 'searchLiteral'}]}
                 onSelect={() => undefined}
             />);
 
@@ -78,7 +78,7 @@ describe('ModeSelector', () => {
                 label="Mode"
                 value="view"
                 options={[
-                    { id: 'view', label: 'View' },
+                    {id: 'view', label: 'View'},
                     {
                         id: 'simulate', label: 'Simulate',
                         disabled: true, disabledReason: 'This story has no simulation',
@@ -97,7 +97,7 @@ describe('ModeSelector', () => {
             <ModeSelector
                 label="View"
                 value="front"
-                options={[{ id: 'front', label: 'Front', title: 'Look from the front' }]}
+                options={[{id: 'front', label: 'Front', title: 'Look from the front'}]}
                 onSelect={() => undefined}
             />);
 

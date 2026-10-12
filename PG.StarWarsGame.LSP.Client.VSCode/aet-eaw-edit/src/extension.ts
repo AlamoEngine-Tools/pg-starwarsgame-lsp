@@ -13,7 +13,6 @@ import {
     ServerOptions,
     StaticFeature,
     Trace,
-    TransportKind,
 } from 'vscode-languageclient/node';
 import {CreditsPreviewPanel} from './creditsPreviewPanel';
 import {EncyclopediaPanel} from './encyclopediaPanel';
@@ -24,7 +23,11 @@ import {type ModelPickItem, modelPickItems, pickedModelName} from './modelPicker
 import {type ListModelsResult} from './protocol/modelPreview';
 import {type ServerStatus} from './protocol/serverStatus';
 import {
-    type BugReportClientInfo, type BugReportOptions, flattenFlags, formatBugReport, formatExtendedStats,
+    type BugReportClientInfo,
+    type BugReportOptions,
+    flattenFlags,
+    formatBugReport,
+    formatExtendedStats,
 } from './bugReport';
 import {type DiagnosticReportPayload, editorReport, gitHubIssue} from './diagnosticReport';
 import {offerShaderSources, shaderDirectory} from './shaderSources';
@@ -45,17 +48,30 @@ import {LuaScriptsTreeItem, LuaScriptsViewProvider} from './luaDebug/luaScriptsV
 import {resolveServerCommand, resolveServerEnvironment} from './serverCommand';
 import {serverProblem} from './serverLaunch';
 import {
-    ConvertLocalisationFormatResult, ExportLocalisationToDatResult, GetEffectiveObjectResult,
-    GetEncyclopediaEntryResult, GetLocalisationProjectsResult, GetRootLocalisationConfigResult,
-    GetStoryPlotsResult, LOC_CATEGORY, LocProjectInfo, SetLocalisationProjectFormatResult,
-    StoryGraphChangedParams, StorySimChangedParams,
+    ConvertLocalisationFormatResult,
+    ExportLocalisationToDatResult,
+    GetEffectiveObjectResult,
+    GetEncyclopediaEntryResult,
+    GetLocalisationProjectsResult,
+    GetRootLocalisationConfigResult,
+    GetStoryPlotsResult,
+    LOC_CATEGORY,
+    SetLocalisationProjectFormatResult,
+    StoryGraphChangedParams,
+    StorySimChangedParams,
 } from './protocol';
 import {formatChoices, formatOutcome} from './localisationProjectFormat';
 import {StoryGraphPanel} from './storyGraphPanel';
 import {graphTargets, type StoryGraphTarget} from './storyGraphTarget';
 import {StoryNavigatorViewProvider, StoryTreeItem} from './storyNavigatorViewProvider';
 import {
-    ACCEPT, DECLINE, declinedMessage, diffTitle, outcomeOf, PgprojMigrationProposal, proposalMessage,
+    ACCEPT,
+    DECLINE,
+    declinedMessage,
+    diffTitle,
+    outcomeOf,
+    PgprojMigrationProposal,
+    proposalMessage,
 } from './pgprojMigrationPrompt';
 
 const CLIENT_ID = 'aet.pg.swg.lsp';

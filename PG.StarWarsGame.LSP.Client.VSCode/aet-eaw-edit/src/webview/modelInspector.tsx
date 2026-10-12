@@ -18,10 +18,8 @@ import {createRoot} from 'react-dom/client';
 import styled from 'styled-components';
 
 import {InspectorBody} from './inspector/InspectorBody';
-import {GEOMETRY_PAGE, appendPage, type GeometryRows} from './preview/geometryRows';
-import {
-    geometryKeyOf, sameGeometryKey, type InspectorSubject,
-} from './preview/inspectorSubject';
+import {appendPage, GEOMETRY_PAGE, type GeometryRows} from './preview/geometryRows';
+import {geometryKeyOf, type InspectorSubject, sameGeometryKey,} from './preview/inspectorSubject';
 import {dockChromeCss, inspectorCss} from './shared/dockChrome';
 import {type GeometryTable, type GetSubMeshGeometryResult} from '../protocol/modelPreview';
 

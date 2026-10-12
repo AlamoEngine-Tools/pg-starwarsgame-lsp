@@ -2,9 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { flattenIncludes, type ShaderReader } from './includes';
+import {flattenIncludes, type ShaderReader} from './includes';
 
 const reader = (files: Record<string, string>): ShaderReader =>
     name => files[name.toLowerCase()] ?? null;
@@ -12,7 +12,7 @@ const reader = (files: Record<string, string>): ShaderReader =>
 describe('flattenIncludes', () => {
     it('splices a header in where it was included', () => {
         const result = flattenIncludes('a\n#include "H.fxh"\nb',
-            reader({ 'h.fxh': 'header' }));
+            reader({'h.fxh': 'header'}));
 
         assert.equal(result.text.replace(/\s+/g, ' ').trim(), 'a header b');
         assert.deepEqual(result.included, ['H.fxh']);
@@ -20,7 +20,7 @@ describe('flattenIncludes', () => {
 
     it('follows a header that includes another', () => {
         const result = flattenIncludes('#include "A.fxh"',
-            reader({ 'a.fxh': '#include "B.fxh"\nfromA', 'b.fxh': 'fromB' }));
+            reader({'a.fxh': '#include "B.fxh"\nfromA', 'b.fxh': 'fromB'}));
 
         // Depth first, so B's declarations land before A's code, which needs them.
         assert.match(result.text.replace(/\s+/g, ' '), /fromB fromA/);
@@ -42,7 +42,7 @@ describe('flattenIncludes', () => {
 
     it('survives headers that include each other', () => {
         const result = flattenIncludes('#include "A.fxh"',
-            reader({ 'a.fxh': '#include "B.fxh"\nfromA', 'b.fxh': '#include "A.fxh"\nfromB' }));
+            reader({'a.fxh': '#include "B.fxh"\nfromA', 'b.fxh': '#include "A.fxh"\nfromB'}));
 
         assert.match(result.text, /fromA/);
         assert.match(result.text, /fromB/);
@@ -59,14 +59,14 @@ describe('flattenIncludes', () => {
 
     it('matches the name case-insensitively, as the files themselves are inconsistent', () => {
         const result = flattenIncludes('#include "AlamoEngine.fxh"',
-            reader({ 'alamoengine.fxh': 'engine' }));
+            reader({'alamoengine.fxh': 'engine'}));
 
         assert.match(result.text, /engine/);
     });
 
     it('leaves an include inside a comment alone', () => {
         // Anchored to its own line, so a commented-out include is not resurrected.
-        const result = flattenIncludes('// #include "H.fxh"', reader({ 'h.fxh': 'header' }));
+        const result = flattenIncludes('// #include "H.fxh"', reader({'h.fxh': 'header'}));
 
         assert.doesNotMatch(result.text, /header/);
     });
