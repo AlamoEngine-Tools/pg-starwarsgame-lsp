@@ -553,6 +553,35 @@ class EmitterRenderer {
         return this.emitter.colorTexture;
     }
 
+    /** True once the emitter has finished and its last particle has died. */
+    get exhausted(): boolean {
+        return this.clock.finished && this.particles.length === 0;
+    }
+
+    /** The live particles, for the tests and diagnostics that need to read the simulation. */
+    get live(): readonly Particle[] {
+        return this.particles;
+    }
+
+    /**
+     * How fast a child emits, per parent particle.
+     *
+     * The engine gives every parent particle its OWN emitter instance, so the rate is per particle
+     * and not shared - a hundred sparks each drag a full trail.
+     */
+    get rate(): number {
+        const properties = this.emitter.properties;
+
+        return properties.useBursts
+            ? properties.particlesPerBurst / Math.max(properties.burstDelay, 1e-3)
+            : properties.particlesPerSecond;
+    }
+
+    /** A whole burst of it, for a death child, which the engine fires as one. */
+    get burstSize(): number {
+        return Math.max(1, this.emitter.properties.particlesPerBurst);
+    }
+
     /**
      * Supplies the texture once it arrives.
      *
@@ -580,16 +609,6 @@ class EmitterRenderer {
         this.material.uniforms.uMissing.value = 1;
         this.material.uniforms.uColumns.value = 1;
         this.material.needsUpdate = true;
-    }
-
-    /** True once the emitter has finished and its last particle has died. */
-    get exhausted(): boolean {
-        return this.clock.finished && this.particles.length === 0;
-    }
-
-    /** The live particles, for the tests and diagnostics that need to read the simulation. */
-    get live(): readonly Particle[] {
-        return this.particles;
     }
 
     /**
@@ -706,23 +725,9 @@ class EmitterRenderer {
         this.writeBuffers(frame);
     }
 
-    /**
-     * How fast a child emits, per parent particle.
-     *
-     * The engine gives every parent particle its OWN emitter instance, so the rate is per particle
-     * and not shared - a hundred sparks each drag a full trail.
-     */
-    get rate(): number {
-        const properties = this.emitter.properties;
-
-        return properties.useBursts
-            ? properties.particlesPerBurst / Math.max(properties.burstDelay, 1e-3)
-            : properties.particlesPerSecond;
-    }
-
-    /** A whole burst of it, for a death child, which the engine fires as one. */
-    get burstSize(): number {
-        return Math.max(1, this.emitter.properties.particlesPerBurst);
+    dispose(): void {
+        this.geometry.dispose();
+        this.material.dispose();
     }
 
     /**
@@ -845,11 +850,6 @@ class EmitterRenderer {
         return tailGeometry(this.emitter.properties, this.viewVelocity, speed)
             ?? {stretch: 1, turns: 0};
     }
-
-    dispose(): void {
-        this.geometry.dispose();
-        this.material.dispose();
-    }
 }
 
 /**
@@ -962,6 +962,55 @@ export class ParticleSystemInstance {
         this.root.name = `particles:${name}`;
     }
 
+    /** True once every emitter has finished and its last particle has died. */
+    get exhausted(): boolean {
+        return this.emitters.every(emitter => emitter.exhausted);
+    }
+
+    /**
+     * True once nothing this system threw is still in the air.
+     *
+     * NOT {@link exhausted}, which also asks whether the emitter has finished - and a continuous
+     * emitter never finishes. For a system that has been told to stop spawning, "finished" will
+     * never come, so what decides when it can be disposed is simply whether anything is left.
+     */
+    get empty(): boolean {
+        return this.emitters.every(emitter => emitter.live.length === 0);
+    }
+
+    /** Whether anything here needs the distortion pass, which is not worth its targets otherwise. */
+    get hasVisibleHeat(): boolean {
+        return this.root.visible && this.emitters.some(
+            emitter => emitter.description.properties.isHeatParticle && emitter.mesh.visible);
+    }
+
+    /** Whether anything is currently holding the emitters, and what. */
+    get heldBy(): EmissionHold[] {
+        return [...this.holds];
+    }
+
+    /** The bone this system is anchored on, for the callers that describe where an effect sits. */
+    get anchorNode(): THREE.Object3D | null {
+        return this.anchor;
+    }
+
+    /**
+     * Whether the emitters may spawn this step.
+     *
+     * Every gate resolved HERE rather than by several writers of one flag: the reasons in
+     * {@link holds}, and being drawn at all. A system nobody can see is not running - the
+     * reader's tick, the effects master, the level gate and the quiet-on-open rule all hold an
+     * effect back by not drawing it, and an emitter that goes on firing behind that is spending its
+     * life where nobody can watch it. For a burst that is fatal: `p_explosion_empire_atat00` was
+     * exhausted seconds before its row could be ticked on, so switching it on showed nothing at all.
+     *
+     * The clock is held with it - `EmitterRenderer.update` only advances it when it may spawn - so
+     * a held system starts from its first frame rather than resuming somewhere in the middle.
+     */
+    private get spawning(): boolean {
+        return this.holds.size === 0 && this.root.visible;
+    }
+
     /** Every texture this system's emitters want, lowercased and de-duplicated. */
     textureNames(): string[] {
         return [...new Set(
@@ -978,22 +1027,6 @@ export class ParticleSystemInstance {
      */
     extent(): number {
         return systemExtent(this.emitters.map(emitter => emitter.description));
-    }
-
-    /** True once every emitter has finished and its last particle has died. */
-    get exhausted(): boolean {
-        return this.emitters.every(emitter => emitter.exhausted);
-    }
-
-    /**
-     * True once nothing this system threw is still in the air.
-     *
-     * NOT {@link exhausted}, which also asks whether the emitter has finished - and a continuous
-     * emitter never finishes. For a system that has been told to stop spawning, "finished" will
-     * never come, so what decides when it can be disposed is simply whether anything is left.
-     */
-    get empty(): boolean {
-        return this.emitters.every(emitter => emitter.live.length === 0);
     }
 
     /** The emitters in file order. Names repeat - p_explosion_huge01 has three called "debre". */
@@ -1019,12 +1052,6 @@ export class ParticleSystemInstance {
     /** One emitter's drawn object, for the callers that need to ask about its layer or bounds. */
     emitterMesh(index: number): THREE.Mesh | null {
         return this.emitters[index]?.mesh ?? null;
-    }
-
-    /** Whether anything here needs the distortion pass, which is not worth its targets otherwise. */
-    get hasVisibleHeat(): boolean {
-        return this.root.visible && this.emitters.some(
-            emitter => emitter.description.properties.isHeatParticle && emitter.mesh.visible);
     }
 
     /**
@@ -1087,11 +1114,6 @@ export class ParticleSystemInstance {
         }
     }
 
-    /** Whether anything is currently holding the emitters, and what. */
-    get heldBy(): EmissionHold[] {
-        return [...this.holds];
-    }
-
     /**
      * Names the bone this system is anchored on.
      *
@@ -1109,11 +1131,6 @@ export class ParticleSystemInstance {
         this.previous = null;
     }
 
-    /** The bone this system is anchored on, for the callers that describe where an effect sits. */
-    get anchorNode(): THREE.Object3D | null {
-        return this.anchor;
-    }
-
     /**
      * Cuts the system loose from its bone, leaving everything it has thrown exactly where it is.
      *
@@ -1123,23 +1140,6 @@ export class ParticleSystemInstance {
      */
     detach(): void {
         this.attachTo(null);
-    }
-
-    /**
-     * Whether the emitters may spawn this step.
-     *
-     * Every gate resolved HERE rather than by several writers of one flag: the reasons in
-     * {@link holds}, and being drawn at all. A system nobody can see is not running - the
-     * reader's tick, the effects master, the level gate and the quiet-on-open rule all hold an
-     * effect back by not drawing it, and an emitter that goes on firing behind that is spending its
-     * life where nobody can watch it. For a burst that is fatal: `p_explosion_empire_atat00` was
-     * exhausted seconds before its row could be ticked on, so switching it on showed nothing at all.
-     *
-     * The clock is held with it - `EmitterRenderer.update` only advances it when it may spawn - so
-     * a held system starts from its first frame rather than resuming somewhere in the middle.
-     */
-    private get spawning(): boolean {
-        return this.holds.size === 0 && this.root.visible;
     }
 
     update(dt: number, view: THREE.Matrix4 | null = null, wind?: AlamoVector3): void {
@@ -1165,6 +1165,18 @@ export class ParticleSystemInstance {
         }
 
         this.emitters.forEach((parent, index) => this.runChains(parent, index, deaths, step, frame));
+    }
+
+    setVisible(visible: boolean): void {
+        this.root.visible = visible;
+    }
+
+    dispose(): void {
+        for (const emitter of this.emitters) {
+            emitter.dispose();
+        }
+
+        this.root.removeFromParent();
     }
 
     /**
@@ -1297,17 +1309,5 @@ export class ParticleSystemInstance {
         this.frame.toView.setFromMatrix4(view === null
             ? IDENTITY
             : VIEW_SCRATCH.multiplyMatrices(view, space.matrixWorld));
-    }
-
-    setVisible(visible: boolean): void {
-        this.root.visible = visible;
-    }
-
-    dispose(): void {
-        for (const emitter of this.emitters) {
-            emitter.dispose();
-        }
-
-        this.root.removeFromParent();
     }
 }

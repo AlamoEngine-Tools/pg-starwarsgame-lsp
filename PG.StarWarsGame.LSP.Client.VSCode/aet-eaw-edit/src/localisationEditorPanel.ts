@@ -56,16 +56,13 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
     /** Every file the table is built from, in column order. */
     private _members: Member[] = [];
-
     /**
-     * The file a file-level action applies to: convert, export to DAT, open as text.
+     * The languages the engine officially supports, cached for the life of the tab.
      *
-     * The first of the set. Those actions are about one file on disk, and for a set the one the
-     * tree was opened on is the only defensible choice.
+     * A property of the game rather than of the file, so it is fetched once. The editor offers only
+     * these when adding a language - a made-up identifier produces a column the game never reads.
      */
-    private get _filePath(): string {
-        return this._filePaths[0];
-    }
+    private _supportedLanguages: string[] | undefined;
 
     private constructor(
         private readonly _filePaths: string[],
@@ -121,44 +118,14 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         LocalisationEditorPanel._active = this;
     }
 
-    protected async onMessage(msg: WebviewMessage): Promise<void> {
-        switch (msg.type) {
-            case 'ready':
-            case 'fetch':
-                await this._sendRows();
-                break;
-            case 'pendingSync':
-                this._state.syncPending(msg.commands as Record<string, unknown>[]);
-                break;
-            case 'validateBatch':
-                await this._validate(msg.commands as Record<string, unknown>[]);
-                break;
-            case 'saveBatch':
-                await this._save(msg.commands as Record<string, unknown>[]);
-                break;
-            case 'requestBaseline':
-                await this._sendBaseline();
-                break;
-            case 'crawlRows':
-                this._sendCrawlRows(msg);
-                break;
-            case 'convertFormat':
-                await this._convertFormat(msg.targetFormat as string);
-                break;
-            case 'addLanguageFile':
-                await this._addLanguageFile(msg.language as string);
-                break;
-            case 'saveDialogGeometry':
-                saveDialogGeometry(msg.id as string, msg.geometry as StoredGeometry);
-                break;
-            case 'exportDat':
-                await vscode.commands.executeCommand(
-                    'aet-eaw-edit.lsp.exportLocalisationToDat',
-                    {project: {filePath: this._filePath}});
-                break;
-            default:
-                break;
-        }
+    /**
+     * The file a file-level action applies to: convert, export to DAT, open as text.
+     *
+     * The first of the set. Those actions are about one file on disk, and for a set the one the
+     * tree was opened on is the only defensible choice.
+     */
+    private get _filePath(): string {
+        return this._filePaths[0];
     }
 
     static show(
@@ -199,17 +166,6 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
     }
 
     /**
-     * Re-aims an open tab at one language of its set, or back at all of them.
-     *
-     * A message rather than a re-read: the files have not changed, and re-reading would throw away
-     * the staged queue along with the user's sort and selection just to hide some columns.
-     */
-    private _focusOn(language: string | undefined): void {
-        this._focusLanguage = language;
-        this.post({type: 'focusLanguage', language: language ?? null});
-    }
-
-    /**
      * Tells every open tab its file may have changed underneath it. All of them, because
      * `aet/localisationIndexUpdated` carries no payload - it cannot say which file moved.
      *
@@ -233,6 +189,61 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         LocalisationEditorPanel._active?.post({type: 'requestCrawlRows', fullScreen});
     }
 
+    static disposeAll(): void {
+        LocalisationEditorPanel._panels.disposeAll();
+    }
+
+    protected async onMessage(msg: WebviewMessage): Promise<void> {
+        switch (msg.type) {
+            case 'ready':
+            case 'fetch':
+                await this._sendRows();
+                break;
+            case 'pendingSync':
+                this._state.syncPending(msg.commands as Record<string, unknown>[]);
+                break;
+            case 'validateBatch':
+                await this._validate(msg.commands as Record<string, unknown>[]);
+                break;
+            case 'saveBatch':
+                await this._save(msg.commands as Record<string, unknown>[]);
+                break;
+            case 'requestBaseline':
+                await this._sendBaseline();
+                break;
+            case 'crawlRows':
+                this._sendCrawlRows(msg);
+                break;
+            case 'convertFormat':
+                await this._convertFormat(msg.targetFormat as string);
+                break;
+            case 'addLanguageFile':
+                await this._addLanguageFile(msg.language as string);
+                break;
+            case 'saveDialogGeometry':
+                saveDialogGeometry(msg.id as string, msg.geometry as StoredGeometry);
+                break;
+            case 'exportDat':
+                await vscode.commands.executeCommand(
+                    'aet-eaw-edit.lsp.exportLocalisationToDat',
+                    {project: {filePath: this._filePath}});
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * Re-aims an open tab at one language of its set, or back at all of them.
+     *
+     * A message rather than a re-read: the files have not changed, and re-reading would throw away
+     * the staged queue along with the user's sort and selection just to hide some columns.
+     */
+    private _focusOn(language: string | undefined): void {
+        this._focusLanguage = language;
+        this.post({type: 'focusLanguage', language: language ?? null});
+    }
+
     /** Forwards the editor's staged rows to the preview beside it, if one is open. */
     private _sendCrawlRows(msg: Record<string, unknown>): void {
         const payload = {
@@ -248,18 +259,6 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             CreditsPreviewPanel.update(this._filePath, payload);
         }
     }
-
-    static disposeAll(): void {
-        LocalisationEditorPanel._panels.disposeAll();
-    }
-
-    /**
-     * The languages the engine officially supports, cached for the life of the tab.
-     *
-     * A property of the game rather than of the file, so it is fetched once. The editor offers only
-     * these when adding a language - a made-up identifier produces a column the game never reads.
-     */
-    private _supportedLanguages: string[] | undefined;
 
     private async _supportedLanguagesAsync(): Promise<string[]> {
         if (this._supportedLanguages !== undefined) {

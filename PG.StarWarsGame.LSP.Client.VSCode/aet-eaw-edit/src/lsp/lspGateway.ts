@@ -56,6 +56,16 @@ const EXECUTE_COMMAND = 'workspace/executeCommand';
 
 export class LspGateway {
     /**
+     * Whether the server has finished STARTING, which is not the same as having a client object.
+     *
+     * `isRunning` answers "has a client been constructed", and the client is constructed several
+     * lines before `start()` is called on it - so it reads true during a window in which every
+     * request throws. Only the extension knows when start() resolved, so it says so.
+     */
+    private _ready = false;
+    private readonly _waiting = new Set<(ready: boolean) => void>();
+
+    /**
      * @param _resolve Looks the client up per call rather than holding it. The client is replaced
      *     on every restart, and a gateway holding the old one would keep talking to a dead process.
      * @param _sink Where messages go. Optional so a caller that reports everything itself - the
@@ -70,16 +80,6 @@ export class LspGateway {
     get isRunning(): boolean {
         return this._resolve() !== undefined;
     }
-
-    /**
-     * Whether the server has finished STARTING, which is not the same as having a client object.
-     *
-     * `isRunning` answers "has a client been constructed", and the client is constructed several
-     * lines before `start()` is called on it - so it reads true during a window in which every
-     * request throws. Only the extension knows when start() resolved, so it says so.
-     */
-    private _ready = false;
-    private readonly _waiting = new Set<(ready: boolean) => void>();
 
     /** The server has started and can take requests. */
     markReady(): void {

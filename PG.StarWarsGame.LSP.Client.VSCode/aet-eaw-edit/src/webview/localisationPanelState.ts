@@ -6,14 +6,24 @@
 // for its own close - by the time the tab is going away, this is the only copy left.
 
 export class LocalisationPanelState {
-    private _pending: Record<string, unknown>[] = [];
-    private _contentHash: string | undefined;
     /** The hash of the contents the webview was last handed. See {@link shouldDeliver}. */
     private _deliveredHash: string | undefined;
+
+    private _pending: Record<string, unknown>[] = [];
 
     /** The staged commands, in the order the user performed them. */
     get pending(): Record<string, unknown>[] {
         return this._pending;
+    }
+
+    private _contentHash: string | undefined;
+
+    /**
+     * Hash of the text this tab last read, echoed on the next save so the server can tell whether
+     * the file moved underneath it.
+     */
+    get contentHash(): string | undefined {
+        return this._contentHash;
     }
 
     get pendingCount(): number {
@@ -22,14 +32,6 @@ export class LocalisationPanelState {
 
     get isDirty(): boolean {
         return this._pending.length > 0;
-    }
-
-    /**
-     * Hash of the text this tab last read, echoed on the next save so the server can tell whether
-     * the file moved underneath it.
-     */
-    get contentHash(): string | undefined {
-        return this._contentHash;
     }
 
     /**

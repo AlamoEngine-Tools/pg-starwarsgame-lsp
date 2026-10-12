@@ -4,13 +4,14 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.IO.Pipelines;
+using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using OmniSharp.Extensions.DebugAdapter.Client;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Events;
 using OmniSharp.Extensions.DebugAdapter.Server;
-using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Lua.Debug.Dap;
 
 namespace PG.StarWarsGame.LSP.Lua.Debug.Tests.Dap;
@@ -21,13 +22,15 @@ namespace PG.StarWarsGame.LSP.Lua.Debug.Tests.Dap;
 /// </summary>
 internal sealed class DapTestHarness : IAsyncDisposable
 {
-    private readonly Lock _gate = new();
-    private readonly List<StoppedEvent> _stopped = [];
-    private readonly List<OutputEvent> _output = [];
-    private readonly List<TerminatedEvent> _terminated = [];
-    private readonly List<InitializedEvent> _initialized = [];
     private readonly List<BreakpointEvent> _breakpointEvents = [];
+    private readonly Lock _gate = new();
+    private readonly List<InitializedEvent> _initialized = [];
+    private readonly List<OutputEvent> _output = [];
     private readonly List<LuaScriptsChangedEvent> _scriptsChanged = [];
+
+    private readonly StringBuilder _serverOutput = new();
+    private readonly List<StoppedEvent> _stopped = [];
+    private readonly List<TerminatedEvent> _terminated = [];
 
     private DapTestHarness(FakeTimeProvider time, MockFileSystem fileSystem, FakeGameLauncher launcher,
         IServiceProvider services)
@@ -120,6 +123,26 @@ internal sealed class DapTestHarness : IAsyncDisposable
         }
     }
 
+    /// <summary>Everything the server has written, as text, for assertions on the wire itself.</summary>
+    public string ServerOutput
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _serverOutput.ToString();
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Client.Dispose();
+        Server.Dispose();
+        Adapter.Dispose();
+        await Task.CompletedTask;
+    }
+
     /// <summary>Builds the adapter's container, starts the server and the client, and completes the initialize handshake.</summary>
     public static async Task<DapTestHarness> StartAsync(Action<MockFileSystem>? files = null,
         CancellationToken cancellationToken = default)
@@ -170,14 +193,6 @@ internal sealed class DapTestHarness : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        Client.Dispose();
-        Server.Dispose();
-        Adapter.Dispose();
-        await Task.CompletedTask;
-    }
-
     private void Record<T>(List<T> list, T item)
     {
         lock (_gate)
@@ -193,24 +208,10 @@ internal sealed class DapTestHarness : IAsyncDisposable
     /// </summary>
     public string? LastErrorMessage()
     {
-        var matches = System.Text.RegularExpressions.Regex.Matches(ServerOutput,
+        var matches = Regex.Matches(ServerOutput,
             "\"success\":false,\"command\":\"[^\"]+\",\"message\":\"((?:[^\"\\\\]|\\\\.)*)\"");
-        return matches.Count == 0 ? null : System.Text.RegularExpressions.Regex.Unescape(matches[^1].Groups[1].Value);
+        return matches.Count == 0 ? null : Regex.Unescape(matches[^1].Groups[1].Value);
     }
-
-    /// <summary>Everything the server has written, as text, for assertions on the wire itself.</summary>
-    public string ServerOutput
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _serverOutput.ToString();
-            }
-        }
-    }
-
-    private readonly System.Text.StringBuilder _serverOutput = new();
 
     /// <summary>Copies the server's output into a second pipe for the client while recording it.</summary>
     private PipeReader Tap(PipeReader source)
@@ -225,7 +226,7 @@ internal sealed class DapTestHarness : IAsyncDisposable
                 {
                     lock (_gate)
                     {
-                        _serverOutput.Append(System.Text.Encoding.UTF8.GetString(segment.Span));
+                        _serverOutput.Append(Encoding.UTF8.GetString(segment.Span));
                     }
 
                     await copy.Writer.WriteAsync(segment);

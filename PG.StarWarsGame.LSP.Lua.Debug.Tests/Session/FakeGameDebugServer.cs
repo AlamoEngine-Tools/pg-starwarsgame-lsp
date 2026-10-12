@@ -19,17 +19,17 @@ namespace PG.StarWarsGame.LSP.Lua.Debug.Tests.Session;
 /// </summary>
 internal sealed class FakeGameDebugServer : IAsyncDisposable
 {
-    private readonly UdpClient _socket;
-    private readonly IPgNetDatagramCodec _datagrams;
-    private readonly ILuaMessageCodec _messages;
-    private readonly IReliableChannel _channel;
-    private readonly CancellationTokenSource _stop = new();
-    private readonly Lock _gate = new();
-    private readonly List<LuaDebugMessage> _received = [];
-    private readonly List<string> _violations = [];
-    private readonly List<AddBreakpointMessage> _breakpoints = [];
     private readonly HashSet<int> _attached = [];
+    private readonly List<AddBreakpointMessage> _breakpoints = [];
+    private readonly IReliableChannel _channel;
+    private readonly IPgNetDatagramCodec _datagrams;
+    private readonly Lock _gate = new();
     private readonly Task _loop;
+    private readonly ILuaMessageCodec _messages;
+    private readonly List<LuaDebugMessage> _received = [];
+    private readonly UdpClient _socket;
+    private readonly CancellationTokenSource _stop = new();
+    private readonly List<string> _violations = [];
     private IPEndPoint? _client;
 
     public FakeGameDebugServer()
@@ -129,6 +129,19 @@ internal sealed class FakeGameDebugServer : IAsyncDisposable
         }
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        await _stop.CancelAsync();
+        _socket.Dispose();
+        try
+        {
+            await _loop;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
     // -- pushes from the game side ------------------------------------------------------------
 
     public Task SuspendAsync(int scriptId, int threadId, IReadOnlyList<string> callstack,
@@ -213,19 +226,6 @@ internal sealed class FakeGameDebugServer : IAsyncDisposable
             }
 
             await Task.Delay(10, deadline.Token);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _stop.CancelAsync();
-        _socket.Dispose();
-        try
-        {
-            await _loop;
-        }
-        catch (OperationCanceledException)
-        {
         }
     }
 
@@ -401,10 +401,14 @@ internal sealed class FakeGameDebugServer : IAsyncDisposable
                 lock (_gate)
                 {
                     if (ContextScriptId is not { } context)
+                    {
                         Violate("break-thread with no context script");
+                    }
                     else if (m.ThreadId != -1 &&
                              !Threads.GetValueOrDefault(context, []).Any(t => t.ThreadIndex == m.ThreadId))
+                    {
                         Violate($"break-thread on thread {m.ThreadId} that script {context} does not have");
+                    }
                     else
                     {
                         Armed = ArmedBreakKind.BreakThread;

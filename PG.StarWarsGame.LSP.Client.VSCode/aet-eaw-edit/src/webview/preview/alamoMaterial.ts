@@ -36,14 +36,13 @@ interface BoundUniform {
 
 /** A material built from a translated effect, plus what it needs each frame. */
 export class AlamoMaterial extends THREE.RawShaderMaterial {
-    private readonly bound: BoundUniform[] = [];
-
     /** Sampler uniform name to the texture file it wants, lower-cased for matching. */
     readonly wantedTextures = new Map<string, string>();
-
+    /** Samplers the effect declares that no parameter on this sub-mesh names a texture for. */
+    readonly unnamedSamplers: string[] = [];
+    private readonly bound: BoundUniform[] = [];
     /** Every uniform's declared type, so no value is ever sent at the wrong width. */
     private readonly types: Map<string, string>;
-
     /** `Colorization`'s declared width, so the team colour is fitted like any other value. */
     private readonly colorizationType: string | undefined;
 
@@ -119,9 +118,6 @@ export class AlamoMaterial extends THREE.RawShaderMaterial {
             .filter(([sampler]) => this.uniforms[sampler]?.value === null)
             .map(([sampler, file]) => ({sampler, file}));
     }
-
-    /** Samplers the effect declares that no parameter on this sub-mesh names a texture for. */
-    readonly unnamedSamplers: string[] = [];
 
     /**
      * Sets the pass's alpha cutoff, or clears it.

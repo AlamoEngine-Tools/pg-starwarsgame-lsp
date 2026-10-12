@@ -50,7 +50,7 @@ public sealed class BitReaderTest
     public void Constructor_BitOffset_SkipsLeadingBits()
     {
         // 0x95bc0a with the first 3 bits skipped leaves 0b10010 as the next 5-bit field.
-        var reader = new BitReader(Convert.FromHexString("95bc0a"), bitOffset: 3);
+        var reader = new BitReader(Convert.FromHexString("95bc0a"), 3);
 
         Assert.Equal(0b10010u, reader.ReadBits(5));
         Assert.Equal(16, reader.RemainingBits);
@@ -59,7 +59,7 @@ public sealed class BitReaderTest
     [Fact]
     public void Constructor_BitCount_BoundsTheReadableRange()
     {
-        var reader = new BitReader(Convert.FromHexString("95bc0a"), bitOffset: 0, bitCount: 8);
+        var reader = new BitReader(Convert.FromHexString("95bc0a"), 0, 8);
 
         reader.ReadBits(8);
 

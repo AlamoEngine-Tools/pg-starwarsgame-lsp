@@ -24,7 +24,7 @@ public sealed class SetLocalisationProjectFormatHandlerTest
     [Fact]
     public async Task Switching_csv_to_dat_repoints_the_project_and_keeps_its_directory()
     {
-        var (handler, reload, writer) = Build("CSV");
+        var (handler, reload, writer) = Build();
 
         var result = await handler.Handle(new SetLocalisationProjectFormatParams("Dat"), CancellationToken.None);
 
@@ -61,7 +61,7 @@ public sealed class SetLocalisationProjectFormatHandlerTest
     [InlineData("CSV")]
     public async Task The_format_it_already_loads_writes_nothing(string format)
     {
-        var (handler, reload, writer) = Build("CSV");
+        var (handler, reload, writer) = Build();
 
         var result = await handler.Handle(new SetLocalisationProjectFormatParams(format), CancellationToken.None);
 

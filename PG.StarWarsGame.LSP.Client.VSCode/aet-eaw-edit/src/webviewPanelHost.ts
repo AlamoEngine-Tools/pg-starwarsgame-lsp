@@ -56,8 +56,6 @@ export interface WebviewPanelSpec {
  * webview and tearing it down lives here.
  */
 export abstract class WebviewPanelHost {
-    protected readonly panel: vscode.WebviewPanel;
-
     /**
      * The tab was closed.
      *
@@ -66,6 +64,7 @@ export abstract class WebviewPanelHost {
      * `super.onDisposed()`, which is exactly the call that gets forgotten.
      */
     readonly onDidDispose: vscode.Event<void>;
+    protected readonly panel: vscode.WebviewPanel;
 
     /**
      * @param adopt A panel VS Code already created, for a custom editor. Custom editors are handed
@@ -131,19 +130,19 @@ export abstract class WebviewPanelHost {
         });
     }
 
-    /** Handles one message from the webview. */
-    protected abstract onMessage(msg: WebviewMessage): void | Promise<void>;
-
-    protected post(msg: unknown): void {
-        void this.panel.webview.postMessage(msg);
-    }
-
     reveal(preserveFocus = false): void {
         this.panel.reveal(this.panel.viewColumn, preserveFocus);
     }
 
     dispose(): void {
         this.panel.dispose();
+    }
+
+    /** Handles one message from the webview. */
+    protected abstract onMessage(msg: WebviewMessage): void | Promise<void>;
+
+    protected post(msg: unknown): void {
+        void this.panel.webview.postMessage(msg);
     }
 }
 
@@ -164,16 +163,16 @@ export interface WebviewMessage {
 export class PanelRegistry<T extends WebviewPanelHost> {
     private readonly _panels = new Map<string, T>();
 
+    get all(): T[] {
+        return [...this._panels.values()];
+    }
+
     get(key: string): T | undefined {
         return this._panels.get(key);
     }
 
     has(key: string): boolean {
         return this._panels.has(key);
-    }
-
-    get all(): T[] {
-        return [...this._panels.values()];
     }
 
     /** Registers a panel and arranges for it to remove itself when its tab closes. */

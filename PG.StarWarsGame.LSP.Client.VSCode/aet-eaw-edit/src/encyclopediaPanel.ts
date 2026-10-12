@@ -56,25 +56,6 @@ export class EncyclopediaPanel extends WebviewPanelHost {
         });
     }
 
-    protected onMessage(msg: WebviewMessage): void {
-        if (msg.type === 'ready') {
-            // The entry may have been pushed before the bundle finished loading; hold it until the
-            // webview says it is listening, or the first preview opens blank.
-            this._ready = true;
-            if (this._pending !== null) {
-                this.post(this._pending);
-                this._pending = null;
-            }
-        }
-        if (msg.type === 'setMultiplayer') {
-            this._multiplayer = msg.multiplayer === true;
-            this._reload?.(this._multiplayer);
-        }
-        if (msg.type === 'close') {
-            this.dispose();
-        }
-    }
-
     /**
      * Shows an entry, creating the panel or retargeting the open one.
      *
@@ -130,6 +111,25 @@ export class EncyclopediaPanel extends WebviewPanelHost {
 
     static disposeAll(): void {
         EncyclopediaPanel._instance?.dispose();
+    }
+
+    protected onMessage(msg: WebviewMessage): void {
+        if (msg.type === 'ready') {
+            // The entry may have been pushed before the bundle finished loading; hold it until the
+            // webview says it is listening, or the first preview opens blank.
+            this._ready = true;
+            if (this._pending !== null) {
+                this.post(this._pending);
+                this._pending = null;
+            }
+        }
+        if (msg.type === 'setMultiplayer') {
+            this._multiplayer = msg.multiplayer === true;
+            this._reload?.(this._multiplayer);
+        }
+        if (msg.type === 'close') {
+            this.dispose();
+        }
     }
 
     /**

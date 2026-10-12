@@ -20,6 +20,10 @@ const MAX_CHAIN = 64;
 export class StagedRenames {
     private readonly _chain = new Map<string, string>();
 
+    get size(): number {
+        return this._chain.size;
+    }
+
     /** Records that `from` is now called `to`. */
     record(from: string, to: string): void {
         this._chain.set(from.toLowerCase(), to);
@@ -27,10 +31,6 @@ export class StagedRenames {
 
     clear(): void {
         this._chain.clear();
-    }
-
-    get size(): number {
-        return this._chain.size;
     }
 
     /**

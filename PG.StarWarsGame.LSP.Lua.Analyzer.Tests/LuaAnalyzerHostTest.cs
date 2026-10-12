@@ -18,10 +18,11 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
     private static readonly string FakeDll =
         Path.Combine(AppContext.BaseDirectory, "PG.StarWarsGame.LSP.Lua.Analyzer.Fake.dll");
 
+    private readonly ConcurrentQueue<string> _messages = new();
+
     private readonly string _work =
         Path.Combine(Path.GetTempPath(), "aet-analyzer-test-" + Guid.NewGuid().ToString("N"));
 
-    private readonly ConcurrentQueue<string> _messages = new();
     private LuaAnalyzerHost? _host;
 
     public async ValueTask DisposeAsync()

@@ -37,6 +37,34 @@ import {
  */
 export class StoryGraphPanel extends WebviewPanelHost {
     private static readonly _panels = new PanelRegistry<StoryGraphPanel>();
+    // offer to save if the tab is closed while dirty - the disposed webview can no longer prompt.
+    private _pendingCommands: Record<string, unknown>[] = [];
+    // Cached "skip the delete-event confirmation" preference (undefined = not fetched yet).
+    private _skipDeleteConfirm: boolean | undefined;
+    // that did not exist yet.
+    private _pendingCenter: string | undefined;
+
+    // Mirror of the webview's staged command queue, kept in sync via 'pendingSync'. Lets the panel
+    // simulation opens straight into its own session.
+    private _pendingSimulate = false;
+
+    private constructor(
+        private readonly _target: StoryGraphTarget,
+        private readonly _extensionUri: vscode.Uri,
+        private readonly _lsp: LspGateway
+    ) {
+        // No bodyStyle: this webview resets the page from inside its own styled-components global,
+        // which is where the rest of its canvas styling lives.
+        super(_extensionUri, {
+            viewType: 'aetStoryGraph',
+            title: panelTitle(_target),
+            column: vscode.ViewColumn.Active,
+            script: 'storyGraph.js',
+        });
+
+        this.onDidDispose(() => void this._promptSaveOnClose());
+    }
+    // A node to centre on once the first graph has been posted - a portal's landing spot on a panel
 
     /**
      * Opens or reveals the panel for a target. `centerOn` is a node the revealed graph should
@@ -62,6 +90,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         panel._pendingCenter = centerOn;
         panel._pendingSimulate = simulate;
     }
+    // Whether to enter Simulation once the first graph is up - a battle entered from the galactic
 
     /**
      * Called on `aet/storyGraphChanged` - refreshes the panels the change reached.
@@ -84,33 +113,15 @@ export class StoryGraphPanel extends WebviewPanelHost {
         StoryGraphPanel._panels.disposeAll();
     }
 
-    // Mirror of the webview's staged command queue, kept in sync via 'pendingSync'. Lets the panel
-    // offer to save if the tab is closed while dirty - the disposed webview can no longer prompt.
-    private _pendingCommands: Record<string, unknown>[] = [];
-    // Cached "skip the delete-event confirmation" preference (undefined = not fetched yet).
-    private _skipDeleteConfirm: boolean | undefined;
-    // A node to centre on once the first graph has been posted - a portal's landing spot on a panel
-    // that did not exist yet.
-    private _pendingCenter: string | undefined;
-    // Whether to enter Simulation once the first graph is up - a battle entered from the galactic
-    // simulation opens straight into its own session.
-    private _pendingSimulate = false;
-
-    private constructor(
-        private readonly _target: StoryGraphTarget,
-        private readonly _extensionUri: vscode.Uri,
-        private readonly _lsp: LspGateway
-    ) {
-        // No bodyStyle: this webview resets the page from inside its own styled-components global,
-        // which is where the rest of its canvas styling lives.
-        super(_extensionUri, {
-            viewType: 'aetStoryGraph',
-            title: panelTitle(_target),
-            column: vscode.ViewColumn.Active,
-            script: 'storyGraph.js',
-        });
-
-        this.onDidDispose(() => void this._promptSaveOnClose());
+    /**
+     * Called on `aet/storySimChanged` - the panel showing that session re-fetches its state.
+     *
+     * A session is one scope: the galactic story, or one battle. The server names the scope a
+     * change happened in and pushes both when a battle's resolution reaches the galaxy, so the
+     * routing here is exact rather than fanned out over the faction.
+     */
+    static simChanged(target: StoryGraphTarget): void {
+        StoryGraphPanel._panels.get(panelKey(target))?.post({type: 'simChanged'});
     }
 
     protected async onMessage(msg: WebviewMessage): Promise<void> {
@@ -195,17 +206,6 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 StoryGraphPanel.show(galacticOf(this._target), this._extensionUri, this._lsp, msg.nodeId as string);
                 break;
         }
-    }
-
-    /**
-     * Called on `aet/storySimChanged` - the panel showing that session re-fetches its state.
-     *
-     * A session is one scope: the galactic story, or one battle. The server names the scope a
-     * change happened in and pushes both when a battle's resolution reaches the galaxy, so the
-     * routing here is exact rather than fanned out over the faction.
-     */
-    static simChanged(target: StoryGraphTarget): void {
-        StoryGraphPanel._panels.get(panelKey(target))?.post({type: 'simChanged'});
     }
 
     /**

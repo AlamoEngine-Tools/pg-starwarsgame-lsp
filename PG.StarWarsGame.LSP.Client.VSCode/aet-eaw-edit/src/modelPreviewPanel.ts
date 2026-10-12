@@ -75,17 +75,6 @@ const ENERGY_SETTING = 'aet-eaw-edit.features.preview.energyPool';
 export class ModelPreviewPanel extends WebviewPanelHost {
     static readonly viewType = 'aetModelPreview';
     private static readonly panels = new PanelRegistry<ModelPreviewPanel>();
-
-    private subject: PreviewSubject;
-
-    /**
-     * Textures already asked for.
-     *
-     * Every part that loads reports the whole scene's texture list, so without this a ten-part unit
-     * would request its shared hull texture ten times.
-     */
-    private readonly requestedTextures = new Set<string>();
-
     /**
      * Every open preview, for the refresh push.
      *
@@ -96,7 +85,22 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * both and disposes of nothing.
      */
     private static readonly live = new Set<ModelPreviewPanel>();
-
+    /**
+     * Per-subject state, for as long as the window lives.
+     *
+     * Keyed by the same key the panel tracker uses, and held on the CLASS rather than the instance
+     * so closing a preview and reopening the same subject picks up where it left off. Deliberately
+     * not written to disk - see `setSubjectState`.
+     */
+    private static readonly subjectStates = new Map<string, SubjectState>();
+    private subject: PreviewSubject;
+    /**
+     * Textures already asked for.
+     *
+     * Every part that loads reports the whole scene's texture list, so without this a ten-part unit
+     * would request its shared hull texture ten times.
+     */
+    private readonly requestedTextures = new Set<string>();
     /**
      * The scene as last sent, serialised.
      *
@@ -105,6 +109,10 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * by asking for every part's geometry again.
      */
     private lastScene: string | null = null;
+    /** The clips this subject's model has, as the scene reported them. */
+    private sceneAnimations: string[] = [];
+    /** The file the subject's name resolved to, as the scene reported it - what a hand-off opens. */
+    private sceneSourceFile: PreviewSourceFile | null = null;
 
     private constructor(
         // Kept, not just passed up: opening the inspector tab needs it again later.
@@ -145,21 +153,8 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         this.onDidDispose(() => watch.dispose());
     }
 
-    /**
-     * Which optional mechanics this preview shows.
-     *
-     * The webview defaults every one of them to OFF, so a panel that never receives this - an older
-     * host, a message lost on startup - stays in the safe state rather than offering a mechanic the
-     * shipped game disables.
-     */
-    private sendPreviewFeatures(): void {
-        this.post({
-            type: 'previewFeatures',
-            features: {
-                energyPool: vscode.workspace.getConfiguration()
-                    .get<boolean>(ENERGY_SETTING) === true,
-            },
-        });
+    private get stateKey(): string {
+        return subjectKey(this.subject);
     }
 
     /**
@@ -193,81 +188,19 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         return ModelPreviewPanel.panels.track(key, panel);
     }
 
-    /**
-     * Per-subject state, for as long as the window lives.
-     *
-     * Keyed by the same key the panel tracker uses, and held on the CLASS rather than the instance
-     * so closing a preview and reopening the same subject picks up where it left off. Deliberately
-     * not written to disk - see `setSubjectState`.
-     */
-    private static readonly subjectStates = new Map<string, SubjectState>();
-
-    /** The clips this subject's model has, as the scene reported them. */
-    private sceneAnimations: string[] = [];
-
-    /** The file the subject's name resolved to, as the scene reported it - what a hand-off opens. */
-    private sceneSourceFile: PreviewSourceFile | null = null;
-
-    private get stateKey(): string {
-        return subjectKey(this.subject);
-    }
-
     static disposeAll(): void {
         ModelPreviewPanel.panels.disposeAll();
     }
 
     /**
-     * Writes a rendered frame to a file the reader chooses.
+     * Re-reads the tree behind every open preview.
      *
-     * The webview hands over bytes because it CANNOT do this itself: a webview has no filesystem,
-     * and a `data:` link in one is inert - the viewer's sandbox blocks a download the page starts.
-     * So the picture is made where the GPU is and written where the API is.
+     * Called on <c>aet/previewSceneChanged</c>, which the server pushes once the new index is live -
+     * so this reads the edit rather than racing it.
      */
-    private async saveCapture(message: WebviewMessage): Promise<void> {
-        const dataUrl = String(message.dataUrl ?? '');
-        const comma = dataUrl.indexOf(',');
-
-        if (!dataUrl.startsWith('data:image/png;base64,') || comma < 0) {
-            void vscode.window.showErrorMessage('The preview produced no image to save.');
-            return;
-        }
-
-        const target = await vscode.window.showSaveDialog({
-            defaultUri: vscode.Uri.file(String(message.fileName ?? 'capture.png')),
-            filters: {Images: ['png']},
-        });
-
-        if (target === undefined) {
-            return;
-        }
-
-        await vscode.workspace.fs.writeFile(
-            target, Buffer.from(dataUrl.slice(comma + 1), 'base64'));
-
-        // Said out loud, and with a way to act on it: a file written somewhere the reader chose but
-        // cannot see is a file they will look for in the wrong place.
-        const open = 'Open';
-        const chosen = await vscode.window.showInformationMessage(
-            `Saved ${target.path.split('/').pop() ?? 'the capture'}.`, open);
-
-        if (chosen === open) {
-            await vscode.commands.executeCommand('vscode.open', target);
-        }
-    }
-
-    /**
-     * Opens the inspector on a row, and arranges to hear when the reader closes it.
-     *
-     * The preview marks the row it is inspecting, and the tab is its own editor - the reader can
-     * close it from the tab bar, which the webview cannot see. So the close is reported back rather
-     * than left for the mark to go stale on a tab that is no longer there.
-     */
-    private openInspector(subject: unknown): void {
-        const alreadyOpen = ModelInspectorPanel.isOpen;
-        const inspector = ModelInspectorPanel.show(this.extensionUri, this.lsp, subject);
-
-        if (!alreadyOpen) {
-            inspector.onDidDispose(() => this.post({type: 'inspectorClosed'}));
+    static refreshAll(): void {
+        for (const panel of ModelPreviewPanel.live) {
+            void panel.sendScene(true);
         }
     }
 
@@ -383,6 +316,78 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         }
     }
 
+    /**
+     * Which optional mechanics this preview shows.
+     *
+     * The webview defaults every one of them to OFF, so a panel that never receives this - an older
+     * host, a message lost on startup - stays in the safe state rather than offering a mechanic the
+     * shipped game disables.
+     */
+    private sendPreviewFeatures(): void {
+        this.post({
+            type: 'previewFeatures',
+            features: {
+                energyPool: vscode.workspace.getConfiguration()
+                    .get<boolean>(ENERGY_SETTING) === true,
+            },
+        });
+    }
+
+    /**
+     * Writes a rendered frame to a file the reader chooses.
+     *
+     * The webview hands over bytes because it CANNOT do this itself: a webview has no filesystem,
+     * and a `data:` link in one is inert - the viewer's sandbox blocks a download the page starts.
+     * So the picture is made where the GPU is and written where the API is.
+     */
+    private async saveCapture(message: WebviewMessage): Promise<void> {
+        const dataUrl = String(message.dataUrl ?? '');
+        const comma = dataUrl.indexOf(',');
+
+        if (!dataUrl.startsWith('data:image/png;base64,') || comma < 0) {
+            void vscode.window.showErrorMessage('The preview produced no image to save.');
+            return;
+        }
+
+        const target = await vscode.window.showSaveDialog({
+            defaultUri: vscode.Uri.file(String(message.fileName ?? 'capture.png')),
+            filters: {Images: ['png']},
+        });
+
+        if (target === undefined) {
+            return;
+        }
+
+        await vscode.workspace.fs.writeFile(
+            target, Buffer.from(dataUrl.slice(comma + 1), 'base64'));
+
+        // Said out loud, and with a way to act on it: a file written somewhere the reader chose but
+        // cannot see is a file they will look for in the wrong place.
+        const open = 'Open';
+        const chosen = await vscode.window.showInformationMessage(
+            `Saved ${target.path.split('/').pop() ?? 'the capture'}.`, open);
+
+        if (chosen === open) {
+            await vscode.commands.executeCommand('vscode.open', target);
+        }
+    }
+
+    /**
+     * Opens the inspector on a row, and arranges to hear when the reader closes it.
+     *
+     * The preview marks the row it is inspecting, and the tab is its own editor - the reader can
+     * close it from the tab bar, which the webview cannot see. So the close is reported back rather
+     * than left for the mark to go stale on a tab that is no longer there.
+     */
+    private openInspector(subject: unknown): void {
+        const alreadyOpen = ModelInspectorPanel.isOpen;
+        const inspector = ModelInspectorPanel.show(this.extensionUri, this.lsp, subject);
+
+        if (!alreadyOpen) {
+            inspector.onDidDispose(() => this.post({type: 'inspectorClosed'}));
+        }
+    }
+
     private async sendScene(refresh = false): Promise<void> {
         this.requestedTextures.clear();
 
@@ -430,18 +435,6 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         }
 
         this.post({type: 'scene', scene: result.value.scene, refresh});
-    }
-
-    /**
-     * Re-reads the tree behind every open preview.
-     *
-     * Called on <c>aet/previewSceneChanged</c>, which the server pushes once the new index is live -
-     * so this reads the edit rather than racing it.
-     */
-    static refreshAll(): void {
-        for (const panel of ModelPreviewPanel.live) {
-            void panel.sendScene(true);
-        }
     }
 
     private async sendGlb(message: WebviewMessage): Promise<void> {

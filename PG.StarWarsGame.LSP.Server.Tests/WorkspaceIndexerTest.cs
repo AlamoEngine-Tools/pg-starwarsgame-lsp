@@ -13,7 +13,6 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -83,7 +82,7 @@ public sealed class WorkspaceIndexerTest
         MockFileSystem fs, IGameIndexService svc, IMegEntryReader megReader)
     {
         return BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            null, null, null, megReader, null);
+            null, null, null, megReader);
     }
 
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithHost(
@@ -764,24 +763,7 @@ public sealed class WorkspaceIndexerTest
         // The dependency was reused, so it was never re-saved; the leaf missed and was.
         Assert.DoesNotContain(Root("dep/dep.pgproj"), cache.Saved);
         Assert.Contains(Root("leaf/leaf.pgproj"), cache.Saved);
-        Assert.Equal(new BoneCatalogStats(LayersReused: 1, Layers: 2), indexer.LastBoneCatalog);
-    }
-
-    private sealed class StubBoneCache : IModelBoneCatalogCache
-    {
-        public Dictionary<string, IReadOnlyDictionary<string, ModelCatalogEntry>> Stored { get; } = new();
-        public List<string> Saved { get; } = [];
-
-        public IReadOnlyDictionary<string, ModelCatalogEntry>? TryLoad(string pgprojPath, string fingerprint)
-        {
-            return Stored.GetValueOrDefault(pgprojPath);
-        }
-
-        public void Save(
-            string pgprojPath, string fingerprint, IReadOnlyDictionary<string, ModelCatalogEntry> models)
-        {
-            Saved.Add(pgprojPath);
-        }
+        Assert.Equal(new BoneCatalogStats(1, 2), indexer.LastBoneCatalog);
     }
 
     // ── Dynamic enum catalog ─────────────────────────────────────────────────
@@ -1040,7 +1022,7 @@ public sealed class WorkspaceIndexerTest
 
         Assert.Single(svc.Calls); // parsed normally
         Assert.Empty(svc.InjectedDocuments);
-        Assert.Equal(new IndexCacheStats(LayersFromSnapshot: 0, LayersRebuilt: 1, FilesReused: 0, FilesParsed: 1),
+        Assert.Equal(new IndexCacheStats(0, 1, 0, 1),
             indexer.LastIndexCache);
     }
 
@@ -1088,7 +1070,7 @@ public sealed class WorkspaceIndexerTest
         Assert.Empty(svc.Calls); // no re-parse
         Assert.Single(svc.InjectedDocuments); // injected from cache
         // Kept for the bug report, which otherwise could not tell a warm start from a cold one.
-        Assert.Equal(new IndexCacheStats(LayersFromSnapshot: 1, LayersRebuilt: 0, FilesReused: 1, FilesParsed: 0),
+        Assert.Equal(new IndexCacheStats(1, 0, 1, 0),
             indexer.LastIndexCache);
     }
 
@@ -1807,6 +1789,23 @@ public sealed class WorkspaceIndexerTest
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
         Assert.Single(svc.InjectedDocuments); // cache hit lands in the index; no text is pinned anywhere
+    }
+
+    private sealed class StubBoneCache : IModelBoneCatalogCache
+    {
+        public Dictionary<string, IReadOnlyDictionary<string, ModelCatalogEntry>> Stored { get; } = new();
+        public List<string> Saved { get; } = [];
+
+        public IReadOnlyDictionary<string, ModelCatalogEntry>? TryLoad(string pgprojPath, string fingerprint)
+        {
+            return Stored.GetValueOrDefault(pgprojPath);
+        }
+
+        public void Save(
+            string pgprojPath, string fingerprint, IReadOnlyDictionary<string, ModelCatalogEntry> models)
+        {
+            Saved.Add(pgprojPath);
+        }
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

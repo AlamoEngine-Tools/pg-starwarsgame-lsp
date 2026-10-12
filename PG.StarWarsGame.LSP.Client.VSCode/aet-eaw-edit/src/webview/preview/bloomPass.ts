@@ -235,6 +235,18 @@ export class BloomPass {
         renderer.autoClear = autoClear;
     }
 
+    dispose(): void {
+        for (const target of this.targets ?? []) {
+            target.dispose();
+        }
+
+        this.targets = null;
+        this.bright.dispose();
+        this.blur.dispose();
+        this.combine.dispose();
+        this.mesh.geometry.dispose();
+    }
+
     private draw(
         renderer: THREE.WebGLRenderer, material: THREE.ShaderMaterial,
         source: THREE.Texture, into: THREE.WebGLRenderTarget | null,
@@ -282,17 +294,5 @@ export class BloomPass {
         }
 
         return this.targets;
-    }
-
-    dispose(): void {
-        for (const target of this.targets ?? []) {
-            target.dispose();
-        }
-
-        this.targets = null;
-        this.bright.dispose();
-        this.blur.dispose();
-        this.combine.dispose();
-        this.mesh.geometry.dispose();
     }
 }

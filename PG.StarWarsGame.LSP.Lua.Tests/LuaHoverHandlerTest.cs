@@ -11,7 +11,6 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -20,6 +19,10 @@ public sealed class LuaHoverHandlerTest
 {
     private const string LuaUri = "file:///script.lua";
     private const string LibUri = "file:///lib.lua";
+
+    // ── the analyzer's hover, merged (#154) ──────────────────────────────────
+
+    private const string EngineStub = "---Finds a player.\n---@param name string\nfunction Find_Player(name) end";
 
     private static HoverParams HoverAt(int line, int character, string uri = LuaUri)
     {
@@ -69,10 +72,6 @@ public sealed class LuaHoverHandlerTest
         Assert.Null(result);
     }
 
-    // ── the analyzer's hover, merged (#154) ──────────────────────────────────
-
-    private const string EngineStub = "---Finds a player.\n---@param name string\nfunction Find_Player(name) end";
-
     private static Hover Theirs(string markdown)
     {
         return new Hover
@@ -86,7 +85,7 @@ public sealed class LuaHoverHandlerTest
     {
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
-        var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([EngineStub]), host, analyzer: analyzer);
+        var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([EngineStub]), host, analyzer);
         var result = await handler.Handle(HoverAt(0, character), CancellationToken.None);
         return result is null ? null : GetMarkdown(result);
     }

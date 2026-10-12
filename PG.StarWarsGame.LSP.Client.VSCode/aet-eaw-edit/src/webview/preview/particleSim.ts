@@ -300,6 +300,12 @@ export class SpawnClock {
         this.nextBurst = emitter.properties.initialDelay;
     }
 
+    /** True once a burst emitter has fired every burst it was given. */
+    get finished(): boolean {
+        const limit = this.emitter.properties.burstCount;
+        return this.emitter.properties.useBursts && limit > 0 && this.burstsFired >= limit;
+    }
+
     /** How many particles this step wants, and whether the emitter has finished for good. */
     advance(dt: number): number {
         this.elapsed += dt;
@@ -326,12 +332,6 @@ export class SpawnClock {
         const whole = Math.floor(this.owed);
         this.owed -= whole;
         return whole;
-    }
-
-    /** True once a burst emitter has fired every burst it was given. */
-    get finished(): boolean {
-        const limit = this.emitter.properties.burstCount;
-        return this.emitter.properties.useBursts && limit > 0 && this.burstsFired >= limit;
     }
 }
 

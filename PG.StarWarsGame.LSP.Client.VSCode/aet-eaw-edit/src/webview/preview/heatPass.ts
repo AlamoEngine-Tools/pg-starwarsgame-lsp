@@ -208,6 +208,18 @@ export class HeatPass {
         renderer.render(this.quad, this.quadCamera);
     }
 
+    dispose(): void {
+        this.frame?.dispose();
+        this.heat?.dispose();
+        this.composite.dispose();
+
+        for (const child of this.quad.children) {
+            if (child instanceof THREE.Mesh) {
+                child.geometry.dispose();
+            }
+        }
+    }
+
     /** Matches the buffers to the canvas, building them the first time round. */
     private resize(renderer: THREE.WebGLRenderer): void {
         renderer.getDrawingBufferSize(this.size);
@@ -232,18 +244,6 @@ export class HeatPass {
             this.frame.dispose();
             this.frame = new THREE.FramebufferTexture(width, height);
             this.heat.setSize(width, height);
-        }
-    }
-
-    dispose(): void {
-        this.frame?.dispose();
-        this.heat?.dispose();
-        this.composite.dispose();
-
-        for (const child of this.quad.children) {
-            if (child instanceof THREE.Mesh) {
-                child.geometry.dispose();
-            }
         }
     }
 }

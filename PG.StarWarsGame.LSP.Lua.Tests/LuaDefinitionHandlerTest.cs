@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
@@ -48,7 +49,7 @@ public sealed class LuaDefinitionHandlerTest
         return new LocationOrLocationLinks(new Location
         {
             Uri = DocumentUri.From(LuaUri),
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(7, 6, 7, 9)
+            Range = new Range(7, 6, 7, 9)
         });
     }
 

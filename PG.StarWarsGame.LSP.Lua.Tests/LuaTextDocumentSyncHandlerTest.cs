@@ -62,39 +62,6 @@ public sealed class LuaTextDocumentSyncHandlerTest
         Assert.Equal([$"open {TestUri} v1 x = 1", $"change {TestUri} v2 x = 2", $"close {TestUri}"], analyzer.Calls);
     }
 
-    private sealed class RecordingLuaAnalyzer : ILuaAnalyzer
-    {
-        public List<string> Calls { get; } = [];
-
-        public bool IsRunning => true;
-
-        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished
-        {
-            add { }
-            remove { }
-        }
-
-        public void DidOpen(string uri, string text, int version)
-        {
-            Calls.Add($"open {uri} v{version} {text}");
-        }
-
-        public void DidChange(string uri, string text, int version)
-        {
-            Calls.Add($"change {uri} v{version} {text}");
-        }
-
-        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
-        {
-            return Task.FromResult<T?>(null);
-        }
-
-        public void DidClose(string uri)
-        {
-            Calls.Add($"close {uri}");
-        }
-    }
-
     // ── DidOpen ──────────────────────────────────────────────────────────────
 
     [Fact]
@@ -352,6 +319,39 @@ public sealed class LuaTextDocumentSyncHandlerTest
     {
         var (handler, _, _) = Build();
         Assert.Equal(language, handler.GetTextDocumentAttributes(DocumentUri.From(uri)).LanguageId);
+    }
+
+    private sealed class RecordingLuaAnalyzer : ILuaAnalyzer
+    {
+        public List<string> Calls { get; } = [];
+
+        public bool IsRunning => true;
+
+        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished
+        {
+            add { }
+            remove { }
+        }
+
+        public void DidOpen(string uri, string text, int version)
+        {
+            Calls.Add($"open {uri} v{version} {text}");
+        }
+
+        public void DidChange(string uri, string text, int version)
+        {
+            Calls.Add($"change {uri} v{version} {text}");
+        }
+
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        {
+            return Task.FromResult<T?>(null);
+        }
+
+        public void DidClose(string uri)
+        {
+            Calls.Add($"close {uri}");
+        }
     }
 
     // ── Fakes ────────────────────────────────────────────────────────────────

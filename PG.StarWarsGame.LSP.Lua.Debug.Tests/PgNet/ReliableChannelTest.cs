@@ -9,9 +9,9 @@ namespace PG.StarWarsGame.LSP.Lua.Debug.Tests.PgNet;
 
 public sealed class ReliableChannelTest
 {
-    private readonly FakeTimeProvider _time = new();
-    private readonly IPgNetDatagramCodec _codec;
     private readonly IReliableChannel _channel;
+    private readonly IPgNetDatagramCodec _codec;
+    private readonly FakeTimeProvider _time = new();
 
     public ReliableChannelTest()
     {

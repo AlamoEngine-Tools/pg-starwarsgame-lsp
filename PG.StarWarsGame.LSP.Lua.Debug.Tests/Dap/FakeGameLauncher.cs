@@ -24,15 +24,14 @@ internal sealed class FakeGameLauncher : IGameLauncher
 
     internal sealed class FakeGameProcess(int id, int? exitCode) : IGameProcess
     {
+        public bool Killed { get; private set; }
+
+        public bool Disposed { get; private set; }
         public int Id { get; } = id;
 
         public bool HasExited => ExitCode is not null;
 
         public int? ExitCode { get; private set; } = exitCode;
-
-        public bool Killed { get; private set; }
-
-        public bool Disposed { get; private set; }
 
         public void Kill()
         {

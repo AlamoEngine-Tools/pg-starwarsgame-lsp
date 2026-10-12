@@ -12,7 +12,6 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -20,6 +19,14 @@ namespace PG.StarWarsGame.LSP.Lua.Tests;
 public sealed class LuaCompletionHandlerTest
 {
     private const string LuaUri = "file:///script.lua";
+
+    // Find_First_Object("UNIT") - character 21 is inside "UNIT"
+    private const string ObjectArgument = "Find_First_Object(\"UNIT\")";
+
+    // ── the analyzer's items, merged (#154) ─────────────────────────────────
+
+    private static readonly string[] EngineStub =
+        ["---@param objectName string\n---@aetref XmlObject:Unit\nfunction Find_First_Object(objectName) end"];
 
     private static CompletionParams CompletionAt(int line, int character, string uri = LuaUri)
     {
@@ -47,14 +54,6 @@ public sealed class LuaCompletionHandlerTest
             config ?? new FakeLspConfigurationProvider(),
             analyzer);
     }
-
-    // ── the analyzer's items, merged (#154) ─────────────────────────────────
-
-    private static readonly string[] EngineStub =
-        ["---@param objectName string\n---@aetref XmlObject:Unit\nfunction Find_First_Object(objectName) end"];
-
-    // Find_First_Object("UNIT") - character 21 is inside "UNIT"
-    private const string ObjectArgument = "Find_First_Object(\"UNIT\")";
 
     private static LuaCompletionHandler WithAnalyzer(string text, ScriptedLuaAnalyzer? analyzer)
     {

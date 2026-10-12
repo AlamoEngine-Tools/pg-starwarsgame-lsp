@@ -698,17 +698,36 @@ const BILLBOARD_LIGHT = new THREE.Vector3();
 const BILLBOARD_BONE = new THREE.Quaternion();
 
 export class PreviewViewport {
+    /** Raised when a targeting mark is clicked, so the dock can follow the viewport. */
+    onReticleClicked: ((hardpointId: string) => void) | null = null;
+    /** Raised when a turret is dragged, so the row can read out where it now points. */
+    onTurretAimed: ((id: string, aim: TurretAim) => void) | null = null;
+    /** Raised when a joint is clicked, so the tree can follow the viewport. */
+    onBoneSelected: ((index: number | null) => void) | null = null;
+    /**
+     * Raised the moment the reader drags the camera, so the preset readout can clear.
+     *
+     * A segmented control that keeps "Front" highlighted after you have orbited away from the front
+     * is stating something false. The presets are a place to jump TO, not a mode the camera stays
+     * in, and the control has to admit that as soon as the camera moves.
+     */
+    onCameraMoved: (() => void) | null = null;
+    /**
+     * Told when a piece of wreckage reaches the end of its declared lifetime.
+     *
+     * A callback rather than something polled: it is an EVENT, like a hardpoint's own death, and
+     * the explosion it triggers has to be fetched by the client - the viewport has no way to ask
+     * for a particle system itself.
+     */
+    onBreakoffExpired: ((key: string, prop: PreviewBreakoffProp) => void) | null = null;
     private readonly renderer: THREE.WebGLRenderer;
     private readonly scene = new THREE.Scene();
     private readonly camera: THREE.PerspectiveCamera;
     private readonly controls: OrbitControls;
     private readonly loader = new GLTFLoader();
     private readonly clock = new THREE.Clock();
-
     private readonly grid: THREE.GridHelper;
-
     private readonly floor: THREE.Mesh;
-
     /**
      * The ground's grain, built once and shared by its colour and its roughness.
      *
@@ -735,31 +754,23 @@ export class PreviewViewport {
 
         return texture;
     })();
-
     /** The one shadow-casting light, held so the dial and the framing can both move it. */
     private keyLight: THREE.DirectionalLight | null = null;
     private ambient: THREE.AmbientLight | null = null;
-
     /** The rig as the reader has it. Held so a colour change can be applied without a reframe. */
     private rig: LightRig = DEFAULT_LIGHTS;
-
     /** The wind as a vector in the space the particles are simulated in. */
     private windVector: { x: number; y: number; z: number } = {x: 0, y: 0, z: 0};
-
     /** The same wind in the terms the foliage shaders read it: a heading and a speed. */
     private wind: Wind = DEFAULT_VIEWER_SETTINGS.wind;
-
     /** The starfield and the sky dome, built on first use and then just shown or hidden. */
     private stars: THREE.Points | null = null;
     private sky: THREE.Mesh | null = null;
-
     private lightAzimuth = DEFAULT_LIGHT_AZIMUTH_DEGREES;
-
     private lightElevation = DEFAULT_LIGHT_ELEVATION_DEGREES;
     private readonly axes: THREE.AxesHelper;
     private readonly parts = new Map<string, LoadedPart>();
     private readonly modelRoot = new THREE.Group();
-
     /**
      * The subject's GEOMETRY, carrying the object's `Scale_Factor`.
      *
@@ -786,16 +797,12 @@ export class PreviewViewport {
      * bone-frame arcs and the turret handles, both of which counter-scale by `1 / scale`.
      */
     private readonly scaledRoot = new THREE.Group();
-
     /** The subject's `Scale_Factor`, or 1. Read by everything that counter-scales. */
     private modelScale = 1;
-
     /** Effects that translated, by lower-cased shader name. */
     private readonly translated = new Map<string, TranslatedEffect>();
-
     /** Declared render state per shader, so a material rebuilt later is not left on the defaults. */
     private readonly shaderStates = new Map<string, FxMaterialState>();
-
     /** Sub-meshes the user has shown or hidden by hand, by three.js uuid. */
     /**
      * What one tree row controls.
@@ -809,7 +816,6 @@ export class PreviewViewport {
         mesh?: THREE.Mesh;
         particleId?: string;
     }>();
-
     /**
      * Every bone a skinned mesh is weighted to, worked out once.
      *
@@ -817,38 +823,30 @@ export class PreviewViewport {
      * cleared by hand and must not be the thing that keeps a discarded model alive.
      */
     private readonly skinBoneIds = new WeakMap<THREE.Mesh, readonly BoneId[]>();
-
     /** The clip map {@link restingClipName} last answered for, and its answer. */
     private restingClipFor: Map<string, VisibilityTrack> | null = null;
     private restingClipCached: string | undefined;
-
     /** Each row's parent, so a hidden ancestor can veto without walking the scene graph. */
     private readonly rowParents = new Map<string, string | null>();
-
     /** Each row's display name, so `because` can say WHICH ancestor hid it. */
     private readonly rowNames = new Map<string, string>();
-
     /** The reader's word, one per ROW. The only thing a tick writes. */
     private readonly rowOverrides = new Map<string, RowOverride>();
-
     /** The last resolution per row, so the tree can report why a row looks as it does. */
     private rowResolutions = new Map<string, Resolution>();
-
     /** The same, for what each row does to everything BENEATH it - see `subtreeFacts`. */
     private rowSubtrees = new Map<string, Resolution>();
-
     /** Every decoded texture, kept so a material rebuilt later can be handed them again. */
     private readonly textures = new Map<string, THREE.Texture>();
-
     /** Draw with a translated shader wherever one is available. */
     private translatedShaders = true;
-
     /** Seconds since the viewport opened, for the effects that read the clock. */
     private elapsed = 0;
 
+    // Held on the viewport rather than read off the action, because they have to survive the action
+    // being torn down and rebuilt - which happens on every clip change. Setting the loop mode on the
     /** The directional rig, in the order the engine numbers its lights. */
     private alamoLights: THREE.DirectionalLight[] = [];
-
     /**
      * The light probe the translated shaders read, kept in step with the rig.
      *
@@ -862,13 +860,10 @@ export class PreviewViewport {
      * the reader's Ambient slider moved the scene light while the translated shaders ignored it.
      */
     private harmonics = sphericalHarmonics([], DEFAULT_LIGHTS.ambient.colour);
-
     /** The same probe over the two fills alone, which is what `m_sphFill` means. */
     private fillHarmonics = sphericalHarmonics([], DEFAULT_LIGHTS.ambient.colour);
-
     /** Reused per frame so building the bone palette does not allocate on every draw. */
     private skinScratch = new Float32Array(0);
-
     /**
      * Every subject's animation state, keyed by subject id.
      *
@@ -881,23 +876,16 @@ export class PreviewViewport {
      * path.
      */
     private readonly subjects = new Map<string, SubjectAnimation>();
-
-    // Held on the viewport rather than read off the action, because they have to survive the action
-    // being torn down and rebuilt - which happens on every clip change. Setting the loop mode on the
     // panel and then picking a different clip used to silently drop it.
     private animationSpeed = 1;
     private animationLoop = true;
     private animationPaused = false;
-
     /** Whether a clip is currently driving bone visibility, so the release happens exactly once. */
     private overridingVisibility = false;
-
     private frameHandle = 0;
     private disposed = false;
-
     /** Built the first time a heat sprite is on screen, and not before - it costs two buffers. */
     private heat: HeatPass | null = null;
-
     /**
      * The engine's own shadows: stencil volumes cast by the authored shadow mesh.
      *
@@ -905,7 +893,6 @@ export class PreviewViewport {
      * the finished frame whether it is going to the canvas, the heat composite or bloom.
      */
     private readonly shadowVolumes = new ShadowVolumePass();
-
     /**
      * OFF until the volume pass is right.
      *
@@ -916,15 +903,11 @@ export class PreviewViewport {
      * mode will use once it draws only what it should.
      */
     private shadowVolumesEnabled = false;
-
     /** Whether heat sprites bend the frame at all. */
     private heatEnabled = true;
-
     /** Built the first time bloom is switched on, like the heat buffers - it is not free either. */
     private bloom: BloomPass | null = null;
-
     private bloomEnabled = false;
-
     /**
      * Where the frame goes when something comes after it.
      *
@@ -932,12 +915,9 @@ export class PreviewViewport {
      * straight to the canvas, exactly as it did before any of this existed.
      */
     private frameCopy: THREE.FramebufferTexture | null = null;
-
     /** Draw the heat BUFFER rather than the bent picture. */
     private heatDebug = false;
-
     private wireframe = false;
-
     /**
      * A shadow-only plane over the floor.
      *
@@ -947,37 +927,26 @@ export class PreviewViewport {
      * polygon offset, gives both.
      */
     private readonly shadowCatcher: THREE.Mesh;
-
     private readonly shadowMaterial: THREE.ShadowMaterial;
-
     /** Bone nodes whose geometry turns to face the camera, the light or the wind. */
     private billboards: THREE.Object3D[] = [];
-
     /** How far the camera stands off, kept so the depth range can be redone without reframing. */
     private fitDistance = 1;
-
     /** The reader's own multiplier on the fitted far plane. */
     private drawDistance = 1;
-
     private alt = 0;
     private lod = 0;
-
     /** Joints and the lines between them, rebuilt each frame because animation moves bones. */
     private readonly joints: THREE.Points;
     private readonly jointLines: THREE.LineSegments;
-
     /** One wireframe box per selected row, so the tree can point at something in the viewport. */
     private readonly selectionBoxes: THREE.LineSegments;
-
     /** The selected bone's local axes, so its FACING is visible and not just its position. */
     private readonly boneAxes: THREE.LineSegments;
-
     /** The rows the reader has selected in the tree, in the order they picked them. */
     private selectedRows: readonly string[] = [];
-
     /** Parts outlined whole - a hardpoint's own model. See `setSelectedHardpoint`. */
     private selectedParts: readonly string[] = [];
-
     /** A selected row that must not get its own box, because its part is outlined instead. */
     private unboxedRow: string | null = null;
     private skeletonVisible = false;
@@ -992,24 +961,17 @@ export class PreviewViewport {
     private selectedBones: ReadonlySet<number> = new Set();
     private lastLabelUpdate = 0;
     private readonly labelPool: HTMLElement[] = [];
-
     /** The targeting marks currently being drawn, and the pool of images drawing them. */
     private reticles: ReticleMark[] = [];
     private readonly reticlePool: HTMLElement[] = [];
     private reticleScreenSize: number | null | undefined = null;
-
     /** The hardpoint the pointer is over, so its mark can show the tracked art. */
     private hoveredReticle: string | null = null;
-
-    /** Raised when a targeting mark is clicked, so the dock can follow the viewport. */
-    onReticleClicked: ((hardpointId: string) => void) | null = null;
-
     /** The turrets currently sweeping, and how far through the swing they are. */
     private turretSweeps: {
         partId: string; turretBone: string; barrelBone: string | null; turret: PreviewTurret;
     }[] = [];
     private sweepPhase = 0;
-
     /**
      * The turrets the reader can drag, and where each one is currently pointed.
      *
@@ -1020,35 +982,16 @@ export class PreviewViewport {
      */
     private turretHandles: TurretHandle[] = [];
     private readonly turretAims = new Map<string, TurretAim>();
-
     /** The knob under the pointer, and the one being dragged. At most one of each. */
     private hoveredTurretAxis: { id: string; axis: TurretAxis } | null = null;
     private turretDrag: {
         id: string; axis: TurretAxis; startAim: TurretAim; startX: number; startY: number;
     } | null = null;
-
     /** The drawn handles, so they can be rebuilt or repositioned without a scene walk. */
     private readonly turretHandleNodes = new Map<string, {
         yaw: TurretHandleParts; pitch: TurretHandleParts;
     }>();
-
-    /** Raised when a turret is dragged, so the row can read out where it now points. */
-    onTurretAimed: ((id: string, aim: TurretAim) => void) | null = null;
-
-    /** Raised when a joint is clicked, so the tree can follow the viewport. */
-    onBoneSelected: ((index: number | null) => void) | null = null;
-
-    /**
-     * Raised the moment the reader drags the camera, so the preset readout can clear.
-     *
-     * A segmented control that keeps "Front" highlighted after you have orbited away from the front
-     * is stating something false. The presets are a place to jump TO, not a mode the camera stays
-     * in, and the control has to admit that as soon as the camera moves.
-     */
-    onCameraMoved: (() => void) | null = null;
-
     private readonly particleSystems = new Map<string, ParticleEntry>();
-
     /**
      * Systems that have been killed but whose particles are still finishing.
      *
@@ -1063,7 +1006,6 @@ export class PreviewViewport {
      * the same id.
      */
     private fadingParticles: ParticleSystemInstance[] = [];
-
     /**
      * What each tree row stands for, so the inspector can describe it.
      *
@@ -1075,7 +1017,6 @@ export class PreviewViewport {
     private readonly particleTextures = new Map<string, THREE.Texture>();
     private particlesVisible = true;
     private particlesPaused = false;
-
     /**
      * Whether the last ALT change was downwards.
      *
@@ -1083,7 +1024,6 @@ export class PreviewViewport {
      * passes false for LOD changes.
      */
     private altDescending = false;
-
     /**
      * Damage decals, lowercased.
      *
@@ -1098,10 +1038,8 @@ export class PreviewViewport {
      * loads - a turret arriving after the faction was picked has to come in already tinted.
      */
     private colorization: NormalisedColour | null = null;
-
     private knownDecals: ReadonlySet<string> = new Set();
     private shownDecals: ReadonlySet<string> = new Set();
-
     /**
      * Meshes a hardpoint claims as its collision hull.
      *
@@ -1110,7 +1048,6 @@ export class PreviewViewport {
      * the engine never draws one, whatever the damage state.
      */
     private collisionMeshes: ReadonlySet<string> = new Set();
-
     /**
      * Whether an active ability is holding the SHIELD MESH visible.
      *
@@ -1119,7 +1056,6 @@ export class PreviewViewport {
      * gate. The reader's own tick still sits above it.
      */
     private shieldRevealed = false;
-
     /**
      * Whether a cloak ability is engaged, in which case the STEALTH SHELL is the only thing drawn.
      *
@@ -1132,28 +1068,20 @@ export class PreviewViewport {
      * what keeps the shell off the models whose object never declares the ability.
      */
     private stealthed = false;
-
     /** Bones a weapon fires from, lowercased. Their aim axis is drawn as an arrow. */
     private fireBones: ReadonlySet<string> = new Set();
-
     /** See {@link modelSpan}. Cleared with the scene. */
     private cachedSpan: number | null = null;
-
     /** Wreckage currently in the air, each on its own clock. */
     private readonly breakoffs: BreakoffInstance[] = [];
-
     /** Every named attachment a caller has asked for, so {@link unresolvedAttachments} can check. */
     private readonly attachRequests = new Map<string, AttachmentRequest>();
-
     /** Parts broken off by a destroyed hardpoint. */
     private readonly hiddenParts = new Set<string>();
-
     /** One-shot systems - death explosions - removed once they burn out. */
     private readonly transient = new Set<string>();
-
     /** Firing-arc gizmos, attached to their fire bones so they follow the turret. */
     private readonly arcs: THREE.Mesh[] = [];
-
     /**
      * The HULL-frame arcs and the muzzle each one belongs to, re-placed every frame.
      *
@@ -1164,11 +1092,9 @@ export class PreviewViewport {
      * engine reads the muzzle fresh on every check, so this does too.
      */
     private readonly hullArcs: { mesh: THREE.Mesh; muzzle: THREE.Object3D }[] = [];
-
     /** Scratch for {@link followHullArcs}, which runs every frame and should not allocate. */
     private readonly muzzleScratch = new THREE.Vector3();
     private arcsVisible = false;
-
     /**
      * Emitters switched off, keyed `systemId#index`.
      *
@@ -1177,7 +1103,6 @@ export class PreviewViewport {
      * emitter names repeat within one system.
      */
     private readonly hiddenEmitters = new Set<string>();
-
     /**
      * Playback rate for particles only.
      *
@@ -1185,6 +1110,45 @@ export class PreviewViewport {
      * a model whose animation you still want at speed.
      */
     private particleSpeed = 1;
+    /** Scratch for {@link placeTurretAnchor}, which runs every frame and should not allocate. */
+    private readonly twistScratch = new THREE.Quaternion();
+    /**
+     * The pose the MODEL authored for each bone this class swings, captured before it first moves.
+     *
+     * A sweep is an angle ON TOP of that, not an angle instead of it. The old code assigned
+     * `bone.rotation.z` outright, which threw the authored orientation away and left the other two
+     * Euler components composing against a value that no longer meant anything - the offset the user
+     * reported. A turret bone is placed AND oriented by the exporter, so its rest rotation is almost
+     * never identity.
+     */
+    private readonly sweepRest = new Map<THREE.Object3D, THREE.Quaternion>();
+    /**
+     * The unit flying off and coming apart, for one that declares no death clone.
+     *
+     * Driven HERE rather than from the panel because it is a per-frame thing and this class already
+     * owns the frame. The panel says start and is told when it is over.
+     */
+    private spinAway: {
+        partId: string;
+        spin: PreviewSpinAway;
+        elapsed: number;
+        onDone: () => void;
+    } | null = null;
+    /**
+     * Where the flying part sat before it was pushed, so putting it back is exact.
+     *
+     * Held SEPARATELY from `spinAway` and outlives it. The spin ends the moment the wreck explodes,
+     * but the part is still sitting out there where it finished - and clearing both together left
+     * `clearSpinAway` with nothing to restore, so Repair brought the ship back visible at the far
+     * end of its own death run, 270 units off the grid.
+     */
+    private spinRestore: {
+        partId: string;
+        position: THREE.Vector3;
+        quaternion: THREE.Quaternion;
+    } | null = null;
+    /** Textures the server has told us do not resolve. */
+    private readonly missingTextures = new Set<string>();
 
     constructor(
         private readonly canvas: HTMLCanvasElement,
@@ -1337,91 +1301,42 @@ export class PreviewViewport {
         this.loop();
     }
 
-    /**
-     * Ambient plus two directionals.
-     *
-     * Not an attempt at the engine's lighting - that is what the shader work is for. This exists so
-     * an untextured hull reads as a solid rather than a silhouette, which is what a single light or
-     * ambient alone would give.
-     */
-    private addLighting(): void {
-        this.ambient = new THREE.AmbientLight(0xffffff, DEFAULT_LIGHTS.ambient.intensity);
-        this.scene.add(this.ambient);
+    /** Where the camera stands now, for saving the current shot as a preset. */
+    get cameraPosition(): Vector3Like {
+        return {x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z};
+    }
 
-        const key = new THREE.DirectionalLight(0xffffff, 1.6);
+    /** The bounding sphere a preset is resolved against, so the caller sizes the shot correctly. */
+    get subjectSphere(): { center: Vector3Like; radius: number } {
+        return this.boundingSphere();
+    }
 
-        // Only the KEY light casts. A second shadow-casting light doubles the cost and crosses two
-        // shadows over the model, which reads as a rendering fault rather than as a fill light.
-        key.castShadow = true;
-        key.shadow.mapSize.set(2048, 2048);
-
-        // Shadow acne on a hull covered in near-parallel panels needs a normal bias, not just a
-        // depth one: a constant bias large enough to clear the panels detaches the shadow from the
-        // geometry casting it.
-        key.shadow.bias = -0.0005;
-        key.shadow.normalBias = 0.02;
-
-        // Two fills, not one, which is AloViewer's own rig and the engine's: it numbers three
-        // directional lights and a translated shader asks for all three by semantic. With only two
-        // supplied, DIR_LIGHT_VEC_2 kept whatever the header declared.
-        const fill1 = new THREE.DirectionalLight(0xffffff, 0.5);
-        const fill2 = new THREE.DirectionalLight(0xffffff, 0.25);
-
-        this.scene.add(key, fill1, fill2, key.target);
-
-        this.keyLight = key;
-
-        // In the order the engine numbers them, so a shader asking for DIR_LIGHT_VEC_0 is lit by
-        // the same sun everything else in the viewport is.
-        this.alamoLights = [key, fill1, fill2];
-        this.applyLightRig();
-
-        this.placeKeyLight();
+    get animationNames(): string[] {
+        return this.active.clips.map(c => c.name);
     }
 
     /**
-     * Puts the key light at its current angles, far enough out to clear the model, and sizes the
-     * shadow frustum to match.
+     * Whether the stencil volumes are the thing casting this model's shadow right now.
      *
-     * A directional light's shadow camera does not follow anything on its own, so this has to run
-     * again whenever the model's size changes as well as whenever the dial moves.
+     * Both halves matter. Weighing only "does the model author a volume" left a model with volumes
+     * casting NOTHING in the shading mode that does not draw volumes - it had already handed its
+     * shadow over to a pass that was switched off.
      */
-    private placeKeyLight(): void {
-        const light = this.keyLight;
-        if (light === null) {
-            return;
-        }
+    private get stencilShadowing(): boolean {
+        return this.shadowVolumesEnabled && this.shadowVolumes.active;
+    }
 
-        const sphere = this.boundingSphere();
-        const direction = lightDirection(this.lightAzimuth, this.lightElevation);
-        const frustum = shadowFrustum(sphere.radius);
+    // ── content ───────────────────────────────────────────────────────────────
 
-        // Stood off at the frustum's far edge, so the model sits comfortably inside the depth range
-        // rather than against its near plane.
-        const distance = frustum.far / 2;
-
-        light.position.set(
-            sphere.center.x + direction.x * distance,
-            sphere.center.y + direction.y * distance,
-            sphere.center.z + direction.z * distance);
-
-        light.target.position.set(sphere.center.x, sphere.center.y, sphere.center.z);
-        light.target.updateMatrixWorld();
-
-        // The volumes extrude away from this same light, so the two can never disagree about where
-        // the shadow falls - and their reach is fitted to the model for the same reason the shadow
-        // camera is.
-        this.shadowVolumes.setLight(direction);
-        this.shadowVolumes.setScale(sphere.radius, this.camera.far);
-
-        const camera = light.shadow.camera;
-        camera.left = -frustum.extent;
-        camera.right = frustum.extent;
-        camera.top = frustum.extent;
-        camera.bottom = -frustum.extent;
-        camera.near = frustum.near;
-        camera.far = frustum.far;
-        camera.updateProjectionMatrix();
+    /**
+     * The subject the panel speaks for.
+     *
+     * Every animation control - the picker, the speed, the scrub bar, the loop switch - describes
+     * the model that was opened, and only that one. A passive subject's clip is not something the
+     * reader chose; it is what dying looks like, and it runs on its own terms.
+     */
+    private get active(): SubjectAnimation {
+        return this.subjectAnimation(ACTIVE_SUBJECT);
     }
 
     /**
@@ -1489,63 +1404,6 @@ export class PreviewViewport {
             kind === 'starfield' ? 0x05070c : VIEWPORT_BACKGROUND);
     }
 
-    private buildStars(): THREE.Points {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute(
-            'position', new THREE.BufferAttribute(starPositions(STAR_SEED), 3));
-
-        const stars = new THREE.Points(geometry, new THREE.PointsMaterial({
-            color: 0xffffff,
-            // In pixels, and NOT scaled by distance: these are meant to read as points of light at
-            // infinity, and a star that grows as you dolly in is a speck of dust on the lens.
-            size: 1.6,
-            sizeAttenuation: false,
-            depthTest: false,
-            depthWrite: false,
-        }));
-
-        // Parented to the CAMERA and drawn first: it turns with the view like a sky should and
-        // never occludes anything. It is NOT exempt from the far plane, though - `frustumCulled`
-        // only stops object-level culling - so `prepareForCamera` scales it to sit inside whatever
-        // plane the model has been fitted with.
-        stars.frustumCulled = false;
-        stars.renderOrder = -1;
-        this.camera.add(stars);
-        this.scene.add(this.camera);
-
-        return stars;
-    }
-
-    private buildSky(): THREE.Mesh {
-        const geometry = new THREE.SphereGeometry(1, 32, 24);
-        const colours = new Float32Array(geometry.attributes.position.count * 3);
-        const position = geometry.attributes.position;
-
-        for (let i = 0; i < position.count; i++) {
-            const [r, g, b] = skyGradient(position.getY(i));
-            colours.set([r, g, b], i * 3);
-        }
-
-        geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
-
-        const sky = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-            vertexColors: true,
-            // Seen from the inside, and never in the depth buffer.
-            side: THREE.BackSide,
-            depthTest: false,
-            depthWrite: false,
-        }));
-
-        // Follows the camera's POSITION but not its rotation - the horizon has to stay level and at
-        // eye height however the camera turns, which is what makes it read as a horizon rather than
-        // as a painted backdrop stuck to the screen.
-        sky.frustumCulled = false;
-        sky.renderOrder = -1;
-        this.scene.add(sky);
-
-        return sky;
-    }
-
     /**
      * Sets the one wind the scene has.
      *
@@ -1562,76 +1420,6 @@ export class PreviewViewport {
             z: -Math.sin(heading) * speed || 0,
         };
     }
-
-    /** Puts the current rig onto the three lights and the ambient term. */
-    private applyLightRig(): void {
-        const rig = this.rig;
-        const settings = [rig.sun, rig.fill1, rig.fill2];
-
-        this.alamoLights.forEach((light, index) => {
-            const setting = settings[index];
-            if (setting === undefined) {
-                return;
-            }
-
-            light.color.setRGB(...setting.colour);
-            light.intensity = setting.intensity * ENGINE_LIGHT_TO_THREE;
-
-            // The sun is placed by `placeKeyLight`, which also has the shadow frustum to fit; the
-            // fills only need a direction, and a directional light's position IS its direction.
-            if (index > 0) {
-                const direction = lightDirection(setting.azimuth, setting.elevation);
-                light.position.set(direction.x, direction.y, direction.z);
-            }
-        });
-
-        if (this.ambient !== null) {
-            this.ambient.color.setRGB(...rig.ambient.colour);
-            this.ambient.intensity = rig.ambient.intensity * ENGINE_LIGHT_TO_THREE;
-        }
-
-        this.buildProbe();
-    }
-
-    /**
-     * Projects the rig into the two spherical-harmonic probes the translated shaders read.
-     *
-     * The sun's angles come off `lightAzimuth`/`lightElevation` rather than off `rig.sun`, because
-     * those are the pair `placeKeyLight` uses and `setLightAngles` moves the light without going
-     * through the rig - reading the rig here would leave the probe pointing at where the sun used
-     * to be. Without the PI, which is three's BRDF correction and not the engine's.
-     */
-    private buildProbe(): void {
-        const rig = this.rig;
-        const toward = (azimuth: number, elevation: number): [number, number, number] => {
-            const direction = lightDirection(azimuth, elevation);
-
-            return [direction.x, direction.y, direction.z];
-        };
-
-        const sun: ProbeLight = {
-            toLight: toward(this.lightAzimuth, this.lightElevation),
-            colour: rig.sun.colour,
-            intensity: rig.sun.intensity,
-        };
-
-        const fills: ProbeLight[] = [rig.fill1, rig.fill2].map(fill => ({
-            toLight: toward(fill.azimuth, fill.elevation),
-            colour: fill.colour,
-            intensity: fill.intensity,
-        }));
-
-        const ambient: [number, number, number] = [
-            rig.ambient.colour[0] * rig.ambient.intensity,
-            rig.ambient.colour[1] * rig.ambient.intensity,
-            rig.ambient.colour[2] * rig.ambient.intensity,
-        ];
-
-        this.harmonics = sphericalHarmonics([sun, ...fills], ambient);
-        this.fillHarmonics = sphericalHarmonics(fills, ambient);
-    }
-
-    // ── content ───────────────────────────────────────────────────────────────
 
     /**
      * Adds a model, attached to a bone of an already-loaded part when asked.
@@ -1869,6 +1657,2563 @@ export class PreviewViewport {
         return root;
     }
 
+    /**
+     * Every named attachment that still does not resolve, in words.
+     *
+     * RECOMPUTED rather than logged at the moment of the miss, because most misses are temporary:
+     * geometry arrives asynchronously and a hardpoint routinely asks for its bone before the hull
+     * carrying it has landed. A request that resolves later simply stops being reported, so this
+     * can be read at any time without a stale backlog.
+     */
+    unresolvedAttachments(): string[] {
+        const problems: string[] = [];
+
+        for (const request of this.attachRequests.values()) {
+            const parent = this.parts.get(request.partId);
+            const found = {
+                part: parent !== undefined,
+                bone: request.bone === undefined || parent === undefined
+                    ? false
+                    : (request.boneIndex !== undefined
+                        && parent.bonesByIndex.has(request.boneIndex))
+                    || parent.bones.has(request.bone.toLowerCase()),
+            };
+
+            const problem = attachmentProblem(request, found);
+            if (problem !== null && !problems.includes(problem)) {
+                problems.push(problem);
+            }
+        }
+
+        return problems;
+    }
+
+    /**
+     * Applies a shader's declared render state to every material using it.
+     *
+     * This is the fidelity that needs no shader translation: the effects spell their blend, depth
+     * and cull state out declaratively. A `custom` blend is left alone deliberately - the archetype
+     * guess is better than a wrong one.
+     */
+    applyShaderState(shaderName: string, state: FxMaterialState): void {
+        this.shaderStates.set(shaderName.toLowerCase(), state);
+        this.applyStoredShaderState(shaderName.toLowerCase(), state);
+    }
+
+    /** Every distinct shader name the loaded geometry names, so each is fetched once. */
+    shaderNames(): string[] {
+        const names = new Set<string>();
+
+        this.modelRoot.traverse(node => {
+            if (!(node instanceof THREE.Mesh)) {
+                return;
+            }
+
+            const shader = (node.userData.alamo as MaterialExtras | undefined)?.alamoShader ?? '';
+            if (shader !== '') {
+                names.add(shader);
+            }
+        });
+
+        return [...names].sort();
+    }
+
+    /** Sets the team tint, or clears it back to the model's own colours. */
+    setColorization(colour: NormalisedColour | null): void {
+        this.colorization = colour;
+
+        this.forEachDrawnMesh(node => {
+            const material = node.material;
+
+            if (material instanceof AlamoMaterial) {
+                // The effect masks the tint itself; it only needs the colour.
+                material.setColorization(colour);
+            } else if (material instanceof THREE.MeshStandardMaterial
+                || material instanceof THREE.MeshBasicMaterial) {
+                // Basic as well as standard: an FC_ mesh on an additive shader is unlit and still
+                // takes the team colour, so checking only for standard left it untinted.
+                this.tint(material);
+            }
+        });
+    }
+
+    /** Which distinct sub-mesh names take the team colour, for the dock to report. */
+    colorizedMeshes(): string[] {
+        const names = new Set<string>();
+
+        this.modelRoot.traverse(node => {
+            if (!(node instanceof THREE.Mesh)) {
+                return;
+            }
+
+            const data = node.material as { userData?: { spec?: { colorize?: boolean } } };
+            const extras = node.userData.alamo as MaterialExtras | undefined;
+
+            if (data.userData?.spec?.colorize === true && extras?.alamoMesh !== undefined) {
+                names.add(extras.alamoMesh);
+            }
+        });
+
+        return [...names].sort();
+    }
+
+    /**
+     * Draws with a translated effect instead of its archetype, wherever that effect is used.
+     *
+     * Kept alongside the archetype rather than replacing it: a mod-authored `.fx` will never
+     * translate, the eleven fixed-function effects have no shader at all, and the archetype is what
+     * both fall back to. `setTranslatedShaders(false)` puts everything back on that path, which is
+     * the only way to see what the translation is actually changing.
+     */
+    applyTranslatedEffect(shaderName: string, effect: TranslatedEffect): void {
+        this.translated.set(shaderName.toLowerCase(), effect);
+
+        if (this.translatedShaders) {
+            this.rebuildMaterials();
+        }
+    }
+
+    /** Whether to draw with translated shaders where one is available. */
+    setTranslatedShaders(enabled: boolean): void {
+        if (this.translatedShaders === enabled) {
+            return;
+        }
+
+        this.translatedShaders = enabled;
+        this.rebuildMaterials();
+    }
+
+    /** How many loaded sub-meshes a translated shader actually reaches, out of how many there are. */
+    translatedCoverage(): { translated: number; total: number } {
+        let translated = 0;
+        let total = 0;
+
+        this.forEachPartMesh(mesh => {
+            if (!meshDrawn(mesh)) {
+                return;
+            }
+
+            total++;
+            if (mesh.material instanceof AlamoMaterial) {
+                translated++;
+            }
+        });
+
+        return {translated, total};
+    }
+
+    /**
+     * Samplers on translated materials that are reading nothing, in words.
+     *
+     * A sampler with no texture reads black, and the shader then draws something plausible and
+     * wrong - the sort of thing that looks like a translation bug and is actually a missing file.
+     */
+    shaderTextureProblems(): string[] {
+        const problems = new Set<string>();
+
+        this.forEachPartMesh(mesh => {
+            if (!(mesh.material instanceof AlamoMaterial)) {
+                return;
+            }
+
+            const shader = (mesh.userData.alamo as MaterialExtras | undefined)?.alamoShader
+                ?? 'a shader';
+
+            for (const {sampler, file} of mesh.material.unboundSamplers()) {
+                problems.add(`${shader}: Sampler '${sampler}' is still waiting for '${file}'.`);
+            }
+            for (const sampler of mesh.material.unnamedSamplers) {
+                problems.add(`${shader}: Sampler '${sampler}' has no texture on this sub-mesh.`);
+            }
+        });
+
+        return [...problems];
+    }
+
+    /** Applies a decoded texture wherever a material asked for it by name. */
+    setTexture(name: string, texture: THREE.Texture): void {
+        this.textures.set(name, texture);
+        this.bindTextureIn(this.modelRoot, name, texture);
+    }
+
+    /**
+     * Binds every texture already decoded into a subtree that has only just been added.
+     *
+     * `setTexture` binds at the moment the texture ARRIVES, so geometry added afterwards gets
+     * nothing - and asking the host again does not help, because it remembers what it has already
+     * sent and answers a repeat request with silence. Wreckage is the case that exposed this: a
+     * breakoff prop is usually a piece of the hull it fell off, so its textures are always ones
+     * already in hand, and it dropped as a black shape every time.
+     */
+    bindLoadedTextures(root: THREE.Object3D): void {
+        for (const [name, texture] of this.textures) {
+            this.bindTextureIn(root, name, texture);
+        }
+    }
+
+    /** Removes everything, so a new subject starts from an empty scene. */
+    clear(): void {
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.dispose();
+        }
+        this.particleSystems.clear();
+        // A new subject is one of the two things allowed to cut a fading system short.
+        this.clearFadingParticles();
+
+        // BEFORE the sweep below, not after: a wreck is one of those parts now, and taking it
+        // apart a second time would dispose a tree that has already gone.
+        this.clearBreakoffs();
+
+        // BEFORE the parts are disposed. The pass holds its counting meshes by their SOURCE mesh,
+        // and those sources are inside the trees about to go - so letting them be disposed first
+        // leaves the map keyed by objects nobody else can reach.
+        //
+        // Nothing else takes them: `removePart` unregisters through `dropRegistrations`, but this
+        // sweep does not go through `removePart`, so every subject switch left its volumes behind.
+        // Measured: the palace alone registers 4 sources and 8 counting meshes; opened after the
+        // Executor it reported 8 and 16, half of them belonging to a model no longer in the scene.
+        // The stencil pass then counts geometry that is not there, which is why a handful of models
+        // rendered differently depending on what had been looked at before them.
+        this.shadowVolumes.clear();
+
+        for (const part of this.parts.values()) {
+            part.root.removeFromParent();
+            disposeTree(part.root);
+        }
+
+        this.clearFireArcs();
+        this.clearTurretHandles();
+
+        // The scale belongs to the SUBJECT. Left standing, the next one would be drawn at the last
+        // one's - and a 0.5 ship followed by a 2.0 one is a four-fold error that looks like a
+        // broken model rather than stale state.
+        this.modelScale = 1;
+        this.scaledRoot.scale.setScalar(1);
+
+        // A new subject asks for its own bones. Keeping the old subject's requests would report a
+        // Star Destroyer's missing hardpoint against a Mon Calamari Cruiser for the rest of the session.
+        this.attachRequests.clear();
+        this.cachedSpan = null;
+        // The marks name parts that are about to stop existing; leaving them would draw a reticle
+        // over the next model's geometry at whatever the last one's bounds happened to be.
+        this.reticles = [];
+        this.hoveredReticle = null;
+        this.clearReticles();
+        this.parts.clear();
+        this.billboards = [];
+        this.hiddenParts.clear();
+        this.transient.clear();
+        this.knownDecals = new Set();
+        this.shownDecals = new Set();
+        this.collisionMeshes = new Set();
+        this.shieldRevealed = false;
+        // Every subject's clips, mixer, tracks, rest pose and node names at once. They hold nodes
+        // of a model nobody is looking at any more, and keeping them would leak the whole graph.
+        this.subjects.clear();
+        this.overridingVisibility = false;
+    }
+
+    /**
+     * Which decal meshes exist, and which of them are showing.
+     *
+     * Both together, because a decal that is not showing has to be actively hidden: the model ships
+     * these meshes VISIBLE - measured on Ev_stardestroyer.alo, where HP_F-L_Blast is both a bone and
+     * a mesh - so the engine hides them until the hardpoint is destroyed, and so must this.
+     */
+    setDecals(known: ReadonlySet<string>, shown: ReadonlySet<string>): void {
+        this.knownDecals = known;
+        this.shownDecals = shown;
+        this.applyLevels();
+    }
+
+    /**
+     * Which meshes the hardpoints claim as collision hulls.
+     *
+     * Gated OFF rather than hidden outright, so the reader can still tick one on in the tree and
+     * look at it - which is exactly what someone opens a hull for. The material rules already catch
+     * most of these by name; this is the author's own word, for the ones they do not.
+     */
+    setCollisionMeshes(names: ReadonlySet<string>): void {
+        this.collisionMeshes = names;
+        this.applyLevels();
+    }
+
+    /**
+     * Shield meshes the model names but does not draw with a shield shader.
+     *
+     * Reported to the reader rather than corrected: the NAME is what decides which mesh a shield
+     * ability reveals, so the author's word stands - but a bubble on a hull shader will read as
+     * solid geometry rather than a field, and that is worth saying once.
+     */
+    shieldMeshesOffShader(): string[] {
+        const names = new Set<string>();
+
+        this.forEachPartMesh(mesh => {
+            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
+
+            if (shieldMeshOffShader(extras)) {
+                names.add(extras.alamoMesh ?? mesh.name);
+            }
+        });
+
+        return [...names];
+    }
+
+    /** Shows or hides the shield mesh, for the abilities that reveal it. */
+    setShieldRevealed(revealed: boolean): void {
+        this.shieldRevealed = revealed;
+        this.applyLevels();
+    }
+
+    /**
+     * Cloaks the unit, or uncloaks it.
+     *
+     * Through `applyLevels` like the shield, because the row chain is the one writer of drawn state
+     * and this has to go through it rather than around it. Setting `visible` on the meshes here
+     * would be a second writer, and the chain would put them back on its next run.
+     */
+    setStealthed(on: boolean): void {
+        this.stealthed = on;
+        this.applyLevels();
+    }
+
+    /** Whether a cloak is engaged, which every other visibility rule defers to. */
+    isStealthed(): boolean {
+        return this.stealthed;
+    }
+
+    /**
+     * Puts the subject's geometry at the size the game draws it.
+     *
+     * See {@link scaledRoot} for why this is one node down rather than on the model root. Anything
+     * already drawn is rebuilt, because the two gizmos that counter-scale were built against the
+     * old value.
+     */
+    setModelScale(scale: number): void {
+        const next = Number.isFinite(scale) && scale > 0 ? scale : 1;
+
+        if (next === this.modelScale) {
+            return;
+        }
+
+        this.modelScale = next;
+        this.scaledRoot.scale.setScalar(next);
+
+        // The span is measured off world matrices, so it changes with the scale - and everything
+        // sized against the subject reads it.
+        this.cachedSpan = null;
+
+        for (const arc of this.arcs) {
+            this.applyArcScale(arc);
+        }
+
+        for (const nodes of this.turretHandleNodes.values()) {
+            nodes.yaw.track.scale.setScalar(1 / next);
+            nodes.pitch.track.scale.setScalar(1 / next);
+        }
+
+        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+    }
+
+    /**
+     * Draws the firing arcs, replacing whatever was there.
+     *
+     * Off by default, and for good reason: a Star Destroyer's arcs reach 2000 units on a hull about
+     * 600 long, so leaving them on hides the ship inside its own cones.
+     */
+    setFireArcs(
+        arcs: readonly {
+            partId: string;
+            bone: string;
+            frame: 'bone' | 'hull';
+            kind: 'fire' | 'rotation';
+            widthDegrees: number;
+            heightDegrees: number;
+            range: number;
+        }[],
+    ): void {
+        this.clearFireArcs();
+
+        // How BIG the subject is, so a 2000-unit reach on a 600-unit hull is drawn at a length the
+        // reader can stand outside of. See `drawnConeRange` - the row still states the true range.
+        const modelSize = this.modelSpan();
+
+        for (const arc of arcs) {
+            const boneNode = this.fireBoneAttachment(arc.partId, arc.bone);
+            const drawn = {
+                ...arc,
+                range: drawnConeRange(
+                    arc.range, modelSize, arc.widthDegrees, arc.heightDegrees),
+            };
+            // Two envelopes, told apart by weight rather than by hue: they describe the SAME
+            // weapon, and a second colour would read as a second weapon. The solid one is where it
+            // may shoot; the lighter one is where the barrel may point.
+            const rotation = arc.kind === 'rotation';
+            const mesh = new THREE.Mesh(
+                coneGeometry(drawn),
+                (rotation ? ROTATION_ARC_MATERIAL : FIRE_ARC_MATERIAL).clone());
+
+            // Which frame the arc is measured in is the engine's choice, not ours, and the two
+            // firing paths disagree:
+            //
+            //   bone - the weapon-aim test measures in the hardpoint's OWN
+            //          coordinate system, so the bone's rotation IS the aim and parenting to it is
+            //          exactly right.
+            //   hull - the cone-of-fire test reads the muzzle matrix for its
+            //          TRANSLATION and then discards the rotation, rebuilding the frame from
+            //          owner->Get_Facing(). The arc starts at the bone and points where the HULL
+            //          points, so a rotated MuzzleA must not carry it round.
+            //
+            // Parenting to the model root and placing the mesh at the bone's position in that space
+            // gives exactly that: the bone supplies the origin, and the HULL'S FACING supplies the
+            // orientation. Not the root's raw axes - the nose is +Z there, and the cone is built
+            // along +X. See `hullFrameBasis`.
+            const parent = arc.frame === 'hull' ? this.modelRoot : boneNode;
+
+            if (arc.frame === 'hull') {
+                boneNode.updateWorldMatrix(true, false);
+                this.modelRoot.updateWorldMatrix(true, false);
+                mesh.position.copy(
+                    this.modelRoot.worldToLocal(
+                        boneNode.getWorldPosition(new THREE.Vector3())));
+
+                // And the HULL's facing, not the root's raw axes. The cone is built along +X for a
+                // fire bone; the hull's nose is +Z here. Leaving this out is what put every
+                // WEAPON-behaviour arc a quarter turn off. See `hullFrameBasis`.
+                const [forward, lateral, up] = hullFrameBasis();
+                mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+                    new THREE.Vector3(...forward),
+                    new THREE.Vector3(...lateral),
+                    new THREE.Vector3(...up)));
+
+                // The position above is only the starting point; `followHullArcs` keeps it on the
+                // muzzle once a clip starts moving the bone.
+                this.hullArcs.push({mesh, muzzle: boneNode});
+            }
+
+            mesh.visible = this.arcsVisible;
+            // The gizmo is a hint, not geometry: it must never occlude the hull it describes.
+            mesh.renderOrder = 1;
+
+            // A range is a WORLD distance, so an arc parented inside the scaled geometry has to
+            // undo that scale. Recorded on the mesh so a later `setModelScale` can redo it without
+            // rebuilding every cone.
+            mesh.userData.aetArcFrame = arc.frame;
+            // Not the model. A hardpoint arc hangs on a fire bone inside the hull, where every walk
+            // over the model's meshes reaches it - see `isOverlay`.
+            mesh.userData.aetOverlay = true;
+            this.applyArcScale(mesh);
+
+            // A CHILD of the fill, so one visible flag governs both and an outline can never be
+            // left burning over an arc that has been switched off.
+            const outline = new THREE.LineSegments(
+                coneOutlineGeometry(drawn),
+                (rotation ? ROTATION_ARC_OUTLINE_MATERIAL : FIRE_ARC_OUTLINE_MATERIAL).clone());
+            outline.renderOrder = 2;
+            mesh.add(outline);
+
+            parent.add(mesh);
+            this.arcs.push(mesh);
+        }
+    }
+
+    setFireArcsVisible(visible: boolean): void {
+        this.arcsVisible = visible;
+        for (const arc of this.arcs) {
+            arc.visible = visible;
+        }
+    }
+
+    /**
+     * Poses turrets at their rest angle.
+     *
+     * Traverse is about the bone's local Z. Alamo is Z-up, and the exporter's Z-up-to-Y-up rotation
+     * sits on the ROOT node, so a bone's own axes still follow the file's convention - the same one
+     * the fire bones showed: X forward, Y lateral, Z up.
+     */
+    setTurretRestAngles(
+        poses: readonly { partId: string; bone: string; restAngleDegrees: number }[],
+    ): void {
+        for (const pose of poses) {
+            const bone = this.parts.get(pose.partId)?.bones.get(pose.bone.toLowerCase());
+            if (bone !== undefined) {
+                bone.rotation.z = pose.restAngleDegrees * (Math.PI / 180);
+            }
+        }
+    }
+
+    /**
+     * Sweeps the turrets through the traverse their XML declares.
+     *
+     * The pose is recomputed per frame from `sweepAngles`, so what is on screen is always the
+     * declared extent rather than an accumulated one - an incremental turn drifts, and a turret that
+     * drifts past its own end stops is exactly the thing this exists to disprove.
+     *
+     * Traverse is about the bone's local Z and elevation about its X. Alamo is Z-up and the
+     * exporter's Z-up-to-Y-up rotation sits on the ROOT node, so a bone's own axes still follow the
+     * file's convention - the same one the fire bones showed.
+     */
+    setTurretSweep(
+        sweeps: readonly {
+            partId: string;
+            turretBone: string;
+            barrelBone: string | null;
+            turret: PreviewTurret;
+        }[],
+    ): void {
+        this.turretSweeps = [...sweeps];
+
+        // Anything that has stopped sweeping goes back to the pose the model authored. Only bones
+        // this class actually moved are in the map, so a part that has not loaded yet is not
+        // "missing" here - it was never touched.
+        const swinging = new Set<THREE.Object3D>();
+
+        for (const sweep of sweeps) {
+            const part = this.parts.get(sweep.partId);
+            const turret = part?.bones.get(sweep.turretBone.toLowerCase());
+            const barrel = sweep.barrelBone === null
+                ? undefined
+                : part?.bones.get(sweep.barrelBone.toLowerCase());
+
+            if (turret !== undefined) {
+                swinging.add(turret);
+            }
+
+            if (barrel !== undefined) {
+                swinging.add(barrel);
+            }
+        }
+
+        for (const [bone, rest] of [...this.sweepRest]) {
+            if (!swinging.has(bone)) {
+                bone.quaternion.copy(rest);
+                this.sweepRest.delete(bone);
+            }
+        }
+
+        if (sweeps.length === 0) {
+            this.sweepPhase = 0;
+        }
+    }
+
+    /**
+     * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest.
+     *
+     * Two axes and no third: the engine has no roll on a turret -
+     * the turret-angle calculation returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
+     *
+     * Each track spans only what the engine allows, so the stop is visible before it is reached.
+     * Which turrets these are is {@link turretHandles}' decision, off the arc toggle, and not this
+     * class's.
+     */
+    setTurretHandles(handles: readonly TurretHandle[]): void {
+        this.turretHandles = [...handles];
+
+        const wanted = new Set(handles.map(handle => handle.id));
+
+        for (const [id, nodes] of [...this.turretHandleNodes]) {
+            if (!wanted.has(id)) {
+                disposeTurretHandle(nodes.yaw);
+                disposeTurretHandle(nodes.pitch);
+                this.turretHandleNodes.delete(id);
+            }
+        }
+
+        // The aim OUTLIVES the handle being taken off and put back: switching an arc off and on
+        // again is not a request to re-centre a turret the reader deliberately pointed somewhere.
+        // Same rule the arc toggles already follow. A SUBJECT SWITCH is the case where the aims
+        // really should go, and `clearTurretHandles` is where that happens.
+        if (handles.length === 0) {
+            this.hoveredTurretAxis = null;
+            this.turretDrag = null;
+        }
+
+        const radius = trackRadius(this.modelSpan());
+
+        for (const handle of handles) {
+            if (this.turretHandleNodes.has(handle.id)) {
+                continue;
+            }
+
+            const yawBone = this.turretBoneNode(handle.partId, handle.turretBone);
+            // The barrel carries elevation when the model separates the two; 2 of 19 do not, and
+            // then one bone does both - exactly as the sweep already handles it.
+            const pitchBone = handle.barrelBone === null
+                ? yawBone
+                : this.turretBoneNode(handle.partId, handle.barrelBone) ?? yawBone;
+
+            if (yawBone === undefined || pitchBone === undefined) {
+                continue;
+            }
+
+            this.turretHandleNodes.set(handle.id, {
+                yaw: this.buildTurretHandle(handle, 'yaw', yawBone, radius),
+                // One bone doing both - the model names no barrel, or names one it does not carry -
+                // so the pitch track has to follow the yaw itself. With a barrel, the hierarchy
+                // carries it.
+                pitch: this.buildTurretHandle(
+                    handle, 'pitch', pitchBone, radius, pitchBone === yawBone),
+            });
+        }
+
+        this.applyTurretAims();
+    }
+
+    /** Where the reader has pointed each turret, for the shell to read back out. */
+    turretAim(id: string): TurretAim {
+        return this.turretAims.get(id) ?? TURRET_AT_REST;
+    }
+
+    // ── damage ────────────────────────────────────────────────────────────────
+
+    /**
+     * Puts one turret back where the model authored it.
+     *
+     * Needed because releasing a drag deliberately does NOT spring back - a handle that reset
+     * itself would be a momentary readout rather than a control - so there has to be a way home.
+     */
+    resetTurretAim(id: string): void {
+        this.turretAims.delete(id);
+        this.applyTurretAims();
+        this.onTurretAimed?.(id, TURRET_AT_REST);
+    }
+
+    /**
+     * Drops a piece of wreckage where a hardpoint used to be.
+     *
+     * A PASSIVE SUBJECT loaded by the one loader, which is all that is left here that is specific
+     * to debris: where the hardpoint was, and the clock it runs on. It used to load itself, and the
+     * hand copy drifted - four of its six duplicated steps were added one bug report at a time,
+     * and nine more were simply missing.
+     *
+     * Its own subject rather than another piece of the ship: debris is transient, it is removed on
+     * its own clock, it is drawn by its own file's rules, and re-parenting the hardpoint's own model
+     * would fight the destruction rules that hid it.
+     */
+    async addBreakoff(
+        key: string, glbBase64: string, at: BreakoffAnchor,
+        prop: PreviewBreakoffProp,
+    ): Promise<void> {
+        // Where the hardpoint was, in world space, captured once - the debris does not follow the ship.
+        // WHICH node that is, is `breakoffAnchor`'s decision and not this one's: a hardpoint model can
+        // carry a copy of the hull's own bones, and resolving the attachment bone by name inside it
+        // applied the offset twice.
+        const anchor = this.attachmentFor(at.partId, at.bone, at.boneIndex);
+        const origin = anchor.getWorldPosition(new THREE.Vector3());
+        const facing = anchor.getWorldQuaternion(new THREE.Quaternion());
+
+        // The wreck's part id and its subject id are the same string on purpose: it is one model
+        // and one subject, and the effects it trails already address it by this name.
+        const wreckId = `${BREAKOFF_ATTACHMENT}${key}`;
+
+        const root = await this.addPart(wreckId, glbBase64, undefined, undefined, {
+            subjectId: wreckId,
+            pose: {position: origin, quaternion: facing},
+        });
+
+        this.breakoffs.push({
+            key, partId: wreckId, root, prop, origin, facing,
+            age: 0,
+            lifetime: breakoffLifetime(prop),
+            expired: false,
+        });
+    }
+
+    /**
+     * Clears the wreckage ONE hardpoint shed.
+     *
+     * Repairing a single hardpoint from its own card has to take its debris with it, exactly as
+     * repairing the whole target does - otherwise the hardpoint is back on the hull and its wreck
+     * is still tumbling away beside it.
+     */
+    clearBreakoff(key: string): void {
+        // Spliced in place rather than reassigned: the array is readonly on the field, and the
+        // wholesale clear beside this one empties it the same way for the same reason.
+        for (let at = this.breakoffs.length - 1; at >= 0; at--) {
+            if (this.breakoffs[at].key !== key) {
+                continue;
+            }
+
+            this.removePart(this.breakoffs[at].partId);
+            this.breakoffs.splice(at, 1);
+        }
+    }
+
+    /** Clears every piece of wreckage - a repair puts the hardpoints back, so the debris goes. */
+    clearBreakoffs(): void {
+        for (const debris of this.breakoffs) {
+            this.removePart(debris.partId);
+        }
+
+        this.breakoffs.length = 0;
+    }
+
+    /** Whether a piece of wreckage for this key is already in the air. */
+    hasBreakoff(key: string): boolean {
+        return this.breakoffs.some(debris => debris.key === key);
+    }
+
+    /** Starts the wreck on its way. `onDone` fires once, at the end of the declared time. */
+    startSpinAway(partId: string, spin: PreviewSpinAway, onDone: () => void): void {
+        const part = this.parts.get(partId);
+        if (part === undefined) {
+            // Nothing to fly. Report it over at once rather than leaving the caller waiting on a
+            // callback that can never come.
+            onDone();
+            return;
+        }
+
+        this.clearSpinAway();
+
+        this.spinRestore = {
+            partId,
+            position: part.root.position.clone(),
+            quaternion: part.root.quaternion.clone(),
+        };
+
+        this.spinAway = {partId, spin, elapsed: 0, onDone};
+    }
+
+    /** Puts the wreck back where it started, whether it is still flying or already exploded. */
+    clearSpinAway(): void {
+        this.spinAway = null;
+
+        const home = this.spinRestore;
+        this.spinRestore = null;
+
+        if (home === null) {
+            return;
+        }
+
+        const part = this.parts.get(home.partId);
+        if (part !== undefined) {
+            part.root.position.copy(home.position);
+            part.root.quaternion.copy(home.quaternion);
+        }
+    }
+
+    /** Breaks an attached part off, or puts it back. */
+    setPartHidden(partId: string, hidden: boolean): void {
+        if (hidden) {
+            this.hiddenParts.add(partId);
+        } else {
+            this.hiddenParts.delete(partId);
+        }
+
+        const part = this.parts.get(partId);
+        if (part !== undefined) {
+            part.root.visible = !hidden;
+        }
+
+        this.holdEffectsOf(partId);
+    }
+
+    /**
+     * Removes one loaded part and frees its geometry.
+     *
+     * For parts that come and go with a STATE rather than with the subject - a death clone appears
+     * when the ship dies and goes again when it is repaired. A scene part is never removed this
+     * way; it lives as long as the subject does and is hidden instead.
+     */
+    removePart(partId: string): void {
+        const part = this.parts.get(partId);
+        if (part === undefined) {
+            return;
+        }
+
+        // Its effects first, and through the ordinary route so `leaveParticles` still has its say.
+        // They no longer live inside the part's subtree, so nothing else would ever take them:
+        // before, disposing the part quietly freed their buffers underneath them, which left every
+        // entry in `particleSystems` still being stepped against disposed geometry.
+        for (const [id, entry] of [...this.particleSystems]) {
+            if (entry.attachToPartId === partId) {
+                this.removeParticleSystem(id);
+            }
+        }
+
+        this.dropRegistrations(part.subjectId, part.root);
+        part.root.removeFromParent();
+        disposeTree(part.root);
+        this.parts.delete(partId);
+        this.hiddenParts.delete(partId);
+
+        // The subject goes with its last part. A repair removes the wreck, and a mixer left behind
+        // would keep ticking a clip whose nodes have been disposed. The ACTIVE subject stays
+        // whatever happens - it is the scene, and only `clear` ends it.
+        if (part.subjectId !== ACTIVE_SUBJECT && this.rootPartOf(part.subjectId) === null) {
+            this.subjects.delete(part.subjectId);
+        }
+    }
+
+    /**
+     * Plays a system once and forgets it.
+     *
+     * A death explosion is an event, not a state: it fires as the hardpoint is destroyed and must not
+     * come back when the effect list is toggled or the levels change.
+     */
+    playOnce(
+        id: string,
+        system: AlamoParticleContent,
+        attachToPartId?: string,
+        attachBone?: string,
+        /** The owning object's uniform render scale. See {@link ParticlePlacement}. */
+        scaleFactor = 1,
+        /** Where to put it when it hangs on no part. See {@link ParticlePlacement.at}. */
+        at?: { x: number; y: number; z: number },
+    ): void {
+        // Always the Gameplay lens's. A one-shot IS an event - a hardpoint blowing up - and an
+        // event is never something the model declares.
+        this.addParticleSystem(
+            id, system, {origin: 'gameplay', attachToPartId, attachBone, scaleFactor, at});
+        this.transient.add(id);
+    }
+
+    /**
+     * Sets the damage state and detail level, the way the engine gates geometry.
+     *
+     * The DIRECTION matters, not just the value: the engine computes `altdesc = alt < m_alt` inside
+     * `SetALT` and hands it to `CheckAltLod`, where a proxy marked `altDecreaseStayHidden` is held
+     * back. A LOD change passes false, because winding detail down is not repairing anything.
+     */
+    setLevels(alt: number, lod: number): void {
+        this.altDescending = alt < this.alt;
+        this.alt = alt;
+        this.lod = lod;
+
+        // The reader's word SURVIVES a level change. It used to be cleared, on the grounds that a
+        // different damage state is a different set of geometry - but viewport visibility is now
+        // deliberately independent of what the model draws, and the row that outlives the level is
+        // marked as one the model does not draw, so nothing is claimed that is not true.
+        this.applyLevels();
+    }
+
+    /** The ALT and LOD levels the loaded parts and effects actually define. */
+    definedLevels(): DefinedLevels {
+        const tagged: LevelTagged[] = [];
+
+        this.modelRoot.traverse(node => {
+            if (!(node instanceof THREE.Mesh)) {
+                return;
+            }
+
+            const extras = node.userData.alamo as MaterialExtras | undefined;
+            if (extras !== undefined) {
+                tagged.push({
+                    alt: extras.alamoAlt ?? null,
+                    lod: extras.alamoLod ?? null,
+                    altDecreaseStayHidden: false,
+                });
+            }
+        });
+
+        for (const entry of this.particleSystems.values()) {
+            tagged.push(entry.levels);
+        }
+
+        return definedLevels(tagged);
+    }
+
+    /**
+     * What each detail level draws, in meshes and triangles, at the current damage stage.
+     *
+     * Every mesh the model holds rather than only the ones on screen: the question is what a level
+     * COSTS, which is a property of the file and not of where the slider happens to sit. The rule
+     * that decides which meshes belong to a level is `costByLevel`'s, which is the viewport's own
+     * gate.
+     */
+    costByLod(levels: readonly number[]): Map<number, LevelCost> {
+        const meshes: { extras: MaterialExtras; triangles: number }[] = [];
+
+        this.modelRoot.traverse(node => {
+            if (!(node instanceof THREE.Mesh)) {
+                return;
+            }
+
+            const extras = node.userData.alamo as MaterialExtras | undefined;
+            if (extras !== undefined) {
+                meshes.push({extras, triangles: triangleCount(node.geometry)});
+            }
+        });
+
+        return costByLevel(meshes, this.alt, levels);
+    }
+
+    /**
+     * Everything the model is made of, as flat items for ONE tree: bones, the meshes attached to
+     * them, and the particle emitters attached to them.
+     *
+     * A mesh's origin IS a bone and an emitter is attached to one, so the skeleton is already the
+     * structure all three live in. Ids are prefixed by kind so they cannot collide.
+     */
+    /** For the harness: drives controls that have no UI yet. Costs nothing when unused. */
+    expose(): void {
+        (globalThis as unknown as { __aetViewport?: unknown }).__aetViewport = this;
+    }
+
+    treeItems(): TreeItem[] {
+        const items: TreeItem[] = [];
+
+        // Rebuilt with the rows, so the inspector can never describe something the tree no longer
+        // shows. Deriving it separately would mean two places deciding what a row IS - and the
+        // merge rule is exactly the sort of thing that drifts when it lives twice.
+        this.inspectSources.clear();
+
+        const hull = this.hull();
+        if (hull === null) {
+            return items;
+        }
+
+        const boneId = boneRowId;
+
+        // Which bone owns each object. A mesh is normally parented to the bone that is its origin;
+        // a SKINNED mesh is parented at the skeleton root instead, because it spans many bones, and
+        // then lists under its own first joint.
+        const boneOf = new Map<THREE.Object3D, number>();
+        for (const [index, node] of hull.bonesByIndex) {
+            boneOf.set(node, index);
+        }
+
+        const rootBone = [...hull.bonesByIndex.keys()].sort((a, b) => a - b)[0] ?? 0;
+
+        // From the object ITSELF, not from its parent: an effect names its owning bone directly
+        // rather than being attached to it, so the answer is usually the very node it was handed.
+        const ownerOf = (object: THREE.Object3D): number => {
+            for (let at: THREE.Object3D | null = object; at !== null; at = at.parent) {
+                const index = boneOf.get(at);
+                if (index !== undefined) {
+                    return index;
+                }
+            }
+
+            if (object instanceof THREE.SkinnedMesh) {
+                const first = object.skeleton.bones[0];
+                const index = first === undefined ? undefined : boneOf.get(first);
+
+                if (index !== undefined) {
+                    return index;
+                }
+            }
+
+            return rootBone;
+        };
+
+        const meshByBone = new Map<number, THREE.Mesh>();
+        const extraMeshes: { mesh: THREE.Mesh; owner: number }[] = [];
+
+        // The effect a proxy bone IS, rather than one attached to it - see `effectPlacement`. Held
+        // by bone so the bone loop below can claim both halves as one row, the way it already does
+        // for a mesh of the same name.
+        const effectByBone = new Map<number, string>();
+
+        // Rebuilt from scratch: a row that no longer exists must not keep answering for a scene
+        // object that has been unloaded.
+        this.rowTargets.clear();
+        this.rowParents.clear();
+        this.rowNames.clear();
+
+        const bones = this.skeleton();
+        const roots = new Set(bones.filter(bone => bone.parent < 0).map(bone => bone.index));
+
+        const boneName = (index: number): string => {
+            const node = hull.bonesByIndex.get(index);
+            return node === undefined ? '' : alamoBoneName(node.name)?.name ?? node.name;
+        };
+
+        this.forEachPartMesh(mesh => {
+            // The loader guarantees a mesh is never a bone node itself, so its owner is simply the
+            // nearest bone above it. `meshPlacement` decides on the two NAMES from there.
+            const owner = ownerOf(mesh);
+            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
+
+            const placement = meshPlacement(owner, roots,
+                {bone: boneName(owner), mesh: extras.alamoMesh ?? mesh.name});
+
+            // A bone carrying two meshes keeps the first as its own row; the second stays a child
+            // rather than being dropped.
+            if ('merge' in placement && !meshByBone.has(placement.merge)) {
+                meshByBone.set(placement.merge, mesh);
+            } else {
+                extraMeshes.push({
+                    mesh,
+                    owner: 'merge' in placement ? placement.merge : placement.childOf,
+                });
+            }
+        });
+
+        // The same question for the effects, before any row is claimed: a system whose proxy bone
+        // carries its name IS that row. A bone with two of them keeps the first, exactly as it
+        // keeps the first of two meshes.
+        for (const [systemId, entry] of this.particleSystems) {
+            if (!listedInModelTree(entry.origin)) {
+                continue;
+            }
+
+            const owner = ownerOf(anchorNodeOf(entry));
+            const placement = effectPlacement(owner, roots,
+                {bone: boneName(owner), effect: entry.system.name});
+
+            if ('merge' in placement && !effectByBone.has(placement.merge)) {
+                effectByBone.set(placement.merge, systemId);
+            }
+        }
+
+        const meshItem = (mesh: THREE.Mesh): { name: string; visible: boolean; gatedOff: boolean } => {
+            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
+
+            return {
+                // The ALO's own mesh name, not the glTF node name.
+                name: extras.alamoMesh ?? mesh.name,
+                visible: meshDrawn(mesh),
+                gatedOff: resolveMaterial(extras).hidden
+                    || !isVisibleAt(extras, this.alt, this.lod),
+            };
+        };
+
+        for (const bone of bones) {
+            const mesh = meshByBone.get(bone.index);
+            const effect = effectByBone.get(bone.index);
+            const parentId = bone.parent < 0 ? null : boneId(bone.parent);
+
+            // Every half this row stands for. A particle proxy is all three at once - the bone, the
+            // marker mesh the file hides, and the effect itself - and the panel describes each.
+            this.inspectSources.set(boneId(bone.index), {
+                boneIndex: bone.index,
+                ...(mesh === undefined ? {} : {mesh}),
+                ...(effect === undefined ? {} : {systemId: effect}),
+            });
+
+            // Merged: ONE row for a bone, the mesh that shares its name and the effect that shares
+            // it, anchored on the BONE's id. That is what the bone's children already name and what
+            // survives a reload, so the row needs no alias - and the alias is what cost three
+            // defects, from a hull labelled COLLISION to checkboxes that did nothing.
+            //
+            // EVERY half is claimed, so the row writes everything it reports on. The old code
+            // anchored this row on the bone's id, reported the MESH's state and wrote the BONE's -
+            // which is why a hidden mesh could never be shown again.
+            const details = mesh === undefined ? undefined : meshItem(mesh);
+            const name = effect === undefined
+                ? details?.name ?? bone.name
+                : this.effectRowName(effect);
+
+            this.claimRow(boneId(bone.index), name, parentId, {
+                boneIndex: bone.index,
+                ...(mesh === undefined ? {} : {mesh}),
+                ...(effect === undefined ? {} : {particleId: effect}),
+            });
+
+            items.push({
+                id: boneId(bone.index),
+                // The effect is what a reader acts on, so a proxy row reads as one - the bone and
+                // its marker mesh are the plumbing that carries it.
+                kind: effect !== undefined ? 'particle' : mesh !== undefined ? 'mesh' : 'bone',
+                name,
+                parentId,
+                visible: details?.visible ?? bone.visible,
+                gatedOff: details?.gatedOff ?? false,
+                ...(effect === undefined ? {} : {systemId: effect}),
+            });
+        }
+
+        for (const {mesh, owner} of extraMeshes) {
+            const details = meshItem(mesh);
+            // `ownerBone`, not `boneIndex`: this row is the MESH. The bone it rides has a row of its
+            // own, and describing it here too would say it twice.
+            this.inspectSources.set(`mesh:${treeKeyOf(mesh)}`, {mesh, ownerBone: owner});
+            this.claimRow(`mesh:${treeKeyOf(mesh)}`, details.name, boneId(owner), {mesh});
+
+            items.push({
+                id: `mesh:${treeKeyOf(mesh)}`,
+                kind: 'mesh',
+                name: details.name,
+                parentId: boneId(owner),
+                visible: details.visible,
+                gatedOff: details.gatedOff,
+            });
+        }
+
+        // One row per particle SYSTEM, not per emitter. In a model preview the switchable thing is
+        // the whole effect - a proxy is either playing on this hull or it is not - and the emitters
+        // a system is built from are the particle editor's business, not this one's. Listing them
+        // here put twenty dead rows under a Star Destroyer's damage bones.
+        for (const [systemId, entry] of this.particleSystems) {
+            // The Gameplay lens's own. A death explosion and a wreck's trailing fire are asked for
+            // by NAME at the moment they are needed, so they are in no proxy list and hang off no
+            // bone - `ownerOf` falls back to the root and filed them there, giving the reader a
+            // `p_explosion_big00` under Root whose tick did nothing. See `listedInModelTree`.
+            if (!listedInModelTree(entry.origin)) {
+                continue;
+            }
+
+            const owner = ownerOf(anchorNodeOf(entry));
+
+            // Already folded into its proxy bone's row above. Listing it again would put the same
+            // effect on screen twice, with two checkboxes writing one thing.
+            if (effectByBone.get(owner) === systemId) {
+                continue;
+            }
+
+            this.inspectSources.set(`particle:${systemId}`, {systemId});
+            this.claimRow(`particle:${systemId}`, entry.system.name,
+                boneId(owner), {particleId: systemId});
+
+            items.push({
+                id: `particle:${systemId}`,
+                kind: 'particle',
+                name: this.effectRowName(systemId),
+                parentId: boneId(owner),
+                visible: entry.gateVisible && entry.levelVisible,
+                gatedOff: !entry.levelVisible,
+                systemId,
+            });
+        }
+
+        // Every row is known now, so the chain can run - parents are already ahead of children,
+        // because the skeleton is walked parent-first and the meshes are attached to it.
+        this.resolveRows();
+
+        return items.map(item => {
+            const resolved = this.rowResolutions.get(item.id);
+
+            // `gatedOff` comes from the chain as well, because it is the same question asked with
+            // the reader taken out. Leaving each row to work it out for itself is what let a row
+            // report one thing and draw another.
+            return resolved === undefined
+                ? item
+                : {
+                    ...item,
+                    visible: resolved.visible,
+                    because: resolved.because,
+                    decidedBy: resolved.decidedBy,
+                    gatedOff: !resolved.authored,
+                };
+        });
+    }
+
+    /**
+     * The row that owns one effect.
+     *
+     * A merged proxy row is anchored on its bone, so an effect's row id is not derivable from its
+     * system id. Asked of the row table, which is the only thing that knows.
+     */
+    rowForSystem(systemId: string): string {
+        for (const [rowId, target] of this.rowTargets) {
+            if (target.particleId === systemId) {
+                return rowId;
+            }
+        }
+
+        return `particle:${systemId}`;
+    }
+
+    /**
+     * What a tree row actually is, for the inspector.
+     *
+     * A list because a merged row is two things at once. Empty for a row the tree no longer has -
+     * a selection can outlive a reload or a level change.
+     */
+    inspectionOf(id: string): Inspection[] {
+        const source = this.inspectSources.get(id);
+        if (source === undefined) {
+            return [];
+        }
+
+        const found: Inspection[] = [];
+        const bones = this.skeleton();
+        const nameOf = (index: number): string =>
+            bones.find(bone => bone.index === index)?.name ?? '';
+
+        if (source.mesh !== undefined) {
+            const extras = (source.mesh.userData.alamo ?? {}) as MaterialExtras;
+            const geometry = source.mesh.geometry;
+            const vertices = geometry.getAttribute('position')?.count ?? 0;
+
+            found.push({
+                kind: 'mesh',
+                name: extras.alamoMesh ?? source.mesh.name,
+                boneName: nameOf(source.ownerBone ?? source.boneIndex ?? -1),
+                vertexCount: vertices,
+                triangleCount: triangleCount(geometry),
+                drawn: meshDrawn(source.mesh),
+                extras,
+                meshIndex: typeof extras.alamoMeshIndex === 'number'
+                    ? extras.alamoMeshIndex
+                    : undefined,
+                subMeshIndex: typeof extras.alamoSubMeshIndex === 'number'
+                    ? extras.alamoSubMeshIndex
+                    : undefined,
+            });
+        }
+
+        if (source.boneIndex !== undefined) {
+            const bone = bones.find(entry => entry.index === source.boneIndex);
+            const node = this.hull()?.bonesByIndex.get(source.boneIndex);
+
+            if (bone !== undefined) {
+                found.push({
+                    kind: 'bone',
+                    index: bone.index,
+                    name: bone.name,
+                    parentIndex: bone.parent,
+                    parentName: bone.parent < 0 ? '' : nameOf(bone.parent),
+                    visible: bone.visible,
+                    billboard: node === undefined ? null : billboardTypeOf(node),
+                });
+            }
+        }
+
+        if (source.systemId !== undefined) {
+            const entry = this.particleSystems.get(source.systemId);
+
+            if (entry !== undefined) {
+                found.push({
+                    kind: 'particle',
+                    name: entry.system.name,
+                    boneName: entry.attachBoneIndex === undefined
+                        ? entry.attachBone ?? ''
+                        : nameOf(entry.attachBoneIndex),
+                    emitterCount: entry.system.emitters.length,
+                    playing: this.rowResolutions.get(this.rowForSystem(source.systemId))?.visible
+                        ?? (entry.gateVisible && entry.levelVisible),
+                });
+            }
+        }
+
+        return found;
+    }
+
+    /**
+     * The rows the reader has switched off by hand.
+     *
+     * The OVERRIDES, not what happens to be invisible: a mesh gated off by the current damage level
+     * is not something anyone chose, and writing it down would turn a level's own rule into an
+     * explicit hide that outlives the level. Restorable now that a mesh key survives a reload.
+     */
+    hiddenItemIds(): string[] {
+        return [...this.rowOverrides]
+            .filter(([, override]) => override === 'hidden')
+            .map(([row]) => row);
+    }
+
+    /**
+     * The rows the reader has switched ON by hand.
+     *
+     * Both directions are carried now. A mesh is usually drawn until someone hides it, but a
+     * shadow volume or a collision hull is gated off until someone asks for it - and asking for it
+     * is exactly the deliberate act worth surviving a reopen.
+     */
+    shownItemIds(): string[] {
+        return [...this.rowOverrides]
+            .filter(([, override]) => override === 'shown')
+            .map(([row]) => row);
+    }
+
+    /**
+     * Shows or hides any mix of bones, meshes and particle systems at once.
+     *
+     * One entry point, because the tree selects across kinds and a multi-select toggle has to move
+     * all of them together. A bone carries what is attached to it, so switching one off takes its
+     * subtree with it - which is what the reader is asking for when they untick a limb.
+     */
+    setItemsVisible(ids: readonly string[], visible: boolean): void {
+        this.applyRowOverrides(
+            ids.map(row => ({row, override: visible ? 'shown' as const : 'hidden' as const})));
+    }
+
+    /**
+     * Records the reader's word on a set of rows and re-runs the chain.
+     *
+     * `null` gives a row back to the model. One entry point and one map, because the old code kept
+     * three - meshes by tree key, bones by index, systems by id - and a row anchored on a bone's id
+     * while standing for a mesh wrote one and reported the other.
+     */
+    applyRowOverrides(changes: readonly OverrideChange[]): void {
+        for (const {row, override} of changes) {
+            if (override === null) {
+                this.rowOverrides.delete(row);
+            } else {
+                this.rowOverrides.set(row, override);
+            }
+        }
+
+        this.resolveRows();
+    }
+
+    /** What the reader has said about each row, for carrying across a reopen. */
+    rowOverrideEntries(): { row: string; override: RowOverride }[] {
+        return [...this.rowOverrides].map(([row, override]) => ({row, override}));
+    }
+
+    /**
+     * Hands every row back to the model.
+     *
+     * Called when a clip starts: watching an animation is checking whether the animation works, and
+     * that can only be answered against the model as authored. The clip already resets the pose
+     * each time it runs; the visibilities are part of that pose. Master toggles are untouched - see
+     * `clearedForPlayback`.
+     */
+    clearRowOverrides(): void {
+        this.rowOverrides.clear();
+        this.resolveRows();
+    }
+
+    /**
+     * Hands the rows ONE ability speaks for back to the model.
+     *
+     * Every channel an ability drives - a proxy's `gateVisible`, the shield mesh's and the shell's
+     * `inFile` - enters the chain at the `file` link, four below the reader. So one tick on such a
+     * row outranked the ability for good: the switch fired, the chain ignored it, and nothing but a
+     * whole-model Reset could undo it. Switching the ability now takes its own rows back, which is
+     * the same rule a starting clip already follows.
+     *
+     * Scoped, unlike {@link clearRowOverrides}. A clip may be global because it resets the entire
+     * pose; an ability is one statement about a handful of rows, and a mesh the reader hid for an
+     * unrelated reason has to survive it.
+     */
+    releaseAbilityRows(ownership: AbilityOwnership): void {
+        const released: string[] = ownership.systemIds.map(id => this.rowForSystem(id));
+
+        if (ownership.shieldMesh || ownership.stealthShell) {
+            for (const [rowId, target] of this.rowTargets) {
+                if (target.mesh === undefined) {
+                    continue;
+                }
+
+                const extras = (target.mesh.userData.alamo ?? {}) as MaterialExtras;
+
+                if ((ownership.shieldMesh && isShieldMesh(extras))
+                    || (ownership.stealthShell && isStealthMesh(extras))) {
+                    released.push(rowId);
+                }
+            }
+        }
+
+        // Only the rows that actually carry one. Every ability click would otherwise re-resolve the
+        // whole skeleton to delete nothing, and most abilities own no row the reader has touched.
+        const carrying = released.filter(row => this.rowOverrides.has(row));
+
+        if (carrying.length === 0) {
+            return;
+        }
+
+        // One re-resolve at the end, not one per row.
+        this.applyRowOverrides(carrying.map(row => ({row, override: null})));
+    }
+
+    /** Frames whatever is currently loaded. */
+    /**
+     * Puts the camera where the model's own authored camera stands, looking where it looks.
+     *
+     * Placed from the camera's own BONE NODES rather than from the coordinates the server sent.
+     * Both describe the same point, but the bone is already in the scene and has been through
+     * exactly the transform the geometry went through - including the root's Z-up to Y-up rotation,
+     * which is the one thing certain to be got wrong if it is applied a second time by hand. A shot
+     * a quarter turn out looks like a broken camera rather than a broken conversion.
+     *
+     * @returns false when the model does not carry that bone pair, so the caller can say so.
+     */
+    applyModelCamera(name: string): boolean {
+        const eye = this.boneNodeFor(name);
+        const at = this.boneNodeFor(`${name}.Target`);
+
+        if (eye === undefined || at === undefined) {
+            return false;
+        }
+
+        eye.updateWorldMatrix(true, false);
+        at.updateWorldMatrix(true, false);
+
+        this.applyCameraPose(
+            new THREE.Vector3().setFromMatrixPosition(eye.matrixWorld),
+            new THREE.Vector3().setFromMatrixPosition(at.matrixWorld));
+
+        return true;
+    }
+
+    /**
+     * Points the camera at a place, from a place.
+     *
+     * The one path every framing goes through - the presets, the model's own camera and the
+     * reader's saved shots - so the clip planes are refitted the same way for all of them. Without
+     * that a camera parked 653 units out, which `Eb_icc`'s own camera is, lands outside the range
+     * the previous framing chose and the model disappears.
+     */
+    applyCameraPose(position: Vector3Like, target: Vector3Like): void {
+        this.fitDistance = Math.hypot(
+            position.x - target.x, position.y - target.y, position.z - target.z);
+        this.applyClipPlanes(this.boundingSphere(true), this.fitDistance);
+
+        this.camera.position.set(position.x, position.y, position.z);
+        this.controls.target.set(target.x, target.y, target.z);
+        this.controls.update();
+    }
+
+    frameAll(preset: PresetView = 'threeQuarter'): void {
+        const sphere = this.boundingSphere();
+        const {azimuth, elevation} = PRESETS[preset];
+        const aspect = this.camera.aspect;
+
+        const pose = frameSphere(sphere, FIELD_OF_VIEW, aspect, azimuth, elevation);
+        const distance = Math.hypot(
+            pose.position.x - sphere.center.x,
+            pose.position.y - sphere.center.y,
+            pose.position.z - sphere.center.z,
+        );
+
+        this.fitDistance = distance;
+        this.applyClipPlanes(this.boundingSphere(true), distance);
+
+        this.camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+        this.controls.target.set(pose.target.x, pose.target.y, pose.target.z);
+        this.controls.update();
+
+        // The grid is a sense of scale, so it has to grow with the subject: a fixed 100-unit grid is
+        // invisible under a capital ship and swallows a fighter.
+        this.rebuildGrid(sphere);
+    }
+
+    setGridVisible(visible: boolean): void {
+        this.grid.visible = visible;
+        this.axes.visible = visible;
+    }
+
+    /** Shows or hides the ground plane. Independent of the grid: either is useful without it. */
+    setFloorVisible(visible: boolean): void {
+        this.floor.visible = visible;
+        this.shadowCatcher.visible = visible;
+    }
+
+    /**
+     * Moves the ground, and the grid measuring it, to a height in model units.
+     *
+     * Both together, always. The grid is the ruler for the ground plane, and leaving it at zero
+     * while the floor moved would draw a measurement of somewhere the floor is not. Not every model
+     * is authored standing on the origin - `Eb_icc_landingpad` and the props dug into terrain are
+     * not - so a floor pinned to zero cuts through them or floats beneath them.
+     */
+    setFloorLevel(level: number): void {
+        this.floor.position.y = level;
+        this.grid.position.y = level;
+        this.axes.position.y = level;
+        this.shadowCatcher.position.y = level;
+    }
+
+    /**
+     * Draws every part mesh as its edges.
+     *
+     * Reaches the translated effects as well as the archetype materials: `wireframe` is declared on
+     * `THREE.Material`, and a `RawShaderMaterial` inherits it through `ShaderMaterial`, so the flag
+     * is honoured whichever renderer the reader has chosen. Particle systems are pruned by
+     * `forEachPartMesh` and stay as they are - a wireframe billboard is a pair of triangles and
+     * says nothing about the model.
+     */
+    setWireframe(on: boolean): void {
+        this.wireframe = on;
+        this.applyWireframe();
+    }
+
+    /**
+     * Whether the engine's stencil shadows are being cast right now.
+     *
+     * Public because the shadow COLOUR control has to know. The tint reaches the hull through this
+     * pass with no ground involved, so gating that control on the floor alone disabled it while it
+     * was working. Both halves matter here for the same reason they do inside: Game mode with no
+     * authored volume casts nothing, and 63% of models author none.
+     */
+    castsStencilShadows(): boolean {
+        return this.stencilShadowing;
+    }
+
+    /** Whether the engine's stencil shadows are drawn at all. */
+    /** Draws the extruded volumes themselves, for diagnosing what the stencil is counting. */
+    setShadowVolumeDebug(on: boolean): void {
+        this.shadowVolumes.setDebug(on);
+    }
+
+    setShadowVolumes(on: boolean): void {
+        this.shadowVolumesEnabled = on;
+        this.shadowVolumes.setEnabled(on);
+        this.refreshShadowCasting();
+    }
+
+    /**
+     * Tints the shadow, wherever it can be seen.
+     *
+     * TWO sinks, which the control above has to know about. Under three's shadow mapping there is
+     * no colour to set at all, so a dedicated catcher plane over the floor is the only place the
+     * tint can be expressed - that one needs the ground. The stencil darken really does multiply,
+     * the way Alamo's own does, and it reaches the MODEL as well: a hull self-shadows in its tint
+     * with no ground under it whatsoever. See `shadowTintReach`, which is the rule both halves and
+     * the control are read from.
+     */
+    setShadowColour(colour: THREE.ColorRepresentation): void {
+        // The catcher paints; the value is a multiplier. Only the ALPHA moves - see
+        // `shadowCatcherOpacity`, which is also where the tint goes and why.
+        this.shadowMaterial.opacity = shadowCatcherOpacity(colour);
+
+        // The same colour drives the stencil darken, which really does multiply - so it takes the
+        // value as it stands, tint and all, and reaches the MODEL as well as the ground.
+        this.shadowVolumes.setColour(colour);
+    }
+
+    /**
+     * Starts a passive subject's own death clip, once.
+     *
+     * ONCE, and clamped: the user's word is that a death clone is spawned at the exact position of
+     * the model it replaces and plays through a single time. There is no picker for it and no loop
+     * - it is not something the reader chose, it is what dying looks like.
+     *
+     * Separate from LOADING it so the geometry can be fetched early and held: asking for a capital
+     * ship's three-megabyte clone at the moment of death left a visible gap between the ship going
+     * and the wreck arriving. Idempotent - a second call does not restart a clip already running,
+     * because it is the same wreck.
+     *
+     * This is `play` for a subject nobody is driving. It is the same machinery: the subject's own
+     * mixer, the subject's own clips, the subject's own tracks. It used to be a second
+     * implementation of all three, because the scene-wide maps it would have had to use were
+     * already full of the hull's answers.
+     */
+    startDeathClip(subjectId: string): void {
+        const subject = this.subjects.get(subjectId);
+
+        if (subject === undefined || subject.mixer === null || subject.action !== null) {
+            return;
+        }
+
+        const name = deathClip(subject.clips.map(c => c.name));
+        const clip = subject.clips.find(c => c.name === name);
+
+        if (clip === undefined) {
+            return;
+        }
+
+        subject.action = subject.mixer.clipAction(clip);
+        subject.action.setLoop(THREE.LoopOnce, 1);
+        // Without this the last pose is gone the frame it arrives.
+        subject.action.clampWhenFinished = true;
+        subject.action.reset();
+        subject.action.play();
+    }
+
+    /**
+     * Plays a clip by name, or stops playback when given null.
+     *
+     * Timing comes from the file. The exporter writes each keyframe at `frame / fps` using the rate
+     * the `.ala` itself declares - 30 fps for 1270 of the 1363 shipped animations, but 1, 5, 10 or
+     * 15 for the other 93 - so 1.0x means "this clip's own declared rate", whatever that is: a
+     * 15 fps clip plays at 15 frames a second. There is no rate for the panel to impose.
+     *
+     * The rest pose is restored before anything starts, so a clip never plays on top of the pose
+     * another one left behind.
+     */
+    /**
+     * Starts a clip by name, answering whether one actually started.
+     *
+     * The answer matters and used to be thrown away. A name no loaded clip carries returned here in
+     * silence while the panel went on showing that clip as the one playing - which is exactly what
+     * an ability's deploy did on every model, since the XML names an `.ala` FILE and the clips are
+     * held under their stems. Silence is right for the viewport, which cannot know whether a miss is
+     * a fault; reporting it lets the caller stop claiming otherwise.
+     */
+    play(name: string | null): boolean {
+        this.active.action?.stop();
+        this.active.action = null;
+        this.resetPose();
+
+        // The pose is not the only thing a clip resets. Watching an animation means asking whether
+        // the animation works, and that can only be answered against the model as its author left
+        // it - so every row goes back to what the model says. The master toggles are untouched:
+        // effects switched off because they obstruct the view are the one thing worth keeping off
+        // while a clip runs. See `clearedForPlayback`.
+        this.clearRowOverrides();
+
+        if (name === null || this.active.mixer === null) {
+            return false;
+        }
+
+        const clip = this.active.clips.find(c => c.name === name);
+        if (clip === undefined) {
+            return false;
+        }
+
+        this.active.action = this.active.mixer.clipAction(clip);
+        this.active.action.setLoop(this.animationLoop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+        // Without this a non-looping action snaps back to frame 0 the instant it ends, so the last
+        // pose - often the whole point of a death or a deploy - is never on screen.
+        this.active.action.clampWhenFinished = true;
+        this.active.action.timeScale = this.animationSpeed;
+        this.active.action.paused = this.animationPaused;
+        this.active.action.play();
+
+        return true;
+    }
+
+    // ── spinning away ─────────────────────────────────────────────────────────
+
+    setPaused(paused: boolean): void {
+        this.animationPaused = paused;
+
+        if (this.active.action !== null) {
+            this.active.action.paused = paused;
+        }
+    }
+
+    /**
+     * Puts every animated node back where the model file had it.
+     *
+     * three.js does restore a binding's "original state" when an action is deactivated - but the
+     * original it restores is whatever the node held when that binding was FIRST created, and a
+     * binding for a clip you start mid-way through another clip captures the other clip's pose. So
+     * stopping left the model in a pose no file describes, and switching clips carried the previous
+     * one's residue into every bone the new clip does not drive.
+     *
+     * Snapshotting at load and writing it back explicitly sidesteps all of that: the rest pose is
+     * the file's pose, by definition, and it cannot drift.
+     */
+    resetPose(): void {
+        for (const [node, rest] of this.active.restPose) {
+            node.position.copy(rest.position);
+            node.quaternion.copy(rest.quaternion);
+            node.scale.copy(rest.scale);
+        }
+
+        // Transforms are the part three.js would have restored on its own; visibility is not, and a
+        // bone left switched off by the clip that just stopped is the residue that actually shows.
+        // Asking the level and override rules again is what puts it back - they, not this, know
+        // what the model looked like before the clip took over.
+        if (this.overridingVisibility) {
+            this.overridingVisibility = false;
+            this.applyLevels();
+        }
+
+        // Only the CLIP's hold: the clip has stopped having an opinion, which says nothing about a
+        // part that is hidden or a system that has been released to finish.
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.hold('clip', false);
+        }
+    }
+
+    /** How fast the clip runs, as a multiple of the rate its file declares. */
+    setAnimationSpeed(speed: number): void {
+        this.animationSpeed = speed;
+
+        if (this.active.action !== null) {
+            this.active.action.timeScale = speed;
+        }
+    }
+
+    setAnimationLoop(loop: boolean): void {
+        this.animationLoop = loop;
+
+        if (this.active.action !== null) {
+            this.active.action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+            this.active.action.clampWhenFinished = true;
+        }
+    }
+
+    /**
+     * Moves the playhead, in seconds.
+     *
+     * `paused` is left alone: scrubbing a running clip should keep it running from where you
+     * dropped it, and scrubbing a held one should leave it held on the frame you chose.
+     */
+    seekAnimation(seconds: number): void {
+        if (this.active.action === null) {
+            return;
+        }
+
+        this.active.action.time = Math.max(0, Math.min(seconds, this.active.action.getClip().duration));
+        // One update with no time step, so the pose on screen matches the playhead immediately
+        // rather than at the next frame - which is what makes a scrubber feel attached to the model.
+        this.active.mixer?.update(0);
+    }
+
+    /** Where the playhead is and how long the clip runs, for the scrubber. Zeroes when idle. */
+    animationProgress(): { time: number; duration: number; running: boolean } {
+        if (this.active.action === null) {
+            return {time: 0, duration: 0, running: false};
+        }
+
+        return {
+            time: this.active.action.time,
+            duration: this.active.action.getClip().duration,
+            running: this.active.action.isRunning() && !this.active.action.paused,
+        };
+    }
+
+    stats(): ViewportStats {
+        let meshes = 0;
+        let triangles = 0;
+
+        this.modelRoot.traverse(node => {
+            if (node instanceof THREE.Mesh && this.drawn(node)) {
+                meshes++;
+                triangles += triangleCount(node.geometry);
+            }
+        });
+
+        return {
+            // The ACTIVE subject's, not the scene's. These stats describe the model being
+            // previewed, and a wreck it shed or the clone it became is not another part of it.
+            parts: this.activeSubjectRoots().length,
+            meshes,
+            triangles: Math.round(triangles),
+            // From the same source as the tree. Counting THREE.Bone instead reported ZERO for any
+            // model with no skinned mesh - the loader only creates Bone objects for skin joints, so
+            // the Star Destroyer's 71 bones read as none while the tree beside it listed all of them.
+            bones: this.skeleton().length,
+            animations: this.animationNames,
+        };
+    }
+
+    /**
+     * Where a bone sits in world space, or null when it is not loaded.
+     *
+     * Thin on purpose: the blast arithmetic is pure and lives in `blast.ts`, and all it needs from
+     * a scene graph is a point per hardpoint. Anything more here would be geometry the tests cannot
+     * reach.
+     */
+    bonePosition(partId?: string, bone?: string): { x: number; y: number; z: number } | null {
+        if (partId === undefined) {
+            return vectorOf(this.modelRoot.getWorldPosition(new THREE.Vector3()));
+        }
+
+        // Recorded even though this refuses to place anything: the request was made, and it is the
+        // REQUEST that gets reported. The early return below used to happen before `attachmentFor`
+        // was ever reached, so a hardpoint that had not loaded left no trace anywhere.
+        this.noteAttachment(partId, bone);
+
+        const part = this.parts.get(partId);
+        if (part === undefined) {
+            return null;
+        }
+
+        if (bone === undefined) {
+            return vectorOf(part.root.getWorldPosition(new THREE.Vector3()));
+        }
+
+        // NULL for a bone that is not there, rather than the part's origin. `attachmentFor` answers
+        // the root because it has to return something to parent to; this returns a POSITION, and
+        // the model's origin is not this bone's position. Handing one back put every unresolved
+        // hardpoint at the same spot, which is a blast radius that catches all of them.
+        const node = part.bones.get(bone.toLowerCase());
+
+        return node === undefined
+            ? null
+            : vectorOf(node.getWorldPosition(new THREE.Vector3()));
+    }
+
+    /**
+     * The Alamo extras of every loaded material.
+     *
+     * Read back off the scene rather than tracked alongside it, so the texture request list can
+     * never fall out of step with what was actually loaded.
+     */
+    materialExtras(): MaterialExtras[] {
+        const all: MaterialExtras[] = [];
+
+        this.modelRoot.traverse(node => {
+            if (node instanceof THREE.Mesh && node.userData.alamo !== undefined) {
+                all.push(node.userData.alamo as MaterialExtras);
+            }
+        });
+
+        return all;
+    }
+
+    /**
+     * Starts a particle system, optionally attached to a bone of a loaded part.
+     *
+     * Parented rather than positioned: a damaged hardpoint's smoke has to follow the hull as it
+     * animates, and parenting gets that for nothing.
+     */
+    addParticleSystem(
+        id: string,
+        system: AlamoParticleContent,
+        placement: ParticlePlacement,
+    ): void {
+        const {
+            attachToPartId, attachBone, attachBoneIndex, origin, scaleFactor = 1, at,
+            levels = {alt: null, lod: null, altDecreaseStayHidden: false},
+        } = placement;
+
+        // Immediate: the id is about to name something else, and a fading twin under it would be
+        // orphaned in the scene for good.
+        this.removeParticleSystem(id, true);
+
+        const entry: ParticleEntry = {
+            id,
+            system,
+            attachToPartId,
+            attachBone,
+            attachBoneIndex,
+            gateVisible: true,
+            levels,
+            levelVisible: proxyVisibleAt(levels, this.alt, this.lod, this.altDescending),
+            scaleFactor,
+            origin,
+            instance: this.instantiate(
+                id, system, attachToPartId, attachBone, attachBoneIndex, scaleFactor, at),
+        };
+
+        // Held from birth when it is attached to something already off screen: a death clone's effects
+        // attach while the clone is still hidden, and a one-shot that runs there is spent before
+        // anyone sees it.
+        if (attachToPartId !== undefined && this.hiddenParts.has(attachToPartId)) {
+            entry.instance.hold('part', true);
+        }
+
+        this.particleSystems.set(id, entry);
+        this.refreshParticleVisibility(entry);
+
+        // The depth range again, because the effects reach further than the model and they arrive
+        // AFTER the camera was fitted to it. Without this, Boba Fett's flamethrower - 206 units of
+        // throw on a seven-unit model - was culled at 156 and looked like a flame that stops.
+        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+    }
+
+    // ── levels ────────────────────────────────────────────────────────────────
+
+    /**
+     * Takes a system out of the scene.
+     *
+     * What it does with the particles ALREADY IN THE AIR is the file's word: see
+     * {@link fadingParticles}. `immediate` overrides it, and only two things may - replacing a
+     * system under the same id, and a wholesale reset of the scene or the renderer.
+     */
+    removeParticleSystem(id: string, immediate = false): void {
+        const entry = this.particleSystems.get(id);
+
+        if (entry !== undefined) {
+            if (!immediate && entry.system.leaveParticles && !entry.instance.empty) {
+                // Stop spawning and let the air clear. Nothing sweeps it after this, which is why
+                // it leaves `particleSystems` - a gate re-enabling it would refill it forever.
+                entry.instance.hold('released', true);
+
+                // And cut loose from the bone it was anchored on, which is usually about to be
+                // hidden or disposed. Nothing moves: the simulation already runs in the model's
+                // space with the bone cancelled out, so the particles stay exactly where they are -
+                // but a bone still being read after its part is gone would report its last stale
+                // matrix as this step's movement and fling every linked particle with it.
+                entry.instance.detach();
+
+                this.fadingParticles.push(entry.instance);
+            } else {
+                entry.instance.dispose();
+            }
+        }
+
+        this.particleSystems.delete(id);
+
+        // And back in again once the effect is gone, so a one-off explosion does not leave the
+        // depth range stretched for the rest of the session.
+        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+    }
+
+    /** Whether a part's geometry has arrived, so something can be attached to its bones. */
+    hasPart(partId: string): boolean {
+        return this.parts.has(partId);
+    }
+
+    /** Names of the running systems, for the emitter list in the dock. */
+    particleSystemIds(): string[] {
+        return [...this.particleSystems.keys()].sort();
+    }
+
+    /** Every texture the running systems want but may not have yet. */
+    particleTextureNames(): string[] {
+        return [...new Set(
+            [...this.particleSystems.values()].flatMap(e => e.instance.textureNames()))].sort();
+    }
+
+    /** Hands a fetched texture to whichever emitters named it, now and after a restart. */
+    setParticleTexture(name: string, texture: THREE.Texture): void {
+        this.particleTextures.set(name.toLowerCase(), texture);
+        this.missingTextures.delete(name.toLowerCase());
+
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.setTexture(name, texture);
+        }
+    }
+
+    /**
+     * Says a texture will never arrive, so every emitter naming it shows the marker.
+     *
+     * Remembered, not just applied: a system can be built after the answer came back - a hardpoint
+     * blowing up spawns one - and it has to show the marker too rather than sitting on a blank quad
+     * because it happened to be late.
+     */
+    setParticleTextureMissing(name: string): void {
+        this.missingTextures.add(name.toLowerCase());
+
+        void this.markMissing(name);
+    }
+
+    setParticlesVisible(visible: boolean): void {
+        this.particlesVisible = visible;
+
+        // A system switched off individually, or by its level, stays off when the global toggle
+        // comes back on.
+        for (const entry of this.particleSystems.values()) {
+            this.refreshParticleVisibility(entry);
+        }
+    }
+
+    /**
+     * What the game's rules say about a system: the opening rule and the current damage state.
+     *
+     * The RULES path, called on attach and again whenever a hardpoint is destroyed or repaired -
+     * never in response to a click. A hand-set override survives this, so switching one effect on
+     * does not get undone by an unrelated hardpoint blowing up.
+     *
+     * What the rules say is `inFile` for this row - the model's own word - and the chain weighs it
+     * against everything else. It does NOT clear a hand-set override: the reader's word is taken
+     * back only by the reader or by a clip starting, and a row standing against the rules is marked
+     * as one the model does not draw, so nothing here is claimed that is not true.
+     */
+    setParticleSystemVisible(id: string, visible: boolean): void {
+        const entry = this.particleSystems.get(id);
+        if (entry === undefined) {
+            return;
+        }
+
+        entry.gateVisible = visible;
+        this.refreshRows();
+    }
+
+    /** The emitters of one system, in file order. */
+    emitterNames(systemId: string): string[] {
+        return this.particleSystems.get(systemId)?.instance.emitterNames() ?? [];
+    }
+
+    /** Shows or hides one emitter of one system, by its position in that system's file. */
+    setEmitterVisible(systemId: string, index: number, visible: boolean): void {
+        const key = `${systemId}#${index}`;
+
+        if (visible) {
+            this.hiddenEmitters.delete(key);
+        } else {
+            this.hiddenEmitters.add(key);
+        }
+
+        this.particleSystems.get(systemId)?.instance.setEmitterVisible(index, visible);
+    }
+
+    setParticlesPaused(paused: boolean): void {
+        this.particlesPaused = paused;
+    }
+
+    /** Multiplier on particle time. 1 is real time. */
+    setParticleSpeed(speed: number): void {
+        this.particleSpeed = Math.max(0, speed);
+    }
+
+    /**
+     * Replays every system from nothing.
+     *
+     * Rebuilt rather than rewound: a burst emitter's whole point is the first half second, and there
+     * is no way back to it from the middle of a run short of discarding the state.
+     */
+    restartParticles(): void {
+        // The other override: every system is being rebuilt from scratch, and a fading one has no
+        // rebuilt twin to belong to.
+        this.clearFadingParticles();
+
+        for (const [id, entry] of this.particleSystems) {
+            entry.instance.dispose();
+            entry.instance =
+                this.instantiate(id, entry.system, entry.attachToPartId, entry.attachBone,
+                    entry.attachBoneIndex, entry.scaleFactor);
+            this.refreshParticleVisibility(entry);
+        }
+    }
+
+    /**
+     * The hull's bones, flattened.
+     *
+     * Read off the loaded scene rather than tracked separately, so the tree can never describe a
+     * skeleton that is not the one on screen. Only the FIRST part's bones: an attached turret carries
+     * its own skeleton, and merging them would produce a tree whose indices match no single model.
+     */
+    skeleton(): FlatBone[] {
+        const hull = this.hull();
+        if (hull === null) {
+            return [];
+        }
+
+        const indexOf = new Map<THREE.Object3D, number>();
+        for (const [index, node] of hull.bonesByIndex) {
+            indexOf.set(node, index);
+        }
+
+        // The nearest ANCESTOR that is a bone, not just the immediate parent. The exporter puts a
+        // synthetic node between the skeleton and the scene, and a skinned model can have others in
+        // between too - so checking only `node.parent` reported a bone as parentless whenever
+        // anything sat in the gap, and the tree came out with a handful of spurious roots. On the
+        // rancor that made `Shadow_Feet` a root of the model, which it plainly is not.
+        const boneAncestor = (node: THREE.Object3D): number => {
+            for (let at = node.parent; at !== null; at = at.parent) {
+                const index = indexOf.get(at);
+                if (index !== undefined) {
+                    return index;
+                }
+            }
+
+            return -1;
+        };
+
+        return [...hull.bonesByIndex.entries()]
+            .map(([index, node]) => ({
+                index,
+                name: alamoBoneName(node.name)?.name ?? node.name,
+                parent: boneAncestor(node),
+                visible: node.visible,
+            }))
+            .sort((a, b) => a.index - b.index);
+    }
+
+    /** What is attached to each bone of the hull, keyed by bone index. */
+    attachmentsByBone(): Map<number, BoneAttachment[]> {
+        const attachments = new Map<number, BoneAttachment[]>();
+        const hull = this.hull();
+        if (hull === null) {
+            return attachments;
+        }
+
+        // Which bone each object belongs to, so a mesh can be placed even when it is not a direct
+        // child of one. A SKINNED mesh is parented to the skeleton root rather than attached to any single bone -
+        // it spans many - and listing only direct children left most of a skinned model with no row
+        // at all, which is no use for a control whose whole point is reaching every mesh.
+        const boneOf = new Map<THREE.Object3D, number>();
+        for (const [index, node] of hull.bonesByIndex) {
+            boneOf.set(node, index);
+        }
+
+        const rootBone = [...hull.bonesByIndex.keys()].sort((a, b) => a - b)[0] ?? 0;
+        const meshesByBone = new Map<number, THREE.Mesh[]>();
+
+        hull.root.traverse(object => {
+            if (!(object instanceof THREE.Mesh) || object.name === '') {
+                return;
+            }
+
+            // The nearest ancestor that is a bone; the root otherwise.
+            let owner = rootBone;
+            for (let at = object.parent; at !== null; at = at.parent) {
+                const index = boneOf.get(at);
+                if (index !== undefined) {
+                    owner = index;
+                    break;
+                }
+            }
+
+            meshesByBone.set(owner, [...(meshesByBone.get(owner) ?? []), object]);
+        });
+
+        for (const [index, node] of hull.bonesByIndex) {
+            const found: BoneAttachment[] = [];
+
+            for (const mesh of meshesByBone.get(index) ?? []) {
+                found.push({kind: 'mesh', label: mesh.name});
+            }
+
+            // A attached part is a separate root parented onto the bone, so it reads as a hardpoint.
+            for (const part of this.parts.values()) {
+                if (part.root.parent === node) {
+                    found.push({kind: 'hardpoint', label: part.id});
+                }
+            }
+
+            if (found.length > 0) {
+                attachments.set(index, found);
+            }
+        }
+
+        return attachments;
+    }
+
+    setSkeletonVisible(visible: boolean): void {
+        this.skeletonVisible = visible;
+        this.joints.visible = visible;
+        this.jointLines.visible = visible;
+
+        if (!visible) {
+            this.clearLabels();
+        }
+    }
+
+    setLabelMode(mode: LabelMode): void {
+        this.labelMode = mode;
+        // Immediately rather than on the next throttled tick: a mode change the user just made must
+        // not appear to have been ignored.
+        this.lastLabelUpdate = 0;
+    }
+
+    /**
+     * Which bones a weapon fires from, so the triad can mark the aim axis.
+     *
+     * By NAME, because that is what a weapon declares. The axis itself is local X and that is
+     * measured rather than assumed - see `AlamoFireBone.AimDirection`.
+     */
+    setFireBones(names: ReadonlySet<string>): void {
+        this.fireBones = names;
+        this.updateBoneAxes();
+    }
+
+    setSelectedBones(indices: ReadonlySet<number>): void {
+        this.selectedBones = indices;
+        this.lastLabelUpdate = 0;
+        this.updateBoneAxes();
+    }
+
+    /**
+     * Draws a box round what the tree has selected.
+     *
+     * Selecting a bone boxes its whole SUBTREE, not its origin: a bone is where something is
+     * attached, so a box around the point itself would be a dot in the middle of the thing being
+     * pointed at. A row whose ancestor is selected too gets no box of its own - one box around the
+     * arm beats a second one nested inside it around the hand.
+     */
+    setSelectedRows(ids: readonly string[]): void {
+        this.selectedRows = [...ids];
+        this.updateSelectionBoxes();
+    }
+
+    /**
+     * Parts to outline whole, beside whatever rows are boxed.
+     *
+     * A hardpoint that attaches a model is one of these: its geometry is its own part, and boxing
+     * the hull bone it is attached to gathers that bone's whole subtree instead - the turret's meshes and
+     * every empty fire-point bone under it, which on the Executor stretched the box to 2211 units
+     * on a 5094 hull. See `boxTargetFor`.
+     */
+    setSelectedHardpoint(partId: string | null, boneRow: string | null): void {
+        // Decided HERE rather than by the caller, because the answer depends on which parts are in
+        // the scene - and that is this object's own state, arriving one GLB at a time.
+        const target = boxTargetFor(partId, new Set(this.parts.keys()));
+
+        this.selectedParts = target.kind === 'part' ? [target.id] : [];
+
+        // The attach bone stays SELECTED - it lights the tree row and draws the axes - but it stops
+        // being BOXED once its part is outlined. Both at once draws the outline inside a second box
+        // around the bone's whole subtree, which is the 2211-unit smear this replaced.
+        this.unboxedRow = target.kind === 'part' ? boneRow : null;
+        this.updateSelectionBoxes();
+    }
+
+    /**
+     * The targeting marks to draw, and how big.
+     *
+     * Replaced wholesale rather than diffed: the list is one per targetable hardpoint - ten on the Star
+     * Destroyer, and never more than a few hundred - and it changes only when the scene, the state
+     * or the damage does.
+     */
+    setReticles(marks: readonly ReticleMark[], screenSize: number | null | undefined): void {
+        this.reticles = [...marks];
+        // The FRACTION, not a pixel count. Resizing the panel has to change the mark's size, and a
+        // number computed in React would be stale until something else happened to re-render.
+        this.reticleScreenSize = screenSize;
+
+        if (this.reticles.length === 0) {
+            this.clearReticles();
+        }
+    }
+
+    /**
+     * Renders one frame at a chosen size and hands back the PNG bytes.
+     *
+     * The renderer is resized, drawn and put back inside ONE synchronous block. Without
+     * `preserveDrawingBuffer` the drawing buffer is only guaranteed to hold its contents until the
+     * browser composites, which cannot happen while this is running - and asking for that flag
+     * instead would cost every ordinary frame for the sake of the rare capture.
+     *
+     * What it hides is passed in rather than read from the panel's own toggles: an icon usually
+     * wants no grid, no floor and no hardpoint markers even while the reader is working with all
+     * three switched on, and a capture that quietly changed what they were looking at would be
+     * worse than one that asked.
+     */
+    capture(options: {
+        width: number;
+        height: number;
+        background: string | null;
+        grid: boolean;
+        floor: boolean;
+        particles: boolean;
+        /** The axes, the skeleton and the firing arcs: diagnostics, not part of the subject. */
+        annotations: boolean;
+    }): string {
+        const before = {
+            width: this.canvas.width,
+            height: this.canvas.height,
+            aspect: this.camera.aspect,
+            pixelRatio: this.renderer.getPixelRatio(),
+            background: this.scene.background,
+            grid: this.grid.visible,
+            floor: this.floor.visible,
+            catcher: this.shadowCatcher.visible,
+            particles: this.particlesVisible,
+            axes: this.axes.visible,
+            joints: this.joints.visible,
+            jointLines: this.jointLines.visible,
+            selection: this.selectionBoxes.visible,
+            arcs: this.arcsVisible,
+        };
+
+        try {
+            // One device pixel per requested pixel: a capture is measured in pixels, not in the
+            // reader's display scaling, or the same request would give a different file on a
+            // different monitor.
+            this.renderer.setPixelRatio(1);
+            this.renderer.setSize(options.width, options.height, false);
+            // The frame drawn over the viewport, exactly: the largest rectangle of the capture's
+            // shape that fits the viewport, centred (captureFrame). Rendered as a view offset on the
+            // viewport's own projection, so a capture wider than the viewport shows what the frame
+            // shows - not more to either side, which is what widening the aspect used to do.
+            const frame = captureFrame(before.width, before.height, options.width, options.height);
+            this.camera.setViewOffset(before.width, before.height, frame.x, frame.y, frame.width, frame.height);
+            this.camera.updateProjectionMatrix();
+
+            // Null is TRANSPARENT, which is what an icon wants: the alpha the renderer was created
+            // with is what makes it possible at all.
+            this.scene.background = options.background === null
+                ? null
+                : new THREE.Color(options.background);
+
+            this.grid.visible = options.grid;
+            this.floor.visible = options.floor;
+            this.shadowCatcher.visible = options.floor && before.catcher;
+            this.setParticlesVisible(options.particles);
+
+            // The axes, the skeleton and the firing arcs are things drawn to help someone READ the
+            // model. They are not part of it, and an icon with a coloured cross through it is not
+            // an icon - which is exactly what the first capture came out as.
+            this.axes.visible = options.annotations && before.axes;
+            this.joints.visible = options.annotations && before.joints;
+            this.jointLines.visible = options.annotations && before.jointLines;
+
+            // A selection box is a thing drawn to help someone READ the model, exactly like the
+            // axes and the skeleton, and an icon with an amber cage around it is not an icon.
+            this.selectionBoxes.visible = options.annotations && before.selection;
+
+            if (!options.annotations) {
+                this.setFireArcsVisible(false);
+            }
+
+            this.prepareForCamera();
+
+            // A sprite is oriented against the VIEW matrix - a streak's length is a screen-space
+            // measurement - so it has to be re-aimed for this camera. A zero step re-aims without
+            // advancing the simulation: a capture must not move the effects on.
+            if (this.particlesVisible) {
+                for (const entry of this.particleSystems.values()) {
+                    entry.instance.update(0, this.camera.matrixWorldInverse, this.windVector);
+                }
+            }
+
+            this.renderFrame();
+
+            return this.canvas.toDataURL('image/png');
+        } finally {
+            // Always put the room back, including when the render throws: a failed capture must not
+            // leave the reader looking at a 64-pixel viewport with the grid switched off.
+            this.renderer.setPixelRatio(before.pixelRatio);
+            this.scene.background = before.background;
+            this.grid.visible = before.grid;
+            this.floor.visible = before.floor;
+            this.shadowCatcher.visible = before.catcher;
+            this.setParticlesVisible(before.particles);
+            this.axes.visible = before.axes;
+            this.joints.visible = before.joints;
+            this.jointLines.visible = before.jointLines;
+            this.selectionBoxes.visible = before.selection;
+            this.setFireArcsVisible(before.arcs);
+            this.camera.clearViewOffset();
+            this.camera.aspect = before.aspect;
+            this.camera.updateProjectionMatrix();
+            this.resize();
+            this.prepareForCamera();
+            this.renderFrame();
+        }
+    }
+
+    resize(): void {
+        const width = this.canvas.clientWidth || 1;
+        const height = this.canvas.clientHeight || 1;
+
+        this.renderer.setSize(width, height, false);
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
+    }
+
+    /** Whether heat sprites bend the frame. */
+    setHeat(on: boolean): void {
+        this.heatEnabled = on;
+    }
+
+    /**
+     * Draws the heat buffer rather than the bent picture.
+     *
+     * Forces the heat path on while it is on, even with nothing distorting: a debug view that shows
+     * an ordinary frame until something happens to be burning is a control the reader cannot tell
+     * is working. It costs the two heat buffers for as long as it is switched on, which is the
+     * bargain a debug view is.
+     */
+    setHeatDebug(on: boolean): void {
+        this.heatDebug = on;
+    }
+
+    setBloom(on: boolean): void {
+        this.bloomEnabled = on;
+
+        if (!on) {
+            // Give the buffer back rather than holding a full-screen copy of the canvas for a
+            // switch the reader has turned off.
+            this.frameCopy?.dispose();
+            this.frameCopy = null;
+        }
+    }
+
+    /**
+     * The reader's draw-distance multiplier.
+     *
+     * Applied on the next reframe as well as at once, so a change is visible without having to
+     * touch the camera.
+     */
+    setDrawDistance(multiplier: number): void {
+        this.drawDistance = multiplier;
+        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+    }
+
+    dispose(): void {
+        this.disposed = true;
+        // The capture flag has to match, or this silently removes nothing.
+        this.canvas.removeEventListener('pointerdown', this.onPointerDown, {capture: true});
+        this.canvas.removeEventListener('pointermove', this.onPointerMove);
+        window.removeEventListener('pointerup', this.onPointerUp);
+        window.removeEventListener('pointercancel', this.onPointerUp);
+        cancelAnimationFrame(this.frameHandle);
+        this.clear();
+        this.controls.dispose();
+        this.heat?.dispose();
+        this.bloom?.dispose();
+        this.shadowVolumes.dispose();
+        this.frameCopy?.dispose();
+        this.renderer.dispose();
+    }
+
+    /**
+     * Ambient plus two directionals.
+     *
+     * Not an attempt at the engine's lighting - that is what the shader work is for. This exists so
+     * an untextured hull reads as a solid rather than a silhouette, which is what a single light or
+     * ambient alone would give.
+     */
+    private addLighting(): void {
+        this.ambient = new THREE.AmbientLight(0xffffff, DEFAULT_LIGHTS.ambient.intensity);
+        this.scene.add(this.ambient);
+
+        const key = new THREE.DirectionalLight(0xffffff, 1.6);
+
+        // Only the KEY light casts. A second shadow-casting light doubles the cost and crosses two
+        // shadows over the model, which reads as a rendering fault rather than as a fill light.
+        key.castShadow = true;
+        key.shadow.mapSize.set(2048, 2048);
+
+        // Shadow acne on a hull covered in near-parallel panels needs a normal bias, not just a
+        // depth one: a constant bias large enough to clear the panels detaches the shadow from the
+        // geometry casting it.
+        key.shadow.bias = -0.0005;
+        key.shadow.normalBias = 0.02;
+
+        // Two fills, not one, which is AloViewer's own rig and the engine's: it numbers three
+        // directional lights and a translated shader asks for all three by semantic. With only two
+        // supplied, DIR_LIGHT_VEC_2 kept whatever the header declared.
+        const fill1 = new THREE.DirectionalLight(0xffffff, 0.5);
+        const fill2 = new THREE.DirectionalLight(0xffffff, 0.25);
+
+        this.scene.add(key, fill1, fill2, key.target);
+
+        this.keyLight = key;
+
+        // In the order the engine numbers them, so a shader asking for DIR_LIGHT_VEC_0 is lit by
+        // the same sun everything else in the viewport is.
+        this.alamoLights = [key, fill1, fill2];
+        this.applyLightRig();
+
+        this.placeKeyLight();
+    }
+
+    /**
+     * Puts the key light at its current angles, far enough out to clear the model, and sizes the
+     * shadow frustum to match.
+     *
+     * A directional light's shadow camera does not follow anything on its own, so this has to run
+     * again whenever the model's size changes as well as whenever the dial moves.
+     */
+    private placeKeyLight(): void {
+        const light = this.keyLight;
+        if (light === null) {
+            return;
+        }
+
+        const sphere = this.boundingSphere();
+        const direction = lightDirection(this.lightAzimuth, this.lightElevation);
+        const frustum = shadowFrustum(sphere.radius);
+
+        // Stood off at the frustum's far edge, so the model sits comfortably inside the depth range
+        // rather than against its near plane.
+        const distance = frustum.far / 2;
+
+        light.position.set(
+            sphere.center.x + direction.x * distance,
+            sphere.center.y + direction.y * distance,
+            sphere.center.z + direction.z * distance);
+
+        light.target.position.set(sphere.center.x, sphere.center.y, sphere.center.z);
+        light.target.updateMatrixWorld();
+
+        // The volumes extrude away from this same light, so the two can never disagree about where
+        // the shadow falls - and their reach is fitted to the model for the same reason the shadow
+        // camera is.
+        this.shadowVolumes.setLight(direction);
+        this.shadowVolumes.setScale(sphere.radius, this.camera.far);
+
+        const camera = light.shadow.camera;
+        camera.left = -frustum.extent;
+        camera.right = frustum.extent;
+        camera.top = frustum.extent;
+        camera.bottom = -frustum.extent;
+        camera.near = frustum.near;
+        camera.far = frustum.far;
+        camera.updateProjectionMatrix();
+    }
+
+    // ── camera ────────────────────────────────────────────────────────────────
+
+    private buildStars(): THREE.Points {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute(
+            'position', new THREE.BufferAttribute(starPositions(STAR_SEED), 3));
+
+        const stars = new THREE.Points(geometry, new THREE.PointsMaterial({
+            color: 0xffffff,
+            // In pixels, and NOT scaled by distance: these are meant to read as points of light at
+            // infinity, and a star that grows as you dolly in is a speck of dust on the lens.
+            size: 1.6,
+            sizeAttenuation: false,
+            depthTest: false,
+            depthWrite: false,
+        }));
+
+        // Parented to the CAMERA and drawn first: it turns with the view like a sky should and
+        // never occludes anything. It is NOT exempt from the far plane, though - `frustumCulled`
+        // only stops object-level culling - so `prepareForCamera` scales it to sit inside whatever
+        // plane the model has been fitted with.
+        stars.frustumCulled = false;
+        stars.renderOrder = -1;
+        this.camera.add(stars);
+        this.scene.add(this.camera);
+
+        return stars;
+    }
+
+    private buildSky(): THREE.Mesh {
+        const geometry = new THREE.SphereGeometry(1, 32, 24);
+        const colours = new Float32Array(geometry.attributes.position.count * 3);
+        const position = geometry.attributes.position;
+
+        for (let i = 0; i < position.count; i++) {
+            const [r, g, b] = skyGradient(position.getY(i));
+            colours.set([r, g, b], i * 3);
+        }
+
+        geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+
+        const sky = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+            vertexColors: true,
+            // Seen from the inside, and never in the depth buffer.
+            side: THREE.BackSide,
+            depthTest: false,
+            depthWrite: false,
+        }));
+
+        // Follows the camera's POSITION but not its rotation - the horizon has to stay level and at
+        // eye height however the camera turns, which is what makes it read as a horizon rather than
+        // as a painted backdrop stuck to the screen.
+        sky.frustumCulled = false;
+        sky.renderOrder = -1;
+        this.scene.add(sky);
+
+        return sky;
+    }
+
+    /** Puts the current rig onto the three lights and the ambient term. */
+    private applyLightRig(): void {
+        const rig = this.rig;
+        const settings = [rig.sun, rig.fill1, rig.fill2];
+
+        this.alamoLights.forEach((light, index) => {
+            const setting = settings[index];
+            if (setting === undefined) {
+                return;
+            }
+
+            light.color.setRGB(...setting.colour);
+            light.intensity = setting.intensity * ENGINE_LIGHT_TO_THREE;
+
+            // The sun is placed by `placeKeyLight`, which also has the shadow frustum to fit; the
+            // fills only need a direction, and a directional light's position IS its direction.
+            if (index > 0) {
+                const direction = lightDirection(setting.azimuth, setting.elevation);
+                light.position.set(direction.x, direction.y, direction.z);
+            }
+        });
+
+        if (this.ambient !== null) {
+            this.ambient.color.setRGB(...rig.ambient.colour);
+            this.ambient.intensity = rig.ambient.intensity * ENGINE_LIGHT_TO_THREE;
+        }
+
+        this.buildProbe();
+    }
+
+    /**
+     * Projects the rig into the two spherical-harmonic probes the translated shaders read.
+     *
+     * The sun's angles come off `lightAzimuth`/`lightElevation` rather than off `rig.sun`, because
+     * those are the pair `placeKeyLight` uses and `setLightAngles` moves the light without going
+     * through the rig - reading the rig here would leave the probe pointing at where the sun used
+     * to be. Without the PI, which is three's BRDF correction and not the engine's.
+     */
+    private buildProbe(): void {
+        const rig = this.rig;
+        const toward = (azimuth: number, elevation: number): [number, number, number] => {
+            const direction = lightDirection(azimuth, elevation);
+
+            return [direction.x, direction.y, direction.z];
+        };
+
+        const sun: ProbeLight = {
+            toLight: toward(this.lightAzimuth, this.lightElevation),
+            colour: rig.sun.colour,
+            intensity: rig.sun.intensity,
+        };
+
+        const fills: ProbeLight[] = [rig.fill1, rig.fill2].map(fill => ({
+            toLight: toward(fill.azimuth, fill.elevation),
+            colour: fill.colour,
+            intensity: fill.intensity,
+        }));
+
+        const ambient: [number, number, number] = [
+            rig.ambient.colour[0] * rig.ambient.intensity,
+            rig.ambient.colour[1] * rig.ambient.intensity,
+            rig.ambient.colour[2] * rig.ambient.intensity,
+        ];
+
+        this.harmonics = sphericalHarmonics([sun, ...fills], ambient);
+        this.fillHarmonics = sphericalHarmonics(fills, ambient);
+    }
+
     /** The object a part is attached to: a named bone of another part, or the scene root. */
     private attachmentFor(
         partId?: string, bone?: string, boneIndex?: number,
@@ -1966,37 +4311,6 @@ export class PreviewViewport {
 
         this.attachRequests.set(`${partId} / ${bone ?? ''} / ${boneIndex ?? ''}`,
             {partId, bone, boneIndex});
-    }
-
-    /**
-     * Every named attachment that still does not resolve, in words.
-     *
-     * RECOMPUTED rather than logged at the moment of the miss, because most misses are temporary:
-     * geometry arrives asynchronously and a hardpoint routinely asks for its bone before the hull
-     * carrying it has landed. A request that resolves later simply stops being reported, so this
-     * can be read at any time without a stale backlog.
-     */
-    unresolvedAttachments(): string[] {
-        const problems: string[] = [];
-
-        for (const request of this.attachRequests.values()) {
-            const parent = this.parts.get(request.partId);
-            const found = {
-                part: parent !== undefined,
-                bone: request.bone === undefined || parent === undefined
-                    ? false
-                    : (request.boneIndex !== undefined
-                        && parent.bonesByIndex.has(request.boneIndex))
-                    || parent.bones.has(request.bone.toLowerCase()),
-            };
-
-            const problem = attachmentProblem(request, found);
-            if (problem !== null && !problems.includes(problem)) {
-                problems.push(problem);
-            }
-        }
-
-        return problems;
     }
 
     /**
@@ -2224,18 +4538,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Applies a shader's declared render state to every material using it.
-     *
-     * This is the fidelity that needs no shader translation: the effects spell their blend, depth
-     * and cull state out declaratively. A `custom` blend is left alone deliberately - the archetype
-     * guess is better than a wrong one.
-     */
-    applyShaderState(shaderName: string, state: FxMaterialState): void {
-        this.shaderStates.set(shaderName.toLowerCase(), state);
-        this.applyStoredShaderState(shaderName.toLowerCase(), state);
-    }
-
-    /**
      * Puts one shader's render state onto every material currently using it.
      *
      * Both kinds: a translated `AlamoMaterial` needs the blend and depth state just as much as the
@@ -2289,108 +4591,6 @@ export class PreviewViewport {
 
             material.needsUpdate = true;
         });
-    }
-
-    /** Every distinct shader name the loaded geometry names, so each is fetched once. */
-    shaderNames(): string[] {
-        const names = new Set<string>();
-
-        this.modelRoot.traverse(node => {
-            if (!(node instanceof THREE.Mesh)) {
-                return;
-            }
-
-            const shader = (node.userData.alamo as MaterialExtras | undefined)?.alamoShader ?? '';
-            if (shader !== '') {
-                names.add(shader);
-            }
-        });
-
-        return [...names].sort();
-    }
-
-    /** Sets the team tint, or clears it back to the model's own colours. */
-    setColorization(colour: NormalisedColour | null): void {
-        this.colorization = colour;
-
-        this.forEachDrawnMesh(node => {
-            const material = node.material;
-
-            if (material instanceof AlamoMaterial) {
-                // The effect masks the tint itself; it only needs the colour.
-                material.setColorization(colour);
-            } else if (material instanceof THREE.MeshStandardMaterial
-                || material instanceof THREE.MeshBasicMaterial) {
-                // Basic as well as standard: an FC_ mesh on an additive shader is unlit and still
-                // takes the team colour, so checking only for standard left it untinted.
-                this.tint(material);
-            }
-        });
-    }
-
-    /** Which distinct sub-mesh names take the team colour, for the dock to report. */
-    colorizedMeshes(): string[] {
-        const names = new Set<string>();
-
-        this.modelRoot.traverse(node => {
-            if (!(node instanceof THREE.Mesh)) {
-                return;
-            }
-
-            const data = node.material as { userData?: { spec?: { colorize?: boolean } } };
-            const extras = node.userData.alamo as MaterialExtras | undefined;
-
-            if (data.userData?.spec?.colorize === true && extras?.alamoMesh !== undefined) {
-                names.add(extras.alamoMesh);
-            }
-        });
-
-        return [...names].sort();
-    }
-
-    /**
-     * Draws with a translated effect instead of its archetype, wherever that effect is used.
-     *
-     * Kept alongside the archetype rather than replacing it: a mod-authored `.fx` will never
-     * translate, the eleven fixed-function effects have no shader at all, and the archetype is what
-     * both fall back to. `setTranslatedShaders(false)` puts everything back on that path, which is
-     * the only way to see what the translation is actually changing.
-     */
-    applyTranslatedEffect(shaderName: string, effect: TranslatedEffect): void {
-        this.translated.set(shaderName.toLowerCase(), effect);
-
-        if (this.translatedShaders) {
-            this.rebuildMaterials();
-        }
-    }
-
-    /** Whether to draw with translated shaders where one is available. */
-    setTranslatedShaders(enabled: boolean): void {
-        if (this.translatedShaders === enabled) {
-            return;
-        }
-
-        this.translatedShaders = enabled;
-        this.rebuildMaterials();
-    }
-
-    /** How many loaded sub-meshes a translated shader actually reaches, out of how many there are. */
-    translatedCoverage(): { translated: number; total: number } {
-        let translated = 0;
-        let total = 0;
-
-        this.forEachPartMesh(mesh => {
-            if (!meshDrawn(mesh)) {
-                return;
-            }
-
-            total++;
-            if (mesh.material instanceof AlamoMaterial) {
-                translated++;
-            }
-        });
-
-        return {translated, total};
     }
 
     /**
@@ -2584,34 +4784,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Samplers on translated materials that are reading nothing, in words.
-     *
-     * A sampler with no texture reads black, and the shader then draws something plausible and
-     * wrong - the sort of thing that looks like a translation bug and is actually a missing file.
-     */
-    shaderTextureProblems(): string[] {
-        const problems = new Set<string>();
-
-        this.forEachPartMesh(mesh => {
-            if (!(mesh.material instanceof AlamoMaterial)) {
-                return;
-            }
-
-            const shader = (mesh.userData.alamo as MaterialExtras | undefined)?.alamoShader
-                ?? 'a shader';
-
-            for (const {sampler, file} of mesh.material.unboundSamplers()) {
-                problems.add(`${shader}: Sampler '${sampler}' is still waiting for '${file}'.`);
-            }
-            for (const sampler of mesh.material.unnamedSamplers) {
-                problems.add(`${shader}: Sampler '${sampler}' has no texture on this sub-mesh.`);
-            }
-        });
-
-        return [...problems];
-    }
-
-    /**
      * The bone palette for one skinned mesh, in the space the Alamo skinned shaders work in.
      *
      * WORLD space, not mesh-local. The skinned effects project with VIEWPROJECTION rather than
@@ -2645,6 +4817,8 @@ export class PreviewViewport {
         return palette;
     }
 
+    // ── animation ─────────────────────────────────────────────────────────────
+
     /** Rebuilds every mesh's material for the current translated/archetype choice. */
     private rebuildMaterials(): void {
         this.forEachDrawnMesh(mesh => this.applyMaterial(mesh));
@@ -2662,12 +4836,6 @@ export class PreviewViewport {
         for (const [name, texture] of this.textures) {
             this.setTexture(name, texture);
         }
-    }
-
-    /** Applies a decoded texture wherever a material asked for it by name. */
-    setTexture(name: string, texture: THREE.Texture): void {
-        this.textures.set(name, texture);
-        this.bindTextureIn(this.modelRoot, name, texture);
     }
 
     /**
@@ -2695,21 +4863,6 @@ export class PreviewViewport {
         });
 
         return found;
-    }
-
-    /**
-     * Binds every texture already decoded into a subtree that has only just been added.
-     *
-     * `setTexture` binds at the moment the texture ARRIVES, so geometry added afterwards gets
-     * nothing - and asking the host again does not help, because it remembers what it has already
-     * sent and answers a repeat request with silence. Wreckage is the case that exposed this: a
-     * breakoff prop is usually a piece of the hull it fell off, so its textures are always ones
-     * already in hand, and it dropped as a black shape every time.
-     */
-    bindLoadedTextures(root: THREE.Object3D): void {
-        for (const [name, texture] of this.textures) {
-            this.bindTextureIn(root, name, texture);
-        }
     }
 
     private bindTextureIn(root: THREE.Object3D, name: string, texture: THREE.Texture): void {
@@ -2754,172 +4907,6 @@ export class PreviewViewport {
         });
     }
 
-    /** Removes everything, so a new subject starts from an empty scene. */
-    clear(): void {
-        for (const entry of this.particleSystems.values()) {
-            entry.instance.dispose();
-        }
-        this.particleSystems.clear();
-        // A new subject is one of the two things allowed to cut a fading system short.
-        this.clearFadingParticles();
-
-        // BEFORE the sweep below, not after: a wreck is one of those parts now, and taking it
-        // apart a second time would dispose a tree that has already gone.
-        this.clearBreakoffs();
-
-        // BEFORE the parts are disposed. The pass holds its counting meshes by their SOURCE mesh,
-        // and those sources are inside the trees about to go - so letting them be disposed first
-        // leaves the map keyed by objects nobody else can reach.
-        //
-        // Nothing else takes them: `removePart` unregisters through `dropRegistrations`, but this
-        // sweep does not go through `removePart`, so every subject switch left its volumes behind.
-        // Measured: the palace alone registers 4 sources and 8 counting meshes; opened after the
-        // Executor it reported 8 and 16, half of them belonging to a model no longer in the scene.
-        // The stencil pass then counts geometry that is not there, which is why a handful of models
-        // rendered differently depending on what had been looked at before them.
-        this.shadowVolumes.clear();
-
-        for (const part of this.parts.values()) {
-            part.root.removeFromParent();
-            disposeTree(part.root);
-        }
-
-        this.clearFireArcs();
-        this.clearTurretHandles();
-
-        // The scale belongs to the SUBJECT. Left standing, the next one would be drawn at the last
-        // one's - and a 0.5 ship followed by a 2.0 one is a four-fold error that looks like a
-        // broken model rather than stale state.
-        this.modelScale = 1;
-        this.scaledRoot.scale.setScalar(1);
-
-        // A new subject asks for its own bones. Keeping the old subject's requests would report a
-        // Star Destroyer's missing hardpoint against a Mon Calamari Cruiser for the rest of the session.
-        this.attachRequests.clear();
-        this.cachedSpan = null;
-        // The marks name parts that are about to stop existing; leaving them would draw a reticle
-        // over the next model's geometry at whatever the last one's bounds happened to be.
-        this.reticles = [];
-        this.hoveredReticle = null;
-        this.clearReticles();
-        this.parts.clear();
-        this.billboards = [];
-        this.hiddenParts.clear();
-        this.transient.clear();
-        this.knownDecals = new Set();
-        this.shownDecals = new Set();
-        this.collisionMeshes = new Set();
-        this.shieldRevealed = false;
-        // Every subject's clips, mixer, tracks, rest pose and node names at once. They hold nodes
-        // of a model nobody is looking at any more, and keeping them would leak the whole graph.
-        this.subjects.clear();
-        this.overridingVisibility = false;
-    }
-
-    // ── damage ────────────────────────────────────────────────────────────────
-
-    /**
-     * Which decal meshes exist, and which of them are showing.
-     *
-     * Both together, because a decal that is not showing has to be actively hidden: the model ships
-     * these meshes VISIBLE - measured on Ev_stardestroyer.alo, where HP_F-L_Blast is both a bone and
-     * a mesh - so the engine hides them until the hardpoint is destroyed, and so must this.
-     */
-    setDecals(known: ReadonlySet<string>, shown: ReadonlySet<string>): void {
-        this.knownDecals = known;
-        this.shownDecals = shown;
-        this.applyLevels();
-    }
-
-    /**
-     * Which meshes the hardpoints claim as collision hulls.
-     *
-     * Gated OFF rather than hidden outright, so the reader can still tick one on in the tree and
-     * look at it - which is exactly what someone opens a hull for. The material rules already catch
-     * most of these by name; this is the author's own word, for the ones they do not.
-     */
-    setCollisionMeshes(names: ReadonlySet<string>): void {
-        this.collisionMeshes = names;
-        this.applyLevels();
-    }
-
-    /**
-     * Shield meshes the model names but does not draw with a shield shader.
-     *
-     * Reported to the reader rather than corrected: the NAME is what decides which mesh a shield
-     * ability reveals, so the author's word stands - but a bubble on a hull shader will read as
-     * solid geometry rather than a field, and that is worth saying once.
-     */
-    shieldMeshesOffShader(): string[] {
-        const names = new Set<string>();
-
-        this.forEachPartMesh(mesh => {
-            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-            if (shieldMeshOffShader(extras)) {
-                names.add(extras.alamoMesh ?? mesh.name);
-            }
-        });
-
-        return [...names];
-    }
-
-    /** Shows or hides the shield mesh, for the abilities that reveal it. */
-    setShieldRevealed(revealed: boolean): void {
-        this.shieldRevealed = revealed;
-        this.applyLevels();
-    }
-
-    /**
-     * Cloaks the unit, or uncloaks it.
-     *
-     * Through `applyLevels` like the shield, because the row chain is the one writer of drawn state
-     * and this has to go through it rather than around it. Setting `visible` on the meshes here
-     * would be a second writer, and the chain would put them back on its next run.
-     */
-    setStealthed(on: boolean): void {
-        this.stealthed = on;
-        this.applyLevels();
-    }
-
-    /** Whether a cloak is engaged, which every other visibility rule defers to. */
-    isStealthed(): boolean {
-        return this.stealthed;
-    }
-
-    /**
-     * Puts the subject's geometry at the size the game draws it.
-     *
-     * See {@link scaledRoot} for why this is one node down rather than on the model root. Anything
-     * already drawn is rebuilt, because the two gizmos that counter-scale were built against the
-     * old value.
-     */
-    setModelScale(scale: number): void {
-        const next = Number.isFinite(scale) && scale > 0 ? scale : 1;
-
-        if (next === this.modelScale) {
-            return;
-        }
-
-        this.modelScale = next;
-        this.scaledRoot.scale.setScalar(next);
-
-        // The span is measured off world matrices, so it changes with the scale - and everything
-        // sized against the subject reads it.
-        this.cachedSpan = null;
-
-        for (const arc of this.arcs) {
-            this.applyArcScale(arc);
-        }
-
-        for (const nodes of this.turretHandleNodes.values()) {
-            nodes.yaw.track.scale.setScalar(1 / next);
-            nodes.pitch.track.scale.setScalar(1 / next);
-        }
-
-        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
-    }
-
     /**
      * Undoes the geometry scale on an arc that lives inside it.
      *
@@ -2931,108 +4918,6 @@ export class PreviewViewport {
         const inside = arc.userData.aetArcFrame === 'bone';
 
         arc.scale.setScalar(inside ? 1 / this.modelScale : 1);
-    }
-
-    /**
-     * Draws the firing arcs, replacing whatever was there.
-     *
-     * Off by default, and for good reason: a Star Destroyer's arcs reach 2000 units on a hull about
-     * 600 long, so leaving them on hides the ship inside its own cones.
-     */
-    setFireArcs(
-        arcs: readonly {
-            partId: string;
-            bone: string;
-            frame: 'bone' | 'hull';
-            kind: 'fire' | 'rotation';
-            widthDegrees: number;
-            heightDegrees: number;
-            range: number;
-        }[],
-    ): void {
-        this.clearFireArcs();
-
-        // How BIG the subject is, so a 2000-unit reach on a 600-unit hull is drawn at a length the
-        // reader can stand outside of. See `drawnConeRange` - the row still states the true range.
-        const modelSize = this.modelSpan();
-
-        for (const arc of arcs) {
-            const boneNode = this.fireBoneAttachment(arc.partId, arc.bone);
-            const drawn = {
-                ...arc,
-                range: drawnConeRange(
-                    arc.range, modelSize, arc.widthDegrees, arc.heightDegrees),
-            };
-            // Two envelopes, told apart by weight rather than by hue: they describe the SAME
-            // weapon, and a second colour would read as a second weapon. The solid one is where it
-            // may shoot; the lighter one is where the barrel may point.
-            const rotation = arc.kind === 'rotation';
-            const mesh = new THREE.Mesh(
-                coneGeometry(drawn),
-                (rotation ? ROTATION_ARC_MATERIAL : FIRE_ARC_MATERIAL).clone());
-
-            // Which frame the arc is measured in is the engine's choice, not ours, and the two
-            // firing paths disagree:
-            //
-            //   bone - the weapon-aim test measures in the hardpoint's OWN
-            //          coordinate system, so the bone's rotation IS the aim and parenting to it is
-            //          exactly right.
-            //   hull - the cone-of-fire test reads the muzzle matrix for its
-            //          TRANSLATION and then discards the rotation, rebuilding the frame from
-            //          owner->Get_Facing(). The arc starts at the bone and points where the HULL
-            //          points, so a rotated MuzzleA must not carry it round.
-            //
-            // Parenting to the model root and placing the mesh at the bone's position in that space
-            // gives exactly that: the bone supplies the origin, and the HULL'S FACING supplies the
-            // orientation. Not the root's raw axes - the nose is +Z there, and the cone is built
-            // along +X. See `hullFrameBasis`.
-            const parent = arc.frame === 'hull' ? this.modelRoot : boneNode;
-
-            if (arc.frame === 'hull') {
-                boneNode.updateWorldMatrix(true, false);
-                this.modelRoot.updateWorldMatrix(true, false);
-                mesh.position.copy(
-                    this.modelRoot.worldToLocal(
-                        boneNode.getWorldPosition(new THREE.Vector3())));
-
-                // And the HULL's facing, not the root's raw axes. The cone is built along +X for a
-                // fire bone; the hull's nose is +Z here. Leaving this out is what put every
-                // WEAPON-behaviour arc a quarter turn off. See `hullFrameBasis`.
-                const [forward, lateral, up] = hullFrameBasis();
-                mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
-                    new THREE.Vector3(...forward),
-                    new THREE.Vector3(...lateral),
-                    new THREE.Vector3(...up)));
-
-                // The position above is only the starting point; `followHullArcs` keeps it on the
-                // muzzle once a clip starts moving the bone.
-                this.hullArcs.push({mesh, muzzle: boneNode});
-            }
-
-            mesh.visible = this.arcsVisible;
-            // The gizmo is a hint, not geometry: it must never occlude the hull it describes.
-            mesh.renderOrder = 1;
-
-            // A range is a WORLD distance, so an arc parented inside the scaled geometry has to
-            // undo that scale. Recorded on the mesh so a later `setModelScale` can redo it without
-            // rebuilding every cone.
-            mesh.userData.aetArcFrame = arc.frame;
-            // Not the model. A hardpoint arc hangs on a fire bone inside the hull, where every walk
-            // over the model's meshes reaches it - see `isOverlay`.
-            mesh.userData.aetOverlay = true;
-            this.applyArcScale(mesh);
-
-            // A CHILD of the fill, so one visible flag governs both and an outline can never be
-            // left burning over an arc that has been switched off.
-            const outline = new THREE.LineSegments(
-                coneOutlineGeometry(drawn),
-                (rotation ? ROTATION_ARC_OUTLINE_MATERIAL : FIRE_ARC_OUTLINE_MATERIAL).clone());
-            outline.renderOrder = 2;
-            mesh.add(outline);
-
-            parent.add(mesh);
-            this.arcs.push(mesh);
-        }
     }
 
     /**
@@ -3052,13 +4937,6 @@ export class PreviewViewport {
     private fireBoneAttachment(partId: string, bone: string): THREE.Object3D {
         return this.parts.get('hull')?.bones.get(bone.toLowerCase())
             ?? this.attachmentFor(partId, bone);
-    }
-
-    setFireArcsVisible(visible: boolean): void {
-        this.arcsVisible = visible;
-        for (const arc of this.arcs) {
-            arc.visible = visible;
-        }
     }
 
     private clearFireArcs(): void {
@@ -3106,146 +4984,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Poses turrets at their rest angle.
-     *
-     * Traverse is about the bone's local Z. Alamo is Z-up, and the exporter's Z-up-to-Y-up rotation
-     * sits on the ROOT node, so a bone's own axes still follow the file's convention - the same one
-     * the fire bones showed: X forward, Y lateral, Z up.
-     */
-    setTurretRestAngles(
-        poses: readonly { partId: string; bone: string; restAngleDegrees: number }[],
-    ): void {
-        for (const pose of poses) {
-            const bone = this.parts.get(pose.partId)?.bones.get(pose.bone.toLowerCase());
-            if (bone !== undefined) {
-                bone.rotation.z = pose.restAngleDegrees * (Math.PI / 180);
-            }
-        }
-    }
-
-    /**
-     * Sweeps the turrets through the traverse their XML declares.
-     *
-     * The pose is recomputed per frame from `sweepAngles`, so what is on screen is always the
-     * declared extent rather than an accumulated one - an incremental turn drifts, and a turret that
-     * drifts past its own end stops is exactly the thing this exists to disprove.
-     *
-     * Traverse is about the bone's local Z and elevation about its X. Alamo is Z-up and the
-     * exporter's Z-up-to-Y-up rotation sits on the ROOT node, so a bone's own axes still follow the
-     * file's convention - the same one the fire bones showed.
-     */
-    setTurretSweep(
-        sweeps: readonly {
-            partId: string;
-            turretBone: string;
-            barrelBone: string | null;
-            turret: PreviewTurret;
-        }[],
-    ): void {
-        this.turretSweeps = [...sweeps];
-
-        // Anything that has stopped sweeping goes back to the pose the model authored. Only bones
-        // this class actually moved are in the map, so a part that has not loaded yet is not
-        // "missing" here - it was never touched.
-        const swinging = new Set<THREE.Object3D>();
-
-        for (const sweep of sweeps) {
-            const part = this.parts.get(sweep.partId);
-            const turret = part?.bones.get(sweep.turretBone.toLowerCase());
-            const barrel = sweep.barrelBone === null
-                ? undefined
-                : part?.bones.get(sweep.barrelBone.toLowerCase());
-
-            if (turret !== undefined) {
-                swinging.add(turret);
-            }
-
-            if (barrel !== undefined) {
-                swinging.add(barrel);
-            }
-        }
-
-        for (const [bone, rest] of [...this.sweepRest]) {
-            if (!swinging.has(bone)) {
-                bone.quaternion.copy(rest);
-                this.sweepRest.delete(bone);
-            }
-        }
-
-        if (sweeps.length === 0) {
-            this.sweepPhase = 0;
-        }
-    }
-
-    /**
-     * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest.
-     *
-     * Two axes and no third: the engine has no roll on a turret -
-     * the turret-angle calculation returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
-     *
-     * Each track spans only what the engine allows, so the stop is visible before it is reached.
-     * Which turrets these are is {@link turretHandles}' decision, off the arc toggle, and not this
-     * class's.
-     */
-    setTurretHandles(handles: readonly TurretHandle[]): void {
-        this.turretHandles = [...handles];
-
-        const wanted = new Set(handles.map(handle => handle.id));
-
-        for (const [id, nodes] of [...this.turretHandleNodes]) {
-            if (!wanted.has(id)) {
-                disposeTurretHandle(nodes.yaw);
-                disposeTurretHandle(nodes.pitch);
-                this.turretHandleNodes.delete(id);
-            }
-        }
-
-        // The aim OUTLIVES the handle being taken off and put back: switching an arc off and on
-        // again is not a request to re-centre a turret the reader deliberately pointed somewhere.
-        // Same rule the arc toggles already follow. A SUBJECT SWITCH is the case where the aims
-        // really should go, and `clearTurretHandles` is where that happens.
-        if (handles.length === 0) {
-            this.hoveredTurretAxis = null;
-            this.turretDrag = null;
-        }
-
-        const radius = trackRadius(this.modelSpan());
-
-        for (const handle of handles) {
-            if (this.turretHandleNodes.has(handle.id)) {
-                continue;
-            }
-
-            const yawBone = this.turretBoneNode(handle.partId, handle.turretBone);
-            // The barrel carries elevation when the model separates the two; 2 of 19 do not, and
-            // then one bone does both - exactly as the sweep already handles it.
-            const pitchBone = handle.barrelBone === null
-                ? yawBone
-                : this.turretBoneNode(handle.partId, handle.barrelBone) ?? yawBone;
-
-            if (yawBone === undefined || pitchBone === undefined) {
-                continue;
-            }
-
-            this.turretHandleNodes.set(handle.id, {
-                yaw: this.buildTurretHandle(handle, 'yaw', yawBone, radius),
-                // One bone doing both - the model names no barrel, or names one it does not carry -
-                // so the pitch track has to follow the yaw itself. With a barrel, the hierarchy
-                // carries it.
-                pitch: this.buildTurretHandle(
-                    handle, 'pitch', pitchBone, radius, pitchBone === yawBone),
-            });
-        }
-
-        this.applyTurretAims();
-    }
-
-    /** Where the reader has pointed each turret, for the shell to read back out. */
-    turretAim(id: string): TurretAim {
-        return this.turretAims.get(id) ?? TURRET_AT_REST;
-    }
-
-    /**
      * Everything this class holds about turrets, for a SUBJECT SWITCH.
      *
      * A handle's track is parented to a bone of the part about to be disposed, and its aim is a
@@ -3265,18 +5003,6 @@ export class PreviewViewport {
         this.turretAims.clear();
         this.hoveredTurretAxis = null;
         this.turretDrag = null;
-    }
-
-    /**
-     * Puts one turret back where the model authored it.
-     *
-     * Needed because releasing a drag deliberately does NOT spring back - a handle that reset
-     * itself would be a momentary readout rather than a control - so there has to be a way home.
-     */
-    resetTurretAim(id: string): void {
-        this.turretAims.delete(id);
-        this.applyTurretAims();
-        this.onTurretAimed?.(id, TURRET_AT_REST);
     }
 
     /**
@@ -3387,9 +5113,6 @@ export class PreviewViewport {
         }
     }
 
-    /** Scratch for {@link placeTurretAnchor}, which runs every frame and should not allocate. */
-    private readonly twistScratch = new THREE.Quaternion();
-
     /**
      * The bone an axis turns about, looking on the hull before the attached model.
      *
@@ -3447,16 +5170,7 @@ export class PreviewViewport {
         }
     }
 
-    /**
-     * The pose the MODEL authored for each bone this class swings, captured before it first moves.
-     *
-     * A sweep is an angle ON TOP of that, not an angle instead of it. The old code assigned
-     * `bone.rotation.z` outright, which threw the authored orientation away and left the other two
-     * Euler components composing against a value that no longer meant anything - the offset the user
-     * reported. A turret bone is placed AND oriented by the exporter, so its rest rotation is almost
-     * never identity.
-     */
-    private readonly sweepRest = new Map<THREE.Object3D, THREE.Quaternion>();
+    // ── frame loop ────────────────────────────────────────────────────────────
 
     /** Its authored pose, remembered the first time it is asked for. */
     private sweepRestOf(bone: THREE.Object3D): THREE.Quaternion {
@@ -3557,89 +5271,7 @@ export class PreviewViewport {
         bone.quaternion.copy(this.sweepRestOf(bone)).multiply(turn);
     }
 
-    /**
-     * Drops a piece of wreckage where a hardpoint used to be.
-     *
-     * A PASSIVE SUBJECT loaded by the one loader, which is all that is left here that is specific
-     * to debris: where the hardpoint was, and the clock it runs on. It used to load itself, and the
-     * hand copy drifted - four of its six duplicated steps were added one bug report at a time,
-     * and nine more were simply missing.
-     *
-     * Its own subject rather than another piece of the ship: debris is transient, it is removed on
-     * its own clock, it is drawn by its own file's rules, and re-parenting the hardpoint's own model
-     * would fight the destruction rules that hid it.
-     */
-    async addBreakoff(
-        key: string, glbBase64: string, at: BreakoffAnchor,
-        prop: PreviewBreakoffProp,
-    ): Promise<void> {
-        // Where the hardpoint was, in world space, captured once - the debris does not follow the ship.
-        // WHICH node that is, is `breakoffAnchor`'s decision and not this one's: a hardpoint model can
-        // carry a copy of the hull's own bones, and resolving the attachment bone by name inside it
-        // applied the offset twice.
-        const anchor = this.attachmentFor(at.partId, at.bone, at.boneIndex);
-        const origin = anchor.getWorldPosition(new THREE.Vector3());
-        const facing = anchor.getWorldQuaternion(new THREE.Quaternion());
-
-        // The wreck's part id and its subject id are the same string on purpose: it is one model
-        // and one subject, and the effects it trails already address it by this name.
-        const wreckId = `${BREAKOFF_ATTACHMENT}${key}`;
-
-        const root = await this.addPart(wreckId, glbBase64, undefined, undefined, {
-            subjectId: wreckId,
-            pose: {position: origin, quaternion: facing},
-        });
-
-        this.breakoffs.push({
-            key, partId: wreckId, root, prop, origin, facing,
-            age: 0,
-            lifetime: breakoffLifetime(prop),
-            expired: false,
-        });
-    }
-
-    /**
-     * Clears the wreckage ONE hardpoint shed.
-     *
-     * Repairing a single hardpoint from its own card has to take its debris with it, exactly as
-     * repairing the whole target does - otherwise the hardpoint is back on the hull and its wreck
-     * is still tumbling away beside it.
-     */
-    clearBreakoff(key: string): void {
-        // Spliced in place rather than reassigned: the array is readonly on the field, and the
-        // wholesale clear beside this one empties it the same way for the same reason.
-        for (let at = this.breakoffs.length - 1; at >= 0; at--) {
-            if (this.breakoffs[at].key !== key) {
-                continue;
-            }
-
-            this.removePart(this.breakoffs[at].partId);
-            this.breakoffs.splice(at, 1);
-        }
-    }
-
-    /** Clears every piece of wreckage - a repair puts the hardpoints back, so the debris goes. */
-    clearBreakoffs(): void {
-        for (const debris of this.breakoffs) {
-            this.removePart(debris.partId);
-        }
-
-        this.breakoffs.length = 0;
-    }
-
-    /**
-     * Told when a piece of wreckage reaches the end of its declared lifetime.
-     *
-     * A callback rather than something polled: it is an EVENT, like a hardpoint's own death, and
-     * the explosion it triggers has to be fetched by the client - the viewport has no way to ask
-     * for a particle system itself.
-     */
-    onBreakoffExpired: ((key: string, prop: PreviewBreakoffProp) => void) | null = null;
-
-    /** Whether a piece of wreckage for this key is already in the air. */
-    hasBreakoff(key: string): boolean {
-        return this.breakoffs.some(debris => debris.key === key);
-    }
+    // ── particles ──────────────────────────────────────────────────────
 
     /**
      * Drifts the wreckage and retires it when its time is up.
@@ -3705,74 +5337,6 @@ export class PreviewViewport {
         this.breakoffs.push(...alive);
     }
 
-    // ── spinning away ─────────────────────────────────────────────────────────
-
-    /**
-     * The unit flying off and coming apart, for one that declares no death clone.
-     *
-     * Driven HERE rather than from the panel because it is a per-frame thing and this class already
-     * owns the frame. The panel says start and is told when it is over.
-     */
-    private spinAway: {
-        partId: string;
-        spin: PreviewSpinAway;
-        elapsed: number;
-        onDone: () => void;
-    } | null = null;
-
-    /**
-     * Where the flying part sat before it was pushed, so putting it back is exact.
-     *
-     * Held SEPARATELY from `spinAway` and outlives it. The spin ends the moment the wreck explodes,
-     * but the part is still sitting out there where it finished - and clearing both together left
-     * `clearSpinAway` with nothing to restore, so Repair brought the ship back visible at the far
-     * end of its own death run, 270 units off the grid.
-     */
-    private spinRestore: {
-        partId: string;
-        position: THREE.Vector3;
-        quaternion: THREE.Quaternion;
-    } | null = null;
-
-    /** Starts the wreck on its way. `onDone` fires once, at the end of the declared time. */
-    startSpinAway(partId: string, spin: PreviewSpinAway, onDone: () => void): void {
-        const part = this.parts.get(partId);
-        if (part === undefined) {
-            // Nothing to fly. Report it over at once rather than leaving the caller waiting on a
-            // callback that can never come.
-            onDone();
-            return;
-        }
-
-        this.clearSpinAway();
-
-        this.spinRestore = {
-            partId,
-            position: part.root.position.clone(),
-            quaternion: part.root.quaternion.clone(),
-        };
-
-        this.spinAway = {partId, spin, elapsed: 0, onDone};
-    }
-
-    /** Puts the wreck back where it started, whether it is still flying or already exploded. */
-    clearSpinAway(): void {
-        this.spinAway = null;
-
-        const home = this.spinRestore;
-        this.spinRestore = null;
-
-        if (home === null) {
-            return;
-        }
-
-        const part = this.parts.get(home.partId);
-        if (part !== undefined) {
-            part.root.position.copy(home.position);
-            part.root.quaternion.copy(home.quaternion);
-        }
-    }
-
     private advanceSpinAway(dt: number): void {
         const flying = this.spinAway;
         if (flying === null) {
@@ -3818,22 +5382,6 @@ export class PreviewViewport {
         }
     }
 
-    /** Breaks an attached part off, or puts it back. */
-    setPartHidden(partId: string, hidden: boolean): void {
-        if (hidden) {
-            this.hiddenParts.add(partId);
-        } else {
-            this.hiddenParts.delete(partId);
-        }
-
-        const part = this.parts.get(partId);
-        if (part !== undefined) {
-            part.root.visible = !hidden;
-        }
-
-        this.holdEffectsOf(partId);
-    }
-
     /**
      * Holds the effects attached to a part while that part is off screen.
      *
@@ -3855,43 +5403,6 @@ export class PreviewViewport {
             if (entry.attachToPartId === partId) {
                 entry.instance.hold('part', hidden);
             }
-        }
-    }
-
-    /**
-     * Removes one loaded part and frees its geometry.
-     *
-     * For parts that come and go with a STATE rather than with the subject - a death clone appears
-     * when the ship dies and goes again when it is repaired. A scene part is never removed this
-     * way; it lives as long as the subject does and is hidden instead.
-     */
-    removePart(partId: string): void {
-        const part = this.parts.get(partId);
-        if (part === undefined) {
-            return;
-        }
-
-        // Its effects first, and through the ordinary route so `leaveParticles` still has its say.
-        // They no longer live inside the part's subtree, so nothing else would ever take them:
-        // before, disposing the part quietly freed their buffers underneath them, which left every
-        // entry in `particleSystems` still being stepped against disposed geometry.
-        for (const [id, entry] of [...this.particleSystems]) {
-            if (entry.attachToPartId === partId) {
-                this.removeParticleSystem(id);
-            }
-        }
-
-        this.dropRegistrations(part.subjectId, part.root);
-        part.root.removeFromParent();
-        disposeTree(part.root);
-        this.parts.delete(partId);
-        this.hiddenParts.delete(partId);
-
-        // The subject goes with its last part. A repair removes the wreck, and a mixer left behind
-        // would keep ticking a clip whose nodes have been disposed. The ACTIVE subject stays
-        // whatever happens - it is the scene, and only `clear` ends it.
-        if (part.subjectId !== ACTIVE_SUBJECT && this.rootPartOf(part.subjectId) === null) {
-            this.subjects.delete(part.subjectId);
         }
     }
 
@@ -3930,101 +5441,6 @@ export class PreviewViewport {
 
         const held = new Set(inside);
         this.billboards = this.billboards.filter(node => !held.has(node));
-    }
-
-    /**
-     * Plays a system once and forgets it.
-     *
-     * A death explosion is an event, not a state: it fires as the hardpoint is destroyed and must not
-     * come back when the effect list is toggled or the levels change.
-     */
-    playOnce(
-        id: string,
-        system: AlamoParticleContent,
-        attachToPartId?: string,
-        attachBone?: string,
-        /** The owning object's uniform render scale. See {@link ParticlePlacement}. */
-        scaleFactor = 1,
-        /** Where to put it when it hangs on no part. See {@link ParticlePlacement.at}. */
-        at?: { x: number; y: number; z: number },
-    ): void {
-        // Always the Gameplay lens's. A one-shot IS an event - a hardpoint blowing up - and an
-        // event is never something the model declares.
-        this.addParticleSystem(
-            id, system, {origin: 'gameplay', attachToPartId, attachBone, scaleFactor, at});
-        this.transient.add(id);
-    }
-
-    // ── levels ────────────────────────────────────────────────────────────────
-
-    /**
-     * Sets the damage state and detail level, the way the engine gates geometry.
-     *
-     * The DIRECTION matters, not just the value: the engine computes `altdesc = alt < m_alt` inside
-     * `SetALT` and hands it to `CheckAltLod`, where a proxy marked `altDecreaseStayHidden` is held
-     * back. A LOD change passes false, because winding detail down is not repairing anything.
-     */
-    setLevels(alt: number, lod: number): void {
-        this.altDescending = alt < this.alt;
-        this.alt = alt;
-        this.lod = lod;
-
-        // The reader's word SURVIVES a level change. It used to be cleared, on the grounds that a
-        // different damage state is a different set of geometry - but viewport visibility is now
-        // deliberately independent of what the model draws, and the row that outlives the level is
-        // marked as one the model does not draw, so nothing is claimed that is not true.
-        this.applyLevels();
-    }
-
-    /** The ALT and LOD levels the loaded parts and effects actually define. */
-    definedLevels(): DefinedLevels {
-        const tagged: LevelTagged[] = [];
-
-        this.modelRoot.traverse(node => {
-            if (!(node instanceof THREE.Mesh)) {
-                return;
-            }
-
-            const extras = node.userData.alamo as MaterialExtras | undefined;
-            if (extras !== undefined) {
-                tagged.push({
-                    alt: extras.alamoAlt ?? null,
-                    lod: extras.alamoLod ?? null,
-                    altDecreaseStayHidden: false,
-                });
-            }
-        });
-
-        for (const entry of this.particleSystems.values()) {
-            tagged.push(entry.levels);
-        }
-
-        return definedLevels(tagged);
-    }
-
-    /**
-     * What each detail level draws, in meshes and triangles, at the current damage stage.
-     *
-     * Every mesh the model holds rather than only the ones on screen: the question is what a level
-     * COSTS, which is a property of the file and not of where the slider happens to sit. The rule
-     * that decides which meshes belong to a level is `costByLevel`'s, which is the viewport's own
-     * gate.
-     */
-    costByLod(levels: readonly number[]): Map<number, LevelCost> {
-        const meshes: { extras: MaterialExtras; triangles: number }[] = [];
-
-        this.modelRoot.traverse(node => {
-            if (!(node instanceof THREE.Mesh)) {
-                return;
-            }
-
-            const extras = node.userData.alamo as MaterialExtras | undefined;
-            if (extras !== undefined) {
-                meshes.push({extras, triangles: triangleCount(node.geometry)});
-            }
-        });
-
-        return costByLevel(meshes, this.alt, levels);
     }
 
     private applyLevels(): void {
@@ -4437,273 +5853,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Everything the model is made of, as flat items for ONE tree: bones, the meshes attached to
-     * them, and the particle emitters attached to them.
-     *
-     * A mesh's origin IS a bone and an emitter is attached to one, so the skeleton is already the
-     * structure all three live in. Ids are prefixed by kind so they cannot collide.
-     */
-    /** For the harness: drives controls that have no UI yet. Costs nothing when unused. */
-    expose(): void {
-        (globalThis as unknown as { __aetViewport?: unknown }).__aetViewport = this;
-    }
-
-    treeItems(): TreeItem[] {
-        const items: TreeItem[] = [];
-
-        // Rebuilt with the rows, so the inspector can never describe something the tree no longer
-        // shows. Deriving it separately would mean two places deciding what a row IS - and the
-        // merge rule is exactly the sort of thing that drifts when it lives twice.
-        this.inspectSources.clear();
-
-        const hull = this.hull();
-        if (hull === null) {
-            return items;
-        }
-
-        const boneId = boneRowId;
-
-        // Which bone owns each object. A mesh is normally parented to the bone that is its origin;
-        // a SKINNED mesh is parented at the skeleton root instead, because it spans many bones, and
-        // then lists under its own first joint.
-        const boneOf = new Map<THREE.Object3D, number>();
-        for (const [index, node] of hull.bonesByIndex) {
-            boneOf.set(node, index);
-        }
-
-        const rootBone = [...hull.bonesByIndex.keys()].sort((a, b) => a - b)[0] ?? 0;
-
-        // From the object ITSELF, not from its parent: an effect names its owning bone directly
-        // rather than being attached to it, so the answer is usually the very node it was handed.
-        const ownerOf = (object: THREE.Object3D): number => {
-            for (let at: THREE.Object3D | null = object; at !== null; at = at.parent) {
-                const index = boneOf.get(at);
-                if (index !== undefined) {
-                    return index;
-                }
-            }
-
-            if (object instanceof THREE.SkinnedMesh) {
-                const first = object.skeleton.bones[0];
-                const index = first === undefined ? undefined : boneOf.get(first);
-
-                if (index !== undefined) {
-                    return index;
-                }
-            }
-
-            return rootBone;
-        };
-
-        const meshByBone = new Map<number, THREE.Mesh>();
-        const extraMeshes: { mesh: THREE.Mesh; owner: number }[] = [];
-
-        // The effect a proxy bone IS, rather than one attached to it - see `effectPlacement`. Held
-        // by bone so the bone loop below can claim both halves as one row, the way it already does
-        // for a mesh of the same name.
-        const effectByBone = new Map<number, string>();
-
-        // Rebuilt from scratch: a row that no longer exists must not keep answering for a scene
-        // object that has been unloaded.
-        this.rowTargets.clear();
-        this.rowParents.clear();
-        this.rowNames.clear();
-
-        const bones = this.skeleton();
-        const roots = new Set(bones.filter(bone => bone.parent < 0).map(bone => bone.index));
-
-        const boneName = (index: number): string => {
-            const node = hull.bonesByIndex.get(index);
-            return node === undefined ? '' : alamoBoneName(node.name)?.name ?? node.name;
-        };
-
-        this.forEachPartMesh(mesh => {
-            // The loader guarantees a mesh is never a bone node itself, so its owner is simply the
-            // nearest bone above it. `meshPlacement` decides on the two NAMES from there.
-            const owner = ownerOf(mesh);
-            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-            const placement = meshPlacement(owner, roots,
-                {bone: boneName(owner), mesh: extras.alamoMesh ?? mesh.name});
-
-            // A bone carrying two meshes keeps the first as its own row; the second stays a child
-            // rather than being dropped.
-            if ('merge' in placement && !meshByBone.has(placement.merge)) {
-                meshByBone.set(placement.merge, mesh);
-            } else {
-                extraMeshes.push({
-                    mesh,
-                    owner: 'merge' in placement ? placement.merge : placement.childOf,
-                });
-            }
-        });
-
-        // The same question for the effects, before any row is claimed: a system whose proxy bone
-        // carries its name IS that row. A bone with two of them keeps the first, exactly as it
-        // keeps the first of two meshes.
-        for (const [systemId, entry] of this.particleSystems) {
-            if (!listedInModelTree(entry.origin)) {
-                continue;
-            }
-
-            const owner = ownerOf(anchorNodeOf(entry));
-            const placement = effectPlacement(owner, roots,
-                {bone: boneName(owner), effect: entry.system.name});
-
-            if ('merge' in placement && !effectByBone.has(placement.merge)) {
-                effectByBone.set(placement.merge, systemId);
-            }
-        }
-
-        const meshItem = (mesh: THREE.Mesh): { name: string; visible: boolean; gatedOff: boolean } => {
-            const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
-
-            return {
-                // The ALO's own mesh name, not the glTF node name.
-                name: extras.alamoMesh ?? mesh.name,
-                visible: meshDrawn(mesh),
-                gatedOff: resolveMaterial(extras).hidden
-                    || !isVisibleAt(extras, this.alt, this.lod),
-            };
-        };
-
-        for (const bone of bones) {
-            const mesh = meshByBone.get(bone.index);
-            const effect = effectByBone.get(bone.index);
-            const parentId = bone.parent < 0 ? null : boneId(bone.parent);
-
-            // Every half this row stands for. A particle proxy is all three at once - the bone, the
-            // marker mesh the file hides, and the effect itself - and the panel describes each.
-            this.inspectSources.set(boneId(bone.index), {
-                boneIndex: bone.index,
-                ...(mesh === undefined ? {} : {mesh}),
-                ...(effect === undefined ? {} : {systemId: effect}),
-            });
-
-            // Merged: ONE row for a bone, the mesh that shares its name and the effect that shares
-            // it, anchored on the BONE's id. That is what the bone's children already name and what
-            // survives a reload, so the row needs no alias - and the alias is what cost three
-            // defects, from a hull labelled COLLISION to checkboxes that did nothing.
-            //
-            // EVERY half is claimed, so the row writes everything it reports on. The old code
-            // anchored this row on the bone's id, reported the MESH's state and wrote the BONE's -
-            // which is why a hidden mesh could never be shown again.
-            const details = mesh === undefined ? undefined : meshItem(mesh);
-            const name = effect === undefined
-                ? details?.name ?? bone.name
-                : this.effectRowName(effect);
-
-            this.claimRow(boneId(bone.index), name, parentId, {
-                boneIndex: bone.index,
-                ...(mesh === undefined ? {} : {mesh}),
-                ...(effect === undefined ? {} : {particleId: effect}),
-            });
-
-            items.push({
-                id: boneId(bone.index),
-                // The effect is what a reader acts on, so a proxy row reads as one - the bone and
-                // its marker mesh are the plumbing that carries it.
-                kind: effect !== undefined ? 'particle' : mesh !== undefined ? 'mesh' : 'bone',
-                name,
-                parentId,
-                visible: details?.visible ?? bone.visible,
-                gatedOff: details?.gatedOff ?? false,
-                ...(effect === undefined ? {} : {systemId: effect}),
-            });
-        }
-
-        for (const {mesh, owner} of extraMeshes) {
-            const details = meshItem(mesh);
-            // `ownerBone`, not `boneIndex`: this row is the MESH. The bone it rides has a row of its
-            // own, and describing it here too would say it twice.
-            this.inspectSources.set(`mesh:${treeKeyOf(mesh)}`, {mesh, ownerBone: owner});
-            this.claimRow(`mesh:${treeKeyOf(mesh)}`, details.name, boneId(owner), {mesh});
-
-            items.push({
-                id: `mesh:${treeKeyOf(mesh)}`,
-                kind: 'mesh',
-                name: details.name,
-                parentId: boneId(owner),
-                visible: details.visible,
-                gatedOff: details.gatedOff,
-            });
-        }
-
-        // One row per particle SYSTEM, not per emitter. In a model preview the switchable thing is
-        // the whole effect - a proxy is either playing on this hull or it is not - and the emitters
-        // a system is built from are the particle editor's business, not this one's. Listing them
-        // here put twenty dead rows under a Star Destroyer's damage bones.
-        for (const [systemId, entry] of this.particleSystems) {
-            // The Gameplay lens's own. A death explosion and a wreck's trailing fire are asked for
-            // by NAME at the moment they are needed, so they are in no proxy list and hang off no
-            // bone - `ownerOf` falls back to the root and filed them there, giving the reader a
-            // `p_explosion_big00` under Root whose tick did nothing. See `listedInModelTree`.
-            if (!listedInModelTree(entry.origin)) {
-                continue;
-            }
-
-            const owner = ownerOf(anchorNodeOf(entry));
-
-            // Already folded into its proxy bone's row above. Listing it again would put the same
-            // effect on screen twice, with two checkboxes writing one thing.
-            if (effectByBone.get(owner) === systemId) {
-                continue;
-            }
-
-            this.inspectSources.set(`particle:${systemId}`, {systemId});
-            this.claimRow(`particle:${systemId}`, entry.system.name,
-                boneId(owner), {particleId: systemId});
-
-            items.push({
-                id: `particle:${systemId}`,
-                kind: 'particle',
-                name: this.effectRowName(systemId),
-                parentId: boneId(owner),
-                visible: entry.gateVisible && entry.levelVisible,
-                gatedOff: !entry.levelVisible,
-                systemId,
-            });
-        }
-
-        // Every row is known now, so the chain can run - parents are already ahead of children,
-        // because the skeleton is walked parent-first and the meshes are attached to it.
-        this.resolveRows();
-
-        return items.map(item => {
-            const resolved = this.rowResolutions.get(item.id);
-
-            // `gatedOff` comes from the chain as well, because it is the same question asked with
-            // the reader taken out. Leaving each row to work it out for itself is what let a row
-            // report one thing and draw another.
-            return resolved === undefined
-                ? item
-                : {
-                    ...item,
-                    visible: resolved.visible,
-                    because: resolved.because,
-                    decidedBy: resolved.decidedBy,
-                    gatedOff: !resolved.authored,
-                };
-        });
-    }
-
-    /**
-     * The row that owns one effect.
-     *
-     * A merged proxy row is anchored on its bone, so an effect's row id is not derivable from its
-     * system id. Asked of the row table, which is the only thing that knows.
-     */
-    rowForSystem(systemId: string): string {
-        for (const [rowId, target] of this.rowTargets) {
-            if (target.particleId === systemId) {
-                return rowId;
-            }
-        }
-
-        return `particle:${systemId}`;
-    }
-
-    /**
      * What a row carrying an effect is called.
      *
      * The `[heat]` tag goes on only when EVERY emitter is a heat distortion, which is the case that
@@ -4736,199 +5885,7 @@ export class PreviewViewport {
         this.rowNames.set(rowId, name);
     }
 
-    /**
-     * What a tree row actually is, for the inspector.
-     *
-     * A list because a merged row is two things at once. Empty for a row the tree no longer has -
-     * a selection can outlive a reload or a level change.
-     */
-    inspectionOf(id: string): Inspection[] {
-        const source = this.inspectSources.get(id);
-        if (source === undefined) {
-            return [];
-        }
-
-        const found: Inspection[] = [];
-        const bones = this.skeleton();
-        const nameOf = (index: number): string =>
-            bones.find(bone => bone.index === index)?.name ?? '';
-
-        if (source.mesh !== undefined) {
-            const extras = (source.mesh.userData.alamo ?? {}) as MaterialExtras;
-            const geometry = source.mesh.geometry;
-            const vertices = geometry.getAttribute('position')?.count ?? 0;
-
-            found.push({
-                kind: 'mesh',
-                name: extras.alamoMesh ?? source.mesh.name,
-                boneName: nameOf(source.ownerBone ?? source.boneIndex ?? -1),
-                vertexCount: vertices,
-                triangleCount: triangleCount(geometry),
-                drawn: meshDrawn(source.mesh),
-                extras,
-                meshIndex: typeof extras.alamoMeshIndex === 'number'
-                    ? extras.alamoMeshIndex
-                    : undefined,
-                subMeshIndex: typeof extras.alamoSubMeshIndex === 'number'
-                    ? extras.alamoSubMeshIndex
-                    : undefined,
-            });
-        }
-
-        if (source.boneIndex !== undefined) {
-            const bone = bones.find(entry => entry.index === source.boneIndex);
-            const node = this.hull()?.bonesByIndex.get(source.boneIndex);
-
-            if (bone !== undefined) {
-                found.push({
-                    kind: 'bone',
-                    index: bone.index,
-                    name: bone.name,
-                    parentIndex: bone.parent,
-                    parentName: bone.parent < 0 ? '' : nameOf(bone.parent),
-                    visible: bone.visible,
-                    billboard: node === undefined ? null : billboardTypeOf(node),
-                });
-            }
-        }
-
-        if (source.systemId !== undefined) {
-            const entry = this.particleSystems.get(source.systemId);
-
-            if (entry !== undefined) {
-                found.push({
-                    kind: 'particle',
-                    name: entry.system.name,
-                    boneName: entry.attachBoneIndex === undefined
-                        ? entry.attachBone ?? ''
-                        : nameOf(entry.attachBoneIndex),
-                    emitterCount: entry.system.emitters.length,
-                    playing: this.rowResolutions.get(this.rowForSystem(source.systemId))?.visible
-                        ?? (entry.gateVisible && entry.levelVisible),
-                });
-            }
-        }
-
-        return found;
-    }
-
-    /**
-     * The rows the reader has switched off by hand.
-     *
-     * The OVERRIDES, not what happens to be invisible: a mesh gated off by the current damage level
-     * is not something anyone chose, and writing it down would turn a level's own rule into an
-     * explicit hide that outlives the level. Restorable now that a mesh key survives a reload.
-     */
-    hiddenItemIds(): string[] {
-        return [...this.rowOverrides]
-            .filter(([, override]) => override === 'hidden')
-            .map(([row]) => row);
-    }
-
-    /**
-     * The rows the reader has switched ON by hand.
-     *
-     * Both directions are carried now. A mesh is usually drawn until someone hides it, but a
-     * shadow volume or a collision hull is gated off until someone asks for it - and asking for it
-     * is exactly the deliberate act worth surviving a reopen.
-     */
-    shownItemIds(): string[] {
-        return [...this.rowOverrides]
-            .filter(([, override]) => override === 'shown')
-            .map(([row]) => row);
-    }
-
-    /**
-     * Shows or hides any mix of bones, meshes and particle systems at once.
-     *
-     * One entry point, because the tree selects across kinds and a multi-select toggle has to move
-     * all of them together. A bone carries what is attached to it, so switching one off takes its
-     * subtree with it - which is what the reader is asking for when they untick a limb.
-     */
-    setItemsVisible(ids: readonly string[], visible: boolean): void {
-        this.applyRowOverrides(
-            ids.map(row => ({row, override: visible ? 'shown' as const : 'hidden' as const})));
-    }
-
-    /**
-     * Records the reader's word on a set of rows and re-runs the chain.
-     *
-     * `null` gives a row back to the model. One entry point and one map, because the old code kept
-     * three - meshes by tree key, bones by index, systems by id - and a row anchored on a bone's id
-     * while standing for a mesh wrote one and reported the other.
-     */
-    applyRowOverrides(changes: readonly OverrideChange[]): void {
-        for (const {row, override} of changes) {
-            if (override === null) {
-                this.rowOverrides.delete(row);
-            } else {
-                this.rowOverrides.set(row, override);
-            }
-        }
-
-        this.resolveRows();
-    }
-
-    /** What the reader has said about each row, for carrying across a reopen. */
-    rowOverrideEntries(): { row: string; override: RowOverride }[] {
-        return [...this.rowOverrides].map(([row, override]) => ({row, override}));
-    }
-
-    /**
-     * Hands every row back to the model.
-     *
-     * Called when a clip starts: watching an animation is checking whether the animation works, and
-     * that can only be answered against the model as authored. The clip already resets the pose
-     * each time it runs; the visibilities are part of that pose. Master toggles are untouched - see
-     * `clearedForPlayback`.
-     */
-    clearRowOverrides(): void {
-        this.rowOverrides.clear();
-        this.resolveRows();
-    }
-
-    /**
-     * Hands the rows ONE ability speaks for back to the model.
-     *
-     * Every channel an ability drives - a proxy's `gateVisible`, the shield mesh's and the shell's
-     * `inFile` - enters the chain at the `file` link, four below the reader. So one tick on such a
-     * row outranked the ability for good: the switch fired, the chain ignored it, and nothing but a
-     * whole-model Reset could undo it. Switching the ability now takes its own rows back, which is
-     * the same rule a starting clip already follows.
-     *
-     * Scoped, unlike {@link clearRowOverrides}. A clip may be global because it resets the entire
-     * pose; an ability is one statement about a handful of rows, and a mesh the reader hid for an
-     * unrelated reason has to survive it.
-     */
-    releaseAbilityRows(ownership: AbilityOwnership): void {
-        const released: string[] = ownership.systemIds.map(id => this.rowForSystem(id));
-
-        if (ownership.shieldMesh || ownership.stealthShell) {
-            for (const [rowId, target] of this.rowTargets) {
-                if (target.mesh === undefined) {
-                    continue;
-                }
-
-                const extras = (target.mesh.userData.alamo ?? {}) as MaterialExtras;
-
-                if ((ownership.shieldMesh && isShieldMesh(extras))
-                    || (ownership.stealthShell && isStealthMesh(extras))) {
-                    released.push(rowId);
-                }
-            }
-        }
-
-        // Only the rows that actually carry one. Every ability click would otherwise re-resolve the
-        // whole skeleton to delete nothing, and most abilities own no row the reader has touched.
-        const carrying = released.filter(row => this.rowOverrides.has(row));
-
-        if (carrying.length === 0) {
-            return;
-        }
-
-        // One re-resolve at the end, not one per row.
-        this.applyRowOverrides(carrying.map(row => ({row, override: null})));
-    }
+    // ── skeleton ───────────────────────────────────────────────────────
 
     /**
      * Draws or holds one system, as the row chain decided.
@@ -4946,90 +5903,6 @@ export class PreviewViewport {
         // and a second opinion here would silently undo the first.
         void entry;
         this.refreshRows();
-    }
-
-    // ── camera ────────────────────────────────────────────────────────────────
-
-    /** Frames whatever is currently loaded. */
-    /**
-     * Puts the camera where the model's own authored camera stands, looking where it looks.
-     *
-     * Placed from the camera's own BONE NODES rather than from the coordinates the server sent.
-     * Both describe the same point, but the bone is already in the scene and has been through
-     * exactly the transform the geometry went through - including the root's Z-up to Y-up rotation,
-     * which is the one thing certain to be got wrong if it is applied a second time by hand. A shot
-     * a quarter turn out looks like a broken camera rather than a broken conversion.
-     *
-     * @returns false when the model does not carry that bone pair, so the caller can say so.
-     */
-    applyModelCamera(name: string): boolean {
-        const eye = this.boneNodeFor(name);
-        const at = this.boneNodeFor(`${name}.Target`);
-
-        if (eye === undefined || at === undefined) {
-            return false;
-        }
-
-        eye.updateWorldMatrix(true, false);
-        at.updateWorldMatrix(true, false);
-
-        this.applyCameraPose(
-            new THREE.Vector3().setFromMatrixPosition(eye.matrixWorld),
-            new THREE.Vector3().setFromMatrixPosition(at.matrixWorld));
-
-        return true;
-    }
-
-    /**
-     * Points the camera at a place, from a place.
-     *
-     * The one path every framing goes through - the presets, the model's own camera and the
-     * reader's saved shots - so the clip planes are refitted the same way for all of them. Without
-     * that a camera parked 653 units out, which `Eb_icc`'s own camera is, lands outside the range
-     * the previous framing chose and the model disappears.
-     */
-    applyCameraPose(position: Vector3Like, target: Vector3Like): void {
-        this.fitDistance = Math.hypot(
-            position.x - target.x, position.y - target.y, position.z - target.z);
-        this.applyClipPlanes(this.boundingSphere(true), this.fitDistance);
-
-        this.camera.position.set(position.x, position.y, position.z);
-        this.controls.target.set(target.x, target.y, target.z);
-        this.controls.update();
-    }
-
-    /** Where the camera stands now, for saving the current shot as a preset. */
-    get cameraPosition(): Vector3Like {
-        return {x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z};
-    }
-
-    /** The bounding sphere a preset is resolved against, so the caller sizes the shot correctly. */
-    get subjectSphere(): { center: Vector3Like; radius: number } {
-        return this.boundingSphere();
-    }
-
-    frameAll(preset: PresetView = 'threeQuarter'): void {
-        const sphere = this.boundingSphere();
-        const {azimuth, elevation} = PRESETS[preset];
-        const aspect = this.camera.aspect;
-
-        const pose = frameSphere(sphere, FIELD_OF_VIEW, aspect, azimuth, elevation);
-        const distance = Math.hypot(
-            pose.position.x - sphere.center.x,
-            pose.position.y - sphere.center.y,
-            pose.position.z - sphere.center.z,
-        );
-
-        this.fitDistance = distance;
-        this.applyClipPlanes(this.boundingSphere(true), distance);
-
-        this.camera.position.set(pose.position.x, pose.position.y, pose.position.z);
-        this.controls.target.set(pose.target.x, pose.target.y, pose.target.z);
-        this.controls.update();
-
-        // The grid is a sense of scale, so it has to grow with the subject: a fixed 100-unit grid is
-        // invisible under a capital ship and swallows a fighter.
-        this.rebuildGrid(sphere);
     }
 
     private rebuildGrid(sphere: BoundingSphere): void {
@@ -5097,46 +5970,6 @@ export class PreviewViewport {
         return {center: sphere.center, radius: radius > 0 ? radius : 1};
     }
 
-    setGridVisible(visible: boolean): void {
-        this.grid.visible = visible;
-        this.axes.visible = visible;
-    }
-
-    /** Shows or hides the ground plane. Independent of the grid: either is useful without it. */
-    setFloorVisible(visible: boolean): void {
-        this.floor.visible = visible;
-        this.shadowCatcher.visible = visible;
-    }
-
-    /**
-     * Moves the ground, and the grid measuring it, to a height in model units.
-     *
-     * Both together, always. The grid is the ruler for the ground plane, and leaving it at zero
-     * while the floor moved would draw a measurement of somewhere the floor is not. Not every model
-     * is authored standing on the origin - `Eb_icc_landingpad` and the props dug into terrain are
-     * not - so a floor pinned to zero cuts through them or floats beneath them.
-     */
-    setFloorLevel(level: number): void {
-        this.floor.position.y = level;
-        this.grid.position.y = level;
-        this.axes.position.y = level;
-        this.shadowCatcher.position.y = level;
-    }
-
-    /**
-     * Draws every part mesh as its edges.
-     *
-     * Reaches the translated effects as well as the archetype materials: `wireframe` is declared on
-     * `THREE.Material`, and a `RawShaderMaterial` inherits it through `ShaderMaterial`, so the flag
-     * is honoured whichever renderer the reader has chosen. Particle systems are pruned by
-     * `forEachPartMesh` and stay as they are - a wireframe billboard is a pair of triangles and
-     * says nothing about the model.
-     */
-    setWireframe(on: boolean): void {
-        this.wireframe = on;
-        this.applyWireframe();
-    }
-
     /**
      * Adopts this part's authored shadow meshes as stencil volumes.
      *
@@ -5202,41 +6035,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Whether the stencil volumes are the thing casting this model's shadow right now.
-     *
-     * Both halves matter. Weighing only "does the model author a volume" left a model with volumes
-     * casting NOTHING in the shading mode that does not draw volumes - it had already handed its
-     * shadow over to a pass that was switched off.
-     */
-    private get stencilShadowing(): boolean {
-        return this.shadowVolumesEnabled && this.shadowVolumes.active;
-    }
-
-    /**
-     * Whether the engine's stencil shadows are being cast right now.
-     *
-     * Public because the shadow COLOUR control has to know. The tint reaches the hull through this
-     * pass with no ground involved, so gating that control on the floor alone disabled it while it
-     * was working. Both halves matter here for the same reason they do inside: Game mode with no
-     * authored volume casts nothing, and 63% of models author none.
-     */
-    castsStencilShadows(): boolean {
-        return this.stencilShadowing;
-    }
-
-    /** Whether the engine's stencil shadows are drawn at all. */
-    /** Draws the extruded volumes themselves, for diagnosing what the stencil is counting. */
-    setShadowVolumeDebug(on: boolean): void {
-        this.shadowVolumes.setDebug(on);
-    }
-
-    setShadowVolumes(on: boolean): void {
-        this.shadowVolumesEnabled = on;
-        this.shadowVolumes.setEnabled(on);
-        this.refreshShadowCasting();
-    }
-
-    /**
      * Puts the current wireframe state onto whatever materials exist now.
      *
      * Called again after a part loads and after a renderer switch, because both replace materials
@@ -5253,67 +6051,6 @@ export class PreviewViewport {
                 }
             }
         });
-    }
-
-    /**
-     * Tints the shadow, wherever it can be seen.
-     *
-     * TWO sinks, which the control above has to know about. Under three's shadow mapping there is
-     * no colour to set at all, so a dedicated catcher plane over the floor is the only place the
-     * tint can be expressed - that one needs the ground. The stencil darken really does multiply,
-     * the way Alamo's own does, and it reaches the MODEL as well: a hull self-shadows in its tint
-     * with no ground under it whatsoever. See `shadowTintReach`, which is the rule both halves and
-     * the control are read from.
-     */
-    setShadowColour(colour: THREE.ColorRepresentation): void {
-        // The catcher paints; the value is a multiplier. Only the ALPHA moves - see
-        // `shadowCatcherOpacity`, which is also where the tint goes and why.
-        this.shadowMaterial.opacity = shadowCatcherOpacity(colour);
-
-        // The same colour drives the stencil darken, which really does multiply - so it takes the
-        // value as it stands, tint and all, and reaches the MODEL as well as the ground.
-        this.shadowVolumes.setColour(colour);
-    }
-
-    // ── animation ─────────────────────────────────────────────────────────────
-
-    /**
-     * Starts a passive subject's own death clip, once.
-     *
-     * ONCE, and clamped: the user's word is that a death clone is spawned at the exact position of
-     * the model it replaces and plays through a single time. There is no picker for it and no loop
-     * - it is not something the reader chose, it is what dying looks like.
-     *
-     * Separate from LOADING it so the geometry can be fetched early and held: asking for a capital
-     * ship's three-megabyte clone at the moment of death left a visible gap between the ship going
-     * and the wreck arriving. Idempotent - a second call does not restart a clip already running,
-     * because it is the same wreck.
-     *
-     * This is `play` for a subject nobody is driving. It is the same machinery: the subject's own
-     * mixer, the subject's own clips, the subject's own tracks. It used to be a second
-     * implementation of all three, because the scene-wide maps it would have had to use were
-     * already full of the hull's answers.
-     */
-    startDeathClip(subjectId: string): void {
-        const subject = this.subjects.get(subjectId);
-
-        if (subject === undefined || subject.mixer === null || subject.action !== null) {
-            return;
-        }
-
-        const name = deathClip(subject.clips.map(c => c.name));
-        const clip = subject.clips.find(c => c.name === name);
-
-        if (clip === undefined) {
-            return;
-        }
-
-        subject.action = subject.mixer.clipAction(clip);
-        subject.action.setLoop(THREE.LoopOnce, 1);
-        // Without this the last pose is gone the frame it arrives.
-        subject.action.clampWhenFinished = true;
-        subject.action.reset();
-        subject.action.play();
     }
 
     /**
@@ -5373,72 +6110,6 @@ export class PreviewViewport {
                     this.setPartHidden(part.id, true);
                 }
             }
-        }
-    }
-
-
-    get animationNames(): string[] {
-        return this.active.clips.map(c => c.name);
-    }
-
-    /**
-     * Plays a clip by name, or stops playback when given null.
-     *
-     * Timing comes from the file. The exporter writes each keyframe at `frame / fps` using the rate
-     * the `.ala` itself declares - 30 fps for 1270 of the 1363 shipped animations, but 1, 5, 10 or
-     * 15 for the other 93 - so 1.0x means "this clip's own declared rate", whatever that is: a
-     * 15 fps clip plays at 15 frames a second. There is no rate for the panel to impose.
-     *
-     * The rest pose is restored before anything starts, so a clip never plays on top of the pose
-     * another one left behind.
-     */
-    /**
-     * Starts a clip by name, answering whether one actually started.
-     *
-     * The answer matters and used to be thrown away. A name no loaded clip carries returned here in
-     * silence while the panel went on showing that clip as the one playing - which is exactly what
-     * an ability's deploy did on every model, since the XML names an `.ala` FILE and the clips are
-     * held under their stems. Silence is right for the viewport, which cannot know whether a miss is
-     * a fault; reporting it lets the caller stop claiming otherwise.
-     */
-    play(name: string | null): boolean {
-        this.active.action?.stop();
-        this.active.action = null;
-        this.resetPose();
-
-        // The pose is not the only thing a clip resets. Watching an animation means asking whether
-        // the animation works, and that can only be answered against the model as its author left
-        // it - so every row goes back to what the model says. The master toggles are untouched:
-        // effects switched off because they obstruct the view are the one thing worth keeping off
-        // while a clip runs. See `clearedForPlayback`.
-        this.clearRowOverrides();
-
-        if (name === null || this.active.mixer === null) {
-            return false;
-        }
-
-        const clip = this.active.clips.find(c => c.name === name);
-        if (clip === undefined) {
-            return false;
-        }
-
-        this.active.action = this.active.mixer.clipAction(clip);
-        this.active.action.setLoop(this.animationLoop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-        // Without this a non-looping action snaps back to frame 0 the instant it ends, so the last
-        // pose - often the whole point of a death or a deploy - is never on screen.
-        this.active.action.clampWhenFinished = true;
-        this.active.action.timeScale = this.animationSpeed;
-        this.active.action.paused = this.animationPaused;
-        this.active.action.play();
-
-        return true;
-    }
-
-    setPaused(paused: boolean): void {
-        this.animationPaused = paused;
-
-        if (this.active.action !== null) {
-            this.active.action.paused = paused;
         }
     }
 
@@ -5549,116 +6220,6 @@ export class PreviewViewport {
     }
 
     /**
-     * Puts every animated node back where the model file had it.
-     *
-     * three.js does restore a binding's "original state" when an action is deactivated - but the
-     * original it restores is whatever the node held when that binding was FIRST created, and a
-     * binding for a clip you start mid-way through another clip captures the other clip's pose. So
-     * stopping left the model in a pose no file describes, and switching clips carried the previous
-     * one's residue into every bone the new clip does not drive.
-     *
-     * Snapshotting at load and writing it back explicitly sidesteps all of that: the rest pose is
-     * the file's pose, by definition, and it cannot drift.
-     */
-    resetPose(): void {
-        for (const [node, rest] of this.active.restPose) {
-            node.position.copy(rest.position);
-            node.quaternion.copy(rest.quaternion);
-            node.scale.copy(rest.scale);
-        }
-
-        // Transforms are the part three.js would have restored on its own; visibility is not, and a
-        // bone left switched off by the clip that just stopped is the residue that actually shows.
-        // Asking the level and override rules again is what puts it back - they, not this, know
-        // what the model looked like before the clip took over.
-        if (this.overridingVisibility) {
-            this.overridingVisibility = false;
-            this.applyLevels();
-        }
-
-        // Only the CLIP's hold: the clip has stopped having an opinion, which says nothing about a
-        // part that is hidden or a system that has been released to finish.
-        for (const entry of this.particleSystems.values()) {
-            entry.instance.hold('clip', false);
-        }
-    }
-
-    /** How fast the clip runs, as a multiple of the rate its file declares. */
-    setAnimationSpeed(speed: number): void {
-        this.animationSpeed = speed;
-
-        if (this.active.action !== null) {
-            this.active.action.timeScale = speed;
-        }
-    }
-
-    setAnimationLoop(loop: boolean): void {
-        this.animationLoop = loop;
-
-        if (this.active.action !== null) {
-            this.active.action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-            this.active.action.clampWhenFinished = true;
-        }
-    }
-
-    /**
-     * Moves the playhead, in seconds.
-     *
-     * `paused` is left alone: scrubbing a running clip should keep it running from where you
-     * dropped it, and scrubbing a held one should leave it held on the frame you chose.
-     */
-    seekAnimation(seconds: number): void {
-        if (this.active.action === null) {
-            return;
-        }
-
-        this.active.action.time = Math.max(0, Math.min(seconds, this.active.action.getClip().duration));
-        // One update with no time step, so the pose on screen matches the playhead immediately
-        // rather than at the next frame - which is what makes a scrubber feel attached to the model.
-        this.active.mixer?.update(0);
-    }
-
-    /** Where the playhead is and how long the clip runs, for the scrubber. Zeroes when idle. */
-    animationProgress(): { time: number; duration: number; running: boolean } {
-        if (this.active.action === null) {
-            return {time: 0, duration: 0, running: false};
-        }
-
-        return {
-            time: this.active.action.time,
-            duration: this.active.action.getClip().duration,
-            running: this.active.action.isRunning() && !this.active.action.paused,
-        };
-    }
-
-    // ── frame loop ────────────────────────────────────────────────────────────
-
-    stats(): ViewportStats {
-        let meshes = 0;
-        let triangles = 0;
-
-        this.modelRoot.traverse(node => {
-            if (node instanceof THREE.Mesh && this.drawn(node)) {
-                meshes++;
-                triangles += triangleCount(node.geometry);
-            }
-        });
-
-        return {
-            // The ACTIVE subject's, not the scene's. These stats describe the model being
-            // previewed, and a wreck it shed or the clone it became is not another part of it.
-            parts: this.activeSubjectRoots().length,
-            meshes,
-            triangles: Math.round(triangles),
-            // From the same source as the tree. Counting THREE.Bone instead reported ZERO for any
-            // model with no skinned mesh - the loader only creates Bone objects for skin joints, so
-            // the Star Destroyer's 71 bones read as none while the tree beside it listed all of them.
-            bones: this.skeleton().length,
-            animations: this.animationNames,
-        };
-    }
-
-    /**
      * Whether a mesh actually reaches the screen: its own flag AND every ancestor's.
      *
      * A mesh with no ALT or LOD tag is always drawn unless it is hidden itself or is attached to a hidden
@@ -5685,114 +6246,6 @@ export class PreviewViewport {
         }
 
         return true;
-    }
-
-    /**
-     * Where a bone sits in world space, or null when it is not loaded.
-     *
-     * Thin on purpose: the blast arithmetic is pure and lives in `blast.ts`, and all it needs from
-     * a scene graph is a point per hardpoint. Anything more here would be geometry the tests cannot
-     * reach.
-     */
-    bonePosition(partId?: string, bone?: string): { x: number; y: number; z: number } | null {
-        if (partId === undefined) {
-            return vectorOf(this.modelRoot.getWorldPosition(new THREE.Vector3()));
-        }
-
-        // Recorded even though this refuses to place anything: the request was made, and it is the
-        // REQUEST that gets reported. The early return below used to happen before `attachmentFor`
-        // was ever reached, so a hardpoint that had not loaded left no trace anywhere.
-        this.noteAttachment(partId, bone);
-
-        const part = this.parts.get(partId);
-        if (part === undefined) {
-            return null;
-        }
-
-        if (bone === undefined) {
-            return vectorOf(part.root.getWorldPosition(new THREE.Vector3()));
-        }
-
-        // NULL for a bone that is not there, rather than the part's origin. `attachmentFor` answers
-        // the root because it has to return something to parent to; this returns a POSITION, and
-        // the model's origin is not this bone's position. Handing one back put every unresolved
-        // hardpoint at the same spot, which is a blast radius that catches all of them.
-        const node = part.bones.get(bone.toLowerCase());
-
-        return node === undefined
-            ? null
-            : vectorOf(node.getWorldPosition(new THREE.Vector3()));
-    }
-
-    /**
-     * The Alamo extras of every loaded material.
-     *
-     * Read back off the scene rather than tracked alongside it, so the texture request list can
-     * never fall out of step with what was actually loaded.
-     */
-    materialExtras(): MaterialExtras[] {
-        const all: MaterialExtras[] = [];
-
-        this.modelRoot.traverse(node => {
-            if (node instanceof THREE.Mesh && node.userData.alamo !== undefined) {
-                all.push(node.userData.alamo as MaterialExtras);
-            }
-        });
-
-        return all;
-    }
-
-    // ── particles ──────────────────────────────────────────────────────
-
-    /**
-     * Starts a particle system, optionally attached to a bone of a loaded part.
-     *
-     * Parented rather than positioned: a damaged hardpoint's smoke has to follow the hull as it
-     * animates, and parenting gets that for nothing.
-     */
-    addParticleSystem(
-        id: string,
-        system: AlamoParticleContent,
-        placement: ParticlePlacement,
-    ): void {
-        const {
-            attachToPartId, attachBone, attachBoneIndex, origin, scaleFactor = 1, at,
-            levels = {alt: null, lod: null, altDecreaseStayHidden: false},
-        } = placement;
-
-        // Immediate: the id is about to name something else, and a fading twin under it would be
-        // orphaned in the scene for good.
-        this.removeParticleSystem(id, true);
-
-        const entry: ParticleEntry = {
-            id,
-            system,
-            attachToPartId,
-            attachBone,
-            attachBoneIndex,
-            gateVisible: true,
-            levels,
-            levelVisible: proxyVisibleAt(levels, this.alt, this.lod, this.altDescending),
-            scaleFactor,
-            origin,
-            instance: this.instantiate(
-                id, system, attachToPartId, attachBone, attachBoneIndex, scaleFactor, at),
-        };
-
-        // Held from birth when it is attached to something already off screen: a death clone's effects
-        // attach while the clone is still hidden, and a one-shot that runs there is spent before
-        // anyone sees it.
-        if (attachToPartId !== undefined && this.hiddenParts.has(attachToPartId)) {
-            entry.instance.hold('part', true);
-        }
-
-        this.particleSystems.set(id, entry);
-        this.refreshParticleVisibility(entry);
-
-        // The depth range again, because the effects reach further than the model and they arrive
-        // AFTER the camera was fitted to it. Without this, Boba Fett's flamethrower - 206 units of
-        // throw on a seven-unit model - was culled at 156 and looked like a flame that stops.
-        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
     }
 
     private instantiate(
@@ -5859,42 +6312,6 @@ export class PreviewViewport {
         return partId === undefined ? this.modelRoot : this.parts.get(partId)?.root ?? null;
     }
 
-    /**
-     * Takes a system out of the scene.
-     *
-     * What it does with the particles ALREADY IN THE AIR is the file's word: see
-     * {@link fadingParticles}. `immediate` overrides it, and only two things may - replacing a
-     * system under the same id, and a wholesale reset of the scene or the renderer.
-     */
-    removeParticleSystem(id: string, immediate = false): void {
-        const entry = this.particleSystems.get(id);
-
-        if (entry !== undefined) {
-            if (!immediate && entry.system.leaveParticles && !entry.instance.empty) {
-                // Stop spawning and let the air clear. Nothing sweeps it after this, which is why
-                // it leaves `particleSystems` - a gate re-enabling it would refill it forever.
-                entry.instance.hold('released', true);
-
-                // And cut loose from the bone it was anchored on, which is usually about to be
-                // hidden or disposed. Nothing moves: the simulation already runs in the model's
-                // space with the bone cancelled out, so the particles stay exactly where they are -
-                // but a bone still being read after its part is gone would report its last stale
-                // matrix as this step's movement and fling every linked particle with it.
-                entry.instance.detach();
-
-                this.fadingParticles.push(entry.instance);
-            } else {
-                entry.instance.dispose();
-            }
-        }
-
-        this.particleSystems.delete(id);
-
-        // And back in again once the effect is gone, so a one-off explosion does not leave the
-        // depth range stretched for the rest of the session.
-        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
-    }
-
     /** Drops every fading system at once, for a reset that takes the whole scene with it. */
     private clearFadingParticles(): void {
         for (const instance of this.fadingParticles) {
@@ -5902,45 +6319,6 @@ export class PreviewViewport {
         }
 
         this.fadingParticles = [];
-    }
-
-    /** Whether a part's geometry has arrived, so something can be attached to its bones. */
-    hasPart(partId: string): boolean {
-        return this.parts.has(partId);
-    }
-
-    /** Names of the running systems, for the emitter list in the dock. */
-    particleSystemIds(): string[] {
-        return [...this.particleSystems.keys()].sort();
-    }
-
-    /** Every texture the running systems want but may not have yet. */
-    particleTextureNames(): string[] {
-        return [...new Set(
-            [...this.particleSystems.values()].flatMap(e => e.instance.textureNames()))].sort();
-    }
-
-    /** Hands a fetched texture to whichever emitters named it, now and after a restart. */
-    setParticleTexture(name: string, texture: THREE.Texture): void {
-        this.particleTextures.set(name.toLowerCase(), texture);
-        this.missingTextures.delete(name.toLowerCase());
-
-        for (const entry of this.particleSystems.values()) {
-            entry.instance.setTexture(name, texture);
-        }
-    }
-
-    /**
-     * Says a texture will never arrive, so every emitter naming it shows the marker.
-     *
-     * Remembered, not just applied: a system can be built after the answer came back - a hardpoint
-     * blowing up spawns one - and it has to show the marker too rather than sitting on a blank quad
-     * because it happened to be late.
-     */
-    setParticleTextureMissing(name: string): void {
-        this.missingTextures.add(name.toLowerCase());
-
-        void this.markMissing(name);
     }
 
     private async markMissing(name: string): Promise<void> {
@@ -5955,194 +6333,6 @@ export class PreviewViewport {
         for (const entry of this.particleSystems.values()) {
             entry.instance.setMissingTexture(name, marker);
         }
-    }
-
-    /** Textures the server has told us do not resolve. */
-    private readonly missingTextures = new Set<string>();
-
-    setParticlesVisible(visible: boolean): void {
-        this.particlesVisible = visible;
-
-        // A system switched off individually, or by its level, stays off when the global toggle
-        // comes back on.
-        for (const entry of this.particleSystems.values()) {
-            this.refreshParticleVisibility(entry);
-        }
-    }
-
-    /**
-     * What the game's rules say about a system: the opening rule and the current damage state.
-     *
-     * The RULES path, called on attach and again whenever a hardpoint is destroyed or repaired -
-     * never in response to a click. A hand-set override survives this, so switching one effect on
-     * does not get undone by an unrelated hardpoint blowing up.
-     *
-     * What the rules say is `inFile` for this row - the model's own word - and the chain weighs it
-     * against everything else. It does NOT clear a hand-set override: the reader's word is taken
-     * back only by the reader or by a clip starting, and a row standing against the rules is marked
-     * as one the model does not draw, so nothing here is claimed that is not true.
-     */
-    setParticleSystemVisible(id: string, visible: boolean): void {
-        const entry = this.particleSystems.get(id);
-        if (entry === undefined) {
-            return;
-        }
-
-        entry.gateVisible = visible;
-        this.refreshRows();
-    }
-
-    /** The emitters of one system, in file order. */
-    emitterNames(systemId: string): string[] {
-        return this.particleSystems.get(systemId)?.instance.emitterNames() ?? [];
-    }
-
-    /** Shows or hides one emitter of one system, by its position in that system's file. */
-    setEmitterVisible(systemId: string, index: number, visible: boolean): void {
-        const key = `${systemId}#${index}`;
-
-        if (visible) {
-            this.hiddenEmitters.delete(key);
-        } else {
-            this.hiddenEmitters.add(key);
-        }
-
-        this.particleSystems.get(systemId)?.instance.setEmitterVisible(index, visible);
-    }
-
-    setParticlesPaused(paused: boolean): void {
-        this.particlesPaused = paused;
-    }
-
-    /** Multiplier on particle time. 1 is real time. */
-    setParticleSpeed(speed: number): void {
-        this.particleSpeed = Math.max(0, speed);
-    }
-
-    /**
-     * Replays every system from nothing.
-     *
-     * Rebuilt rather than rewound: a burst emitter's whole point is the first half second, and there
-     * is no way back to it from the middle of a run short of discarding the state.
-     */
-    restartParticles(): void {
-        // The other override: every system is being rebuilt from scratch, and a fading one has no
-        // rebuilt twin to belong to.
-        this.clearFadingParticles();
-
-        for (const [id, entry] of this.particleSystems) {
-            entry.instance.dispose();
-            entry.instance =
-                this.instantiate(id, entry.system, entry.attachToPartId, entry.attachBone,
-                    entry.attachBoneIndex, entry.scaleFactor);
-            this.refreshParticleVisibility(entry);
-        }
-    }
-
-    // ── skeleton ───────────────────────────────────────────────────────
-
-    /**
-     * The hull's bones, flattened.
-     *
-     * Read off the loaded scene rather than tracked separately, so the tree can never describe a
-     * skeleton that is not the one on screen. Only the FIRST part's bones: an attached turret carries
-     * its own skeleton, and merging them would produce a tree whose indices match no single model.
-     */
-    skeleton(): FlatBone[] {
-        const hull = this.hull();
-        if (hull === null) {
-            return [];
-        }
-
-        const indexOf = new Map<THREE.Object3D, number>();
-        for (const [index, node] of hull.bonesByIndex) {
-            indexOf.set(node, index);
-        }
-
-        // The nearest ANCESTOR that is a bone, not just the immediate parent. The exporter puts a
-        // synthetic node between the skeleton and the scene, and a skinned model can have others in
-        // between too - so checking only `node.parent` reported a bone as parentless whenever
-        // anything sat in the gap, and the tree came out with a handful of spurious roots. On the
-        // rancor that made `Shadow_Feet` a root of the model, which it plainly is not.
-        const boneAncestor = (node: THREE.Object3D): number => {
-            for (let at = node.parent; at !== null; at = at.parent) {
-                const index = indexOf.get(at);
-                if (index !== undefined) {
-                    return index;
-                }
-            }
-
-            return -1;
-        };
-
-        return [...hull.bonesByIndex.entries()]
-            .map(([index, node]) => ({
-                index,
-                name: alamoBoneName(node.name)?.name ?? node.name,
-                parent: boneAncestor(node),
-                visible: node.visible,
-            }))
-            .sort((a, b) => a.index - b.index);
-    }
-
-    /** What is attached to each bone of the hull, keyed by bone index. */
-    attachmentsByBone(): Map<number, BoneAttachment[]> {
-        const attachments = new Map<number, BoneAttachment[]>();
-        const hull = this.hull();
-        if (hull === null) {
-            return attachments;
-        }
-
-        // Which bone each object belongs to, so a mesh can be placed even when it is not a direct
-        // child of one. A SKINNED mesh is parented to the skeleton root rather than attached to any single bone -
-        // it spans many - and listing only direct children left most of a skinned model with no row
-        // at all, which is no use for a control whose whole point is reaching every mesh.
-        const boneOf = new Map<THREE.Object3D, number>();
-        for (const [index, node] of hull.bonesByIndex) {
-            boneOf.set(node, index);
-        }
-
-        const rootBone = [...hull.bonesByIndex.keys()].sort((a, b) => a - b)[0] ?? 0;
-        const meshesByBone = new Map<number, THREE.Mesh[]>();
-
-        hull.root.traverse(object => {
-            if (!(object instanceof THREE.Mesh) || object.name === '') {
-                return;
-            }
-
-            // The nearest ancestor that is a bone; the root otherwise.
-            let owner = rootBone;
-            for (let at = object.parent; at !== null; at = at.parent) {
-                const index = boneOf.get(at);
-                if (index !== undefined) {
-                    owner = index;
-                    break;
-                }
-            }
-
-            meshesByBone.set(owner, [...(meshesByBone.get(owner) ?? []), object]);
-        });
-
-        for (const [index, node] of hull.bonesByIndex) {
-            const found: BoneAttachment[] = [];
-
-            for (const mesh of meshesByBone.get(index) ?? []) {
-                found.push({kind: 'mesh', label: mesh.name});
-            }
-
-            // A attached part is a separate root parented onto the bone, so it reads as a hardpoint.
-            for (const part of this.parts.values()) {
-                if (part.root.parent === node) {
-                    found.push({kind: 'hardpoint', label: part.id});
-                }
-            }
-
-            if (found.length > 0) {
-                attachments.set(index, found);
-            }
-        }
-
-        return attachments;
     }
 
     /**
@@ -6238,51 +6428,6 @@ export class PreviewViewport {
     }
 
     /**
-     * The subject the panel speaks for.
-     *
-     * Every animation control - the picker, the speed, the scrub bar, the loop switch - describes
-     * the model that was opened, and only that one. A passive subject's clip is not something the
-     * reader chose; it is what dying looks like, and it runs on its own terms.
-     */
-    private get active(): SubjectAnimation {
-        return this.subjectAnimation(ACTIVE_SUBJECT);
-    }
-
-    setSkeletonVisible(visible: boolean): void {
-        this.skeletonVisible = visible;
-        this.joints.visible = visible;
-        this.jointLines.visible = visible;
-
-        if (!visible) {
-            this.clearLabels();
-        }
-    }
-
-    setLabelMode(mode: LabelMode): void {
-        this.labelMode = mode;
-        // Immediately rather than on the next throttled tick: a mode change the user just made must
-        // not appear to have been ignored.
-        this.lastLabelUpdate = 0;
-    }
-
-    /**
-     * Which bones a weapon fires from, so the triad can mark the aim axis.
-     *
-     * By NAME, because that is what a weapon declares. The axis itself is local X and that is
-     * measured rather than assumed - see `AlamoFireBone.AimDirection`.
-     */
-    setFireBones(names: ReadonlySet<string>): void {
-        this.fireBones = names;
-        this.updateBoneAxes();
-    }
-
-    setSelectedBones(indices: ReadonlySet<number>): void {
-        this.selectedBones = indices;
-        this.lastLabelUpdate = 0;
-        this.updateBoneAxes();
-    }
-
-    /**
      * Draws the selected bone's own axes at its own orientation.
      *
      * Scaled to the SUBJECT, like everything else that has to be legible from a two-unit trooper to
@@ -6363,41 +6508,6 @@ export class PreviewViewport {
         this.boneAxes.geometry.setAttribute(
             'color', new THREE.Float32BufferAttribute(colours, 3));
         this.boneAxes.visible = true;
-    }
-
-    /**
-     * Draws a box round what the tree has selected.
-     *
-     * Selecting a bone boxes its whole SUBTREE, not its origin: a bone is where something is
-     * attached, so a box around the point itself would be a dot in the middle of the thing being
-     * pointed at. A row whose ancestor is selected too gets no box of its own - one box around the
-     * arm beats a second one nested inside it around the hand.
-     */
-    setSelectedRows(ids: readonly string[]): void {
-        this.selectedRows = [...ids];
-        this.updateSelectionBoxes();
-    }
-
-    /**
-     * Parts to outline whole, beside whatever rows are boxed.
-     *
-     * A hardpoint that attaches a model is one of these: its geometry is its own part, and boxing
-     * the hull bone it is attached to gathers that bone's whole subtree instead - the turret's meshes and
-     * every empty fire-point bone under it, which on the Executor stretched the box to 2211 units
-     * on a 5094 hull. See `boxTargetFor`.
-     */
-    setSelectedHardpoint(partId: string | null, boneRow: string | null): void {
-        // Decided HERE rather than by the caller, because the answer depends on which parts are in
-        // the scene - and that is this object's own state, arriving one GLB at a time.
-        const target = boxTargetFor(partId, new Set(this.parts.keys()));
-
-        this.selectedParts = target.kind === 'part' ? [target.id] : [];
-
-        // The attach bone stays SELECTED - it lights the tree row and draws the axes - but it stops
-        // being BOXED once its part is outlined. Both at once draws the outline inside a second box
-        // around the bone's whole subtree, which is the 2211-unit smear this replaced.
-        this.unboxedRow = target.kind === 'part' ? boneRow : null;
-        this.updateSelectionBoxes();
     }
 
     /**
@@ -6618,24 +6728,6 @@ export class PreviewViewport {
 
         for (let i = used; i < this.labelPool.length; i++) {
             this.labelPool[i].style.display = 'none';
-        }
-    }
-
-    /**
-     * The targeting marks to draw, and how big.
-     *
-     * Replaced wholesale rather than diffed: the list is one per targetable hardpoint - ten on the Star
-     * Destroyer, and never more than a few hundred - and it changes only when the scene, the state
-     * or the damage does.
-     */
-    setReticles(marks: readonly ReticleMark[], screenSize: number | null | undefined): void {
-        this.reticles = [...marks];
-        // The FRACTION, not a pixel count. Resizing the panel has to change the mark's size, and a
-        // number computed in React would be stale until something else happened to re-render.
-        this.reticleScreenSize = screenSize;
-
-        if (this.reticles.length === 0) {
-            this.clearReticles();
         }
     }
 
@@ -7015,132 +7107,6 @@ export class PreviewViewport {
         }
     };
 
-    /**
-     * Renders one frame at a chosen size and hands back the PNG bytes.
-     *
-     * The renderer is resized, drawn and put back inside ONE synchronous block. Without
-     * `preserveDrawingBuffer` the drawing buffer is only guaranteed to hold its contents until the
-     * browser composites, which cannot happen while this is running - and asking for that flag
-     * instead would cost every ordinary frame for the sake of the rare capture.
-     *
-     * What it hides is passed in rather than read from the panel's own toggles: an icon usually
-     * wants no grid, no floor and no hardpoint markers even while the reader is working with all
-     * three switched on, and a capture that quietly changed what they were looking at would be
-     * worse than one that asked.
-     */
-    capture(options: {
-        width: number;
-        height: number;
-        background: string | null;
-        grid: boolean;
-        floor: boolean;
-        particles: boolean;
-        /** The axes, the skeleton and the firing arcs: diagnostics, not part of the subject. */
-        annotations: boolean;
-    }): string {
-        const before = {
-            width: this.canvas.width,
-            height: this.canvas.height,
-            aspect: this.camera.aspect,
-            pixelRatio: this.renderer.getPixelRatio(),
-            background: this.scene.background,
-            grid: this.grid.visible,
-            floor: this.floor.visible,
-            catcher: this.shadowCatcher.visible,
-            particles: this.particlesVisible,
-            axes: this.axes.visible,
-            joints: this.joints.visible,
-            jointLines: this.jointLines.visible,
-            selection: this.selectionBoxes.visible,
-            arcs: this.arcsVisible,
-        };
-
-        try {
-            // One device pixel per requested pixel: a capture is measured in pixels, not in the
-            // reader's display scaling, or the same request would give a different file on a
-            // different monitor.
-            this.renderer.setPixelRatio(1);
-            this.renderer.setSize(options.width, options.height, false);
-            // The frame drawn over the viewport, exactly: the largest rectangle of the capture's
-            // shape that fits the viewport, centred (captureFrame). Rendered as a view offset on the
-            // viewport's own projection, so a capture wider than the viewport shows what the frame
-            // shows - not more to either side, which is what widening the aspect used to do.
-            const frame = captureFrame(before.width, before.height, options.width, options.height);
-            this.camera.setViewOffset(before.width, before.height, frame.x, frame.y, frame.width, frame.height);
-            this.camera.updateProjectionMatrix();
-
-            // Null is TRANSPARENT, which is what an icon wants: the alpha the renderer was created
-            // with is what makes it possible at all.
-            this.scene.background = options.background === null
-                ? null
-                : new THREE.Color(options.background);
-
-            this.grid.visible = options.grid;
-            this.floor.visible = options.floor;
-            this.shadowCatcher.visible = options.floor && before.catcher;
-            this.setParticlesVisible(options.particles);
-
-            // The axes, the skeleton and the firing arcs are things drawn to help someone READ the
-            // model. They are not part of it, and an icon with a coloured cross through it is not
-            // an icon - which is exactly what the first capture came out as.
-            this.axes.visible = options.annotations && before.axes;
-            this.joints.visible = options.annotations && before.joints;
-            this.jointLines.visible = options.annotations && before.jointLines;
-
-            // A selection box is a thing drawn to help someone READ the model, exactly like the
-            // axes and the skeleton, and an icon with an amber cage around it is not an icon.
-            this.selectionBoxes.visible = options.annotations && before.selection;
-
-            if (!options.annotations) {
-                this.setFireArcsVisible(false);
-            }
-
-            this.prepareForCamera();
-
-            // A sprite is oriented against the VIEW matrix - a streak's length is a screen-space
-            // measurement - so it has to be re-aimed for this camera. A zero step re-aims without
-            // advancing the simulation: a capture must not move the effects on.
-            if (this.particlesVisible) {
-                for (const entry of this.particleSystems.values()) {
-                    entry.instance.update(0, this.camera.matrixWorldInverse, this.windVector);
-                }
-            }
-
-            this.renderFrame();
-
-            return this.canvas.toDataURL('image/png');
-        } finally {
-            // Always put the room back, including when the render throws: a failed capture must not
-            // leave the reader looking at a 64-pixel viewport with the grid switched off.
-            this.renderer.setPixelRatio(before.pixelRatio);
-            this.scene.background = before.background;
-            this.grid.visible = before.grid;
-            this.floor.visible = before.floor;
-            this.shadowCatcher.visible = before.catcher;
-            this.setParticlesVisible(before.particles);
-            this.axes.visible = before.axes;
-            this.joints.visible = before.joints;
-            this.jointLines.visible = before.jointLines;
-            this.selectionBoxes.visible = before.selection;
-            this.setFireArcsVisible(before.arcs);
-            this.camera.clearViewOffset();
-            this.camera.aspect = before.aspect;
-            this.camera.updateProjectionMatrix();
-            this.resize();
-            this.prepareForCamera();
-            this.renderFrame();
-        }
-    }
-
-    resize(): void {
-        const width = this.canvas.clientWidth || 1;
-        const height = this.canvas.clientHeight || 1;
-
-        this.renderer.setSize(width, height, false);
-        this.camera.aspect = width / height;
-        this.camera.updateProjectionMatrix();
-    }
-
     private loop = (): void => {
         if (this.disposed) {
             return;
@@ -7343,34 +7309,6 @@ export class PreviewViewport {
         return this.frameCopy;
     }
 
-    /** Whether heat sprites bend the frame. */
-    setHeat(on: boolean): void {
-        this.heatEnabled = on;
-    }
-
-    /**
-     * Draws the heat buffer rather than the bent picture.
-     *
-     * Forces the heat path on while it is on, even with nothing distorting: a debug view that shows
-     * an ordinary frame until something happens to be burning is a control the reader cannot tell
-     * is working. It costs the two heat buffers for as long as it is switched on, which is the
-     * bargain a debug view is.
-     */
-    setHeatDebug(on: boolean): void {
-        this.heatDebug = on;
-    }
-
-    setBloom(on: boolean): void {
-        this.bloomEnabled = on;
-
-        if (!on) {
-            // Give the buffer back rather than holding a full-screen copy of the canvas for a
-            // switch the reader has turned off.
-            this.frameCopy?.dispose();
-            this.frameCopy = null;
-        }
-    }
-
     /**
      * Turns each billboarded bone's geometry to face whatever it is meant to face.
      *
@@ -7439,17 +7377,6 @@ export class PreviewViewport {
         return reach;
     }
 
-    /**
-     * The reader's draw-distance multiplier.
-     *
-     * Applied on the next reframe as well as at once, so a change is visible without having to
-     * touch the camera.
-     */
-    setDrawDistance(multiplier: number): void {
-        this.drawDistance = multiplier;
-        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
-    }
-
     /** Whether any running system has a heat emitter on screen this frame. */
     private distorting(): boolean {
         // The debug view has to draw the buffer whether or not anything is currently bending it -
@@ -7469,23 +7396,6 @@ export class PreviewViewport {
         }
 
         return false;
-    }
-
-    dispose(): void {
-        this.disposed = true;
-        // The capture flag has to match, or this silently removes nothing.
-        this.canvas.removeEventListener('pointerdown', this.onPointerDown, {capture: true});
-        this.canvas.removeEventListener('pointermove', this.onPointerMove);
-        window.removeEventListener('pointerup', this.onPointerUp);
-        window.removeEventListener('pointercancel', this.onPointerUp);
-        cancelAnimationFrame(this.frameHandle);
-        this.clear();
-        this.controls.dispose();
-        this.heat?.dispose();
-        this.bloom?.dispose();
-        this.shadowVolumes.dispose();
-        this.frameCopy?.dispose();
-        this.renderer.dispose();
     }
 }
 

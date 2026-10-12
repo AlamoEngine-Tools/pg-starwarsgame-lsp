@@ -72,6 +72,11 @@ export class ModelInspectorPanel extends WebviewPanelHost {
         });
     }
 
+    /** Whether a tab is open to receive anything - what the preview checks before it sends. */
+    static get isOpen(): boolean {
+        return ModelInspectorPanel.current !== undefined;
+    }
+
     /**
      * Opens the inspector on one row, or retargets the open one.
      *
@@ -93,22 +98,8 @@ export class ModelInspectorPanel extends WebviewPanelHost {
         ModelInspectorPanel.current?.setSubject(subject);
     }
 
-    /** Whether a tab is open to receive anything - what the preview checks before it sends. */
-    static get isOpen(): boolean {
-        return ModelInspectorPanel.current !== undefined;
-    }
-
     static disposeAll(): void {
         ModelInspectorPanel.current?.dispose();
-    }
-
-    private setSubject(subject: unknown): void {
-        if (!this.live) {
-            this.pending = subject;
-            return;
-        }
-
-        this.post({type: 'setSubject', subject});
     }
 
     protected async onMessage(message: WebviewMessage): Promise<void> {
@@ -125,5 +116,14 @@ export class ModelInspectorPanel extends WebviewPanelHost {
             default:
                 return;
         }
+    }
+
+    private setSubject(subject: unknown): void {
+        if (!this.live) {
+            this.pending = subject;
+            return;
+        }
+
+        this.post({type: 'setSubject', subject});
     }
 }

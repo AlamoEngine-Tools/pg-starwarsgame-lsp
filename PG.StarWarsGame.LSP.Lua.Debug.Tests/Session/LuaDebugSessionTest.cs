@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using PG.StarWarsGame.LSP.Lua.Debug.Protocol;
@@ -17,10 +19,10 @@ public sealed class LuaDebugSessionTest : IAsyncLifetime
     private const int Hero = 343;
     private const int Ai = 344;
     private static readonly CancellationToken None = CancellationToken.None;
-
-    private readonly FakeTimeProvider _time = new();
     private readonly FakeGameDebugServer _game = new();
     private readonly ILuaDebugSession _session;
+
+    private readonly FakeTimeProvider _time = new();
 
     public LuaDebugSessionTest()
     {
@@ -85,8 +87,8 @@ public sealed class LuaDebugSessionTest : IAsyncLifetime
     public async Task ConnectAsync_NobodyListening_TimesOutWithAHint()
     {
         using var silent =
-            new System.Net.Sockets.UdpClient(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
-        var endPoint = (System.Net.IPEndPoint)silent.Client.LocalEndPoint!;
+            new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        var endPoint = (IPEndPoint)silent.Client.LocalEndPoint!;
         var connect = _session.ConnectAsync(endPoint, "AetLuaDebugger:test", None);
 
         await Task.Delay(50, TestContext.Current.CancellationToken);

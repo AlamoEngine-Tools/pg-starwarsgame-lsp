@@ -188,17 +188,13 @@ void main() {
  * frame is going to the canvas, through the heat composite, or on to bloom.
  */
 export class ShadowVolumePass {
-    /** Front faces: increment where the volume is behind what was already drawn. */
-    private readonly front: THREE.ShaderMaterial;
-
-    /** Back faces: decrement, so a ray that leaves the volume again is not counted as inside. */
-    private readonly back: THREE.ShaderMaterial;
-
-    private readonly darkenMaterial: THREE.ShaderMaterial;
-
     /** The full-screen darken, added to the scene once. */
     readonly darken: THREE.Mesh;
-
+    /** Front faces: increment where the volume is behind what was already drawn. */
+    private readonly front: THREE.ShaderMaterial;
+    /** Back faces: decrement, so a ray that leaves the volume again is not counted as inside. */
+    private readonly back: THREE.ShaderMaterial;
+    private readonly darkenMaterial: THREE.ShaderMaterial;
     /** The extra meshes this pass owns, one per volume sub-mesh per face direction. */
     private readonly drawn: THREE.Mesh[] = [];
 
@@ -429,17 +425,6 @@ export class ShadowVolumePass {
         this.refreshDrawn();
     }
 
-    /** `visible` is the product of the two gates, and only this writes it. */
-    private refreshDrawn(): void {
-        for (const [source, meshes] of this.bySource) {
-            for (const mesh of meshes) {
-                mesh.visible = this.enabled && !this.uncounted.has(source);
-            }
-        }
-
-        this.darken.visible = this.enabled && this.active;
-    }
-
     /** Drops every volume mesh, for a part being unloaded. */
     clear(): void {
         for (const mesh of this.drawn) {
@@ -513,5 +498,16 @@ export class ShadowVolumePass {
         this.back.dispose();
         this.darkenMaterial.dispose();
         this.darken.geometry.dispose();
+    }
+
+    /** `visible` is the product of the two gates, and only this writes it. */
+    private refreshDrawn(): void {
+        for (const [source, meshes] of this.bySource) {
+            for (const mesh of meshes) {
+                mesh.visible = this.enabled && !this.uncounted.has(source);
+            }
+        }
+
+        this.darken.visible = this.enabled && this.active;
     }
 }

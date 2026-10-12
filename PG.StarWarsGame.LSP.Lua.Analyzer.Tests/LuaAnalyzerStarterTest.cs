@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Lua.Analyzer.Tests;
 public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
 {
     private static readonly IReadOnlyList<ProjectLayer> Layers =
-        [new ProjectLayer(0, "Mod", [], ["D:/Mods/MyMod/Data/Scripts"], [], [], null)];
+        [new(0, "Mod", [], ["D:/Mods/MyMod/Data/Scripts"], [], [], null)];
 
     private readonly LuaAnalyzerHost _host = new(new LuaAnalyzerOptions
     {
@@ -54,7 +54,7 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
     [Fact]
     public async Task NoExecutable_TheAnalyzerDoesNotStart()
     {
-        await Starter(true, executableFound: false).ConfigureAsync(Layers);
+        await Starter(true, false).ConfigureAsync(Layers);
 
         Assert.Equal(0, _host.Starts);
     }
