@@ -117,23 +117,64 @@ export function documentSelectorFor(spec: ClientSpec): DocumentFilter[] {
         ];
     }
 
-    return spec.roots.flatMap((root) => [
+    // VS Code matches the pattern against its own spelling of the path, case-sensitively, and spells
+    // a drive letter in lower case: a root spelled "C:/..." selects nothing.
+    return spec.roots.map(vscodeSpelling).flatMap((root) => [
         { scheme: "file", language: "xml", pattern: `${root}/**` },
         { scheme: "file", language: "lua", pattern: `${root}/**` },
         { scheme: "file", language: "plaintext", pattern: `${root}/**/*.txt` },
     ]);
 }
 
-/** Whether a client is told about an on-disk change to `path`. */
-export function ownsPath(spec: ClientSpec, path: string): boolean {
-    if (spec.watched === undefined) {
-        return true;
+function vscodeSpelling(path: string): string {
+    return slashed(path).replace(
+        /^([A-Za-z]):/,
+        (_, drive: string) => `${drive.toLowerCase()}:`,
+    );
+}
+
+/**
+ * The client whose server owns `path` (#230): the one whose roots hold it, the deepest root winning;
+ * the single client owns every file. Undefined when the file lies in no project.
+ */
+export function ownerKey(
+    specs: readonly ClientSpec[],
+    path: string,
+): string | undefined {
+    if (specs.length === 1 && specs[0].roots === undefined) {
+        return specs[0].key;
     }
     const target = slashed(path).toLowerCase();
-    return spec.watched.some((directory) => {
-        const d = slashed(directory).toLowerCase();
-        return target === d || target.startsWith(d + "/");
-    });
+    let owner: string | undefined;
+    let longest = -1;
+    for (const spec of specs) {
+        for (const root of spec.roots ?? []) {
+            const r = slashed(root).toLowerCase();
+            if (
+                (target === r || target.startsWith(r + "/")) &&
+                r.length > longest
+            ) {
+                owner = spec.key;
+                longest = r.length;
+            }
+        }
+    }
+    return owner;
+}
+
+/** Whether a client is told about an on-disk change to `path`. */
+export function ownsPath(spec: ClientSpec, path: string): boolean {
+    return (
+        spec.watched === undefined ||
+        spec.watched.some((directory) => isInside(path, directory))
+    );
+}
+
+/** Whether `path` is `directory` or lies under it, on a segment boundary, ignoring separator and case. */
+export function isInside(path: string, directory: string): boolean {
+    const target = slashed(path).toLowerCase();
+    const d = slashed(directory).toLowerCase();
+    return target === d || target.startsWith(d + "/");
 }
 
 /** Where one client stands. */

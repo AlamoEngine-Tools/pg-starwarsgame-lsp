@@ -69,6 +69,20 @@ Activation: an open XML or Lua file, or a `.pgproj` in the workspace. The bundle
 - `icons` (optional) - `megaTexture` (atlas pair without extension, e.g. `data/art/textures/mt_commandbar`) and
   `sourceRoots` (loose icon folders). Omitted: engine convention.
 
+### Several projects in one window
+
+Every `.pgproj` under the open folders is a project with a language server of its own.
+
+- A file belongs to the project whose directory holds it. A dependency outside every folder belongs to the first
+  project that references it; the others see its changes on save.
+- A `.pgproj` inside another project's directory is served as that project's dependency, not as a project.
+- Diagnostics name their project: `aetswg (<project name>)`.
+- Commands act on the project of the document in front; with none, the project picked last in the window, or a picker.
+  **EaWEdit: Select Project** changes the pick.
+- The story and localisation navigators list one group per project.
+- Each project has its own output channel and log file, in its own directory.
+- A single project behaves as before: one server, no project level anywhere.
+
 ---
 
 ## Upgrading from 0.1.x
@@ -640,6 +654,7 @@ Command Palette (`Ctrl+Shift+P`). Commands of a flagged feature are greyed out u
 |--------------------------------------------------------|------------------------------------------------------------------|----------------------------------------|
 | EaWEdit: New Mod Project                               | Creates a `.pgproj` and initial directories                      | -                                      |
 | EaWEdit: Reload Mod Project                            | Re-reads the `.pgproj`, re-indexes                               | -                                      |
+| EaWEdit: Select Project                                | The project commands act on, with several open                   | -                                      |
 | EaWEdit: Re-validate Workspace                         | Re-runs diagnostics in every language                            | -                                      |
 | EaWEdit: Restart LSP Server                            | Restarts the language server                                     | -                                      |
 | EaWEdit: Force LSP Startup                             | Runs the startup scan again when a session came up without one   | -                                      |

@@ -34,18 +34,25 @@ export class ModelPreviewEditorProvider
     /** Matches the `customEditors` contribution in package.json. */
     static readonly viewType = "aet-eaw-edit.modelPreview";
 
+    /**
+     * @param projectOf The server a file's preview talks to, and the project it is filed under: the
+     *     project that owns the file, when the window holds several (#230).
+     */
     constructor(
         private readonly extensionUri: vscode.Uri,
-        private readonly lsp: LspGateway,
+        private readonly projectOf: (uri: vscode.Uri) => {
+            lsp: LspGateway;
+            projectKey: string;
+        },
     ) {}
 
     static register(
         context: vscode.ExtensionContext,
-        lsp: LspGateway,
+        projectOf: (uri: vscode.Uri) => { lsp: LspGateway; projectKey: string },
     ): vscode.Disposable {
         return vscode.window.registerCustomEditorProvider(
             ModelPreviewEditorProvider.viewType,
-            new ModelPreviewEditorProvider(context.extensionUri, lsp),
+            new ModelPreviewEditorProvider(context.extensionUri, projectOf),
             {
                 // A GPU context and several megabytes of geometry are expensive to rebuild, and a
                 // model tab is something people switch away from and back to constantly.
@@ -64,12 +71,14 @@ export class ModelPreviewEditorProvider
         document: vscode.CustomDocument,
         panel: vscode.WebviewPanel,
     ): void {
+        const { lsp, projectKey } = this.projectOf(document.uri);
         ModelPreviewPanel.adopt(
             this.extensionUri,
-            this.lsp,
+            lsp,
             subjectFor(document.uri),
             basename(document.uri),
             panel,
+            projectKey,
         );
     }
 }

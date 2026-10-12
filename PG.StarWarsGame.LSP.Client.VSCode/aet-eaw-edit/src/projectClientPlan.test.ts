@@ -8,6 +8,7 @@ import { discoverProjects } from "./projectDiscovery";
 import {
     clientSpecs,
     documentSelectorFor,
+    ownerKey,
     ownsPath,
     planChanges,
     statusText,
@@ -211,6 +212,28 @@ describe("documentSelectorFor", () => {
     });
 });
 
+describe("documentSelectorFor drive letters", () => {
+    /**
+     * Measured in a live window: VS Code matches a selector's pattern against its own spelling of
+     * the path, which has a lower-case drive letter, and the match is case-sensitive. A root spelled
+     * from the disk ("C:/...") selected nothing, and no project's server received a single file.
+     */
+    it("spells the drive letter as VS Code does", () => {
+        const spec = {
+            ...clientSpecs(
+                discover(["c:/m", "c:/n"], {
+                    "c:/m/m.pgproj": pgproj("M"),
+                    "c:/n/n.pgproj": pgproj("N"),
+                }),
+                ["c:/m", "c:/n"],
+            )[0],
+            roots: ["C:\\Mods\\M"],
+        };
+
+        assert.equal(documentSelectorFor(spec)[0].pattern, "c:/Mods/M/**");
+    });
+});
+
 describe("ownsPath", () => {
     const folders = ["c:/dev/EaWX/Rev", "c:/dev/EaWX/FotR"];
     const [rev, fotr] = clientSpecs(discover(folders, EAWX), folders);
@@ -237,6 +260,35 @@ describe("ownsPath", () => {
         );
 
         assert.equal(ownsPath(single, "d:/elsewhere/a.xml"), true);
+    });
+});
+
+describe("ownerKey", () => {
+    const folders = ["c:/dev/EaWX/Rev", "c:/dev/EaWX/FotR"];
+    const specs = clientSpecs(discover(folders, EAWX), folders);
+
+    it("names the client whose roots hold the file", () => {
+        assert.equal(
+            ownerKey(specs, "C:\\dev\\EaWX\\FotR\\Data\\XML\\a.xml"),
+            specs[1].key,
+        );
+        assert.equal(
+            ownerKey(specs, "c:/dev/EaWX/Data/Data/XML/a.xml"),
+            specs[0].key,
+        );
+    });
+
+    it("names no client for a file outside every project", () => {
+        assert.equal(ownerKey(specs, "c:/elsewhere/a.xml"), undefined);
+    });
+
+    it("names the single client for any file", () => {
+        const [single] = clientSpecs(
+            discover(["c:/m"], { "c:/m/m.pgproj": pgproj("M") }),
+            ["c:/m"],
+        );
+
+        assert.equal(ownerKey([single], "d:/elsewhere/a.xml"), single.key);
     });
 });
 

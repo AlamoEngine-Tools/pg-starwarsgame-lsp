@@ -388,6 +388,10 @@
         "title": "EaWEdit: Reload Mod Project"
       },
       {
+        "command": "aet-eaw-edit.lsp.selectProject",
+        "title": "EaWEdit: Select Project"
+      },
+      {
         "command": "aet-eaw-edit.lsp.initLocalisationProject",
         "title": "EaWEdit: Initialise Localisation Project from Baseline",
         "enablement": "config.aet-eaw-edit.features.tools.localisation"
