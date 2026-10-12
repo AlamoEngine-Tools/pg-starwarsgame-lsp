@@ -267,6 +267,18 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Single(diagnostics, d => d.Code?.String == DiagnosticIds.LuaStateTransitionUnregistered.ToString());
     }
 
+    // Host globals are set only after Base_Definitions returns (#250).
+    [Fact]
+    public void OnIndexChanged_HostGlobalReadInDefinitions_PublishesTheDiagnostic()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri, "function Definitions()\n  difficulty = PlayerObject.Get_Difficulty()\nend\n");
+        indexService.Fire(GameIndex.Empty);
+
+        Assert.Single(Assert.Single(published).Diagnostics!,
+            d => d.Code?.String == DiagnosticIds.LuaHostGlobalInDefinitions.ToString());
+    }
+
     [Fact]
     public void PublishForDocument_SameContentTwice_ParsesOnce()
     {

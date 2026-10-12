@@ -235,6 +235,10 @@ Scripts under the declared `scripts` directories are indexed and checked.
   - Diagnostics `Engine8` to `Engine13`: a transition to an unregistered state, a non-function registered, a story
     event naming an undefined function, a state registered twice, a handler not taking one parameter, a message
     compared with anything else
+- **A script's state reused between instances** - unless `ScriptPoolCount = 0`, the game hands a script's state to
+  its next instance; `Engine14` to `Engine17`: a host global read at definition time, a global read before it is set
+  at run time and not reset by `Definitions` (a reset on `OnUpdate` counts), a reused state without `Flush_G`, a
+  release that never empties the event queue
 
 ### Lua analyzer
 
