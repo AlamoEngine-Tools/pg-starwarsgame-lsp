@@ -10,8 +10,8 @@
 // Keyed text files only. A credits file keys every row by a formatting directive, so matching by
 // key against a baseline would pair unrelated lines.
 
-import {BaselineEntryDto} from '../protocol';
-import {LocRow, LocValue} from './loc/locRow';
+import { BaselineEntryDto } from "../protocol";
+import { LocRow, LocValue } from "./loc/locRow";
 
 export interface BaselineRow {
     key: string;
@@ -19,7 +19,7 @@ export interface BaselineRow {
 }
 
 // Re-exported so the editors reading a baseline need only one import for it.
-export {BaselineEntryDto};
+export { BaselineEntryDto };
 
 /**
  * Converts the server's entries into the grid's row shape.
@@ -31,12 +31,16 @@ export {BaselineEntryDto};
  * each use.
  */
 export function toBaselineRows(entries: BaselineEntryDto[]): BaselineRow[] {
-    return entries.map(entry => ({
+    return entries.map((entry) => ({
         key: entry.key,
         // `?? {}` despite the contract promising a dictionary: an entry with no translations at all
         // serialises as an omitted field, and the alternative is a crash on the whole baseline.
-        values: Object.entries(entry.translations ?? {})
-            .map(([language, value]) => ({language: language.toUpperCase(), value})),
+        values: Object.entries(entry.translations ?? {}).map(
+            ([language, value]) => ({
+                language: language.toUpperCase(),
+                value,
+            }),
+        ),
     }));
 }
 
@@ -47,14 +51,16 @@ export function toBaselineRows(entries: BaselineEntryDto[]): BaselineRow[] {
  * difference they can act on, and counting it would keep rows on screen for no visible reason.
  */
 export function findInheritedKeys(
-    rows: LocRow[], baseline: BaselineRow[], languages: string[],
+    rows: LocRow[],
+    baseline: BaselineRow[],
+    languages: string[],
 ): Set<string> {
     const inherited = new Set<string>();
     if (baseline.length === 0) {
         return inherited;
     }
 
-    const byKey = new Map(baseline.map(row => [row.key, row]));
+    const byKey = new Map(baseline.map((row) => [row.key, row]));
 
     for (const row of rows) {
         const base = byKey.get(row.key);
@@ -62,7 +68,13 @@ export function findInheritedKeys(
             continue;
         }
         // An absent cell and an empty one are the same thing to the reader, so they compare equal.
-        if (languages.every(language => valueOf(row.values, language) === valueOf(base.values, language))) {
+        if (
+            languages.every(
+                (language) =>
+                    valueOf(row.values, language) ===
+                    valueOf(base.values, language),
+            )
+        ) {
             inherited.add(row.key);
         }
     }
@@ -71,11 +83,15 @@ export function findInheritedKeys(
 }
 
 /** Drops rows that only repeat an inherited value, unless the user has asked to see them. */
-export function hideInherited(rows: LocRow[], inherited: Set<string>, show: boolean): LocRow[] {
+export function hideInherited(
+    rows: LocRow[],
+    inherited: Set<string>,
+    show: boolean,
+): LocRow[] {
     if (show || inherited.size === 0) {
         return rows;
     }
-    return rows.filter(row => !inherited.has(row.key));
+    return rows.filter((row) => !inherited.has(row.key));
 }
 
 /**
@@ -83,15 +99,20 @@ export function hideInherited(rows: LocRow[], inherited: Set<string>, show: bool
  * key - there is nothing to revert to, and the reset must not be offered.
  */
 export function baselineValuesFor(
-    key: string, baseline: BaselineRow[], languages: string[],
+    key: string,
+    baseline: BaselineRow[],
+    languages: string[],
 ): LocValue[] | null {
-    const base = baseline.find(row => row.key === key);
+    const base = baseline.find((row) => row.key === key);
     if (base === undefined) {
         return null;
     }
-    return languages.map(language => ({language, value: valueOf(base.values, language)}));
+    return languages.map((language) => ({
+        language,
+        value: valueOf(base.values, language),
+    }));
 }
 
 function valueOf(values: LocValue[], language: string): string {
-    return values.find(v => v.language === language)?.value ?? '';
+    return values.find((v) => v.language === language)?.value ?? "";
 }

@@ -8,21 +8,21 @@
 
 export interface Point {
     x: number;
-    y: number
+    y: number;
 }
 
 export interface Size {
     width: number;
-    height: number
+    height: number;
 }
 
 export interface Viewport {
     width: number;
-    height: number
+    height: number;
 }
 
 /** Smallest usable dialog: below this the buttons start overlapping the body. */
-export const MIN_MODAL_SIZE: Size = {width: 260, height: 160};
+export const MIN_MODAL_SIZE: Size = { width: 260, height: 160 };
 
 /**
  * Keeps a moved dialog reachable.
@@ -31,7 +31,11 @@ export const MIN_MODAL_SIZE: Size = {width: 260, height: 160};
  * off the top or past an edge would strand it with no way to recover short of closing the tab. A
  * dialog larger than the viewport is pinned to the top-left rather than pushed off-screen.
  */
-export function clampPosition(position: Point, size: Size, viewport: Viewport): Point {
+export function clampPosition(
+    position: Point,
+    size: Size,
+    viewport: Viewport,
+): Point {
     return {
         x: Math.max(0, Math.min(position.x, viewport.width - size.width)),
         y: Math.max(0, Math.min(position.y, viewport.height - size.height)),
@@ -44,8 +48,14 @@ export function clampPosition(position: Point, size: Size, viewport: Viewport): 
  */
 export function clampSize(size: Size, origin: Point, viewport: Viewport): Size {
     return {
-        width: Math.max(MIN_MODAL_SIZE.width, Math.min(size.width, viewport.width - origin.x)),
-        height: Math.max(MIN_MODAL_SIZE.height, Math.min(size.height, viewport.height - origin.y)),
+        width: Math.max(
+            MIN_MODAL_SIZE.width,
+            Math.min(size.width, viewport.width - origin.x),
+        ),
+        height: Math.max(
+            MIN_MODAL_SIZE.height,
+            Math.min(size.height, viewport.height - origin.y),
+        ),
     };
 }
 
@@ -68,7 +78,10 @@ export interface StoredGeometry {
 }
 
 /** What to remember about a dialog the user has placed. */
-export function toStoredGeometry(rect: Rect, viewport: Viewport): StoredGeometry {
+export function toStoredGeometry(
+    rect: Rect,
+    viewport: Viewport,
+): StoredGeometry {
     // Guarded against a zero viewport, which a hidden webview can report.
     const usableWidth = Math.max(1, viewport.width);
     const usableHeight = Math.max(1, viewport.height);
@@ -88,15 +101,22 @@ export function toStoredGeometry(rect: Rect, viewport: Viewport): StoredGeometry
  * clamped per axis, so it keeps the shape it was given and stays recognisably the dialog that was
  * put there - "resize relatively" rather than "squash to fit".
  */
-export function fromStoredGeometry(stored: StoredGeometry, viewport: Viewport): Rect {
+export function fromStoredGeometry(
+    stored: StoredGeometry,
+    viewport: Viewport,
+): Rect {
     const scale = Math.min(
         1,
         viewport.width / Math.max(1, stored.width),
-        viewport.height / Math.max(1, stored.height));
+        viewport.height / Math.max(1, stored.height),
+    );
 
     const size: Size = {
         width: Math.max(MIN_MODAL_SIZE.width, Math.round(stored.width * scale)),
-        height: Math.max(MIN_MODAL_SIZE.height, Math.round(stored.height * scale)),
+        height: Math.max(
+            MIN_MODAL_SIZE.height,
+            Math.round(stored.height * scale),
+        ),
     };
 
     const position = clampPosition(
@@ -105,16 +125,16 @@ export function fromStoredGeometry(stored: StoredGeometry, viewport: Viewport): 
             y: Math.round(stored.yRatio * viewport.height),
         },
         size,
-        viewport);
+        viewport,
+    );
 
-    return {...position, ...size};
+    return { ...position, ...size };
 }
 
 /** Which edge or corner is being dragged. Named like the CSS cursors they map to. */
-export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+export type ResizeDirection = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
-export interface Rect extends Point, Size {
-}
+export interface Rect extends Point, Size {}
 
 /**
  * The rectangle a resize drag produces.
@@ -126,27 +146,35 @@ export interface Rect extends Point, Size {
  * its own minimum stops growing in the other direction instead of walking across the screen.
  */
 export function resizeRect(
-    base: Rect, direction: ResizeDirection, dx: number, dy: number, viewport: Viewport,
+    base: Rect,
+    direction: ResizeDirection,
+    dx: number,
+    dy: number,
+    viewport: Viewport,
 ): Rect {
     let left = base.x;
     let top = base.y;
     let right = base.x + base.width;
     let bottom = base.y + base.height;
 
-    if (direction.includes('w')) {
+    if (direction.includes("w")) {
         left = clamp(base.x + dx, 0, right - MIN_MODAL_SIZE.width);
     }
-    if (direction.includes('e')) {
+    if (direction.includes("e")) {
         right = clamp(right + dx, left + MIN_MODAL_SIZE.width, viewport.width);
     }
-    if (direction.includes('n')) {
+    if (direction.includes("n")) {
         top = clamp(base.y + dy, 0, bottom - MIN_MODAL_SIZE.height);
     }
-    if (direction.includes('s')) {
-        bottom = clamp(bottom + dy, top + MIN_MODAL_SIZE.height, viewport.height);
+    if (direction.includes("s")) {
+        bottom = clamp(
+            bottom + dy,
+            top + MIN_MODAL_SIZE.height,
+            viewport.height,
+        );
     }
 
-    return {x: left, y: top, width: right - left, height: bottom - top};
+    return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -168,5 +196,6 @@ export function centredPosition(size: Size, viewport: Viewport): Point {
             y: Math.round((viewport.height - size.height) / 2),
         },
         size,
-        viewport);
+        viewport,
+    );
 }

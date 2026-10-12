@@ -16,15 +16,19 @@
  * reader's, so the first box drawn is the first row they picked.
  */
 export function boxRoots(
-    selected: readonly string[], parents: ReadonlyMap<string, string | null>,
+    selected: readonly string[],
+    parents: ReadonlyMap<string, string | null>,
 ): string[] {
     const chosen = new Set(selected);
 
-    return selected.filter(row => !hasSelectedAncestor(row, chosen, parents));
+    return selected.filter((row) => !hasSelectedAncestor(row, chosen, parents));
 }
 
 /** Every row one box covers: the row itself and everything beneath it. */
-export function rowsInBox(root: string, parents: ReadonlyMap<string, string | null>): string[] {
+export function rowsInBox(
+    root: string,
+    parents: ReadonlyMap<string, string | null>,
+): string[] {
     const covered = new Set<string>([root]);
 
     // Repeated sweeps rather than recursion down a child map, because the map runs the other way
@@ -47,11 +51,17 @@ export function rowsInBox(root: string, parents: ReadonlyMap<string, string | nu
 
 /** Walks up from a row looking for a selected ancestor, without trusting the map to be a tree. */
 function hasSelectedAncestor(
-    row: string, selected: ReadonlySet<string>, parents: ReadonlyMap<string, string | null>,
+    row: string,
+    selected: ReadonlySet<string>,
+    parents: ReadonlyMap<string, string | null>,
 ): boolean {
     const seen = new Set<string>([row]);
 
-    for (let at = parents.get(row) ?? null; at !== null; at = parents.get(at) ?? null) {
+    for (
+        let at = parents.get(row) ?? null;
+        at !== null;
+        at = parents.get(at) ?? null
+    ) {
         if (selected.has(at)) {
             return true;
         }
@@ -69,7 +79,7 @@ function hasSelectedAncestor(
 }
 
 /** What a selected hardpoint's box encloses. */
-export type BoxTarget = { kind: 'part'; id: string } | { kind: 'bone' };
+export type BoxTarget = { kind: "part"; id: string } | { kind: "bone" };
 
 /**
  * Whether a hardpoint's box should outline its own model, or just mark its attach bone.
@@ -90,9 +100,13 @@ export type BoxTarget = { kind: 'part'; id: string } | { kind: 'bone' };
  * did not take.
  */
 export function boxTargetFor(
-    partId: string | null | undefined, loadedParts: ReadonlySet<string>,
+    partId: string | null | undefined,
+    loadedParts: ReadonlySet<string>,
 ): BoxTarget {
-    return partId !== null && partId !== undefined && partId !== '' && loadedParts.has(partId)
-        ? {kind: 'part', id: partId}
-        : {kind: 'bone'};
+    return partId !== null &&
+        partId !== undefined &&
+        partId !== "" &&
+        loadedParts.has(partId)
+        ? { kind: "part", id: partId }
+        : { kind: "bone" };
 }

@@ -21,7 +21,7 @@ export interface FlatBone {
 
 /** Something attached to a bone. */
 export interface BoneAttachment {
-    kind: 'mesh' | 'hardpoint';
+    kind: "mesh" | "hardpoint";
     label: string;
     /**
      * The mesh's own identity, for the visibility toggle. Meshes only.
@@ -43,15 +43,17 @@ export interface BoneNode extends FlatBone {
 }
 
 /** How many bone labels the viewport draws. */
-export type LabelMode = 'none' | 'selected' | 'all';
+export type LabelMode = "none" | "selected" | "all";
 
 /**
  * The exporter appends `#index` to every glTF node name, because shipped skeletons repeat names - a
  * Star Destroyer hull carries twenty bones called `p_hp_imperial_damage`. This recovers the name the
  * XML actually references.
  */
-export function alamoBoneName(nodeName: string): { name: string; index: number } | null {
-    const hash = nodeName.lastIndexOf('#');
+export function alamoBoneName(
+    nodeName: string,
+): { name: string; index: number } | null {
+    const hash = nodeName.lastIndexOf("#");
     if (hash <= 0) {
         return null;
     }
@@ -61,7 +63,7 @@ export function alamoBoneName(nodeName: string): { name: string; index: number }
         return null;
     }
 
-    return {name: nodeName.slice(0, hash), index};
+    return { name: nodeName.slice(0, hash), index };
 }
 
 /**
@@ -75,7 +77,7 @@ export function buildBoneTree(
     bones: readonly FlatBone[],
     attachments: ReadonlyMap<number, BoneAttachment[]> = new Map(),
 ): BoneNode[] {
-    const nodes = bones.map<BoneNode>(bone => ({
+    const nodes = bones.map<BoneNode>((bone) => ({
         ...bone,
         children: [],
         depth: 0,
@@ -85,9 +87,12 @@ export function buildBoneTree(
     const roots: BoneNode[] = [];
 
     for (const node of nodes) {
-        const parent = node.parent >= 0 && node.parent < nodes.length && node.parent !== node.index
-            ? nodes[node.parent]
-            : null;
+        const parent =
+            node.parent >= 0 &&
+            node.parent < nodes.length &&
+            node.parent !== node.index
+                ? nodes[node.parent]
+                : null;
 
         if (parent === null) {
             roots.push(node);
@@ -117,9 +122,12 @@ function setDepth(node: BoneNode, depth: number): void {
  * a flat list of matches would answer "which bones" but not "where". Descendants are dropped: typing
  * `HP_` should give the hardpoint bones, not also the twenty damage proxies attached to them.
  */
-export function filterBones(roots: readonly BoneNode[], query: string): BoneNode[] {
+export function filterBones(
+    roots: readonly BoneNode[],
+    query: string,
+): BoneNode[] {
     const needle = query.trim().toLowerCase();
-    if (needle === '') {
+    if (needle === "") {
         return [...roots];
     }
 
@@ -134,7 +142,7 @@ export function filterBones(roots: readonly BoneNode[], query: string): BoneNode
         }
 
         // A match keeps its own subtree collapsed away; an ancestor keeps only the path down.
-        return {...node, children: matches ? [] : children};
+        return { ...node, children: matches ? [] : children };
     };
 
     return roots.map(keep).filter((node): node is BoneNode => node !== null);
@@ -155,13 +163,14 @@ export interface BoneRow {
  * twisties on open makes the tree useless at a glance.
  */
 export function visibleRows(
-    roots: readonly BoneNode[], collapsed: ReadonlySet<number>,
+    roots: readonly BoneNode[],
+    collapsed: ReadonlySet<number>,
 ): BoneRow[] {
     const rows: BoneRow[] = [];
 
     const walk = (node: BoneNode): void => {
         const expanded = !collapsed.has(node.index);
-        rows.push({node, expandable: node.children.length > 0, expanded});
+        rows.push({ node, expandable: node.children.length > 0, expanded });
 
         if (expanded) {
             for (const child of node.children) {
@@ -184,25 +193,30 @@ export function visibleRows(
  * projected positions and cannot be decided here.
  */
 export function labelCandidates(
-    bones: readonly FlatBone[], mode: LabelMode, selected: ReadonlySet<number>,
+    bones: readonly FlatBone[],
+    mode: LabelMode,
+    selected: ReadonlySet<number>,
 ): Set<number> {
-    if (mode === 'none') {
+    if (mode === "none") {
         return new Set();
     }
 
     // A SET, because the panel selects several at once - two fire bones, a shift-run in the tree.
     // It took one index, so a selection of three was labelled once and the other two read as
     // unselected.
-    if (mode === 'selected') {
+    if (mode === "selected") {
         return new Set(selected);
     }
 
-    return new Set(bones.map(bone => bone.index));
+    return new Set(bones.map((bone) => bone.index));
 }
 
 /** The chain from a root down to <paramref name="index" />, for revealing a selection. */
-export function ancestorsOf(bones: readonly FlatBone[], index: number): number[] {
-    const byIndex = new Map(bones.map(bone => [bone.index, bone]));
+export function ancestorsOf(
+    bones: readonly FlatBone[],
+    index: number,
+): number[] {
+    const byIndex = new Map(bones.map((bone) => [bone.index, bone]));
     const chain: number[] = [];
 
     let current = byIndex.get(index)?.parent ?? -1;

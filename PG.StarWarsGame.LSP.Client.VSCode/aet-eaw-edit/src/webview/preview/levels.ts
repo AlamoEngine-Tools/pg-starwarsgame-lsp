@@ -7,7 +7,7 @@
 // numbers. The rule is `RenderObject::CheckAltLod`: only TAGGED things are ever switched, so an
 // untagged mesh is the hull itself and must never be hidden by a level change.
 
-import {isVisibleAtLevel, type MaterialExtras} from './materials';
+import { isVisibleAtLevel, type MaterialExtras } from "./materials";
 
 /** The level tags something carries, with null meaning untagged. */
 export interface LevelTagged {
@@ -26,7 +26,10 @@ export interface LevelTagged {
  * hardpoint's fire flickering back on as the damage state winds down.
  */
 export function proxyVisibleAt(
-    proxy: LevelTagged, alt: number, lod: number, altDescending: boolean,
+    proxy: LevelTagged,
+    alt: number,
+    lod: number,
+    altDescending: boolean,
 ): boolean {
     // Untagged proxies are never touched by a level change.
     if (proxy.alt === null && proxy.lod === null) {
@@ -92,14 +95,18 @@ export function definedLevels(tagged: Iterable<LevelTagged>): DefinedLevels {
     }
 
     // Numeric sort: the default is lexicographic, which puts 10 before 2.
-    const ascending = (values: Set<number>): number[] => [...values].sort((a, b) => a - b);
+    const ascending = (values: Set<number>): number[] =>
+        [...values].sort((a, b) => a - b);
 
     // ALT fills its gaps; LOD does not. See the note above - a damage stage can exist without the
     // model drawing anything for it, and a detail level cannot.
     const stages = ascending(alt);
-    const contiguous = Array.from({length: stages[stages.length - 1] + 1}, (_, i) => i);
+    const contiguous = Array.from(
+        { length: stages[stages.length - 1] + 1 },
+        (_, i) => i,
+    );
 
-    return {alt: contiguous, lod: ascending(lod)};
+    return { alt: contiguous, lod: ascending(lod) };
 }
 
 /** A slider's worth of positions over the levels a model actually defines. */
@@ -134,7 +141,10 @@ export function levelSteps(levels: readonly number[]): LevelSteps {
                 return 0;
             }
 
-            const clamped = Math.min(levels.length - 1, Math.max(0, Math.round(position)));
+            const clamped = Math.min(
+                levels.length - 1,
+                Math.max(0, Math.round(position)),
+            );
 
             return levels[clamped];
         },
@@ -163,7 +173,7 @@ export function levelSteps(levels: readonly number[]): LevelSteps {
  * NOT ONE names a stage twice. So a stage has at most one band and this cannot be ambiguous.
  */
 function stageBand(table: readonly DamageBand[], stage: number): string | null {
-    const at = table.findIndex(band => band.stage === stage);
+    const at = table.findIndex((band) => band.stage === stage);
 
     let top: number;
     let bottom: number;
@@ -173,7 +183,7 @@ function stageBand(table: readonly DamageBand[], stage: number): string | null {
         bottom = at === table.length - 1 ? 0 : table[at + 1].threshold;
     } else if (stage === 0) {
         top = 1;
-        bottom = Math.max(...table.map(band => band.threshold));
+        bottom = Math.max(...table.map((band) => band.threshold));
     } else {
         return null;
     }
@@ -189,7 +199,7 @@ function stageBand(table: readonly DamageBand[], stage: number): string | null {
     // top row of 1 is never entered at all. Writing either as `0-0%` or `100-100%` would name a
     // range the stage does not have.
     if (high === low) {
-        return high === 0 ? '0%' : null;
+        return high === 0 ? "0%" : null;
     }
 
     return `${high}-${low}%`;
@@ -218,15 +228,20 @@ export interface LevelCost {
  */
 export function costByLevel(
     meshes: Iterable<{ extras: MaterialExtras; triangles: number }>,
-    alt: number, levels: readonly number[],
+    alt: number,
+    levels: readonly number[],
 ): Map<number, LevelCost> {
     const counts = new Map<number, LevelCost>(
-        levels.map(level => [level, {meshes: 0, triangles: 0}]));
+        levels.map((level) => [level, { meshes: 0, triangles: 0 }]),
+    );
 
     for (const mesh of meshes) {
         for (const level of levels) {
             const cost = counts.get(level);
-            if (cost !== undefined && isVisibleAtLevel(mesh.extras, alt, level)) {
+            if (
+                cost !== undefined &&
+                isVisibleAtLevel(mesh.extras, alt, level)
+            ) {
                 cost.meshes++;
                 cost.triangles += mesh.triangles;
             }
@@ -268,10 +283,12 @@ export interface LevelDetail {
  * a level of zero triangles.
  */
 export function levelLabel(
-    axis: 'alt' | 'lod', level: number, levels: readonly number[],
+    axis: "alt" | "lod",
+    level: number,
+    levels: readonly number[],
     detail: LevelDetail = {},
 ): string {
-    if (axis === 'alt') {
+    if (axis === "alt") {
         const table = detail.table ?? [];
         const band = table.length > 0 ? stageBand(table, level) : null;
 
@@ -279,24 +296,28 @@ export function levelLabel(
             return `${level} (${band})`;
         }
 
-        return level === 0 ? '0 (undamaged)' : String(level);
+        return level === 0 ? "0 (undamaged)" : String(level);
     }
 
     const cost = detail.cost ?? null;
     if (cost !== null && cost.triangles > 0) {
         // `en-US` rather than the reader's locale: the house rule is ASCII only, and about half the
         // locales VS Code ships group thousands with a non-breaking space.
-        const count = (value: number): string => value.toLocaleString('en-US');
+        const count = (value: number): string => value.toLocaleString("en-US");
 
-        return `${level} (${count(cost.meshes)} mesh${cost.meshes === 1 ? '' : 'es'}, `
-            + `${count(cost.triangles)} tri${cost.triangles === 1 ? '' : 's'})`;
+        return (
+            `${level} (${count(cost.meshes)} mesh${cost.meshes === 1 ? "" : "es"}, ` +
+            `${count(cost.triangles)} tri${cost.triangles === 1 ? "" : "s"})`
+        );
     }
 
     if (level === 0) {
-        return '0 (distant)';
+        return "0 (distant)";
     }
 
-    return level === levels[levels.length - 1] ? `${level} (close-up)` : String(level);
+    return level === levels[levels.length - 1]
+        ? `${level} (close-up)`
+        : String(level);
 }
 
 /**
@@ -316,7 +337,8 @@ export function levelLabel(
  * LOD is untouched. A detail level IS geometry, and nothing in the XML has an opinion about it.
  */
 export function withDeclaredStages(
-    levels: DefinedLevels, declared: readonly number[],
+    levels: DefinedLevels,
+    declared: readonly number[],
 ): DefinedLevels {
     if (declared.length === 0) {
         return levels;
@@ -324,10 +346,11 @@ export function withDeclaredStages(
 
     const highest = Math.max(
         levels.alt[levels.alt.length - 1] ?? 0,
-        ...declared.filter(stage => Number.isFinite(stage) && stage >= 0));
+        ...declared.filter((stage) => Number.isFinite(stage) && stage >= 0),
+    );
 
     return {
-        alt: Array.from({length: highest + 1}, (_, stage) => stage),
+        alt: Array.from({ length: highest + 1 }, (_, stage) => stage),
         lod: levels.lod,
     };
 }
@@ -353,7 +376,10 @@ export interface DamageBand {
  * Rows are taken in WRITTEN order and a stage may repeat; nothing here sorts or de-duplicates,
  * because the pairing is positional and the order is the whole meaning of it.
  */
-export function stageForHull(table: readonly DamageBand[], fraction: number): number {
+export function stageForHull(
+    table: readonly DamageBand[],
+    fraction: number,
+): number {
     if (table.length === 0 || Number.isNaN(fraction)) {
         return 0;
     }

@@ -20,14 +20,15 @@ import {
     type Scope,
     splitTopLevel,
     type StructTable,
-} from './glslTypes';
+} from "./glslTypes";
 
 /** Wraps an expression so it can take a swizzle, parenthesising only when it must. */
 function narrow(expression: string, components: number): string {
     const text = expression.trim();
-    const atomic = /^[A-Za-z_][A-Za-z0-9_.]*$/.test(text)
-        || (text.startsWith('(') && matchingParen(text, 0) === text.length - 1)
-        || /^[A-Za-z_][A-Za-z0-9_]*\s*\(.*\)$/.test(text);
+    const atomic =
+        /^[A-Za-z_][A-Za-z0-9_.]*$/.test(text) ||
+        (text.startsWith("(") && matchingParen(text, 0) === text.length - 1) ||
+        /^[A-Za-z_][A-Za-z0-9_]*\s*\(.*\)$/.test(text);
 
     return `${atomic ? text : `(${text})`}${narrowingSwizzle(components)}`;
 }
@@ -39,7 +40,10 @@ function narrow(expression: string, components: number): string {
  * it silently either - and matrices are left alone entirely.
  */
 export function narrowExpression(
-    expression: string, target: string, scope: Scope, structs: StructTable,
+    expression: string,
+    target: string,
+    scope: Scope,
+    structs: StructTable,
     functions: FunctionTable = new Map(),
 ): string {
     const wanted = componentCount(target);
@@ -47,10 +51,14 @@ export function narrowExpression(
         return expression;
     }
 
-    const actual = componentCount(inferType(expression, scope, structs, functions));
+    const actual = componentCount(
+        inferType(expression, scope, structs, functions),
+    );
 
     // A scalar broadcasts in both languages, so it needs nothing.
-    return actual > wanted && actual > 1 ? narrow(expression, wanted) : expression;
+    return actual > wanted && actual > 1
+        ? narrow(expression, wanted)
+        : expression;
 }
 
 /**
@@ -62,16 +70,19 @@ export function narrowExpression(
  * through call arguments and parentheses rather than looking only at the top level.
  */
 function balanceWidths(
-    expression: string, scope: Scope, structs: StructTable, functions: FunctionTable,
+    expression: string,
+    scope: Scope,
+    structs: StructTable,
+    functions: FunctionTable,
 ): string {
     const text = expression.trim();
 
-    if (text === '') {
+    if (text === "") {
         return expression;
     }
 
     // Parenthesised as a whole: balance what is inside.
-    if (text.startsWith('(') && matchingParen(text, 0) === text.length - 1) {
+    if (text.startsWith("(") && matchingParen(text, 0) === text.length - 1) {
         return `(${balanceWidths(text.slice(1, -1), scope, structs, functions)})`;
     }
 
@@ -81,30 +92,50 @@ function balanceWidths(
         const left = balanceWidths(split.left, scope, structs, functions);
         const right = balanceWidths(split.right, scope, structs, functions);
 
-        const leftWidth = componentCount(inferType(left, scope, structs, functions));
-        const rightWidth = componentCount(inferType(right, scope, structs, functions));
+        const leftWidth = componentCount(
+            inferType(left, scope, structs, functions),
+        );
+        const rightWidth = componentCount(
+            inferType(right, scope, structs, functions),
+        );
 
         if (leftWidth > 1 && rightWidth > 1 && leftWidth !== rightWidth) {
             const target = wide(Math.min(leftWidth, rightWidth));
 
-            return `${narrowExpression(left, target, scope, structs, functions)} `
-                + `${split.operator} `
-                + `${narrowExpression(right, target, scope, structs, functions)}`;
+            return (
+                `${narrowExpression(left, target, scope, structs, functions)} ` +
+                `${split.operator} ` +
+                `${narrowExpression(right, target, scope, structs, functions)}`
+            );
         }
 
         // A vector against a MATRIX, which has no component count of its own: `mul(v, m)` with a
         // float4 and a float3x3 is a truncation HLSL performs for you. Every skinning shader does
         // it, rotating the light vector by the bone's 3x3.
-        const leftMatrix = matrixDimension(inferType(left, scope, structs, functions));
-        const rightMatrix = matrixDimension(inferType(right, scope, structs, functions));
+        const leftMatrix = matrixDimension(
+            inferType(left, scope, structs, functions),
+        );
+        const rightMatrix = matrixDimension(
+            inferType(right, scope, structs, functions),
+        );
 
         if (leftMatrix > 0 && rightWidth > leftMatrix) {
-            return `${left} ${split.operator} `
-                + narrowExpression(right, wide(leftMatrix), scope, structs, functions);
+            return (
+                `${left} ${split.operator} ` +
+                narrowExpression(
+                    right,
+                    wide(leftMatrix),
+                    scope,
+                    structs,
+                    functions,
+                )
+            );
         }
         if (rightMatrix > 0 && leftWidth > rightMatrix) {
-            return `${narrowExpression(left, wide(rightMatrix), scope, structs, functions)} `
-                + `${split.operator} ${right}`;
+            return (
+                `${narrowExpression(left, wide(rightMatrix), scope, structs, functions)} ` +
+                `${split.operator} ${right}`
+            );
         }
 
         return `${left} ${split.operator} ${right}`;
@@ -114,20 +145,29 @@ function balanceWidths(
     // components at a call boundary as quietly as it does at an assignment - the tangent-space
     // helpers are declared in float3 and every caller hands them a float4.
     const call = /^([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(text);
-    if (call !== null && matchingParen(text, call[0].length - 1) === text.length - 1) {
+    if (
+        call !== null &&
+        matchingParen(text, call[0].length - 1) === text.length - 1
+    ) {
         const parameters = functions.get(call[1])?.parameters;
 
         const args = splitTopLevel(text.slice(call[0].length, -1))
-            .map(arg => balanceWidths(arg, scope, structs, functions))
+            .map((arg) => balanceWidths(arg, scope, structs, functions))
             .map((arg, index) => {
                 const parameter = parameters?.[index];
 
                 return parameter === undefined
                     ? arg
-                    : narrowExpression(arg, parameter, scope, structs, functions);
+                    : narrowExpression(
+                          arg,
+                          parameter,
+                          scope,
+                          structs,
+                          functions,
+                      );
             });
 
-        return `${call[1]}(${args.join(', ')})`;
+        return `${call[1]}(${args.join(", ")})`;
     }
 
     return text;
@@ -137,26 +177,26 @@ function balanceWidths(
 function splitBinary(
     text: string,
 ): { left: string; right: string; operator: string } | null {
-    for (const operators of ['+-', '*/']) {
+    for (const operators of ["+-", "*/"]) {
         let depth = 0;
 
         for (let i = text.length - 1; i >= 0; i--) {
             const c = text[i];
 
-            if (c === ')' || c === ']') {
+            if (c === ")" || c === "]") {
                 depth++;
-            } else if (c === '(' || c === '[') {
+            } else if (c === "(" || c === "[") {
                 depth--;
             } else if (depth === 0 && operators.includes(c)) {
                 const left = text.slice(0, i).trim();
 
                 // Nothing to the left, or another operator, means this is a sign rather than a
                 // binary operator.
-                if (left === '' || /[-+*/(,]$/.test(left)) {
+                if (left === "" || /[-+*/(,]$/.test(left)) {
                     continue;
                 }
 
-                return {left, right: text.slice(i + 1).trim(), operator: c};
+                return { left, right: text.slice(i + 1).trim(), operator: c };
             }
         }
     }
@@ -165,13 +205,26 @@ function splitBinary(
 }
 
 function wide(components: number): string {
-    return components === 1 ? 'float' : `vec${components}`;
+    return components === 1 ? "float" : `vec${components}`;
 }
 
 // Non-square spellings first, so the alternation does not match `mat4` inside `mat4x3`.
 const BUILTIN_TYPES = [
-    'mat2x3', 'mat2x4', 'mat3x2', 'mat3x4', 'mat4x2', 'mat4x3',
-    'float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4', 'int', 'bool',
+    "mat2x3",
+    "mat2x4",
+    "mat3x2",
+    "mat3x4",
+    "mat4x2",
+    "mat4x3",
+    "float",
+    "vec2",
+    "vec3",
+    "vec4",
+    "mat2",
+    "mat3",
+    "mat4",
+    "int",
+    "bool",
 ];
 
 /**
@@ -181,9 +234,9 @@ const BUILTIN_TYPES = [
  * a declaration.
  */
 function localDeclarations(structs: StructTable): RegExp {
-    const types = [...BUILTIN_TYPES, ...structs.keys()].join('|');
+    const types = [...BUILTIN_TYPES, ...structs.keys()].join("|");
 
-    return new RegExp(`\\b(${types})\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*[=;]`, 'g');
+    return new RegExp(`\\b(${types})\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*[=;]`, "g");
 }
 
 /**
@@ -205,17 +258,22 @@ function localDeclarations(structs: StructTable): RegExp {
  * `int()` truncates toward zero exactly as HLSL's implicit conversion does.
  */
 function convertScalar(
-    expression: string, target: string, scope: Scope, structs: StructTable,
+    expression: string,
+    target: string,
+    scope: Scope,
+    structs: StructTable,
     functions: FunctionTable,
 ): string {
-    if (target !== 'int' && target !== 'float') {
+    if (target !== "int" && target !== "float") {
         return expression;
     }
 
     const actual = inferType(expression, scope, structs, functions);
-    const convertible = actual === 'int' || actual === 'float';
+    const convertible = actual === "int" || actual === "float";
 
-    return convertible && actual !== target ? `${target}(${expression})` : expression;
+    return convertible && actual !== target
+        ? `${target}(${expression})`
+        : expression;
 }
 
 /**
@@ -226,12 +284,18 @@ function convertScalar(
  * statement was passed over, truncation and all.
  */
 function scopeFor(
-    header: FunctionHeader, body: string, globals: Scope, structs: StructTable,
+    header: FunctionHeader,
+    body: string,
+    globals: Scope,
+    structs: StructTable,
 ): Scope {
     const scope: Scope = new Map(globals);
 
     for (const parameter of splitTopLevel(header.parameters)) {
-        const parts = parameter.replace(/\buniform\b/, '').trim().split(/\s+/);
+        const parts = parameter
+            .replace(/\buniform\b/, "")
+            .trim()
+            .split(/\s+/);
         if (parts.length >= 2) {
             scope.set(parts[1], parts[0]);
         }
@@ -257,19 +321,45 @@ export function fixVectorTruncation(source: string): string {
         // balanced. The `(?!=)` keeps `==` out of it.
         return body.replace(
             /^([ \t]+)(?:((?:float|vec[234]|mat[234](?:x[234])?|int|bool)\s+)?([A-Za-z_][A-Za-z0-9_.]*)\s*([-+*/]?=)(?!=)\s*)([^;]+);/gm,
-            (whole, indent: string, declaredType: string | undefined, target: string,
-             operator: string, rhs: string) => {
-                const type = declaredType?.trim() ?? inferType(target, scope, structs, functions);
+            (
+                whole,
+                indent: string,
+                declaredType: string | undefined,
+                target: string,
+                operator: string,
+                rhs: string,
+            ) => {
+                const type =
+                    declaredType?.trim() ??
+                    inferType(target, scope, structs, functions);
                 if (type === null) {
                     return whole;
                 }
 
-                const balanced = balanceWidths(rhs.trim(), scope, structs, functions);
-                const narrowed = narrowExpression(balanced, type, scope, structs, functions);
-                const fixed = convertScalar(narrowed, type, scope, structs, functions);
+                const balanced = balanceWidths(
+                    rhs.trim(),
+                    scope,
+                    structs,
+                    functions,
+                );
+                const narrowed = narrowExpression(
+                    balanced,
+                    type,
+                    scope,
+                    structs,
+                    functions,
+                );
+                const fixed = convertScalar(
+                    narrowed,
+                    type,
+                    scope,
+                    structs,
+                    functions,
+                );
 
-                return `${indent}${declaredType ?? ''}${target} ${operator} ${fixed};`;
-            });
+                return `${indent}${declaredType ?? ""}${target} ${operator} ${fixed};`;
+            },
+        );
     });
 }
 
@@ -288,12 +378,12 @@ export function fixBooleanConditions(source: string): string {
 
     return eachFunction(source, (header, body) => {
         const scope = scopeFor(header, body, globals, structs);
-        let out = '';
+        let out = "";
         let cursor = 0;
 
         const keyword = /\b(if|while)\s*\(/g;
 
-        for (; ;) {
+        for (;;) {
             keyword.lastIndex = cursor;
             const match = keyword.exec(body);
             if (match === null) {
@@ -310,9 +400,10 @@ export function fixBooleanConditions(source: string): string {
             const type = inferType(condition, scope, structs, functions);
 
             out += body.slice(cursor, open + 1);
-            out += type === 'int' || type === 'float'
-                ? `${condition} != ${type === 'int' ? '0' : '0.0'}`
-                : condition;
+            out +=
+                type === "int" || type === "float"
+                    ? `${condition} != ${type === "int" ? "0" : "0.0"}`
+                    : condition;
             cursor = close;
         }
     });
@@ -330,12 +421,16 @@ export function zeroStructCasts(source: string): string {
     let out = source;
 
     for (const [name, fields] of structs) {
-        const zeroes = [...fields.values()].map(zeroFor).join(', ');
+        const zeroes = [...fields.values()].map(zeroFor).join(", ");
 
         // `(Name)0` and `(Name)(0)`, with any spacing.
         out = out.replace(
-            new RegExp(`\\(\\s*${name}\\s*\\)\\s*\\(?\\s*0(?:\\.0*)?\\s*\\)?`, 'g'),
-            `${name}(${zeroes})`);
+            new RegExp(
+                `\\(\\s*${name}\\s*\\)\\s*\\(?\\s*0(?:\\.0*)?\\s*\\)?`,
+                "g",
+            ),
+            `${name}(${zeroes})`,
+        );
     }
 
     return out;
@@ -343,14 +438,14 @@ export function zeroStructCasts(source: string): string {
 
 /** A zero of the given type, spelled the way GLSL wants it. */
 export function zeroFor(type: string): string {
-    if (type === 'int') {
-        return '0';
+    if (type === "int") {
+        return "0";
     }
-    if (type === 'bool') {
-        return 'false';
+    if (type === "bool") {
+        return "false";
     }
-    if (type === 'float') {
-        return '0.0';
+    if (type === "float") {
+        return "0.0";
     }
 
     return `${type}(0.0)`;
@@ -375,10 +470,10 @@ function eachFunction(
     const header =
         /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g;
 
-    let out = '';
+    let out = "";
     let cursor = 0;
 
-    for (; ;) {
+    for (;;) {
         header.lastIndex = cursor;
         const match = header.exec(source);
         if (match === null) {
@@ -416,17 +511,18 @@ export function fixReturnWidths(source: string): string {
     const scope = collectGlobals(source);
 
     for (const match of source.matchAll(
-        /\b(float|vec2|vec3|vec4|int|bool)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g)) {
+        /\b(float|vec2|vec3|vec4|int|bool)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g,
+    )) {
         scope.set(match[2], match[1]);
     }
 
     const signature =
         /\b(float|vec2|vec3|vec4|int|bool)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g;
 
-    let out = '';
+    let out = "";
     let cursor = 0;
 
-    for (; ;) {
+    for (;;) {
         signature.lastIndex = cursor;
         const match = signature.exec(source);
         if (match === null) {
@@ -442,21 +538,30 @@ export function fixReturnWidths(source: string): string {
         // Parameters count as locals, or a return using one cannot be typed.
         const local: Scope = new Map(scope);
         for (const parameter of splitTopLevel(match[3])) {
-            const parts = parameter.replace(/\buniform\b/, '').trim().split(/\s+/);
+            const parts = parameter
+                .replace(/\buniform\b/, "")
+                .trim()
+                .split(/\s+/);
             if (parts.length >= 2) {
                 local.set(parts[1], parts[0]);
             }
         }
 
-        for (const declaration of source.slice(open, close).matchAll(
-            /\b(float|vec2|vec3|vec4|mat2|mat3|mat4|int|bool)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[=;]/g)) {
+        for (const declaration of source
+            .slice(open, close)
+            .matchAll(
+                /\b(float|vec2|vec3|vec4|mat2|mat3|mat4|int|bool)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[=;]/g,
+            )) {
             local.set(declaration[2], declaration[1]);
         }
 
-        const body = source.slice(open, close).replace(
-            /\breturn\s+([^;]+);/g,
-            (whole, expression: string) =>
-                `return ${narrowExpression(expression.trim(), match[1], local, structs)};`);
+        const body = source
+            .slice(open, close)
+            .replace(
+                /\breturn\s+([^;]+);/g,
+                (whole, expression: string) =>
+                    `return ${narrowExpression(expression.trim(), match[1], local, structs)};`,
+            );
 
         out += source.slice(cursor, open) + body;
         cursor = close;
@@ -468,9 +573,9 @@ function matchingBrace(text: string, open: number): number {
     let depth = 0;
 
     for (let i = open; i < text.length; i++) {
-        if (text[i] === '{') {
+        if (text[i] === "{") {
             depth++;
-        } else if (text[i] === '}') {
+        } else if (text[i] === "}") {
             depth--;
             if (depth === 0) {
                 return i;
@@ -493,10 +598,10 @@ export function fillEmptyFunctions(source: string): string {
     const signature =
         /\b(float|vec2|vec3|vec4|mat2|mat3|mat4|int|bool)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*\{/g;
 
-    let out = '';
+    let out = "";
     let cursor = 0;
 
-    for (; ;) {
+    for (;;) {
         signature.lastIndex = cursor;
         const match = signature.exec(source);
         if (match === null) {
@@ -510,7 +615,11 @@ export function fillEmptyFunctions(source: string): string {
         }
 
         const body = source.slice(open + 1, close);
-        const empty = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').trim() === '';
+        const empty =
+            body
+                .replace(/\/\*[\s\S]*?\*\//g, "")
+                .replace(/\/\/[^\n]*/g, "")
+                .trim() === "";
 
         out += source.slice(cursor, open + 1);
         out += empty ? `\n    return ${match[1]}(0.0);\n` : body;
@@ -520,9 +629,12 @@ export function fillEmptyFunctions(source: string): string {
 
 /** Narrows every argument of a call to the parameter widths a signature declares. */
 export function narrowCallArguments(
-    call: string, parameterTypes: readonly string[], scope: Scope, structs: StructTable,
+    call: string,
+    parameterTypes: readonly string[],
+    scope: Scope,
+    structs: StructTable,
 ): string {
-    const open = call.indexOf('(');
+    const open = call.indexOf("(");
     if (open === -1 || matchingParen(call, open) !== call.length - 1) {
         return call;
     }
@@ -532,8 +644,9 @@ export function narrowCallArguments(
         return call;
     }
 
-    const narrowed = args.map(
-        (arg, i) => narrowExpression(arg, parameterTypes[i], scope, structs));
+    const narrowed = args.map((arg, i) =>
+        narrowExpression(arg, parameterTypes[i], scope, structs),
+    );
 
-    return `${call.slice(0, open)}(${narrowed.join(', ')})`;
+    return `${call.slice(0, open)}(${narrowed.join(", ")})`;
 }

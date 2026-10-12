@@ -13,21 +13,21 @@
 
 /** Where a uniform's value comes from. `null` means the semantic has no known source. */
 export type UniformSource =
-    | { kind: 'matrix'; of: AlamoMatrix }
-    | { kind: 'eye'; space: Space }
-    | { kind: 'light'; index: number; channel: LightChannel; space: Space }
-    | { kind: 'ambient' }
-    | { kind: 'lightScale' }
-    | { kind: 'sphericalHarmonics'; set: 'all' | 'fill' }
-    | { kind: 'skinMatrices' }
-    | { kind: 'time' }
-    | { kind: 'resolution' }
-    | { kind: 'fog' }
-    | { kind: 'distanceFade' }
-    | { kind: 'shadowExtrusion' }
-    | { kind: 'wind'; of: 'bend' | 'grass' }
-    | { kind: 'texture'; role: TextureRole }
-    | { kind: 'projectedTexcoord'; role: TextureRole; axis: 'u' | 'v' };
+    | { kind: "matrix"; of: AlamoMatrix }
+    | { kind: "eye"; space: Space }
+    | { kind: "light"; index: number; channel: LightChannel; space: Space }
+    | { kind: "ambient" }
+    | { kind: "lightScale" }
+    | { kind: "sphericalHarmonics"; set: "all" | "fill" }
+    | { kind: "skinMatrices" }
+    | { kind: "time" }
+    | { kind: "resolution" }
+    | { kind: "fog" }
+    | { kind: "distanceFade" }
+    | { kind: "shadowExtrusion" }
+    | { kind: "wind"; of: "bend" | "grass" }
+    | { kind: "texture"; role: TextureRole }
+    | { kind: "projectedTexcoord"; role: TextureRole; axis: "u" | "v" };
 
 /**
  * The matrices, named as the engine names them.
@@ -37,17 +37,24 @@ export type UniformSource =
  * value once a non-uniform scale is in play.
  */
 export type AlamoMatrix =
-    | 'world' | 'worldInverse' | 'worldView' | 'worldViewInverse' | 'worldViewProjection'
-    | 'view' | 'viewInverse' | 'viewProjection' | 'projection';
+    | "world"
+    | "worldInverse"
+    | "worldView"
+    | "worldViewInverse"
+    | "worldViewProjection"
+    | "view"
+    | "viewInverse"
+    | "viewProjection"
+    | "projection";
 
 /** Whether a vector is wanted in world space or in the object's own space. */
-export type Space = 'world' | 'object';
+export type Space = "world" | "object";
 
 /** Which part of a directional light. */
-export type LightChannel = 'vector' | 'diffuse' | 'specular';
+export type LightChannel = "vector" | "diffuse" | "specular";
 
 /** An engine-owned texture the preview has no real data for. */
-export type TextureRole = 'fogOfWar' | 'cloud' | 'skyCube';
+export type TextureRole = "fogOfWar" | "cloud" | "skyCube";
 
 /**
  * The vertex semantics, mapped onto the attribute names the exported glTF carries.
@@ -56,19 +63,19 @@ export type TextureRole = 'fogOfWar' | 'cloud' | 'skyCube';
  * reconstructed from it and the normal, which is what the exporter writes.
  */
 const ATTRIBUTES: Record<string, string> = {
-    POSITION: 'position',
-    NORMAL: 'normal',
-    TANGENT0: 'tangent',
-    BINORMAL0: 'binormal',
-    COLOR0: 'color',
-    COLOR1: 'color1',
-    TEXCOORD0: 'uv',
-    TEXCOORD1: 'uv1',
-    TEXCOORD2: 'uv2',
-    TEXCOORD3: 'uv3',
-    TEXCOORD4: 'uv4',
-    TEXCOORD5: 'uv5',
-    FOG: 'fog',
+    POSITION: "position",
+    NORMAL: "normal",
+    TANGENT0: "tangent",
+    BINORMAL0: "binormal",
+    COLOR0: "color",
+    COLOR1: "color1",
+    TEXCOORD0: "uv",
+    TEXCOORD1: "uv1",
+    TEXCOORD2: "uv2",
+    TEXCOORD3: "uv3",
+    TEXCOORD4: "uv4",
+    TEXCOORD5: "uv5",
+    FOG: "fog",
 };
 
 /** The glTF attribute a vertex semantic reads from, or null if it is not a vertex semantic. */
@@ -77,39 +84,39 @@ export function attributeFor(semantic: string): string | null {
 }
 
 const MATRICES: Record<string, AlamoMatrix> = {
-    WORLD: 'world',
-    WORLDINVERSE: 'worldInverse',
-    WORLDVIEW: 'worldView',
-    WORLDVIEWINVERSE: 'worldViewInverse',
-    WORLDVIEWPROJECTION: 'worldViewProjection',
-    VIEW: 'view',
-    VIEWINVERSE: 'viewInverse',
-    VIEWPROJECTION: 'viewProjection',
-    PROJECTION: 'projection',
+    WORLD: "world",
+    WORLDINVERSE: "worldInverse",
+    WORLDVIEW: "worldView",
+    WORLDVIEWINVERSE: "worldViewInverse",
+    WORLDVIEWPROJECTION: "worldViewProjection",
+    VIEW: "view",
+    VIEWINVERSE: "viewInverse",
+    VIEWPROJECTION: "viewProjection",
+    PROJECTION: "projection",
 };
 
 const SIMPLE: Record<string, UniformSource> = {
-    EYE_POSITION: {kind: 'eye', space: 'world'},
-    EYE_OBJ_POSITION: {kind: 'eye', space: 'object'},
-    GLOBAL_AMBIENT: {kind: 'ambient'},
-    LIGHT_SCALE: {kind: 'lightScale'},
-    SKINMATRIXARRAY: {kind: 'skinMatrices'},
-    SPH_LIGHT_ALL: {kind: 'sphericalHarmonics', set: 'all'},
-    SPH_LIGHT_FILL: {kind: 'sphericalHarmonics', set: 'fill'},
-    TIME: {kind: 'time'},
-    RESOLUTION_CONSTANTS: {kind: 'resolution'},
-    FOG_VALS: {kind: 'fog'},
-    DISTANCE_FADE_VALS: {kind: 'distanceFade'},
-    SHADOW_EXTRUSION_DISTANCE: {kind: 'shadowExtrusion'},
-    WIND_BEND_VECTOR: {kind: 'wind', of: 'bend'},
-    WIND_GRASS_PARAMS: {kind: 'wind', of: 'grass'},
-    FOW_TEXTURE: {kind: 'texture', role: 'fogOfWar'},
-    CLOUD_TEXTURE: {kind: 'texture', role: 'cloud'},
-    SKY_CUBE_TEXTURE: {kind: 'texture', role: 'skyCube'},
-    FOW_TEX_U: {kind: 'projectedTexcoord', role: 'fogOfWar', axis: 'u'},
-    FOW_TEX_V: {kind: 'projectedTexcoord', role: 'fogOfWar', axis: 'v'},
-    CLOUD_TEX_U: {kind: 'projectedTexcoord', role: 'cloud', axis: 'u'},
-    CLOUD_TEX_V: {kind: 'projectedTexcoord', role: 'cloud', axis: 'v'},
+    EYE_POSITION: { kind: "eye", space: "world" },
+    EYE_OBJ_POSITION: { kind: "eye", space: "object" },
+    GLOBAL_AMBIENT: { kind: "ambient" },
+    LIGHT_SCALE: { kind: "lightScale" },
+    SKINMATRIXARRAY: { kind: "skinMatrices" },
+    SPH_LIGHT_ALL: { kind: "sphericalHarmonics", set: "all" },
+    SPH_LIGHT_FILL: { kind: "sphericalHarmonics", set: "fill" },
+    TIME: { kind: "time" },
+    RESOLUTION_CONSTANTS: { kind: "resolution" },
+    FOG_VALS: { kind: "fog" },
+    DISTANCE_FADE_VALS: { kind: "distanceFade" },
+    SHADOW_EXTRUSION_DISTANCE: { kind: "shadowExtrusion" },
+    WIND_BEND_VECTOR: { kind: "wind", of: "bend" },
+    WIND_GRASS_PARAMS: { kind: "wind", of: "grass" },
+    FOW_TEXTURE: { kind: "texture", role: "fogOfWar" },
+    CLOUD_TEXTURE: { kind: "texture", role: "cloud" },
+    SKY_CUBE_TEXTURE: { kind: "texture", role: "skyCube" },
+    FOW_TEX_U: { kind: "projectedTexcoord", role: "fogOfWar", axis: "u" },
+    FOW_TEX_V: { kind: "projectedTexcoord", role: "fogOfWar", axis: "v" },
+    CLOUD_TEX_U: { kind: "projectedTexcoord", role: "cloud", axis: "u" },
+    CLOUD_TEX_V: { kind: "projectedTexcoord", role: "cloud", axis: "v" },
 };
 
 /**
@@ -121,9 +128,9 @@ const SIMPLE: Record<string, UniformSource> = {
 const DIRECTIONAL = /^DIR_LIGHT_(OBJ_)?(VEC|DIFFUSE|SPECULAR)_([0-9]+)$/;
 
 const CHANNELS: Record<string, LightChannel> = {
-    VEC: 'vector',
-    DIFFUSE: 'diffuse',
-    SPECULAR: 'specular',
+    VEC: "vector",
+    DIFFUSE: "diffuse",
+    SPECULAR: "specular",
 };
 
 /**
@@ -138,16 +145,16 @@ export function uniformSourceFor(semantic: string): UniformSource | null {
 
     const matrix = MATRICES[name];
     if (matrix !== undefined) {
-        return {kind: 'matrix', of: matrix};
+        return { kind: "matrix", of: matrix };
     }
 
     const directional = DIRECTIONAL.exec(name);
     if (directional !== null) {
         return {
-            kind: 'light',
+            kind: "light",
             index: Number(directional[3]),
             channel: CHANNELS[directional[2]],
-            space: directional[1] === undefined ? 'world' : 'object',
+            space: directional[1] === undefined ? "world" : "object",
         };
     }
 
@@ -166,12 +173,13 @@ export function collectUniformTypes(source: string): Map<string, string> {
     const types = new Map<string, string>();
 
     for (const match of source.matchAll(
-        /^\s*uniform\s+([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(\[[^\]]*\])?\s*;/gm)) {
+        /^\s*uniform\s+([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(\[[^\]]*\])?\s*;/gm,
+    )) {
         // The array suffix is KEPT. It was matched and thrown away, which left nothing to
         // distinguish `mat4 m_sphFill[3]` from `mat4 m_world` - so `fitToUniform` had to guess from
         // the value's length instead, and the guess is wrong whenever the value divides evenly by a
         // narrower uniform's width. See its own comment.
-        types.set(match[2], match[1] + (match[3] ?? ''));
+        types.set(match[2], match[1] + (match[3] ?? ""));
     }
 
     return types;
@@ -188,33 +196,35 @@ export function collectUniformTypes(source: string): Map<string, string> {
  * rendered nothing at all.
  */
 function arrayLengthOf(type: string | undefined): number | null {
-    const suffix = /\[([^\]]*)\]\s*$/.exec(type ?? '');
+    const suffix = /\[([^\]]*)\]\s*$/.exec(type ?? "");
 
     if (suffix === null) {
         return 1;
     }
 
-    return /^\s*\d+\s*$/.test(suffix[1]) ? Math.max(1, Number(suffix[1])) : null;
+    return /^\s*\d+\s*$/.test(suffix[1])
+        ? Math.max(1, Number(suffix[1]))
+        : null;
 }
 
 /** How many components one uniform of this type takes. Zero for anything not a number. */
 function widthOf(type: string | undefined): number {
-    switch ((type ?? '').replace(/\[[^\]]*\]\s*$/, '')) {
-        case 'float':
-        case 'int':
-        case 'bool':
+    switch ((type ?? "").replace(/\[[^\]]*\]\s*$/, "")) {
+        case "float":
+        case "int":
+        case "bool":
             return 1;
-        case 'vec2':
+        case "vec2":
             return 2;
-        case 'vec3':
+        case "vec3":
             return 3;
-        case 'vec4':
+        case "vec4":
             return 4;
-        case 'mat2':
+        case "mat2":
             return 4;
-        case 'mat3':
+        case "mat3":
             return 9;
-        case 'mat4':
+        case "mat4":
             return 16;
         default:
             return 0;
@@ -229,7 +239,8 @@ function widthOf(type: string | undefined): number {
  * already a multiple of the element width, which is exactly what the setter wants.
  */
 export function fitToUniform(
-    value: readonly number[], type: string | undefined,
+    value: readonly number[],
+    type: string | undefined,
 ): number | number[] {
     const width = widthOf(type);
     if (width === 0) {
@@ -275,11 +286,14 @@ export function collectSamplerTextures(source: string): Map<string, string> {
     const links = new Map<string, string>();
 
     for (const match of source.matchAll(
-        /\bsampler(?:2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*sampler_state\s*\{([^}]*)\}/g)) {
+        /\bsampler(?:2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*sampler_state\s*\{([^}]*)\}/g,
+    )) {
         // Parentheses in 41 of the 42 shipped declarations, angle brackets in the other one, and
         // the keyword's capitalisation varies too.
         const texture =
-            /\btexture\s*=\s*[<(]\s*([A-Za-z_][A-Za-z0-9_]*)\s*[>)]/i.exec(match[2]);
+            /\btexture\s*=\s*[<(]\s*([A-Za-z_][A-Za-z0-9_]*)\s*[>)]/i.exec(
+                match[2],
+            );
 
         if (texture !== null) {
             links.set(match[1], texture[1]);
@@ -316,14 +330,16 @@ export function collectUniformDefaults(source: string): Map<string, number[]> {
         /^(?:uniform\s+|const\s+)*[A-Za-z_][A-Za-z0-9_]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*(?::\s*[A-Za-z_][A-Za-z0-9_]*\s*)?(?:<[^>]*>\s*)?=/gm;
 
     for (const match of source.matchAll(declaration)) {
-        const end = source.indexOf(';', match.index + match[0].length);
+        const end = source.indexOf(";", match.index + match[0].length);
         if (end === -1) {
             continue;
         }
 
-        const numbers = [...source.slice(match.index + match[0].length, end)
-            .matchAll(/-?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?/g)]
-            .map(number => Number(number[0]));
+        const numbers = [
+            ...source
+                .slice(match.index + match[0].length, end)
+                .matchAll(/-?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?/g),
+        ].map((number) => Number(number[0]));
 
         if (numbers.length > 0) {
             defaults.set(match[1], numbers);
@@ -344,10 +360,14 @@ export function collectUniformDefaults(source: string): Map<string, number[]> {
 export function collectSemantics(source: string): Map<string, string> {
     const semantics = new Map<string, string>();
 
-    const withoutStructs = source.replace(/\bstruct\s+[A-Za-z_][A-Za-z0-9_]*\s*\{[^}]*\}\s*;/g, '');
+    const withoutStructs = source.replace(
+        /\bstruct\s+[A-Za-z_][A-Za-z0-9_]*\s*\{[^}]*\}\s*;/g,
+        "",
+    );
 
     for (const match of withoutStructs.matchAll(
-        /^[ \t]*(?:uniform\s+|const\s+)*[A-Za-z_][A-Za-z0-9_]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/gm)) {
+        /^[ \t]*(?:uniform\s+|const\s+)*[A-Za-z_][A-Za-z0-9_]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/gm,
+    )) {
         semantics.set(match[1], match[2]);
     }
 

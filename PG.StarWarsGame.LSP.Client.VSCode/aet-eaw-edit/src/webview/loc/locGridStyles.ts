@@ -10,7 +10,7 @@
 // are credits-only, the inherited toggle is translations-only. They are inert in the other editor
 // and are kept together while the two share one stylesheet.
 
-import styled from 'styled-components';
+import styled from "styled-components";
 
 import {
     dockBodyCss,
@@ -19,7 +19,7 @@ import {
     dockOverviewCss,
     problemsPanelCss,
     rightDockCss,
-} from '../shared/dockChrome';
+} from "../shared/dockChrome";
 
 export const Shell = styled.div`
     ${dockChromeCss}
@@ -39,7 +39,10 @@ export const Shell = styled.div`
        padding and a border. Without this they come out wider than what holds them - which is what
        put a horizontal scrollbar under a table whose columns fitted perfectly well. */
 
-    input, select, textarea, button {
+    input,
+    select,
+    textarea,
+    button {
         box-sizing: border-box;
     }
 
@@ -174,7 +177,8 @@ export const Shell = styled.div`
         gap: var(--space-4);
         padding: var(--space-8) var(--space-8);
         border-radius: var(--radius-6);
-        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid
+            var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         background: var(--vscode-editorWidget-background, #252526);
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
         font-weight: normal;
@@ -187,15 +191,15 @@ export const Shell = styled.div`
        looking like a column of checkboxes with the names floating over the dock beside them.
        Anything else put in the header will need the same undoing. */
 
-    .column-flyout input[type=checkbox] {
+    .column-flyout input[type="checkbox"] {
         width: auto;
         padding: 0;
         border: none;
         background: initial;
     }
 
-    .column-flyout input[type=checkbox]:hover,
-    .column-flyout input[type=checkbox]:focus {
+    .column-flyout input[type="checkbox"]:hover,
+    .column-flyout input[type="checkbox"]:focus {
         border: none;
     }
 
@@ -277,17 +281,29 @@ export const Shell = styled.div`
        selected row still shows what is wrong with it. */
 
     .data-row.row-sev-error {
-        background: color-mix(in srgb, var(--vscode-errorForeground, #f48771) 13%, transparent);
+        background: color-mix(
+            in srgb,
+            var(--vscode-errorForeground, #f48771) 13%,
+            transparent
+        );
         box-shadow: inset 3px 0 0 var(--vscode-errorForeground, #f48771);
     }
 
     .data-row.row-sev-warning {
-        background: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 13%, transparent);
+        background: color-mix(
+            in srgb,
+            var(--vscode-charts-yellow, #cca700) 13%,
+            transparent
+        );
         box-shadow: inset 3px 0 0 var(--vscode-charts-yellow, #cca700);
     }
 
     .data-row.row-sev-info {
-        background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 11%, transparent);
+        background: color-mix(
+            in srgb,
+            var(--vscode-charts-blue, #3794ff) 11%,
+            transparent
+        );
         box-shadow: inset 3px 0 0 var(--vscode-charts-blue, #3794ff);
     }
 
@@ -341,7 +357,7 @@ export const Shell = styled.div`
     }
 
     ${dockHeaderCss}
-        /* A header of plain buttons; no dial to make room for. */
+    /* A header of plain buttons; no dial to make room for. */
     .dock-header {
         min-height: 34px;
     }
@@ -362,8 +378,14 @@ export const Shell = styled.div`
     ${dockBodyCss}
     ${dockOverviewCss}
     button {
-        background: var(--vscode-button-secondaryBackground, var(--vscode-button-background, #3a3d41));
-        color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground, #ccc));
+        background: var(
+            --vscode-button-secondaryBackground,
+            var(--vscode-button-background, #3a3d41)
+        );
+        color: var(
+            --vscode-button-secondaryForeground,
+            var(--vscode-button-foreground, #ccc)
+        );
         border: none;
         padding: var(--space-2) var(--space-8);
         cursor: pointer;
@@ -374,7 +396,10 @@ export const Shell = styled.div`
     }
 
     button:hover {
-        background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+        background: var(
+            --vscode-button-secondaryHoverBackground,
+            var(--vscode-button-hoverBackground)
+        );
     }
 
     button.primary {
@@ -419,7 +444,8 @@ export const Shell = styled.div`
     /* Inputs, selects and the filter row are the story graph editor's rules verbatim, so the two
        editors' docks are the same control set rather than two that merely resemble each other. */
 
-    select, input[type=text] {
+    select,
+    input[type="text"] {
         background: var(--vscode-input-background, #3c3c3c);
         color: var(--vscode-input-foreground, #ccc);
         border: var(--space-1) solid var(--vscode-input-border, transparent);
@@ -430,7 +456,8 @@ export const Shell = styled.div`
         min-width: 0;
     }
 
-    input[type=text]:focus, select:focus {
+    input[type="text"]:focus,
+    select:focus {
         border-color: var(--vscode-focusBorder, #007fd4);
     }
 
@@ -448,9 +475,13 @@ export const Shell = styled.div`
         display: flex;
         flex-direction: column;
         padding: var(--space-4) 0;
-        background: var(--vscode-menu-background, var(--vscode-editorWidget-background, #252526));
+        background: var(
+            --vscode-menu-background,
+            var(--vscode-editorWidget-background, #252526)
+        );
         color: var(--vscode-menu-foreground, #ccc);
-        border: var(--space-1) solid var(--vscode-menu-border, var(--vscode-panel-border, #454545));
+        border: var(--space-1) solid
+            var(--vscode-menu-border, var(--vscode-panel-border, #454545));
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     }
 
@@ -510,7 +541,8 @@ export const Shell = styled.div`
     /* A row that only repeats the layer below is shown dimmed and italic, so when they are on
        screen it stays obvious which lines this file actually changes. */
 
-    .data-row.inherited input, .data-row.inherited select {
+    .data-row.inherited input,
+    .data-row.inherited select {
         color: var(--vscode-disabledForeground, #888);
         font-style: italic;
     }
@@ -611,13 +643,16 @@ export const Shell = styled.div`
         outline-offset: -1px;
     }
 
-    .field input[aria-invalid='true'] {
+    .field input[aria-invalid="true"] {
         border-color: var(--vscode-inputValidation-errorBorder, #be1100);
     }
 
     .field-error {
         margin: -4px 0 0;
-        color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, #f48771));
+        color: var(
+            --vscode-inputValidation-errorForeground,
+            var(--vscode-errorForeground, #f48771)
+        );
         font-size: var(--font-size-smaller);
     }
 
@@ -666,7 +701,8 @@ export const Shell = styled.div`
         cursor: pointer;
     }
 
-    .suggestions button:hover, .suggestions button:focus-visible {
+    .suggestions button:hover,
+    .suggestions button:focus-visible {
         background: var(--vscode-list-hoverBackground, #2a2d2e);
         outline: none;
     }

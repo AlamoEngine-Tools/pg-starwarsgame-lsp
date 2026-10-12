@@ -14,32 +14,36 @@
 
 /** An object to read fields off, or an empty one. Arrays are not records. */
 export function asRecord(value: unknown): Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-        ? value as Record<string, unknown>
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
         : {};
 }
 
 export function boolean_(value: unknown, fallback: boolean): boolean {
-    return typeof value === 'boolean' ? value : fallback;
+    return typeof value === "boolean" ? value : fallback;
 }
 
 /** A list of names, keeping the good entries. One bad string is not a reason to unfold the lot. */
 export function names(value: unknown): string[] {
-    return Array.isArray(value) ? value.filter(entry => typeof entry === 'string') : [];
+    return Array.isArray(value)
+        ? value.filter((entry) => typeof entry === "string")
+        : [];
 }
 
 export function string_(value: unknown, fallback: string): string {
-    return typeof value === 'string' ? value : fallback;
+    return typeof value === "string" ? value : fallback;
 }
 
 export function nullableString(value: unknown): string | null {
-    return typeof value === 'string' ? value : null;
+    return typeof value === "string" ? value : null;
 }
 
 export function number_(
-    value: unknown, fallback: number, range: { min: number; max: number },
+    value: unknown,
+    fallback: number,
+    range: { min: number; max: number },
 ): number {
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
         return fallback;
     }
 

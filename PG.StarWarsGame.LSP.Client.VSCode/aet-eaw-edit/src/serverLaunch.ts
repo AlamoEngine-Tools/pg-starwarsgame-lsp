@@ -3,14 +3,14 @@
 
 // How the server process is started. Pure - no `vscode` import - so the decision is unit-tested.
 
-import * as path from 'path';
+import * as path from "path";
 
 /** The variable the server reads for the Lua analyzer's path before its bundled one. */
-export const ANALYZER_VARIABLE = 'AET_EMMYLUA_LS';
+export const ANALYZER_VARIABLE = "AET_EMMYLUA_LS";
 
 /** The server the VSIX ships; the Lua analyzer ships beside it, in `server/emmylua`. */
 export function bundledServerPath(extensionPath: string): string {
-    return path.join(extensionPath, 'server', 'PG.StarWarsGame.LSP.Server.exe');
+    return path.join(extensionPath, "server", "PG.StarWarsGame.LSP.Server.exe");
 }
 
 export interface ServerChoice {
@@ -39,30 +39,57 @@ export interface ServerChoiceInput {
  */
 export function chooseServerCommand(input: ServerChoiceInput): ServerChoice {
     if (input.devMode) {
-        const projectPath = input.projectPath ||
-            path.join(input.extensionPath, '..', '..', 'PG.StarWarsGame.LSP.Server', 'PG.StarWarsGame.LSP.Server.csproj');
-        const args = ['run', '--project', projectPath];
+        const projectPath =
+            input.projectPath ||
+            path.join(
+                input.extensionPath,
+                "..",
+                "..",
+                "PG.StarWarsGame.LSP.Server",
+                "PG.StarWarsGame.LSP.Server.csproj",
+            );
+        const args = ["run", "--project", projectPath];
         if (input.extraArgs.length > 0) {
-            args.push('--', ...input.extraArgs);
+            args.push("--", ...input.extraArgs);
         }
-        return {command: 'dotnet', args, bundled: false, description: `Dev mode: dotnet ${args.join(' ')}`};
+        return {
+            command: "dotnet",
+            args,
+            bundled: false,
+            description: `Dev mode: dotnet ${args.join(" ")}`,
+        };
     }
 
     if (!input.executable) {
         const command = bundledServerPath(input.extensionPath);
         const args = [...input.extraArgs];
-        return {command, args, bundled: true, description: `Bundled: ${command} ${args.join(' ')}`};
+        return {
+            command,
+            args,
+            bundled: true,
+            description: `Bundled: ${command} ${args.join(" ")}`,
+        };
     }
 
-    const isDll = input.executable.toLowerCase().endsWith('.dll');
-    const command = isDll ? 'dotnet' : input.executable;
-    const args = isDll ? [input.executable, ...input.extraArgs] : [...input.extraArgs];
-    return {command, args, bundled: false, description: `${command} ${args.join(' ')}`};
+    const isDll = input.executable.toLowerCase().endsWith(".dll");
+    const command = isDll ? "dotnet" : input.executable;
+    const args = isDll
+        ? [input.executable, ...input.extraArgs]
+        : [...input.extraArgs];
+    return {
+        command,
+        args,
+        bundled: false,
+        description: `${command} ${args.join(" ")}`,
+    };
 }
 
 /** Why the chosen server cannot start, or undefined when it can; `dotnet` is not checked on disk. */
-export function serverProblem(choice: ServerChoice, exists: (file: string) => boolean): string | undefined {
-    if (choice.command === 'dotnet' || exists(choice.command)) {
+export function serverProblem(
+    choice: ServerChoice,
+    exists: (file: string) => boolean,
+): string | undefined {
+    if (choice.command === "dotnet" || exists(choice.command)) {
         return undefined;
     }
     return choice.bundled
@@ -75,6 +102,9 @@ export function serverProblem(choice: ServerChoice, exists: (file: string) => bo
  * A variable rather than an initialization option because the server resolves the analyzer while
  * it builds its services, before it reads any option.
  */
-export function serverEnvironment(base: NodeJS.ProcessEnv, analyzerPath: string): NodeJS.ProcessEnv {
-    return analyzerPath ? {...base, [ANALYZER_VARIABLE]: analyzerPath} : base;
+export function serverEnvironment(
+    base: NodeJS.ProcessEnv,
+    analyzerPath: string,
+): NodeJS.ProcessEnv {
+    return analyzerPath ? { ...base, [ANALYZER_VARIABLE]: analyzerPath } : base;
 }

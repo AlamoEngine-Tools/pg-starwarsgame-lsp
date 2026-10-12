@@ -8,13 +8,17 @@
 // the generated source is a complete GLSL ES 3.00 program with its own `main`, its own attribute
 // declarations and its own uniform contract.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
-import type {TranslatedEffect} from './fx/effect';
-import {ALPHA_TEST_OFF, ALPHA_TEST_UNIFORM} from './fx/glslProgram';
-import {fitToUniform, type UniformSource, uniformSourceFor} from './fx/semantics';
-import {type AlamoFrame, uniformValue} from './fx/uniforms';
-import {type MaterialExtras, numericParams, textureParam} from './materials';
+import type { TranslatedEffect } from "./fx/effect";
+import { ALPHA_TEST_OFF, ALPHA_TEST_UNIFORM } from "./fx/glslProgram";
+import {
+    fitToUniform,
+    type UniformSource,
+    uniformSourceFor,
+} from "./fx/semantics";
+import { type AlamoFrame, uniformValue } from "./fx/uniforms";
+import { type MaterialExtras, numericParams, textureParam } from "./materials";
 
 /**
  * Drops the `#version` line, which three.js insists on writing itself.
@@ -25,7 +29,7 @@ import {type MaterialExtras, numericParams, textureParam} from './materials';
  * oracle builds them exactly as written; the quirk belongs here, at the three.js boundary.
  */
 function withoutVersion(source: string): string {
-    return source.replace(/^#version[^\n]*\n/, '');
+    return source.replace(/^#version[^\n]*\n/, "");
 }
 
 /** A uniform this material feeds, and what feeds it. */
@@ -54,12 +58,12 @@ export class AlamoMaterial extends THREE.RawShaderMaterial {
         });
 
         this.types = effect.types;
-        this.colorizationType = effect.types.get('Colorization');
+        this.colorizationType = effect.types.get("Colorization");
 
         // The alpha test the pass declares, which reaches the GPU only this way: three's own
         // `material.alphaTest` is a built-in shader chunk, and a RawShaderMaterial gets none of
         // them. Off until an effect asks for it.
-        this.uniforms[ALPHA_TEST_UNIFORM] = {value: ALPHA_TEST_OFF};
+        this.uniforms[ALPHA_TEST_UNIFORM] = { value: ALPHA_TEST_OFF };
 
         // Three sources, weakest first.
         //
@@ -67,7 +71,9 @@ export class AlamoMaterial extends THREE.RawShaderMaterial {
         //    light probes, the wind - then keeps a real value chosen by whoever wrote the effect
         //    rather than sitting at zero.
         for (const [name, value] of effect.defaults) {
-            this.uniforms[name] = {value: fitToUniform(value, effect.types.get(name))};
+            this.uniforms[name] = {
+                value: fitToUniform(value, effect.types.get(name)),
+            };
         }
 
         // 2. The SUB-MESH's own parameters, which is where the material properties actually live:
@@ -80,7 +86,9 @@ export class AlamoMaterial extends THREE.RawShaderMaterial {
         //    INVALID_VALUE - GL drops the call, the uniform keeps its zero, and the model renders
         //    black with nothing anywhere reporting a problem.
         for (const [name, value] of numericParams(extras)) {
-            this.uniforms[name] = {value: fitToUniform(value, effect.types.get(name))};
+            this.uniforms[name] = {
+                value: fitToUniform(value, effect.types.get(name)),
+            };
         }
 
         // 3. The engine semantics, refreshed every frame by `updateFrame`.
@@ -88,15 +96,15 @@ export class AlamoMaterial extends THREE.RawShaderMaterial {
         for (const [name, semantic] of effect.semantics) {
             const source = uniformSourceFor(semantic);
             if (source !== null) {
-                this.uniforms[name] ??= {value: null};
-                this.bound.push({name, source});
+                this.uniforms[name] ??= { value: null };
+                this.bound.push({ name, source });
             }
         }
 
         // Samplers are bound by the texture PARAMETER they read, which is how the sub-mesh names
         // its own textures. Left unresolved they would all sample whatever is on unit zero.
         for (const [sampler, parameter] of effect.samplers) {
-            this.uniforms[sampler] ??= {value: null};
+            this.uniforms[sampler] ??= { value: null };
 
             const file = textureParam(extras, parameter);
             if (file === undefined) {
@@ -116,7 +124,7 @@ export class AlamoMaterial extends THREE.RawShaderMaterial {
     unboundSamplers(): { sampler: string; file: string }[] {
         return [...this.wantedTextures]
             .filter(([sampler]) => this.uniforms[sampler]?.value === null)
-            .map(([sampler, file]) => ({sampler, file}));
+            .map(([sampler, file]) => ({ sampler, file }));
     }
 
     /**
@@ -158,13 +166,14 @@ export class AlamoMaterial extends THREE.RawShaderMaterial {
         }
 
         // White is the identity for the multiply, so an untinted model keeps its own texture.
-        const rgb = colour === null ? [1, 1, 1] : [colour.r, colour.g, colour.b];
+        const rgb =
+            colour === null ? [1, 1, 1] : [colour.r, colour.g, colour.b];
         uniform.value = fitToUniform([...rgb, 1], this.colorizationType);
     }
 
     /** Refreshes everything the engine would recompute per frame. */
     updateFrame(frame: AlamoFrame): void {
-        for (const {name, source} of this.bound) {
+        for (const { name, source } of this.bound) {
             const value = uniformValue(source, frame);
 
             // Undefined means "leave the default alone" - never overwrite a real declared value
@@ -177,9 +186,10 @@ export class AlamoMaterial extends THREE.RawShaderMaterial {
             // components while the effects declare `float4 m_eyePos`, and `uniform4fv` with a
             // 3-length array is INVALID_VALUE - the call is dropped and the uniform silently keeps
             // whatever it had.
-            this.uniforms[name].value = typeof value === 'number'
-                ? value
-                : fitToUniform(Array.from(value), this.types.get(name));
+            this.uniforms[name].value =
+                typeof value === "number"
+                    ? value
+                    : fitToUniform(Array.from(value), this.types.get(name));
         }
     }
 }

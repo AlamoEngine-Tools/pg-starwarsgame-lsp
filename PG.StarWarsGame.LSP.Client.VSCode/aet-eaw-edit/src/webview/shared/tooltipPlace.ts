@@ -29,24 +29,25 @@ export interface TooltipPlacement {
     top: number;
 
     /** Which way the bubble sits, so the arrow can be drawn on the correct edge. */
-    side: 'above' | 'below';
+    side: "above" | "below";
 
     /** Where the arrow goes along the bubble's own width. */
     arrowLeft: number;
 }
 
 export function placeTooltip(request: TooltipRequest): TooltipPlacement {
-    const {anchor, size, window: win} = request;
+    const { anchor, size, window: win } = request;
     const middle = (anchor.left + anchor.right) / 2;
 
     // Above by preference: a tooltip under a control covers the next control down, which is the one
     // the reader is most likely to want next.
     const fits = anchor.top - size.height - TIP_GAP >= TIP_MARGIN;
-    const side = fits ? 'above' : 'below';
+    const side = fits ? "above" : "below";
 
     const left = Math.max(
         TIP_MARGIN,
-        Math.min(middle - size.width / 2, win.width - size.width - TIP_MARGIN));
+        Math.min(middle - size.width / 2, win.width - size.width - TIP_MARGIN),
+    );
 
     // In the BUBBLE's coordinates, and kept on it: clamped against an edge the bubble is no longer
     // centred on its control, and an arrow drawn at its middle would point at nothing.
@@ -54,7 +55,9 @@ export function placeTooltip(request: TooltipRequest): TooltipPlacement {
 
     return {
         left,
-        top: fits ? anchor.top - size.height - TIP_GAP : anchor.bottom + TIP_GAP,
+        top: fits
+            ? anchor.top - size.height - TIP_GAP
+            : anchor.bottom + TIP_GAP,
         side,
         arrowLeft,
     };

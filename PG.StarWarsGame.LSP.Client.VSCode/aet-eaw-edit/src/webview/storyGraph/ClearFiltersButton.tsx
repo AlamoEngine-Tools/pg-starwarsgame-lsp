@@ -13,8 +13,8 @@
 // A control with nothing to act on is disabled and says why; it is never removed. Here that also
 // makes the column a fixed height, which is the whole of the layout fix.
 
-import type {GraphFilters} from '../../protocol/story';
-import {IconButton} from '../shared/Button';
+import type { GraphFilters } from "../../protocol/story";
+import { IconButton } from "../shared/Button";
 
 /**
  * Whether any of the four filters is set.
@@ -23,11 +23,13 @@ import {IconButton} from '../shared/Button';
  * type where all four are required strings - the panel is entitled to send a subset.
  */
 export function anyFilterSet(filters: GraphFilters): boolean {
-    return (filters.nameFilter ?? '') !== ''
-        || (filters.branch ?? '') !== ''
-        || (filters.lifecycle ?? '') !== ''
-        || (filters.reachableFrom ?? '') !== ''
-        || (filters.plotState ?? '') !== '';
+    return (
+        (filters.nameFilter ?? "") !== "" ||
+        (filters.branch ?? "") !== "" ||
+        (filters.lifecycle ?? "") !== "" ||
+        (filters.reachableFrom ?? "") !== "" ||
+        (filters.plotState ?? "") !== ""
+    );
 }
 
 export interface ClearFiltersButtonProps {
@@ -35,9 +37,10 @@ export interface ClearFiltersButtonProps {
     onClear: () => void;
 }
 
-export function ClearFiltersButton(
-    {filters, onClear}: ClearFiltersButtonProps,
-): React.JSX.Element {
+export function ClearFiltersButton({
+    filters,
+    onClear,
+}: ClearFiltersButtonProps): React.JSX.Element {
     const active = anyFilterSet(filters);
 
     return (

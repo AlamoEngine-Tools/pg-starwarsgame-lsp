@@ -1118,7 +1118,8 @@
     "watch:tsc": "tsc -p ./ --noEmit --watch",
     "test:unit": "node esbuild.test.js && node --test \"out/test-unit/**/*.test.js\" && node --test \"scripts/**/*.test.js\"",
     "pretest": "npm run compile && npm run lint",
-    "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && eslint src",
+    "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && eslint src && prettier --check \"src/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "test": "vscode-test",
     "package": "vsce package --no-dependencies"
   },
@@ -1134,7 +1135,6 @@
     "serialize-javascript": "^7.0.5"
   },
   "devDependencies": {
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
@@ -1149,6 +1149,7 @@
     "@vscode/vsce": "^3.5.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
+    "prettier": "3.9.10",
     "typescript": "^6.0.0"
   },
   "dependencies": {

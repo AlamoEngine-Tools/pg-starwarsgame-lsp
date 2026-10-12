@@ -8,8 +8,8 @@
 // near the joint. Sharing a module would invite sharing a radius, and they are not the same
 // measurement.
 
-import type {Point} from './fireArc';
-import type {TurretAxisRange} from './turretHandles';
+import type { Point } from "./fireArc";
+import type { TurretAxisRange } from "./turretHandles";
 
 /**
  * The plane a track is drawn in, named by the axis it turns about.
@@ -18,11 +18,11 @@ import type {TurretAxisRange} from './turretHandles';
  * exporter's Z-up-to-Y-up rotation sits on the root node, so a bone still carries the file's axes -
  * X forward, Y lateral, Z up. Traverse turns about Z; elevation turns about Y.
  */
-export type TrackPlane = 'traverse' | 'elevation';
+export type TrackPlane = "traverse" | "elevation";
 
 /** Which plane an axis is drawn in. There are only the two, and no roll. */
 export function trackPlane(range: TurretAxisRange): TrackPlane {
-    return range.axis === 'yaw' ? 'traverse' : 'elevation';
+    return range.axis === "yaw" ? "traverse" : "elevation";
 }
 
 /**
@@ -31,7 +31,11 @@ export function trackPlane(range: TurretAxisRange): TrackPlane {
  * Forward is local +X, so zero degrees is straight ahead - the same zero the aim readout uses and
  * the same one the fire bones point along.
  */
-export function trackPoint(plane: TrackPlane, degrees: number, radius: number): Point {
+export function trackPoint(
+    plane: TrackPlane,
+    degrees: number,
+    radius: number,
+): Point {
     const angle = degrees * (Math.PI / 180);
     const along = Math.cos(angle) * radius;
     const across = Math.sin(angle) * radius;
@@ -39,7 +43,7 @@ export function trackPoint(plane: TrackPlane, degrees: number, radius: number): 
     // Traverse swings X towards Y, which is lateral. Elevation swings X towards +Z, which is up -
     // hence the sign, matching the viewport's nose-up convention where a positive pitch raises the
     // barrel.
-    return plane === 'traverse' ? [along, across, 0] : [along, 0, across];
+    return plane === "traverse" ? [along, across, 0] : [along, 0, across];
 }
 
 /**
@@ -50,7 +54,9 @@ export function trackPoint(plane: TrackPlane, degrees: number, radius: number): 
  * discovered by pushing against it.
  */
 export function trackPoints(
-    range: TurretAxisRange, radius: number, segments: number,
+    range: TurretAxisRange,
+    radius: number,
+    segments: number,
 ): Point[] {
     const plane = trackPlane(range);
     const span = range.free ? 360 : range.limitDegrees * 2;
@@ -70,7 +76,9 @@ export function trackPoints(
 
 /** A line-segment buffer for the track, closed when the axis is free. */
 export function trackSegments(
-    range: TurretAxisRange, radius: number, segments: number,
+    range: TurretAxisRange,
+    radius: number,
+    segments: number,
 ): number[] {
     const points = trackPoints(range, radius, segments);
     const positions: number[] = [];
@@ -94,7 +102,9 @@ export function trackSegments(
  * A free axis has none, which is itself the thing worth seeing.
  */
 export function stopTicks(
-    range: TurretAxisRange, radius: number, tickLength: number,
+    range: TurretAxisRange,
+    radius: number,
+    tickLength: number,
 ): number[] {
     if (range.free) {
         return [];
@@ -106,7 +116,8 @@ export function stopTicks(
     for (const degrees of [-range.limitDegrees, range.limitDegrees]) {
         positions.push(
             ...trackPoint(plane, degrees, radius - tickLength / 2),
-            ...trackPoint(plane, degrees, radius + tickLength / 2));
+            ...trackPoint(plane, degrees, radius + tickLength / 2),
+        );
     }
 
     return positions;
@@ -114,7 +125,9 @@ export function stopTicks(
 
 /** Where the knob sits: on the track, at the angle the turret is currently pointed. */
 export function knobPoint(
-    range: TurretAxisRange, degrees: number, radius: number,
+    range: TurretAxisRange,
+    degrees: number,
+    radius: number,
 ): Point {
     return trackPoint(trackPlane(range), degrees, radius);
 }

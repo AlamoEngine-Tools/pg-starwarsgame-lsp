@@ -12,14 +12,20 @@
 // clipped by the canvas. `placeTooltip` decides above or below from the room available, so a node at
 // the bottom edge opens upwards.
 
-import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
-import {createPortal} from 'react-dom';
-import {createGlobalStyle} from 'styled-components';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { createGlobalStyle } from "styled-components";
 
-import {tokensRootCss} from '../shared/tokens';
-import {placeTooltip, type TooltipPlacement} from '../shared/tooltipPlace';
+import { tokensRootCss } from "../shared/tokens";
+import { placeTooltip, type TooltipPlacement } from "../shared/tooltipPlace";
 
-import {PATH_DIRECTIONS, type PathDirection} from './pathDirection';
+import { PATH_DIRECTIONS, type PathDirection } from "./pathDirection";
 
 const MenuStyles = createGlobalStyle`
     /* Portalled to the body, so it is inside no panel's Shell and inherits none of the tokens
@@ -80,7 +86,11 @@ export interface PathFilterMenuProps {
     initiallyOpen?: boolean;
 }
 
-export function PathFilterMenu({onPick, active, initiallyOpen = false}: PathFilterMenuProps): React.JSX.Element {
+export function PathFilterMenu({
+    onPick,
+    active,
+    initiallyOpen = false,
+}: PathFilterMenuProps): React.JSX.Element {
     const [open, setOpen] = useState(initiallyOpen);
     const [placement, setPlacement] = useState<TooltipPlacement | null>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -95,11 +105,16 @@ export function PathFilterMenu({onPick, active, initiallyOpen = false}: PathFilt
 
         const anchor = button.getBoundingClientRect();
         const size = menu.getBoundingClientRect();
-        setPlacement(placeTooltip({
-            anchor,
-            size: {width: size.width, height: size.height},
-            window: {width: window.innerWidth, height: window.innerHeight},
-        }));
+        setPlacement(
+            placeTooltip({
+                anchor,
+                size: { width: size.width, height: size.height },
+                window: {
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                },
+            }),
+        );
     }, []);
 
     useLayoutEffect(() => {
@@ -118,26 +133,29 @@ export function PathFilterMenu({onPick, active, initiallyOpen = false}: PathFilt
 
         const close = (): void => setOpen(false);
         const onKey = (event: KeyboardEvent): void => {
-            if (event.key === 'Escape') {
+            if (event.key === "Escape") {
                 close();
             }
         };
         const onDown = (event: MouseEvent): void => {
             const target = event.target as Node;
-            if (!menuRef.current?.contains(target) && !buttonRef.current?.contains(target)) {
+            if (
+                !menuRef.current?.contains(target) &&
+                !buttonRef.current?.contains(target)
+            ) {
                 close();
             }
         };
 
-        window.addEventListener('keydown', onKey);
-        window.addEventListener('mousedown', onDown, true);
-        window.addEventListener('resize', close);
-        window.addEventListener('wheel', close, true);
+        window.addEventListener("keydown", onKey);
+        window.addEventListener("mousedown", onDown, true);
+        window.addEventListener("resize", close);
+        window.addEventListener("wheel", close, true);
         return () => {
-            window.removeEventListener('keydown', onKey);
-            window.removeEventListener('mousedown', onDown, true);
-            window.removeEventListener('resize', close);
-            window.removeEventListener('wheel', close, true);
+            window.removeEventListener("keydown", onKey);
+            window.removeEventListener("mousedown", onDown, true);
+            window.removeEventListener("resize", close);
+            window.removeEventListener("wheel", close, true);
         };
     }, [open]);
 
@@ -148,22 +166,26 @@ export function PathFilterMenu({onPick, active, initiallyOpen = false}: PathFilt
                 title="Filter by path"
                 aria-haspopup="menu"
                 aria-expanded={open}
-                onClick={() => setOpen(value => !value)}
-            ><span className="codicon codicon-filter"/></button>
-            {open && createPortal(
-                <>
-                    <MenuStyles/>
-                    <PathDirectionMenu
-                        ref={menuRef}
-                        active={active}
-                        placement={placement}
-                        onPick={direction => {
-                            setOpen(false);
-                            onPick(direction);
-                        }}
-                    />
-                </>,
-                document.body)}
+                onClick={() => setOpen((value) => !value)}
+            >
+                <span className="codicon codicon-filter" />
+            </button>
+            {open &&
+                createPortal(
+                    <>
+                        <MenuStyles />
+                        <PathDirectionMenu
+                            ref={menuRef}
+                            active={active}
+                            placement={placement}
+                            onPick={(direction) => {
+                                setOpen(false);
+                                onPick(direction);
+                            }}
+                        />
+                    </>,
+                    document.body,
+                )}
         </>
     );
 }
@@ -181,29 +203,34 @@ export interface PathDirectionMenuProps {
  * The menu itself, without the portal - which is what makes it testable: rendering a portal needs a
  * document, and the webview tests render to a string.
  */
-export function PathDirectionMenu(
-    {onPick, active, placement = null, ref}: PathDirectionMenuProps,
-): React.JSX.Element {
+export function PathDirectionMenu({
+    onPick,
+    active,
+    placement = null,
+    ref,
+}: PathDirectionMenuProps): React.JSX.Element {
     return (
         <div
             ref={ref}
             className="path-menu"
             role="menu"
             aria-label="Filter by path"
-            style={placement === null
-                // Measured before it is placed: render it out of sight rather than at the corner,
-                // where it would flash on every open.
-                ? {visibility: 'hidden', left: 0, top: 0}
-                : {left: placement.left, top: placement.top}}
+            style={
+                placement === null
+                    ? // Measured before it is placed: render it out of sight rather than at the corner,
+                      // where it would flash on every open.
+                      { visibility: "hidden", left: 0, top: 0 }
+                    : { left: placement.left, top: placement.top }
+            }
         >
-            {PATH_DIRECTIONS.map(choice => (
+            {PATH_DIRECTIONS.map((choice) => (
                 <button
                     key={choice.direction}
                     role="menuitemradio"
                     aria-checked={active === choice.direction}
                     onClick={() => onPick(choice.direction)}
                 >
-                    <span className={`codicon codicon-${choice.icon}`}/>
+                    <span className={`codicon codicon-${choice.icon}`} />
                     {choice.label}
                 </button>
             ))}

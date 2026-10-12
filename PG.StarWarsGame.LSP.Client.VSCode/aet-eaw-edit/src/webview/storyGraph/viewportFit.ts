@@ -44,7 +44,8 @@ export function fitZoom(view: Extent, content: Extent): number | null {
     return Math.min(
         (view.height / contentHeight) * FIT_MARGIN,
         (view.width / contentWidth) * FIT_MARGIN,
-        1);
+        1,
+    );
 }
 
 function isUsable(size: number): boolean {

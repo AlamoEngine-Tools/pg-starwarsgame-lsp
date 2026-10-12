@@ -16,12 +16,20 @@
 export interface MemberDocument {
     filePath: string;
     languages: string[];
-    rows: { index: number; key: string; values: { language: string; value: string }[] }[];
+    rows: {
+        index: number;
+        key: string;
+        values: { language: string; value: string }[];
+    }[];
 }
 
 export interface MergedDocument {
     languages: string[];
-    rows: { index: number; key: string; values: { language: string; value: string }[] }[];
+    rows: {
+        index: number;
+        key: string;
+        values: { language: string; value: string }[];
+    }[];
 }
 
 /** A key-addressed command as the editors stage it. */
@@ -44,11 +52,17 @@ export interface KeyedCommand {
  * Merging is keyed, so it is only ever right for an actual set. One file is passed straight
  * through - see {@link passThrough}.
  */
-export function mergeMembers(members: readonly MemberDocument[]): MergedDocument {
+export function mergeMembers(
+    members: readonly MemberDocument[],
+): MergedDocument {
     const languages: string[] = [];
     for (const member of members) {
         for (const language of member.languages) {
-            if (!languages.some(l => l.toUpperCase() === language.toUpperCase())) {
+            if (
+                !languages.some(
+                    (l) => l.toUpperCase() === language.toUpperCase(),
+                )
+            ) {
                 languages.push(language);
             }
         }
@@ -93,9 +107,9 @@ export function mergeMembers(members: readonly MemberDocument[]): MergedDocument
         rows: order.map((key, index) => ({
             index,
             key,
-            values: languages.map(language => ({
+            values: languages.map((language) => ({
                 language,
-                value: byKey.get(key)?.get(language) ?? '',
+                value: byKey.get(key)?.get(language) ?? "",
             })),
         })),
     };
@@ -109,16 +123,22 @@ export function mergeMembers(members: readonly MemberDocument[]): MergedDocument
  * about the row's identity is touched: `index` stays the row's position in the file, which is what
  * a credits edit addresses, and two rows sharing a key stay two rows.
  */
-function passThrough(member: MemberDocument, languages: string[]): MergedDocument {
+function passThrough(
+    member: MemberDocument,
+    languages: string[],
+): MergedDocument {
     return {
         languages,
-        rows: member.rows.map(row => ({
+        rows: member.rows.map((row) => ({
             index: row.index,
             key: row.key,
-            values: languages.map(language => ({
+            values: languages.map((language) => ({
                 language,
-                value: row.values.find(
-                    v => v.language.toUpperCase() === language.toUpperCase())?.value ?? '',
+                value:
+                    row.values.find(
+                        (v) =>
+                            v.language.toUpperCase() === language.toUpperCase(),
+                    )?.value ?? "",
             })),
         })),
     };
@@ -126,10 +146,14 @@ function passThrough(member: MemberDocument, languages: string[]): MergedDocumen
 
 /** The member holding a language, or undefined when no file in the set does. */
 export function memberForLanguage(
-    members: readonly MemberDocument[], language: string,
+    members: readonly MemberDocument[],
+    language: string,
 ): MemberDocument | undefined {
-    return members.find(
-        member => member.languages.some(l => l.toUpperCase() === language.toUpperCase()));
+    return members.find((member) =>
+        member.languages.some(
+            (l) => l.toUpperCase() === language.toUpperCase(),
+        ),
+    );
 }
 
 /**
@@ -143,7 +167,8 @@ export function memberForLanguage(
  * its content hash is not spent.
  */
 export function partitionCommands(
-    commands: readonly KeyedCommand[], members: readonly MemberDocument[],
+    commands: readonly KeyedCommand[],
+    members: readonly MemberDocument[],
 ): Map<string, KeyedCommand[]> {
     const batches = new Map<string, KeyedCommand[]>();
     const add = (filePath: string, command: KeyedCommand): void => {
@@ -156,10 +181,11 @@ export function partitionCommands(
     };
 
     for (const command of commands) {
-        if (command.kind === 'setValue') {
-            const owner = command.language === undefined
-                ? undefined
-                : memberForLanguage(members, command.language);
+        if (command.kind === "setValue") {
+            const owner =
+                command.language === undefined
+                    ? undefined
+                    : memberForLanguage(members, command.language);
             // A value for a language no file holds has nowhere to go. Dropped rather than guessed
             // at: writing it into an arbitrary file would put German text in the French file.
             if (owner !== undefined) {
@@ -168,24 +194,26 @@ export function partitionCommands(
             continue;
         }
 
-        if (command.kind === 'addEntry') {
+        if (command.kind === "addEntry") {
             // Each file gets only the values for the languages it holds; the rest of the row is
             // that file's business to leave blank.
             for (const member of members) {
                 add(member.filePath, {
                     ...command,
-                    values: (command.values ?? []).filter(v =>
-                        member.languages.some(l => l.toUpperCase() === v.language.toUpperCase())),
+                    values: (command.values ?? []).filter((v) =>
+                        member.languages.some(
+                            (l) => l.toUpperCase() === v.language.toUpperCase(),
+                        ),
+                    ),
                 });
             }
             continue;
         }
 
-        if (command.kind === 'renameKey' || command.kind === 'deleteEntry') {
+        if (command.kind === "renameKey" || command.kind === "deleteEntry") {
             for (const member of members) {
                 add(member.filePath, command);
             }
-
         }
 
         // addLanguage has no meaning here: in a single-language format another language is another

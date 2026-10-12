@@ -13,9 +13,9 @@
 // What actually differs between the three is a view type, a title, a script name and a message
 // switch. Everything above is here.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {readPanelLayout, savePanelSize} from './panelLayoutStorage';
+import { readPanelLayout, savePanelSize } from "./panelLayoutStorage";
 
 /** What makes one panel different from another. */
 export interface WebviewPanelSpec {
@@ -74,50 +74,72 @@ export abstract class WebviewPanelHost {
      *     already drifted apart once.
      */
     protected constructor(
-        extensionUri: vscode.Uri, spec: WebviewPanelSpec, adopt?: vscode.WebviewPanel,
+        extensionUri: vscode.Uri,
+        spec: WebviewPanelSpec,
+        adopt?: vscode.WebviewPanel,
     ) {
         const localResourceRoots = [
             // Everything the webviews load lives under out/. The VSIX is packaged with
             // `vsce package --no-dependencies`, so anything addressed via node_modules 404s in
             // the published extension - it only works in dev because the folder happens to be
             // there. See copyCodicons in esbuild.js.
-            vscode.Uri.joinPath(extensionUri, 'out', 'webview'),
-            vscode.Uri.joinPath(extensionUri, 'out', 'codicons'),
+            vscode.Uri.joinPath(extensionUri, "out", "webview"),
+            vscode.Uri.joinPath(extensionUri, "out", "codicons"),
         ];
 
-        this.panel = adopt ?? vscode.window.createWebviewPanel(
-            spec.viewType, spec.title, spec.column,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                ...(spec.enableFindWidget ? {enableFindWidget: true} : {}),
-                localResourceRoots,
-            });
+        this.panel =
+            adopt ??
+            vscode.window.createWebviewPanel(
+                spec.viewType,
+                spec.title,
+                spec.column,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    ...(spec.enableFindWidget
+                        ? { enableFindWidget: true }
+                        : {}),
+                    localResourceRoots,
+                },
+            );
 
         if (adopt !== undefined) {
             // An adopted panel arrives with scripts disabled and no roots. retainContextWhenHidden
             // is NOT settable here - it is a creation option, so a custom editor declares it in its
             // registration instead.
-            this.panel.webview.options = {enableScripts: true, localResourceRoots};
+            this.panel.webview.options = {
+                enableScripts: true,
+                localResourceRoots,
+            };
         }
 
         const scriptUri = this.panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(extensionUri, 'out', 'webview', spec.script));
+            vscode.Uri.joinPath(extensionUri, "out", "webview", spec.script),
+        );
         const codiconUri = this.panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(extensionUri, 'out', 'codicons', 'codicon.css'));
+            vscode.Uri.joinPath(extensionUri, "out", "codicons", "codicon.css"),
+        );
 
         this.panel.webview.html = buildHtml(
-            scriptUri, codiconUri, this.panel.webview.cspSource, spec.bodyStyle, spec.allowBlobImages,
-            readPanelLayout());
+            scriptUri,
+            codiconUri,
+            this.panel.webview.cspSource,
+            spec.bodyStyle,
+            spec.allowBlobImages,
+            readPanelLayout(),
+        );
 
         this.onDidDispose = this.panel.onDidDispose;
         this.panel.webview.onDidReceiveMessage((msg: WebviewMessage) => {
             // Handled here for every editor at once. A dock width is the base class's business -
             // no subclass has an opinion about it, and five identical cases in five switches is
             // exactly the duplication this class exists to prevent.
-            if (msg.type === 'setPanelLayout') {
-                const {key, value} = msg as { key?: unknown; value?: unknown };
-                if (typeof key === 'string' && typeof value === 'number') {
+            if (msg.type === "setPanelLayout") {
+                const { key, value } = msg as {
+                    key?: unknown;
+                    value?: unknown;
+                };
+                if (typeof key === "string" && typeof value === "number") {
                     savePanelSize(key, value);
                 }
                 return;
@@ -125,7 +147,10 @@ export abstract class WebviewPanelHost {
             // Caught here, once, because a rejected handler used to vanish: the hand-off button
             // "did nothing" and nothing anywhere said why.
             Promise.resolve(this.onMessage(msg)).catch((error: unknown) => {
-                console.error(`EaWEdit: Webview message '${msg.type}' failed`, error);
+                console.error(
+                    `EaWEdit: Webview message '${msg.type}' failed`,
+                    error,
+                );
             });
         });
     }
@@ -208,7 +233,7 @@ export function panelKey(filePath: string): string {
  * rather than a second one staging edits against the same files.
  */
 export function panelSetKey(filePaths: string[]): string {
-    return filePaths.map(panelKey).sort().join('|');
+    return filePaths.map(panelKey).sort().join("|");
 }
 
 /**
@@ -220,15 +245,19 @@ export function panelSetKey(filePaths: string[]): string {
  */
 function escapeAttribute(value: string): string {
     return value
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 }
 
 function buildHtml(
-    scriptUri: vscode.Uri, codiconUri: vscode.Uri, cspSource: string, bodyStyle?: string,
-    allowBlobImages = false, panelLayout: Record<string, number> = {},
+    scriptUri: vscode.Uri,
+    codiconUri: vscode.Uri,
+    cspSource: string,
+    bodyStyle?: string,
+    allowBlobImages = false,
+    panelLayout: Record<string, number> = {},
 ): string {
     // A bundled script, so script-src is the extension origin rather than 'unsafe-inline' - which
     // is what the old sidebar webview needed, having its JS inlined as a template literal.
@@ -240,11 +269,15 @@ function buildHtml(
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline' ${cspSource}; script-src ${cspSource}; font-src ${cspSource}; img-src ${cspSource} data:${allowBlobImages ? ' blob:' : ''};">
-<link rel="stylesheet" href="${codiconUri}">${bodyStyle ? `
+      content="default-src 'none'; style-src 'unsafe-inline' ${cspSource}; script-src ${cspSource}; font-src ${cspSource}; img-src ${cspSource} data:${allowBlobImages ? " blob:" : ""};">
+<link rel="stylesheet" href="${codiconUri}">${
+        bodyStyle
+            ? `
 <style>
 ${bodyStyle}
-</style>` : ''}
+</style>`
+            : ""
+    }
 </head>
 <body>
 <div id="root" data-panel-layout="${escapeAttribute(JSON.stringify(panelLayout))}"></div>

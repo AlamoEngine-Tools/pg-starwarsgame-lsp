@@ -8,12 +8,12 @@
 // toggles now sit inside the box the way an editor's find widget puts them, which buys back a row,
 // and what is left is a labelled field with room to breathe.
 
-import {ReactNode} from 'react';
+import { ReactNode } from "react";
 
-import {FilterMode} from '../locFilter';
-import {type ChoiceOption} from '../shared/choice';
-import {ModeSelector} from '../shared/ModeSelector';
-import {Field} from '../shared/Field';
+import { FilterMode } from "../locFilter";
+import { type ChoiceOption } from "../shared/choice";
+import { ModeSelector } from "../shared/ModeSelector";
+import { Field } from "../shared/Field";
 
 export interface LocSearchProps {
     filter: string;
@@ -44,14 +44,23 @@ export interface LocSearchProps {
 // The icons and wording the sidebar shipped with - unchanged, because users have them in their
 // fingers and this is a layout change, not a behaviour one.
 const MODES: ChoiceOption<FilterMode>[] = [
-    {id: 'text', label: 'text', icon: 'searchLiteral', title: 'Plain text search'},
     {
-        id: 'wildcard', label: 'wildcard', icon: 'searchWildcard',
-        title: 'Wildcard: * matches any text, ? matches one character',
+        id: "text",
+        label: "text",
+        icon: "searchLiteral",
+        title: "Plain text search",
     },
     {
-        id: 'regex', label: 'regex', icon: 'searchRegex',
-        title: 'Regular expression (case-insensitive)',
+        id: "wildcard",
+        label: "wildcard",
+        icon: "searchWildcard",
+        title: "Wildcard: * matches any text, ? matches one character",
+    },
+    {
+        id: "regex",
+        label: "regex",
+        icon: "searchRegex",
+        title: "Regular expression (case-insensitive)",
     },
 ];
 
@@ -63,10 +72,10 @@ export function LocSearch(props: LocSearchProps): React.JSX.Element {
             <div className="search-field with-modes">
                 <input
                     type="text"
-                    className={`filter${props.error ? ' invalid' : ''}`}
+                    className={`filter${props.error ? " invalid" : ""}`}
                     placeholder={props.placeholders[props.mode]}
                     value={props.filter}
-                    onChange={e => props.onFilter(e.target.value)}
+                    onChange={(e) => props.onFilter(e.target.value)}
                     aria-invalid={props.error !== undefined}
                 />
                 <div className="mode-group">
@@ -87,11 +96,16 @@ export function LocSearch(props: LocSearchProps): React.JSX.Element {
             {props.error && <div className="filter-error">{props.error}</div>}
 
             <Field label="Search in" as="label">
-                <select value={props.scope} onChange={e => props.onScope(e.target.value)}>
+                <select
+                    value={props.scope}
+                    onChange={(e) => props.onScope(e.target.value)}
+                >
                     <option value="all">All fields</option>
                     <option value="key">{props.keyScopeLabel}</option>
-                    {props.languages.map(language => (
-                        <option key={language} value={language}>{language}</option>
+                    {props.languages.map((language) => (
+                        <option key={language} value={language}>
+                            {language}
+                        </option>
                     ))}
                 </select>
             </Field>

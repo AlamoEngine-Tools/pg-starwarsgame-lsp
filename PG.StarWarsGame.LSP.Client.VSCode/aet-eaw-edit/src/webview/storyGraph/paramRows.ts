@@ -3,7 +3,7 @@
 
 // Which param rows a node body shows, and in what order.
 
-import {StoryParamSchemaDto} from '../../protocol';
+import { StoryParamSchemaDto } from "../../protocol";
 
 /** One editable param row on an inline node body. `missing` = mandatory and still unset. */
 export interface ParamRowSpec {
@@ -28,13 +28,15 @@ export function paramRowSpecs(
     existing: { position: number; value: string }[] | null | undefined,
     schema: StoryParamSchemaDto[],
 ): ParamRowSpec[] {
-    const byPosition = new Map((existing ?? []).map(p => [p.position, p.value]));
+    const byPosition = new Map(
+        (existing ?? []).map((p) => [p.position, p.value]),
+    );
     const rows: ParamRowSpec[] = [];
 
     for (const p of schema) {
         rows.push({
             position: p.position,
-            value: byPosition.get(p.position) ?? '',
+            value: byPosition.get(p.position) ?? "",
             missing: !p.optional && !byPosition.has(p.position),
         });
         // Taken out as it is consumed, so what is left below is exactly the undeclared slots.
@@ -43,7 +45,7 @@ export function paramRowSpecs(
 
     for (const [position, value] of byPosition) {
         // Never "missing": the schema says nothing about it, so it cannot be a mandatory gap.
-        rows.push({position, value, missing: false});
+        rows.push({ position, value, missing: false });
     }
 
     rows.sort((a, b) => a.position - b.position);

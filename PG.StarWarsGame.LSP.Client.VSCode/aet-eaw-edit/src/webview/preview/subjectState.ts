@@ -54,7 +54,7 @@ export const EMPTY_SUBJECT_STATE: SubjectState = {
     destroyed: [],
     hiddenEmitters: [],
     animation: null,
-    filterText: '',
+    filterText: "",
     collapsed: [],
     hidden: [],
     shown: [],
@@ -74,8 +74,8 @@ export function subjectStateFrom(stored: unknown): SubjectState {
         lod: index_(raw.lod, EMPTY_SUBJECT_STATE.lod),
         destroyed: strings(raw.destroyed),
         hiddenEmitters: indices(raw.hiddenEmitters),
-        animation: typeof raw.animation === 'string' ? raw.animation : null,
-        filterText: typeof raw.filterText === 'string' ? raw.filterText : '',
+        animation: typeof raw.animation === "string" ? raw.animation : null,
+        filterText: typeof raw.filterText === "string" ? raw.filterText : "",
         collapsed: strings(raw.collapsed),
         hidden: strings(raw.hidden),
         shown: strings(raw.shown),
@@ -83,25 +83,31 @@ export function subjectStateFrom(stored: unknown): SubjectState {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-        ? value as Record<string, unknown>
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
         : {};
 }
 
 function index_(value: unknown, fallback: number): number {
-    return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : fallback;
+    return typeof value === "number" && Number.isInteger(value) && value >= 0
+        ? value
+        : fallback;
 }
 
 /** An array of strings, or nothing. A mixed array is refused whole - half a list is not a list. */
 function strings(value: unknown): string[] {
-    return Array.isArray(value) && value.every(item => typeof item === 'string')
-        ? [...value] as string[]
+    return Array.isArray(value) &&
+        value.every((item) => typeof item === "string")
+        ? ([...value] as string[])
         : [];
 }
 
 function indices(value: unknown): number[] {
-    return Array.isArray(value)
-    && value.every(item => typeof item === 'number' && Number.isInteger(item) && item >= 0)
-        ? [...value] as number[]
+    return Array.isArray(value) &&
+        value.every(
+            (item) =>
+                typeof item === "number" && Number.isInteger(item) && item >= 0,
+        )
+        ? ([...value] as number[])
         : [];
 }

@@ -4,9 +4,9 @@
 // Grid pieces both editors use. Neither knows what a row means; they are about typing into a cell
 // and about a menu staying where it was opened.
 
-import {ReactNode, useEffect, useLayoutEffect, useRef, useState} from 'react';
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import {MenuPlacement, placeMenu} from './menuPlacement';
+import { MenuPlacement, placeMenu } from "./menuPlacement";
 
 /**
  * A cell that commits on blur or Enter and reverts on Escape.
@@ -37,13 +37,13 @@ export function CellInput(props: {
         <input
             type="text"
             value={draft}
-            onChange={e => setDraft(e.target.value)}
+            onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
-            onKeyDown={e => {
-                if (e.key === 'Enter') {
+            onKeyDown={(e) => {
+                if (e.key === "Enter") {
                     e.currentTarget.blur();
                 }
-                if (e.key === 'Escape') {
+                if (e.key === "Escape") {
                     setDraft(committed.current);
                     e.currentTarget.blur();
                 }
@@ -67,11 +67,14 @@ export function RowMenuFrame(props: {
     onClose: () => void;
     children: ReactNode;
 }): React.JSX.Element {
-    const {anchorIndex, onClose} = props;
+    const { anchorIndex, onClose } = props;
 
     const menuRef = useRef<HTMLDivElement>(null);
-    const [placement, setPlacement] = useState<MenuPlacement>(
-        {left: props.x, top: props.y, maxHeight: null});
+    const [placement, setPlacement] = useState<MenuPlacement>({
+        left: props.x,
+        top: props.y,
+        maxHeight: null,
+    });
 
     // Measured rather than estimated, because what the menu contains differs by row - a spacer
     // offers different items from an entry. A layout effect runs before paint, so the corrected
@@ -79,7 +82,7 @@ export function RowMenuFrame(props: {
     //
     // Keyed on the anchor, never on the children: the child elements are a fresh object every
     // render, so depending on them re-runs this after each reposition, which never settles.
-    const {x, y} = props;
+    const { x, y } = props;
     useLayoutEffect(() => {
         const el = menuRef.current;
         if (el === null) {
@@ -88,20 +91,24 @@ export function RowMenuFrame(props: {
 
         const box = el.getBoundingClientRect();
         const next = placeMenu(
-            {x, y},
-            {width: box.width, height: box.height},
-            {width: window.innerWidth, height: window.innerHeight});
+            { x, y },
+            { width: box.width, height: box.height },
+            { width: window.innerWidth, height: window.innerHeight },
+        );
 
-        setPlacement(current => (current.left === next.left && current.top === next.top
-        && current.maxHeight === next.maxHeight
-            ? current
-            : next));
+        setPlacement((current) =>
+            current.left === next.left &&
+            current.top === next.top &&
+            current.maxHeight === next.maxHeight
+                ? current
+                : next,
+        );
     }, [x, y, anchorIndex]);
 
     useEffect(() => {
         const close = (): void => onClose();
         const onKey = (e: KeyboardEvent): void => {
-            if (e.key === 'Escape') {
+            if (e.key === "Escape") {
                 onClose();
             }
         };
@@ -112,25 +119,31 @@ export function RowMenuFrame(props: {
         // closed it again. What matters is whether the menu still points at its row, so the row's
         // own vertical position is what is watched: a real scroll moves it, a blur nudge does not.
         const anchorTop = (): number | null => {
-            const row = document.querySelector(`[data-row-index="${anchorIndex}"]`);
+            const row = document.querySelector(
+                `[data-row-index="${anchorIndex}"]`,
+            );
             return row === null ? null : row.getBoundingClientRect().top;
         };
         const openedAt = anchorTop();
         const onScroll = (): void => {
             const now = anchorTop();
             // Gone entirely means scrolled out of the virtualised window - close.
-            if (now === null || openedAt === null || Math.abs(now - openedAt) > 2) {
+            if (
+                now === null ||
+                openedAt === null ||
+                Math.abs(now - openedAt) > 2
+            ) {
                 onClose();
             }
         };
 
-        window.addEventListener('pointerdown', close);
-        window.addEventListener('scroll', onScroll, true);
-        window.addEventListener('keydown', onKey);
+        window.addEventListener("pointerdown", close);
+        window.addEventListener("scroll", onScroll, true);
+        window.addEventListener("keydown", onKey);
         return () => {
-            window.removeEventListener('pointerdown', close);
-            window.removeEventListener('scroll', onScroll, true);
-            window.removeEventListener('keydown', onKey);
+            window.removeEventListener("pointerdown", close);
+            window.removeEventListener("scroll", onScroll, true);
+            window.removeEventListener("keydown", onKey);
         };
     }, [anchorIndex, onClose]);
 
@@ -142,9 +155,9 @@ export function RowMenuFrame(props: {
                 left: placement.left,
                 top: placement.top,
                 maxHeight: placement.maxHeight ?? undefined,
-                overflowY: placement.maxHeight === null ? undefined : 'auto',
+                overflowY: placement.maxHeight === null ? undefined : "auto",
             }}
-            onPointerDown={e => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             role="menu"
         >
             {props.children}

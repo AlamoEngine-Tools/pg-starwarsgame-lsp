@@ -16,11 +16,18 @@
  * carrying nothing. Measuring the filter against what is on screen therefore reported a fresh,
  * unfiltered model as "50 of 58", which is the panel accusing itself of hiding things.
  */
-export function countTreeNodes(roots: readonly { children: readonly unknown[] }[]): number {
+export function countTreeNodes(
+    roots: readonly { children: readonly unknown[] }[],
+): number {
     return roots.reduce(
-        (n, node) => n + 1 + countTreeNodes(
-            node.children as readonly { children: readonly unknown[] }[]),
-        0);
+        (n, node) =>
+            n +
+            1 +
+            countTreeNodes(
+                node.children as readonly { children: readonly unknown[] }[],
+            ),
+        0,
+    );
 }
 
 /** The three kinds a tree row can be, so "all of them" has a number rather than a magic 3. */
@@ -47,7 +54,9 @@ export function searchIsOpen(pressed: boolean, pattern: string): boolean {
  * element is collapsed.
  */
 export function treeFilterSummary(
-    shown: number, total: number, kindsOn: number,
+    shown: number,
+    total: number,
+    kindsOn: number,
 ): string | null {
     const narrowed = shown < total || kindsOn < TREE_KIND_COUNT;
 

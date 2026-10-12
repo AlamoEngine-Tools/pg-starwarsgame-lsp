@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import type {StoryGraphNodeDto} from '../../protocol/story';
+import type { StoryGraphNodeDto } from "../../protocol/story";
 
 /**
  * Which threads in the current graph belong to a referenced project, and to which one.
@@ -14,7 +14,9 @@ import type {StoryGraphNodeDto} from '../../protocol/story';
  * half of the rule, not the authority. The command boundary decides, and a gesture that slips past
  * a filtered-out thread is still refused there.
  */
-export function readOnlyThreadIndex(nodes: readonly StoryGraphNodeDto[]): Map<string, string> {
+export function readOnlyThreadIndex(
+    nodes: readonly StoryGraphNodeDto[],
+): Map<string, string> {
     const index = new Map<string, string>();
     for (const node of nodes) {
         if (node.threadUri && node.readOnlyOwner) {
@@ -30,7 +32,8 @@ export function readOnlyThreadIndex(nodes: readonly StoryGraphNodeDto[]): Map<st
  * A command carrying no thread is not judged here - the server knows what such a command targets.
  */
 export function readOnlyOwnerOf(
-    index: ReadonlyMap<string, string>, threadUri: string | null | undefined,
+    index: ReadonlyMap<string, string>,
+    threadUri: string | null | undefined,
 ): string | null {
     if (!threadUri) {
         return null;
@@ -57,20 +60,30 @@ export function readOnlyMessage(owner: string): string {
  * Only nodes that HAVE a thread count. Junctions and portals are structural - drawn from the events
  * around them and owning no file - so they neither block nor permit.
  */
-export function editModeBlockedBy(nodes: readonly StoryGraphNodeDto[]): string | null {
-    const threaded = nodes.filter(n => n.threadUri);
-    const owners = [...new Set(
-        threaded.map(n => n.readOnlyOwner).filter((o): o is string => Boolean(o)))];
+export function editModeBlockedBy(
+    nodes: readonly StoryGraphNodeDto[],
+): string | null {
+    const threaded = nodes.filter((n) => n.threadUri);
+    const owners = [
+        ...new Set(
+            threaded
+                .map((n) => n.readOnlyOwner)
+                .filter((o): o is string => Boolean(o)),
+        ),
+    ];
 
     if (owners.length === 0) {
         return null;
     }
 
-    const named = owners.length === 1
-        ? `'${owners[0]}'`
-        : owners.map(o => `'${o}'`).join(' and ');
-    const all = threaded.every(n => n.readOnlyOwner);
+    const named =
+        owners.length === 1
+            ? `'${owners[0]}'`
+            : owners.map((o) => `'${o}'`).join(" and ");
+    const all = threaded.every((n) => n.readOnlyOwner);
 
-    return `${all ? 'Every thread here belongs' : 'Part of this graph belongs'} to ${named}, which `
-        + 'this workspace only references. Open the graph in that project to edit it.';
+    return (
+        `${all ? "Every thread here belongs" : "Part of this graph belongs"} to ${named}, which ` +
+        "this workspace only references. Open the graph in that project to edit it."
+    );
 }

@@ -1,12 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import assert from 'node:assert/strict';
-import {describe, it} from 'node:test';
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
-import {drawnBounds} from './modelBounds';
+import { drawnBounds } from "./modelBounds";
 
 /** A one-unit cube at the origin, scaled to the span asked for. */
 function cube(span: number): THREE.Mesh {
@@ -16,8 +16,8 @@ function cube(span: number): THREE.Mesh {
     return mesh;
 }
 
-describe('drawnBounds', () => {
-    it('measures the meshes that are drawn', () => {
+describe("drawnBounds", () => {
+    it("measures the meshes that are drawn", () => {
         const root = new THREE.Object3D();
         root.add(cube(10));
 
@@ -36,40 +36,46 @@ describe('drawnBounds', () => {
      * camera preset framed the weapon range and put the ship 27 times further away than the view it
      * replaced.
      */
-    it('ignores an overlay that is not a mesh', () => {
+    it("ignores an overlay that is not a mesh", () => {
         const root = new THREE.Object3D();
         root.add(cube(10));
 
-        const arc = new THREE.LineSegments(new THREE.BoxGeometry(7000, 7000, 7000));
+        const arc = new THREE.LineSegments(
+            new THREE.BoxGeometry(7000, 7000, 7000),
+        );
         arc.updateMatrixWorld(true);
         root.add(arc);
 
-        assert.equal(drawnBounds(root, () => true).max.x - drawnBounds(root, () => true).min.x, 10);
+        assert.equal(
+            drawnBounds(root, () => true).max.x -
+                drawnBounds(root, () => true).min.x,
+            10,
+        );
     });
 
     /**
      * Framing fits what you can SEE. Hidden detail levels, the damage variants that are not
      * selected, collision hulls and shadow volumes are all in the graph and all larger than nothing.
      */
-    it('ignores a mesh the caller says is not drawn', () => {
+    it("ignores a mesh the caller says is not drawn", () => {
         const root = new THREE.Object3D();
         const small = cube(10);
         const huge = cube(900);
         root.add(small, huge);
 
-        const box = drawnBounds(root, mesh => mesh === small);
+        const box = drawnBounds(root, (mesh) => mesh === small);
 
         assert.equal(box.max.x - box.min.x, 10);
     });
 
-    it('is empty when nothing is drawn', () => {
+    it("is empty when nothing is drawn", () => {
         const root = new THREE.Object3D();
         root.add(cube(10));
 
         assert.equal(drawnBounds(root, () => false).isEmpty(), true);
     });
 
-    it('takes world transforms into account', () => {
+    it("takes world transforms into account", () => {
         const root = new THREE.Object3D();
         const moved = cube(2);
         moved.position.set(100, 0, 0);
@@ -86,13 +92,15 @@ describe('drawnBounds', () => {
      * A geometry with a NaN vertex would otherwise poison the whole box, and the sphere taken from
      * it comes out NaN - which the caller reads as "no size at all" and frames a one-unit ball.
      */
-    it('skips a geometry whose bounds are not finite', () => {
+    it("skips a geometry whose bounds are not finite", () => {
         const root = new THREE.Object3D();
         root.add(cube(10));
 
         const broken = new THREE.Mesh(new THREE.BufferGeometry());
-        broken.geometry.setAttribute('position',
-            new THREE.BufferAttribute(new Float32Array([NaN, NaN, NaN]), 3));
+        broken.geometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(new Float32Array([NaN, NaN, NaN]), 3),
+        );
         broken.updateMatrixWorld(true);
         root.add(broken);
 
@@ -106,7 +114,7 @@ describe('drawnBounds', () => {
      * are both `THREE.Mesh`, both hang inside the model on a bone, and both are drawn. Measured on
      * the Gargantuan with its arcs on: the framing radius went from 99 to 508.
      */
-    it('prunes a whole subtree the caller marks as not the model', () => {
+    it("prunes a whole subtree the caller marks as not the model", () => {
         const root = new THREE.Object3D();
         root.add(cube(10));
 
@@ -116,12 +124,20 @@ describe('drawnBounds', () => {
         root.add(overlay);
         root.updateMatrixWorld(true);
 
-        const box = drawnBounds(root, () => true, node => node === overlay);
+        const box = drawnBounds(
+            root,
+            () => true,
+            (node) => node === overlay,
+        );
 
-        assert.equal(box.max.x - box.min.x, 10, 'the pruned subtree - and its children - are skipped');
+        assert.equal(
+            box.max.x - box.min.x,
+            10,
+            "the pruned subtree - and its children - are skipped",
+        );
     });
 
-    it('measures everything when no prune is given, as before', () => {
+    it("measures everything when no prune is given, as before", () => {
         const root = new THREE.Object3D();
         const overlay = new THREE.Object3D();
         overlay.add(cube(1000));

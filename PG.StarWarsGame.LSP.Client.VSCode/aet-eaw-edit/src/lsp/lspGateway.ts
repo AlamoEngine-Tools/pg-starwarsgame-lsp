@@ -14,10 +14,10 @@
 
 /** The two ways a call can come back with nothing. */
 export type LspFailure =
-/** The server is not running - nothing was sent. */
-    | 'offline'
+    /** The server is not running - nothing was sent. */
+    | "offline"
     /** It was sent and the request rejected, or the server answered with an error. */
-    | 'failed';
+    | "failed";
 
 /**
  * What a call produced.
@@ -29,7 +29,11 @@ export type LspFailure =
  */
 export type LspOutcome<T> =
     | { readonly ok: true; readonly value: T }
-    | { readonly ok: false; readonly reason: LspFailure; readonly message: string };
+    | {
+          readonly ok: false;
+          readonly reason: LspFailure;
+          readonly message: string;
+      };
 
 /** Where the gateway's user-facing messages go. `vscode.window` in production. */
 export interface LspMessageSink {
@@ -43,7 +47,7 @@ export interface LspRequestSender {
     sendRequest<T>(method: string, params: unknown): Promise<T>;
 }
 
-export const SERVER_NOT_RUNNING = 'EaWEdit LSP: Server is not running.';
+export const SERVER_NOT_RUNNING = "EaWEdit LSP: Server is not running.";
 
 /**
  * The LSP method behind `ExecuteCommandRequest.type`.
@@ -52,7 +56,7 @@ export const SERVER_NOT_RUNNING = 'EaWEdit LSP: Server is not running.';
  * what lets it be unit-tested. JSON-RPC dispatches on the method name either way, so the typed
  * request object buys nothing a caller here can use.
  */
-const EXECUTE_COMMAND = 'workspace/executeCommand';
+const EXECUTE_COMMAND = "workspace/executeCommand";
 
 export class LspGateway {
     /**
@@ -74,8 +78,7 @@ export class LspGateway {
     constructor(
         private readonly _resolve: () => LspRequestSender | undefined,
         private readonly _sink?: LspMessageSink,
-    ) {
-    }
+    ) {}
 
     get isRunning(): boolean {
         return this._resolve() !== undefined;
@@ -112,7 +115,7 @@ export class LspGateway {
             return Promise.resolve(true);
         }
 
-        return new Promise<boolean>(resolve => {
+        return new Promise<boolean>((resolve) => {
             const release = (ready: boolean): void => {
                 clearTimeout(timer);
                 this._waiting.delete(release);
@@ -145,16 +148,26 @@ export class LspGateway {
      *
      * This is the primitive; the helpers below are the three things callers actually do with it.
      */
-    async request<T>(method: string, params: unknown = {}): Promise<LspOutcome<T>> {
+    async request<T>(
+        method: string,
+        params: unknown = {},
+    ): Promise<LspOutcome<T>> {
         const client = this._resolve();
         if (client === undefined) {
-            return {ok: false, reason: 'offline', message: SERVER_NOT_RUNNING};
+            return {
+                ok: false,
+                reason: "offline",
+                message: SERVER_NOT_RUNNING,
+            };
         }
 
         try {
-            return {ok: true, value: await client.sendRequest<T>(method, params)};
+            return {
+                ok: true,
+                value: await client.sendRequest<T>(method, params),
+            };
         } catch (e) {
-            return {ok: false, reason: 'failed', message: String(e)};
+            return { ok: false, reason: "failed", message: String(e) };
         }
     }
 
@@ -165,18 +178,23 @@ export class LspGateway {
      *     than only that something did. `undefined` on success is the caller's cue to stop.
      */
     async requestOrReport<T>(
-        method: string, params: unknown = {}, context?: string,
+        method: string,
+        params: unknown = {},
+        context?: string,
     ): Promise<T | undefined> {
         const outcome = await this.request<T>(method, params);
         if (outcome.ok) {
             return outcome.value;
         }
 
-        if (outcome.reason === 'offline') {
+        if (outcome.reason === "offline") {
             this._sink?.warn(SERVER_NOT_RUNNING);
         } else {
             this._sink?.error(
-                context ? `EaWEdit: ${context}: ${outcome.message}` : `EaWEdit: ${outcome.message}`);
+                context
+                    ? `EaWEdit: ${context}: ${outcome.message}`
+                    : `EaWEdit: ${outcome.message}`,
+            );
         }
         return undefined;
     }
@@ -189,7 +207,11 @@ export class LspGateway {
      * modal would interrupt editing over a convenience, and a dropdown awaiting a reply must not
      * hang just because the answer never came.
      */
-    async requestOr<T>(method: string, params: unknown, fallback: T): Promise<T> {
+    async requestOr<T>(
+        method: string,
+        params: unknown,
+        fallback: T,
+    ): Promise<T> {
         const outcome = await this.request<T>(method, params);
         return outcome.ok ? outcome.value : fallback;
     }
@@ -215,17 +237,27 @@ export class LspGateway {
      *
      * @returns whether it ran, for a caller that follows up on success.
      */
-    async executeCommand(command: string, args: unknown[] = [], context?: string): Promise<boolean> {
-        const outcome = await this.request(EXECUTE_COMMAND, {command, arguments: args});
+    async executeCommand(
+        command: string,
+        args: unknown[] = [],
+        context?: string,
+    ): Promise<boolean> {
+        const outcome = await this.request(EXECUTE_COMMAND, {
+            command,
+            arguments: args,
+        });
         if (outcome.ok) {
             return true;
         }
 
-        if (outcome.reason === 'offline') {
+        if (outcome.reason === "offline") {
             this._sink?.warn(SERVER_NOT_RUNNING);
         } else {
             this._sink?.error(
-                context ? `EaWEdit: ${context}: ${outcome.message}` : `EaWEdit: ${outcome.message}`);
+                context
+                    ? `EaWEdit: ${context}: ${outcome.message}`
+                    : `EaWEdit: ${outcome.message}`,
+            );
         }
         return false;
     }

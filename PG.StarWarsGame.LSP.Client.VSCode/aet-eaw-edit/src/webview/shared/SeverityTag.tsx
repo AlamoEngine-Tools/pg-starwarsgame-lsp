@@ -22,15 +22,20 @@
 // A tag, not a button, in three of the four cases: it reports a verdict and opens the report. The
 // class it carries is still called `validate-btn`, which is the older name for the same control.
 
-import {ValidationState} from '../loc/useLocPanel';
-import {Enablement} from './Button';
+import { ValidationState } from "../loc/useLocPanel";
+import { Enablement } from "./Button";
 
 /** The codicon that stands for a verdict. */
 export function severityIcon(severity: ValidationState): string {
-    return severity === 'unvalidated' ? 'question'
-        : severity === 'error' ? 'error'
-            : severity === 'warning' ? 'warning'
-                : severity === 'info' ? 'info' : 'check';
+    return severity === "unvalidated"
+        ? "question"
+        : severity === "error"
+          ? "error"
+          : severity === "warning"
+            ? "warning"
+            : severity === "info"
+              ? "info"
+              : "check";
 }
 
 export type SeverityTagProps = Enablement & {
@@ -49,8 +54,14 @@ export type SeverityTagProps = Enablement & {
 };
 
 export function SeverityTag({
-                                severity, count, title, expanded, disabled, disabledReason, onClick,
-                            }: SeverityTagProps): React.JSX.Element {
+    severity,
+    count,
+    title,
+    expanded,
+    disabled,
+    disabledReason,
+    onClick,
+}: SeverityTagProps): React.JSX.Element {
     return (
         <button
             type="button"
@@ -60,10 +71,10 @@ export function SeverityTag({
             disabled={disabled}
             onClick={onClick}
         >
-            <span className={`codicon codicon-${severityIcon(severity)}`}/>
+            <span className={`codicon codicon-${severityIcon(severity)}`} />
             {/* Nothing rather than a bare "0": a zero here reads as a value someone should look at,
                 where what is meant is that there is nothing to look at. */}
-            {count > 0 ? ` ${count}` : ''}
+            {count > 0 ? ` ${count}` : ""}
         </button>
     );
 }

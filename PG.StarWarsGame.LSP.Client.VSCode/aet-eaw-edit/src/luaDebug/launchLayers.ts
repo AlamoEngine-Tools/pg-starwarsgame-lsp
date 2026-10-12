@@ -34,7 +34,7 @@ export function collectSourceRoots(layers: readonly LaunchLayer[]): string[] {
     const roots: string[] = [];
     for (const layer of byPrecedence(layers)) {
         for (const root of layer.scriptRoots) {
-            const key = root.replace(/\\/g, '/').toLowerCase();
+            const key = root.replace(/\\/g, "/").toLowerCase();
             if (!seen.has(key)) {
                 seen.add(key);
                 roots.push(root);
@@ -51,23 +51,27 @@ export function collectSourceRoots(layers: readonly LaunchLayer[]): string[] {
  * refuses the whole launch with its reason, because a chain with a hole silently plays the wrong
  * files. An explicit override replaces the chain as given, for mod folders maintained by hand.
  */
-export function buildModChain(layers: readonly LaunchLayer[], override?: readonly string[]): ModChain {
+export function buildModChain(
+    layers: readonly LaunchLayer[],
+    override?: readonly string[],
+): ModChain {
     if (override !== undefined) {
-        const withSpace = override.find(p => p.includes(' '));
+        const withSpace = override.find((p) => p.includes(" "));
         if (withSpace !== undefined) {
             return {
                 ok: false,
-                message: `The mod path '${withSpace}' contains a space; the game's command line cannot carry a path with one`
+                message: `The mod path '${withSpace}' contains a space; the game's command line cannot carry a path with one`,
             };
         }
-        return {ok: true, args: override.map(p => `MODPATH=${p}`)};
+        return { ok: true, args: override.map((p) => `MODPATH=${p}`) };
     }
 
     const ordered = byPrecedence(layers);
     if (ordered.length === 0) {
         return {
             ok: false,
-            message: 'No mod project is loaded, so there is nothing to launch the game with. Open a workspace with a .pgproj, or set "modPaths" in the launch configuration'
+            message:
+                'No mod project is loaded, so there is nothing to launch the game with. Open a workspace with a .pgproj, or set "modPaths" in the launch configuration',
         };
     }
 
@@ -76,13 +80,14 @@ export function buildModChain(layers: readonly LaunchLayer[], override?: readonl
         if (layer.modPath === null) {
             return {
                 ok: false,
-                message: `Project layer '${layer.name}' cannot be launched as a mod: ${layer.notRunnableReason ?? 'no reason given'}. ` +
+                message:
+                    `Project layer '${layer.name}' cannot be launched as a mod: ${layer.notRunnableReason ?? "no reason given"}. ` +
                     'Attach to a running game instead, or set "modPaths" in the launch configuration to a mod folder you maintain yourself',
             };
         }
         args.push(`MODPATH=${layer.modPath}`);
     }
-    return {ok: true, args};
+    return { ok: true, args };
 }
 
 function byPrecedence(layers: readonly LaunchLayer[]): LaunchLayer[] {

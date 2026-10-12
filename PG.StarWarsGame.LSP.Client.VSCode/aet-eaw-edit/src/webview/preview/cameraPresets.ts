@@ -14,7 +14,7 @@
 // different shot on every one of them. It is resolved back to world units at the moment it is
 // written out as Lua, which is the only place the engine's own units are wanted.
 
-import {type BoundingSphere, type Vec3} from './framing';
+import { type BoundingSphere, type Vec3 } from "./framing";
 
 /** A saved shot. */
 export interface CameraPreset {
@@ -51,7 +51,10 @@ const MIN_RADIUS = 0.001;
 const RADIANS = Math.PI / 180;
 
 /** Turns a saved shot into a camera position for this subject. */
-export function poseFromPreset(preset: CameraPreset, sphere: BoundingSphere): PresetPose {
+export function poseFromPreset(
+    preset: CameraPreset,
+    sphere: BoundingSphere,
+): PresetPose {
     const radius = Math.max(sphere.radius, MIN_RADIUS);
     const distance = Math.max(preset.distance, 0) * radius;
 
@@ -65,7 +68,7 @@ export function poseFromPreset(preset: CameraPreset, sphere: BoundingSphere): Pr
             y: sphere.center.y + distance * Math.sin(pitch),
             z: sphere.center.z + horizontal * Math.cos(yaw),
         },
-        target: {...sphere.center},
+        target: { ...sphere.center },
     };
 }
 
@@ -76,7 +79,9 @@ export function poseFromPreset(preset: CameraPreset, sphere: BoundingSphere): Pr
  * same place - a Save button that moved the camera would be worse than no Save button.
  */
 export function presetFromPose(
-    name: string, position: Vec3, sphere: BoundingSphere,
+    name: string,
+    position: Vec3,
+    sphere: BoundingSphere,
 ): CameraPreset {
     const radius = Math.max(sphere.radius, MIN_RADIUS);
     const dx = position.x - sphere.center.x;
@@ -94,7 +99,7 @@ export function presetFromPose(
 
         // 0 to 360, which is how the shipped keys are written - `(Pirate_Frigate2, 220, -12, 290,
         // ...)` rather than -70.
-        yaw: ((Math.atan2(dx, dz) / RADIANS) % 360 + 360) % 360,
+        yaw: (((Math.atan2(dx, dz) / RADIANS) % 360) + 360) % 360,
         bone: null,
     };
 }
@@ -106,17 +111,24 @@ export function presetFromPose(
  * hold them: a key written for a trooper is not a key for a Star Destroyer.
  */
 export function luaFor(
-    preset: CameraPreset, sphere: BoundingSphere, objectName: string | null,
+    preset: CameraPreset,
+    sphere: BoundingSphere,
+    objectName: string | null,
 ): string {
     const radius = Math.max(sphere.radius, MIN_RADIUS);
     const distance = round(Math.max(preset.distance, 0) * radius);
 
     // A model preview has no game object to name. An obvious hole beats a plausible wrong guess:
     // the line is still worth copying, and what has to be filled in is unmissable.
-    const object = objectName === null || objectName.trim() === '' ? '<object>' : objectName.trim();
+    const object =
+        objectName === null || objectName.trim() === ""
+            ? "<object>"
+            : objectName.trim();
 
-    return `Set_Cinematic_Camera_Key(${object}, ${distance}, ${round(preset.pitch)}, `
-        + `${round(preset.yaw)}, 1, 0, 0, 0)`;
+    return (
+        `Set_Cinematic_Camera_Key(${object}, ${distance}, ${round(preset.pitch)}, ` +
+        `${round(preset.yaw)}, 1, 0, 0, 0)`
+    );
 }
 
 /** Two decimals at most: this is going into a script a person reads and edits. */
@@ -126,7 +138,7 @@ function round(value: number): number {
 
 /** A new preset's name: `Camera preset N`, N the first number no preset carries (any casing). */
 export function nextPresetName(presets: readonly CameraPreset[]): string {
-    const taken = new Set(presets.map(p => p.name.trim().toLowerCase()));
+    const taken = new Set(presets.map((p) => p.name.trim().toLowerCase()));
     for (let n = 1; ; n++) {
         const name = `Camera preset ${n}`;
         if (!taken.has(name.toLowerCase())) {
@@ -136,7 +148,13 @@ export function nextPresetName(presets: readonly CameraPreset[]): string {
 }
 
 /** The presets with one renamed, trimmed; an empty name keeps the old one. */
-export function renamePreset(presets: readonly CameraPreset[], id: string, name: string): CameraPreset[] {
+export function renamePreset(
+    presets: readonly CameraPreset[],
+    id: string,
+    name: string,
+): CameraPreset[] {
     const trimmed = name.trim();
-    return presets.map(p => p.id === id && trimmed ? {...p, name: trimmed} : p);
+    return presets.map((p) =>
+        p.id === id && trimmed ? { ...p, name: trimmed } : p,
+    );
 }

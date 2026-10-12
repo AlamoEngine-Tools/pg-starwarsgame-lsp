@@ -46,7 +46,7 @@ export function visibilityTracks(json: unknown): Map<string, VisibilityTrack> {
         const fps = track.fps;
         const bones = record(track.bones);
 
-        if (typeof name !== 'string' || typeof fps !== 'number' || !(fps > 0)) {
+        if (typeof name !== "string" || typeof fps !== "number" || !(fps > 0)) {
             continue;
         }
 
@@ -59,13 +59,13 @@ export function visibilityTracks(json: unknown): Map<string, VisibilityTrack> {
         // other. The id is the identity; the name is for reading.
         const byNode = new Map<string, string>();
         for (const [node, bits] of Object.entries(bones)) {
-            if (typeof bits === 'string' && bits.length > 0) {
+            if (typeof bits === "string" && bits.length > 0) {
                 byNode.set(node, bits);
             }
         }
 
         if (byNode.size > 0) {
-            tracks.set(name, {fps, bones: byNode});
+            tracks.set(name, { fps, bones: byNode });
         }
     }
 
@@ -84,13 +84,16 @@ export function hiddenAt(bits: string, fps: number, seconds: number): boolean {
         return false;
     }
 
-    const frame = Math.min(bits.length - 1, Math.max(0, Math.floor(seconds * fps)));
+    const frame = Math.min(
+        bits.length - 1,
+        Math.max(0, Math.floor(seconds * fps)),
+    );
 
-    return bits[frame] !== '1';
+    return bits[frame] !== "1";
 }
 
 function record(value: unknown): Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-        ? value as Record<string, unknown>
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
         : {};
 }

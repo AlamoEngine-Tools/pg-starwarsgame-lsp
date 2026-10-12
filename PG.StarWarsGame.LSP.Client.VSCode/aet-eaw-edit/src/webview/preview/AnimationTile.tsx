@@ -16,36 +16,41 @@
 // The shape, as they set it: the play state on the left, vertically centred across the card; the
 // name on the top row, left aligned; the takes on the bottom row, left aligned and filling right.
 
-import {Icon} from '../shared/Icon';
-import {type AnimationAction} from './animationNames';
+import { Icon } from "../shared/Icon";
+import { type AnimationAction } from "./animationNames";
 
-export function AnimationTile(
-    {action, playing, onPlay, onPick}: {
-        action: AnimationAction;
-        /** The clip playing right now, so the card that owns it reads as active. */
-        playing: string | null;
-        /** Play this action - the caller draws the take. */
-        onPlay: (action: AnimationAction) => void;
-        /** Play one named take, chosen by hand. */
-        onPick: (clip: string) => void;
-    },
-): React.JSX.Element {
-    const mine = action.takes.some(take => take.name === playing);
+export function AnimationTile({
+    action,
+    playing,
+    onPlay,
+    onPick,
+}: {
+    action: AnimationAction;
+    /** The clip playing right now, so the card that owns it reads as active. */
+    playing: string | null;
+    /** Play this action - the caller draws the take. */
+    onPlay: (action: AnimationAction) => void;
+    /** Play one named take, chosen by hand. */
+    onPick: (clip: string) => void;
+}): React.JSX.Element {
+    const mine = action.takes.some((take) => take.name === playing);
     const several = action.takes.length > 1;
 
     return (
-        <div className={'anim-card' + (mine ? ' active' : '')}>
+        <div className={"anim-card" + (mine ? " active" : "")}>
             <button
                 type="button"
                 className="anim-play"
                 aria-pressed={mine}
                 aria-label={action.label}
-                title={several
-                    ? `Play ${action.label} - a take at random each time round, as the game does`
-                    : `Play ${action.label}`}
+                title={
+                    several
+                        ? `Play ${action.label} - a take at random each time round, as the game does`
+                        : `Play ${action.label}`
+                }
                 onClick={() => onPlay(action)}
             >
-                <Icon name={mine ? 'pause' : 'play'} size={16}/>
+                <Icon name={mine ? "pause" : "play"} size={16} />
             </button>
 
             <span className="anim-card-body">
@@ -56,12 +61,14 @@ export function AnimationTile(
                     what the name above it already said. */}
                 {several && (
                     <span className="anim-takes">
-                        {action.takes.map(take => (
+                        {action.takes.map((take) => (
                             <button
                                 key={take.name}
                                 type="button"
-                                className={'anim-take'
-                                    + (playing === take.name ? ' active' : '')}
+                                className={
+                                    "anim-take" +
+                                    (playing === take.name ? " active" : "")
+                                }
                                 title={take.name}
                                 onClick={() => onPick(take.name)}
                             >

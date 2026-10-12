@@ -8,11 +8,11 @@
 // several megabytes of geometry across a dozen models plus its textures, and shipping that as one
 // message would stall the extension host and leave the panel blank until all of it arrived.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {LspGateway} from './lsp/lspGateway';
-import {subMeshGeometryReply} from './lsp/subMeshGeometry';
-import {ModelInspectorPanel} from './modelInspectorPanel';
+import { LspGateway } from "./lsp/lspGateway";
+import { subMeshGeometryReply } from "./lsp/subMeshGeometry";
+import { ModelInspectorPanel } from "./modelInspectorPanel";
 import {
     GetModelDetailResult,
     GetModelGlbResult,
@@ -22,19 +22,33 @@ import {
     GetProjectileResult,
     GetShaderSourceResult,
     PreviewSourceFile,
-} from './protocol/modelPreview';
-import {handoffFile, launchDetached} from './externalTool';
-import {revealDefinition} from './revealDefinition';
-import {type SubjectState, subjectStateFrom} from './webview/preview/subjectState';
-import {readViewerSettings, saveViewerSettings} from './viewerSettingsStorage';
-import {readProjectSettings, saveProjectSettings} from './projectSettingsStorage';
-import {panelKey, PanelRegistry, WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
+} from "./protocol/modelPreview";
+import { handoffFile, launchDetached } from "./externalTool";
+import { revealDefinition } from "./revealDefinition";
+import {
+    type SubjectState,
+    subjectStateFrom,
+} from "./webview/preview/subjectState";
+import {
+    readViewerSettings,
+    saveViewerSettings,
+} from "./viewerSettingsStorage";
+import {
+    readProjectSettings,
+    saveProjectSettings,
+} from "./projectSettingsStorage";
+import {
+    panelKey,
+    PanelRegistry,
+    WebviewMessage,
+    WebviewPanelHost,
+} from "./webviewPanelHost";
 
 /** What the preview is showing, and therefore what to ask the server for. */
 export type PreviewSubject =
-    | { kind: 'object'; objectId: string }
-    | { kind: 'model'; modelReference: string }
-    | { kind: 'animation'; animationReference: string };
+    | { kind: "object"; objectId: string }
+    | { kind: "model"; modelReference: string }
+    | { kind: "animation"; animationReference: string };
 
 /** External tools the preview can hand off to. */
 interface ExternalTool {
@@ -43,13 +57,13 @@ interface ExternalTool {
 }
 
 const ALO_VIEWER: ExternalTool = {
-    setting: 'aet-eaw-edit.tools.aloViewerExecutable',
-    label: 'AloViewer',
+    setting: "aet-eaw-edit.tools.aloViewerExecutable",
+    label: "AloViewer",
 };
 
 const PARTICLE_EDITOR: ExternalTool = {
-    setting: 'aet-eaw-edit.tools.particleEditorExecutable',
-    label: 'Particle Editor',
+    setting: "aet-eaw-edit.tools.particleEditorExecutable",
+    label: "Particle Editor",
 };
 
 /**
@@ -61,7 +75,7 @@ const PARTICLE_EDITOR: ExternalTool = {
  * the one the harness invented.
  */
 export const MODEL_PREVIEW_BODY_STYLE =
-    'html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }';
+    "html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }";
 
 /**
  * The energy toggle, off by default.
@@ -70,10 +84,10 @@ export const MODEL_PREVIEW_BODY_STYLE =
  * no interface for it - so a modder has to turn it on deliberately, having read what the setting
  * says, rather than finding a pool in the preview that no player will ever see.
  */
-const ENERGY_SETTING = 'aet-eaw-edit.features.preview.energyPool';
+const ENERGY_SETTING = "aet-eaw-edit.features.preview.energyPool";
 
 export class ModelPreviewPanel extends WebviewPanelHost {
-    static readonly viewType = 'aetModelPreview';
+    static readonly viewType = "aetModelPreview";
     private static readonly panels = new PanelRegistry<ModelPreviewPanel>();
     /**
      * Every open preview, for the refresh push.
@@ -122,19 +136,23 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         title: string,
         adopt?: vscode.WebviewPanel,
     ) {
-        super(extensionUri, {
-            viewType: ModelPreviewPanel.viewType,
-            title,
-            column: vscode.ViewColumn.Active,
-            script: 'modelPreview.js',
-            // #root needs the height too, not just html and body. The shell is `height: 100%`, which
-            // resolves against #root - and a plain div is auto-height, so without this the whole
-            // preview collapses to its content and sits squashed against the top of the tab with the
-            // viewport a few pixels tall.
-            bodyStyle: MODEL_PREVIEW_BODY_STYLE,
-            // three.js hands decoded texture pixels to the GPU through a blob URL.
-            allowBlobImages: true,
-        }, adopt);
+        super(
+            extensionUri,
+            {
+                viewType: ModelPreviewPanel.viewType,
+                title,
+                column: vscode.ViewColumn.Active,
+                script: "modelPreview.js",
+                // #root needs the height too, not just html and body. The shell is `height: 100%`, which
+                // resolves against #root - and a plain div is auto-height, so without this the whole
+                // preview collapses to its content and sits squashed against the top of the tab with the
+                // viewport a few pixels tall.
+                bodyStyle: MODEL_PREVIEW_BODY_STYLE,
+                // three.js hands decoded texture pixels to the GPU through a blob URL.
+                allowBlobImages: true,
+            },
+            adopt,
+        );
 
         this.subject = subject;
 
@@ -144,7 +162,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         // The energy toggle, pushed again whenever it changes. Only the extension host can read
         // configuration, so the webview cannot ask - and a reader who turns energy on wants to see
         // it in the preview they already have open, not after a reload.
-        const watch = vscode.workspace.onDidChangeConfiguration(event => {
+        const watch = vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration(ENERGY_SETTING)) {
                 this.sendPreviewFeatures();
             }
@@ -164,7 +182,10 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * second tab for the same file, so tracking it would only risk disposing a panel twice.
      */
     static adopt(
-        extensionUri: vscode.Uri, lsp: LspGateway, subject: PreviewSubject, title: string,
+        extensionUri: vscode.Uri,
+        lsp: LspGateway,
+        subject: PreviewSubject,
+        title: string,
         panel: vscode.WebviewPanel,
     ): ModelPreviewPanel {
         return new ModelPreviewPanel(extensionUri, lsp, subject, title, panel);
@@ -172,7 +193,10 @@ export class ModelPreviewPanel extends WebviewPanelHost {
 
     /** Opens, or reveals and retargets, the preview for one subject. */
     static show(
-        extensionUri: vscode.Uri, lsp: LspGateway, subject: PreviewSubject, title: string,
+        extensionUri: vscode.Uri,
+        lsp: LspGateway,
+        subject: PreviewSubject,
+        title: string,
     ): ModelPreviewPanel {
         // One panel per subject: opening the same model twice should not give two GPU contexts, and
         // two panels for one thing is a way to run out of them.
@@ -206,17 +230,19 @@ export class ModelPreviewPanel extends WebviewPanelHost {
 
     protected async onMessage(message: WebviewMessage): Promise<void> {
         switch (message.type) {
-            case 'ready':
+            case "ready":
                 // The room first, so the viewport is set up the way the reader left it before any
                 // geometry lands - otherwise the grid and the lights visibly snap a frame later.
                 this.post({
-                    type: 'viewerSettings',
+                    type: "viewerSettings",
                     settings: readViewerSettings(),
                     // Beside the room rather than inside it: the two are at different TIERS -
                     // the room follows the person, these follow the project. See
                     // `projectSettingsStorage`.
                     project: readProjectSettings(),
-                    subject: ModelPreviewPanel.subjectStates.get(this.stateKey) ?? null,
+                    subject:
+                        ModelPreviewPanel.subjectStates.get(this.stateKey) ??
+                        null,
                 });
 
                 this.sendPreviewFeatures();
@@ -230,85 +256,95 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 await this.sendScene();
                 return;
 
-            case 'setViewerSettings':
+            case "setViewerSettings":
                 saveViewerSettings(message.settings);
                 return;
 
-            case 'setProjectSettings':
+            case "setProjectSettings":
                 saveProjectSettings(message.project);
                 return;
 
-            case 'setSubjectState':
+            case "setSubjectState":
                 // Session-scoped and NOT persisted: a model's damage state, detail level and hidden
                 // meshes describe that model, and restoring them across a restart would fight the
                 // opening rules - a fresh preview must open undamaged, at full detail, and quiet.
                 ModelPreviewPanel.subjectStates.set(
-                    this.stateKey, subjectStateFrom(message.state));
+                    this.stateKey,
+                    subjectStateFrom(message.state),
+                );
                 return;
 
-            case 'saveCapture':
+            case "saveCapture":
                 await this.saveCapture(message);
                 return;
 
-            case 'requestGlb':
+            case "requestGlb":
                 await this.sendGlb(message);
                 return;
 
-            case 'requestModelDetail':
-                await this.sendModelDetail(String(message.modelReference ?? ''));
+            case "requestModelDetail":
+                await this.sendModelDetail(
+                    String(message.modelReference ?? ""),
+                );
                 return;
 
-            case 'requestSubMeshGeometry':
+            case "requestSubMeshGeometry":
                 this.post(await subMeshGeometryReply(this.lsp, message));
                 return;
 
-            case 'openInspector':
+            case "openInspector":
                 this.openInspector(message.subject);
                 return;
 
-            case 'updateInspector':
+            case "updateInspector":
                 // Retargets a tab that is open and does nothing if none is. The preview sends this
                 // whenever the row's facts change, so it must NOT be able to open one - a reader
                 // who closed the tab would have it spring back the next time they ticked a box.
                 ModelInspectorPanel.update(message.subject);
                 return;
 
-            case 'requestTexture':
-                await this.sendTexture(String(message.name ?? ''));
+            case "requestTexture":
+                await this.sendTexture(String(message.name ?? ""));
                 return;
 
-            case 'requestParticleSystem':
-                await this.sendParticleSystem(String(message.name ?? ''));
+            case "requestParticleSystem":
+                await this.sendParticleSystem(String(message.name ?? ""));
                 return;
 
-            case 'requestShader':
-                await this.sendShader(String(message.name ?? ''));
+            case "requestShader":
+                await this.sendShader(String(message.name ?? ""));
                 return;
 
-            case 'requestProjectile':
-                await this.sendProjectile(String(message.name ?? ''));
+            case "requestProjectile":
+                await this.sendProjectile(String(message.name ?? ""));
                 return;
 
-            case 'obtainShaders':
+            case "obtainShaders":
                 // The setup flow already exists as a command; this only makes it reachable from the
                 // place the reader finds out they need it, instead of the command palette alone.
-                await vscode.commands.executeCommand('aet-eaw-edit.shaders.obtain');
+                await vscode.commands.executeCommand(
+                    "aet-eaw-edit.shaders.obtain",
+                );
                 return;
 
-            case 'revealDefinition':
+            case "revealDefinition":
                 // A row in the panel holds a name and the type it should be - an ability's
                 // GUI_Activated_Ability_Name, say - and nothing else. There is no document behind
                 // it to run textDocument/definition against, because the server assembled the row
                 // out of several files.
                 await revealDefinition(
                     this.lsp,
-                    String(message.value ?? ''),
-                    typeof message.referenceType === 'string' ? message.referenceType : undefined);
+                    String(message.value ?? ""),
+                    typeof message.referenceType === "string"
+                        ? message.referenceType
+                        : undefined,
+                );
                 return;
 
-            case 'openExternal':
+            case "openExternal":
                 await this.openExternal(
-                    message.tool === 'particles' ? PARTICLE_EDITOR : ALO_VIEWER);
+                    message.tool === "particles" ? PARTICLE_EDITOR : ALO_VIEWER,
+                );
                 return;
 
             default:
@@ -325,10 +361,12 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      */
     private sendPreviewFeatures(): void {
         this.post({
-            type: 'previewFeatures',
+            type: "previewFeatures",
             features: {
-                energyPool: vscode.workspace.getConfiguration()
-                    .get<boolean>(ENERGY_SETTING) === true,
+                energyPool:
+                    vscode.workspace
+                        .getConfiguration()
+                        .get<boolean>(ENERGY_SETTING) === true,
             },
         });
     }
@@ -341,17 +379,21 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * So the picture is made where the GPU is and written where the API is.
      */
     private async saveCapture(message: WebviewMessage): Promise<void> {
-        const dataUrl = String(message.dataUrl ?? '');
-        const comma = dataUrl.indexOf(',');
+        const dataUrl = String(message.dataUrl ?? "");
+        const comma = dataUrl.indexOf(",");
 
-        if (!dataUrl.startsWith('data:image/png;base64,') || comma < 0) {
-            void vscode.window.showErrorMessage('The preview produced no image to save.');
+        if (!dataUrl.startsWith("data:image/png;base64,") || comma < 0) {
+            void vscode.window.showErrorMessage(
+                "The preview produced no image to save.",
+            );
             return;
         }
 
         const target = await vscode.window.showSaveDialog({
-            defaultUri: vscode.Uri.file(String(message.fileName ?? 'capture.png')),
-            filters: {Images: ['png']},
+            defaultUri: vscode.Uri.file(
+                String(message.fileName ?? "capture.png"),
+            ),
+            filters: { Images: ["png"] },
         });
 
         if (target === undefined) {
@@ -359,16 +401,20 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         }
 
         await vscode.workspace.fs.writeFile(
-            target, Buffer.from(dataUrl.slice(comma + 1), 'base64'));
+            target,
+            Buffer.from(dataUrl.slice(comma + 1), "base64"),
+        );
 
         // Said out loud, and with a way to act on it: a file written somewhere the reader chose but
         // cannot see is a file they will look for in the wrong place.
-        const open = 'Open';
+        const open = "Open";
         const chosen = await vscode.window.showInformationMessage(
-            `Saved ${target.path.split('/').pop() ?? 'the capture'}.`, open);
+            `Saved ${target.path.split("/").pop() ?? "the capture"}.`,
+            open,
+        );
 
         if (chosen === open) {
-            await vscode.commands.executeCommand('vscode.open', target);
+            await vscode.commands.executeCommand("vscode.open", target);
         }
     }
 
@@ -381,10 +427,16 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      */
     private openInspector(subject: unknown): void {
         const alreadyOpen = ModelInspectorPanel.isOpen;
-        const inspector = ModelInspectorPanel.show(this.extensionUri, this.lsp, subject);
+        const inspector = ModelInspectorPanel.show(
+            this.extensionUri,
+            this.lsp,
+            subject,
+        );
 
         if (!alreadyOpen) {
-            inspector.onDidDispose(() => this.post({type: 'inspectorClosed'}));
+            inspector.onDidDispose(() =>
+                this.post({ type: "inspectorClosed" }),
+            );
         }
     }
 
@@ -392,7 +444,9 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         this.requestedTextures.clear();
 
         const result = await this.lsp.request<GetPreviewSceneResult>(
-            'aet/getPreviewScene', requestFor(this.subject));
+            "aet/getPreviewScene",
+            requestFor(this.subject),
+        );
 
         if (!result.ok) {
             // Said out loud on an open, because the panel would otherwise sit empty with no reason
@@ -400,7 +454,8 @@ export class ModelPreviewPanel extends WebviewPanelHost {
             // failed background re-read is not worth a modal over the top of it.
             if (!refresh) {
                 void vscode.window.showErrorMessage(
-                    `EaWEdit: Could not build the preview scene. ${result.message}`);
+                    `EaWEdit: Could not build the preview scene. ${result.message}`,
+                );
             }
             return;
         }
@@ -427,18 +482,19 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         // time the file was saved.
         if (refresh) {
             this.post({
-                type: 'viewerSettings',
+                type: "viewerSettings",
                 settings: readViewerSettings(),
                 project: readProjectSettings(),
-                subject: ModelPreviewPanel.subjectStates.get(this.stateKey) ?? null,
+                subject:
+                    ModelPreviewPanel.subjectStates.get(this.stateKey) ?? null,
             });
         }
 
-        this.post({type: 'scene', scene: result.value.scene, refresh});
+        this.post({ type: "scene", scene: result.value.scene, refresh });
     }
 
     private async sendGlb(message: WebviewMessage): Promise<void> {
-        const modelReference = String(message.modelReference ?? '');
+        const modelReference = String(message.modelReference ?? "");
 
         // A PASSIVE subject names its own clips on the request: a death clone and a piece of
         // wreckage are their own models, and the scene's list describes the one that was opened.
@@ -449,28 +505,33 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         // asked for a GLB with no animation at all, and a death clone with no clip plays no death.
         // Before this field existed the scene's list was sent for everything and happened to carry
         // the clone's clip, so narrowing it without this guard was strictly worse.
-        const own = Array.isArray(message.animations) && message.animations.length > 0
-            ? message.animations.map(name => String(name))
-            : null;
+        const own =
+            Array.isArray(message.animations) && message.animations.length > 0
+                ? message.animations.map((name) => String(name))
+                : null;
 
-        const result = await this.lsp.request<GetModelGlbResult>('aet/getModelGlb', {
-            modelReference,
-            // An animation subject asks for its own clip. Anything else asks for every clip the
-            // scene found for it - the picker needs them all, and the opening rules already say
-            // none of them plays until the reader chooses one.
-            animations: this.subject.kind === 'animation'
-                ? [this.subject.animationReference]
-                : own ?? this.sceneAnimations,
-        });
+        const result = await this.lsp.request<GetModelGlbResult>(
+            "aet/getModelGlb",
+            {
+                modelReference,
+                // An animation subject asks for its own clip. Anything else asks for every clip the
+                // scene found for it - the picker needs them all, and the opening rules already say
+                // none of them plays until the reader chooses one.
+                animations:
+                    this.subject.kind === "animation"
+                        ? [this.subject.animationReference]
+                        : (own ?? this.sceneAnimations),
+            },
+        );
 
         this.post({
-            type: 'glb',
+            type: "glb",
             partId: message.partId,
             attachToPartId: message.attachToPartId,
             attachBone: message.attachBone,
             result: result.ok
                 ? result.value
-                : {glb: null, animations: [], error: result.message},
+                : { glb: null, animations: [], error: result.message },
         });
     }
 
@@ -482,23 +543,31 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      */
     private async sendModelDetail(modelReference: string): Promise<void> {
         const result = await this.lsp.request<GetModelDetailResult>(
-            'aet/getModelDetail', {modelReference});
+            "aet/getModelDetail",
+            { modelReference },
+        );
 
         this.post({
-            type: 'modelDetail',
+            type: "modelDetail",
             modelReference,
-            result: result.ok ? result.value : {detail: null, error: result.message},
+            result: result.ok
+                ? result.value
+                : { detail: null, error: result.message },
         });
     }
 
     private async sendParticleSystem(name: string): Promise<void> {
         const result = await this.lsp.request<GetParticleSystemResult>(
-            'aet/getParticleSystem', {name});
+            "aet/getParticleSystem",
+            { name },
+        );
 
         this.post({
-            type: 'particleSystem',
+            type: "particleSystem",
             name,
-            result: result.ok ? result.value : {system: null, error: result.message},
+            result: result.ok
+                ? result.value
+                : { system: null, error: result.message },
         });
     }
 
@@ -510,44 +579,56 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      */
     private async sendProjectile(name: string): Promise<void> {
         const result = await this.lsp.request<GetProjectileResult>(
-            'aet/getProjectile', {name});
+            "aet/getProjectile",
+            { name },
+        );
 
         this.post({
-            type: 'projectile',
+            type: "projectile",
             name,
-            result: result.ok ? result.value : {projectile: null, error: result.message},
+            result: result.ok
+                ? result.value
+                : { projectile: null, error: result.message },
         });
     }
 
     private async sendShader(name: string): Promise<void> {
         const result = await this.lsp.request<GetShaderSourceResult>(
-            'aet/getShaderSource', {name});
+            "aet/getShaderSource",
+            { name },
+        );
 
         this.post({
-            type: 'shader',
+            type: "shader",
             name,
             result: result.ok
                 ? result.value
-                : {source: null, hasManagedShaders: false, error: result.message},
+                : {
+                      source: null,
+                      hasManagedShaders: false,
+                      error: result.message,
+                  },
         });
     }
 
     private async sendTexture(name: string): Promise<void> {
-        if (name === '' || this.requestedTextures.has(name.toLowerCase())) {
+        if (name === "" || this.requestedTextures.has(name.toLowerCase())) {
             return;
         }
 
         this.requestedTextures.add(name.toLowerCase());
 
         const result = await this.lsp.request<GetModelTextureResult>(
-            'aet/getModelTexture', {name});
+            "aet/getModelTexture",
+            { name },
+        );
 
         this.post({
-            type: 'texture',
+            type: "texture",
             name,
             result: result.ok
                 ? result.value
-                : {format: null, data: null, error: result.message},
+                : { format: null, data: null, error: result.message },
         });
     }
 
@@ -559,32 +640,47 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * extension does not search for an install.
      */
     private async openExternal(tool: ExternalTool): Promise<void> {
-        const executable = vscode.workspace.getConfiguration().get<string>(tool.setting)?.trim();
+        const executable = vscode.workspace
+            .getConfiguration()
+            .get<string>(tool.setting)
+            ?.trim();
 
-        if (executable === undefined || executable === '') {
+        if (executable === undefined || executable === "") {
             const choice = await vscode.window.showWarningMessage(
-                `EaWEdit: No path is configured for ${tool.label}.`, 'Open settings');
+                `EaWEdit: No path is configured for ${tool.label}.`,
+                "Open settings",
+            );
 
-            if (choice === 'Open settings') {
+            if (choice === "Open settings") {
                 await vscode.commands.executeCommand(
-                    'workbench.action.openSettings', tool.setting);
+                    "workbench.action.openSettings",
+                    tool.setting,
+                );
             }
             return;
         }
 
         // The webview disables the button when there is no file, so this is the stale-scene case:
         // pressed in the moment between a refresh and the next scene.
-        const file = handoffFile(subjectFile(this.subject), this.sceneSourceFile);
+        const file = handoffFile(
+            subjectFile(this.subject),
+            this.sceneSourceFile,
+        );
         if (file === null) {
-            void vscode.window.showWarningMessage(`EaWEdit: No file to open in ${tool.label}`);
+            void vscode.window.showWarningMessage(
+                `EaWEdit: No file to open in ${tool.label}`,
+            );
             return;
         }
 
         try {
             await launchDetached(executable, file);
         } catch (error) {
-            const reason = error instanceof Error ? error.message : String(error);
-            void vscode.window.showErrorMessage(`EaWEdit: Could not start ${tool.label} - ${reason}`);
+            const reason =
+                error instanceof Error ? error.message : String(error);
+            void vscode.window.showErrorMessage(
+                `EaWEdit: Could not start ${tool.label} - ${reason}`,
+            );
         }
     }
 }
@@ -592,9 +688,9 @@ export class ModelPreviewPanel extends WebviewPanelHost {
 /** Identifies a panel, so the same subject reveals rather than opening a second one. */
 function subjectKey(subject: PreviewSubject): string {
     switch (subject.kind) {
-        case 'object':
+        case "object":
             return `object:${subject.objectId}`;
-        case 'model':
+        case "model":
             return `model:${subject.modelReference}`;
         default:
             return `animation:${subject.animationReference}`;
@@ -604,21 +700,21 @@ function subjectKey(subject: PreviewSubject): string {
 /** The request body for a subject. */
 function requestFor(subject: PreviewSubject): Record<string, string> {
     switch (subject.kind) {
-        case 'object':
-            return {objectId: subject.objectId};
-        case 'model':
-            return {modelReference: subject.modelReference};
+        case "object":
+            return { objectId: subject.objectId };
+        case "model":
+            return { modelReference: subject.modelReference };
         default:
-            return {animationReference: subject.animationReference};
+            return { animationReference: subject.animationReference };
     }
 }
 
 /** The file a subject came from, or null when it came from XML rather than a file. */
 function subjectFile(subject: PreviewSubject): string | null {
     switch (subject.kind) {
-        case 'model':
+        case "model":
             return uriToPath(subject.modelReference);
-        case 'animation':
+        case "animation":
             return uriToPath(subject.animationReference);
         default:
             return null;
@@ -626,7 +722,7 @@ function subjectFile(subject: PreviewSubject): string | null {
 }
 
 function uriToPath(reference: string): string | null {
-    if (!reference.startsWith('file://')) {
+    if (!reference.startsWith("file://")) {
         // A bare model name is not a path. The file the scene resolved it to stands in for it.
         return null;
     }

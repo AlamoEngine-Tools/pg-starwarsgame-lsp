@@ -33,7 +33,7 @@
 // the rule that decided it.
 
 /** The reader's word on one row. Absent means they have not said anything about it. */
-export type RowOverride = 'shown' | 'hidden';
+export type RowOverride = "shown" | "hidden";
 
 /** A global switch a row answers to, such as the effects or hardpoint master. */
 export interface MasterToggle {
@@ -105,7 +105,7 @@ export interface RowFacts {
  * times.
  */
 export type VisibilityLink =
-    'master' | 'ancestor' | 'you' | 'animation' | 'level' | 'idle' | 'file';
+    "master" | "ancestor" | "you" | "animation" | "level" | "idle" | "file";
 
 /** Whether the row is drawn, and the rule that settled it. */
 export interface Resolution {
@@ -143,46 +143,65 @@ export function resolveRow(facts: RowFacts): Resolution {
     // it. Deriving it instead ("gated or not in the file") would miss the animation, which speaks
     // for the model too.
     const authored = decide(
-        {...facts, ancestorHidden: facts.ancestorHiddenAuthored}, undefined);
+        { ...facts, ancestorHidden: facts.ancestorHiddenAuthored },
+        undefined,
+    );
 
-    return {...decided, authored: authored.visible};
+    return { ...decided, authored: authored.visible };
 }
 
 /** The chain itself, for one reading of what the reader has said. */
 function decide(
-    facts: Omit<RowFacts, 'ancestorHiddenAuthored'>, override: RowOverride | undefined,
-): Omit<Resolution, 'authored'> {
+    facts: Omit<RowFacts, "ancestorHiddenAuthored">,
+    override: RowOverride | undefined,
+): Omit<Resolution, "authored"> {
     // Vetoes first, widest first. A master switch beats an ancestor because it is the broader
     // statement: "no effects at all" outranks "not this limb".
     for (const master of facts.masters) {
         if (!master.on) {
-            return {visible: false, decidedBy: 'master', because: `master:${master.id}`};
+            return {
+                visible: false,
+                decidedBy: "master",
+                because: `master:${master.id}`,
+            };
         }
     }
 
     if (facts.ancestorHidden !== undefined) {
-        return {visible: false, decidedBy: 'ancestor', because: `ancestor:${facts.ancestorHidden}`};
+        return {
+            visible: false,
+            decidedBy: "ancestor",
+            because: `ancestor:${facts.ancestorHidden}`,
+        };
     }
 
     if (override !== undefined) {
-        return {visible: override === 'shown', decidedBy: 'you', because: 'you'};
+        return {
+            visible: override === "shown",
+            decidedBy: "you",
+            because: "you",
+        };
     }
 
     if (facts.animated !== undefined) {
-        return {visible: facts.animated, decidedBy: 'animation', because: 'animation'};
+        return {
+            visible: facts.animated,
+            decidedBy: "animation",
+            because: "animation",
+        };
     }
 
     if (facts.gated) {
-        return {visible: false, decidedBy: 'level', because: 'level'};
+        return { visible: false, decidedBy: "level", because: "level" };
     }
 
     // Below the level gate on purpose: a mesh tagged for another damage or detail state is not part
     // of this one whatever the idle clip has to say about it.
     if (facts.resting !== undefined) {
-        return {visible: facts.resting, decidedBy: 'idle', because: 'idle'};
+        return { visible: facts.resting, decidedBy: "idle", because: "idle" };
     }
 
-    return {visible: facts.inFile, decidedBy: 'file', because: 'file'};
+    return { visible: facts.inFile, decidedBy: "file", because: "file" };
 }
 
 /**
@@ -206,8 +225,10 @@ export function restingClip(clips: readonly string[]): string | undefined {
     // they just lose to a plain idle whenever the model ships one.
     const sorted = [...clips].sort();
 
-    return sorted.find(clip => /(^|[^a-z])idle/i.test(clip))
-        ?? sorted.find(clip => clip.toLowerCase().includes('idle'));
+    return (
+        sorted.find((clip) => /(^|[^a-z])idle/i.test(clip)) ??
+        sorted.find((clip) => clip.toLowerCase().includes("idle"))
+    );
 }
 
 /**
@@ -226,7 +247,10 @@ export function restingClip(clips: readonly string[]): string | undefined {
 export function deathClip(clips: readonly string[]): string | undefined {
     const sorted = [...clips].sort();
 
-    return sorted.find(clip => /(^|[^a-z])die([^a-z]|$)/i.test(clip)) ?? sorted[0];
+    return (
+        sorted.find((clip) => /(^|[^a-z])die([^a-z]|$)/i.test(clip)) ??
+        sorted[0]
+    );
 }
 
 /** One row's override changing, where null means "give it back to the model". */
@@ -250,7 +274,10 @@ export interface OverrideChange {
  * off and is exactly the row worth ticking, so clearing it would leave it invisible.
  */
 export function toggleRow(
-    rowId: string, descendantIds: readonly string[], effective: boolean, authored: boolean,
+    rowId: string,
+    descendantIds: readonly string[],
+    effective: boolean,
+    authored: boolean,
 ): OverrideChange[] {
     // From what the reader can SEE, never from a stored flag. The old tree computed the next state
     // from a value it was not the one writing, which is why the tick stuck.
@@ -271,7 +298,10 @@ export function toggleRow(
  * while Show hid them.
  */
 export function setRow(
-    rowId: string, descendantIds: readonly string[], visible: boolean, authored: boolean,
+    rowId: string,
+    descendantIds: readonly string[],
+    visible: boolean,
+    authored: boolean,
 ): OverrideChange[] {
     // Stored only where it DISAGREES with the model - `authored` is what this row would do if the
     // reader had never touched it. Asking for what the model already does is not a statement, it is
@@ -283,16 +313,16 @@ export function setRow(
     // takes nothing away: a shadow volume is gated off, so asking for it genuinely disagrees and is
     // stored, which is the row worth ticking in the first place.
     const override: RowOverride | null =
-        visible === authored ? null : visible ? 'shown' : 'hidden';
+        visible === authored ? null : visible ? "shown" : "hidden";
 
     return [
-        {row: rowId, override},
+        { row: rowId, override },
         // The subtree is unchanged: hiding an arm hides the hand explicitly, and showing it clears
         // them so each child goes back to whatever the chain says. Only the CLICKED row is the
         // reader making a statement about one thing.
-        ...descendantIds.map(row => ({
+        ...descendantIds.map((row) => ({
             row,
-            override: visible ? null : 'hidden' as const,
+            override: visible ? null : ("hidden" as const),
         })),
     ];
 }
@@ -321,12 +351,12 @@ export function clearedForPlayback(): Map<string, RowOverride> {
  * ticks. The chain names the link that decided; this puts it in words.
  */
 export function becauseText(because: string): string {
-    if (because.startsWith('master:')) {
-        return `Hidden by the ${because.slice('master:'.length)} switch`;
+    if (because.startsWith("master:")) {
+        return `Hidden by the ${because.slice("master:".length)} switch`;
     }
 
-    if (because.startsWith('ancestor:')) {
-        return `Hidden with ${because.slice('ancestor:'.length)}, above it`;
+    if (because.startsWith("ancestor:")) {
+        return `Hidden with ${because.slice("ancestor:".length)}, above it`;
     }
 
     // One clause each. These are read standing over a row in a tree that can be a hundred deep,
@@ -336,16 +366,16 @@ export function becauseText(because: string): string {
     // this is the model's own idle clip running and its visibility track deciding the row, which is
     // why it reads as a sibling of `animation` rather than as a pose.
     switch (because) {
-        case 'you':
-            return 'Set by hand';
-        case 'idle':
-            return 'Set by the idle animation';
-        case 'animation':
-            return 'Set by the animation playing';
-        case 'level':
-            return 'Not in this damage or detail level';
+        case "you":
+            return "Set by hand";
+        case "idle":
+            return "Set by the idle animation";
+        case "animation":
+            return "Set by the animation playing";
+        case "level":
+            return "Not in this damage or detail level";
         default:
-            return 'As the model draws it';
+            return "As the model draws it";
     }
 }
 
@@ -384,8 +414,9 @@ export function becauseText(because: string): string {
  * reason the ancestor is hidden.
  */
 export function effectFacts(facts: RowFacts): RowFacts {
-    const readerHidIt = facts.ancestorHidden !== undefined
-        && facts.ancestorHiddenAuthored === undefined;
+    const readerHidIt =
+        facts.ancestorHidden !== undefined &&
+        facts.ancestorHiddenAuthored === undefined;
 
     return {
         ...facts,
@@ -412,11 +443,11 @@ export function effectFacts(facts: RowFacts): RowFacts {
  * which made a row's tooltip blame the level for a damage decision.
  */
 export function damageMeshFacts(facts: RowFacts, shown: boolean): RowFacts {
-    return {...facts, inFile: shown};
+    return { ...facts, inFile: shown };
 }
 
 export function subtreeFacts(facts: RowFacts): RowFacts {
     // `resting` stays: it comes from a clip's track, which names a BONE, so it is a statement about
     // the whole subtree in the same way a playing clip's is.
-    return {...facts, inFile: true, gated: false};
+    return { ...facts, inFile: true, gated: false };
 }

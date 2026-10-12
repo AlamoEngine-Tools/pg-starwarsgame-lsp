@@ -27,26 +27,32 @@ export interface LightBearing {
  * a light at 0 stands where the reader stands when they press Front.
  */
 const POINTS = [
-    'the front', 'the front right', 'the right', 'the back right',
-    'behind', 'the back left', 'the left', 'the front left',
+    "the front",
+    "the front right",
+    "the right",
+    "the back right",
+    "behind",
+    "the back left",
+    "the left",
+    "the front left",
 ];
 
 /** Height bands, from the horizon up. Anything below it is under the floor. */
 function heightWord(elevation: number): string {
     if (elevation < 0) {
-        return 'below';
+        return "below";
     }
 
     if (elevation === 0) {
-        return 'level';
+        return "level";
     }
 
     if (elevation < 25) {
         // The band that makes panel lines and hardpoint edges read, and the one worth naming.
-        return 'raking';
+        return "raking";
     }
 
-    return elevation < 65 ? 'above' : 'overhead';
+    return elevation < 65 ? "above" : "overhead";
 }
 
 /**
@@ -55,7 +61,10 @@ function heightWord(elevation: number): string {
  * Rounds to the nearest of eight points rather than reporting the angle again: the slider steps in
  * fives, and a readout that changed wording on every step would be noise rather than orientation.
  */
-export function lightBearing(azimuthDegrees: number, elevationDegrees: number): LightBearing {
+export function lightBearing(
+    azimuthDegrees: number,
+    elevationDegrees: number,
+): LightBearing {
     const wrapped = ((azimuthDegrees % 360) + 360) % 360;
     const point = Math.round(wrapped / 45) % POINTS.length;
 

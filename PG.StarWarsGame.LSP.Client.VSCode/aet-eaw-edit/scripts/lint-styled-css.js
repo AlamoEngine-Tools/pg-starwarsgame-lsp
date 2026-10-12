@@ -51,7 +51,7 @@ function definedTokens() {
     for (const m of text.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)) {
         names.add(m[1]);
     }
-    for (const m of text.matchAll(/name:\s*'(--[a-z0-9-]+)'/g)) {
+    for (const m of text.matchAll(/name:\s*["'](--[a-z0-9-]+)["']/g)) {
         names.add(m[1]);
     }
 

@@ -7,29 +7,34 @@
 // no meaning the user can see, which is also why the grid can be sorted freely and why adding an
 // entry never asks where to put it.
 
-import {useCallback, useEffect, useMemo, useState} from 'react';
-import {createRoot} from 'react-dom/client';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createRoot } from "react-dom/client";
 
-import {BaselineSuggestion, suggestBaselineKeys} from './baselineSuggestions';
-import {CellInput, menuAction, RowMenuFrame} from './loc/LocCells';
-import {gridFooterLabel} from './loc/gridFooter';
-import {ConvertibleFormat, LocDockActions} from './loc/LocDockActions';
-import {languageCopyValues} from './loc/languageCopy';
-import {languageFillValues} from './loc/languageFill';
-import {LocColumnMenu} from './loc/LocColumnMenu';
-import {LocDockHeader} from './loc/LocDockHeader';
-import {useLocColumns} from './loc/useLocColumns';
-import {LocGridMessage, LocGridShell} from './loc/LocGridShell';
-import {LocSearch} from './loc/LocSearch';
-import {LocProblemsBar} from './loc/LocProblemsBar';
-import {LocRow} from './loc/locRow';
-import {rowSeverityClass, severityByRow} from './loc/rowSeverity';
-import {FILTER_DEBOUNCE_MS, useDebounced} from './loc/useDebounced';
-import {LocPanelMessage, LocProblem, post, useLocPanel} from './loc/useLocPanel';
-import {DIALOG_IDS} from './shared/dialogGeometryStore';
-import {ResizeHandles} from './shared/ResizeHandles';
-import {useMovableDialog} from './shared/useMovableDialog';
-import {buildRowFilter, FilterMode} from './locFilter';
+import { BaselineSuggestion, suggestBaselineKeys } from "./baselineSuggestions";
+import { CellInput, menuAction, RowMenuFrame } from "./loc/LocCells";
+import { gridFooterLabel } from "./loc/gridFooter";
+import { ConvertibleFormat, LocDockActions } from "./loc/LocDockActions";
+import { languageCopyValues } from "./loc/languageCopy";
+import { languageFillValues } from "./loc/languageFill";
+import { LocColumnMenu } from "./loc/LocColumnMenu";
+import { LocDockHeader } from "./loc/LocDockHeader";
+import { useLocColumns } from "./loc/useLocColumns";
+import { LocGridMessage, LocGridShell } from "./loc/LocGridShell";
+import { LocSearch } from "./loc/LocSearch";
+import { LocProblemsBar } from "./loc/LocProblemsBar";
+import { LocRow } from "./loc/locRow";
+import { rowSeverityClass, severityByRow } from "./loc/rowSeverity";
+import { FILTER_DEBOUNCE_MS, useDebounced } from "./loc/useDebounced";
+import {
+    LocPanelMessage,
+    LocProblem,
+    post,
+    useLocPanel,
+} from "./loc/useLocPanel";
+import { DIALOG_IDS } from "./shared/dialogGeometryStore";
+import { ResizeHandles } from "./shared/ResizeHandles";
+import { useMovableDialog } from "./shared/useMovableDialog";
+import { buildRowFilter, FilterMode } from "./locFilter";
 import {
     BaselineEntryDto,
     BaselineRow,
@@ -37,19 +42,34 @@ import {
     findInheritedKeys,
     hideInherited,
     toBaselineRows,
-} from './translationInherited';
-import {blankDraft, draftToCommandValues, NewRowDraft, normaliseKey, validateNewKey,} from './translationNewRow';
-import {applyStaged, coalesce, TranslationCommand} from './translationStaging';
-import {countDuplicateKeys, nextSort, sortRows, SortState} from './translationView';
-import {Button} from './shared/Button';
-import {Field} from './shared/Field';
+} from "./translationInherited";
+import {
+    blankDraft,
+    draftToCommandValues,
+    NewRowDraft,
+    normaliseKey,
+    validateNewKey,
+} from "./translationNewRow";
+import {
+    applyStaged,
+    coalesce,
+    TranslationCommand,
+} from "./translationStaging";
+import {
+    countDuplicateKeys,
+    nextSort,
+    sortRows,
+    SortState,
+} from "./translationView";
+import { Button } from "./shared/Button";
+import { Field } from "./shared/Field";
 
 function App(): React.JSX.Element {
-    const [filter, setFilter] = useState('');
+    const [filter, setFilter] = useState("");
     // What the box shows is immediate; what the grid applies waits for typing to settle.
     const appliedFilter = useDebounced(filter, FILTER_DEBOUNCE_MS);
-    const [mode, setMode] = useState<FilterMode>('text');
-    const [scope, setScope] = useState('all');
+    const [mode, setMode] = useState<FilterMode>("text");
+    const [scope, setScope] = useState("all");
     // View order only. Null is the order the file has on disk.
     const [sort, setSort] = useState<SortState | null>(null);
     // What the layers below this file already say. Entries merely repeating it are hidden by
@@ -62,14 +82,21 @@ function App(): React.JSX.Element {
     // Null means "the user has not chosen", in which case the languages the file says nothing in
     // are hidden. Once they touch the picker their choice is explicit and stands, including for a
     // language they have just added and not yet written anything in.
-    const [hiddenLanguages, setHiddenLanguages] = useState<Set<string> | null>(null);
+    const [hiddenLanguages, setHiddenLanguages] = useState<Set<string> | null>(
+        null,
+    );
     // Open when adding an entry. The key is validated before the row exists, so there is never a
     // blank half-row in the grid waiting to be filled in.
     const [adding, setAdding] = useState(false);
     const [selected, setSelected] = useState<string | null>(null);
     // Set by an add; consumed once the entry exists so it can be scrolled to and focused.
     const [pendingFocus, setPendingFocus] = useState<number | null>(null);
-    const [menu, setMenu] = useState<{ x: number; y: number; key: string; index: number } | null>(null);
+    const [menu, setMenu] = useState<{
+        x: number;
+        y: number;
+        key: string;
+        index: number;
+    } | null>(null);
     const [problemsOpen, setProblemsOpen] = useState(false);
 
     // A different file has a different baseline and a different order, so neither may linger and
@@ -80,89 +107,139 @@ function App(): React.JSX.Element {
         setBaseline([]);
         setShowInherited(false);
         setSelected(null);
-        post({type: 'requestBaseline'});
+        post({ type: "requestBaseline" });
     }, []);
 
     const onMessage = useCallback((msg: LocPanelMessage) => {
-        if (msg.type === 'baselineRows') {
-            setBaseline(toBaselineRows((msg.entries as BaselineEntryDto[]) ?? []));
+        if (msg.type === "baselineRows") {
+            setBaseline(
+                toBaselineRows((msg.entries as BaselineEntryDto[]) ?? []),
+            );
         }
     }, []);
 
     // Re-aiming the tab at another language of its set drops any by-hand column choices, so the new
     // focus decides what is shown rather than a choice made about a different view of the set.
-    const onFocusLanguageChanged = useCallback(() => setHiddenLanguages(null), []);
+    const onFocusLanguageChanged = useCallback(
+        () => setHiddenLanguages(null),
+        [],
+    );
 
     const panel = useLocPanel<TranslationCommand>({
-        applyStaged, coalesce, onFileLoaded, onFocusLanguageChanged, onMessage,
+        applyStaged,
+        coalesce,
+        onFileLoaded,
+        onFocusLanguageChanged,
+        onMessage,
     });
 
     const {
-        rows, languages, setLanguages, canAddLanguage, addLanguageCreatesFile, focusLanguage,
-        supportedLanguages, error, loaded, queue,
-        problems, validation, stage, save, validate,
+        rows,
+        languages,
+        setLanguages,
+        canAddLanguage,
+        addLanguageCreatesFile,
+        focusLanguage,
+        supportedLanguages,
+        error,
+        loaded,
+        queue,
+        problems,
+        validation,
+        stage,
+        save,
+        validate,
     } = panel;
 
     /** Adds a fully formed entry from the dialog. Position is never asked for. */
-    const addEntry = useCallback((draft: NewRowDraft) => {
-        const key = normaliseKey(draft.key);
-        stage({kind: 'addEntry', key, values: draftToCommandValues(draft)});
+    const addEntry = useCallback(
+        (draft: NewRowDraft) => {
+            const key = normaliseKey(draft.key);
+            stage({
+                kind: "addEntry",
+                key,
+                values: draftToCommandValues(draft),
+            });
 
-        // The new entry carries real content, but a filter or sort would still decide where - or
-        // whether - it appears. Both are dropped so it is simply there, at the end, in view.
-        setFilter('');
-        setSort(null);
-        setSelected(key);
-        setPendingFocus(rows.length);
-        setAdding(false);
-    }, [rows.length, stage]);
+            // The new entry carries real content, but a filter or sort would still decide where - or
+            // whether - it appears. Both are dropped so it is simply there, at the end, in view.
+            setFilter("");
+            setSort(null);
+            setSelected(key);
+            setPendingFocus(rows.length);
+            setAdding(false);
+        },
+        [rows.length, stage],
+    );
 
-    const deleteEntry = useCallback((key: string) => {
-        stage({kind: 'deleteEntry', key});
-        setSelected(current => (current === key ? null : current));
-    }, [stage]);
+    const deleteEntry = useCallback(
+        (key: string) => {
+            stage({ kind: "deleteEntry", key });
+            setSelected((current) => (current === key ? null : current));
+        },
+        [stage],
+    );
 
     /**
      * Puts an entry back to what the layer below it says, staged like any other edit so it is
      * undone by discarding rather than by a second round of typing.
      */
-    const resetEntry = useCallback((key: string) => {
-        const values = baselineValuesFor(key, baseline, languages);
-        if (values === null) {
-            return;
-        }
+    const resetEntry = useCallback(
+        (key: string) => {
+            const values = baselineValuesFor(key, baseline, languages);
+            if (values === null) {
+                return;
+            }
 
-        // The reset makes this entry inherited, so with inherited entries hidden it would drop off
-        // screen the instant it was clicked - indistinguishable from the Delete directly beneath it
-        // in the same menu. Showing them keeps it in place, dimmed, which is the actual result.
-        setShowInherited(true);
+            // The reset makes this entry inherited, so with inherited entries hidden it would drop off
+            // screen the instant it was clicked - indistinguishable from the Delete directly beneath it
+            // in the same menu. Showing them keeps it in place, dimmed, which is the actual result.
+            setShowInherited(true);
 
-        for (const value of values) {
-            stage({kind: 'setValue', key, language: value.language, value: value.value});
-        }
-    }, [baseline, languages, stage]);
+            for (const value of values) {
+                stage({
+                    kind: "setValue",
+                    key,
+                    language: value.language,
+                    value: value.value,
+                });
+            }
+        },
+        [baseline, languages, stage],
+    );
 
     /** Entries identical to what a lower layer already provides. */
     const inherited = useMemo(
         () => findInheritedKeys(rows, baseline, languages),
-        [rows, baseline, languages]);
+        [rows, baseline, languages],
+    );
 
     // Compiled once per filter change rather than once per row: this is the same pattern for every
     // row, and rebuilding it 19,000 times a keystroke is what made typing here stall.
     const rowFilter = useMemo(
-        () => buildRowFilter(appliedFilter, mode, scope), [appliedFilter, mode, scope]);
+        () => buildRowFilter(appliedFilter, mode, scope),
+        [appliedFilter, mode, scope],
+    );
 
     // Hide inherited, then filter, then order. All three are projections over the staged rows;
     // edits address entries by key, so none of them can move an edit onto the wrong entry.
     const visible = useMemo(
-        () => sortRows(
-            hideInherited(rows, inherited, showInherited).filter(rowFilter.test),
-            sort),
-        [rows, inherited, showInherited, rowFilter, sort]);
+        () =>
+            sortRows(
+                hideInherited(rows, inherited, showInherited).filter(
+                    rowFilter.test,
+                ),
+                sort,
+            ),
+        [rows, inherited, showInherited, rowFilter, sort],
+    );
 
     // Built from the whole row set, not the visible slice: a row scrolled out of view is still the
     // row a finding is about, and the map is keyed by index so the grid can look it up per row.
-    const rowSeverities = useMemo(() => severityByRow(problems, rows), [problems, rows]);
+    const rowSeverities = useMemo(
+        () => severityByRow(problems, rows),
+        [problems, rows],
+    );
 
     const problemKeys = useMemo(() => {
         const byKey = new Map<string, LocProblem>();
@@ -189,35 +266,45 @@ function App(): React.JSX.Element {
      * something that is not on screen would do nothing visible, so whatever is concealing it is
      * lifted first.
      */
-    const jumpToProblem = useCallback((problem: LocProblem) => {
-        if (!problem.key) {
-            return null;
-        }
-        const target = rows.find(row => row.key === problem.key);
-        if (target === undefined) {
-            return null;
-        }
-
-        return () => {
-            setFilter('');
-            if (inherited.has(target.key)) {
-                setShowInherited(true);
+    const jumpToProblem = useCallback(
+        (problem: LocProblem) => {
+            if (!problem.key) {
+                return null;
             }
-            setSelected(target.key);
-            setPendingFocus(target.index);
-        };
-    }, [rows, inherited]);
+            const target = rows.find((row) => row.key === problem.key);
+            if (target === undefined) {
+                return null;
+            }
+
+            return () => {
+                setFilter("");
+                if (inherited.has(target.key)) {
+                    setShowInherited(true);
+                }
+                setSelected(target.key);
+                setPendingFocus(target.index);
+            };
+        },
+        [rows, inherited],
+    );
 
     // Hiding the column the search is scoped to would leave the grid filtered by something the
     // user can no longer see - the results would look arbitrary - so the scope goes back to
     // everything.
     const onColumnHidden = useCallback(
-        (language: string) => setScope(s => (s === language ? 'all' : s)), []);
+        (language: string) => setScope((s) => (s === language ? "all" : s)),
+        [],
+    );
 
-    const {hidden, shownLanguages, columns, toggleLanguage, materialise} = useLocColumns({
-        rows, languages, hiddenLanguages, setHiddenLanguages, focusLanguage,
-        onHidden: onColumnHidden,
-    });
+    const { hidden, shownLanguages, columns, toggleLanguage, materialise } =
+        useLocColumns({
+            rows,
+            languages,
+            hiddenLanguages,
+            setHiddenLanguages,
+            focusLanguage,
+            onHidden: onColumnHidden,
+        });
 
     if (error) {
         return <LocGridMessage>{error}</LocGridMessage>;
@@ -229,7 +316,8 @@ function App(): React.JSX.Element {
     const duplicateCount = countDuplicateKeys(rows);
     // Two things can hold rows back here, and the footer says how many are doing so.
     const activeFilters =
-        (filter.trim().length > 0 ? 1 : 0) + (!showInherited && inherited.size > 0 ? 1 : 0);
+        (filter.trim().length > 0 ? 1 : 0) +
+        (!showInherited && inherited.size > 0 ? 1 : 0);
 
     const overlays = (
         <>
@@ -242,18 +330,23 @@ function App(): React.JSX.Element {
                     onAdd={() => setAdding(true)}
                     // Empty when the click missed every row, which is the only way into an empty
                     // file - there is nothing to delete or reset there.
-                    onDelete={menu.key === '' ? null : () => deleteEntry(menu.key)}
-                    onReset={menu.key !== ''
-                    && baselineValuesFor(menu.key, baseline, languages) !== null
-                    && !inherited.has(menu.key)
-                        ? () => resetEntry(menu.key)
-                        : null}
+                    onDelete={
+                        menu.key === "" ? null : () => deleteEntry(menu.key)
+                    }
+                    onReset={
+                        menu.key !== "" &&
+                        baselineValuesFor(menu.key, baseline, languages) !==
+                            null &&
+                        !inherited.has(menu.key)
+                            ? () => resetEntry(menu.key)
+                            : null
+                    }
                 />
             )}
             {adding && (
                 <AddTranslationDialog
                     languages={languages}
-                    existingKeys={rows.map(row => row.key)}
+                    existingKeys={rows.map((row) => row.key)}
                     baseline={baseline}
                     onCancel={() => setAdding(false)}
                     onAdd={addEntry}
@@ -264,8 +357,8 @@ function App(): React.JSX.Element {
 
     const header = (
         <>
-            <HeadCell label="Key" column="key" sort={sort} onSort={setSort}/>
-            {shownLanguages.map(language => (
+            <HeadCell label="Key" column="key" sort={sort} onSort={setSort} />
+            {shownLanguages.map((language) => (
                 <HeadCell
                     key={language}
                     label={language}
@@ -274,7 +367,11 @@ function App(): React.JSX.Element {
                     onSort={setSort}
                 />
             ))}
-            <LocColumnMenu languages={languages} hidden={hidden} onToggle={toggleLanguage}/>
+            <LocColumnMenu
+                languages={languages}
+                hidden={hidden}
+                onToggle={toggleLanguage}
+            />
         </>
     );
 
@@ -283,16 +380,23 @@ function App(): React.JSX.Element {
             <div className="cell">
                 <CellInput
                     value={row.key}
-                    onCommit={next => stage({kind: 'renameKey', key: row.key, newKey: next})}
+                    onCommit={(next) =>
+                        stage({ kind: "renameKey", key: row.key, newKey: next })
+                    }
                 />
             </div>
-            {shownLanguages.map(language => (
+            {shownLanguages.map((language) => (
                 <div className="cell" key={language}>
                     <CellInput
                         value={valueOf(row, language)}
-                        onCommit={next => stage({
-                            kind: 'setValue', key: row.key, language, value: next,
-                        })}
+                        onCommit={(next) =>
+                            stage({
+                                kind: "setValue",
+                                key: row.key,
+                                language,
+                                value: next,
+                            })
+                        }
                     />
                 </div>
             ))}
@@ -317,25 +421,31 @@ function App(): React.JSX.Element {
                 addLanguageCreatesFile={addLanguageCreatesFile}
                 supportedLanguages={supportedLanguages}
                 rowCount={rows.length}
-                baselineFillCount={language => languageFillValues(language, rows, baseline).length}
+                baselineFillCount={(language) =>
+                    languageFillValues(language, rows, baseline).length
+                }
                 onAddLanguage={(language, fillFromBaseline) => {
                     // A single-language format cannot take a column - the language goes in a new
                     // file beside this one, which the host has to create because it is not an edit
                     // to this document and cannot be staged with the rest of the batch.
                     if (addLanguageCreatesFile) {
-                        post({type: 'addLanguageFile', language});
+                        post({ type: "addLanguageFile", language });
                         return;
                     }
 
-                    stage({kind: 'addLanguage', language});
-                    setLanguages(current => [...current, language]);
+                    stage({ kind: "addLanguage", language });
+                    setLanguages((current) => [...current, language]);
                     // Explicit from here on, so the column just added is not hidden for being empty.
                     materialise();
 
                     // Staged as ordinary edits, so the filled text is visible in the grid before it
                     // is saved and is discarded with everything else if the tab is abandoned.
                     if (fillFromBaseline) {
-                        const filled = languageFillValues(language, rows, baseline);
+                        const filled = languageFillValues(
+                            language,
+                            rows,
+                            baseline,
+                        );
 
                         // Filling from the baseline makes those entries match the layer below in
                         // every language - which is the definition of inherited, so with inherited
@@ -346,17 +456,29 @@ function App(): React.JSX.Element {
                         }
 
                         for (const value of filled) {
-                            stage({kind: 'setValue', key: value.key, language, value: value.value});
+                            stage({
+                                kind: "setValue",
+                                key: value.key,
+                                language,
+                                value: value.value,
+                            });
                         }
                     }
                 }}
-                copyLanguageCount={(from, to) => languageCopyValues(from, to, rows).length}
+                copyLanguageCount={(from, to) =>
+                    languageCopyValues(from, to, rows).length
+                }
                 onCopyLanguage={(from, to) => {
                     for (const copied of languageCopyValues(from, to, rows)) {
-                        stage({kind: 'setValue', key: copied.key, language: to, value: copied.value});
+                        stage({
+                            kind: "setValue",
+                            key: copied.key,
+                            language: to,
+                            value: copied.value,
+                        });
                     }
                 }}
-                onFillFromBaseline={language => {
+                onFillFromBaseline={(language) => {
                     const filled = languageFillValues(language, rows, baseline);
                     // Same reason as the add-language fill: these entries now match the layer below
                     // in every language, so hiding inherited entries would make them vanish as they
@@ -365,12 +487,18 @@ function App(): React.JSX.Element {
                         setShowInherited(true);
                     }
                     for (const value of filled) {
-                        stage({kind: 'setValue', key: value.key, language, value: value.value});
+                        stage({
+                            kind: "setValue",
+                            key: value.key,
+                            language,
+                            value: value.value,
+                        });
                     }
                 }}
                 onConvertFormat={(format: ConvertibleFormat) =>
-                    post({type: 'convertFormat', targetFormat: format})}
-                onExportDat={() => post({type: 'exportDat'})}
+                    post({ type: "convertFormat", targetFormat: format })
+                }
+                onExportDat={() => post({ type: "exportDat" })}
             />
 
             {/* A repeated key is an error the validator reports: only one of the two would ever be
@@ -380,7 +508,6 @@ function App(): React.JSX.Element {
                     <div className="warn">{duplicateCount} duplicate keys</div>
                 </div>
             )}
-
         </>
     );
 
@@ -404,10 +531,12 @@ function App(): React.JSX.Element {
                 <input
                     type="checkbox"
                     checked={showInherited}
-                    onChange={e => setShowInherited(e.target.checked)}
+                    onChange={(e) => setShowInherited(e.target.checked)}
                 />
                 Inherited
-                {inherited.size > 0 && <span className="badge">{inherited.size}</span>}
+                {inherited.size > 0 && (
+                    <span className="badge">{inherited.size}</span>
+                )}
             </label>
         </LocSearch>
     );
@@ -418,34 +547,45 @@ function App(): React.JSX.Element {
             columns={columns}
             header={header}
             renderRow={renderRow}
-            rowClassName={row => [
-                rowSeverityClass(rowSeverities.get(row.index)) ?? '',
-                row.key === selected ? 'selected' : '',
-                // Only visible when showing them, since they are otherwise filtered out entirely.
-                inherited.has(row.key) ? 'inherited' : '',
-            ].filter(Boolean).join(' ')}
-            rowTitle={row => problemKeys.get(row.key)?.message}
-            onRowFocus={row => setSelected(row.key)}
+            rowClassName={(row) =>
+                [
+                    rowSeverityClass(rowSeverities.get(row.index)) ?? "",
+                    row.key === selected ? "selected" : "",
+                    // Only visible when showing them, since they are otherwise filtered out entirely.
+                    inherited.has(row.key) ? "inherited" : "",
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+            }
+            rowTitle={(row) => problemKeys.get(row.key)?.message}
+            onRowFocus={(row) => setSelected(row.key)}
             onRowContextMenu={(row, e) => {
                 e.preventDefault();
                 setSelected(row.key);
-                setMenu({x: e.clientX, y: e.clientY, key: row.key, index: row.index});
+                setMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    key: row.key,
+                    index: row.index,
+                });
             }}
             focusRowIndex={pendingFocus}
             onFocused={() => setPendingFocus(null)}
             overlays={overlays}
-            problemsBar={problems.length > 0 && problemsOpen ? (
-                <LocProblemsBar
-                    problems={problems}
-                    labelOf={problem => problem.key ?? 'This file'}
-                    jumpTo={jumpToProblem}
-                    onClose={() => setProblemsOpen(false)}
-                />
-            ) : undefined}
+            problemsBar={
+                problems.length > 0 && problemsOpen ? (
+                    <LocProblemsBar
+                        problems={problems}
+                        labelOf={(problem) => problem.key ?? "This file"}
+                        jumpTo={jumpToProblem}
+                        onClose={() => setProblemsOpen(false)}
+                    />
+                ) : undefined
+            }
             footer={gridFooterLabel(rows.length, visible.length, activeFilters)}
-            onEmptyAreaContextMenu={e => {
+            onEmptyAreaContextMenu={(e) => {
                 e.preventDefault();
-                setMenu({x: e.clientX, y: e.clientY, key: '', index: -1});
+                setMenu({ x: e.clientX, y: e.clientY, key: "", index: -1 });
             }}
             dockHeader={dockHeader}
             dockContent={dockContent}
@@ -461,7 +601,9 @@ function App(): React.JSX.Element {
  * to choose between them. Add opens a dialog that settles the key before the entry exists.
  */
 function TranslationRowMenu(props: {
-    x: number; y: number; index: number;
+    x: number;
+    y: number;
+    index: number;
     onClose: () => void;
     onAdd: () => void;
     /** Null when the menu was opened on empty space rather than on an entry. */
@@ -472,12 +614,19 @@ function TranslationRowMenu(props: {
     const run = (action: () => void) => menuAction(action, props.onClose);
 
     return (
-        <RowMenuFrame x={props.x} y={props.y} anchorIndex={props.index} onClose={props.onClose}>
-            <button role="menuitem" onClick={run(props.onAdd)}>Add translation...</button>
+        <RowMenuFrame
+            x={props.x}
+            y={props.y}
+            anchorIndex={props.index}
+            onClose={props.onClose}
+        >
+            <button role="menuitem" onClick={run(props.onAdd)}>
+                Add translation...
+            </button>
 
             {props.onReset && (
                 <>
-                    <div className="sep"/>
+                    <div className="sep" />
                     <button
                         role="menuitem"
                         title="Replace this entry with the value the layer below it provides"
@@ -490,7 +639,7 @@ function TranslationRowMenu(props: {
 
             {props.onDelete && (
                 <>
-                    <div className="sep"/>
+                    <div className="sep" />
                     <button
                         role="menuitem"
                         className="danger"
@@ -520,14 +669,20 @@ function HeadCell(props: {
 
     return (
         <div
-            className={`cell sortable${active ? ' sorted' : ''}`}
+            className={`cell sortable${active ? " sorted" : ""}`}
             role="columnheader"
             tabIndex={0}
-            aria-sort={active === null ? 'none' : active.direction === 'asc' ? 'ascending' : 'descending'}
+            aria-sort={
+                active === null
+                    ? "none"
+                    : active.direction === "asc"
+                      ? "ascending"
+                      : "descending"
+            }
             title={`Sort by ${props.label}`}
             onClick={() => props.onSort(nextSort(props.sort, props.column))}
-            onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     props.onSort(nextSort(props.sort, props.column));
                 }
@@ -536,7 +691,7 @@ function HeadCell(props: {
             <span className="head-label">{props.label}</span>
             {active && (
                 <span
-                    className={`codicon codicon-arrow-${active.direction === 'asc' ? 'up' : 'down'}`}
+                    className={`codicon codicon-arrow-${active.direction === "asc" ? "up" : "down"}`}
                     aria-hidden="true"
                 />
             )}
@@ -558,7 +713,9 @@ function AddTranslationDialog(props: {
     onCancel: () => void;
     onAdd: (draft: NewRowDraft) => void;
 }): React.JSX.Element {
-    const [draft, setDraft] = useState<NewRowDraft>(() => blankDraft(props.languages));
+    const [draft, setDraft] = useState<NewRowDraft>(() =>
+        blankDraft(props.languages),
+    );
     // The key error is shown once the field has been visited, so the dialog does not open already
     // complaining about a field nobody has touched.
     const [touched, setTouched] = useState(false);
@@ -568,10 +725,23 @@ function AddTranslationDialog(props: {
     const error = validateNewKey(draft.key, props.existingKeys);
 
     const suggestions = useMemo(
-        () => (picked
-            ? []
-            : suggestBaselineKeys(draft.key, props.baseline, props.existingKeys, props.languages)),
-        [picked, draft.key, props.baseline, props.existingKeys, props.languages]);
+        () =>
+            picked
+                ? []
+                : suggestBaselineKeys(
+                      draft.key,
+                      props.baseline,
+                      props.existingKeys,
+                      props.languages,
+                  ),
+        [
+            picked,
+            draft.key,
+            props.baseline,
+            props.existingKeys,
+            props.languages,
+        ],
+    );
 
     const submit = (): void => {
         setTouched(true);
@@ -580,27 +750,30 @@ function AddTranslationDialog(props: {
         }
     };
 
-    const setValue = (language: string, value: string): void => setDraft(current => ({
-        ...current,
-        values: current.values.map(v => (v.language === language ? {language, value} : v)),
-    }));
+    const setValue = (language: string, value: string): void =>
+        setDraft((current) => ({
+            ...current,
+            values: current.values.map((v) =>
+                v.language === language ? { language, value } : v,
+            ),
+        }));
 
     /** Takes a suggestion: its key, and the inherited text as a starting point for editing. */
     const take = (suggestion: BaselineSuggestion): void => {
-        setDraft({key: suggestion.key, values: suggestion.values});
+        setDraft({ key: suggestion.key, values: suggestion.values });
         setPicked(true);
     };
 
     // Movable and resizable like every other dialog: this one carries a key, a value per language
     // and a suggestion list, so it is the one most likely to need more room - and to need moving
     // aside to read the row it is about to duplicate.
-    const {dialogProps, dragHandleProps, resizeHandleProps} =
+    const { dialogProps, dragHandleProps, resizeHandleProps } =
         useMovableDialog(DIALOG_IDS.addTranslation);
 
     return (
         <div
             className="modal-backdrop"
-            onPointerDown={e => {
+            onPointerDown={(e) => {
                 if (e.target === e.currentTarget) {
                     props.onCancel();
                 }
@@ -611,18 +784,20 @@ function AddTranslationDialog(props: {
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add translation"
-                onSubmit={e => {
+                onSubmit={(e) => {
                     e.preventDefault();
                     submit();
                 }}
-                onKeyDown={e => {
-                    if (e.key === 'Escape') {
+                onKeyDown={(e) => {
+                    if (e.key === "Escape") {
                         props.onCancel();
                     }
                 }}
                 {...dialogProps}
             >
-                <h2 className="drag-handle" {...dragHandleProps}>Add translation</h2>
+                <h2 className="drag-handle" {...dragHandleProps}>
+                    Add translation
+                </h2>
 
                 {/* Pinned: the key is what every other field is about, and its error is the reason
                     Add is disabled - both have to stay readable while the language list scrolls,
@@ -635,16 +810,22 @@ function AddTranslationDialog(props: {
                             autoFocus
                             spellCheck={false}
                             aria-invalid={touched && error !== null}
-                            onChange={e => {
+                            onChange={(e) => {
                                 setPicked(false);
-                                setDraft(current => ({...current, key: e.target.value}));
+                                setDraft((current) => ({
+                                    ...current,
+                                    key: e.target.value,
+                                }));
                             }}
                             onBlur={() => setTouched(true)}
                         />
                     </Field>
                     {touched && error !== null && (
                         <p className="field-error">
-                            <span className="codicon codicon-error" aria-hidden="true"/>
+                            <span
+                                className="codicon codicon-error"
+                                aria-hidden="true"
+                            />
                             {error}
                         </p>
                     )}
@@ -653,13 +834,20 @@ function AddTranslationDialog(props: {
                     override is. Taking one fills in the inherited text to edit from. */}
                     {suggestions.length > 0 && (
                         <ul className="suggestions">
-                            {suggestions.map(suggestion => (
+                            {suggestions.map((suggestion) => (
                                 <li key={suggestion.key}>
-                                    <button type="button" onClick={() => take(suggestion)}>
-                                        <span className="suggestion-key">{suggestion.key}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => take(suggestion)}
+                                    >
+                                        <span className="suggestion-key">
+                                            {suggestion.key}
+                                        </span>
                                         <span className="suggestion-value">
-                                        {suggestion.values.find(v => v.value)?.value ?? ''}
-                                    </span>
+                                            {suggestion.values.find(
+                                                (v) => v.value,
+                                            )?.value ?? ""}
+                                        </span>
                                     </button>
                                 </li>
                             ))}
@@ -671,17 +859,22 @@ function AddTranslationDialog(props: {
                     dialog is resized small. */}
                 <div className="modal-body">
                     <div className="languages">
-                        {props.languages.map(language => (
+                        {props.languages.map((language) => (
                             <Field label={language} as="label" key={language}>
                                 <input
                                     type="text"
-                                    value={draft.values.find(v => v.language === language)?.value ?? ''}
-                                    onChange={e => setValue(language, e.target.value)}
+                                    value={
+                                        draft.values.find(
+                                            (v) => v.language === language,
+                                        )?.value ?? ""
+                                    }
+                                    onChange={(e) =>
+                                        setValue(language, e.target.value)
+                                    }
                                 />
                             </Field>
                         ))}
                     </div>
-
                 </div>
 
                 <div className="dialog-actions">
@@ -689,7 +882,10 @@ function AddTranslationDialog(props: {
                         untranslated cells are visible in the grid afterwards. On the button row so
                         it is still there when the language list has been scrolled past it. */}
                     <p className="modal-footnote">
-                        <span className="codicon codicon-info" aria-hidden="true"/>
+                        <span
+                            className="codicon codicon-info"
+                            aria-hidden="true"
+                        />
                         Languages left empty stay empty.
                     </p>
                     <Button onClick={props.onCancel}>Cancel</Button>
@@ -697,27 +893,26 @@ function AddTranslationDialog(props: {
                         submit
                         className="primary"
                         disabled={error !== null}
-                        disabledReason={error ?? 'Fill in the fields above'}
+                        disabledReason={error ?? "Fill in the fields above"}
                     >
                         Add
                     </Button>
                 </div>
-                <ResizeHandles handleProps={resizeHandleProps}/>
+                <ResizeHandles handleProps={resizeHandleProps} />
             </form>
         </div>
     );
 }
 
 function valueOf(row: LocRow, language: string): string {
-    return row.values.find(v => v.language === language)?.value ?? '';
+    return row.values.find((v) => v.language === language)?.value ?? "";
 }
-
 
 // Examples from this file's own vocabulary.
 const PLACEHOLDERS: Record<FilterMode, string> = {
-    text: 'Filter rows...',
-    wildcard: 'TEXT_*_NAME',
-    regex: '^TEXT_.*NAME$'
+    text: "Filter rows...",
+    wildcard: "TEXT_*_NAME",
+    regex: "^TEXT_.*NAME$",
 };
 
-createRoot(document.getElementById('root')!).render(<App/>);
+createRoot(document.getElementById("root")!).render(<App />);

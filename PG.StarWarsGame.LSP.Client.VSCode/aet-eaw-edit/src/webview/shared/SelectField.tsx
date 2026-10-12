@@ -1,11 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import {useState} from 'react';
+import { useState } from "react";
 
-import {Combobox} from './Combobox';
-import {resolveChoice} from './comboOptions';
-import type {IconName} from './Icon';
+import { Combobox } from "./Combobox";
+import { resolveChoice } from "./comboOptions";
+import type { IconName } from "./Icon";
 
 /**
  * The smart field for a value that must be one of its options - a filter, an enum - in place of a
@@ -23,14 +23,18 @@ export function SelectField(props: {
     icon?: IconName;
     disabled?: boolean;
 }): React.JSX.Element {
-    const labelOf = (value: string): string => props.options.find(o => o.value === value)?.label ?? value;
+    const labelOf = (value: string): string =>
+        props.options.find((o) => o.value === value)?.label ?? value;
     // The text being typed, or null while the field shows the chosen option.
     const [draft, setDraft] = useState<string | null>(null);
-    const shown = props.options.map(o => ({value: o.label ?? o.value}));
+    const shown = props.options.map((o) => ({ value: o.label ?? o.value }));
 
     const commit = (label: string | null): void => {
         setDraft(null);
-        const option = label === null ? undefined : props.options.find(o => (o.label ?? o.value) === label);
+        const option =
+            label === null
+                ? undefined
+                : props.options.find((o) => (o.label ?? o.value) === label);
         if (option && option.value !== props.value) {
             props.onChange(option.value);
         }
@@ -47,7 +51,7 @@ export function SelectField(props: {
                 selectOnFocus
                 onChange={setDraft}
                 onPick={commit}
-                onEnter={text => commit(resolveChoice(shown, text))}
+                onEnter={(text) => commit(resolveChoice(shown, text))}
                 onEscape={() => setDraft(null)}
                 onBlur={() => setDraft(null)}
             />

@@ -11,7 +11,7 @@
 // anything else there means Downstream, so an older client and an unfiltered request behave as they
 // always did.
 
-export type PathDirection = 'Upstream' | 'Both' | 'Downstream';
+export type PathDirection = "Upstream" | "Both" | "Downstream";
 
 export interface PathDirectionChoice {
     readonly direction: PathDirection;
@@ -29,19 +29,23 @@ export interface PathDirectionChoice {
  * paths are what it arms. Order is what the menu renders, so it is reading order and nothing else.
  */
 export const PATH_DIRECTIONS: readonly PathDirectionChoice[] = [
-    {direction: 'Upstream', label: 'Incoming', icon: 'arrow-left'},
-    {direction: 'Both', label: 'Both', icon: 'arrow-both'},
-    {direction: 'Downstream', label: 'Outgoing', icon: 'arrow-right'},
+    { direction: "Upstream", label: "Incoming", icon: "arrow-left" },
+    { direction: "Both", label: "Both", icon: "arrow-both" },
+    { direction: "Downstream", label: "Outgoing", icon: "arrow-right" },
 ];
 
-const DEFAULT_DIRECTION: PathDirection = 'Downstream';
+const DEFAULT_DIRECTION: PathDirection = "Downstream";
 
 export function isPathDirection(value: string): value is PathDirection {
-    return PATH_DIRECTIONS.some(choice => choice.direction === value);
+    return PATH_DIRECTIONS.some((choice) => choice.direction === value);
 }
 
 /** The label for a wire value, falling back to the default direction for anything unrecognised. */
 export function directionLabel(value: string | undefined): string {
-    const direction = value !== undefined && isPathDirection(value) ? value : DEFAULT_DIRECTION;
-    return PATH_DIRECTIONS.find(choice => choice.direction === direction)!.label;
+    const direction =
+        value !== undefined && isPathDirection(value)
+            ? value
+            : DEFAULT_DIRECTION;
+    return PATH_DIRECTIONS.find((choice) => choice.direction === direction)!
+        .label;
 }

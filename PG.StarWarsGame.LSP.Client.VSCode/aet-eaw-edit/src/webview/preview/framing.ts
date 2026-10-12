@@ -51,12 +51,17 @@ const MIN_RADIUS = 0.001;
  * Uses the vertical field of view, and the horizontal one when the viewport is narrower than it is
  * tall - otherwise a portrait-shaped panel crops the sides off a wide model.
  */
-export function fitDistance(radius: number, verticalFovDegrees: number, aspect: number): number {
+export function fitDistance(
+    radius: number,
+    verticalFovDegrees: number,
+    aspect: number,
+): number {
     const safeRadius = Math.max(radius, MIN_RADIUS);
     const vertical = (verticalFovDegrees * Math.PI) / 180;
 
     // Horizontal FOV follows from the vertical one and the aspect ratio.
-    const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * Math.max(aspect, MIN_RADIUS));
+    const horizontal =
+        2 * Math.atan(Math.tan(vertical / 2) * Math.max(aspect, MIN_RADIUS));
     const limiting = Math.min(vertical, horizontal);
 
     return safeRadius / (Math.sin(limiting / 2) * FILL_FRACTION);
@@ -89,7 +94,7 @@ export function frameSphere(
             y: sphere.center.y + distance * Math.sin(elevation),
             z: sphere.center.z + horizontal * Math.cos(azimuth),
         },
-        target: {...sphere.center},
+        target: { ...sphere.center },
     };
 }
 
@@ -109,7 +114,10 @@ export function frameSphere(
  * pulling the plane back in when a huge hull z-fights.
  */
 export function clipPlanes(
-    sphere: BoundingSphere, distance: number, reach = 0, multiplier = 1,
+    sphere: BoundingSphere,
+    distance: number,
+    reach = 0,
+    multiplier = 1,
 ): { near: number; far: number } {
     const radius = Math.max(sphere.radius, MIN_RADIUS, reach);
 
@@ -137,8 +145,10 @@ export function sphereFromBounds(min: Vec3, max: Vec3): BoundingSphere {
     };
 
     const radius = Math.sqrt(
-        (max.x - center.x) ** 2 + (max.y - center.y) ** 2 + (max.z - center.z) ** 2,
+        (max.x - center.x) ** 2 +
+            (max.y - center.y) ** 2 +
+            (max.z - center.z) ** 2,
     );
 
-    return {center, radius};
+    return { center, radius };
 }

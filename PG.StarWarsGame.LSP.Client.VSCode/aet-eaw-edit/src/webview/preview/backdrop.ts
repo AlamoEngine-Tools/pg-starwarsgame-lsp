@@ -70,7 +70,7 @@ export function skyGradient(height: number): [number, number, number] {
  * rearrange the sky and invalidate every screenshot taken against it.
  */
 function seededRandom(seed: number): () => number {
-    let state = (seed | 0) || 1;
+    let state = seed | 0 || 1;
 
     return () => {
         state = (state * 1664525 + 1013904223) | 0;

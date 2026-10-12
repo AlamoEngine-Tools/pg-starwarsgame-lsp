@@ -25,7 +25,7 @@
 // decodes or encodes: the combine draws OVER the scene already on the canvas, so the base image is
 // never resampled and cannot come back subtly different.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
 /**
  * `BloomCutoff` - above this luminance a pixel passes through the bright filter untouched.
@@ -150,7 +150,8 @@ void main() {
  */
 export class BloomPass {
     /** The two buffers the blur ping-pongs between. */
-    private targets: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] | null = null;
+    private targets: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] | null =
+        null;
 
     private readonly bright: THREE.ShaderMaterial;
     private readonly blur: THREE.ShaderMaterial;
@@ -164,18 +165,24 @@ export class BloomPass {
     private readonly size = new THREE.Vector2();
 
     constructor() {
-        const flat = {depthTest: false, depthWrite: false};
+        const flat = { depthTest: false, depthWrite: false };
 
         this.bright = new THREE.ShaderMaterial({
             ...flat,
-            uniforms: {tScene: {value: null}, uCutoff: {value: BLOOM_CUTOFF}},
+            uniforms: {
+                tScene: { value: null },
+                uCutoff: { value: BLOOM_CUTOFF },
+            },
             vertexShader: QUAD_VERTEX_SHADER,
             fragmentShader: BRIGHT_FRAGMENT_SHADER,
         });
 
         this.blur = new THREE.ShaderMaterial({
             ...flat,
-            uniforms: {tScene: {value: null}, uDelta: {value: new THREE.Vector2()}},
+            uniforms: {
+                tScene: { value: null },
+                uDelta: { value: new THREE.Vector2() },
+            },
             vertexShader: QUAD_VERTEX_SHADER,
             fragmentShader: BLUR_FRAGMENT_SHADER,
         });
@@ -184,7 +191,10 @@ export class BloomPass {
         // this can be added straight over the canvas without blowing the highlights to flat white.
         this.combine = new THREE.ShaderMaterial({
             ...flat,
-            uniforms: {tScene: {value: null}, uStrength: {value: BLOOM_STRENGTH}},
+            uniforms: {
+                tScene: { value: null },
+                uStrength: { value: BLOOM_STRENGTH },
+            },
             vertexShader: QUAD_VERTEX_SHADER,
             fragmentShader: COMBINE_FRAGMENT_SHADER,
             transparent: true,
@@ -223,7 +233,9 @@ export class BloomPass {
 
         for (let i = 0; i < ITERATIONS; i++) {
             (this.blur.uniforms.uDelta.value as THREE.Vector2).set(
-                blurDelta(i, width), blurDelta(i, height));
+                blurDelta(i, width),
+                blurDelta(i, height),
+            );
 
             this.draw(renderer, this.blur, read.texture, write);
             [read, write] = [write, read];
@@ -248,8 +260,10 @@ export class BloomPass {
     }
 
     private draw(
-        renderer: THREE.WebGLRenderer, material: THREE.ShaderMaterial,
-        source: THREE.Texture, into: THREE.WebGLRenderTarget | null,
+        renderer: THREE.WebGLRenderer,
+        material: THREE.ShaderMaterial,
+        source: THREE.Texture,
+        into: THREE.WebGLRenderTarget | null,
     ): void {
         material.uniforms.tScene.value = source;
         this.mesh.material = material;
@@ -268,7 +282,8 @@ export class BloomPass {
      * texel apart, so nearest sampling would collapse the blur to a copy.
      */
     private buffers(
-        width: number, height: number,
+        width: number,
+        height: number,
     ): [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] {
         if (this.targets === null) {
             const make = (): THREE.WebGLRenderTarget => {
@@ -287,7 +302,10 @@ export class BloomPass {
             };
 
             this.targets = [make(), make()];
-        } else if (this.targets[0].width !== width || this.targets[0].height !== height) {
+        } else if (
+            this.targets[0].width !== width ||
+            this.targets[0].height !== height
+        ) {
             for (const target of this.targets) {
                 target.setSize(width, height);
             }

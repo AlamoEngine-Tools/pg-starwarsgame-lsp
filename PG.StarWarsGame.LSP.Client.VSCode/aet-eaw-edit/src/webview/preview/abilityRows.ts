@@ -12,7 +12,10 @@
 // `project_preview_effect_rows`. Nothing here needs to know about it beyond routing visibility
 // through the same call every other effect uses.
 
-import type {PreviewAbility, PreviewParticle} from '../../protocol/modelPreview';
+import type {
+    PreviewAbility,
+    PreviewParticle,
+} from "../../protocol/modelPreview";
 
 /** One row in the Gameplay dock's Abilities section. */
 export interface AbilityRow {
@@ -76,7 +79,8 @@ export interface AbilityRow {
  * to ids here is what stops nineteen of twenty engines staying dark.
  */
 export function abilityProxies(
-    abilities: readonly PreviewAbility[], particles: readonly PreviewParticle[],
+    abilities: readonly PreviewAbility[],
+    particles: readonly PreviewParticle[],
 ): Map<string, string[]> {
     const byAbility = new Map<string, string[]>();
 
@@ -85,10 +89,12 @@ export function abilityProxies(
             continue;
         }
 
-        const wanted = new Set(ability.proxyNames.map(name => name.toLowerCase()));
+        const wanted = new Set(
+            ability.proxyNames.map((name) => name.toLowerCase()),
+        );
         const ids = particles
-            .filter(particle => wanted.has(particle.bone.toLowerCase()))
-            .map(particle => particle.id);
+            .filter((particle) => wanted.has(particle.bone.toLowerCase()))
+            .map((particle) => particle.id);
 
         if (ids.length > 0) {
             byAbility.set(ability.type, ids);
@@ -140,7 +146,8 @@ export function abilityAllows(
  * because an ability is on.
  */
 export function abilityClaims(
-    particleId: string, proxies: ReadonlyMap<string, string[]>,
+    particleId: string,
+    proxies: ReadonlyMap<string, string[]>,
 ): boolean {
     for (const ids of proxies.values()) {
         if (ids.includes(particleId)) {
@@ -166,17 +173,18 @@ export function abilityClaims(
  * not, and a proxy claiming nothing is never unbound.
  */
 export function unboundEffectIds(
-    abilities: readonly PreviewAbility[], particles: readonly PreviewParticle[],
+    abilities: readonly PreviewAbility[],
+    particles: readonly PreviewParticle[],
 ): Set<string> {
     // Case-insensitive both ways: `Ev_acclamator` writes `power_to_weapons` in lower case, and the
     // proxy names are written both ways too - `pptw_2mtank` beside `PTE_Corvetteengines`.
-    const declared = new Set(abilities.map(a => a.type.trim().toUpperCase()));
+    const declared = new Set(abilities.map((a) => a.type.trim().toUpperCase()));
     const unbound = new Set<string>();
 
     for (const particle of particles) {
         const claim = particle.claimsAbility?.trim().toUpperCase();
 
-        if (claim !== undefined && claim !== '' && !declared.has(claim)) {
+        if (claim !== undefined && claim !== "" && !declared.has(claim)) {
             unbound.add(particle.id);
         }
     }
@@ -195,7 +203,7 @@ export function unboundEffectIds(
  * this channel is what made DEFEND look like a dead switch: it declares no proxy, no bone, no
  * particle and no clip, and revealing the shield is the whole of what it shows.
  */
-const SHIELD_ABILITIES = new Set(['DEFEND']);
+const SHIELD_ABILITIES = new Set(["DEFEND"]);
 
 /** Whether this ability type reveals the shield mesh. */
 export function revealsShield(abilityType: string): boolean {
@@ -214,7 +222,7 @@ export function revealsShield(abilityType: string): boolean {
  * drawing its cloak over its hull from the first frame, permanently, which is what the reader saw
  * on the Vengeance. See {@link isStealthMesh}.
  */
-const STEALTH_ABILITIES = new Set(['STEALTH', 'FORCE_CLOAK']);
+const STEALTH_ABILITIES = new Set(["STEALTH", "FORCE_CLOAK"]);
 
 /** Whether this ability type cloaks the unit. */
 export function revealsStealth(abilityType: string): boolean {
@@ -274,7 +282,8 @@ export interface AbilityOwnership {
 
 /** What switching one ability takes back from the reader. */
 export function abilityOwnership(
-    type: string, proxies: ReadonlyMap<string, string[]>,
+    type: string,
+    proxies: ReadonlyMap<string, string[]>,
 ): AbilityOwnership {
     return {
         systemIds: proxies.get(type) ?? [],
@@ -284,8 +293,12 @@ export function abilityOwnership(
 }
 
 /** The clip to play for a change of state, or null when the model ships none for that direction. */
-export function clipFor(ability: PreviewAbility, activating: boolean): string | null {
-    const declared = (activating ? ability.deployClip : ability.undeployClip) ?? '';
+export function clipFor(
+    ability: PreviewAbility,
+    activating: boolean,
+): string | null {
+    const declared =
+        (activating ? ability.deployClip : ability.undeployClip) ?? "";
 
     // The XML names a FILE; the mixer holds the clip under its STEM. Measured on the X-Wing: the
     // ability declares `rv_xwing_deploy_00.ala` and the loaded glTF animation is called
@@ -294,43 +307,58 @@ export function clipFor(ability: PreviewAbility, activating: boolean): string | 
     //
     // Only an `.ala` comes off, rather than everything after the last dot: nothing guarantees a mod
     // writes the extension at all, and a name that merely contains a dot must survive intact.
-    const stem = declared.replace(/\.ala$/i, '').trim();
+    const stem = declared.replace(/\.ala$/i, "").trim();
 
-    return stem === '' ? null : stem;
+    return stem === "" ? null : stem;
 }
 
 /** A row per declared ability, in document order. */
 export function abilityRows(
-    abilities: readonly PreviewAbility[], proxies: ReadonlyMap<string, string[]>,
+    abilities: readonly PreviewAbility[],
+    proxies: ReadonlyMap<string, string[]>,
 ): AbilityRow[] {
-    return abilities.map(ability => {
+    return abilities.map((ability) => {
         const proxyCount = proxies.get(ability.type)?.length ?? 0;
         const deployClip = ability.deployClip ?? null;
         const undeployClip = ability.undeployClip ?? null;
 
-        const drivesSomething = proxyCount > 0
-            || deployClip !== null
-            || revealsShield(ability.type)
-            || revealsStealth(ability.type)
-            || (ability.ownerAttachmentBone ?? '') !== ''
-            || (ability.particleEffect ?? '') !== '';
+        const drivesSomething =
+            proxyCount > 0 ||
+            deployClip !== null ||
+            revealsShield(ability.type) ||
+            revealsStealth(ability.type) ||
+            (ability.ownerAttachmentBone ?? "") !== "" ||
+            (ability.particleEffect ?? "") !== "";
 
-        const definition = (ability.guiName ?? '').trim();
+        const definition = (ability.guiName ?? "").trim();
 
         return {
             type: ability.type,
-            label: (ability.name ?? '').trim() === '' ? ability.type : ability.name!.trim(),
-            description: (ability.description ?? '').trim() === '' ? null : ability.description!,
-            iconDataUri: (ability.iconDataUri ?? '') === '' ? null : ability.iconDataUri!,
-            definition: definition === '' ? null : definition,
+            label:
+                (ability.name ?? "").trim() === ""
+                    ? ability.type
+                    : ability.name!.trim(),
+            description:
+                (ability.description ?? "").trim() === ""
+                    ? null
+                    : ability.description!,
+            iconDataUri:
+                (ability.iconDataUri ?? "") === ""
+                    ? null
+                    : ability.iconDataUri!,
+            definition: definition === "" ? null : definition,
             detail: detailOf(ability, proxyCount, deployClip, undeployClip),
-            guiName: (ability.guiName ?? '') === '' ? null : ability.guiName!,
+            guiName: (ability.guiName ?? "") === "" ? null : ability.guiName!,
             rechargeSeconds: ability.rechargeSeconds ?? null,
             expirationSeconds: ability.expirationSeconds ?? null,
-            particleEffect: (ability.particleEffect ?? '') === '' ? null : ability.particleEffect!,
-            ownerAttachmentBone: (ability.ownerAttachmentBone ?? '') === ''
-                ? null
-                : ability.ownerAttachmentBone!,
+            particleEffect:
+                (ability.particleEffect ?? "") === ""
+                    ? null
+                    : ability.particleEffect!,
+            ownerAttachmentBone:
+                (ability.ownerAttachmentBone ?? "") === ""
+                    ? null
+                    : ability.ownerAttachmentBone!,
             modifiers: ability.modifiers ?? [],
             proxyCount,
             deployClip,
@@ -352,19 +380,19 @@ function detailOf(
     const parts: string[] = [];
 
     if (proxyCount > 0) {
-        parts.push(`${proxyCount} effect${proxyCount === 1 ? '' : 's'}`);
+        parts.push(`${proxyCount} effect${proxyCount === 1 ? "" : "s"}`);
     }
 
-    if ((ability.particleEffect ?? '') !== '') {
+    if ((ability.particleEffect ?? "") !== "") {
         parts.push(ability.particleEffect!);
     }
 
-    if ((ability.ownerAttachmentBone ?? '') !== '') {
+    if ((ability.ownerAttachmentBone ?? "") !== "") {
         parts.push(`on ${ability.ownerAttachmentBone}`);
     }
 
     if (revealsShield(ability.type)) {
-        parts.push('shows the shield mesh');
+        parts.push("shows the shield mesh");
     }
 
     // ONLY, because that is the whole of what a cloak draws - the hull, the effects and the
@@ -372,12 +400,14 @@ function detailOf(
     // `TIE_Phantom`'s STEALTH is a type and an icon, so without this the row read
     // "no effects, bones or clips declared" beside a key that cloaks the ship.
     if (revealsStealth(ability.type)) {
-        parts.push('shows the stealth mesh only');
+        parts.push("shows the stealth mesh only");
     }
 
     if (deployClip !== null) {
         // Named rather than counted: which clip plays is the thing a reader is checking.
-        parts.push(undeployClip === null ? 'deploy only' : 'deploy and undeploy');
+        parts.push(
+            undeployClip === null ? "deploy only" : "deploy and undeploy",
+        );
     }
 
     // What a stat-only ability actually does. Written as the game writes it - `speed x0.8` - so a
@@ -386,15 +416,23 @@ function detailOf(
         parts.push(`${statLabel(modifier.stat)} x${num(modifier.factor)}`);
     }
 
-    if (ability.rechargeSeconds !== null && ability.rechargeSeconds !== undefined) {
+    if (
+        ability.rechargeSeconds !== null &&
+        ability.rechargeSeconds !== undefined
+    ) {
         parts.push(`${num(ability.rechargeSeconds)}s recharge`);
     }
 
-    if (ability.expirationSeconds !== null && ability.expirationSeconds !== undefined) {
+    if (
+        ability.expirationSeconds !== null &&
+        ability.expirationSeconds !== undefined
+    ) {
         parts.push(`lasts ${num(ability.expirationSeconds)}s`);
     }
 
-    return parts.length === 0 ? 'no effects, bones or clips declared' : parts.join(' - ');
+    return parts.length === 0
+        ? "no effects, bones or clips declared"
+        : parts.join(" - ");
 }
 
 /**
@@ -404,7 +442,10 @@ function detailOf(
  * lets four modifiers fit on a row instead of two.
  */
 function statLabel(stat: string): string {
-    return stat.replace(/_MULTIPLIER$/i, '').toLowerCase().replaceAll('_', ' ');
+    return stat
+        .replace(/_MULTIPLIER$/i, "")
+        .toLowerCase()
+        .replaceAll("_", " ");
 }
 
 /** A number as a person writes it: the XML's `60.0000` is `60`. */
@@ -439,7 +480,8 @@ export function gotoDefinitionTitle(row: AbilityRow): string {
  * line: its detail already says what, and pressing it shows you.
  */
 export function abilityBarTitle(row: AbilityRow): string {
-    const head = row.label === row.type ? row.type : `${row.label} (${row.type})`;
+    const head =
+        row.label === row.type ? row.type : `${row.label} (${row.type})`;
     const lines = [head];
 
     if (row.description !== null) {
@@ -454,7 +496,7 @@ export function abilityBarTitle(row: AbilityRow): string {
         lines.push(row.title);
     }
 
-    return lines.join('\n');
+    return lines.join("\n");
 }
 
 /**
@@ -472,21 +514,31 @@ export function abilityFacts(row: AbilityRow): [string, string][] {
         value === null ? null : `${value}s`;
 
     const rows: [string, string | null][] = [
-        ['Recharge', seconds(row.rechargeSeconds)],
-        ['Lasts', seconds(row.expirationSeconds)],
-        ['Defined by', row.guiName],
-        ['Effect', row.particleEffect],
-        ['On bone', row.ownerAttachmentBone],
-        ['Effects driven', row.proxyCount === 0 ? null : String(row.proxyCount)],
-        ['Deploy clip', row.deployClip],
-        ['Undeploy clip', row.undeployClip],
+        ["Recharge", seconds(row.rechargeSeconds)],
+        ["Lasts", seconds(row.expirationSeconds)],
+        ["Defined by", row.guiName],
+        ["Effect", row.particleEffect],
+        ["On bone", row.ownerAttachmentBone],
+        [
+            "Effects driven",
+            row.proxyCount === 0 ? null : String(row.proxyCount),
+        ],
+        ["Deploy clip", row.deployClip],
+        ["Undeploy clip", row.undeployClip],
         // As the game writes them - `speed x0.8` - so a reader can match the line against the XML
         // without translating it first.
-        ['Modifiers', row.modifiers.length === 0
-            ? null
-            : row.modifiers.map(m => `${m.stat.toLowerCase()} x${m.factor}`).join(', ')],
+        [
+            "Modifiers",
+            row.modifiers.length === 0
+                ? null
+                : row.modifiers
+                      .map((m) => `${m.stat.toLowerCase()} x${m.factor}`)
+                      .join(", "),
+        ],
     ];
 
-    return rows.filter((entry): entry is [string, string] =>
-        entry[1] !== null && entry[1] !== undefined && entry[1] !== '');
+    return rows.filter(
+        (entry): entry is [string, string] =>
+            entry[1] !== null && entry[1] !== undefined && entry[1] !== "",
+    );
 }

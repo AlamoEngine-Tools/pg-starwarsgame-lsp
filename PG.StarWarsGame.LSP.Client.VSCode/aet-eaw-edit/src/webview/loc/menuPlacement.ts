@@ -33,9 +33,10 @@ export function placeMenu(
     return {
         left: axis(anchor.x, size.width, viewport.width),
         top: axis(anchor.y, size.height, viewport.height),
-        maxHeight: size.height > viewport.height - MARGIN * 2
-            ? viewport.height - MARGIN * 2
-            : null,
+        maxHeight:
+            size.height > viewport.height - MARGIN * 2
+                ? viewport.height - MARGIN * 2
+                : null,
     };
 }
 

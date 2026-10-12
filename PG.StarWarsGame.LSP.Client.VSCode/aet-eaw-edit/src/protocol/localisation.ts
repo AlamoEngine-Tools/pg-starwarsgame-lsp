@@ -14,9 +14,9 @@
  */
 export const LOC_CATEGORY = {
     /** Keyed: one entry per key, order irrelevant. The usual MasterText case. */
-    text: 'text',
+    text: "text",
     /** Ordered: duplicate keys allowed, row order significant. */
-    credits: 'credits',
+    credits: "credits",
 } as const;
 
 // ── aet/getLocalisationProjects ──────────────────────────────────────────────

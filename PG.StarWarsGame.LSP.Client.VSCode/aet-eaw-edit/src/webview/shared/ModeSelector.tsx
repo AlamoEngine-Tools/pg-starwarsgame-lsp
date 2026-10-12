@@ -15,10 +15,10 @@
 // pressed state say nothing about being alternatives to one another, which is the one fact about
 // this control worth telling a screen reader.
 
-import * as React from 'react';
+import * as React from "react";
 
-import {type ChoiceOption} from './choice';
-import {Icon} from './Icon';
+import { type ChoiceOption } from "./choice";
+import { Icon } from "./Icon";
 
 export function ModeSelector<Id extends string>(props: {
     /**
@@ -35,25 +35,33 @@ export function ModeSelector<Id extends string>(props: {
     label: string;
 }): React.JSX.Element {
     return (
-        <span className="mode-selector" role="radiogroup" aria-label={props.label}>
-            {props.options.map(option => (
+        <span
+            className="mode-selector"
+            role="radiogroup"
+            aria-label={props.label}
+        >
+            {props.options.map((option) => (
                 <button
                     key={option.id}
                     type="button"
                     role="radio"
                     aria-checked={option.id === props.value}
-                    className={option.id === props.value ? 'active' : ''}
+                    className={option.id === props.value ? "active" : ""}
                     disabled={option.disabled ?? false}
                     // The reason outranks both: it is the only thing worth saying about an option
                     // that cannot be taken.
-                    title={option.disabled
-                        ? option.disabledReason
-                        : option.title ?? option.label}
+                    title={
+                        option.disabled
+                            ? option.disabledReason
+                            : (option.title ?? option.label)
+                    }
                     onClick={() => props.onSelect(option.id)}
                 >
-                    {option.icon === undefined
-                        ? option.label
-                        : <Icon name={option.icon}/>}
+                    {option.icon === undefined ? (
+                        option.label
+                    ) : (
+                        <Icon name={option.icon} />
+                    )}
                 </button>
             ))}
         </span>

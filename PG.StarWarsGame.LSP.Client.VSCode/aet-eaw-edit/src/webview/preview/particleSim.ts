@@ -11,7 +11,11 @@
 // seeded from Math.random cannot be tested at all, and "the sparks go the wrong way" is otherwise
 // only ever settled by squinting at it.
 
-import type {AlamoEmitter, AlamoSpawnVolume, AlamoTrack} from '../../protocol/modelPreview';
+import type {
+    AlamoEmitter,
+    AlamoSpawnVolume,
+    AlamoTrack,
+} from "../../protocol/modelPreview";
 
 /** Named for what it is: a value in [0, 1). */
 export type Random = () => number;
@@ -120,7 +124,7 @@ export function sampleTrack(track: AlamoTrack, t: number): number {
     const a = keys[i];
     const b = keys[i + 1];
 
-    if (track.interpolation === 'Step') {
+    if (track.interpolation === "Step") {
         return a.value;
     }
 
@@ -129,7 +133,7 @@ export function sampleTrack(track: AlamoTrack, t: number): number {
     const u = span <= 0 ? 0 : (clamped - a.time) / span;
 
     // Smoothstep, which is what the engine's "smooth" mode is: ease in and out, same endpoints.
-    const eased = track.interpolation === 'Smooth' ? u * u * (3 - 2 * u) : u;
+    const eased = track.interpolation === "Smooth" ? u * u * (3 - 2 * u) : u;
 
     return a.value + (b.value - a.value) * eased;
 }
@@ -142,14 +146,14 @@ export function sampleTrack(track: AlamoTrack, t: number): number {
  */
 export function sampleVolume(volume: AlamoSpawnVolume, random: Random): Vec3 {
     switch (volume.shape) {
-        case 'Box':
+        case "Box":
             return {
                 x: lerp(volume.min.x, volume.max.x, random()),
                 y: lerp(volume.min.y, volume.max.y, random()),
                 z: lerp(volume.min.z, volume.max.z, random()),
             };
 
-        case 'Cube': {
+        case "Cube": {
             const half = volume.sideLength / 2;
             return {
                 x: lerp(-half, half, random()),
@@ -158,11 +162,15 @@ export function sampleVolume(volume: AlamoSpawnVolume, random: Random): Vec3 {
             };
         }
 
-        case 'Sphere':
-            return onSphere(random,
-                volume.sphereEdgeOnly ? volume.sphereRadius : volume.sphereRadius * cubeRoot(random()));
+        case "Sphere":
+            return onSphere(
+                random,
+                volume.sphereEdgeOnly
+                    ? volume.sphereRadius
+                    : volume.sphereRadius * cubeRoot(random()),
+            );
 
-        case 'Cylinder': {
+        case "Cylinder": {
             const angle = random() * Math.PI * 2;
             // Edge-only puts everything on the wall; otherwise the area grows with the radius, so a
             // uniform radius would crowd the axis.
@@ -179,7 +187,7 @@ export function sampleVolume(volume: AlamoSpawnVolume, random: Random): Vec3 {
 
         default:
             // Point: one exact value, not random at all.
-            return {...volume.exactValue};
+            return { ...volume.exactValue };
     }
 }
 
@@ -194,17 +202,17 @@ export function sampleVolume(volume: AlamoSpawnVolume, random: Random): Vec3 {
  */
 export function volumeExtent(volume: AlamoSpawnVolume): number {
     switch (volume.shape) {
-        case 'Box':
+        case "Box":
             return Math.max(length(volume.min), length(volume.max));
 
-        case 'Cube':
+        case "Cube":
             // To the corner, not the face - half a side would leave the corners outside the frame.
             return (volume.sideLength / 2) * Math.sqrt(3);
 
-        case 'Sphere':
+        case "Sphere":
             return volume.sphereRadius;
 
-        case 'Cylinder':
+        case "Cylinder":
             return Math.hypot(volume.cylinderRadius, volume.cylinderHeight);
 
         default:
@@ -221,16 +229,21 @@ export function volumeExtent(volume: AlamoSpawnVolume): number {
  */
 export function emitterExtent(emitter: AlamoEmitter): number {
     const lifetimeFromVolume = volumeExtent(emitter.lifetime);
-    const lifetime = lifetimeFromVolume > 0 ? lifetimeFromVolume : emitter.properties.lifetime;
+    const lifetime =
+        lifetimeFromVolume > 0
+            ? lifetimeFromVolume
+            : emitter.properties.lifetime;
 
-    const reach = volumeExtent(emitter.position) + volumeExtent(emitter.speed) * lifetime;
+    const reach =
+        volumeExtent(emitter.position) + volumeExtent(emitter.speed) * lifetime;
 
     // The sprite is often the bigger half: p_explosion_huge01's smoke travels about 14 units and then
     // draws itself 224 across. Scale is a half-extent, matching the engine's own quad.
-    const scale = trackFor(emitter, 'Scale');
-    const sprite = scale === undefined
-        ? 0
-        : Math.max(0, ...scale.keys.map(key => key.value));
+    const scale = trackFor(emitter, "Scale");
+    const sprite =
+        scale === undefined
+            ? 0
+            : Math.max(0, ...scale.keys.map((key) => key.value));
 
     const extent = reach + sprite;
 
@@ -255,9 +268,11 @@ export function systemExtent(emitters: readonly AlamoEmitter[]): number {
     const extents = emitters.map(emitterExtent).sort((a, b) => a - b);
     const median = extents[Math.floor((extents.length - 1) / 2)];
 
-    const sprites = emitters.map(emitter => {
-        const scale = trackFor(emitter, 'Scale');
-        return scale === undefined ? 0 : Math.max(0, ...scale.keys.map(key => key.value));
+    const sprites = emitters.map((emitter) => {
+        const scale = trackFor(emitter, "Scale");
+        return scale === undefined
+            ? 0
+            : Math.max(0, ...scale.keys.map((key) => key.value));
     });
 
     return Math.max(median, ...sprites);
@@ -273,7 +288,11 @@ function onSphere(random: Random, radius: number): Vec3 {
     const angle = random() * Math.PI * 2;
     const r = Math.sqrt(Math.max(0, 1 - z * z));
 
-    return {x: Math.cos(angle) * r * radius, y: Math.sin(angle) * r * radius, z: z * radius};
+    return {
+        x: Math.cos(angle) * r * radius,
+        y: Math.sin(angle) * r * radius,
+        z: z * radius,
+    };
 }
 
 function cubeRoot(v: number): number {
@@ -303,7 +322,11 @@ export class SpawnClock {
     /** True once a burst emitter has fired every burst it was given. */
     get finished(): boolean {
         const limit = this.emitter.properties.burstCount;
-        return this.emitter.properties.useBursts && limit > 0 && this.burstsFired >= limit;
+        return (
+            this.emitter.properties.useBursts &&
+            limit > 0 &&
+            this.burstsFired >= limit
+        );
     }
 
     /** How many particles this step wants, and whether the emitter has finished for good. */
@@ -318,11 +341,16 @@ export class SpawnClock {
             let count = 0;
             const limit = this.emitter.properties.burstCount;
 
-            while (this.elapsed >= this.nextBurst
-            && (limit === 0 || this.burstsFired < limit)) {
+            while (
+                this.elapsed >= this.nextBurst &&
+                (limit === 0 || this.burstsFired < limit)
+            ) {
                 count += this.emitter.properties.particlesPerBurst;
                 this.burstsFired++;
-                this.nextBurst += Math.max(this.emitter.properties.burstDelay, 1e-4);
+                this.nextBurst += Math.max(
+                    this.emitter.properties.burstDelay,
+                    1e-4,
+                );
             }
 
             return count;
@@ -337,7 +365,9 @@ export class SpawnClock {
 
 /** Creates one particle at birth, drawing everything random about it now. */
 export function spawnParticle(
-    emitter: AlamoEmitter, random: Random, wind: Vec3 = {x: 0, y: 0, z: 0},
+    emitter: AlamoEmitter,
+    random: Random,
+    wind: Vec3 = { x: 0, y: 0, z: 0 },
 ): Particle {
     const properties = emitter.properties;
 
@@ -346,29 +376,39 @@ export function spawnParticle(
     const lifetimeSample = sampleVolume(emitter.lifetime, random);
 
     // The lifetime volume yields a vector because the record is shared; only x is a duration.
-    const baseLifetime = lifetimeSample.x !== 0 ? lifetimeSample.x : properties.lifetime;
+    const baseLifetime =
+        lifetimeSample.x !== 0 ? lifetimeSample.x : properties.lifetime;
     const lifetime = Math.max(
-        0.01, baseLifetime * (1 + (random() * 2 - 1) * properties.randomLifetimePercent));
+        0.01,
+        baseLifetime *
+            (1 + (random() * 2 - 1) * properties.randomLifetimePercent),
+    );
 
     // Two different things wear the same track. With `randomRotation` the particle takes a FIXED
     // angle from the average and the speed track is not read at all; without it the particle starts
     // square-on and the track is integrated over its life. The direction flips either way.
     const rotation = properties.randomRotation
-        ? properties.randomRotationAverage
-        * (1 + (random() * 2 - 1) * properties.randomRotationVariance)
+        ? properties.randomRotationAverage *
+          (1 + (random() * 2 - 1) * properties.randomRotationVariance)
         : 0;
 
-    const direction = properties.randomRotationDirection && random() < 0.5 ? -1 : 1;
+    const direction =
+        properties.randomRotationDirection && random() < 0.5 ? -1 : 1;
 
     // Downwind, once, at birth: `if (affectedByWind) initialSpeed += GetWind()`. 484 of the
     // corpus's 1019 emitters set the flag, so half the drifting smoke in the game depends on it.
-    const blown = properties.affectedByWind ? wind : {x: 0, y: 0, z: 0};
+    const blown = properties.affectedByWind ? wind : { x: 0, y: 0, z: 0 };
 
     // The direction the particle was born in, which is what the inward terms pull along.
     const spread = Math.hypot(position.x, position.y, position.z);
-    const inward = spread < 1e-6
-        ? {x: 0, y: 0, z: 0}
-        : {x: position.x / spread, y: position.y / spread, z: position.z / spread};
+    const inward =
+        spread < 1e-6
+            ? { x: 0, y: 0, z: 0 }
+            : {
+                  x: position.x / spread,
+                  y: position.y / spread,
+                  z: position.z / spread,
+              };
 
     return {
         position,
@@ -401,13 +441,14 @@ export function spawnParticle(
  * asking for a brightness jitter got a colour jitter instead.
  */
 function colourAddition(
-    properties: AlamoEmitter['properties'], random: () => number,
+    properties: AlamoEmitter["properties"],
+    random: () => number,
 ): { r: number; g: number; b: number; a: number } {
     const max = properties.randomColors;
     const red = random() * max.x;
 
     if (properties.colorAddGrayscale) {
-        return {r: red, g: red, b: red, a: red};
+        return { r: red, g: red, b: red, a: red };
     }
 
     return {
@@ -438,7 +479,7 @@ function saturate(value: number): number {
  * Not used for the 31 emitters that set `objectSpaceAcceleration`: theirs is a vector in the
  * EMITTER's own frame, and the caller rotates it by that instead.
  */
-export function accelerationIn(properties: AlamoEmitter['properties']): Vec3 {
+export function accelerationIn(properties: AlamoEmitter["properties"]): Vec3 {
     return {
         x: properties.acceleration.x,
         y: properties.acceleration.z - properties.gravity,
@@ -447,7 +488,10 @@ export function accelerationIn(properties: AlamoEmitter['properties']): Vec3 {
 }
 
 export function stepParticle(
-    particle: Particle, emitter: AlamoEmitter, dt: number, groundY = 0,
+    particle: Particle,
+    emitter: AlamoEmitter,
+    dt: number,
+    groundY = 0,
     acceleration: Vec3 = accelerationIn(emitter.properties),
 ): boolean {
     const properties = emitter.properties;
@@ -477,17 +521,25 @@ export function stepParticle(
     // `groundY`, not zero. Particle positions are relative to the system's root, which is attached to a
     // bone, so a bare `y < 0` puts the ground at whatever height that bone sits at - the dirt of an
     // explosion partway up a hull vanished in mid-air the moment it was thrown.
-    if (properties.groundBehavior !== 'None' && particle.position.y < groundY) {
-        applyGround(particle, properties.groundBehavior, properties.bounciness, groundY);
+    if (properties.groundBehavior !== "None" && particle.position.y < groundY) {
+        applyGround(
+            particle,
+            properties.groundBehavior,
+            properties.bounciness,
+            groundY,
+        );
     }
 
     return true;
 }
 
 function applyGround(
-    particle: Particle, behavior: string, bounciness: number, groundY: number,
+    particle: Particle,
+    behavior: string,
+    bounciness: number,
+    groundY: number,
 ): void {
-    if (behavior === 'Disappear') {
+    if (behavior === "Disappear") {
         // Aged out rather than removed here, so one rule retires particles.
         particle.age = particle.lifetime;
         return;
@@ -495,7 +547,7 @@ function applyGround(
 
     particle.position.y = groundY;
 
-    if (behavior === 'Bounce') {
+    if (behavior === "Bounce") {
         particle.velocity.y = Math.abs(particle.velocity.y) * bounciness;
         return;
     }
@@ -550,13 +602,15 @@ export function integrateTrack(track: AlamoTrack, t: number): number {
         // How far into this segment the particle has got, as a fraction of it.
         const u = Math.min(1, (until - from.time) / span);
 
-        const area = track.interpolation === 'Step'
-            ? from.value * u
-            : track.interpolation === 'Smooth'
-                // The integral of the cubic ease, which is what Smooth interpolates with.
-                ? (from.value - to.value) * u ** 4 / 2 + (to.value - from.value) * u ** 3
-                + from.value * u
-                : u * (from.value + u * (to.value - from.value) / 2);
+        const area =
+            track.interpolation === "Step"
+                ? from.value * u
+                : track.interpolation === "Smooth"
+                  ? // The integral of the cubic ease, which is what Smooth interpolates with.
+                    ((from.value - to.value) * u ** 4) / 2 +
+                    (to.value - from.value) * u ** 3 +
+                    from.value * u
+                  : u * (from.value + (u * (to.value - from.value)) / 2);
 
         total += area * span;
     }
@@ -568,7 +622,10 @@ export function integrateTrack(track: AlamoTrack, t: number): number {
     return total;
 }
 
-export function appearanceOf(particle: Particle, emitter: AlamoEmitter): ParticleAppearance {
+export function appearanceOf(
+    particle: Particle,
+    emitter: AlamoEmitter,
+): ParticleAppearance {
     const t = particle.lifetime <= 0 ? 1 : particle.age / particle.lifetime;
 
     const channel = (name: string, fallback: number): number => {
@@ -577,27 +634,29 @@ export function appearanceOf(particle: Particle, emitter: AlamoEmitter): Particl
     };
 
     return {
-        r: saturate(channel('Red', 1) + particle.addition.r),
-        g: saturate(channel('Green', 1) + particle.addition.g),
-        b: saturate(channel('Blue', 1) + particle.addition.b),
-        a: saturate(channel('Alpha', 1) + particle.addition.a),
+        r: saturate(channel("Red", 1) + particle.addition.r),
+        g: saturate(channel("Green", 1) + particle.addition.g),
+        b: saturate(channel("Blue", 1) + particle.addition.b),
+        a: saturate(channel("Alpha", 1) + particle.addition.a),
         // HALF the scale track. Both references agree and neither says so out loud: the editor
         // builds its quad at `baseScale * scaleSample / 2` (`EmitterInstance.cpp:538`), and
         // alo-viewer turns the same track into a size plugin at `value / 2`
         // (`ParticleSystem.cpp:734`) before drawing at +/-size. Taking the raw value made every
         // sprite twice as wide and four times the area, which on an additive effect - a jetpack,
         // a flamethrower - reads as far too intense.
-        size: channel('Scale', 1) * HALF * particle.scaleJitter,
+        size: channel("Scale", 1) * HALF * particle.scaleJitter,
         // A fixed angle for a random-rotation particle, otherwise the integral of the speed track
         // over the life so far. Either way the direction drawn at birth decides which way round.
-        rotation: particle.direction * (particle.rotation + spin(particle, emitter, t)),
-        frame: Math.max(0, Math.floor(channel('TextureIndex', 0))),
+        rotation:
+            particle.direction *
+            (particle.rotation + spin(particle, emitter, t)),
+        frame: Math.max(0, Math.floor(channel("TextureIndex", 0))),
     };
 }
 
 /** How far a particle has turned by `t`, in turns. Zero for the emitters that do not spin. */
 function spin(particle: Particle, emitter: AlamoEmitter, t: number): number {
-    const track = trackFor(emitter, 'RotationSpeed');
+    const track = trackFor(emitter, "RotationSpeed");
 
     if (track === undefined || emitter.properties.randomRotation) {
         return 0;
@@ -608,8 +667,11 @@ function spin(particle: Particle, emitter: AlamoEmitter, t: number): number {
     return integrateTrack(track, t) * particle.lifetime;
 }
 
-function trackFor(emitter: AlamoEmitter, channel: string): AlamoTrack | undefined {
-    return emitter.tracks.find(track => track.channel === channel);
+function trackFor(
+    emitter: AlamoEmitter,
+    channel: string,
+): AlamoTrack | undefined {
+    return emitter.tracks.find((track) => track.channel === channel);
 }
 
 /**
@@ -632,11 +694,14 @@ export function atlasColumns(textureSize: number): number {
  * Rows run top-down from frame 0, which is how the engine indexes them and how a DDS stores its rows.
  */
 export function atlasFrame(
-    frame: number, textureSize: number,
+    frame: number,
+    textureSize: number,
 ): { u: number; v: number; size: number } {
     const columns = atlasColumns(textureSize);
     const size = 1 / columns;
-    const index = ((frame % (columns * columns)) + columns * columns) % (columns * columns);
+    const index =
+        ((frame % (columns * columns)) + columns * columns) %
+        (columns * columns);
 
     return {
         u: (index % columns) * size,

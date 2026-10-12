@@ -4,3 +4,7 @@
 # bash cannot run a script with CRLF line endings, and both setup scripts read the manifest
 *.sh text eol=lf
 workspace.deps text eol=lf
+
+# Prettier formats the client's TypeScript with LF (its default); a CRLF checkout would fail its check
+PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/src/**/*.ts text eol=lf
+PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/src/**/*.tsx text eol=lf

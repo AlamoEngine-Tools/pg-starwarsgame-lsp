@@ -9,10 +9,10 @@
 // which is the same state machine with an extra variable that can disagree with the first. Both
 // also spelled out the identical four-branch load: no server, error, empty, items.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {LspGateway, LspOutcome} from './lsp/lspGateway';
-import {emptyNavigatorMessage} from './navigatorPlaceholder';
+import { LspGateway, LspOutcome } from "./lsp/lspGateway";
+import { emptyNavigatorMessage } from "./navigatorPlaceholder";
 
 /**
  * A tree view fed by one `aet/*` request.
@@ -20,8 +20,10 @@ import {emptyNavigatorMessage} from './navigatorPlaceholder';
  * @typeParam TItem The view's TreeItem type.
  * @typeParam TData What the request returns for the tree to build itself from.
  */
-export abstract class LspTreeDataProvider<TItem extends vscode.TreeItem, TData>
-    implements vscode.TreeDataProvider<TItem> {
+export abstract class LspTreeDataProvider<
+    TItem extends vscode.TreeItem,
+    TData,
+> implements vscode.TreeDataProvider<TItem> {
     /**
      * The last answer, or undefined for "not fetched, or the last fetch failed".
      *
@@ -33,7 +35,9 @@ export abstract class LspTreeDataProvider<TItem extends vscode.TreeItem, TData>
     protected abstract readonly method: string;
     /** What the view is showing, for the empty-state line: "localisation files", "story campaigns". */
     protected abstract readonly subject: string;
-    private readonly _onDidChangeTreeData = new vscode.EventEmitter<TItem | undefined>();
+    private readonly _onDidChangeTreeData = new vscode.EventEmitter<
+        TItem | undefined
+    >();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     // ── what a subclass supplies ─────────────────────────────────────────────
@@ -46,8 +50,7 @@ export abstract class LspTreeDataProvider<TItem extends vscode.TreeItem, TData>
      */
     private _scanned = false;
 
-    protected constructor(protected readonly lsp: LspGateway) {
-    }
+    protected constructor(protected readonly lsp: LspGateway) {}
 
     refresh(): void {
         this.data = undefined;
@@ -71,7 +74,10 @@ export abstract class LspTreeDataProvider<TItem extends vscode.TreeItem, TData>
         // Left uncached on any failure. The view then fetches when it is opened, which is where a
         // failure has somewhere to be shown - here there is no row to put it in.
         const outcome = await this.lsp.request<TData>(this.method);
-        this.data = outcome.ok && !this.errorOf(outcome.value) ? outcome.value : undefined;
+        this.data =
+            outcome.ok && !this.errorOf(outcome.value)
+                ? outcome.value
+                : undefined;
 
         this._onDidChangeTreeData.fire(undefined);
     }
@@ -81,7 +87,9 @@ export abstract class LspTreeDataProvider<TItem extends vscode.TreeItem, TData>
     }
 
     async getChildren(element?: TItem): Promise<TItem[]> {
-        return element === undefined ? this._loadRoot() : this.childrenOf(element);
+        return element === undefined
+            ? this._loadRoot()
+            : this.childrenOf(element);
     }
 
     /** The error the payload carries, if any. Server results report failure in-band. */
@@ -112,9 +120,11 @@ export abstract class LspTreeDataProvider<TItem extends vscode.TreeItem, TData>
      * Overridable because the two navigators word a broken request differently - one names the
      * error, the other keeps it short - and neither is wrong.
      */
-    protected failureMessage(outcome: Extract<LspOutcome<TData>, { ok: false }>): string {
-        return outcome.reason === 'offline'
-            ? 'LSP server is not running.'
+    protected failureMessage(
+        outcome: Extract<LspOutcome<TData>, { ok: false }>,
+    ): string {
+        return outcome.reason === "offline"
+            ? "LSP server is not running."
             : `Could not read ${this.subject} from the server.`;
     }
 
@@ -139,7 +149,11 @@ export abstract class LspTreeDataProvider<TItem extends vscode.TreeItem, TData>
 
     private _present(data: TData): TItem[] {
         return this.isEmpty(data)
-            ? [this.infoItem(emptyNavigatorMessage(this._scanned, this.subject))]
+            ? [
+                  this.infoItem(
+                      emptyNavigatorMessage(this._scanned, this.subject),
+                  ),
+              ]
             : this.rootItems(data);
     }
 }

@@ -6,22 +6,31 @@
 // The schema documents params in sentences, which is right for hover text and far too long for a
 // 280px node body. These take the first useful phrase out of one.
 
-import {StoryParamSchemaDto} from '../../protocol';
+import { StoryParamSchemaDto } from "../../protocol";
 
 /**
  * The row label for a param: the schema's label when it has one, else the first phrase of its
  * description, else the generic name by position ("Param 3"). The description stays the tooltip.
  */
-export function paramLabel(schema: StoryParamSchemaDto | undefined, generic: string): string {
+export function paramLabel(
+    schema: StoryParamSchemaDto | undefined,
+    generic: string,
+): string {
     const label = schema?.label?.trim();
-    return (label && label.length ? label : null) ?? shortParamLabel(schema) ?? generic;
+    return (
+        (label && label.length ? label : null) ??
+        shortParamLabel(schema) ??
+        generic
+    );
 }
 
 /**
  * A short row label from a param description ("Attacker faction." -> "Attacker faction"), or null
  * when the schema has nothing usable - the caller falls back to "Param N".
  */
-export function shortParamLabel(schema: StoryParamSchemaDto | undefined): string | null {
+export function shortParamLabel(
+    schema: StoryParamSchemaDto | undefined,
+): string | null {
     const description = schema?.description?.trim();
     if (!description) {
         return null;
@@ -39,7 +48,9 @@ export function shortParamLabel(schema: StoryParamSchemaDto | undefined): string
  * "1 = loop the movie; 0 = ..." becomes "Loop the movie". Null when the description has another
  * shape, which is the caller's cue to use the generic label instead.
  */
-export function booleanParamLabel(description: string | null | undefined): string | null {
+export function booleanParamLabel(
+    description: string | null | undefined,
+): string | null {
     if (!description) {
         return null;
     }

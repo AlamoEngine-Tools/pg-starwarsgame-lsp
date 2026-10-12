@@ -7,8 +7,8 @@
 // is exactly the framing an icon wants. The other 87% declare none, and say so rather than dropping
 // the control: a reader who never sees the entry never learns the feature is there.
 
-import {type PreviewCamera} from '../../protocol/modelPreview';
-import {type ChoiceOption} from '../shared/choice';
+import { type PreviewCamera } from "../../protocol/modelPreview";
+import { type ChoiceOption } from "../shared/choice";
 
 /** One selectable camera, or the one disabled entry that stands in for none. */
 export type ModelCameraEntry = ChoiceOption<string> & {
@@ -41,14 +41,14 @@ export type ModelCameraEntry = ChoiceOption<string> & {
 
 /** What the list says when the subject declares no camera of its own. */
 const NONE: ModelCameraEntry = {
-    id: 'camera:none',
-    label: 'Author',
+    id: "camera:none",
+    label: "Author",
     // 447 of the 3340 shipped models carry one, as a Camera01 / Camera01.Target bone pair. That is
     // the note at the top of this file, which is where it belongs - a reader who wants to know what
     // the entry IS has the disabled button in front of them saying this model has none.
     title: "Look from the model's own camera",
     disabled: true,
-    disabledReason: 'Author - this model carries no camera of its own',
+    disabledReason: "Author - this model carries no camera of its own",
     position: null,
     target: null,
 };
@@ -58,7 +58,9 @@ const NONE: ModelCameraEntry = {
  *
  * Ordered as the file lists them, because a model with several numbered them for a reason.
  */
-export function modelCameraEntries(cameras: readonly PreviewCamera[]): ModelCameraEntry[] {
+export function modelCameraEntries(
+    cameras: readonly PreviewCamera[],
+): ModelCameraEntry[] {
     if (cameras.length === 0) {
         return [NONE];
     }
@@ -74,7 +76,6 @@ export function modelCameraEntries(cameras: readonly PreviewCamera[]): ModelCame
         target: camera.target ?? null,
     }));
 }
-
 
 /**
  * One entry in the camera group on the stage - a preset, or a camera the model carries.
@@ -106,7 +107,7 @@ export function cameraViewOptions(
     cameras: readonly PreviewCamera[],
 ): CameraViewOption[] {
     return [
-        ...presets.map(preset => ({
+        ...presets.map((preset) => ({
             id: preset.view,
             label: preset.label,
             title: preset.title,
@@ -142,15 +143,20 @@ export function cameraPose(camera: {
     position?: readonly number[] | null;
     target?: readonly number[] | null;
 }): CameraPose | null {
-    const at = (v: readonly number[] | null | undefined): CameraPose['position'] | null =>
-        v === null || v === undefined || v.length < 3 || v.some(n => !Number.isFinite(n))
+    const at = (
+        v: readonly number[] | null | undefined,
+    ): CameraPose["position"] | null =>
+        v === null ||
+        v === undefined ||
+        v.length < 3 ||
+        v.some((n) => !Number.isFinite(n))
             ? null
-            // Alamo (x, y, z) -> scene (x, z, -y). The `+ 0` normalises the negative zero that
-            // -0 produces, which reads as a real value everywhere it surfaces.
-            : {x: v[0], y: v[2], z: -v[1] + 0};
+            : // Alamo (x, y, z) -> scene (x, z, -y). The `+ 0` normalises the negative zero that
+              // -0 produces, which reads as a real value everywhere it surfaces.
+              { x: v[0], y: v[2], z: -v[1] + 0 };
 
     const position = at(camera.position);
     const target = at(camera.target);
 
-    return position === null || target === null ? null : {position, target};
+    return position === null || target === null ? null : { position, target };
 }

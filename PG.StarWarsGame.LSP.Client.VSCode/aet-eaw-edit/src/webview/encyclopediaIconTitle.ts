@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import {EncyclopediaIcon} from '../protocol/encyclopedia';
+import { EncyclopediaIcon } from "../protocol/encyclopedia";
 
 /**
  * Hover text for the card's portrait, naming where its pixels came from.
@@ -13,19 +13,21 @@ import {EncyclopediaIcon} from '../protocol/encyclopedia';
  *
  * Split out of the card so it can be tested without a DOM: the webview suite is pure logic modules.
  */
-export function encyclopediaIconTitle(icon: EncyclopediaIcon | null | undefined): string {
+export function encyclopediaIconTitle(
+    icon: EncyclopediaIcon | null | undefined,
+): string {
     if (!icon) {
-        return 'No icon resolved for this object';
+        return "No icon resolved for this object";
     }
     if (icon.isMegaTextureStale) {
         return `${icon.name} - from a source image; this project's mega texture does not contain it yet, so the game will not show it`;
     }
     switch (icon.source) {
-        case 'WorkspaceMegaTexture':
+        case "WorkspaceMegaTexture":
             return `${icon.name} - from this project's mega texture`;
-        case 'LooseSource':
+        case "LooseSource":
             return `${icon.name} - from a source image in this project`;
-        case 'Fallback':
+        case "Fallback":
             return `${icon.name} - not found in any mega texture or source folder; showing a placeholder`;
         default:
             return `${icon.name} - from the base game`;

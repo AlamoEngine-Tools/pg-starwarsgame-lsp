@@ -16,8 +16,8 @@ export interface PgprojMigrationProposal {
 }
 
 /** The two answers, as they appear on the buttons. */
-export const ACCEPT = 'Update project file';
-export const DECLINE = 'Discard and stop';
+export const ACCEPT = "Update project file";
+export const DECLINE = "Discard and stop";
 
 /** Title of the diff tab: which file, and which direction the change runs. */
 export function diffTitle(fileName: string): string {
@@ -33,14 +33,17 @@ export function diffTitle(fileName: string): string {
  * by hand.
  */
 export function proposalMessage(proposal: PgprojMigrationProposal): string {
-    const notices = proposal.notices.length > 0 ? ` ${proposal.notices.join(' ')}` : '';
-    return `'${proposal.fileName}' uses an older project format.${notices}`
-        + ' Review the changes and update the file? Comments in it are not preserved, and a backup'
-        + ' is written next to it first. Declining stops the language server.';
+    const notices =
+        proposal.notices.length > 0 ? ` ${proposal.notices.join(" ")}` : "";
+    return (
+        `'${proposal.fileName}' uses an older project format.${notices}` +
+        " Review the changes and update the file? Comments in it are not preserved, and a backup" +
+        " is written next to it first. Declining stops the language server."
+    );
 }
 
 /** What the client does next, given what the user picked (or dismissed). */
-export type ProposalOutcome = 'accept' | 'decline';
+export type ProposalOutcome = "accept" | "decline";
 
 /**
  * Anything that is not an explicit yes is a decline.
@@ -50,11 +53,13 @@ export type ProposalOutcome = 'accept' | 'decline';
  * project file because somebody pressed Escape.
  */
 export function outcomeOf(answer: string | undefined): ProposalOutcome {
-    return answer === ACCEPT ? 'accept' : 'decline';
+    return answer === ACCEPT ? "accept" : "decline";
 }
 
 /** What the user is told once the server has stopped, so the state is not a mystery. */
 export function declinedMessage(fileName: string): string {
-    return `'${fileName}' was left unchanged, so aet-eaw-edit has stopped. `
-        + 'Update the project file, or reload the window to be asked again.';
+    return (
+        `'${fileName}' was left unchanged, so aet-eaw-edit has stopped. ` +
+        "Update the project file, or reload the window to be asked again."
+    );
 }

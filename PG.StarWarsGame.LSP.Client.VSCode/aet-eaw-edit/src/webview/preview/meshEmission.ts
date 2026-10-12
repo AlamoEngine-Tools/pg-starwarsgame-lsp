@@ -12,7 +12,10 @@
 // multiplier at `:1040`. Kept free of three.js so the walk order and the barycentric sampling can
 // be tested directly.
 
-import type {AlamoEmitFromMesh, AlamoVector3} from '../../protocol/modelPreview';
+import type {
+    AlamoEmitFromMesh,
+    AlamoVector3,
+} from "../../protocol/modelPreview";
 
 /** A source of positions and normals to emit from. Sub-meshes are kept apart, as the engine does. */
 export interface EmissionMesh {
@@ -39,7 +42,10 @@ export interface EmissionPoint {
 
 /** How many vertices a mesh offers, across every sub-mesh. */
 export function vertexCount(mesh: EmissionMesh): number {
-    return mesh.subMeshes.reduce((total, sub) => total + sub.positions.length / 3, 0);
+    return mesh.subMeshes.reduce(
+        (total, sub) => total + sub.positions.length / 3,
+        0,
+    );
 }
 
 /**
@@ -50,8 +56,11 @@ export function vertexCount(mesh: EmissionMesh): number {
  * line is most of why a system attached this way looks nothing like the same system attached to a
  * bone.
  */
-export function emissionMultiplier(mode: AlamoEmitFromMesh, mesh: EmissionMesh | null): number {
-    if (mode !== 'EveryVertex' || mesh === null) {
+export function emissionMultiplier(
+    mode: AlamoEmitFromMesh,
+    mesh: EmissionMesh | null,
+): number {
+    if (mode !== "EveryVertex" || mesh === null) {
         return 1;
     }
 
@@ -59,14 +68,24 @@ export function emissionMultiplier(mode: AlamoEmitFromMesh, mesh: EmissionMesh |
 }
 
 function vertexAt(
-    mesh: EmissionMesh, subMesh: number, vertex: number,
+    mesh: EmissionMesh,
+    subMesh: number,
+    vertex: number,
 ): EmissionPoint {
     const sub = mesh.subMeshes[subMesh];
     const at = vertex * 3;
 
     return {
-        position: {x: sub.positions[at], y: sub.positions[at + 1], z: sub.positions[at + 2]},
-        normal: {x: sub.normals[at] ?? 0, y: sub.normals[at + 1] ?? 0, z: sub.normals[at + 2] ?? 0},
+        position: {
+            x: sub.positions[at],
+            y: sub.positions[at + 1],
+            z: sub.positions[at + 2],
+        },
+        normal: {
+            x: sub.normals[at] ?? 0,
+            y: sub.normals[at + 1] ?? 0,
+            z: sub.normals[at + 2] ?? 0,
+        },
     };
 }
 
@@ -83,16 +102,18 @@ export function emissionPoint(
     cursor: EmissionCursor,
     random: () => number,
 ): EmissionPoint | null {
-    const usable = mesh.subMeshes.filter(sub => sub.positions.length >= 3);
+    const usable = mesh.subMeshes.filter((sub) => sub.positions.length >= 3);
     if (usable.length === 0) {
         return null;
     }
 
-    if (mode === 'EveryVertex') {
+    if (mode === "EveryVertex") {
         // Guard the cursor against a mesh that changed under it, so a reload cannot index off the
         // end of a shorter sub-mesh.
-        if (cursor.subMesh >= mesh.subMeshes.length
-            || cursor.vertex * 3 >= mesh.subMeshes[cursor.subMesh].positions.length) {
+        if (
+            cursor.subMesh >= mesh.subMeshes.length ||
+            cursor.vertex * 3 >= mesh.subMeshes[cursor.subMesh].positions.length
+        ) {
             cursor.subMesh = 0;
             cursor.vertex = 0;
         }
@@ -100,7 +121,10 @@ export function emissionPoint(
         const point = vertexAt(mesh, cursor.subMesh, cursor.vertex);
 
         cursor.vertex += 1;
-        if (cursor.vertex * 3 >= mesh.subMeshes[cursor.subMesh].positions.length) {
+        if (
+            cursor.vertex * 3 >=
+            mesh.subMeshes[cursor.subMesh].positions.length
+        ) {
             cursor.vertex = 0;
             cursor.subMesh = (cursor.subMesh + 1) % mesh.subMeshes.length;
         }
@@ -109,7 +133,9 @@ export function emissionPoint(
     }
 
     const subMesh = Math.min(
-        mesh.subMeshes.length - 1, Math.floor(random() * mesh.subMeshes.length));
+        mesh.subMeshes.length - 1,
+        Math.floor(random() * mesh.subMeshes.length),
+    );
     const sub = mesh.subMeshes[subMesh];
     const vertices = sub.positions.length / 3;
 
@@ -117,20 +143,29 @@ export function emissionPoint(
         return null;
     }
 
-    if (mode === 'RandomVertex') {
-        return vertexAt(mesh, subMesh, Math.min(vertices - 1, Math.floor(random() * vertices)));
+    if (mode === "RandomVertex") {
+        return vertexAt(
+            mesh,
+            subMesh,
+            Math.min(vertices - 1, Math.floor(random() * vertices)),
+        );
     }
 
     // RandomMesh: a random point on a random FACE, by barycentric weights. Falls back to a vertex
     // when the sub-mesh carries no indices, which is the only thing left to sample.
     const faces = Math.floor(sub.indices.length / 3);
     if (faces === 0) {
-        return vertexAt(mesh, subMesh, Math.min(vertices - 1, Math.floor(random() * vertices)));
+        return vertexAt(
+            mesh,
+            subMesh,
+            Math.min(vertices - 1, Math.floor(random() * vertices)),
+        );
     }
 
     const face = Math.min(faces - 1, Math.floor(random() * faces)) * 3;
-    const corners = [0, 1, 2].map(
-        i => vertexAt(mesh, subMesh, sub.indices[face + i]));
+    const corners = [0, 1, 2].map((i) =>
+        vertexAt(mesh, subMesh, sub.indices[face + i]),
+    );
 
     const w1 = random();
     const w2 = random() * (1 - w1);
@@ -143,7 +178,10 @@ export function emissionPoint(
         z: corners.reduce((sum, c, i) => sum + pick(c).z * weights[i], 0),
     });
 
-    return {position: blend(p => p.position), normal: blend(p => p.normal)};
+    return {
+        position: blend((p) => p.position),
+        normal: blend((p) => p.normal),
+    };
 }
 
 /**
@@ -153,7 +191,10 @@ export function emissionPoint(
  * Without it every particle is born exactly in the skin of the model and the near half of the
  * cloud is swallowed by the hull it came from.
  */
-export function offsetAlongNormal(point: EmissionPoint, offset: number): AlamoVector3 {
+export function offsetAlongNormal(
+    point: EmissionPoint,
+    offset: number,
+): AlamoVector3 {
     return {
         x: point.position.x + point.normal.x * offset,
         y: point.position.y + point.normal.y * offset,

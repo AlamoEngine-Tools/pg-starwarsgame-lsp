@@ -8,10 +8,10 @@
 // (how many edits are staged, how the last validation went) that must be phrased the same way in
 // both or the same situation looks like two different ones.
 
-import {LocProblem, ValidationState} from './useLocPanel';
-import {validateTitle} from './validateState';
-import {IconButton} from '../shared/Button';
-import {SeverityTag} from '../shared/SeverityTag';
+import { LocProblem, ValidationState } from "./useLocPanel";
+import { validateTitle } from "./validateState";
+import { IconButton } from "../shared/Button";
+import { SeverityTag } from "../shared/SeverityTag";
 
 export function LocDockHeader(props: {
     /** The staged queue; its length is the badge on Save and disables the button when empty. */
@@ -25,9 +25,9 @@ export function LocDockHeader(props: {
         <>
             <IconButton
                 icon="save"
-                className={`header-left${props.queue.length > 0 ? ' active' : ''}`}
+                className={`header-left${props.queue.length > 0 ? " active" : ""}`}
                 title="Save - write all staged changes to the file"
-                badge={props.queue.length > 0 ? ` ${props.queue.length}` : ''}
+                badge={props.queue.length > 0 ? ` ${props.queue.length}` : ""}
                 disabled={props.queue.length === 0}
                 disabledReason="Save - nothing is staged"
                 onClick={props.onSave}
@@ -35,7 +35,11 @@ export function LocDockHeader(props: {
             <SeverityTag
                 severity={props.validation}
                 count={props.problems.length}
-                title={validateTitle(props.validation, props.problems.length, props.queue.length)}
+                title={validateTitle(
+                    props.validation,
+                    props.problems.length,
+                    props.queue.length,
+                )}
                 onClick={props.onValidate}
             />
         </>

@@ -9,7 +9,7 @@
 // The shapes themselves are the server's, declared in ../../protocol. Named here in the grid's own
 // vocabulary - a row on screen, not a row on the wire - because that is what every consumer in this
 // folder is talking about, and because `index` carries a meaning below that the wire does not fix.
-import {LocRowDto, LocValueDto} from '../../protocol';
+import { LocRowDto, LocValueDto } from "../../protocol";
 
 export type LocValue = LocValueDto;
 

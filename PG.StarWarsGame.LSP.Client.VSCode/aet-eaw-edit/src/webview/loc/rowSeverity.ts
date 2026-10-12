@@ -3,11 +3,11 @@
 
 // Which rows a validation run has something to say about, and how badly.
 
-import {LocProblem} from './useLocPanel';
-import {LocRow} from './locRow';
+import { LocProblem } from "./useLocPanel";
+import { LocRow } from "./locRow";
 
 /** Highest-first, so the worst finding on a row is the one that colours it. */
-const RANK: Record<string, number> = {error: 3, warning: 2, info: 1};
+const RANK: Record<string, number> = { error: 3, warning: 2, info: 1 };
 
 /**
  * The worst severity reported against each row, keyed by row index.
@@ -19,7 +19,8 @@ const RANK: Record<string, number> = {error: 3, warning: 2, info: 1};
  * rows unmarked - an "ok" class on every row would tint the whole table.
  */
 export function severityByRow(
-    problems: readonly LocProblem[], rows: readonly LocRow[],
+    problems: readonly LocProblem[],
+    rows: readonly LocRow[],
 ): Map<number, string> {
     if (problems.length === 0) {
         return new Map();
@@ -70,11 +71,13 @@ export function severityByRow(
  * An unrecognised severity is treated as a warning, matching how the Validate tag grades one: a
  * level this does not know about must still show, and picking the mildest tint would hide it.
  */
-export function rowSeverityClass(severity: string | undefined): string | undefined {
+export function rowSeverityClass(
+    severity: string | undefined,
+): string | undefined {
     if (severity === undefined) {
         return undefined;
     }
-    return `row-sev-${severity in RANK ? severity : 'warning'}`;
+    return `row-sev-${severity in RANK ? severity : "warning"}`;
 }
 
 function rankOf(severity: string): number {

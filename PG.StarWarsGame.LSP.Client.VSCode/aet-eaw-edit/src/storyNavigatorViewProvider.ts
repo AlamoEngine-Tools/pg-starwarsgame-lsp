@@ -1,18 +1,18 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {LspGateway} from './lsp/lspGateway';
-import {LspTreeDataProvider} from './lspTreeDataProvider';
+import { LspGateway } from "./lsp/lspGateway";
+import { LspTreeDataProvider } from "./lspTreeDataProvider";
 import {
     GetStoryPlotsResult,
     StoryCampaignDto,
     StoryFactionDto,
     StoryLuaScriptDto,
     StoryPlotThreadDto,
-} from './protocol';
-import {type BattleBranch, factionTree} from './storyBattles';
+} from "./protocol";
+import { type BattleBranch, factionTree } from "./storyBattles";
 import {
     definitionLabel,
     type FactionRole,
@@ -21,9 +21,10 @@ import {
     orderedFactions,
     roleLabel,
     setSummary,
-} from './storyNavigatorModel';
+} from "./storyNavigatorModel";
 
-type StoryNodeKind = 'set' | 'campaign' | 'faction' | 'battle' | 'thread' | 'lua' | 'info';
+type StoryNodeKind =
+    "set" | "campaign" | "faction" | "battle" | "thread" | "lua" | "info";
 
 export class StoryTreeItem extends vscode.TreeItem {
     /** The document the node's "Open File" button opens; undefined when there is none to open. */
@@ -40,14 +41,17 @@ export class StoryTreeItem extends vscode.TreeItem {
         // A thread's or script's file; on a 'battle' node, the battle's key as the server names it.
         public readonly fileName?: string,
         // The Campaign_Set value a 'set' node represents; undefined on the "Ungrouped" set node.
-        public readonly setName?: string
+        public readonly setName?: string,
     ) {
         super(label, collapsibleState);
     }
 }
 
-const ROLE_ICONS: Record<FactionRole['kind'], string> = {
-    player: 'person', human: 'account', ai: 'hubot', unset: 'organization',
+const ROLE_ICONS: Record<FactionRole["kind"], string> = {
+    player: "person",
+    human: "account",
+    ai: "hubot",
+    unset: "organization",
 };
 
 /**
@@ -61,12 +65,14 @@ const ROLE_ICONS: Record<FactionRole['kind'], string> = {
  * node never opens anything. The tree re-fetches on every expand of the root, so a plain `refresh()`
  * after `aet/storyGraphChanged` is enough to stay current.
  */
-export class StoryNavigatorViewProvider
-    extends LspTreeDataProvider<StoryTreeItem, GetStoryPlotsResult> {
-    public static readonly viewId = 'aet-eaw-edit.lsp.storyNavigator';
+export class StoryNavigatorViewProvider extends LspTreeDataProvider<
+    StoryTreeItem,
+    GetStoryPlotsResult
+> {
+    public static readonly viewId = "aet-eaw-edit.lsp.storyNavigator";
 
-    protected readonly method = 'aet/getStoryPlots';
-    protected readonly subject = 'story campaigns';
+    protected readonly method = "aet/getStoryPlots";
+    protected readonly subject = "story campaigns";
 
     constructor(lsp: LspGateway) {
         super(lsp);
@@ -99,30 +105,41 @@ export class StoryNavigatorViewProvider
         return this._infoItem(message);
     }
 
-    protected failureMessage(
-        outcome: { reason: 'offline' | 'failed'; message: string },
-    ): string {
-        return outcome.reason === 'offline'
-            ? 'LSP server is not running.'
+    protected failureMessage(outcome: {
+        reason: "offline" | "failed";
+        message: string;
+    }): string {
+        return outcome.reason === "offline"
+            ? "LSP server is not running."
             : `Cannot load story plots: ${outcome.message}`;
     }
 
     protected childrenOf(element: StoryTreeItem): StoryTreeItem[] {
-        if (element.kind === 'set') {
+        if (element.kind === "set") {
             // A named set lists the campaigns carrying that Campaign_Set; the "Ungrouped" node
             // (setName undefined) lists the campaigns that declare none.
             const named = element.setName !== undefined;
-            const inSet = this._campaigns.filter(c => named ? c.set === element.setName : !c.set);
-            return orderedDefinitions(inSet, named).map(c => this._campaignItem(c, named));
+            const inSet = this._campaigns.filter((c) =>
+                named ? c.set === element.setName : !c.set,
+            );
+            return orderedDefinitions(inSet, named).map((c) =>
+                this._campaignItem(c, named),
+            );
         }
-        if (element.kind === 'campaign') {
-            const campaign = this._campaigns.find(c => c.name === element.campaignName);
-            return campaign ? orderedFactions(campaign).map(f => this._factionItem(campaign, f)) : [];
+        if (element.kind === "campaign") {
+            const campaign = this._campaigns.find(
+                (c) => c.name === element.campaignName,
+            );
+            return campaign
+                ? orderedFactions(campaign).map((f) =>
+                      this._factionItem(campaign, f),
+                  )
+                : [];
         }
-        if (element.kind === 'faction') {
+        if (element.kind === "faction") {
             const faction = this._campaigns
-                .find(c => c.name === element.campaignName)?.factions
-                .find(f => f.faction === element.factionName);
+                .find((c) => c.name === element.campaignName)
+                ?.factions.find((f) => f.faction === element.factionName);
             if (!faction) {
                 return [];
             }
@@ -131,24 +148,35 @@ export class StoryNavigatorViewProvider
             // and a thread listed twice would read as two files.
             const tree = factionTree(faction);
             return [
-                ...tree.galacticThreads.map(t => this._threadItem(t)),
+                ...tree.galacticThreads.map((t) => this._threadItem(t)),
                 ...tree.battles.map((branch, index) =>
-                    this._battleItem(faction.faction, element.campaignName!, branch, index, tree.battles.length)),
-                ...faction.luaScripts.map(s => this._luaItem(s)),
+                    this._battleItem(
+                        faction.faction,
+                        element.campaignName!,
+                        branch,
+                        index,
+                        tree.battles.length,
+                    ),
+                ),
+                ...faction.luaScripts.map((s) => this._luaItem(s)),
             ];
         }
-        if (element.kind === 'battle') {
+        if (element.kind === "battle") {
             const faction = this._campaigns
-                .find(c => c.name === element.campaignName)?.factions
-                .find(f => f.faction === element.factionName);
+                .find((c) => c.name === element.campaignName)
+                ?.factions.find((f) => f.faction === element.factionName);
             const branch = faction
-                ? factionTree(faction).battles.find(b => b.battle.key === element.fileName)
+                ? factionTree(faction).battles.find(
+                      (b) => b.battle.key === element.fileName,
+                  )
                 : undefined;
             // The battle's plot files, then the script its manifest attaches - the mission's own
             // state machine, which the faction manifest never lists.
             return [
-                ...(branch?.threads ?? []).map(t => this._threadItem(t)),
-                ...(branch?.battle.luaScripts ?? []).map(s => this._luaItem(s)),
+                ...(branch?.threads ?? []).map((t) => this._threadItem(t)),
+                ...(branch?.battle.luaScripts ?? []).map((s) =>
+                    this._luaItem(s),
+                ),
             ];
         }
         return [];
@@ -174,7 +202,7 @@ export class StoryNavigatorViewProvider
 
         const items = [...bySet.keys()]
             .sort((a, b) => a.localeCompare(b))
-            .map(setName => this._setItem(setName, bySet.get(setName)!));
+            .map((setName) => this._setItem(setName, bySet.get(setName)!));
         if (ungrouped.length) {
             items.push(this._setItem(undefined, ungrouped));
         }
@@ -182,30 +210,54 @@ export class StoryNavigatorViewProvider
     }
 
     // setName undefined => the "Ungrouped" bucket.
-    private _setItem(setName: string | undefined, members: StoryCampaignDto[]): StoryTreeItem {
-        const label = setName ?? 'Ungrouped';
+    private _setItem(
+        setName: string | undefined,
+        members: StoryCampaignDto[],
+    ): StoryTreeItem {
+        const label = setName ?? "Ungrouped";
         const item = new StoryTreeItem(
-            label, vscode.TreeItemCollapsibleState.Collapsed, 'set',
-            undefined, undefined, undefined, setName);
-        item.iconPath = new vscode.ThemeIcon(setName ? 'folder-library' : 'folder');
+            label,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            "set",
+            undefined,
+            undefined,
+            undefined,
+            setName,
+        );
+        item.iconPath = new vscode.ThemeIcon(
+            setName ? "folder-library" : "folder",
+        );
         item.description = setSummary(members, setName !== undefined);
-        item.tooltip = setName ?? 'No Campaign_Set';
-        item.contextValue = setName ? 'aetCampaignSet' : 'aetCampaignSetUngrouped';
+        item.tooltip = setName ?? "No Campaign_Set";
+        item.contextValue = setName
+            ? "aetCampaignSet"
+            : "aetCampaignSetUngrouped";
         return item;
     }
 
     /** A campaign definition: inside a set, one playable perspective of the set's campaign. */
-    private _campaignItem(campaign: StoryCampaignDto, inSet: boolean): StoryTreeItem {
-        const {label, description} = definitionLabel(campaign, inSet);
+    private _campaignItem(
+        campaign: StoryCampaignDto,
+        inSet: boolean,
+    ): StoryTreeItem {
+        const { label, description } = definitionLabel(campaign, inSet);
         const item = new StoryTreeItem(
-            label, vscode.TreeItemCollapsibleState.Collapsed, 'campaign', campaign.name);
-        item.iconPath = new vscode.ThemeIcon('map');
+            label,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            "campaign",
+            campaign.name,
+        );
+        item.iconPath = new vscode.ThemeIcon("map");
         item.description = description;
-        const file = campaign.definitionUri ? fileNameOf(campaign.definitionUri) : undefined;
+        const file = campaign.definitionUri
+            ? fileNameOf(campaign.definitionUri)
+            : undefined;
         item.tooltip = file ? `${campaign.name} - ${file}` : campaign.name;
         item.openUri = campaign.definitionUri ?? undefined;
         item.openLine = campaign.definitionLine ?? undefined;
-        item.contextValue = item.openUri ? 'aetStoryCampaign' : 'aetStoryCampaignNoFile';
+        item.contextValue = item.openUri
+            ? "aetStoryCampaign"
+            : "aetStoryCampaignNoFile";
         return item;
     }
 
@@ -216,17 +268,25 @@ export class StoryNavigatorViewProvider
      * that faction's player - the human's for the Starting_Active_Player faction, an AI's otherwise.
      * The graph used to open on the campaign and merged them, which is why the button lives here.
      */
-    private _factionItem(campaign: StoryCampaignDto, faction: StoryFactionDto): StoryTreeItem {
+    private _factionItem(
+        campaign: StoryCampaignDto,
+        faction: StoryFactionDto,
+    ): StoryTreeItem {
         const item = new StoryTreeItem(
-            faction.faction, vscode.TreeItemCollapsibleState.Collapsed, 'faction',
-            campaign.name, faction.faction);
+            faction.faction,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            "faction",
+            campaign.name,
+            faction.faction,
+        );
         const role = factionRole(campaign, faction);
         const roleText = roleLabel(role);
         item.iconPath = new vscode.ThemeIcon(ROLE_ICONS[role.kind]);
         item.description = roleText;
-        item.contextValue = 'aetStoryFaction';
-        item.tooltip = (roleText ? `${faction.faction} - ${roleText}` : faction.faction)
-            + `\n${faction.manifestFile}`;
+        item.contextValue = "aetStoryFaction";
+        item.tooltip =
+            (roleText ? `${faction.faction} - ${roleText}` : faction.faction) +
+            `\n${faction.manifestFile}`;
         return item;
     }
 
@@ -236,37 +296,66 @@ export class StoryNavigatorViewProvider
      * 9" says, since a file name says nothing about the order of play.
      */
     private _battleItem(
-        factionName: string, campaignName: string, branch: BattleBranch, index: number, count: number,
+        factionName: string,
+        campaignName: string,
+        branch: BattleBranch,
+        index: number,
+        count: number,
     ): StoryTreeItem {
         const item = new StoryTreeItem(
-            branch.battle.label, vscode.TreeItemCollapsibleState.Collapsed, 'battle',
-            campaignName, factionName, branch.battle.key);
-        item.iconPath = new vscode.ThemeIcon('target');
-        item.contextValue = 'aetStoryBattle';
+            branch.battle.label,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            "battle",
+            campaignName,
+            factionName,
+            branch.battle.key,
+        );
+        item.iconPath = new vscode.ThemeIcon("target");
+        item.contextValue = "aetStoryBattle";
         item.description = `Battle ${index + 1} of ${count}`;
-        item.tooltip = branch.battle.label
-            + `\nPlot files - ${branch.threads.length}`
-            + `\nScripts - ${branch.battle.luaScripts?.length ?? 0}`;
+        item.tooltip =
+            branch.battle.label +
+            `\nPlot files - ${branch.threads.length}` +
+            `\nScripts - ${branch.battle.luaScripts?.length ?? 0}`;
         return item;
     }
 
     private _threadItem(thread: StoryPlotThreadDto): StoryTreeItem {
         const item = new StoryTreeItem(
-            thread.file, vscode.TreeItemCollapsibleState.None, 'thread',
-            undefined, undefined, thread.file);
-        item.iconPath = new vscode.ThemeIcon(thread.suspended ? 'circle-slash' : 'type-hierarchy-sub');
-        item.description = thread.suspended ? 'suspended' : undefined;
-        this._fileNode(item, thread.file, thread.uri, thread.suspended ? 'suspended' : undefined);
+            thread.file,
+            vscode.TreeItemCollapsibleState.None,
+            "thread",
+            undefined,
+            undefined,
+            thread.file,
+        );
+        item.iconPath = new vscode.ThemeIcon(
+            thread.suspended ? "circle-slash" : "type-hierarchy-sub",
+        );
+        item.description = thread.suspended ? "suspended" : undefined;
+        this._fileNode(
+            item,
+            thread.file,
+            thread.uri,
+            thread.suspended ? "suspended" : undefined,
+        );
         return item;
     }
 
     private _luaItem(script: StoryLuaScriptDto): StoryTreeItem {
         const item = new StoryTreeItem(
-            script.name, vscode.TreeItemCollapsibleState.None, 'lua',
-            undefined, undefined, script.name);
-        item.iconPath = new vscode.ThemeIcon('file-code');
-        item.description = 'Lua';
-        const file = script.name.toLowerCase().endsWith('.lua') ? script.name : `${script.name}.lua`;
+            script.name,
+            vscode.TreeItemCollapsibleState.None,
+            "lua",
+            undefined,
+            undefined,
+            script.name,
+        );
+        item.iconPath = new vscode.ThemeIcon("file-code");
+        item.description = "Lua";
+        const file = script.name.toLowerCase().endsWith(".lua")
+            ? script.name
+            : `${script.name}.lua`;
         this._fileNode(item, file, script.uri, undefined);
         return item;
     }
@@ -275,22 +364,34 @@ export class StoryNavigatorViewProvider
      * A node that stands for one document: its "Open File" button, or the disabled one when the
      * story model could not read the file - a broken chain link, which the tooltip names.
      */
-    private _fileNode(item: StoryTreeItem, file: string, uri: string | null | undefined, state: string | undefined): void {
+    private _fileNode(
+        item: StoryTreeItem,
+        file: string,
+        uri: string | null | undefined,
+        state: string | undefined,
+    ): void {
         item.openUri = uri ?? undefined;
-        item.contextValue = item.openUri ? 'aetStoryFile' : 'aetStoryFileMissing';
+        item.contextValue = item.openUri
+            ? "aetStoryFile"
+            : "aetStoryFileMissing";
         item.tooltip = item.openUri
-            ? (state ? `${file} - ${state}` : file)
+            ? state
+                ? `${file} - ${state}`
+                : file
             : `${file} - not found`;
     }
 
     private _infoItem(message: string): StoryTreeItem {
         const item = new StoryTreeItem(
-            message, vscode.TreeItemCollapsibleState.None, 'info');
-        item.iconPath = new vscode.ThemeIcon('info');
+            message,
+            vscode.TreeItemCollapsibleState.None,
+            "info",
+        );
+        item.iconPath = new vscode.ThemeIcon("info");
         return item;
     }
 }
 
 function fileNameOf(uri: string): string {
-    return decodeURIComponent(uri.slice(uri.lastIndexOf('/') + 1));
+    return decodeURIComponent(uri.slice(uri.lastIndexOf("/") + 1));
 }

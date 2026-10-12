@@ -100,10 +100,10 @@ import {
     IconWind,
     IconWorld,
     IconX,
-} from '@tabler/icons-react';
-import {type ComponentType} from 'react';
+} from "@tabler/icons-react";
+import { type ComponentType } from "react";
 
-import {codiconFor} from './iconSource';
+import { codiconFor } from "./iconSource";
 
 /**
  * What the preview can draw, by meaning.
@@ -290,7 +290,7 @@ export interface IconProps_ {
     size?: number;
 }
 
-export function Icon({name, size = 16}: IconProps_): React.JSX.Element {
+export function Icon({ name, size = 16 }: IconProps_): React.JSX.Element {
     // An EDITOR action keeps the editor's own glyph - see `iconSource`. Only the domain icons are
     // Tabler's, because those are the ones codicons has not got.
     const codicon = codiconFor(name);
@@ -299,7 +299,7 @@ export function Icon({name, size = 16}: IconProps_): React.JSX.Element {
         return (
             <span
                 className={`codicon codicon-${codicon}`}
-                style={{fontSize: size}}
+                style={{ fontSize: size }}
                 aria-hidden="true"
             />
         );
@@ -310,5 +310,7 @@ export function Icon({name, size = 16}: IconProps_): React.JSX.Element {
     // `currentColor` and aria-hidden are the two things that make an icon behave: it takes the
     // colour of whatever it sits in - including a disabled or a warning state - and it is invisible
     // to a screen reader, which reads the control's own label instead.
-    return <Glyph size={size} stroke={2} color="currentColor" aria-hidden="true"/>;
+    return (
+        <Glyph size={size} stroke={2} color="currentColor" aria-hidden="true" />
+    );
 }

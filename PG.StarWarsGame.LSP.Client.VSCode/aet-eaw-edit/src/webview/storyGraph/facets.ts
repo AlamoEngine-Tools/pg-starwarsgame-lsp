@@ -28,6 +28,10 @@ export function facetList(
         return fromServer;
     }
 
-    const found = [...new Set(fromNodes.filter((v): v is string => !!v))].sort();
-    return active && !found.includes(active) ? [...found, active].sort() : found;
+    const found = [
+        ...new Set(fromNodes.filter((v): v is string => !!v)),
+    ].sort();
+    return active && !found.includes(active)
+        ? [...found, active].sort()
+        : found;
 }

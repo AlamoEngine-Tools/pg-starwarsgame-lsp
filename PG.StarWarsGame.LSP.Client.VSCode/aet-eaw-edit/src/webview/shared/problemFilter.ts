@@ -73,12 +73,15 @@ export function filterProblems<T>(
         hidden,
         total,
         filterable: hidden > 0,
-        label: hidden > 0 ? `${showAll ? total : matching.length} of ${total}` : String(total),
+        label:
+            hidden > 0
+                ? `${showAll ? total : matching.length} of ${total}`
+                : String(total),
     };
 }
 
 /** What a click on a problem row has to do to get the reader to its node. */
-export type ProblemJump = 'centre' | 'unfilter';
+export type ProblemJump = "centre" | "unfilter";
 
 /**
  * Whether jumping to a problem's node needs the view filter dropped first.
@@ -93,9 +96,12 @@ export type ProblemJump = 'centre' | 'unfilter';
  *     where there is nothing to judge against, and discarding the reader's filter on a guess is
  *     worse than a jump that lands on an already-visible node.
  */
-export function resolveProblemJump(nodeId: string, inView: ReadonlySet<string> | null): ProblemJump {
+export function resolveProblemJump(
+    nodeId: string,
+    inView: ReadonlySet<string> | null,
+): ProblemJump {
     if (inView === null) {
-        return 'centre';
+        return "centre";
     }
-    return inView.has(nodeId) ? 'centre' : 'unfilter';
+    return inView.has(nodeId) ? "centre" : "unfilter";
 }

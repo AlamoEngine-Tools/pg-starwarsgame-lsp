@@ -28,8 +28,11 @@ export interface AnchorRequest {
 }
 
 /** Top-left corner for the flyout, in window coordinates. */
-export function anchorFlyout(request: AnchorRequest): { left: number; top: number } {
-    const {row, dockLeft, window: win, size} = request;
+export function anchorFlyout(request: AnchorRequest): {
+    left: number;
+    top: number;
+} {
+    const { row, dockLeft, window: win, size } = request;
 
     // Clamped bottom FIRST, then top, so the top edge wins when the two disagree - which is what
     // happens when the flyout is taller than the window. Losing the foot of a long table costs a
@@ -40,5 +43,5 @@ export function anchorFlyout(request: AnchorRequest): { left: number; top: numbe
     // Flush against the window edge rather than half off it, when the dock leaves no room.
     const left = Math.max(MARGIN, dockLeft - size.width - GAP);
 
-    return {left, top};
+    return { left, top };
 }

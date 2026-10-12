@@ -28,12 +28,12 @@ import {
     EncyclopediaRgba,
     EncyclopediaTextStyle,
     GetEncyclopediaEntryResult,
-} from '../protocol/encyclopedia';
-import {cssFontStack} from './encyclopediaFonts';
-import {encyclopediaIconTitle} from './encyclopediaIconTitle';
-import {wrapByCharacterBudget} from './encyclopediaWrap';
-import {drawsPopulationBlip} from './encyclopediaBlip';
-import {safeImageSource} from './shared/safeImage';
+} from "../protocol/encyclopedia";
+import { cssFontStack } from "./encyclopediaFonts";
+import { encyclopediaIconTitle } from "./encyclopediaIconTitle";
+import { wrapByCharacterBudget } from "./encyclopediaWrap";
+import { drawsPopulationBlip } from "./encyclopediaBlip";
+import { safeImageSource } from "./shared/safeImage";
 
 /*
  * Glyph size arrives on the style as `fontUnits`, already in card units.
@@ -47,7 +47,6 @@ import {safeImageSource} from './shared/safeImage';
  *
  * The server owns that arithmetic now, so nothing here needs to know the screen.
  */
-
 
 /**
  * The unit icon, drawn 50 units square.
@@ -69,26 +68,32 @@ const REFERENCE_ICON_SCALE = 0.75;
  * ~23 units - a little larger than the ~19 first measured off a screenshot, and the game's own
  * icons are visibly upscaled in that slot rather than shrunk.
  */
-function abilitySlotSize(layout: EncyclopediaLayout, art?: EncyclopediaImage | null): number {
+function abilitySlotSize(
+    layout: EncyclopediaLayout,
+    art?: EncyclopediaImage | null,
+): number {
     const scale = layout.abilityIconScale > 0 ? layout.abilityIconScale : 0.66;
     // The icon's OWN size, not the base game's 26: a mod may draw its ability icons at any size and
     // the engine scales what it finds, so assuming 26 shrinks or inflates a reskinned set.
-    const asset = art?.width && art.width > 0 ? art.width : CHROME.abilityAssetSize;
+    const asset =
+        art?.width && art.width > 0 ? art.width : CHROME.abilityAssetSize;
     return (asset * scale) / REFERENCE_ICON_SCALE;
 }
 
 /** The natural size of `art` scaled the way the engine scales it, or `fallback` when unknown. */
 function drawnSize(
-    art: EncyclopediaImage | null | undefined, scale: number, fallback: number,
+    art: EncyclopediaImage | null | undefined,
+    scale: number,
+    fallback: number,
 ): { width: number; height: number } {
     if (!art || art.width <= 0 || art.height <= 0) {
-        return {width: fallback, height: fallback};
+        return { width: fallback, height: fallback };
     }
 
-    const factor = (scale > 0 ? scale : REFERENCE_ICON_SCALE) / REFERENCE_ICON_SCALE;
-    return {width: art.width * factor, height: art.height * factor};
+    const factor =
+        (scale > 0 ? scale : REFERENCE_ICON_SCALE) / REFERENCE_ICON_SCALE;
+    return { width: art.width * factor, height: art.height * factor };
 }
-
 
 const CHROME = {
     /**
@@ -144,7 +149,7 @@ const CHROME = {
      * 127.5x42 we measured, and `E_UNIT_AGAINST` is a 43x43 square, matching the derived slot.
      * The atlas is the better source, so those are the numbers to trust if the two ever disagree.
      */
-    againstFrame: {width: 129, height: 43},
+    againstFrame: { width: 129, height: 43 },
     againstSlotSize: 43,
     againstSlots: 3,
     againstGap: 5,
@@ -162,17 +167,17 @@ const CHROME = {
 
     // Sampled from the game screenshot rather than guessed. The backdrop is a slight vertical
     // gradient, lighter at the top.
-    backgroundTop: 'rgb(21, 32, 73)',
-    backgroundBottom: 'rgb(16, 25, 56)',
-    border: 'rgb(91, 122, 181)',
-    headerBand: 'rgb(83, 83, 83)',
+    backgroundTop: "rgb(21, 32, 73)",
+    backgroundBottom: "rgb(16, 25, 56)",
+    border: "rgb(91, 122, 181)",
+    headerBand: "rgb(83, 83, 83)",
     /**
      * Faint, not bright. Sampling a column clear of the portrait and the ability icons puts this
      * line at rgb(47,55,88) against a rgb(17,27,59) backdrop - barely there. An earlier reading of
      * rgb(161,184,253) came from x=500, which is inside an ability-icon box rather than on the
      * line, and drew a vivid light-blue rule the game does not have.
      */
-    separator: 'rgb(47, 55, 88)',
+    separator: "rgb(47, 55, 88)",
     /**
      * `E_LINE` is 232x27 but almost entirely EMPTY: scanning its rows, only row 22 carries any
      * pixels at all (mean alpha 187, luminance 86) and the other 26 are fully transparent. It is a
@@ -196,7 +201,7 @@ const CHROME = {
      * assumption left in the divider - noted rather than hidden.
      */
     lineArtRowsBelowRule: 27 - 22,
-    abilitySlot: 'rgba(110, 126, 158, 0.70)',
+    abilitySlot: "rgba(110, 126, 158, 0.70)",
     /**
      * The blip is a BLACK disc with a GOLD numeral, not the other way round. A cut straight
      * through it reads rgb(0,0,0) either side of a rgb(255,215,56) stroke. An earlier reading of
@@ -206,20 +211,20 @@ const CHROME = {
      * The fill is FALLBACK ONLY. `E_TOPBAR` bakes the disc into the band art, so a card drawing
      * chrome gets it from the atlas and painting this one as well doubled it up.
      */
-    blipFill: 'rgb(0, 0, 0)',
-    blipLabel: 'rgb(255, 215, 56)',
+    blipFill: "rgb(0, 0, 0)",
+    blipLabel: "rgb(255, 215, 56)",
 
     // Three tones of one hue, and the "light dark light" is the SLOTS, not a gradient across one
     // fill: slots 1 and 3 take the lighter tone, slot 2 a darker hue of it. The border takes the
     // lightest variant, so it matches the label exactly.
-    strongSlot: 'rgb(0, 91, 0)',
-    strongSlotDark: 'rgb(0, 63, 0)',
-    strongBorder: 'rgb(0, 192, 0)',
-    strongLabel: 'rgb(0, 192, 0)',
-    weakSlot: 'rgb(91, 0, 0)',
-    weakSlotDark: 'rgb(63, 0, 0)',
-    weakBorder: 'rgb(192, 0, 0)',
-    weakLabel: 'rgb(192, 0, 0)',
+    strongSlot: "rgb(0, 91, 0)",
+    strongSlotDark: "rgb(0, 63, 0)",
+    strongBorder: "rgb(0, 192, 0)",
+    strongLabel: "rgb(0, 192, 0)",
+    weakSlot: "rgb(91, 0, 0)",
+    weakSlotDark: "rgb(63, 0, 0)",
+    weakBorder: "rgb(192, 0, 0)",
+    weakLabel: "rgb(192, 0, 0)",
 } as const;
 
 /**
@@ -249,31 +254,33 @@ function rgba(c: EncyclopediaRgba): string {
  */
 export function fontOf(fontName: string): React.CSSProperties {
     let family = fontName.trim();
-    let fontWeight: React.CSSProperties['fontWeight'] = 'normal';
-    let fontStyle: React.CSSProperties['fontStyle'] = 'normal';
+    let fontWeight: React.CSSProperties["fontWeight"] = "normal";
+    let fontStyle: React.CSSProperties["fontStyle"] = "normal";
 
-    for (; ;) {
+    for (;;) {
         const lower = family.toLowerCase();
-        if (lower.endsWith(' bold')) {
+        if (lower.endsWith(" bold")) {
             // The family suffix is stripped but the weight is NOT applied: measuring the game's
             // glyphs gives the header and the body the same stem width (median 3px at a 17px glyph
             // height) even though encyclopedia_header_text asks for "Arial Bold" and
             // encyclopedia_text for plain "Arial". The engine evidently does not resolve the
             // suffix to a bold face, so rendering one made the header heavier than the game's.
             family = family.slice(0, -5).trim();
-        } else if (lower.endsWith(' italic')) {
-            fontStyle = 'italic';
+        } else if (lower.endsWith(" italic")) {
+            fontStyle = "italic";
             family = family.slice(0, -7).trim();
         } else {
             break;
         }
     }
 
-    return {fontFamily: cssFontStack(family), fontWeight, fontStyle};
+    return { fontFamily: cssFontStack(family), fontWeight, fontStyle };
 }
 
 function textStyle(
-    style: EncyclopediaTextStyle, layout: EncyclopediaLayout, u: (n: number) => string,
+    style: EncyclopediaTextStyle,
+    layout: EncyclopediaLayout,
+    u: (n: number) => string,
 ): React.CSSProperties {
     return {
         ...fontOf(style.fontName),
@@ -285,8 +292,8 @@ function textStyle(
         lineHeight: u(layout.rowHeight),
         color: textColor(style.textColor),
         // Authored leading spaces and blank lines are content; pre-wrap keeps them and still wraps.
-        whiteSpace: 'pre-wrap',
-        overflowWrap: 'break-word',
+        whiteSpace: "pre-wrap",
+        overflowWrap: "break-word",
     };
 }
 
@@ -298,39 +305,47 @@ function textStyle(
  * The caller decides whether to render one at all: a unit with no Good_Against / Vulnerable_To
  * shows no panel.
  */
-function AgainstPanel(
-    {
-        label, refs, layout, u, width, labelColor, slotFill, slotFillDark, border,
-        frameImage, slotImage,
-    }: {
-        label: string;
-        refs: readonly EncyclopediaReference[];
-        layout: EncyclopediaLayout;
-        u: (n: number) => string;
-        width: number;
-        labelColor: string;
-        slotFill: string;
-        slotFillDark: string;
-        border: string;
-        /** `E_AGAINST_FRAME` (129x43) when the atlas has it; the CSS border stands in otherwise. */
-        frameImage?: EncyclopediaImage | null;
-        /** `E_UNIT_AGAINST` (43x43) when the atlas has it; the CSS slot tones stand in otherwise. */
-        slotImage?: EncyclopediaImage | null;
-    },
-): React.JSX.Element {
+function AgainstPanel({
+    label,
+    refs,
+    layout,
+    u,
+    width,
+    labelColor,
+    slotFill,
+    slotFillDark,
+    border,
+    frameImage,
+    slotImage,
+}: {
+    label: string;
+    refs: readonly EncyclopediaReference[];
+    layout: EncyclopediaLayout;
+    u: (n: number) => string;
+    width: number;
+    labelColor: string;
+    slotFill: string;
+    slotFillDark: string;
+    border: string;
+    /** `E_AGAINST_FRAME` (129x43) when the atlas has it; the CSS border stands in otherwise. */
+    frameImage?: EncyclopediaImage | null;
+    /** `E_UNIT_AGAINST` (43x43) when the atlas has it; the CSS slot tones stand in otherwise. */
+    slotImage?: EncyclopediaImage | null;
+}): React.JSX.Element {
     // Three slots fill the interior exactly, so the slot width is the interior width over three.
     const slot = (width - 2) / CHROME.againstSlots;
     // The panel's height follows the FRAME ART's aspect rather than assuming the slot is square.
     // In the base game E_AGAINST_FRAME is 129x43 and the slot 43x43, so this reduces to the square
     // reading it replaces - but a reskinned frame of any other proportion now keeps its shape
     // instead of being stretched into the base game's.
-    const panelHeight = frameImage?.width && frameImage.width > 0 && frameImage.height > 0
-        ? width * (frameImage.height / frameImage.width)
-        : slot + 2;
+    const panelHeight =
+        frameImage?.width && frameImage.width > 0 && frameImage.height > 0
+            ? width * (frameImage.height / frameImage.width)
+            : slot + 2;
     // Fixed width, not flex: a panel shown on its own keeps its half-card size rather than
     // stretching to fill the row.
     return (
-        <div style={{width: u(width), flex: '0 0 auto'}}>
+        <div style={{ width: u(width), flex: "0 0 auto" }}>
             <div
                 style={{
                     ...fontOf(layout.header.fontName),
@@ -353,21 +368,21 @@ function AgainstPanel(
                     // so the CSS border would double it.
                     ...(frameImage
                         ? {
-                            backgroundImage: `url("${frameImage.dataUri}")`,
-                            backgroundSize: '100% 100%',
-                            backgroundRepeat: 'no-repeat',
-                            backgroundColor: border,
-                            backgroundBlendMode: 'multiply',
-                            // The frame art includes its own 1-unit edge, and the slot row starting
-                            // at 0,0 sat on top of it - clipping the upper-left border. Inset the
-                            // contents by that edge so the frame reads as a frame on every side.
-                            padding: u(1),
-                        }
-                        : {border: `${u(1)} solid ${border}`}),
+                              backgroundImage: `url("${frameImage.dataUri}")`,
+                              backgroundSize: "100% 100%",
+                              backgroundRepeat: "no-repeat",
+                              backgroundColor: border,
+                              backgroundBlendMode: "multiply",
+                              // The frame art includes its own 1-unit edge, and the slot row starting
+                              // at 0,0 sat on top of it - clipping the upper-left border. Inset the
+                              // contents by that edge so the frame reads as a frame on every side.
+                              padding: u(1),
+                          }
+                        : { border: `${u(1)} solid ${border}` }),
                     height: u(panelHeight),
-                    boxSizing: 'border-box',
-                    display: 'flex',
-                    overflow: 'hidden',
+                    boxSizing: "border-box",
+                    display: "flex",
+                    overflow: "hidden",
                 }}
             >
                 {/* Always three slots, filled left to right. Slots 1 and 3 take the lighter tone
@@ -378,21 +393,23 @@ function AgainstPanel(
                     card's own portrait uses - missing-icon placeholder included. A unit whose icon
                     cannot be found therefore looks the same here as anywhere else. The name only
                     appears when the unit names no icon at all, or is unknown. */}
-                {Array.from({length: CHROME.againstSlots}, (_, i) => {
+                {Array.from({ length: CHROME.againstSlots }, (_, i) => {
                     const ref = refs[i];
                     return (
                         <div
                             key={ref?.objectId ?? `empty-${i}`}
-                            title={ref === undefined
-                                ? undefined
-                                : ref.displayName
-                                    ? `${ref.displayName} (${ref.objectId})`
-                                    : ref.objectId}
+                            title={
+                                ref === undefined
+                                    ? undefined
+                                    : ref.displayName
+                                      ? `${ref.displayName} (${ref.objectId})`
+                                      : ref.objectId
+                            }
                             style={{
                                 width: u(slot),
                                 // Fills the frame's interior, whatever aspect the frame art has.
-                                height: '100%',
-                                flex: '0 0 auto',
+                                height: "100%",
+                                flex: "0 0 auto",
                                 // The measured tones, NOT E_UNIT_AGAINST - and this one is settled by
                                 // what the art turned out to be. The slot texture is UNIFORM, so
                                 // tinting it cannot reproduce the light/dark/light banding the game
@@ -404,38 +421,40 @@ function AgainstPanel(
                                 // These sampled fills - green rgb(0,89,0), red rgb(91,0,0) - already
                                 // reproduce it exactly. `slotImage` stays on the wire.
                                 background: i === 1 ? slotFillDark : slotFill,
-                                boxSizing: 'border-box',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
+                                boxSizing: "border-box",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
                                 padding: u(2),
-                                ...fontOf('Arial'),
+                                ...fontOf("Arial"),
                                 fontSize: u(4.5),
                                 lineHeight: u(5),
-                                color: 'rgba(255, 255, 255, 0.92)',
-                                textAlign: 'center',
-                                overflow: 'hidden',
-                                wordBreak: 'break-word',
+                                color: "rgba(255, 255, 255, 0.92)",
+                                textAlign: "center",
+                                overflow: "hidden",
+                                wordBreak: "break-word",
                             }}
                         >
-                            {ref?.iconDataUri
-                                ? (
-                                    <img
-                                        src={safeImageSource(ref.iconDataUri)}
-                                        alt={ref.displayName ?? ref.objectId}
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            display: 'block',
-                                            objectFit: 'fill',
-                                            imageRendering: 'pixelated',
-                                        }}
-                                    />
-                                )
-                                // Reached only when the unit names NO icon, or is unknown - a unit
-                                // whose icon merely failed to resolve already arrives as the
-                                // placeholder. The name is the last resort, not the design.
-                                : ref === undefined ? '' : ref.displayName ?? ref.objectId}
+                            {ref?.iconDataUri ? (
+                                <img
+                                    src={safeImageSource(ref.iconDataUri)}
+                                    alt={ref.displayName ?? ref.objectId}
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        display: "block",
+                                        objectFit: "fill",
+                                        imageRendering: "pixelated",
+                                    }}
+                                />
+                            ) : // Reached only when the unit names NO icon, or is unknown - a unit
+                            // whose icon merely failed to resolve already arrives as the
+                            // placeholder. The name is the last resort, not the design.
+                            ref === undefined ? (
+                                ""
+                            ) : (
+                                (ref.displayName ?? ref.objectId)
+                            )}
                         </div>
                     );
                 })}
@@ -452,37 +471,45 @@ function AgainstPanel(
  * {@link CHROME.lineArtRowsBelowRule} for why that height cannot simply be squashed, and how the
  * anchor is chosen.
  */
-function Divider(
-    {art, u, marginTop, marginBottom}: {
-        art?: EncyclopediaImage | null;
-        u: (n: number) => string;
-        marginTop: number;
-        marginBottom?: number;
-    },
-): React.JSX.Element {
-    const height = art?.height && art.height > 0 ? art.height : CHROME.lineArtHeight;
+function Divider({
+    art,
+    u,
+    marginTop,
+    marginBottom,
+}: {
+    art?: EncyclopediaImage | null;
+    u: (n: number) => string;
+    marginTop: number;
+    marginBottom?: number;
+}): React.JSX.Element {
+    const height =
+        art?.height && art.height > 0 ? art.height : CHROME.lineArtHeight;
 
     return (
         <div
             style={{
-                position: 'relative',
+                position: "relative",
                 height: 0,
                 // The 1px rule is the fallback for an atlas without the art.
-                ...(art ? {} : {borderTop: `${u(1)} solid ${CHROME.separator}`}),
+                ...(art
+                    ? {}
+                    : { borderTop: `${u(1)} solid ${CHROME.separator}` }),
                 marginTop: u(marginTop),
-                ...(marginBottom === undefined ? {} : {marginBottom: u(marginBottom)}),
+                ...(marginBottom === undefined
+                    ? {}
+                    : { marginBottom: u(marginBottom) }),
             }}
         >
             {art && (
                 <div
                     style={{
-                        position: 'absolute',
+                        position: "absolute",
                         left: 0,
                         right: 0,
                         top: u(-(height - CHROME.lineArtRowsBelowRule)),
                         height: u(height),
                         background: `url("${art.dataUri}") no-repeat center / 100% 100%`,
-                        pointerEvents: 'none',
+                        pointerEvents: "none",
                     }}
                 />
             )}
@@ -496,19 +523,21 @@ function Divider(
  * `zoom` multiplies every dimension and every font size by the same factor, so wrap points are
  * identical at any zoom - only legibility changes.
  */
-export function EncyclopediaCard(
-    {entry, zoom, factionSlot = 0}: {
-        entry: GetEncyclopediaEntryResult;
-        zoom: number;
-        /**
-         * Which faction's frame to draw - an index into `chrome.factionFrames`, which the engine
-         * would pick from the viewing player's faction. A preview has no player, so the caller
-         * chooses. Out-of-range simply draws no frame, which is what the game does for a faction
-         * past the last entry.
-         */
-        factionSlot?: number;
-    },
-): React.JSX.Element {
+export function EncyclopediaCard({
+    entry,
+    zoom,
+    factionSlot = 0,
+}: {
+    entry: GetEncyclopediaEntryResult;
+    zoom: number;
+    /**
+     * Which faction's frame to draw - an index into `chrome.factionFrames`, which the engine
+     * would pick from the viewing player's faction. A preview has no player, so the caller
+     * chooses. Out-of-range simply draws no frame, which is what the game does for a faction
+     * past the last entry.
+     */
+    factionSlot?: number;
+}): React.JSX.Element {
     const layout = entry.layout;
     // Chrome cut from the mega texture. Every piece is optional and every use falls back to the
     // calibrated CSS, so a mod whose atlas lacks these still gets the card it got before.
@@ -535,14 +564,17 @@ export function EncyclopediaCard(
     // Do not try to match this against a screenshot by eye. A portrait is art with its own
     // transparent margins inside the slot, so the leftmost DRAWN pixel differs from icon to icon;
     // comparing two different units measures their margins, not their placement.
-    const iconCentre = hasBlip ? offsets.iconX : offsets.iconX - offsets.population;
+    const iconCentre = hasBlip
+        ? offsets.iconX
+        : offsets.iconX - offsets.population;
     const iconLeft = iconCentre - ICON_SIZE / 2;
     // The band art already contains the disc, so the variant IS the blip's background.
     const topBarArt = hasBlip ? chrome?.topBar : chrome?.topBarNoBlip;
     // The band's own height, not an assumed 20: it is atlas art and a mod may ship it taller.
-    const headerHeight = topBarArt?.height && topBarArt.height > 0
-        ? topBarArt.height
-        : CHROME.headerHeight;
+    const headerHeight =
+        topBarArt?.height && topBarArt.height > 0
+            ? topBarArt.height
+            : CHROME.headerHeight;
     // The portrait at the size the engine would draw it. The slot stays a fixed ICON_SIZE so the
     // name and class line keep their left edge whatever the art measures, but the art itself is
     // drawn at its true proportions - several shipped portraits are NOT square (50x49, 47x47,
@@ -553,16 +585,21 @@ export function EncyclopediaCard(
     // for the cost. Nothing is left holding empty space: with no blip the name moves left by the
     // blip's own offset, with no portrait it closes the portrait's share too, and with neither it
     // simply starts where the blip would have.
-    const textLeft = !hasIcon && !hasBlip ? offsets.population
-        : !hasBlip ? offsets.name - offsets.population
-            : !hasIcon ? offsets.name - (offsets.iconX - offsets.population)
+    const textLeft =
+        !hasIcon && !hasBlip
+            ? offsets.population
+            : !hasBlip
+              ? offsets.name - offsets.population
+              : !hasIcon
+                ? offsets.name - (offsets.iconX - offsets.population)
                 : offsets.name;
 
     // The faction frame the engine would draw for the viewing player's faction. Absent art is
     // normal - the base game ships no frame past slot 1, and a mod may name one the atlas lacks.
     const factionFrame = chrome?.factionFrames?.[factionSlot]?.image;
 
-    const hasAgainst = entry.goodAgainst.length > 0 || entry.vulnerableTo.length > 0;
+    const hasAgainst =
+        entry.goodAgainst.length > 0 || entry.vulnerableTo.length > 0;
     // Half the card's inner width, so the pair spans edge to edge with one gap between them.
     const againstWidth = (layout.width - 2 - CHROME.againstGap) / 2;
 
@@ -573,7 +610,7 @@ export function EncyclopediaCard(
                 // The backdrop art is drawn by the rotated layer below, so the CSS gradient here is
                 // only the fallback for an atlas that ships no E_BACKGROUND.
                 background: chrome?.background
-                    ? 'transparent'
+                    ? "transparent"
                     : `linear-gradient(${CHROME.backgroundTop}, ${CHROME.backgroundBottom})`,
                 // The card's border IS the faction frame - it is the only per-faction art the
                 // component names, no atlas entry supplies a border of its own, and both shipped
@@ -583,73 +620,79 @@ export function EncyclopediaCard(
                 // which is the feathered ring on the empire frame and flat colour on the rebel one.
                 border: `${u(1)} solid ${CHROME.border}`,
                 ...(factionFrame
-                    ? {borderImage: `url("${factionFrame.dataUri}") 25% stretch`}
+                    ? {
+                          borderImage: `url("${factionFrame.dataUri}") 25% stretch`,
+                      }
                     : {}),
                 // Anchors the backdrop layer, and the z-index makes this a stacking context so a
                 // negative-z child cannot escape behind the panel's own background.
-                position: 'relative',
+                position: "relative",
                 zIndex: 0,
                 // No inset at the top: the grey band starts immediately under the border (the
                 // game's border line sits at y=874 and the band at y=876, about one unit apart).
                 // The band also runs the full width inside the border - x 65..535 on a card of
                 // 60..530 - so the horizontal inset belongs to the text below it, not the card.
                 padding: `0 0 ${u(layout.offsetY)} 0`,
-                boxSizing: 'border-box',
+                boxSizing: "border-box",
             }}
         >
             {/*
-              * The backdrop, ROTATED A QUARTER TURN.
-              *
-              * E_BACKGROUND is 48x48 and stretched across the card, not tiled - tiling is the
-              * obvious reading of a small square texture and it is wrong, since the harness showed
-              * visible seams where the game's backdrop is smooth. But the texture's gradient runs
-              * HORIZONTALLY (rgb(22,33,73) at x=0 to rgb(17,25,56) at x=47, rows near-identical)
-              * while the card's own pixels show it running vertically between those same two
-              * colours - so the engine draws this one turned on its side.
-              *
-              * Rotating a stretched fill needs the box with its axes swapped, and the card's height
-              * is content-driven. Container query units give it without measuring: 100cqh/100cqw
-              * are the container's height and width, so the inner box is exactly the transpose.
-              */}
+             * The backdrop, ROTATED A QUARTER TURN.
+             *
+             * E_BACKGROUND is 48x48 and stretched across the card, not tiled - tiling is the
+             * obvious reading of a small square texture and it is wrong, since the harness showed
+             * visible seams where the game's backdrop is smooth. But the texture's gradient runs
+             * HORIZONTALLY (rgb(22,33,73) at x=0 to rgb(17,25,56) at x=47, rows near-identical)
+             * while the card's own pixels show it running vertically between those same two
+             * colours - so the engine draws this one turned on its side.
+             *
+             * Rotating a stretched fill needs the box with its axes swapped, and the card's height
+             * is content-driven. Container query units give it without measuring: 100cqh/100cqw
+             * are the container's height and width, so the inner box is exactly the transpose.
+             */}
             {chrome?.background && (
                 <div
                     style={{
-                        position: 'absolute',
+                        position: "absolute",
                         inset: 0,
-                        overflow: 'hidden',
-                        containerType: 'size',
+                        overflow: "hidden",
+                        containerType: "size",
                         // Behind the content but still inside this card's stacking context.
                         zIndex: -1,
                     }}
                 >
                     <div
                         style={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            width: '100cqh',
-                            height: '100cqw',
-                            transform: 'translate(-50%, -50%) rotate(90deg)',
-                            background:
-                                `url("${chrome.background.dataUri}") no-repeat center / 100% 100%`,
+                            position: "absolute",
+                            top: "50%",
+                            left: "50%",
+                            width: "100cqh",
+                            height: "100cqw",
+                            transform: "translate(-50%, -50%) rotate(90deg)",
+                            background: `url("${chrome.background.dataUri}") no-repeat center / 100% 100%`,
                         }}
                     />
                 </div>
             )}
 
             {/*
-              * Header: a full-width grey band with the portrait laid OVER its left end.
-              *
-              * Scanning the game's own pixels across the band's row shows grey (83,83,83) at x=80,
-              * which is left of the portrait, then the portrait, then grey again all the way to the
-              * right edge - so the band runs edge to edge and the portrait sits on top of it. The
-              * name is centred on the whole card too (its centre lands within a pixel of the
-              * card's), not on the space beside the portrait.
-              */}
-            <div style={{position: 'relative', height: u(CHROME.headerBlockHeight)}}>
+             * Header: a full-width grey band with the portrait laid OVER its left end.
+             *
+             * Scanning the game's own pixels across the band's row shows grey (83,83,83) at x=80,
+             * which is left of the portrait, then the portrait, then grey again all the way to the
+             * right edge - so the band runs edge to edge and the portrait sits on top of it. The
+             * name is centred on the whole card too (its centre lands within a pixel of the
+             * card's), not on the space beside the portrait.
+             */}
+            <div
+                style={{
+                    position: "relative",
+                    height: u(CHROME.headerBlockHeight),
+                }}
+            >
                 <div
                     style={{
-                        position: 'absolute',
+                        position: "absolute",
                         inset: `0 0 auto 0`,
                         height: u(headerHeight),
                         // E_TOPBAR is exactly 262x20 - the card's full width - so unlike the
@@ -662,22 +705,29 @@ export function EncyclopediaCard(
                         background: topBarArt
                             ? `url("${topBarArt.dataUri}") no-repeat center / 100% 100%`
                             : CHROME.headerBand,
-                        display: 'flex',
-                        alignItems: 'center',
+                        display: "flex",
+                        alignItems: "center",
                         // Left-aligned on the same edge as the class line below it.
                         paddingLeft: u(textLeft),
-                        boxSizing: 'border-box',
+                        boxSizing: "border-box",
                     }}
                 >
                     {/* Wrapped on its own budget, not the header component's: with no cost drawn
                         beside it the name is given eight more characters of the row. `pre` so CSS
                         cannot re-break what the budget already decided. */}
-                    <span style={{...textStyle(layout.header, layout, u), color: '#ffffff'}}>
+                    <span
+                        style={{
+                            ...textStyle(layout.header, layout, u),
+                            color: "#ffffff",
+                        }}
+                    >
                         {wrapByCharacterBudget(
                             entry.displayName ?? entry.objectId,
                             entry.rowBudgets?.name ?? layout.header.wrapChars,
                         ).map((line, i) => (
-                            <div key={i} style={{whiteSpace: 'pre'}}>{line}</div>
+                            <div key={i} style={{ whiteSpace: "pre" }}>
+                                {line}
+                            </div>
                         ))}
                     </span>
 
@@ -690,45 +740,52 @@ export function EncyclopediaCard(
                         Right-aligned to the card's own inset. The engine places it from a
                         GameConstant (Encyclopedia_Cost_Offset) that nothing here reads yet, so this
                         is the card's inset rather than that value. */}
-                    {entry.buildCost !== null && entry.buildCost !== undefined && entry.buildCost > 0 && (
-                        <span
-                            style={{
-                                ...textStyle(layout.costText, layout, u),
-                                marginLeft: 'auto',
-                                paddingRight: u(layout.offsetX),
-                                whiteSpace: 'pre',
-                                flex: '0 0 auto',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: u(2),
-                            }}
-                        >
-                            {chrome?.credit
-                                ? (
+                    {entry.buildCost !== null &&
+                        entry.buildCost !== undefined &&
+                        entry.buildCost > 0 && (
+                            <span
+                                style={{
+                                    ...textStyle(layout.costText, layout, u),
+                                    marginLeft: "auto",
+                                    paddingRight: u(layout.offsetX),
+                                    whiteSpace: "pre",
+                                    flex: "0 0 auto",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: u(2),
+                                }}
+                            >
+                                {chrome?.credit ? (
                                     <img
-                                        src={safeImageSource(chrome.credit.dataUri)}
+                                        src={safeImageSource(
+                                            chrome.credit.dataUri,
+                                        )}
                                         alt="credits"
                                         // Its own proportions at the row's height, so a reskinned
                                         // coin keeps its shape instead of being squared off.
                                         style={{
-                                            height: u(layout.costText.fontUnits),
-                                            width: 'auto',
-                                            display: 'block',
+                                            height: u(
+                                                layout.costText.fontUnits,
+                                            ),
+                                            width: "auto",
+                                            display: "block",
                                         }}
                                     />
-                                )
-                                : '$ '}
-                            {wrapByCharacterBudget(
-                                String(entry.buildCost), layout.costText.wrapChars,
-                            ).join(' ')}
-                        </span>
-                    )}
+                                ) : (
+                                    "$ "
+                                )}
+                                {wrapByCharacterBudget(
+                                    String(entry.buildCost),
+                                    layout.costText.wrapChars,
+                                ).join(" ")}
+                            </span>
+                        )}
                 </div>
 
                 {hasBlip && (
                     <div
                         style={{
-                            position: 'absolute',
+                            position: "absolute",
                             // The box is centred on the offset, so the digits inside it land where
                             // the engine puts them whatever the mod moves that offset to.
                             left: u(offsets.population - CHROME.blipSize / 2),
@@ -743,10 +800,13 @@ export function EncyclopediaCard(
                             // that supplied no band at all.
                             ...(topBarArt
                                 ? {}
-                                : {borderRadius: '50%', background: CHROME.blipFill}),
+                                : {
+                                      borderRadius: "50%",
+                                      background: CHROME.blipFill,
+                                  }),
                             color: CHROME.blipLabel,
-                            display: 'flex',
-                            alignItems: 'center',
+                            display: "flex",
+                            alignItems: "center",
                             // CENTRED on Encyclopedia_Population_Offset. The engine adds this
                             // number as an `encyclopedia_center_text` line at that offset, and that
                             // component declares neither justify tag - which is what centres it.
@@ -756,9 +816,9 @@ export function EncyclopediaCard(
                             // draws the band and the portrait, not this number. The mistake put the
                             // digits at 6.8 units where the engine puts them at 11 - visibly left
                             // of the disc baked into the band art, which sits at about 10.
-                            justifyContent: 'center',
-                            boxSizing: 'border-box',
-                            ...fontOf('Arial Bold'),
+                            justifyContent: "center",
+                            boxSizing: "border-box",
+                            ...fontOf("Arial Bold"),
                             fontSize: u(CHROME.blipSize * 0.62),
                             lineHeight: 1,
                         }}
@@ -770,7 +830,7 @@ export function EncyclopediaCard(
 
                 <div
                     style={{
-                        position: 'absolute',
+                        position: "absolute",
                         left: u(iconLeft),
                         top: u(CHROME.iconTop),
                         width: u(ICON_SIZE),
@@ -784,13 +844,13 @@ export function EncyclopediaCard(
                         // through their transparent regions. Painting a slab here would put a box
                         // around every portrait that the game does not draw. Only the empty-slot
                         // placeholder below opts back into an outline.
-                        boxSizing: 'border-box',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        ...fontOf('Arial'),
+                        boxSizing: "border-box",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        ...fontOf("Arial"),
                         fontSize: u(5),
-                        color: 'rgba(255, 255, 255, 0.45)',
+                        color: "rgba(255, 255, 255, 0.45)",
                     }}
                     title={encyclopediaIconTitle(entry.icon)}
                 >
@@ -806,10 +866,10 @@ export function EncyclopediaCard(
                                 // fixed slot so the name and class line keep their left edge.
                                 width: u(portrait.width),
                                 height: u(portrait.height),
-                                display: 'block',
+                                display: "block",
                                 // Icons are small pixel art blown up several times at high zoom;
                                 // smoothing them turns crisp 2006 artwork into mush.
-                                imageRendering: 'pixelated',
+                                imageRendering: "pixelated",
                             }}
                         />
                     ) : (
@@ -818,13 +878,13 @@ export function EncyclopediaCard(
                         // outline - the alpha rules above only apply to real artwork.
                         <div
                             style={{
-                                width: '100%',
-                                height: '100%',
+                                width: "100%",
+                                height: "100%",
                                 border: `${u(1)} solid rgba(255, 255, 255, 0.18)`,
-                                boxSizing: 'border-box',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
+                                boxSizing: "border-box",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
                             }}
                         >
                             icon
@@ -834,33 +894,33 @@ export function EncyclopediaCard(
 
                 <div
                     style={{
-                        position: 'absolute',
+                        position: "absolute",
                         left: u(textLeft),
                         // Inset from the card edge, not flush to it: the game's right-hand ability
                         // slot ends about one content inset short of the border.
                         right: u(layout.offsetX),
                         top: u(headerHeight),
                         bottom: 0,
-                        display: 'flex',
+                        display: "flex",
                         // Top-aligned, not centred: the game sets the class line immediately under
                         // the header band. The row is taller than the text because the ability
                         // icons hang below it, so centring opens a gap the game does not have.
-                        alignItems: 'flex-start',
+                        alignItems: "flex-start",
                         gap: u(2),
-                        boxSizing: 'border-box',
+                        boxSizing: "border-box",
                     }}
                 >
-                        <span
-                            style={{
-                                // Body font, not the header's: the game draws the name bold and the
-                                // class line in the ordinary face, just white rather than grey.
-                                ...textStyle(layout.body, layout, u),
-                                color: '#ffffff',
-                                flex: '1 1 0',
-                                minWidth: 0,
-                            }}
-                        >
-                            {/* Verbatim - do NOT prepend "Class: ". That label is part of the
+                    <span
+                        style={{
+                            // Body font, not the header's: the game draws the name bold and the
+                            // class line in the ordinary face, just white rather than grey.
+                            ...textStyle(layout.body, layout, u),
+                            color: "#ffffff",
+                            flex: "1 1 0",
+                            minWidth: 0,
+                        }}
+                    >
+                        {/* Verbatim - do NOT prepend "Class: ". That label is part of the
                                 translation, not something the engine adds: the shipped English
                                 MasterTextFile stores whole values like "Class: Turret" and
                                 "Class: Tank", and it could not be hardcoded anyway since the game
@@ -871,13 +931,15 @@ export function EncyclopediaCard(
                                 does NOT use the body component's, even though it is drawn with the
                                 body's font. It used to truncate with an ellipsis, which the game
                                 never does; it wraps. */}
-                            {wrapByCharacterBudget(
-                                entry.unitClass ?? '',
-                                entry.rowBudgets?.unitClass ?? 0,
-                            ).map((line, i) => (
-                                <div key={i} style={{whiteSpace: 'pre'}}>{line}</div>
-                            ))}
-                        </span>
+                        {wrapByCharacterBudget(
+                            entry.unitClass ?? "",
+                            entry.rowBudgets?.unitClass ?? 0,
+                        ).map((line, i) => (
+                            <div key={i} style={{ whiteSpace: "pre" }}>
+                                {line}
+                            </div>
+                        ))}
+                    </span>
 
                     {/* Exactly two slots: ability 0 left, ability 1 right. Anything further down
                         the list is simply not drawn - the game does the same, and modders rely on
@@ -886,89 +948,96 @@ export function EncyclopediaCard(
                         The artwork is a placeholder: an ability's ordinary icon is nowhere in the
                         data, only the alternate-state one, so the engine must supply it. The type
                         stands in so a slot still says which ability it is. */}
-                    {entry.abilities.slice(0, CHROME.abilitySlots).map(ability => {
-                        // Sized from THIS icon: the ability scale applies to the art's own
-                        // dimensions, so two abilities whose icons differ in size get slots that
-                        // differ the same way, exactly as the engine draws them.
-                        const slot = abilitySlotSize(layout, ability.icon);
-                        return (
-                            <div
-                                key={ability.abilityName ?? ability.type}
-                                style={{
-                                    width: u(slot),
-                                    height: u(slot),
-                                    flex: '0 0 auto',
-                                    // No background and no border, for the same reason as the portrait:
-                                    // the game draws no slot chrome here. Ability icons merely LOOK like
-                                    // filled squares because most of them are opaque and square - that
-                                    // is the artwork, not a frame around it. Painting one would show
-                                    // through every icon that is not.
-                                    boxSizing: 'border-box',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    // No padding: the engine scales the atlas cut to fill the slot, so
-                                    // insetting it here drew every icon a unit smaller than the game's.
-                                    // The text fallback below opts back into its own padding.
-                                    ...fontOf('Arial'),
-                                    fontSize: u(3.4),
-                                    lineHeight: u(3.8),
-                                    color: 'rgba(255, 255, 255, 0.9)',
-                                    textAlign: 'center',
-                                    overflow: 'hidden',
-                                    wordBreak: 'break-word',
-                                }}
-                                title={
-                                    `${ability.type}${ability.abilityName ? ` (${ability.abilityName})` : ''}`
-                                    + `${ability.alternateIconName
-                                        ? ` - alternate icon ${ability.alternateIconName}` : ''}`
-                                }
-                            >
-                                {ability.icon ? (
-                                    <img
-                                        src={safeImageSource(ability.icon.dataUri)}
-                                        alt={ability.type}
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            display: 'block',
-                                            objectFit: 'fill',
-                                            imageRendering: 'pixelated',
-                                        }}
-                                    />
-                                ) : (
-                                    // No icon resolved - the engine's ability-to-icon mapping is not in
-                                    // the data, so this is expected for a good share of abilities. The
-                                    // type text is still the most useful thing to show, and unlike the
-                                    // icon it needs an outline to read as a slot at all. That outline is
-                                    // an editor affordance; the game draws nothing here.
-                                    <div
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            background: CHROME.abilitySlot,
-                                            border: `${u(1)} solid rgba(255, 255, 255, 0.25)`,
-                                            boxSizing: 'border-box',
-                                            padding: u(0.5),
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            overflow: 'hidden',
-                                        }}
-                                    >
-                                        {ability.type}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                    {entry.abilities
+                        .slice(0, CHROME.abilitySlots)
+                        .map((ability) => {
+                            // Sized from THIS icon: the ability scale applies to the art's own
+                            // dimensions, so two abilities whose icons differ in size get slots that
+                            // differ the same way, exactly as the engine draws them.
+                            const slot = abilitySlotSize(layout, ability.icon);
+                            return (
+                                <div
+                                    key={ability.abilityName ?? ability.type}
+                                    style={{
+                                        width: u(slot),
+                                        height: u(slot),
+                                        flex: "0 0 auto",
+                                        // No background and no border, for the same reason as the portrait:
+                                        // the game draws no slot chrome here. Ability icons merely LOOK like
+                                        // filled squares because most of them are opaque and square - that
+                                        // is the artwork, not a frame around it. Painting one would show
+                                        // through every icon that is not.
+                                        boxSizing: "border-box",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        // No padding: the engine scales the atlas cut to fill the slot, so
+                                        // insetting it here drew every icon a unit smaller than the game's.
+                                        // The text fallback below opts back into its own padding.
+                                        ...fontOf("Arial"),
+                                        fontSize: u(3.4),
+                                        lineHeight: u(3.8),
+                                        color: "rgba(255, 255, 255, 0.9)",
+                                        textAlign: "center",
+                                        overflow: "hidden",
+                                        wordBreak: "break-word",
+                                    }}
+                                    title={
+                                        `${ability.type}${ability.abilityName ? ` (${ability.abilityName})` : ""}` +
+                                        `${
+                                            ability.alternateIconName
+                                                ? ` - alternate icon ${ability.alternateIconName}`
+                                                : ""
+                                        }`
+                                    }
+                                >
+                                    {ability.icon ? (
+                                        <img
+                                            src={safeImageSource(
+                                                ability.icon.dataUri,
+                                            )}
+                                            alt={ability.type}
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                display: "block",
+                                                objectFit: "fill",
+                                                imageRendering: "pixelated",
+                                            }}
+                                        />
+                                    ) : (
+                                        // No icon resolved - the engine's ability-to-icon mapping is not in
+                                        // the data, so this is expected for a good share of abilities. The
+                                        // type text is still the most useful thing to show, and unlike the
+                                        // icon it needs an outline to read as a slot at all. That outline is
+                                        // an editor affordance; the game draws nothing here.
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                background: CHROME.abilitySlot,
+                                                border: `${u(1)} solid rgba(255, 255, 255, 0.25)`,
+                                                boxSizing: "border-box",
+                                                padding: u(0.5),
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                overflow: "hidden",
+                                            }}
+                                        >
+                                            {ability.type}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                 </div>
             </div>
 
             {/* Everything below the band keeps the horizontal inset, so the body's content box
                 stays 250 units (262 less the 1-unit border and 5-unit inset per side) - the width
                 the wrap calibration is fitted to. */}
-            <div style={{padding: `0 ${u(layout.offsetX)}`}}>
+            <div style={{ padding: `0 ${u(layout.offsetX)}` }}>
                 {/* Full width. An earlier scan found no line to the left of the icon and I read that as
                 the divider starting at the icon's edge - but the icon is 50 units tall in a 42-unit
                 header block, so at the divider's row the scan was hitting the icon, which is drawn
@@ -987,26 +1056,35 @@ export function EncyclopediaCard(
                 the card exactly. `pre` is what stops CSS from second-guessing that - letting it
                 wrap as well would break exactly the lines this rule exists to keep whole. */}
                 <div>
-                    {entry.body.map((line, i) => (
-                        line.text === null || line.text === undefined
-                            ? (
-                                <div
-                                    key={`${line.key}-${i}`}
-                                    style={{...textStyle(layout.body, layout, u), color: '#f04c4c'}}
-                                    title={`No translation loaded for '${line.key}'`}
-                                >
-                                    {`<${line.key}>`}
-                                </div>
-                            )
-                            : wrapByCharacterBudget(line.text, layout.body.wrapChars).map((wrapped, w) => (
+                    {entry.body.map((line, i) =>
+                        line.text === null || line.text === undefined ? (
+                            <div
+                                key={`${line.key}-${i}`}
+                                style={{
+                                    ...textStyle(layout.body, layout, u),
+                                    color: "#f04c4c",
+                                }}
+                                title={`No translation loaded for '${line.key}'`}
+                            >
+                                {`<${line.key}>`}
+                            </div>
+                        ) : (
+                            wrapByCharacterBudget(
+                                line.text,
+                                layout.body.wrapChars,
+                            ).map((wrapped, w) => (
                                 <div
                                     key={`${line.key}-${i}-${w}`}
-                                    style={{...textStyle(layout.body, layout, u), whiteSpace: 'pre'}}
+                                    style={{
+                                        ...textStyle(layout.body, layout, u),
+                                        whiteSpace: "pre",
+                                    }}
                                 >
                                     {wrapped}
                                 </div>
                             ))
-                    ))}
+                        ),
+                    )}
                 </div>
             </div>
 
@@ -1017,12 +1095,18 @@ export function EncyclopediaCard(
             {/* The game repeats the divider above this section, but only when the section is there
                 at all - it separates the body from the panels, so with no panels there is nothing
                 to separate. Same art and same core-row offset as the divider under the class row. */}
-            {hasAgainst && <Divider art={chrome?.line} u={u} marginTop={CHROME.sectionGap}/>}
+            {hasAgainst && (
+                <Divider
+                    art={chrome?.line}
+                    u={u}
+                    marginTop={CHROME.sectionGap}
+                />
+            )}
 
             {hasAgainst && (
                 <div
                     style={{
-                        display: 'flex',
+                        display: "flex",
                         gap: u(CHROME.againstGap),
                         marginTop: u(CHROME.sectionGap),
                     }}
@@ -1055,7 +1139,6 @@ export function EncyclopediaCard(
                     />
                 </div>
             )}
-
         </div>
     );
 }

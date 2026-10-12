@@ -7,8 +7,8 @@
 // one means knowing its exact name, which until now meant going and reading the game's own file.
 // The baseline is already loaded for the Inherited toggle, so this costs no extra server call.
 
-import {LocValue} from './loc/locRow';
-import {BaselineRow} from './translationInherited';
+import { LocValue } from "./loc/locRow";
+import { BaselineRow } from "./translationInherited";
 
 export interface BaselineSuggestion {
     key: string;
@@ -37,7 +37,7 @@ export function suggestBaselineKeys(
         return [];
     }
 
-    const taken = new Set(existingKeys.map(key => key.toLowerCase()));
+    const taken = new Set(existingKeys.map((key) => key.toLowerCase()));
     const prefix: BaselineRow[] = [];
     const substring: BaselineRow[] = [];
 
@@ -58,15 +58,13 @@ export function suggestBaselineKeys(
         }
     }
 
-    return [...prefix, ...substring]
-        .slice(0, MAX_SUGGESTIONS)
-        .map(row => ({
-            key: row.key,
-            // Every displayed language gets a cell, empty where the baseline has none, so the
-            // dialog never shows a ragged row.
-            values: languages.map(language => ({
-                language,
-                value: row.values.find(v => v.language === language)?.value ?? '',
-            })),
-        }));
+    return [...prefix, ...substring].slice(0, MAX_SUGGESTIONS).map((row) => ({
+        key: row.key,
+        // Every displayed language gets a cell, empty where the baseline has none, so the
+        // dialog never shows a ragged row.
+        values: languages.map((language) => ({
+            language,
+            value: row.values.find((v) => v.language === language)?.value ?? "",
+        })),
+    }));
 }

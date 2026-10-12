@@ -12,10 +12,10 @@
 // attached to an empty proxy bone whose parent carries the engine block. Read literally it is two
 // puffs a second at a point; read as the engine means it, it is the whole engine wash.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
-import {type MaterialExtras, resolveMaterial} from './materials';
-import type {EmissionMesh} from './meshEmission';
+import { type MaterialExtras, resolveMaterial } from "./materials";
+import type { EmissionMesh } from "./meshEmission";
 
 /** How far up the graph a proxy bone may look for the geometry it belongs to. */
 const MAX_CLIMB = 8;
@@ -36,7 +36,8 @@ const MAX_CLIMB = 8;
  * bind pose of a running trooper is off by centimetres.
  */
 export function emissionMeshFor(
-    attachment: THREE.Object3D, stopAt: THREE.Object3D | null = null,
+    attachment: THREE.Object3D,
+    stopAt: THREE.Object3D | null = null,
 ): EmissionMesh | null {
     const toLocal = new THREE.Matrix4();
     attachment.updateWorldMatrix(true, false);
@@ -45,10 +46,12 @@ export function emissionMeshFor(
     let node: THREE.Object3D | null = attachment;
 
     for (let climbed = 0; node !== null && climbed <= MAX_CLIMB; climbed++) {
-        const subMeshes = meshesOn(node).map(mesh => subMeshOf(mesh, toLocal));
+        const subMeshes = meshesOn(node).map((mesh) =>
+            subMeshOf(mesh, toLocal),
+        );
 
         if (subMeshes.length > 0) {
-            return {subMeshes};
+            return { subMeshes };
         }
 
         if (node === stopAt) {
@@ -73,36 +76,55 @@ export function emissionMeshFor(
  * the entire model, so emitting off it would spread an engine wash over the whole ship.
  */
 function meshesOn(node: THREE.Object3D): THREE.Mesh[] {
-    return node.children.filter((child): child is THREE.Mesh =>
-        child instanceof THREE.Mesh
-        && !resolveMaterial((child.userData.alamo ?? {}) as MaterialExtras).hidden);
+    return node.children.filter(
+        (child): child is THREE.Mesh =>
+            child instanceof THREE.Mesh &&
+            !resolveMaterial((child.userData.alamo ?? {}) as MaterialExtras)
+                .hidden,
+    );
 }
 
 function subMeshOf(
-    mesh: THREE.Mesh, toLocal: THREE.Matrix4,
-): EmissionMesh['subMeshes'][number] {
+    mesh: THREE.Mesh,
+    toLocal: THREE.Matrix4,
+): EmissionMesh["subMeshes"][number] {
     mesh.updateWorldMatrix(true, false);
 
-    const transform = new THREE.Matrix4().multiplyMatrices(toLocal, mesh.matrixWorld);
+    const transform = new THREE.Matrix4().multiplyMatrices(
+        toLocal,
+        mesh.matrixWorld,
+    );
     const rotation = new THREE.Matrix3().getNormalMatrix(transform);
 
-    const position = mesh.geometry.getAttribute('position');
-    const normal = mesh.geometry.getAttribute('normal');
+    const position = mesh.geometry.getAttribute("position");
+    const normal = mesh.geometry.getAttribute("normal");
 
-    const positions = new Float32Array(position === undefined ? 0 : position.count * 3);
+    const positions = new Float32Array(
+        position === undefined ? 0 : position.count * 3,
+    );
     const normals = new Float32Array(positions.length);
     const scratch = new THREE.Vector3();
 
     for (let i = 0; i < positions.length / 3; i++) {
-        scratch.fromBufferAttribute(position, i).applyMatrix4(transform).toArray(positions, i * 3);
+        scratch
+            .fromBufferAttribute(position, i)
+            .applyMatrix4(transform)
+            .toArray(positions, i * 3);
 
         if (normal !== undefined) {
-            scratch.fromBufferAttribute(normal, i)
-                .applyMatrix3(rotation).normalize().toArray(normals, i * 3);
+            scratch
+                .fromBufferAttribute(normal, i)
+                .applyMatrix3(rotation)
+                .normalize()
+                .toArray(normals, i * 3);
         }
     }
 
-    return {positions, normals, indices: indicesOf(mesh.geometry, positions.length / 3)};
+    return {
+        positions,
+        normals,
+        indices: indicesOf(mesh.geometry, positions.length / 3),
+    };
 }
 
 /**
@@ -112,7 +134,10 @@ function subMeshOf(
  * emission needs them. Leaving the list empty would silently demote `RandomMesh` to sampling bare
  * vertices, which clumps a smooth spread onto the corners.
  */
-function indicesOf(geometry: THREE.BufferGeometry, vertices: number): Uint32Array {
+function indicesOf(
+    geometry: THREE.BufferGeometry,
+    vertices: number,
+): Uint32Array {
     const index = geometry.getIndex();
 
     if (index !== null) {

@@ -13,8 +13,8 @@
 //
 // Pure: no `vscode` import, so it is covered by the unit harness rather than by a manual smoke run.
 
-import {factionTree} from './storyBattles';
-import type {StoryCampaignDto} from './protocol';
+import { factionTree } from "./storyBattles";
+import type { StoryCampaignDto } from "./protocol";
 
 /**
  * One campaign faction, and optionally one of its battles - the unit a graph, a panel and a
@@ -37,7 +37,7 @@ export interface StoryGraphTarget {
  * campaign called `GC - Rebel` collide with the Rebel chain of `GC`. A unit separator cannot appear
  * in either.
  */
-const SEPARATOR = '';
+const SEPARATOR = "";
 
 /**
  * The registry key for one target's panel.
@@ -49,12 +49,14 @@ const SEPARATOR = '';
  */
 export function panelKey(target: StoryGraphTarget): string {
     const chain = `${target.campaign.toLowerCase()}${SEPARATOR}${target.faction.toLowerCase()}`;
-    return target.scope ? `${chain}${SEPARATOR}${target.scope.toLowerCase()}` : chain;
+    return target.scope
+        ? `${chain}${SEPARATOR}${target.scope.toLowerCase()}`
+        : chain;
 }
 
 /** The galactic target a scoped one belongs to - itself when it is already galactic. */
 export function galacticOf(target: StoryGraphTarget): StoryGraphTarget {
-    return {campaign: target.campaign, faction: target.faction};
+    return { campaign: target.campaign, faction: target.faction };
 }
 
 /**
@@ -69,12 +71,15 @@ export function panelTitle(target: StoryGraphTarget): string {
 }
 
 /** Every campaign faction pair the navigator feed declares, in document order. */
-export function targetsOf(campaigns: readonly StoryCampaignDto[]): StoryGraphTarget[] {
-    return campaigns.flatMap(campaign =>
-        (campaign.factions ?? []).map(faction => ({
+export function targetsOf(
+    campaigns: readonly StoryCampaignDto[],
+): StoryGraphTarget[] {
+    return campaigns.flatMap((campaign) =>
+        (campaign.factions ?? []).map((faction) => ({
             campaign: campaign.name,
             faction: faction.faction,
-        })));
+        })),
+    );
 }
 
 /** One quick-pick entry per target, carrying the target so the caller never re-parses a label. */
@@ -94,25 +99,33 @@ export interface StoryGraphTargetItem {
  * name is what actually tells the reader which chain they are about to open; a battle's entry
  * says which battle of how many, which is what the galactic story knows about it.
  */
-export function graphTargets(campaigns: readonly StoryCampaignDto[]): StoryGraphTargetItem[] {
-    return campaigns.flatMap(campaign =>
-        (campaign.factions ?? []).flatMap(faction => {
+export function graphTargets(
+    campaigns: readonly StoryCampaignDto[],
+): StoryGraphTargetItem[] {
+    return campaigns.flatMap((campaign) =>
+        (campaign.factions ?? []).flatMap((faction) => {
             const chain = `${campaign.name} - ${faction.faction}`;
             const battles = factionTree(faction).battles;
             return [
                 {
                     label: chain,
                     description: faction.manifestFile,
-                    target: {campaign: campaign.name, faction: faction.faction},
+                    target: {
+                        campaign: campaign.name,
+                        faction: faction.faction,
+                    },
                 },
                 ...battles.map((branch, index) => ({
                     label: `${chain} - ${branch.battle.label}`,
                     description: `Battle ${index + 1} of ${battles.length}`,
                     target: {
-                        campaign: campaign.name, faction: faction.faction,
-                        scope: branch.battle.key, scopeLabel: branch.battle.label,
+                        campaign: campaign.name,
+                        faction: faction.faction,
+                        scope: branch.battle.key,
+                        scopeLabel: branch.battle.label,
                     },
                 })),
             ];
-        }));
+        }),
+    );
 }

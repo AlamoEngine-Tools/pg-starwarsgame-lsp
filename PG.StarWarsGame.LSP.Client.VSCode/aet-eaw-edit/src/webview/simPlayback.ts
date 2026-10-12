@@ -7,11 +7,18 @@
  * the timers stay in storyGraph.tsx; everything here is testable without a DOM.
  */
 
-import {StorySimStepDto} from '../protocol/story';
+import { StorySimStepDto } from "../protocol/story";
 
 /** Mirrors StorySimCause.Fires on the server: the causes that mean "this event fired". */
-export const FIRE_CAUSES: ReadonlySet<string> =
-    new Set(['manual', 'lua', 'poll', 'prereq', 'trigger', 'speech', 'movie']);
+export const FIRE_CAUSES: ReadonlySet<string> = new Set([
+    "manual",
+    "lua",
+    "poll",
+    "prereq",
+    "trigger",
+    "speech",
+    "movie",
+]);
 
 /** One outgoing edge of the adjacency the path search walks. */
 export interface Adjacent {
@@ -20,7 +27,9 @@ export interface Adjacent {
 }
 
 /** Steps grouped by tick, in trace order; ticks come out ascending. */
-export function groupByTick(steps: readonly StorySimStepDto[]): StorySimStepDto[][] {
+export function groupByTick(
+    steps: readonly StorySimStepDto[],
+): StorySimStepDto[][] {
     const groups: StorySimStepDto[][] = [];
     let current: StorySimStepDto[] | null = null;
     let currentTick = Number.NaN;
@@ -59,7 +68,10 @@ export function resolvePath(
                 if (edge.to === sourceId || cameFrom.has(edge.to)) {
                     continue;
                 }
-                cameFrom.set(edge.to, {from: nodeId, connectionId: edge.connectionId});
+                cameFrom.set(edge.to, {
+                    from: nodeId,
+                    connectionId: edge.connectionId,
+                });
                 if (edge.to === targetId) {
                     return unwind(cameFrom, sourceId, targetId);
                 }
@@ -74,7 +86,9 @@ export function resolvePath(
 }
 
 function unwind(
-    cameFrom: ReadonlyMap<string, { from: string; connectionId: string }>, sourceId: string, targetId: string,
+    cameFrom: ReadonlyMap<string, { from: string; connectionId: string }>,
+    sourceId: string,
+    targetId: string,
 ): string[] {
     const path: string[] = [];
     let at = targetId;
@@ -90,10 +104,12 @@ function unwind(
 }
 
 /** How many times each node fired within these steps. */
-export function fireDelta(steps: readonly StorySimStepDto[]): Map<string, number> {
+export function fireDelta(
+    steps: readonly StorySimStepDto[],
+): Map<string, number> {
     const delta = new Map<string, number>();
     for (const step of steps) {
-        if (step.to === 'Fired' && FIRE_CAUSES.has(step.cause)) {
+        if (step.to === "Fired" && FIRE_CAUSES.has(step.cause)) {
             delta.set(step.nodeId, (delta.get(step.nodeId) ?? 0) + 1);
         }
     }
@@ -106,9 +122,16 @@ export function isLifecycleStep(step: StorySimStepDto): boolean {
 }
 
 /** The Lua overlay's steps land on state nodes, which have no lifecycle; they still travel an edge. */
-export const LUA_FLOW_CAUSES: ReadonlySet<string> = new Set(['luaTrigger', 'luaEnter', 'luaExit']);
+export const LUA_FLOW_CAUSES: ReadonlySet<string> = new Set([
+    "luaTrigger",
+    "luaEnter",
+    "luaExit",
+]);
 
 /** True when the step should flow along the edge from its source to its node. */
 export function isFlowStep(step: StorySimStepDto): boolean {
-    return !!step.sourceNodeId && (isLifecycleStep(step) || LUA_FLOW_CAUSES.has(step.cause));
+    return (
+        !!step.sourceNodeId &&
+        (isLifecycleStep(step) || LUA_FLOW_CAUSES.has(step.cause))
+    );
 }

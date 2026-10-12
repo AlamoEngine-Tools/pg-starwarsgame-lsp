@@ -15,9 +15,9 @@
 // playing while you hop into Model mode to hide a mesh - so each lens carries a one-line chip
 // saying what the others are up to. Without that, a soft switch just hides state.
 
-import type {RotaryMode} from '../shared/RotaryModeSwitch';
+import type { RotaryMode } from "../shared/RotaryModeSwitch";
 
-export type PreviewMode = 'model' | 'animation' | 'gameplay';
+export type PreviewMode = "model" | "animation" | "gameplay";
 
 /** What the subject has to work with, for the counts on the dial. */
 export interface SubjectCounts {
@@ -52,15 +52,21 @@ export function previewModes(counts: SubjectCounts): RotaryMode<PreviewMode>[] {
         // fills its button edge to edge and the dial stops reading as a dial. The story graph's
         // own three (`eye`, `edit`, `play`) are the calibration.
         {
-            id: 'animation', icon: 'play', label: 'Animation', angle: 210,
+            id: "animation",
+            icon: "play",
+            label: "Animation",
+            angle: 210,
             count: counts.animations,
         },
-        {id: 'model', icon: 'package', label: 'Model', angle: 270},
+        { id: "model", icon: "package", label: "Model", angle: 270 },
         {
             // Everything the lens can act on, not only the hardpoints. It counted hardpoints alone
             // until the lens grew weapons and abilities, which read 0 on a fighter that carries its
             // guns on the unit itself - a dial position claiming a subject has nothing to see.
-            id: 'gameplay', icon: 'zap', label: 'Gameplay', angle: 330,
+            id: "gameplay",
+            icon: "zap",
+            label: "Gameplay",
+            angle: 330,
             count: counts.hardpoints + counts.weapons + counts.abilities,
         },
     ];
@@ -73,8 +79,11 @@ export function previewModes(counts: SubjectCounts): RotaryMode<PreviewMode>[] {
  * clips still opens in Animation mode, because the empty list is the answer to why nothing moves
  * and bouncing elsewhere would hide it.
  */
-export function defaultMode(sceneKind: string, _counts: SubjectCounts): PreviewMode {
-    return sceneKind === 'Animation' ? 'animation' : 'model';
+export function defaultMode(
+    sceneKind: string,
+    _counts: SubjectCounts,
+): PreviewMode {
+    return sceneKind === "Animation" ? "animation" : "model";
 }
 
 /**
@@ -91,7 +100,7 @@ export function defaultMode(sceneKind: string, _counts: SubjectCounts): PreviewM
  * The pills were already gated this way; only the DRAWING was not, which is the whole of the fault.
  */
 export function drawsAnnotations(mode: PreviewMode): boolean {
-    return mode === 'gameplay';
+    return mode === "gameplay";
 }
 
 /** The Model lens's own state, which is what its Reset puts back. */
@@ -114,35 +123,38 @@ export interface ModelState {
  * them away again.
  */
 export function modelTouched(state: ModelState): boolean {
-    return state.alt !== 0
-        || !state.lodIsHighest
-        || state.hiddenEmitters > 0
-        || state.rowOverrides > 0;
+    return (
+        state.alt !== 0 ||
+        !state.lodIsHighest ||
+        state.hiddenEmitters > 0 ||
+        state.rowOverrides > 0
+    );
 }
 
 /** One chip per other mode that has something running, in dial order. */
 export function otherModeChips(
-    mode: PreviewMode, activity: ModeActivity,
+    mode: PreviewMode,
+    activity: ModeActivity,
 ): { mode: PreviewMode; text: string }[] {
     const chips: { mode: PreviewMode; text: string }[] = [];
 
-    if (mode !== 'animation' && activity.playing !== null) {
-        chips.push({mode: 'animation', text: `${activity.playing} playing`});
+    if (mode !== "animation" && activity.playing !== null) {
+        chips.push({ mode: "animation", text: `${activity.playing} playing` });
     }
 
-    if (mode !== 'gameplay' && activity.destroyed > 0) {
+    if (mode !== "gameplay" && activity.destroyed > 0) {
         chips.push({
-            mode: 'gameplay',
-            text: `${activity.destroyed} hardpoint${activity.destroyed === 1 ? '' : 's'} destroyed`,
+            mode: "gameplay",
+            text: `${activity.destroyed} hardpoint${activity.destroyed === 1 ? "" : "s"} destroyed`,
         });
     }
 
     // An active ability is holding proxies on. Without this the state is invisible from every other
     // lens, which is exactly what the chips exist to prevent.
-    if (mode !== 'gameplay' && activity.abilities > 0) {
+    if (mode !== "gameplay" && activity.abilities > 0) {
         chips.push({
-            mode: 'gameplay',
-            text: `${activity.abilities} abilit${activity.abilities === 1 ? 'y' : 'ies'} active`,
+            mode: "gameplay",
+            text: `${activity.abilities} abilit${activity.abilities === 1 ? "y" : "ies"} active`,
         });
     }
 

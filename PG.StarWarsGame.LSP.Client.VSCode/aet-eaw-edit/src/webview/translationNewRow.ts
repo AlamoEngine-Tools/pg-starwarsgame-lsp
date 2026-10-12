@@ -10,7 +10,7 @@
 // The rules mirror what the server checks when it validates a batch. They are deliberately not
 // stricter: inventing a shape rule here would reject keys the engine accepts.
 
-import {LocValue} from './loc/locRow';
+import { LocValue } from "./loc/locRow";
 
 export interface NewRowDraft {
     key: string;
@@ -19,7 +19,10 @@ export interface NewRowDraft {
 
 /** A draft with a field for every language the file declares. */
 export function blankDraft(languages: string[]): NewRowDraft {
-    return {key: '', values: languages.map(language => ({language, value: ''}))};
+    return {
+        key: "",
+        values: languages.map((language) => ({ language, value: "" })),
+    };
 }
 
 /** The key as it will be stored. Surrounding whitespace is not part of an identifier. */
@@ -40,9 +43,9 @@ export function normaliseKey(key: string): string {
  * here for the client and the server to drift apart on.
  */
 export function foldToEngineKey(key: string): string {
-    let folded = '';
+    let folded = "";
     for (const character of normaliseKey(key)) {
-        folded += character.codePointAt(0)! > 0x7f ? '?' : character;
+        folded += character.codePointAt(0)! > 0x7f ? "?" : character;
     }
     return folded;
 }
@@ -53,18 +56,23 @@ export function foldToEngineKey(key: string): string {
  * Returns a message rather than a boolean because the dialog shows it: "already defined" and
  * "cannot be empty" call for different corrections.
  */
-export function validateNewKey(key: string, existingKeys: string[]): string | null {
+export function validateNewKey(
+    key: string,
+    existingKeys: string[],
+): string | null {
     const candidate = normaliseKey(key);
 
     if (candidate.length === 0) {
-        return 'A key is required - it is how the game refers to this text.';
+        return "A key is required - it is how the game refers to this text.";
     }
 
     // Compared on the folded form, and case-sensitively - which is what the engine does. A
     // case-insensitive compare here used to refuse a differently-cased key the engine reads
     // perfectly well, and at the same time waved through two keys that genuinely collide.
     const folded = foldToEngineKey(candidate);
-    const clash = existingKeys.find(existing => foldToEngineKey(existing) === folded);
+    const clash = existingKeys.find(
+        (existing) => foldToEngineKey(existing) === folded,
+    );
 
     if (clash === undefined) {
         return null;
@@ -72,8 +80,8 @@ export function validateNewKey(key: string, existingKeys: string[]): string | nu
 
     return clash === candidate
         ? `'${clash}' is already in this file. Only one row per key is ever read.`
-        : `'${clash}' is already in this file, and the game cannot tell it apart from `
-        + `'${candidate}' - it reads keys as ASCII, so both become '${folded}'.`;
+        : `'${clash}' is already in this file, and the game cannot tell it apart from ` +
+              `'${candidate}' - it reads keys as ASCII, so both become '${folded}'.`;
 }
 
 /**
@@ -81,5 +89,8 @@ export function validateNewKey(key: string, existingKeys: string[]): string | nu
  * column, or the grid would show a ragged row and later edits would have nothing to address.
  */
 export function draftToCommandValues(draft: NewRowDraft): LocValue[] {
-    return draft.values.map(value => ({language: value.language, value: value.value}));
+    return draft.values.map((value) => ({
+        language: value.language,
+        value: value.value,
+    }));
 }

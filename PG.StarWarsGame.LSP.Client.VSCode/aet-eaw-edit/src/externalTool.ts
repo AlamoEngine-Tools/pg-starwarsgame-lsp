@@ -4,15 +4,15 @@
 // Handing a previewed file to an external editor. Kept free of `vscode` so it runs under the unit
 // test harness; the panel supplies the settings and reports the outcome.
 
-import {spawn} from 'node:child_process';
+import { spawn } from "node:child_process";
 
-import {type PreviewSourceFile} from './protocol/modelPreview';
+import { type PreviewSourceFile } from "./protocol/modelPreview";
 
 /** The slice of `child_process.spawn` the launcher needs, so a test can stand in for it. */
 export type SpawnFn = (
     command: string,
     args: string[],
-    options: { detached: boolean; stdio: 'ignore'; shell?: boolean },
+    options: { detached: boolean; stdio: "ignore"; shell?: boolean },
 ) => NodeJS.EventEmitter & { unref(): void };
 
 /**
@@ -22,7 +22,10 @@ export type SpawnFn = (
  * The opened file wins because the server resolves by NAME. With a mod shadowing the base game it
  * would hand over the mod's copy even when the author had opened the base game's.
  */
-export function handoffFile(openedFile: string | null, source: PreviewSourceFile | null | undefined): string | null {
+export function handoffFile(
+    openedFile: string | null,
+    source: PreviewSourceFile | null | undefined,
+): string | null {
     return openedFile ?? source?.path ?? null;
 }
 
@@ -34,13 +37,20 @@ export function handoffFile(openedFile: string | null, source: PreviewSourceFile
  * call into the default terminal, which in cmd or Git Bash is not a command at all - the tool never
  * started and nothing said so. Detached and unreferenced, so closing VS Code leaves the editor open.
  */
-export function launchDetached(executable: string, file: string, spawnFn: SpawnFn = spawn as unknown as SpawnFn): Promise<void> {
+export function launchDetached(
+    executable: string,
+    file: string,
+    spawnFn: SpawnFn = spawn as unknown as SpawnFn,
+): Promise<void> {
     return new Promise((resolve, reject) => {
-        const child = spawnFn(executable, [file], {detached: true, stdio: 'ignore'});
-        child.once('spawn', () => {
+        const child = spawnFn(executable, [file], {
+            detached: true,
+            stdio: "ignore",
+        });
+        child.once("spawn", () => {
             child.unref();
             resolve();
         });
-        child.once('error', reject);
+        child.once("error", reject);
     });
 }

@@ -8,10 +8,10 @@
 // The story editor had it first, behind its feature flag; the lookup itself was never
 // story-specific, so it now sits on aet/resolveReference and this is the one caller-side copy.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {LspGateway} from './lsp/lspGateway';
-import {ResolveReferenceResult} from './protocol/workspace';
+import { LspGateway } from "./lsp/lspGateway";
+import { ResolveReferenceResult } from "./protocol/workspace";
 
 /**
  * Resolves `value` and opens its definition beside the panel.
@@ -26,32 +26,43 @@ export async function revealDefinition(
     lsp: LspGateway,
     value: string,
     referenceType?: string,
-    method = 'aet/resolveReference',
+    method = "aet/resolveReference",
 ): Promise<void> {
     if (!value) {
         return;
     }
 
     const result = await lsp.requestOrReport<ResolveReferenceResult>(
-        method, {value, referenceType}, `cannot open the definition of '${value}'`);
+        method,
+        { value, referenceType },
+        `cannot open the definition of '${value}'`,
+    );
     if (result === undefined) {
         return;
     }
 
     if (result.error || !result.uri) {
         void vscode.window.showWarningMessage(
-            `EaWEdit: ${result.error ?? `Cannot resolve '${value}'.`}`);
+            `EaWEdit: ${result.error ?? `Cannot resolve '${value}'.`}`,
+        );
         return;
     }
 
     try {
-        const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(result.uri));
-        const position = new vscode.Position(Math.max(0, result.line), Math.max(0, result.column));
+        const doc = await vscode.workspace.openTextDocument(
+            vscode.Uri.parse(result.uri),
+        );
+        const position = new vscode.Position(
+            Math.max(0, result.line),
+            Math.max(0, result.column),
+        );
         await vscode.window.showTextDocument(doc, {
             viewColumn: vscode.ViewColumn.Beside,
             selection: new vscode.Range(position, position),
         });
     } catch (e) {
-        void vscode.window.showErrorMessage(`EaWEdit: Cannot open ${result.uri} - ${e}`);
+        void vscode.window.showErrorMessage(
+            `EaWEdit: Cannot open ${result.uri} - ${e}`,
+        );
     }
 }

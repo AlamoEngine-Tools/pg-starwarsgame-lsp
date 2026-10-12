@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import {BLANK_SENTINEL_VALUE} from '../creditsCrawlModel';
-import {LocRow} from './locRow';
+import { BLANK_SENTINEL_VALUE } from "../creditsCrawlModel";
+import { LocRow } from "./locRow";
 
 /**
  * The columns hidden before the user has chosen anything.
@@ -18,7 +18,9 @@ import {LocRow} from './locRow';
  *     set. Null or undefined for the ordinary case, where the default is to hide empty columns.
  */
 export function defaultHiddenLanguages(
-    rows: LocRow[], languages: string[], focusLanguage: string | null | undefined,
+    rows: LocRow[],
+    languages: string[],
+    focusLanguage: string | null | undefined,
 ): string[] {
     if (focusLanguage === null || focusLanguage === undefined) {
         return emptyLanguages(rows, languages);
@@ -26,7 +28,9 @@ export function defaultHiddenLanguages(
 
     // Everything but the focus - hidden, not absent, so the column menu brings any of them back.
     // That is what makes this a view of the set rather than a different document.
-    return languages.filter(l => l.toUpperCase() !== focusLanguage.toUpperCase());
+    return languages.filter(
+        (l) => l.toUpperCase() !== focusLanguage.toUpperCase(),
+    );
 }
 
 /**
@@ -45,13 +49,20 @@ export function emptyLanguages(rows: LocRow[], languages: string[]): string[] {
     }
 
     const marker = BLANK_SENTINEL_VALUE.toLowerCase();
-    const empty = languages.filter(language => !rows.some(row => {
-        const value = row.values.find(v => v.language.toUpperCase() === language.toUpperCase())?.value;
-        // The blank-line marker is a spacer, not something written in that language.
-        return value !== undefined
-            && value.trim() !== ''
-            && value.trim().toLowerCase() !== marker;
-    }));
+    const empty = languages.filter(
+        (language) =>
+            !rows.some((row) => {
+                const value = row.values.find(
+                    (v) => v.language.toUpperCase() === language.toUpperCase(),
+                )?.value;
+                // The blank-line marker is a spacer, not something written in that language.
+                return (
+                    value !== undefined &&
+                    value.trim() !== "" &&
+                    value.trim().toLowerCase() !== marker
+                );
+            }),
+    );
 
     // A table of keys with no values at all is not a view anyone asked for; the point is to get
     // emptiness out of the way, not the content.

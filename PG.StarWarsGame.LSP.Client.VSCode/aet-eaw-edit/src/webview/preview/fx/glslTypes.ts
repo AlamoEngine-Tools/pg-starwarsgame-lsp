@@ -10,35 +10,47 @@
 
 /** The types the translated subset deals in. `null` means "not known", which is never forced. */
 export type GlslType =
-    | 'float' | 'vec2' | 'vec3' | 'vec4'
-    | 'mat2' | 'mat3' | 'mat4'
-    | 'int' | 'bool'
-    | 'sampler2D' | 'samplerCube'
+    | "float"
+    | "vec2"
+    | "vec3"
+    | "vec4"
+    | "mat2"
+    | "mat3"
+    | "mat4"
+    | "int"
+    | "bool"
+    | "sampler2D"
+    | "samplerCube"
     | string;
 
 /** How many components a vector type carries. Non-vectors answer 0. */
 export function componentCount(type: GlslType | null): number {
     switch (type) {
-        case 'float':
-        case 'int':
-        case 'bool':
+        case "float":
+        case "int":
+        case "bool":
             return 1;
-        case 'vec2':
+        case "vec2":
             return 2;
-        case 'vec3':
+        case "vec3":
             return 3;
-        case 'vec4':
+        case "vec4":
             return 4;
         default:
             return 0;
     }
 }
 
-const VECTOR_BY_COUNT: Record<number, GlslType> = {1: 'float', 2: 'vec2', 3: 'vec3', 4: 'vec4'};
+const VECTOR_BY_COUNT: Record<number, GlslType> = {
+    1: "float",
+    2: "vec2",
+    3: "vec3",
+    4: "vec4",
+};
 
 /** The swizzle that narrows a vector to `count` components. */
 export function narrowingSwizzle(count: number): string {
-    return `.${'xyzw'.slice(0, count)}`;
+    return `.${"xyzw".slice(0, count)}`;
 }
 
 /** A struct and the type of each field. */
@@ -64,22 +76,25 @@ export type FunctionTable = Map<string, FunctionSignature>;
  * of its first argument, which is the GLSL rule too.
  */
 const INTRINSIC_RESULTS: Record<string, GlslType> = {
-    dot: 'float',
-    length: 'float',
-    distance: 'float',
-    texture: 'vec4',
-    textureProj: 'vec4',
+    dot: "float",
+    length: "float",
+    distance: "float",
+    texture: "vec4",
+    textureProj: "vec4",
 };
 
 /** Reads every `struct Name { type field; ... };` into a lookup. */
 export function collectStructs(source: string): StructTable {
     const structs: StructTable = new Map();
 
-    for (const match of source.matchAll(/\bstruct\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{([^}]*)\}\s*;/g)) {
+    for (const match of source.matchAll(
+        /\bstruct\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{([^}]*)\}\s*;/g,
+    )) {
         const fields = new Map<string, GlslType>();
 
         for (const field of match[2].matchAll(
-            /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/g)) {
+            /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/g,
+        )) {
             fields.set(field[2], field[1]);
         }
 
@@ -97,7 +112,16 @@ export function collectStructs(source: string): StructTable {
  * the function. Every shipped shader ends that way.
  */
 const STATEMENT_KEYWORDS = new Set([
-    'return', 'discard', 'if', 'else', 'for', 'while', 'do', 'break', 'continue', 'struct',
+    "return",
+    "discard",
+    "if",
+    "else",
+    "for",
+    "while",
+    "do",
+    "break",
+    "continue",
+    "struct",
 ]);
 
 /** Reads the declared type of every global, whether or not it is a uniform. */
@@ -105,7 +129,8 @@ export function collectGlobals(source: string): Scope {
     const globals: Scope = new Map();
 
     for (const match of source.matchAll(
-        /^[ \t]*(?:uniform\s+|varying\s+|const\s+)*([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*[=;]/gm)) {
+        /^[ \t]*(?:uniform\s+|varying\s+|const\s+)*([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*[=;]/gm,
+    )) {
         if (!STATEMENT_KEYWORDS.has(match[1])) {
             globals.set(match[2], match[1]);
         }
@@ -128,17 +153,22 @@ export function collectFunctions(source: string): FunctionTable {
     const functions: FunctionTable = new Map();
 
     for (const match of source.matchAll(
-        /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g)) {
+        /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g,
+    )) {
         if (STATEMENT_KEYWORDS.has(match[1])) {
             continue;
         }
 
         const parameters = splitTopLevel(match[3])
-            .map(parameter => parameter.replace(/\b(?:uniform|const|in|out|inout)\b/g, '').trim())
-            .filter(parameter => parameter !== '')
-            .map(parameter => parameter.split(/\s+/)[0]);
+            .map((parameter) =>
+                parameter
+                    .replace(/\b(?:uniform|const|in|out|inout)\b/g, "")
+                    .trim(),
+            )
+            .filter((parameter) => parameter !== "")
+            .map((parameter) => parameter.split(/\s+/)[0]);
 
-        functions.set(match[2], {returnType: match[1], parameters});
+        functions.set(match[2], { returnType: match[1], parameters });
     }
 
     return functions;
@@ -157,36 +187,46 @@ function swizzleLength(member: string): number | null {
  * worse than leaving a shader untranslated.
  */
 export function inferType(
-    expression: string, scope: Scope, structs: StructTable, functions: FunctionTable = new Map(),
+    expression: string,
+    scope: Scope,
+    structs: StructTable,
+    functions: FunctionTable = new Map(),
 ): GlslType | null {
     const text = expression.trim();
 
-    if (text === '') {
+    if (text === "") {
         return null;
     }
 
     // Parenthesised: unwrap only when the parens enclose the whole expression.
-    if (text.startsWith('(') && matchingParen(text, 0) === text.length - 1) {
+    if (text.startsWith("(") && matchingParen(text, 0) === text.length - 1) {
         return inferType(text.slice(1, -1), scope, structs, functions);
     }
 
     // Binary operators, lowest precedence first, scanned right to left at depth zero.
-    for (const operators of [['+', '-'], ['*', '/']]) {
+    for (const operators of [
+        ["+", "-"],
+        ["*", "/"],
+    ]) {
         const split = splitAtOperator(text, operators);
         if (split !== null) {
             return combine(
                 inferType(split.left, scope, structs, functions),
                 inferType(split.right, scope, structs, functions),
-                operators.includes('*'));
+                operators.includes("*"),
+            );
         }
     }
 
     // A call, or a constructor.
     const call = /^([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(text);
-    if (call !== null && matchingParen(text, call[0].length - 1) === text.length - 1) {
+    if (
+        call !== null &&
+        matchingParen(text, call[0].length - 1) === text.length - 1
+    ) {
         const name = call[1];
 
-        if (componentCount(name) > 0 || name.startsWith('mat')) {
+        if (componentCount(name) > 0 || name.startsWith("mat")) {
             return name;
         }
         if (name in INTRINSIC_RESULTS) {
@@ -203,7 +243,9 @@ export function inferType(
 
         // What is left is a built-in this file does not list - the componentwise intrinsics, which
         // in GLSL do follow their first argument.
-        return first === undefined ? null : inferType(first, scope, structs, functions);
+        return first === undefined
+            ? null
+            : inferType(first, scope, structs, functions);
     }
 
     // Member access: a struct field, or a swizzle.
@@ -221,10 +263,10 @@ export function inferType(
     }
 
     if (/^[0-9]+\.[0-9]*$|^\.[0-9]+$|^[0-9]+\.$/.test(text)) {
-        return 'float';
+        return "float";
     }
     if (/^[0-9]+$/.test(text)) {
-        return 'int';
+        return "int";
     }
 
     return scope.get(text) ?? null;
@@ -233,11 +275,11 @@ export function inferType(
 /** The side length of a square matrix type. Everything else answers 0. */
 export function matrixDimension(type: GlslType | null): number {
     switch (type) {
-        case 'mat2':
+        case "mat2":
             return 2;
-        case 'mat3':
+        case "mat3":
             return 3;
-        case 'mat4':
+        case "mat4":
             return 4;
         default:
             return 0;
@@ -251,7 +293,9 @@ export function matrixDimension(type: GlslType | null): number {
  * matrix TIMES a vector is a vector, while a matrix plus one is not an expression at all.
  */
 function combine(
-    left: GlslType | null, right: GlslType | null, multiplicative: boolean,
+    left: GlslType | null,
+    right: GlslType | null,
+    multiplicative: boolean,
 ): GlslType | null {
     const a = componentCount(left);
     const b = componentCount(right);
@@ -297,9 +341,9 @@ export function matchingParen(text: string, open: number): number {
     let depth = 0;
 
     for (let i = open; i < text.length; i++) {
-        if (text[i] === '(') {
+        if (text[i] === "(") {
             depth++;
-        } else if (text[i] === ')') {
+        } else if (text[i] === ")") {
             depth--;
             if (depth === 0) {
                 return i;
@@ -312,25 +356,26 @@ export function matchingParen(text: string, open: number): number {
 
 /** Splits at the rightmost top-level occurrence of one of `operators`. */
 function splitAtOperator(
-    text: string, operators: readonly string[],
+    text: string,
+    operators: readonly string[],
 ): { left: string; right: string } | null {
     let depth = 0;
 
     for (let i = text.length - 1; i >= 0; i--) {
         const c = text[i];
 
-        if (c === ')' || c === ']') {
+        if (c === ")" || c === "]") {
             depth++;
-        } else if (c === '(' || c === '[') {
+        } else if (c === "(" || c === "[") {
             depth--;
         } else if (depth === 0 && operators.includes(c)) {
             // Not an operator if there is nothing to its left - that is a sign, not a subtraction.
             const left = text.slice(0, i).trim();
-            if (left === '' || /[-+*/(,]$/.test(left)) {
+            if (left === "" || /[-+*/(,]$/.test(left)) {
                 continue;
             }
 
-            return {left, right: text.slice(i + 1)};
+            return { left, right: text.slice(i + 1) };
         }
     }
 
@@ -346,17 +391,17 @@ export function splitTopLevel(text: string): string[] {
     for (let i = 0; i < text.length; i++) {
         const c = text[i];
 
-        if (c === '(' || c === '[') {
+        if (c === "(" || c === "[") {
             depth++;
-        } else if (c === ')' || c === ']') {
+        } else if (c === ")" || c === "]") {
             depth--;
-        } else if (c === ',' && depth === 0) {
+        } else if (c === "," && depth === 0) {
             parts.push(text.slice(start, i).trim());
             start = i + 1;
         }
     }
 
-    if (text.trim() !== '') {
+    if (text.trim() !== "") {
         parts.push(text.slice(start).trim());
     }
 

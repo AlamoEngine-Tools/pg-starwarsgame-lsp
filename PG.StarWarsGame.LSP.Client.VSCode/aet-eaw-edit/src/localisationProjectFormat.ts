@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import type {SetLocalisationProjectFormatResult} from './protocol/localisation';
+import type { SetLocalisationProjectFormatResult } from "./protocol/localisation";
 
 /**
  * The choices and the outcome wording for "Set Localisation Project Format" (#121), kept free of the
@@ -18,7 +18,7 @@ export interface FormatChoice {
 }
 
 export interface FormatOutcome {
-    kind: 'info' | 'warning' | 'error';
+    kind: "info" | "warning" | "error";
     text: string;
 }
 
@@ -28,44 +28,60 @@ export interface FormatOutcome {
  * files a project already has is what #121 asked for.
  */
 const FORMATS: readonly { format: string; description: string }[] = [
-    {format: 'DAT', description: 'The game\'s binary files (.dat), one per language'},
-    {format: 'CSV', description: 'Comma-separated values (.csv)'},
-    {format: 'XML', description: 'eaw-translation v1 XML (.xml)'},
-    {format: 'NLS', description: 'Java-style properties (.properties), one per language'},
+    {
+        format: "DAT",
+        description: "The game's binary files (.dat), one per language",
+    },
+    { format: "CSV", description: "Comma-separated values (.csv)" },
+    { format: "XML", description: "eaw-translation v1 XML (.xml)" },
+    {
+        format: "NLS",
+        description: "Java-style properties (.properties), one per language",
+    },
 ];
 
 export function formatChoices(current: string | null): FormatChoice[] {
     const declared = current?.toUpperCase() ?? null;
-    return FORMATS.map(({format, description}) => ({
+    return FORMATS.map(({ format, description }) => ({
         format,
         label: format,
-        description: format === declared ? `Current - ${description}` : description,
+        description:
+            format === declared ? `Current - ${description}` : description,
         current: format === declared,
     }));
 }
 
-export function formatOutcome(result: SetLocalisationProjectFormatResult): FormatOutcome {
+export function formatOutcome(
+    result: SetLocalisationProjectFormatResult,
+): FormatOutcome {
     if (result.error) {
-        return {kind: 'error', text: `EaWEdit: ${result.error}`};
+        return { kind: "error", text: `EaWEdit: ${result.error}` };
     }
 
-    const format = result.format ?? '';
+    const format = result.format ?? "";
     if (!result.changed) {
-        return {kind: 'info', text: `EaWEdit: The project already loads ${format}.`};
-    }
-
-    const from = result.previousFormat ? ` instead of ${result.previousFormat.toUpperCase()}` : '';
-    if (result.filesInFormat === 0) {
         return {
-            kind: 'warning',
-            text: `EaWEdit: The project now loads ${format}${from}, but there are no ${format} files in its `
-                + 'localisation directory, so no text is loaded. No files were converted.',
+            kind: "info",
+            text: `EaWEdit: The project already loads ${format}.`,
         };
     }
 
-    const files = result.filesInFormat === 1 ? '1 file' : `${result.filesInFormat} files`;
+    const from = result.previousFormat
+        ? ` instead of ${result.previousFormat.toUpperCase()}`
+        : "";
+    if (result.filesInFormat === 0) {
+        return {
+            kind: "warning",
+            text:
+                `EaWEdit: The project now loads ${format}${from}, but there are no ${format} files in its ` +
+                "localisation directory, so no text is loaded. No files were converted.",
+        };
+    }
+
+    const files =
+        result.filesInFormat === 1 ? "1 file" : `${result.filesInFormat} files`;
     return {
-        kind: 'info',
+        kind: "info",
         text: `EaWEdit: The project now loads ${format}${from}: ${files}. No files were converted.`,
     };
 }

@@ -22,10 +22,10 @@
 // `setRow`, which stores the reader's word only where it disagrees with the model, so showing a
 // mesh you had hidden gives the row back rather than pinning it the other way.
 
-import {type VisibilityLink} from './visibility';
+import { type VisibilityLink } from "./visibility";
 
 /** What the eye shows. */
-export type EyeState = 'shown' | 'inherited' | 'hidden';
+export type EyeState = "shown" | "inherited" | "hidden";
 
 /** What the chain settled about one row, as the eye needs it. */
 export interface EyeFacts {
@@ -46,12 +46,16 @@ export interface RowEye {
 }
 
 /** The links that speak for something ABOVE the row rather than for the row itself. */
-const FROM_ABOVE: readonly VisibilityLink[] = ['master', 'ancestor'];
+const FROM_ABOVE: readonly VisibilityLink[] = ["master", "ancestor"];
 
 /** How one row's eye reads. */
 export function rowEye(facts: EyeFacts): RowEye {
     const fromAbove = FROM_ABOVE.includes(facts.decidedBy);
-    const state: EyeState = facts.visible ? 'shown' : fromAbove ? 'inherited' : 'hidden';
+    const state: EyeState = facts.visible
+        ? "shown"
+        : fromAbove
+          ? "inherited"
+          : "hidden";
 
     return {
         state,
@@ -68,11 +72,11 @@ export function rowEye(facts: EyeFacts): RowEye {
  * master, so spelling that out here says it twice - and a title is read at a glance or not at all.
  */
 function titleFor(state: EyeState): string {
-    if (state === 'inherited') {
-        return 'State inherited from parent';
+    if (state === "inherited") {
+        return "State inherited from parent";
     }
 
-    return state === 'shown'
-        ? 'Hide this and everything under it'
-        : 'Show this and everything under it';
+    return state === "shown"
+        ? "Hide this and everything under it"
+        : "Show this and everything under it";
 }

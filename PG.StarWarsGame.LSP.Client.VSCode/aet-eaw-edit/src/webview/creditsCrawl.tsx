@@ -10,15 +10,15 @@
 // The scroll is a single CSS transform animation rather than a per-frame JS loop: nothing to keep
 // in sync, and it stays smooth over a long roll. No external assets or fonts are used.
 
-import {useLayoutEffect, useMemo, useRef, useState} from 'react';
-import styled from 'styled-components';
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import styled from "styled-components";
 
-import {IconButton} from './shared/Button';
-import {dockHeaderCss} from './shared/dockChrome';
-import {tokensCss} from './shared/tokens';
-import {buildCrawl} from './creditsCrawlModel';
-import {generateStars} from './starfield';
-import {LocRow} from './loc/locRow';
+import { IconButton } from "./shared/Button";
+import { dockHeaderCss } from "./shared/dockChrome";
+import { tokensCss } from "./shared/tokens";
+import { buildCrawl } from "./creditsCrawlModel";
+import { generateStars } from "./starfield";
+import { LocRow } from "./loc/locRow";
 
 const SPEEDS = [0.5, 1, 2, 4];
 
@@ -41,14 +41,17 @@ export function CreditsCrawl(props: {
     // without fighting the animation's own state.
     const [runId, setRunId] = useState(0);
 
-    const blocks = useMemo(() => buildCrawl(props.rows, language), [props.rows, language]);
+    const blocks = useMemo(
+        () => buildCrawl(props.rows, language),
+        [props.rows, language],
+    );
     // Dense enough to read as a sky rather than as scattered dots, and cheap: static elements the
     // browser lays out once.
     const stars = useMemo(() => generateStars(420), []);
 
     const stageRef = useRef<HTMLDivElement>(null);
     const rollRef = useRef<HTMLDivElement>(null);
-    const [travel, setTravel] = useState({from: 0, to: 0, seconds: 1});
+    const [travel, setTravel] = useState({ from: 0, to: 0, seconds: 1 });
 
     // Measured, not expressed in percentages: translateY(100%) is a percentage of the *roll*, so a
     // tall file would start hundreds of pixels below the fold and show a black screen for the first
@@ -74,34 +77,50 @@ export function CreditsCrawl(props: {
             role="dialog"
             aria-label="Credits preview"
             tabIndex={-1}
-            onKeyDown={e => {
-                if (e.key === 'Escape') {
+            onKeyDown={(e) => {
+                if (e.key === "Escape") {
                     props.onClose();
                 }
             }}
-            ref={el => el?.focus()}
+            ref={(el) => el?.focus()}
         >
             <div className="controls">
                 <IconButton
-                    icon={running ? 'pause' : 'play'}
-                    title={running ? 'Pause' : 'Play'}
-                    onClick={() => setRunning(r => !r)}
+                    icon={running ? "pause" : "play"}
+                    title={running ? "Pause" : "Play"}
+                    onClick={() => setRunning((r) => !r)}
                 />
                 <IconButton
                     icon="restart"
                     title="Restart"
                     onClick={() => {
-                        setRunId(id => id + 1);
+                        setRunId((id) => id + 1);
                         setRunning(true);
                     }}
                 />
 
-                <select value={speed} onChange={e => setSpeed(Number(e.target.value))} title="Speed">
-                    {SPEEDS.map(s => <option key={s} value={s}>{s}x</option>)}
+                <select
+                    value={speed}
+                    onChange={(e) => setSpeed(Number(e.target.value))}
+                    title="Speed"
+                >
+                    {SPEEDS.map((s) => (
+                        <option key={s} value={s}>
+                            {s}x
+                        </option>
+                    ))}
                 </select>
 
-                <select value={language} onChange={e => setLanguage(e.target.value)} title="Language">
-                    {props.languages.map(l => <option key={l} value={l}>{l}</option>)}
+                <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    title="Language"
+                >
+                    {props.languages.map((l) => (
+                        <option key={l} value={l}>
+                            {l}
+                        </option>
+                    ))}
                 </select>
 
                 <span className="count">{blocks.length} lines</span>
@@ -130,35 +149,43 @@ export function CreditsCrawl(props: {
                     ))}
                 </div>
 
-                {blocks.length === 0
-                    ? <p className="empty">Nothing to show - this file has no text in {language}.</p>
-                    : (
-                        <div
-                            key={runId}
-                            className="roll"
-                            ref={rollRef}
-                            style={{
-                                animationDuration: `${travel.seconds}s`,
-                                animationPlayState: running ? 'running' : 'paused',
-                                ['--crawl-from' as string]: `${travel.from}px`,
-                                ['--crawl-to' as string]: `${travel.to}px`,
-                            }}
-                        >
-                            {blocks.map((block, i) => (block.kind === 'gap'
-                                ? <div key={i} className="gap"/>
-                                : (
-                                    <div
-                                        key={i}
-                                        className={[
-                                            block.style === 'header' ? 'header' : 'line',
-                                            block.untranslated ? 'missing' : '',
-                                        ].filter(Boolean).join(' ')}
-                                    >
-                                        {block.text}
-                                    </div>
-                                )))}
-                        </div>
-                    )}
+                {blocks.length === 0 ? (
+                    <p className="empty">
+                        Nothing to show - this file has no text in {language}.
+                    </p>
+                ) : (
+                    <div
+                        key={runId}
+                        className="roll"
+                        ref={rollRef}
+                        style={{
+                            animationDuration: `${travel.seconds}s`,
+                            animationPlayState: running ? "running" : "paused",
+                            ["--crawl-from" as string]: `${travel.from}px`,
+                            ["--crawl-to" as string]: `${travel.to}px`,
+                        }}
+                    >
+                        {blocks.map((block, i) =>
+                            block.kind === "gap" ? (
+                                <div key={i} className="gap" />
+                            ) : (
+                                <div
+                                    key={i}
+                                    className={[
+                                        block.style === "header"
+                                            ? "header"
+                                            : "line",
+                                        block.untranslated ? "missing" : "",
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" ")}
+                                >
+                                    {block.text}
+                                </div>
+                            ),
+                        )}
+                    </div>
+                )}
             </div>
         </Overlay>
     );
@@ -245,7 +272,9 @@ const Overlay = styled.div`
         text-align: center;
         /* A humanist sans in the spirit of the films' credits, from fonts already on the system -
            the real face is licensed and cannot be bundled. */
-        font-family: 'Franklin Gothic Medium', 'Trebuchet MS', 'Segoe UI', Arial, sans-serif;
+        font-family:
+            "Franklin Gothic Medium", "Trebuchet MS", "Segoe UI", Arial,
+            sans-serif;
         color: #4dc3ec;
         font-size: 20px;
         line-height: 1.55;

@@ -9,10 +9,10 @@
 // which matters, because most of these describe a fault in the MOD's data and the whole value of
 // saying so is naming the fix.
 
-import {GetEncyclopediaEntryResult} from '../protocol/encyclopedia';
-import {isSubstitutedFont} from './encyclopediaFonts';
-import {worstSeverity} from './loc/validateState';
-import {ValidationState} from './loc/useLocPanel';
+import { GetEncyclopediaEntryResult } from "../protocol/encyclopedia";
+import { isSubstitutedFont } from "./encyclopediaFonts";
+import { worstSeverity } from "./loc/validateState";
+import { ValidationState } from "./loc/useLocPanel";
 
 export interface EncyclopediaNotice {
     /**
@@ -23,12 +23,15 @@ export interface EncyclopediaNotice {
      * is never the author's to fix, so raising it as a warning would leave the control permanently
      * yellow - and a tag that cries warning at healthy data is one people stop reading.
      */
-    severity: 'info' | 'warning';
+    severity: "info" | "warning";
     message: string;
 }
 
 /** Warnings first: the worst of it should read first, whatever order it was collected in. */
-const RANK: Record<EncyclopediaNotice['severity'], number> = {warning: 0, info: 1};
+const RANK: Record<EncyclopediaNotice["severity"], number> = {
+    warning: 0,
+    info: 1,
+};
 
 /**
  * What the preview has to report about `entry`, given how the panel is currently set up.
@@ -52,17 +55,19 @@ export function encyclopediaNotices(
     if (icon) {
         // The server only sends its placeholder when the object NAMED an icon and no layer had it,
         // so this is always a real dangling reference rather than an object that simply has no art.
-        if (icon.source === 'Fallback') {
+        if (icon.source === "Fallback") {
             notices.push({
-                severity: 'warning',
-                message: `No artwork anywhere for '${icon.name}' - the card is showing the `
-                    + 'missing-icon placeholder.',
+                severity: "warning",
+                message:
+                    `No artwork anywhere for '${icon.name}' - the card is showing the ` +
+                    "missing-icon placeholder.",
             });
         } else if (icon.isMegaTextureStale) {
             notices.push({
-                severity: 'warning',
-                message: `'${icon.name}' was found as a source image but is not in the workspace `
-                    + 'mega texture. Rebuild the MTD, or the game will not show it.',
+                severity: "warning",
+                message:
+                    `'${icon.name}' was found as a source image but is not in the workspace ` +
+                    "mega texture. Rebuild the MTD, or the game will not show it.",
             });
         }
     }
@@ -74,27 +79,30 @@ export function encyclopediaNotices(
     const gaps = entry.projectsWithoutIcons ?? [];
     if (gaps.length > 0) {
         notices.push({
-            severity: 'warning',
-            message: `No icon sources configured for ${gaps.join(', ')} - every icon falls back to `
-                + 'the base game. Add an "icons" node naming the source folders to each project '
-                + 'file, or build the mega texture.',
+            severity: "warning",
+            message:
+                `No icon sources configured for ${gaps.join(", ")} - every icon falls back to ` +
+                'the base game. Add an "icons" node naming the source folders to each project ' +
+                "file, or build the mega texture.",
         });
     }
 
     const ships = entry.shipNames;
     if (ships && !ships.fileFound) {
         notices.push({
-            severity: 'warning',
-            message: `Ship name file not found: ${ships.sourcePath}. The card falls back to the `
-                + 'class line.',
+            severity: "warning",
+            message:
+                `Ship name file not found: ${ships.sourcePath}. The card falls back to the ` +
+                "class line.",
         });
     } else if (ships && ships.names.length === 0) {
         // A different fault with a different fix, so it gets its own sentence rather than being
         // folded into the one above: the path is right and the encoding is not.
         notices.push({
-            severity: 'warning',
-            message: `No names read from ${ships.sourcePath}. These files must be UTF-16 with a `
-                + 'byte order mark, which is how the game ships them.',
+            severity: "warning",
+            message:
+                `No names read from ${ships.sourcePath}. These files must be UTF-16 with a ` +
+                "byte order mark, which is how the game ships them.",
         });
     } else if (ships) {
         // Nothing is wrong here - it explains why this card shows a name where every other object
@@ -102,29 +110,35 @@ export function encyclopediaNotices(
         // actually drawn: with an empty pool the card falls back to the class line, and claiming
         // otherwise would be untrue.
         notices.push({
-            severity: 'info',
-            message: 'This object draws an individual name instead of showing its class. The game '
-                + 'picks one and remembers which are used; the preview just picks, and keeps its '
-                + `pick while this panel is open. Names come from ${ships.sourcePath}.`,
+            severity: "info",
+            message:
+                "This object draws an individual name instead of showing its class. The game " +
+                "picks one and remembers which are used; the preview just picks, and keeps its " +
+                `pick while this panel is open. Names come from ${ships.sourcePath}.`,
         });
     }
 
     const frame = entry.chrome?.factionFrames?.[view.factionSlot];
-    if (frame !== undefined && (frame.image === null || frame.image === undefined)) {
+    if (
+        frame !== undefined &&
+        (frame.image === null || frame.image === undefined)
+    ) {
         notices.push({
-            severity: 'warning',
-            message: `No artwork in the mega texture for '${frame.textureName}' - the card falls `
-                + 'back to its measured border.',
+            severity: "warning",
+            message:
+                `No artwork in the mega texture for '${frame.textureName}' - the card falls ` +
+                "back to its measured border.",
         });
     }
 
     const fonts = substitutedFonts(entry);
     if (fonts.length > 0) {
         notices.push({
-            severity: 'info',
-            message: `${fonts.join(' and ')} ${fonts.length > 1 ? 'are' : 'is'} substituted. The `
-                + 'game ships those fonts inside its executable under a commercial licence, so they '
-                + 'are not ours to redistribute; glyph widths in the affected rows are approximate.',
+            severity: "info",
+            message:
+                `${fonts.join(" and ")} ${fonts.length > 1 ? "are" : "is"} substituted. The ` +
+                "game ships those fonts inside its executable under a commercial licence, so they " +
+                "are not ours to redistribute; glyph widths in the affected rows are approximate.",
         });
     }
 
@@ -136,21 +150,27 @@ export function encyclopediaNotices(
     // Said only when the card actually falls back to the "$". When the coin was cut from the atlas
     // the symbol on screen is the right one, and a notice that fires on correct output is one
     // people learn to skip.
-    if (entry.buildCost !== null && entry.buildCost !== undefined && entry.buildCost > 0
-        && !entry.chrome?.credit
-        && isSubstitutedFont(entry.layout.costText.fontName)) {
+    if (
+        entry.buildCost !== null &&
+        entry.buildCost !== undefined &&
+        entry.buildCost > 0 &&
+        !entry.chrome?.credit &&
+        isSubstitutedFont(entry.layout.costText.fontName)
+    ) {
         notices.push({
-            severity: 'info',
-            message: 'The cost reads "$" because the game writes a literal dollar sign there and '
-                + 'draws it with a font whose dollar glyph is the credits symbol. In game it is a '
-                + 'coin.',
+            severity: "info",
+            message:
+                'The cost reads "$" because the game writes a literal dollar sign there and ' +
+                "draws it with a font whose dollar glyph is the credits symbol. In game it is a " +
+                "coin.",
         });
     }
 
     if (view.multiplayer && !entry.usedMultiplayerBody) {
         notices.push({
-            severity: 'info',
-            message: 'No MP_Encyclopedia_Text on this object - showing the single-player body.',
+            severity: "info",
+            message:
+                "No MP_Encyclopedia_Text on this object - showing the single-player body.",
         });
     }
 
@@ -164,7 +184,9 @@ export function encyclopediaNotices(
  * situation is coloured the same way in all three - the point of the tag is that it means one thing
  * across the extension.
  */
-export function noticeSeverity(notices: readonly EncyclopediaNotice[]): ValidationState {
+export function noticeSeverity(
+    notices: readonly EncyclopediaNotice[],
+): ValidationState {
     return worstSeverity(notices);
 }
 
@@ -176,9 +198,12 @@ export function noticeSeverity(notices: readonly EncyclopediaNotice[]): Validati
  * installed should say nothing at all.
  */
 function substitutedFonts(entry: GetEncyclopediaEntryResult): string[] {
-    const {header, body, rightText, centerText, costText} = entry.layout;
-    return [...new Set(
-        [header, body, rightText, centerText, costText]
-            .map(s => s.fontName)
-            .filter(isSubstitutedFont))];
+    const { header, body, rightText, centerText, costText } = entry.layout;
+    return [
+        ...new Set(
+            [header, body, rightText, centerText, costText]
+                .map((s) => s.fontName)
+                .filter(isSubstitutedFont),
+        ),
+    ];
 }

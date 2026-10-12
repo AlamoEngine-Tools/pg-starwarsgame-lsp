@@ -10,8 +10,8 @@
 // rows: draggable from its top edge, a counted title, a close button, and remembering the height
 // it was dragged to. That had been written twice, down to the class names.
 
-import {useEdgeResize} from '../useEdgeResize';
-import {readPanelSize, writePanelSize} from './panelLayout';
+import { useEdgeResize } from "../useEdgeResize";
+import { readPanelSize, writePanelSize } from "./panelLayout";
 
 /** What the panel needs to draw and work the view filter. */
 export interface ProblemFilterControl {
@@ -26,14 +26,13 @@ export interface ProblemFilterControl {
 
 function filterTitle(filter: ProblemFilterControl): string {
     if (!filter.filterable) {
-        return 'Every problem is in view, so there is nothing to filter.';
+        return "Every problem is in view, so there is nothing to filter.";
     }
 
     return filter.showingAll
         ? `Showing all problems. ${filter.hidden} are not in the current view.`
         : `Showing only problems in the current view. ${filter.hidden} hidden.`;
 }
-
 
 export function ProblemsPanel(props: {
     /** The editor's own class for this bar; each skins it in its own stylesheet. */
@@ -58,20 +57,33 @@ export function ProblemsPanel(props: {
     // closing the tab: the size now outlives the window, keyed so the two panels never shove each
     // other around.
     // Up to most of the window, not a fixed 420: a long trace or problem list is read here.
-    const maxHeight = Math.max(420, Math.round((typeof window === 'undefined' ? 0 : window.innerHeight) * 0.7));
-    const {size: height, handleProps} = useEdgeResize(
-        readPanelSize(props.memoKey, props.defaultHeight), 60, maxHeight, 'n',
-        value => {
+    const maxHeight = Math.max(
+        420,
+        Math.round(
+            (typeof window === "undefined" ? 0 : window.innerHeight) * 0.7,
+        ),
+    );
+    const { size: height, handleProps } = useEdgeResize(
+        readPanelSize(props.memoKey, props.defaultHeight),
+        60,
+        maxHeight,
+        "n",
+        (value) => {
             writePanelSize(props.memoKey, value);
-        });
+        },
+    );
 
     // The frame is a flex column and only the ROW LIST scrolls. With the frame itself scrolling,
     // the resize handle (absolute, at the top) scrolled away with the content: measured on the
     // simulation trace, the handle sat 6000 px above the viewport once the newest rows were in
     // view, and the panel could not be dragged taller at all.
     return (
-        <div className={props.className + ' panel-frame'} style={{height}}>
-            <div className="resize-handle-n" title="Drag to resize" {...handleProps} />
+        <div className={props.className + " panel-frame"} style={{ height }}>
+            <div
+                className="resize-handle-n"
+                title="Drag to resize"
+                {...handleProps}
+            />
             <div className="panel-bar">
                 <span className="panel-title">{props.title}</span>
 
@@ -83,24 +95,38 @@ export function ProblemsPanel(props: {
                         // Active means actually holding something back, not merely "not showing
                         // all" - otherwise a filter with nothing to exclude draws itself lit up
                         // while disabled, which reads as a filter that is on and stuck.
-                        className={'panel-filter'
-                            + (!props.filter.showingAll && props.filter.filterable ? ' active' : '')}
+                        className={
+                            "panel-filter" +
+                            (!props.filter.showingAll && props.filter.filterable
+                                ? " active"
+                                : "")
+                        }
                         disabled={!props.filter.filterable}
                         aria-pressed={!props.filter.showingAll}
                         onClick={props.filter.onToggle}
                         title={filterTitle(props.filter)}
                     >
-                        <span className={'codicon codicon-filter'
-                            + (!props.filter.showingAll && props.filter.filterable
-                                ? '-filled' : '')}/>
+                        <span
+                            className={
+                                "codicon codicon-filter" +
+                                (!props.filter.showingAll &&
+                                props.filter.filterable
+                                    ? "-filled"
+                                    : "")
+                            }
+                        />
                         {props.filter.hidden > 0 && !props.filter.showingAll
                             ? ` ${props.filter.hidden} hidden`
-                            : ''}
+                            : ""}
                     </button>
                 )}
 
-                <button className="panel-close" onClick={props.onClose} title="Close">
-                    <span className="codicon codicon-close"/>
+                <button
+                    className="panel-close"
+                    onClick={props.onClose}
+                    title="Close"
+                >
+                    <span className="codicon codicon-close" />
                 </button>
             </div>
             {props.children}

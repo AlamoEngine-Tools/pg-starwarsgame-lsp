@@ -7,9 +7,9 @@
 // and the two lifecycles do not line up: React re-renders on a checkbox, the scene should not. The
 // component owns a canvas and calls into this; nothing here knows React exists.
 
-import * as THREE from 'three';
-import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import {
     type BoundingSphere,
@@ -17,29 +17,39 @@ import {
     DEFAULT_AZIMUTH_DEGREES,
     DEFAULT_ELEVATION_DEGREES,
     frameSphere,
-} from './framing';
+} from "./framing";
 import type {
     AlamoParticleContent,
     PreviewBreakoffProp,
     PreviewSpinAway,
-    PreviewTurret
-} from '../../protocol/modelPreview';
-import {spinAwayPose} from './spinAway';
-import type {NormalisedColour} from './colour';
-import {attachmentProblem, type AttachmentRequest} from './attachments';
-import {drawnConeRange, fireConeOutline, fireConeSurface, hullFrameBasis} from './fireArc';
-import type {FxMaterialState} from './fx/renderState';
+    PreviewTurret,
+} from "../../protocol/modelPreview";
+import { spinAwayPose } from "./spinAway";
+import type { NormalisedColour } from "./colour";
+import { attachmentProblem, type AttachmentRequest } from "./attachments";
+import {
+    drawnConeRange,
+    fireConeOutline,
+    fireConeSurface,
+    hullFrameBasis,
+} from "./fireArc";
+import type { FxMaterialState } from "./fx/renderState";
 import {
     costByLevel,
     definedLevels,
     type DefinedLevels,
     type LevelCost,
     type LevelTagged,
-    proxyVisibleAt
-} from './levels';
-import {AlamoMaterial} from './alamoMaterial';
-import type {TranslatedEffect} from './fx/effect';
-import {type AlamoFrame, engineLight, type ProbeLight, sphericalHarmonics,} from './fx/uniforms';
+    proxyVisibleAt,
+} from "./levels";
+import { AlamoMaterial } from "./alamoMaterial";
+import type { TranslatedEffect } from "./fx/effect";
+import {
+    type AlamoFrame,
+    engineLight,
+    type ProbeLight,
+    sphericalHarmonics,
+} from "./fx/uniforms";
 import {
     castsShadowMap,
     debugColour,
@@ -51,21 +61,36 @@ import {
     type MaterialSpec,
     resolveMaterial,
     shieldMeshOffShader,
-} from './materials';
+} from "./materials";
 import {
     DEFAULT_LIGHT_AZIMUTH_DEGREES,
     DEFAULT_LIGHT_ELEVATION_DEGREES,
     lightDirection,
     shadowFrustum,
     type Vector3 as Vector3Like,
-} from './lighting';
-import {cancelRootCorrection, outermostRoots, splitGeometryFromBone, stampTreeKeys, treeKeyOf,} from './boneNodes';
-import {captureFrame} from './capture';
-import {meshDrawn, setMeshDrawn} from './meshVisibility';
-import {boneRowId, effectPlacement, meshPlacement, type TreeItem} from './previewTree';
-import {healthColour, type ReticleMark, reticleSizePx} from './reticles';
-import {type BreakoffAnchor, breakoffLifetime, breakoffPose} from './breakoff';
-import {sweepAngles} from './deathClone';
+} from "./lighting";
+import {
+    cancelRootCorrection,
+    outermostRoots,
+    splitGeometryFromBone,
+    stampTreeKeys,
+    treeKeyOf,
+} from "./boneNodes";
+import { captureFrame } from "./capture";
+import { meshDrawn, setMeshDrawn } from "./meshVisibility";
+import {
+    boneRowId,
+    effectPlacement,
+    meshPlacement,
+    type TreeItem,
+} from "./previewTree";
+import { healthColour, type ReticleMark, reticleSizePx } from "./reticles";
+import {
+    type BreakoffAnchor,
+    breakoffLifetime,
+    breakoffPose,
+} from "./breakoff";
+import { sweepAngles } from "./deathClone";
 import {
     dragToAim,
     TURRET_AT_REST,
@@ -73,27 +98,40 @@ import {
     type TurretAxis,
     type TurretAxisRange,
     type TurretHandle,
-} from './turretHandles';
-import {knobPoint, stopTicks, trackRadius, trackSegments} from './turretTrack';
-import {type Inspection} from './inspector';
-import {emissionMeshFor} from './emissionSource';
-import {billboardLocalRotation, billboardRotation, billboardTypeOf} from './billboards';
-import {hiddenAt, type VisibilityTrack, visibilityTracks} from './boneVisibility';
-import {skinHiddenByClip} from './skinVisibility';
-import {drawnBounds} from './modelBounds';
-import {HeatPass} from './heatPass';
-import {BloomPass} from './bloomPass';
-import {ShadowVolumePass} from './shadowVolumePass';
+} from "./turretHandles";
+import {
+    knobPoint,
+    stopTicks,
+    trackRadius,
+    trackSegments,
+} from "./turretTrack";
+import { type Inspection } from "./inspector";
+import { emissionMeshFor } from "./emissionSource";
+import {
+    billboardLocalRotation,
+    billboardRotation,
+    billboardTypeOf,
+} from "./billboards";
+import {
+    hiddenAt,
+    type VisibilityTrack,
+    visibilityTracks,
+} from "./boneVisibility";
+import { skinHiddenByClip } from "./skinVisibility";
+import { drawnBounds } from "./modelBounds";
+import { HeatPass } from "./heatPass";
+import { BloomPass } from "./bloomPass";
+import { ShadowVolumePass } from "./shadowVolumePass";
 import {
     applyBaseMapColourSpace,
     applyBlend,
     applyColourScale,
     applyDepth,
     shadowCatcherOpacity,
-} from './materialState';
-import {type BoneId, resolveBoneId} from './boneIds';
-import {type AbilityOwnership} from './abilityRows';
-import {listedInModelTree, type ParticleOrigin} from './particleScene';
+} from "./materialState";
+import { type BoneId, resolveBoneId } from "./boneIds";
+import { type AbilityOwnership } from "./abilityRows";
+import { listedInModelTree, type ParticleOrigin } from "./particleScene";
 import {
     damageMeshFacts,
     deathClip,
@@ -105,20 +143,26 @@ import {
     type RowFacts,
     type RowOverride,
     subtreeFacts,
-} from './visibility';
-import {boxRoots, boxTargetFor, rowsInBox} from './selectionBox';
-import {skyGradient, starPositions} from './backdrop';
-import {concreteNoise, GROUND_TEXTURE_SIZE} from './groundTexture';
-import {missingTexture} from './missingTexture';
+} from "./visibility";
+import { boxRoots, boxTargetFor, rowsInBox } from "./selectionBox";
+import { skyGradient, starPositions } from "./backdrop";
+import { concreteNoise, GROUND_TEXTURE_SIZE } from "./groundTexture";
+import { missingTexture } from "./missingTexture";
 import {
     type BackgroundKind,
     DEFAULT_LIGHTS,
     DEFAULT_VIEWER_SETTINGS,
     type LightRig,
     type Wind,
-} from './viewerSettings';
-import {HEAT_LAYER, ParticleSystemInstance} from './particleRenderer';
-import {alamoBoneName, type BoneAttachment, type FlatBone, labelCandidates, type LabelMode,} from './skeleton';
+} from "./viewerSettings";
+import { HEAT_LAYER, ParticleSystemInstance } from "./particleRenderer";
+import {
+    alamoBoneName,
+    type BoneAttachment,
+    type FlatBone,
+    labelCandidates,
+    type LabelMode,
+} from "./skeleton";
 
 /**
  * The firing-arc gizmo's look.
@@ -256,7 +300,7 @@ const TURRET_KNOB_PICK_RADIUS = 14;
 const TURRET_HANDLE_RENDER_ORDER = 3;
 
 /** The two axes, in the order a reader meets them: traverse first, then elevation. */
-const TURRET_AXES: readonly TurretAxis[] = ['yaw', 'pitch'];
+const TURRET_AXES: readonly TurretAxis[] = ["yaw", "pitch"];
 
 /** One axis of one handle: its track, its stops, its knob, and the range it was built for. */
 interface TurretHandleParts {
@@ -289,7 +333,9 @@ function positionGeometry(positions: readonly number[]): THREE.BufferGeometry {
     const geometry = new THREE.BufferGeometry();
 
     geometry.setAttribute(
-        'position', new THREE.Float32BufferAttribute(Float32Array.from(positions), 3));
+        "position",
+        new THREE.Float32BufferAttribute(Float32Array.from(positions), 3),
+    );
 
     return geometry;
 }
@@ -312,38 +358,60 @@ function disposeTurretHandle(parts: TurretHandleParts): void {
  * own says where the guns bear and how far, but gives the eye no body to read the direction from.
  * Kept faint enough to look THROUGH, with the edges carrying the shape.
  */
-function coneGeometry(
-    arc: { widthDegrees: number; heightDegrees: number; range: number },
-): THREE.BufferGeometry {
+function coneGeometry(arc: {
+    widthDegrees: number;
+    heightDegrees: number;
+    range: number;
+}): THREE.BufferGeometry {
     // A cone with a rounded bottom - see `fireConeSurface`. The apex-to-rim fan it replaced drew a
     // Pringle at the wide arcs the shipped hardpoints declare.
     const geometry = new THREE.BufferGeometry();
 
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(
-        fireConeSurface(arc.widthDegrees, arc.heightDegrees, arc.range,
-            FIRE_ARC_SEGMENTS, FIRE_ARC_RINGS),
-        3));
+    geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(
+            fireConeSurface(
+                arc.widthDegrees,
+                arc.heightDegrees,
+                arc.range,
+                FIRE_ARC_SEGMENTS,
+                FIRE_ARC_RINGS,
+            ),
+            3,
+        ),
+    );
 
     return geometry;
 }
 
 /** The edges of the same cone, as line segments in the same space. */
-function coneOutlineGeometry(
-    arc: { widthDegrees: number; heightDegrees: number; range: number },
-): THREE.BufferGeometry {
+function coneOutlineGeometry(arc: {
+    widthDegrees: number;
+    heightDegrees: number;
+    range: number;
+}): THREE.BufferGeometry {
     const geometry = new THREE.BufferGeometry();
 
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(
-        fireConeOutline(arc.widthDegrees, arc.heightDegrees, arc.range,
-            FIRE_ARC_SEGMENTS, FIRE_ARC_RIBS),
-        3));
+    geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(
+            fireConeOutline(
+                arc.widthDegrees,
+                arc.heightDegrees,
+                arc.range,
+                FIRE_ARC_SEGMENTS,
+                FIRE_ARC_RIBS,
+            ),
+            3,
+        ),
+    );
 
     return geometry;
 }
 
 /** Splits a `systemId#index` emitter key. The id may itself contain a `#`, so split from the right. */
 function splitEmitterKey(key: string): [string, number] {
-    const at = key.lastIndexOf('#');
+    const at = key.lastIndexOf("#");
     return [key.slice(0, at), Number(key.slice(at + 1))];
 }
 
@@ -431,7 +499,7 @@ const FIELD_OF_VIEW = 50;
  * under-report every shipped mesh, all of which are indexed.
  */
 function triangleCount(geometry: THREE.BufferGeometry): number {
-    const vertices = geometry.getAttribute('position')?.count ?? 0;
+    const vertices = geometry.getAttribute("position")?.count ?? 0;
 
     return Math.floor((geometry.getIndex()?.count ?? vertices) / 3);
 }
@@ -462,13 +530,16 @@ const TRAVERSE_AXIS = new THREE.Vector3(0, 0, 1);
 const ELEVATION_AXIS = new THREE.Vector3(0, 1, 0);
 
 /** A named camera angle the toolbar can jump to. */
-export type PresetView = 'front' | 'side' | 'top' | 'threeQuarter';
+export type PresetView = "front" | "side" | "top" | "threeQuarter";
 
 const PRESETS: Record<PresetView, { azimuth: number; elevation: number }> = {
-    front: {azimuth: 0, elevation: 0},
-    side: {azimuth: 90, elevation: 0},
-    top: {azimuth: 0, elevation: 89.9},
-    threeQuarter: {azimuth: DEFAULT_AZIMUTH_DEGREES, elevation: DEFAULT_ELEVATION_DEGREES},
+    front: { azimuth: 0, elevation: 0 },
+    side: { azimuth: 90, elevation: 0 },
+    top: { azimuth: 0, elevation: 89.9 },
+    threeQuarter: {
+        azimuth: DEFAULT_AZIMUTH_DEGREES,
+        elevation: DEFAULT_ELEVATION_DEGREES,
+    },
 };
 
 /** One loaded part, kept so it can be hidden, re-tinted or removed without a reload. */
@@ -500,7 +571,7 @@ interface LoadedPart {
  * a death clone, a piece of wreckage - is a PASSIVE subject: it is drawn by its own file's rules,
  * runs its own clips, and never answers a question about the model being previewed.
  */
-export const ACTIVE_SUBJECT = 'subject';
+export const ACTIVE_SUBJECT = "subject";
 
 /** Anything about a loaded model beyond the bone it is attached to. */
 export interface AddPartOptions {
@@ -602,7 +673,12 @@ interface SubjectAnimation {
      * moved it since.
      */
     restPose: Map<
-        THREE.Object3D, { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: THREE.Vector3 }
+        THREE.Object3D,
+        {
+            position: THREE.Vector3;
+            quaternion: THREE.Quaternion;
+            scale: THREE.Vector3;
+        }
     >;
     /** The clip running on this subject right now. */
     action: THREE.AnimationAction | null;
@@ -614,9 +690,12 @@ interface SubjectAnimation {
 function hiddenMeshes(root: THREE.Object3D): Set<THREE.Object3D> {
     const hidden = new Set<THREE.Object3D>();
 
-    root.traverse(node => {
-        if (node instanceof THREE.Mesh
-            && resolveMaterial((node.userData.alamo ?? {}) as MaterialExtras).hidden) {
+    root.traverse((node) => {
+        if (
+            node instanceof THREE.Mesh &&
+            resolveMaterial((node.userData.alamo ?? {}) as MaterialExtras)
+                .hidden
+        ) {
             hidden.add(node);
         }
     });
@@ -653,11 +732,11 @@ interface BreakoffInstance {
  * pending GLB request, this one names geometry already in the scene, and the two happening to read
  * alike is not a reason to tie them together.
  */
-export const BREAKOFF_ATTACHMENT = 'wreck:';
+export const BREAKOFF_ATTACHMENT = "wreck:";
 
 /** A three vector as the plain shape the wire and the arithmetic use. */
 function vectorOf(at: THREE.Vector3): { x: number; y: number; z: number } {
-    return {x: at.x, y: at.y, z: at.z};
+    return { x: at.x, y: at.y, z: at.z };
 }
 
 /** Reused so a tick of reticle projection allocates nothing at all. */
@@ -719,7 +798,8 @@ export class PreviewViewport {
      * the explosion it triggers has to be fetched by the client - the viewport has no way to ask
      * for a particle system itself.
      */
-    onBreakoffExpired: ((key: string, prop: PreviewBreakoffProp) => void) | null = null;
+    onBreakoffExpired:
+        ((key: string, prop: PreviewBreakoffProp) => void) | null = null;
     private readonly renderer: THREE.WebGLRenderer;
     private readonly scene = new THREE.Scene();
     private readonly camera: THREE.PerspectiveCamera;
@@ -741,7 +821,10 @@ export class PreviewViewport {
      */
     private readonly groundGrain = ((): THREE.DataTexture => {
         const texture = new THREE.DataTexture(
-            concreteNoise(), GROUND_TEXTURE_SIZE, GROUND_TEXTURE_SIZE);
+            concreteNoise(),
+            GROUND_TEXTURE_SIZE,
+            GROUND_TEXTURE_SIZE,
+        );
 
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
@@ -760,7 +843,11 @@ export class PreviewViewport {
     /** The rig as the reader has it. Held so a colour change can be applied without a reframe. */
     private rig: LightRig = DEFAULT_LIGHTS;
     /** The wind as a vector in the space the particles are simulated in. */
-    private windVector: { x: number; y: number; z: number } = {x: 0, y: 0, z: 0};
+    private windVector: { x: number; y: number; z: number } = {
+        x: 0,
+        y: 0,
+        z: 0,
+    };
     /** The same wind in the terms the foliage shaders read it: a heading and a speed. */
     private wind: Wind = DEFAULT_VIEWER_SETTINGS.wind;
     /** The starfield and the sky dome, built on first use and then just shown or hidden. */
@@ -811,11 +898,14 @@ export class PreviewViewport {
      * anchored on its BONE's id while standing for a mesh as well. Reading the mesh's state and
      * writing the bone's is what made a hidden mesh impossible to show again.
      */
-    private readonly rowTargets = new Map<string, {
-        boneIndex?: number;
-        mesh?: THREE.Mesh;
-        particleId?: string;
-    }>();
+    private readonly rowTargets = new Map<
+        string,
+        {
+            boneIndex?: number;
+            mesh?: THREE.Mesh;
+            particleId?: string;
+        }
+    >();
     /**
      * Every bone a skinned mesh is weighted to, worked out once.
      *
@@ -861,7 +951,10 @@ export class PreviewViewport {
      */
     private harmonics = sphericalHarmonics([], DEFAULT_LIGHTS.ambient.colour);
     /** The same probe over the two fills alone, which is what `m_sphFill` means. */
-    private fillHarmonics = sphericalHarmonics([], DEFAULT_LIGHTS.ambient.colour);
+    private fillHarmonics = sphericalHarmonics(
+        [],
+        DEFAULT_LIGHTS.ambient.colour,
+    );
     /** Reused per frame so building the bone palette does not allocate on every draw. */
     private skinScratch = new Float32Array(0);
     /**
@@ -950,7 +1043,7 @@ export class PreviewViewport {
     /** A selected row that must not get its own box, because its part is outlined instead. */
     private unboxedRow: string | null = null;
     private skeletonVisible = false;
-    private labelMode: LabelMode = 'none';
+    private labelMode: LabelMode = "none";
     /**
      * Bones drawn with their own axes, by index.
      *
@@ -969,7 +1062,10 @@ export class PreviewViewport {
     private hoveredReticle: string | null = null;
     /** The turrets currently sweeping, and how far through the swing they are. */
     private turretSweeps: {
-        partId: string; turretBone: string; barrelBone: string | null; turret: PreviewTurret;
+        partId: string;
+        turretBone: string;
+        barrelBone: string | null;
+        turret: PreviewTurret;
     }[] = [];
     private sweepPhase = 0;
     /**
@@ -985,12 +1081,20 @@ export class PreviewViewport {
     /** The knob under the pointer, and the one being dragged. At most one of each. */
     private hoveredTurretAxis: { id: string; axis: TurretAxis } | null = null;
     private turretDrag: {
-        id: string; axis: TurretAxis; startAim: TurretAim; startX: number; startY: number;
+        id: string;
+        axis: TurretAxis;
+        startAim: TurretAim;
+        startX: number;
+        startY: number;
     } | null = null;
     /** The drawn handles, so they can be rebuilt or repositioned without a scene walk. */
-    private readonly turretHandleNodes = new Map<string, {
-        yaw: TurretHandleParts; pitch: TurretHandleParts;
-    }>();
+    private readonly turretHandleNodes = new Map<
+        string,
+        {
+            yaw: TurretHandleParts;
+            pitch: TurretHandleParts;
+        }
+    >();
     private readonly particleSystems = new Map<string, ParticleEntry>();
     /**
      * Systems that have been killed but whose particles are still finishing.
@@ -1012,8 +1116,15 @@ export class PreviewViewport {
      * `boneIndex` means the row IS that bone; `ownerBone` means the row is a mesh that rides one.
      * A merged row carries both a bone and a mesh, and gets a panel describing each.
      */
-    private readonly inspectSources =
-        new Map<string, { mesh?: THREE.Mesh; boneIndex?: number; ownerBone?: number; systemId?: string }>();
+    private readonly inspectSources = new Map<
+        string,
+        {
+            mesh?: THREE.Mesh;
+            boneIndex?: number;
+            ownerBone?: number;
+            systemId?: string;
+        }
+    >();
     private readonly particleTextures = new Map<string, THREE.Texture>();
     private particlesVisible = true;
     private particlesPaused = false;
@@ -1091,7 +1202,8 @@ export class PreviewViewport {
      * The X-Wing's deploy carries its MuzzleA bones 3.4 units, and the cones stayed behind. The
      * engine reads the muzzle fresh on every check, so this does too.
      */
-    private readonly hullArcs: { mesh: THREE.Mesh; muzzle: THREE.Object3D }[] = [];
+    private readonly hullArcs: { mesh: THREE.Mesh; muzzle: THREE.Object3D }[] =
+        [];
     /** Scratch for {@link followHullArcs}, which runs every frame and should not allocate. */
     private readonly muzzleScratch = new THREE.Vector3();
     private arcsVisible = false;
@@ -1159,9 +1271,14 @@ export class PreviewViewport {
         // stencil buffer every stencil op is a silent no-op, so the shadow-volume count never
         // happens and the darken covers the entire frame instead of the shadow.
         this.renderer = new THREE.WebGLRenderer({
-            canvas, antialias: true, alpha: true, stencil: true,
+            canvas,
+            antialias: true,
+            alpha: true,
+            stencil: true,
         });
-        this.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, 2));
+        this.renderer.setPixelRatio(
+            Math.min(globalThis.devicePixelRatio ?? 1, 2),
+        );
 
         // The engine casts shadows with stencil volumes (Crow, 1977) and ships the volume geometry
         // in the model; we cast with a shadow map instead. Reproducing the stencil technique would
@@ -1176,7 +1293,7 @@ export class PreviewViewport {
         this.controls.screenSpacePanning = true;
         // `start`, not `change`: `change` also fires for the framing this class does itself, which
         // would clear the preset the same frame it was applied.
-        this.controls.addEventListener('start', () => this.onCameraMoved?.());
+        this.controls.addEventListener("start", () => this.onCameraMoved?.());
 
         this.scene.background = new THREE.Color(VIEWPORT_BACKGROUND);
         this.modelRoot.add(this.scaledRoot);
@@ -1212,7 +1329,8 @@ export class PreviewViewport {
                 polygonOffset: true,
                 polygonOffsetFactor: 1,
                 polygonOffsetUnits: 1,
-            }));
+            }),
+        );
         this.floor.rotation.x = -Math.PI / 2;
         this.floor.visible = false;
 
@@ -1236,7 +1354,9 @@ export class PreviewViewport {
         });
 
         this.shadowCatcher = new THREE.Mesh(
-            new THREE.PlaneGeometry(100, 100), this.shadowMaterial);
+            new THREE.PlaneGeometry(100, 100),
+            this.shadowMaterial,
+        );
         this.shadowCatcher.rotation.x = -Math.PI / 2;
         this.shadowCatcher.receiveShadow = true;
         this.shadowCatcher.visible = false;
@@ -1249,20 +1369,29 @@ export class PreviewViewport {
         // you can click, and the point of the skeleton view is reaching the bones.
         this.joints = new THREE.Points(
             new THREE.BufferGeometry(),
-            new THREE.PointsMaterial({size: 7, sizeAttenuation: false, depthTest: false}));
+            new THREE.PointsMaterial({
+                size: 7,
+                sizeAttenuation: false,
+                depthTest: false,
+            }),
+        );
         this.jointLines = new THREE.LineSegments(
             new THREE.BufferGeometry(),
             new THREE.LineBasicMaterial({
-                color: 0x6fb3ff, depthTest: false, transparent: true,
-                opacity: 0.7
-            }));
+                color: 0x6fb3ff,
+                depthTest: false,
+                transparent: true,
+                opacity: 0.7,
+            }),
+        );
 
         // Amber rather than the skeleton's blue: the two are shown together, and a selection has
         // to be tellable from a joint at a glance. Drawn through the model on purpose - a box only
         // visible when the thing it points at is already in front is no help finding it.
         this.selectionBoxes = new THREE.LineSegments(
             new THREE.BufferGeometry(),
-            new THREE.LineBasicMaterial({color: 0xffb347, depthTest: false}));
+            new THREE.LineBasicMaterial({ color: 0xffb347, depthTest: false }),
+        );
         this.selectionBoxes.renderOrder = 999;
         this.selectionBoxes.frustumCulled = false;
         this.selectionBoxes.visible = false;
@@ -1274,7 +1403,11 @@ export class PreviewViewport {
         // for X/Y/Z, the convention every 3D tool shares.
         this.boneAxes = new THREE.LineSegments(
             new THREE.BufferGeometry(),
-            new THREE.LineBasicMaterial({vertexColors: true, depthTest: false}));
+            new THREE.LineBasicMaterial({
+                vertexColors: true,
+                depthTest: false,
+            }),
+        );
         this.boneAxes.renderOrder = 1000;
         this.boneAxes.frustumCulled = false;
         this.boneAxes.visible = false;
@@ -1290,12 +1423,14 @@ export class PreviewViewport {
 
         // CAPTURE phase, so a grabbed turret knob is claimed before `OrbitControls` - registered on
         // this canvas above - can start an orbit. See the grab branch of `onPointerDown`.
-        canvas.addEventListener('pointerdown', this.onPointerDown, {capture: true});
-        canvas.addEventListener('pointermove', this.onPointerMove);
+        canvas.addEventListener("pointerdown", this.onPointerDown, {
+            capture: true,
+        });
+        canvas.addEventListener("pointermove", this.onPointerMove);
         // On the WINDOW, not the canvas: a drag that leaves the canvas must still end, and a
         // release outside it is the ordinary way a fast drag finishes.
-        window.addEventListener('pointerup', this.onPointerUp);
-        window.addEventListener('pointercancel', this.onPointerUp);
+        window.addEventListener("pointerup", this.onPointerUp);
+        window.addEventListener("pointercancel", this.onPointerUp);
 
         this.resize();
         this.loop();
@@ -1303,7 +1438,11 @@ export class PreviewViewport {
 
     /** Where the camera stands now, for saving the current shot as a preset. */
     get cameraPosition(): Vector3Like {
-        return {x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z};
+        return {
+            x: this.camera.position.x,
+            y: this.camera.position.y,
+            z: this.camera.position.z,
+        };
     }
 
     /** The bounding sphere a preset is resolved against, so the caller sizes the shot correctly. */
@@ -1312,7 +1451,7 @@ export class PreviewViewport {
     }
 
     get animationNames(): string[] {
-        return this.active.clips.map(c => c.name);
+        return this.active.clips.map((c) => c.name);
     }
 
     /**
@@ -1382,26 +1521,27 @@ export class PreviewViewport {
      * lit, never in the depth buffer, and they follow the camera so they read as infinitely far.
      */
     setBackground(kind: BackgroundKind): void {
-        if (kind === 'starfield') {
+        if (kind === "starfield") {
             this.stars ??= this.buildStars();
         }
 
-        if (kind === 'sky') {
+        if (kind === "sky") {
             this.sky ??= this.buildSky();
         }
 
         if (this.stars !== null) {
-            this.stars.visible = kind === 'starfield';
+            this.stars.visible = kind === "starfield";
         }
 
         if (this.sky !== null) {
-            this.sky.visible = kind === 'sky';
+            this.sky.visible = kind === "sky";
         }
 
         // Space is black behind the stars; the flat backdrop keeps the neutral grey that reads as
         // "no background at all" rather than as a choice.
         this.scene.background = new THREE.Color(
-            kind === 'starfield' ? 0x05070c : VIEWPORT_BACKGROUND);
+            kind === "starfield" ? 0x05070c : VIEWPORT_BACKGROUND,
+        );
     }
 
     /**
@@ -1411,7 +1551,7 @@ export class PreviewViewport {
      * `affectedByWind`, which take it into their initial speed at birth.
      */
     setWind(headingDegrees: number, speed: number): void {
-        this.wind = {heading: headingDegrees, speed};
+        this.wind = { heading: headingDegrees, speed };
         const heading = (headingDegrees * Math.PI) / 180;
 
         this.windVector = {
@@ -1438,7 +1578,10 @@ export class PreviewViewport {
      * Hands back the root it built, for a caller that has its own state to keep beside it.
      */
     async addPart(
-        id: string, glbBase64: string, attachToPartId?: string, attachBone?: string,
+        id: string,
+        glbBase64: string,
+        attachToPartId?: string,
+        attachBone?: string,
         options: AddPartOptions = {},
     ): Promise<THREE.Object3D> {
         const subjectId = options.subjectId ?? ACTIVE_SUBJECT;
@@ -1447,7 +1590,7 @@ export class PreviewViewport {
         // active subject and will never speak for this one.
         const passive = subjectId !== ACTIVE_SUBJECT;
 
-        const gltf = await this.loader.parseAsync(decodeBase64(glbBase64), '');
+        const gltf = await this.loader.parseAsync(decodeBase64(glbBase64), "");
         const root = gltf.scene;
 
         const bones = new Map<string, THREE.Object3D>();
@@ -1464,15 +1607,16 @@ export class PreviewViewport {
         // with geometry only takes it if nothing better claims it. Letting a mesh overwrite a bone
         // made `Ei_trooper` report its root as `Storm_Trooper_LOD2` when bone 0 is `Root`, and
         // every bone count, parent and attachment was then read off the wrong object.
-        root.traverse(node => {
+        root.traverse((node) => {
             const parsed = alamoBoneName(node.name);
             if (parsed === null) {
                 return;
             }
 
             const held = bonesByIndex.get(parsed.index);
-            const better = held === undefined
-                || (held instanceof THREE.Mesh && !(node instanceof THREE.Mesh));
+            const better =
+                held === undefined ||
+                (held instanceof THREE.Mesh && !(node instanceof THREE.Mesh));
 
             if (better) {
                 bonesByIndex.set(parsed.index, node);
@@ -1497,8 +1641,12 @@ export class PreviewViewport {
 
             // Off the MATERIAL, which is where the exporter puts them and where `applyMaterial`
             // reads them from - that has not run yet, so `node.userData.alamo` is still empty.
-            const source = Array.isArray(node.material) ? node.material[0] : node.material;
-            const extras = (node.userData.alamo ?? source?.userData ?? {}) as MaterialExtras;
+            const source = Array.isArray(node.material)
+                ? node.material[0]
+                : node.material;
+            const extras = (node.userData.alamo ??
+                source?.userData ??
+                {}) as MaterialExtras;
             const bone = splitGeometryFromBone(node, extras.alamoMesh);
 
             bonesByIndex.set(index, bone);
@@ -1510,7 +1658,7 @@ export class PreviewViewport {
         }
 
         // Pass three: materials, over the graph as it now stands.
-        root.traverse(node => {
+        root.traverse((node) => {
             if (node instanceof THREE.Mesh) {
                 this.applyMaterial(node);
             }
@@ -1526,15 +1674,20 @@ export class PreviewViewport {
         // An unattached PASSIVE part - a death clone - is neither. It is spawned as its own object,
         // so it goes beside the scaled geometry and carries its OWN scale. It used to fall through
         // to the hull's branch and take the SHIP's, which is wrong for 59 of 265 shipped pairs.
-        const parent = options.pose !== undefined
-            ? this.modelRoot
-            : attachToPartId !== undefined
-                ? this.attachmentFor(attachToPartId, attachBone)
-                : passive
+        const parent =
+            options.pose !== undefined
+                ? this.modelRoot
+                : attachToPartId !== undefined
+                  ? this.attachmentFor(attachToPartId, attachBone)
+                  : passive
                     ? this.modelRoot
                     : this.scaledRoot;
 
-        if (options.scale !== undefined && Number.isFinite(options.scale) && options.scale > 0) {
+        if (
+            options.scale !== undefined &&
+            Number.isFinite(options.scale) &&
+            options.scale > 0
+        ) {
             root.scale.setScalar(options.scale);
         }
 
@@ -1561,7 +1714,7 @@ export class PreviewViewport {
         // replaces did not - see `stampTreeKeys`.
         stampTreeKeys(root, bonesByIndex, id);
 
-        this.parts.set(id, {id, root, bones, bonesByIndex, subjectId});
+        this.parts.set(id, { id, root, bones, bonesByIndex, subjectId });
 
         // Its own file's word, because the row chain will never speak for it - see
         // `LoadedPart.subjectId`. Debris needs exactly this too: outside the chain, nothing else
@@ -1598,7 +1751,7 @@ export class PreviewViewport {
         // The handful of bones that turn to face something. Collected once per part rather than
         // searched for each frame: across the shipped models 268 bones out of 22866 declare a mode
         // at all, so a per-frame traversal would be almost entirely wasted.
-        root.traverse(node => {
+        root.traverse((node) => {
             if (billboardTypeOf(node) !== null) {
                 this.billboards.push(node);
             }
@@ -1615,7 +1768,7 @@ export class PreviewViewport {
 
         // Before any clip can touch it. Recorded for the whole part, not only for the bones this
         // GLB's own clips drive - a later part of the same subject can reach in here too.
-        root.traverse(node => {
+        root.traverse((node) => {
             if (!subject.restPose.has(node)) {
                 subject.restPose.set(node, {
                     position: node.position.clone(),
@@ -1626,7 +1779,7 @@ export class PreviewViewport {
 
             // First wins. A visibility track names a bone, and a bone name is unique within one
             // model because the exporter suffixes it with the bone index.
-            if (node.name !== '' && !subject.nodeByName.has(node.name)) {
+            if (node.name !== "" && !subject.nodeByName.has(node.name)) {
                 subject.nodeByName.set(node.name, node);
             }
         });
@@ -1672,11 +1825,12 @@ export class PreviewViewport {
             const parent = this.parts.get(request.partId);
             const found = {
                 part: parent !== undefined,
-                bone: request.bone === undefined || parent === undefined
-                    ? false
-                    : (request.boneIndex !== undefined
-                        && parent.bonesByIndex.has(request.boneIndex))
-                    || parent.bones.has(request.bone.toLowerCase()),
+                bone:
+                    request.bone === undefined || parent === undefined
+                        ? false
+                        : (request.boneIndex !== undefined &&
+                              parent.bonesByIndex.has(request.boneIndex)) ||
+                          parent.bones.has(request.bone.toLowerCase()),
             };
 
             const problem = attachmentProblem(request, found);
@@ -1704,13 +1858,15 @@ export class PreviewViewport {
     shaderNames(): string[] {
         const names = new Set<string>();
 
-        this.modelRoot.traverse(node => {
+        this.modelRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
 
-            const shader = (node.userData.alamo as MaterialExtras | undefined)?.alamoShader ?? '';
-            if (shader !== '') {
+            const shader =
+                (node.userData.alamo as MaterialExtras | undefined)
+                    ?.alamoShader ?? "";
+            if (shader !== "") {
                 names.add(shader);
             }
         });
@@ -1722,14 +1878,16 @@ export class PreviewViewport {
     setColorization(colour: NormalisedColour | null): void {
         this.colorization = colour;
 
-        this.forEachDrawnMesh(node => {
+        this.forEachDrawnMesh((node) => {
             const material = node.material;
 
             if (material instanceof AlamoMaterial) {
                 // The effect masks the tint itself; it only needs the colour.
                 material.setColorization(colour);
-            } else if (material instanceof THREE.MeshStandardMaterial
-                || material instanceof THREE.MeshBasicMaterial) {
+            } else if (
+                material instanceof THREE.MeshStandardMaterial ||
+                material instanceof THREE.MeshBasicMaterial
+            ) {
                 // Basic as well as standard: an FC_ mesh on an additive shader is unlit and still
                 // takes the team colour, so checking only for standard left it untinted.
                 this.tint(material);
@@ -1741,15 +1899,20 @@ export class PreviewViewport {
     colorizedMeshes(): string[] {
         const names = new Set<string>();
 
-        this.modelRoot.traverse(node => {
+        this.modelRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
 
-            const data = node.material as { userData?: { spec?: { colorize?: boolean } } };
+            const data = node.material as {
+                userData?: { spec?: { colorize?: boolean } };
+            };
             const extras = node.userData.alamo as MaterialExtras | undefined;
 
-            if (data.userData?.spec?.colorize === true && extras?.alamoMesh !== undefined) {
+            if (
+                data.userData?.spec?.colorize === true &&
+                extras?.alamoMesh !== undefined
+            ) {
                 names.add(extras.alamoMesh);
             }
         });
@@ -1788,7 +1951,7 @@ export class PreviewViewport {
         let translated = 0;
         let total = 0;
 
-        this.forEachPartMesh(mesh => {
+        this.forEachPartMesh((mesh) => {
             if (!meshDrawn(mesh)) {
                 return;
             }
@@ -1799,7 +1962,7 @@ export class PreviewViewport {
             }
         });
 
-        return {translated, total};
+        return { translated, total };
     }
 
     /**
@@ -1811,19 +1974,24 @@ export class PreviewViewport {
     shaderTextureProblems(): string[] {
         const problems = new Set<string>();
 
-        this.forEachPartMesh(mesh => {
+        this.forEachPartMesh((mesh) => {
             if (!(mesh.material instanceof AlamoMaterial)) {
                 return;
             }
 
-            const shader = (mesh.userData.alamo as MaterialExtras | undefined)?.alamoShader
-                ?? 'a shader';
+            const shader =
+                (mesh.userData.alamo as MaterialExtras | undefined)
+                    ?.alamoShader ?? "a shader";
 
-            for (const {sampler, file} of mesh.material.unboundSamplers()) {
-                problems.add(`${shader}: Sampler '${sampler}' is still waiting for '${file}'.`);
+            for (const { sampler, file } of mesh.material.unboundSamplers()) {
+                problems.add(
+                    `${shader}: Sampler '${sampler}' is still waiting for '${file}'.`,
+                );
             }
             for (const sampler of mesh.material.unnamedSamplers) {
-                problems.add(`${shader}: Sampler '${sampler}' has no texture on this sub-mesh.`);
+                problems.add(
+                    `${shader}: Sampler '${sampler}' has no texture on this sub-mesh.`,
+                );
             }
         });
 
@@ -1948,7 +2116,7 @@ export class PreviewViewport {
     shieldMeshesOffShader(): string[] {
         const names = new Set<string>();
 
-        this.forEachPartMesh(mesh => {
+        this.forEachPartMesh((mesh) => {
             const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
 
             if (shieldMeshOffShader(extras)) {
@@ -2025,8 +2193,8 @@ export class PreviewViewport {
         arcs: readonly {
             partId: string;
             bone: string;
-            frame: 'bone' | 'hull';
-            kind: 'fire' | 'rotation';
+            frame: "bone" | "hull";
+            kind: "fire" | "rotation";
             widthDegrees: number;
             heightDegrees: number;
             range: number;
@@ -2043,15 +2211,20 @@ export class PreviewViewport {
             const drawn = {
                 ...arc,
                 range: drawnConeRange(
-                    arc.range, modelSize, arc.widthDegrees, arc.heightDegrees),
+                    arc.range,
+                    modelSize,
+                    arc.widthDegrees,
+                    arc.heightDegrees,
+                ),
             };
             // Two envelopes, told apart by weight rather than by hue: they describe the SAME
             // weapon, and a second colour would read as a second weapon. The solid one is where it
             // may shoot; the lighter one is where the barrel may point.
-            const rotation = arc.kind === 'rotation';
+            const rotation = arc.kind === "rotation";
             const mesh = new THREE.Mesh(
                 coneGeometry(drawn),
-                (rotation ? ROTATION_ARC_MATERIAL : FIRE_ARC_MATERIAL).clone());
+                (rotation ? ROTATION_ARC_MATERIAL : FIRE_ARC_MATERIAL).clone(),
+            );
 
             // Which frame the arc is measured in is the engine's choice, not ours, and the two
             // firing paths disagree:
@@ -2068,27 +2241,32 @@ export class PreviewViewport {
             // gives exactly that: the bone supplies the origin, and the HULL'S FACING supplies the
             // orientation. Not the root's raw axes - the nose is +Z there, and the cone is built
             // along +X. See `hullFrameBasis`.
-            const parent = arc.frame === 'hull' ? this.modelRoot : boneNode;
+            const parent = arc.frame === "hull" ? this.modelRoot : boneNode;
 
-            if (arc.frame === 'hull') {
+            if (arc.frame === "hull") {
                 boneNode.updateWorldMatrix(true, false);
                 this.modelRoot.updateWorldMatrix(true, false);
                 mesh.position.copy(
                     this.modelRoot.worldToLocal(
-                        boneNode.getWorldPosition(new THREE.Vector3())));
+                        boneNode.getWorldPosition(new THREE.Vector3()),
+                    ),
+                );
 
                 // And the HULL's facing, not the root's raw axes. The cone is built along +X for a
                 // fire bone; the hull's nose is +Z here. Leaving this out is what put every
                 // WEAPON-behaviour arc a quarter turn off. See `hullFrameBasis`.
                 const [forward, lateral, up] = hullFrameBasis();
-                mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
-                    new THREE.Vector3(...forward),
-                    new THREE.Vector3(...lateral),
-                    new THREE.Vector3(...up)));
+                mesh.quaternion.setFromRotationMatrix(
+                    new THREE.Matrix4().makeBasis(
+                        new THREE.Vector3(...forward),
+                        new THREE.Vector3(...lateral),
+                        new THREE.Vector3(...up),
+                    ),
+                );
 
                 // The position above is only the starting point; `followHullArcs` keeps it on the
                 // muzzle once a clip starts moving the bone.
-                this.hullArcs.push({mesh, muzzle: boneNode});
+                this.hullArcs.push({ mesh, muzzle: boneNode });
             }
 
             mesh.visible = this.arcsVisible;
@@ -2108,7 +2286,11 @@ export class PreviewViewport {
             // left burning over an arc that has been switched off.
             const outline = new THREE.LineSegments(
                 coneOutlineGeometry(drawn),
-                (rotation ? ROTATION_ARC_OUTLINE_MATERIAL : FIRE_ARC_OUTLINE_MATERIAL).clone());
+                (rotation
+                    ? ROTATION_ARC_OUTLINE_MATERIAL
+                    : FIRE_ARC_OUTLINE_MATERIAL
+                ).clone(),
+            );
             outline.renderOrder = 2;
             mesh.add(outline);
 
@@ -2132,10 +2314,16 @@ export class PreviewViewport {
      * the fire bones showed: X forward, Y lateral, Z up.
      */
     setTurretRestAngles(
-        poses: readonly { partId: string; bone: string; restAngleDegrees: number }[],
+        poses: readonly {
+            partId: string;
+            bone: string;
+            restAngleDegrees: number;
+        }[],
     ): void {
         for (const pose of poses) {
-            const bone = this.parts.get(pose.partId)?.bones.get(pose.bone.toLowerCase());
+            const bone = this.parts
+                .get(pose.partId)
+                ?.bones.get(pose.bone.toLowerCase());
             if (bone !== undefined) {
                 bone.rotation.z = pose.restAngleDegrees * (Math.PI / 180);
             }
@@ -2171,9 +2359,10 @@ export class PreviewViewport {
         for (const sweep of sweeps) {
             const part = this.parts.get(sweep.partId);
             const turret = part?.bones.get(sweep.turretBone.toLowerCase());
-            const barrel = sweep.barrelBone === null
-                ? undefined
-                : part?.bones.get(sweep.barrelBone.toLowerCase());
+            const barrel =
+                sweep.barrelBone === null
+                    ? undefined
+                    : part?.bones.get(sweep.barrelBone.toLowerCase());
 
             if (turret !== undefined) {
                 swinging.add(turret);
@@ -2209,7 +2398,7 @@ export class PreviewViewport {
     setTurretHandles(handles: readonly TurretHandle[]): void {
         this.turretHandles = [...handles];
 
-        const wanted = new Set(handles.map(handle => handle.id));
+        const wanted = new Set(handles.map((handle) => handle.id));
 
         for (const [id, nodes] of [...this.turretHandleNodes]) {
             if (!wanted.has(id)) {
@@ -2235,24 +2424,34 @@ export class PreviewViewport {
                 continue;
             }
 
-            const yawBone = this.turretBoneNode(handle.partId, handle.turretBone);
+            const yawBone = this.turretBoneNode(
+                handle.partId,
+                handle.turretBone,
+            );
             // The barrel carries elevation when the model separates the two; 2 of 19 do not, and
             // then one bone does both - exactly as the sweep already handles it.
-            const pitchBone = handle.barrelBone === null
-                ? yawBone
-                : this.turretBoneNode(handle.partId, handle.barrelBone) ?? yawBone;
+            const pitchBone =
+                handle.barrelBone === null
+                    ? yawBone
+                    : (this.turretBoneNode(handle.partId, handle.barrelBone) ??
+                      yawBone);
 
             if (yawBone === undefined || pitchBone === undefined) {
                 continue;
             }
 
             this.turretHandleNodes.set(handle.id, {
-                yaw: this.buildTurretHandle(handle, 'yaw', yawBone, radius),
+                yaw: this.buildTurretHandle(handle, "yaw", yawBone, radius),
                 // One bone doing both - the model names no barrel, or names one it does not carry -
                 // so the pitch track has to follow the yaw itself. With a barrel, the hierarchy
                 // carries it.
                 pitch: this.buildTurretHandle(
-                    handle, 'pitch', pitchBone, radius, pitchBone === yawBone),
+                    handle,
+                    "pitch",
+                    pitchBone,
+                    radius,
+                    pitchBone === yawBone,
+                ),
             });
         }
 
@@ -2291,7 +2490,9 @@ export class PreviewViewport {
      * would fight the destruction rules that hid it.
      */
     async addBreakoff(
-        key: string, glbBase64: string, at: BreakoffAnchor,
+        key: string,
+        glbBase64: string,
+        at: BreakoffAnchor,
         prop: PreviewBreakoffProp,
     ): Promise<void> {
         // Where the hardpoint was, in world space, captured once - the debris does not follow the ship.
@@ -2306,13 +2507,24 @@ export class PreviewViewport {
         // and one subject, and the effects it trails already address it by this name.
         const wreckId = `${BREAKOFF_ATTACHMENT}${key}`;
 
-        const root = await this.addPart(wreckId, glbBase64, undefined, undefined, {
-            subjectId: wreckId,
-            pose: {position: origin, quaternion: facing},
-        });
+        const root = await this.addPart(
+            wreckId,
+            glbBase64,
+            undefined,
+            undefined,
+            {
+                subjectId: wreckId,
+                pose: { position: origin, quaternion: facing },
+            },
+        );
 
         this.breakoffs.push({
-            key, partId: wreckId, root, prop, origin, facing,
+            key,
+            partId: wreckId,
+            root,
+            prop,
+            origin,
+            facing,
             age: 0,
             lifetime: breakoffLifetime(prop),
             expired: false,
@@ -2350,11 +2562,15 @@ export class PreviewViewport {
 
     /** Whether a piece of wreckage for this key is already in the air. */
     hasBreakoff(key: string): boolean {
-        return this.breakoffs.some(debris => debris.key === key);
+        return this.breakoffs.some((debris) => debris.key === key);
     }
 
     /** Starts the wreck on its way. `onDone` fires once, at the end of the declared time. */
-    startSpinAway(partId: string, spin: PreviewSpinAway, onDone: () => void): void {
+    startSpinAway(
+        partId: string,
+        spin: PreviewSpinAway,
+        onDone: () => void,
+    ): void {
         const part = this.parts.get(partId);
         if (part === undefined) {
             // Nothing to fly. Report it over at once rather than leaving the caller waiting on a
@@ -2371,7 +2587,7 @@ export class PreviewViewport {
             quaternion: part.root.quaternion.clone(),
         };
 
-        this.spinAway = {partId, spin, elapsed: 0, onDone};
+        this.spinAway = { partId, spin, elapsed: 0, onDone };
     }
 
     /** Puts the wreck back where it started, whether it is still flying or already exploded. */
@@ -2440,7 +2656,10 @@ export class PreviewViewport {
         // The subject goes with its last part. A repair removes the wreck, and a mixer left behind
         // would keep ticking a clip whose nodes have been disposed. The ACTIVE subject stays
         // whatever happens - it is the scene, and only `clear` ends it.
-        if (part.subjectId !== ACTIVE_SUBJECT && this.rootPartOf(part.subjectId) === null) {
+        if (
+            part.subjectId !== ACTIVE_SUBJECT &&
+            this.rootPartOf(part.subjectId) === null
+        ) {
             this.subjects.delete(part.subjectId);
         }
     }
@@ -2463,8 +2682,13 @@ export class PreviewViewport {
     ): void {
         // Always the Gameplay lens's. A one-shot IS an event - a hardpoint blowing up - and an
         // event is never something the model declares.
-        this.addParticleSystem(
-            id, system, {origin: 'gameplay', attachToPartId, attachBone, scaleFactor, at});
+        this.addParticleSystem(id, system, {
+            origin: "gameplay",
+            attachToPartId,
+            attachBone,
+            scaleFactor,
+            at,
+        });
         this.transient.add(id);
     }
 
@@ -2491,7 +2715,7 @@ export class PreviewViewport {
     definedLevels(): DefinedLevels {
         const tagged: LevelTagged[] = [];
 
-        this.modelRoot.traverse(node => {
+        this.modelRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
@@ -2524,14 +2748,17 @@ export class PreviewViewport {
     costByLod(levels: readonly number[]): Map<number, LevelCost> {
         const meshes: { extras: MaterialExtras; triangles: number }[] = [];
 
-        this.modelRoot.traverse(node => {
+        this.modelRoot.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
 
             const extras = node.userData.alamo as MaterialExtras | undefined;
             if (extras !== undefined) {
-                meshes.push({extras, triangles: triangleCount(node.geometry)});
+                meshes.push({
+                    extras,
+                    triangles: triangleCount(node.geometry),
+                });
             }
         });
 
@@ -2547,7 +2774,8 @@ export class PreviewViewport {
      */
     /** For the harness: drives controls that have no UI yet. Costs nothing when unused. */
     expose(): void {
-        (globalThis as unknown as { __aetViewport?: unknown }).__aetViewport = this;
+        (globalThis as unknown as { __aetViewport?: unknown }).__aetViewport =
+            this;
     }
 
     treeItems(): TreeItem[] {
@@ -2573,12 +2801,17 @@ export class PreviewViewport {
             boneOf.set(node, index);
         }
 
-        const rootBone = [...hull.bonesByIndex.keys()].sort((a, b) => a - b)[0] ?? 0;
+        const rootBone =
+            [...hull.bonesByIndex.keys()].sort((a, b) => a - b)[0] ?? 0;
 
         // From the object ITSELF, not from its parent: an effect names its owning bone directly
         // rather than being attached to it, so the answer is usually the very node it was handed.
         const ownerOf = (object: THREE.Object3D): number => {
-            for (let at: THREE.Object3D | null = object; at !== null; at = at.parent) {
+            for (
+                let at: THREE.Object3D | null = object;
+                at !== null;
+                at = at.parent
+            ) {
                 const index = boneOf.get(at);
                 if (index !== undefined) {
                     return index;
@@ -2587,7 +2820,8 @@ export class PreviewViewport {
 
             if (object instanceof THREE.SkinnedMesh) {
                 const first = object.skeleton.bones[0];
-                const index = first === undefined ? undefined : boneOf.get(first);
+                const index =
+                    first === undefined ? undefined : boneOf.get(first);
 
                 if (index !== undefined) {
                     return index;
@@ -2612,30 +2846,39 @@ export class PreviewViewport {
         this.rowNames.clear();
 
         const bones = this.skeleton();
-        const roots = new Set(bones.filter(bone => bone.parent < 0).map(bone => bone.index));
+        const roots = new Set(
+            bones.filter((bone) => bone.parent < 0).map((bone) => bone.index),
+        );
 
         const boneName = (index: number): string => {
             const node = hull.bonesByIndex.get(index);
-            return node === undefined ? '' : alamoBoneName(node.name)?.name ?? node.name;
+            return node === undefined
+                ? ""
+                : (alamoBoneName(node.name)?.name ?? node.name);
         };
 
-        this.forEachPartMesh(mesh => {
+        this.forEachPartMesh((mesh) => {
             // The loader guarantees a mesh is never a bone node itself, so its owner is simply the
             // nearest bone above it. `meshPlacement` decides on the two NAMES from there.
             const owner = ownerOf(mesh);
             const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
 
-            const placement = meshPlacement(owner, roots,
-                {bone: boneName(owner), mesh: extras.alamoMesh ?? mesh.name});
+            const placement = meshPlacement(owner, roots, {
+                bone: boneName(owner),
+                mesh: extras.alamoMesh ?? mesh.name,
+            });
 
             // A bone carrying two meshes keeps the first as its own row; the second stays a child
             // rather than being dropped.
-            if ('merge' in placement && !meshByBone.has(placement.merge)) {
+            if ("merge" in placement && !meshByBone.has(placement.merge)) {
                 meshByBone.set(placement.merge, mesh);
             } else {
                 extraMeshes.push({
                     mesh,
-                    owner: 'merge' in placement ? placement.merge : placement.childOf,
+                    owner:
+                        "merge" in placement
+                            ? placement.merge
+                            : placement.childOf,
                 });
             }
         });
@@ -2649,23 +2892,28 @@ export class PreviewViewport {
             }
 
             const owner = ownerOf(anchorNodeOf(entry));
-            const placement = effectPlacement(owner, roots,
-                {bone: boneName(owner), effect: entry.system.name});
+            const placement = effectPlacement(owner, roots, {
+                bone: boneName(owner),
+                effect: entry.system.name,
+            });
 
-            if ('merge' in placement && !effectByBone.has(placement.merge)) {
+            if ("merge" in placement && !effectByBone.has(placement.merge)) {
                 effectByBone.set(placement.merge, systemId);
             }
         }
 
-        const meshItem = (mesh: THREE.Mesh): { name: string; visible: boolean; gatedOff: boolean } => {
+        const meshItem = (
+            mesh: THREE.Mesh,
+        ): { name: string; visible: boolean; gatedOff: boolean } => {
             const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
 
             return {
                 // The ALO's own mesh name, not the glTF node name.
                 name: extras.alamoMesh ?? mesh.name,
                 visible: meshDrawn(mesh),
-                gatedOff: resolveMaterial(extras).hidden
-                    || !isVisibleAt(extras, this.alt, this.lod),
+                gatedOff:
+                    resolveMaterial(extras).hidden ||
+                    !isVisibleAt(extras, this.alt, this.lod),
             };
         };
 
@@ -2678,8 +2926,8 @@ export class PreviewViewport {
             // marker mesh the file hides, and the effect itself - and the panel describes each.
             this.inspectSources.set(boneId(bone.index), {
                 boneIndex: bone.index,
-                ...(mesh === undefined ? {} : {mesh}),
-                ...(effect === undefined ? {} : {systemId: effect}),
+                ...(mesh === undefined ? {} : { mesh }),
+                ...(effect === undefined ? {} : { systemId: effect }),
             });
 
             // Merged: ONE row for a bone, the mesh that shares its name and the effect that shares
@@ -2691,39 +2939,53 @@ export class PreviewViewport {
             // anchored this row on the bone's id, reported the MESH's state and wrote the BONE's -
             // which is why a hidden mesh could never be shown again.
             const details = mesh === undefined ? undefined : meshItem(mesh);
-            const name = effect === undefined
-                ? details?.name ?? bone.name
-                : this.effectRowName(effect);
+            const name =
+                effect === undefined
+                    ? (details?.name ?? bone.name)
+                    : this.effectRowName(effect);
 
             this.claimRow(boneId(bone.index), name, parentId, {
                 boneIndex: bone.index,
-                ...(mesh === undefined ? {} : {mesh}),
-                ...(effect === undefined ? {} : {particleId: effect}),
+                ...(mesh === undefined ? {} : { mesh }),
+                ...(effect === undefined ? {} : { particleId: effect }),
             });
 
             items.push({
                 id: boneId(bone.index),
                 // The effect is what a reader acts on, so a proxy row reads as one - the bone and
                 // its marker mesh are the plumbing that carries it.
-                kind: effect !== undefined ? 'particle' : mesh !== undefined ? 'mesh' : 'bone',
+                kind:
+                    effect !== undefined
+                        ? "particle"
+                        : mesh !== undefined
+                          ? "mesh"
+                          : "bone",
                 name,
                 parentId,
                 visible: details?.visible ?? bone.visible,
                 gatedOff: details?.gatedOff ?? false,
-                ...(effect === undefined ? {} : {systemId: effect}),
+                ...(effect === undefined ? {} : { systemId: effect }),
             });
         }
 
-        for (const {mesh, owner} of extraMeshes) {
+        for (const { mesh, owner } of extraMeshes) {
             const details = meshItem(mesh);
             // `ownerBone`, not `boneIndex`: this row is the MESH. The bone it rides has a row of its
             // own, and describing it here too would say it twice.
-            this.inspectSources.set(`mesh:${treeKeyOf(mesh)}`, {mesh, ownerBone: owner});
-            this.claimRow(`mesh:${treeKeyOf(mesh)}`, details.name, boneId(owner), {mesh});
+            this.inspectSources.set(`mesh:${treeKeyOf(mesh)}`, {
+                mesh,
+                ownerBone: owner,
+            });
+            this.claimRow(
+                `mesh:${treeKeyOf(mesh)}`,
+                details.name,
+                boneId(owner),
+                { mesh },
+            );
 
             items.push({
                 id: `mesh:${treeKeyOf(mesh)}`,
-                kind: 'mesh',
+                kind: "mesh",
                 name: details.name,
                 parentId: boneId(owner),
                 visible: details.visible,
@@ -2752,13 +3014,17 @@ export class PreviewViewport {
                 continue;
             }
 
-            this.inspectSources.set(`particle:${systemId}`, {systemId});
-            this.claimRow(`particle:${systemId}`, entry.system.name,
-                boneId(owner), {particleId: systemId});
+            this.inspectSources.set(`particle:${systemId}`, { systemId });
+            this.claimRow(
+                `particle:${systemId}`,
+                entry.system.name,
+                boneId(owner),
+                { particleId: systemId },
+            );
 
             items.push({
                 id: `particle:${systemId}`,
-                kind: 'particle',
+                kind: "particle",
                 name: this.effectRowName(systemId),
                 parentId: boneId(owner),
                 visible: entry.gateVisible && entry.levelVisible,
@@ -2771,7 +3037,7 @@ export class PreviewViewport {
         // because the skeleton is walked parent-first and the meshes are attached to it.
         this.resolveRows();
 
-        return items.map(item => {
+        return items.map((item) => {
             const resolved = this.rowResolutions.get(item.id);
 
             // `gatedOff` comes from the chain as well, because it is the same question asked with
@@ -2780,12 +3046,12 @@ export class PreviewViewport {
             return resolved === undefined
                 ? item
                 : {
-                    ...item,
-                    visible: resolved.visible,
-                    because: resolved.because,
-                    decidedBy: resolved.decidedBy,
-                    gatedOff: !resolved.authored,
-                };
+                      ...item,
+                      visible: resolved.visible,
+                      because: resolved.because,
+                      decidedBy: resolved.decidedBy,
+                      gatedOff: !resolved.authored,
+                  };
         });
     }
 
@@ -2820,43 +3086,48 @@ export class PreviewViewport {
         const found: Inspection[] = [];
         const bones = this.skeleton();
         const nameOf = (index: number): string =>
-            bones.find(bone => bone.index === index)?.name ?? '';
+            bones.find((bone) => bone.index === index)?.name ?? "";
 
         if (source.mesh !== undefined) {
             const extras = (source.mesh.userData.alamo ?? {}) as MaterialExtras;
             const geometry = source.mesh.geometry;
-            const vertices = geometry.getAttribute('position')?.count ?? 0;
+            const vertices = geometry.getAttribute("position")?.count ?? 0;
 
             found.push({
-                kind: 'mesh',
+                kind: "mesh",
                 name: extras.alamoMesh ?? source.mesh.name,
                 boneName: nameOf(source.ownerBone ?? source.boneIndex ?? -1),
                 vertexCount: vertices,
                 triangleCount: triangleCount(geometry),
                 drawn: meshDrawn(source.mesh),
                 extras,
-                meshIndex: typeof extras.alamoMeshIndex === 'number'
-                    ? extras.alamoMeshIndex
-                    : undefined,
-                subMeshIndex: typeof extras.alamoSubMeshIndex === 'number'
-                    ? extras.alamoSubMeshIndex
-                    : undefined,
+                meshIndex:
+                    typeof extras.alamoMeshIndex === "number"
+                        ? extras.alamoMeshIndex
+                        : undefined,
+                subMeshIndex:
+                    typeof extras.alamoSubMeshIndex === "number"
+                        ? extras.alamoSubMeshIndex
+                        : undefined,
             });
         }
 
         if (source.boneIndex !== undefined) {
-            const bone = bones.find(entry => entry.index === source.boneIndex);
+            const bone = bones.find(
+                (entry) => entry.index === source.boneIndex,
+            );
             const node = this.hull()?.bonesByIndex.get(source.boneIndex);
 
             if (bone !== undefined) {
                 found.push({
-                    kind: 'bone',
+                    kind: "bone",
                     index: bone.index,
                     name: bone.name,
                     parentIndex: bone.parent,
-                    parentName: bone.parent < 0 ? '' : nameOf(bone.parent),
+                    parentName: bone.parent < 0 ? "" : nameOf(bone.parent),
                     visible: bone.visible,
-                    billboard: node === undefined ? null : billboardTypeOf(node),
+                    billboard:
+                        node === undefined ? null : billboardTypeOf(node),
                 });
             }
         }
@@ -2866,14 +3137,18 @@ export class PreviewViewport {
 
             if (entry !== undefined) {
                 found.push({
-                    kind: 'particle',
+                    kind: "particle",
                     name: entry.system.name,
-                    boneName: entry.attachBoneIndex === undefined
-                        ? entry.attachBone ?? ''
-                        : nameOf(entry.attachBoneIndex),
+                    boneName:
+                        entry.attachBoneIndex === undefined
+                            ? (entry.attachBone ?? "")
+                            : nameOf(entry.attachBoneIndex),
                     emitterCount: entry.system.emitters.length,
-                    playing: this.rowResolutions.get(this.rowForSystem(source.systemId))?.visible
-                        ?? (entry.gateVisible && entry.levelVisible),
+                    playing:
+                        this.rowResolutions.get(
+                            this.rowForSystem(source.systemId),
+                        )?.visible ??
+                        (entry.gateVisible && entry.levelVisible),
                 });
             }
         }
@@ -2890,7 +3165,7 @@ export class PreviewViewport {
      */
     hiddenItemIds(): string[] {
         return [...this.rowOverrides]
-            .filter(([, override]) => override === 'hidden')
+            .filter(([, override]) => override === "hidden")
             .map(([row]) => row);
     }
 
@@ -2903,7 +3178,7 @@ export class PreviewViewport {
      */
     shownItemIds(): string[] {
         return [...this.rowOverrides]
-            .filter(([, override]) => override === 'shown')
+            .filter(([, override]) => override === "shown")
             .map(([row]) => row);
     }
 
@@ -2916,7 +3191,11 @@ export class PreviewViewport {
      */
     setItemsVisible(ids: readonly string[], visible: boolean): void {
         this.applyRowOverrides(
-            ids.map(row => ({row, override: visible ? 'shown' as const : 'hidden' as const})));
+            ids.map((row) => ({
+                row,
+                override: visible ? ("shown" as const) : ("hidden" as const),
+            })),
+        );
     }
 
     /**
@@ -2927,7 +3206,7 @@ export class PreviewViewport {
      * while standing for a mesh wrote one and reported the other.
      */
     applyRowOverrides(changes: readonly OverrideChange[]): void {
-        for (const {row, override} of changes) {
+        for (const { row, override } of changes) {
             if (override === null) {
                 this.rowOverrides.delete(row);
             } else {
@@ -2940,7 +3219,10 @@ export class PreviewViewport {
 
     /** What the reader has said about each row, for carrying across a reopen. */
     rowOverrideEntries(): { row: string; override: RowOverride }[] {
-        return [...this.rowOverrides].map(([row, override]) => ({row, override}));
+        return [...this.rowOverrides].map(([row, override]) => ({
+            row,
+            override,
+        }));
     }
 
     /**
@@ -2970,7 +3252,9 @@ export class PreviewViewport {
      * unrelated reason has to survive it.
      */
     releaseAbilityRows(ownership: AbilityOwnership): void {
-        const released: string[] = ownership.systemIds.map(id => this.rowForSystem(id));
+        const released: string[] = ownership.systemIds.map((id) =>
+            this.rowForSystem(id),
+        );
 
         if (ownership.shieldMesh || ownership.stealthShell) {
             for (const [rowId, target] of this.rowTargets) {
@@ -2978,10 +3262,13 @@ export class PreviewViewport {
                     continue;
                 }
 
-                const extras = (target.mesh.userData.alamo ?? {}) as MaterialExtras;
+                const extras = (target.mesh.userData.alamo ??
+                    {}) as MaterialExtras;
 
-                if ((ownership.shieldMesh && isShieldMesh(extras))
-                    || (ownership.stealthShell && isStealthMesh(extras))) {
+                if (
+                    (ownership.shieldMesh && isShieldMesh(extras)) ||
+                    (ownership.stealthShell && isStealthMesh(extras))
+                ) {
                     released.push(rowId);
                 }
             }
@@ -2989,14 +3276,16 @@ export class PreviewViewport {
 
         // Only the rows that actually carry one. Every ability click would otherwise re-resolve the
         // whole skeleton to delete nothing, and most abilities own no row the reader has touched.
-        const carrying = released.filter(row => this.rowOverrides.has(row));
+        const carrying = released.filter((row) => this.rowOverrides.has(row));
 
         if (carrying.length === 0) {
             return;
         }
 
         // One re-resolve at the end, not one per row.
-        this.applyRowOverrides(carrying.map(row => ({row, override: null})));
+        this.applyRowOverrides(
+            carrying.map((row) => ({ row, override: null })),
+        );
     }
 
     /** Frames whatever is currently loaded. */
@@ -3024,7 +3313,8 @@ export class PreviewViewport {
 
         this.applyCameraPose(
             new THREE.Vector3().setFromMatrixPosition(eye.matrixWorld),
-            new THREE.Vector3().setFromMatrixPosition(at.matrixWorld));
+            new THREE.Vector3().setFromMatrixPosition(at.matrixWorld),
+        );
 
         return true;
     }
@@ -3039,7 +3329,10 @@ export class PreviewViewport {
      */
     applyCameraPose(position: Vector3Like, target: Vector3Like): void {
         this.fitDistance = Math.hypot(
-            position.x - target.x, position.y - target.y, position.z - target.z);
+            position.x - target.x,
+            position.y - target.y,
+            position.z - target.z,
+        );
         this.applyClipPlanes(this.boundingSphere(true), this.fitDistance);
 
         this.camera.position.set(position.x, position.y, position.z);
@@ -3047,12 +3340,18 @@ export class PreviewViewport {
         this.controls.update();
     }
 
-    frameAll(preset: PresetView = 'threeQuarter'): void {
+    frameAll(preset: PresetView = "threeQuarter"): void {
         const sphere = this.boundingSphere();
-        const {azimuth, elevation} = PRESETS[preset];
+        const { azimuth, elevation } = PRESETS[preset];
         const aspect = this.camera.aspect;
 
-        const pose = frameSphere(sphere, FIELD_OF_VIEW, aspect, azimuth, elevation);
+        const pose = frameSphere(
+            sphere,
+            FIELD_OF_VIEW,
+            aspect,
+            azimuth,
+            elevation,
+        );
         const distance = Math.hypot(
             pose.position.x - sphere.center.x,
             pose.position.y - sphere.center.y,
@@ -3062,7 +3361,11 @@ export class PreviewViewport {
         this.fitDistance = distance;
         this.applyClipPlanes(this.boundingSphere(true), distance);
 
-        this.camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+        this.camera.position.set(
+            pose.position.x,
+            pose.position.y,
+            pose.position.z,
+        );
         this.controls.target.set(pose.target.x, pose.target.y, pose.target.z);
         this.controls.update();
 
@@ -3175,12 +3478,16 @@ export class PreviewViewport {
     startDeathClip(subjectId: string): void {
         const subject = this.subjects.get(subjectId);
 
-        if (subject === undefined || subject.mixer === null || subject.action !== null) {
+        if (
+            subject === undefined ||
+            subject.mixer === null ||
+            subject.action !== null
+        ) {
             return;
         }
 
-        const name = deathClip(subject.clips.map(c => c.name));
-        const clip = subject.clips.find(c => c.name === name);
+        const name = deathClip(subject.clips.map((c) => c.name));
+        const clip = subject.clips.find((c) => c.name === name);
 
         if (clip === undefined) {
             return;
@@ -3230,13 +3537,16 @@ export class PreviewViewport {
             return false;
         }
 
-        const clip = this.active.clips.find(c => c.name === name);
+        const clip = this.active.clips.find((c) => c.name === name);
         if (clip === undefined) {
             return false;
         }
 
         this.active.action = this.active.mixer.clipAction(clip);
-        this.active.action.setLoop(this.animationLoop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+        this.active.action.setLoop(
+            this.animationLoop ? THREE.LoopRepeat : THREE.LoopOnce,
+            Infinity,
+        );
         // Without this a non-looping action snaps back to frame 0 the instant it ends, so the last
         // pose - often the whole point of a death or a deploy - is never on screen.
         this.active.action.clampWhenFinished = true;
@@ -3288,7 +3598,7 @@ export class PreviewViewport {
         // Only the CLIP's hold: the clip has stopped having an opinion, which says nothing about a
         // part that is hidden or a system that has been released to finish.
         for (const entry of this.particleSystems.values()) {
-            entry.instance.hold('clip', false);
+            entry.instance.hold("clip", false);
         }
     }
 
@@ -3305,7 +3615,10 @@ export class PreviewViewport {
         this.animationLoop = loop;
 
         if (this.active.action !== null) {
-            this.active.action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+            this.active.action.setLoop(
+                loop ? THREE.LoopRepeat : THREE.LoopOnce,
+                Infinity,
+            );
             this.active.action.clampWhenFinished = true;
         }
     }
@@ -3321,7 +3634,10 @@ export class PreviewViewport {
             return;
         }
 
-        this.active.action.time = Math.max(0, Math.min(seconds, this.active.action.getClip().duration));
+        this.active.action.time = Math.max(
+            0,
+            Math.min(seconds, this.active.action.getClip().duration),
+        );
         // One update with no time step, so the pose on screen matches the playhead immediately
         // rather than at the next frame - which is what makes a scrubber feel attached to the model.
         this.active.mixer?.update(0);
@@ -3330,13 +3646,14 @@ export class PreviewViewport {
     /** Where the playhead is and how long the clip runs, for the scrubber. Zeroes when idle. */
     animationProgress(): { time: number; duration: number; running: boolean } {
         if (this.active.action === null) {
-            return {time: 0, duration: 0, running: false};
+            return { time: 0, duration: 0, running: false };
         }
 
         return {
             time: this.active.action.time,
             duration: this.active.action.getClip().duration,
-            running: this.active.action.isRunning() && !this.active.action.paused,
+            running:
+                this.active.action.isRunning() && !this.active.action.paused,
         };
     }
 
@@ -3344,7 +3661,7 @@ export class PreviewViewport {
         let meshes = 0;
         let triangles = 0;
 
-        this.modelRoot.traverse(node => {
+        this.modelRoot.traverse((node) => {
             if (node instanceof THREE.Mesh && this.drawn(node)) {
                 meshes++;
                 triangles += triangleCount(node.geometry);
@@ -3372,9 +3689,14 @@ export class PreviewViewport {
      * a scene graph is a point per hardpoint. Anything more here would be geometry the tests cannot
      * reach.
      */
-    bonePosition(partId?: string, bone?: string): { x: number; y: number; z: number } | null {
+    bonePosition(
+        partId?: string,
+        bone?: string,
+    ): { x: number; y: number; z: number } | null {
         if (partId === undefined) {
-            return vectorOf(this.modelRoot.getWorldPosition(new THREE.Vector3()));
+            return vectorOf(
+                this.modelRoot.getWorldPosition(new THREE.Vector3()),
+            );
         }
 
         // Recorded even though this refuses to place anything: the request was made, and it is the
@@ -3411,8 +3733,11 @@ export class PreviewViewport {
     materialExtras(): MaterialExtras[] {
         const all: MaterialExtras[] = [];
 
-        this.modelRoot.traverse(node => {
-            if (node instanceof THREE.Mesh && node.userData.alamo !== undefined) {
+        this.modelRoot.traverse((node) => {
+            if (
+                node instanceof THREE.Mesh &&
+                node.userData.alamo !== undefined
+            ) {
                 all.push(node.userData.alamo as MaterialExtras);
             }
         });
@@ -3432,8 +3757,13 @@ export class PreviewViewport {
         placement: ParticlePlacement,
     ): void {
         const {
-            attachToPartId, attachBone, attachBoneIndex, origin, scaleFactor = 1, at,
-            levels = {alt: null, lod: null, altDecreaseStayHidden: false},
+            attachToPartId,
+            attachBone,
+            attachBoneIndex,
+            origin,
+            scaleFactor = 1,
+            at,
+            levels = { alt: null, lod: null, altDecreaseStayHidden: false },
         } = placement;
 
         // Immediate: the id is about to name something else, and a fading twin under it would be
@@ -3448,18 +3778,33 @@ export class PreviewViewport {
             attachBoneIndex,
             gateVisible: true,
             levels,
-            levelVisible: proxyVisibleAt(levels, this.alt, this.lod, this.altDescending),
+            levelVisible: proxyVisibleAt(
+                levels,
+                this.alt,
+                this.lod,
+                this.altDescending,
+            ),
             scaleFactor,
             origin,
             instance: this.instantiate(
-                id, system, attachToPartId, attachBone, attachBoneIndex, scaleFactor, at),
+                id,
+                system,
+                attachToPartId,
+                attachBone,
+                attachBoneIndex,
+                scaleFactor,
+                at,
+            ),
         };
 
         // Held from birth when it is attached to something already off screen: a death clone's effects
         // attach while the clone is still hidden, and a one-shot that runs there is spent before
         // anyone sees it.
-        if (attachToPartId !== undefined && this.hiddenParts.has(attachToPartId)) {
-            entry.instance.hold('part', true);
+        if (
+            attachToPartId !== undefined &&
+            this.hiddenParts.has(attachToPartId)
+        ) {
+            entry.instance.hold("part", true);
         }
 
         this.particleSystems.set(id, entry);
@@ -3484,10 +3829,14 @@ export class PreviewViewport {
         const entry = this.particleSystems.get(id);
 
         if (entry !== undefined) {
-            if (!immediate && entry.system.leaveParticles && !entry.instance.empty) {
+            if (
+                !immediate &&
+                entry.system.leaveParticles &&
+                !entry.instance.empty
+            ) {
                 // Stop spawning and let the air clear. Nothing sweeps it after this, which is why
                 // it leaves `particleSystems` - a gate re-enabling it would refill it forever.
-                entry.instance.hold('released', true);
+                entry.instance.hold("released", true);
 
                 // And cut loose from the bone it was anchored on, which is usually about to be
                 // hidden or disposed. Nothing moves: the simulation already runs in the model's
@@ -3521,8 +3870,13 @@ export class PreviewViewport {
 
     /** Every texture the running systems want but may not have yet. */
     particleTextureNames(): string[] {
-        return [...new Set(
-            [...this.particleSystems.values()].flatMap(e => e.instance.textureNames()))].sort();
+        return [
+            ...new Set(
+                [...this.particleSystems.values()].flatMap((e) =>
+                    e.instance.textureNames(),
+                ),
+            ),
+        ].sort();
     }
 
     /** Hands a fetched texture to whichever emitters named it, now and after a restart. */
@@ -3582,7 +3936,9 @@ export class PreviewViewport {
 
     /** The emitters of one system, in file order. */
     emitterNames(systemId: string): string[] {
-        return this.particleSystems.get(systemId)?.instance.emitterNames() ?? [];
+        return (
+            this.particleSystems.get(systemId)?.instance.emitterNames() ?? []
+        );
     }
 
     /** Shows or hides one emitter of one system, by its position in that system's file. */
@@ -3595,7 +3951,9 @@ export class PreviewViewport {
             this.hiddenEmitters.add(key);
         }
 
-        this.particleSystems.get(systemId)?.instance.setEmitterVisible(index, visible);
+        this.particleSystems
+            .get(systemId)
+            ?.instance.setEmitterVisible(index, visible);
     }
 
     setParticlesPaused(paused: boolean): void {
@@ -3620,9 +3978,14 @@ export class PreviewViewport {
 
         for (const [id, entry] of this.particleSystems) {
             entry.instance.dispose();
-            entry.instance =
-                this.instantiate(id, entry.system, entry.attachToPartId, entry.attachBone,
-                    entry.attachBoneIndex, entry.scaleFactor);
+            entry.instance = this.instantiate(
+                id,
+                entry.system,
+                entry.attachToPartId,
+                entry.attachBone,
+                entry.attachBoneIndex,
+                entry.scaleFactor,
+            );
             this.refreshParticleVisibility(entry);
         }
     }
@@ -3688,11 +4051,12 @@ export class PreviewViewport {
             boneOf.set(node, index);
         }
 
-        const rootBone = [...hull.bonesByIndex.keys()].sort((a, b) => a - b)[0] ?? 0;
+        const rootBone =
+            [...hull.bonesByIndex.keys()].sort((a, b) => a - b)[0] ?? 0;
         const meshesByBone = new Map<number, THREE.Mesh[]>();
 
-        hull.root.traverse(object => {
-            if (!(object instanceof THREE.Mesh) || object.name === '') {
+        hull.root.traverse((object) => {
+            if (!(object instanceof THREE.Mesh) || object.name === "") {
                 return;
             }
 
@@ -3706,20 +4070,23 @@ export class PreviewViewport {
                 }
             }
 
-            meshesByBone.set(owner, [...(meshesByBone.get(owner) ?? []), object]);
+            meshesByBone.set(owner, [
+                ...(meshesByBone.get(owner) ?? []),
+                object,
+            ]);
         });
 
         for (const [index, node] of hull.bonesByIndex) {
             const found: BoneAttachment[] = [];
 
             for (const mesh of meshesByBone.get(index) ?? []) {
-                found.push({kind: 'mesh', label: mesh.name});
+                found.push({ kind: "mesh", label: mesh.name });
             }
 
             // A attached part is a separate root parented onto the bone, so it reads as a hardpoint.
             for (const part of this.parts.values()) {
                 if (part.root.parent === node) {
-                    found.push({kind: 'hardpoint', label: part.id});
+                    found.push({ kind: "hardpoint", label: part.id });
                 }
             }
 
@@ -3791,12 +4158,12 @@ export class PreviewViewport {
         // the scene - and that is this object's own state, arriving one GLB at a time.
         const target = boxTargetFor(partId, new Set(this.parts.keys()));
 
-        this.selectedParts = target.kind === 'part' ? [target.id] : [];
+        this.selectedParts = target.kind === "part" ? [target.id] : [];
 
         // The attach bone stays SELECTED - it lights the tree row and draws the axes - but it stops
         // being BOXED once its part is outlined. Both at once draws the outline inside a second box
         // around the bone's whole subtree, which is the 2211-unit smear this replaced.
-        this.unboxedRow = target.kind === 'part' ? boneRow : null;
+        this.unboxedRow = target.kind === "part" ? boneRow : null;
         this.updateSelectionBoxes();
     }
 
@@ -3807,7 +4174,10 @@ export class PreviewViewport {
      * Destroyer, and never more than a few hundred - and it changes only when the scene, the state
      * or the damage does.
      */
-    setReticles(marks: readonly ReticleMark[], screenSize: number | null | undefined): void {
+    setReticles(
+        marks: readonly ReticleMark[],
+        screenSize: number | null | undefined,
+    ): void {
         this.reticles = [...marks];
         // The FRACTION, not a pixel count. Resizing the panel has to change the mark's size, and a
         // number computed in React would be stale until something else happened to re-render.
@@ -3868,15 +4238,28 @@ export class PreviewViewport {
             // shape that fits the viewport, centred (captureFrame). Rendered as a view offset on the
             // viewport's own projection, so a capture wider than the viewport shows what the frame
             // shows - not more to either side, which is what widening the aspect used to do.
-            const frame = captureFrame(before.width, before.height, options.width, options.height);
-            this.camera.setViewOffset(before.width, before.height, frame.x, frame.y, frame.width, frame.height);
+            const frame = captureFrame(
+                before.width,
+                before.height,
+                options.width,
+                options.height,
+            );
+            this.camera.setViewOffset(
+                before.width,
+                before.height,
+                frame.x,
+                frame.y,
+                frame.width,
+                frame.height,
+            );
             this.camera.updateProjectionMatrix();
 
             // Null is TRANSPARENT, which is what an icon wants: the alpha the renderer was created
             // with is what makes it possible at all.
-            this.scene.background = options.background === null
-                ? null
-                : new THREE.Color(options.background);
+            this.scene.background =
+                options.background === null
+                    ? null
+                    : new THREE.Color(options.background);
 
             this.grid.visible = options.grid;
             this.floor.visible = options.floor;
@@ -3892,7 +4275,8 @@ export class PreviewViewport {
 
             // A selection box is a thing drawn to help someone READ the model, exactly like the
             // axes and the skeleton, and an icon with an amber cage around it is not an icon.
-            this.selectionBoxes.visible = options.annotations && before.selection;
+            this.selectionBoxes.visible =
+                options.annotations && before.selection;
 
             if (!options.annotations) {
                 this.setFireArcsVisible(false);
@@ -3905,13 +4289,17 @@ export class PreviewViewport {
             // advancing the simulation: a capture must not move the effects on.
             if (this.particlesVisible) {
                 for (const entry of this.particleSystems.values()) {
-                    entry.instance.update(0, this.camera.matrixWorldInverse, this.windVector);
+                    entry.instance.update(
+                        0,
+                        this.camera.matrixWorldInverse,
+                        this.windVector,
+                    );
                 }
             }
 
             this.renderFrame();
 
-            return this.canvas.toDataURL('image/png');
+            return this.canvas.toDataURL("image/png");
         } finally {
             // Always put the room back, including when the render throws: a failed capture must not
             // leave the reader looking at a 64-pixel viewport with the grid switched off.
@@ -3986,10 +4374,12 @@ export class PreviewViewport {
     dispose(): void {
         this.disposed = true;
         // The capture flag has to match, or this silently removes nothing.
-        this.canvas.removeEventListener('pointerdown', this.onPointerDown, {capture: true});
-        this.canvas.removeEventListener('pointermove', this.onPointerMove);
-        window.removeEventListener('pointerup', this.onPointerUp);
-        window.removeEventListener('pointercancel', this.onPointerUp);
+        this.canvas.removeEventListener("pointerdown", this.onPointerDown, {
+            capture: true,
+        });
+        this.canvas.removeEventListener("pointermove", this.onPointerMove);
+        window.removeEventListener("pointerup", this.onPointerUp);
+        window.removeEventListener("pointercancel", this.onPointerUp);
         cancelAnimationFrame(this.frameHandle);
         this.clear();
         this.controls.dispose();
@@ -4008,7 +4398,10 @@ export class PreviewViewport {
      * ambient alone would give.
      */
     private addLighting(): void {
-        this.ambient = new THREE.AmbientLight(0xffffff, DEFAULT_LIGHTS.ambient.intensity);
+        this.ambient = new THREE.AmbientLight(
+            0xffffff,
+            DEFAULT_LIGHTS.ambient.intensity,
+        );
         this.scene.add(this.ambient);
 
         const key = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -4056,7 +4449,10 @@ export class PreviewViewport {
         }
 
         const sphere = this.boundingSphere();
-        const direction = lightDirection(this.lightAzimuth, this.lightElevation);
+        const direction = lightDirection(
+            this.lightAzimuth,
+            this.lightElevation,
+        );
         const frustum = shadowFrustum(sphere.radius);
 
         // Stood off at the frustum's far edge, so the model sits comfortably inside the depth range
@@ -4066,9 +4462,14 @@ export class PreviewViewport {
         light.position.set(
             sphere.center.x + direction.x * distance,
             sphere.center.y + direction.y * distance,
-            sphere.center.z + direction.z * distance);
+            sphere.center.z + direction.z * distance,
+        );
 
-        light.target.position.set(sphere.center.x, sphere.center.y, sphere.center.z);
+        light.target.position.set(
+            sphere.center.x,
+            sphere.center.y,
+            sphere.center.z,
+        );
         light.target.updateMatrixWorld();
 
         // The volumes extrude away from this same light, so the two can never disagree about where
@@ -4092,17 +4493,22 @@ export class PreviewViewport {
     private buildStars(): THREE.Points {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute(
-            'position', new THREE.BufferAttribute(starPositions(STAR_SEED), 3));
+            "position",
+            new THREE.BufferAttribute(starPositions(STAR_SEED), 3),
+        );
 
-        const stars = new THREE.Points(geometry, new THREE.PointsMaterial({
-            color: 0xffffff,
-            // In pixels, and NOT scaled by distance: these are meant to read as points of light at
-            // infinity, and a star that grows as you dolly in is a speck of dust on the lens.
-            size: 1.6,
-            sizeAttenuation: false,
-            depthTest: false,
-            depthWrite: false,
-        }));
+        const stars = new THREE.Points(
+            geometry,
+            new THREE.PointsMaterial({
+                color: 0xffffff,
+                // In pixels, and NOT scaled by distance: these are meant to read as points of light at
+                // infinity, and a star that grows as you dolly in is a speck of dust on the lens.
+                size: 1.6,
+                sizeAttenuation: false,
+                depthTest: false,
+                depthWrite: false,
+            }),
+        );
 
         // Parented to the CAMERA and drawn first: it turns with the view like a sky should and
         // never occludes anything. It is NOT exempt from the far plane, though - `frustumCulled`
@@ -4118,7 +4524,9 @@ export class PreviewViewport {
 
     private buildSky(): THREE.Mesh {
         const geometry = new THREE.SphereGeometry(1, 32, 24);
-        const colours = new Float32Array(geometry.attributes.position.count * 3);
+        const colours = new Float32Array(
+            geometry.attributes.position.count * 3,
+        );
         const position = geometry.attributes.position;
 
         for (let i = 0; i < position.count; i++) {
@@ -4126,15 +4534,18 @@ export class PreviewViewport {
             colours.set([r, g, b], i * 3);
         }
 
-        geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+        geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
 
-        const sky = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-            vertexColors: true,
-            // Seen from the inside, and never in the depth buffer.
-            side: THREE.BackSide,
-            depthTest: false,
-            depthWrite: false,
-        }));
+        const sky = new THREE.Mesh(
+            geometry,
+            new THREE.MeshBasicMaterial({
+                vertexColors: true,
+                // Seen from the inside, and never in the depth buffer.
+                side: THREE.BackSide,
+                depthTest: false,
+                depthWrite: false,
+            }),
+        );
 
         // Follows the camera's POSITION but not its rotation - the horizon has to stay level and at
         // eye height however the camera turns, which is what makes it read as a horizon rather than
@@ -4163,14 +4574,18 @@ export class PreviewViewport {
             // The sun is placed by `placeKeyLight`, which also has the shadow frustum to fit; the
             // fills only need a direction, and a directional light's position IS its direction.
             if (index > 0) {
-                const direction = lightDirection(setting.azimuth, setting.elevation);
+                const direction = lightDirection(
+                    setting.azimuth,
+                    setting.elevation,
+                );
                 light.position.set(direction.x, direction.y, direction.z);
             }
         });
 
         if (this.ambient !== null) {
             this.ambient.color.setRGB(...rig.ambient.colour);
-            this.ambient.intensity = rig.ambient.intensity * ENGINE_LIGHT_TO_THREE;
+            this.ambient.intensity =
+                rig.ambient.intensity * ENGINE_LIGHT_TO_THREE;
         }
 
         this.buildProbe();
@@ -4186,7 +4601,10 @@ export class PreviewViewport {
      */
     private buildProbe(): void {
         const rig = this.rig;
-        const toward = (azimuth: number, elevation: number): [number, number, number] => {
+        const toward = (
+            azimuth: number,
+            elevation: number,
+        ): [number, number, number] => {
             const direction = lightDirection(azimuth, elevation);
 
             return [direction.x, direction.y, direction.z];
@@ -4198,7 +4616,7 @@ export class PreviewViewport {
             intensity: rig.sun.intensity,
         };
 
-        const fills: ProbeLight[] = [rig.fill1, rig.fill2].map(fill => ({
+        const fills: ProbeLight[] = [rig.fill1, rig.fill2].map((fill) => ({
             toLight: toward(fill.azimuth, fill.elevation),
             colour: fill.colour,
             intensity: fill.intensity,
@@ -4216,7 +4634,9 @@ export class PreviewViewport {
 
     /** The object a part is attached to: a named bone of another part, or the scene root. */
     private attachmentFor(
-        partId?: string, bone?: string, boneIndex?: number,
+        partId?: string,
+        bone?: string,
+        boneIndex?: number,
     ): THREE.Object3D {
         if (partId === undefined) {
             return this.modelRoot;
@@ -4236,13 +4656,15 @@ export class PreviewViewport {
         // By INDEX where the caller has one, because bone names repeat: Boba Fett's two jetpack
         // jets are two bones both called `p_boba_jetpack`, and a name-keyed map holds one of them -
         // so both effects were attached to the same jet and he fired from one.
-        const byIndex = boneIndex === undefined
-            ? undefined
-            : parent.bonesByIndex.get(boneIndex);
+        const byIndex =
+            boneIndex === undefined
+                ? undefined
+                : parent.bonesByIndex.get(boneIndex);
 
         // A hardpoint naming a bone the hull does not have is already reported as a problem by the
         // server; here it just means the part sits at the hull's origin rather than vanishing.
-        const anchor = byIndex ?? parent.bones.get(bone.toLowerCase()) ?? parent.root;
+        const anchor =
+            byIndex ?? parent.bones.get(bone.toLowerCase()) ?? parent.root;
 
         return this.mountable(anchor);
     }
@@ -4304,13 +4726,19 @@ export class PreviewViewport {
      * Breakoff roots are left out on purpose - a wreck is meant to stop existing, so a request for
      * one that has been cleared is not a fault.
      */
-    private noteAttachment(partId: string, bone?: string, boneIndex?: number): void {
+    private noteAttachment(
+        partId: string,
+        bone?: string,
+        boneIndex?: number,
+    ): void {
         if (partId.startsWith(BREAKOFF_ATTACHMENT)) {
             return;
         }
 
-        this.attachRequests.set(`${partId} / ${bone ?? ''} / ${boneIndex ?? ''}`,
-            {partId, bone, boneIndex});
+        this.attachRequests.set(
+            `${partId} / ${bone ?? ""} / ${boneIndex ?? ""}`,
+            { partId, bone, boneIndex },
+        );
     }
 
     /**
@@ -4323,8 +4751,12 @@ export class PreviewViewport {
         // On the FIRST pass the glTF material is the carrier. After that this mesh's material is one
         // we made, whose userData is `{ spec, extras }` - reading extras off it again would find no
         // shader name at all, which silently drops every texture and every translated effect.
-        const source = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-        const extras = (mesh.userData.alamo ?? source?.userData ?? {}) as MaterialExtras;
+        const source = Array.isArray(mesh.material)
+            ? mesh.material[0]
+            : mesh.material;
+        const extras = (mesh.userData.alamo ??
+            source?.userData ??
+            {}) as MaterialExtras;
         const spec = resolveMaterial(extras);
 
         mesh.userData.alamo = extras;
@@ -4345,7 +4777,9 @@ export class PreviewViewport {
         // into the map, exactly as the engine does it. Recomputed for every mesh whenever a part
         // arrives, because a volume can turn up after the geometry that it belongs to.
         mesh.castShadow = castsShadowMap({
-            hasVolumes: this.stencilShadowing, hidden: spec.hidden, blend: spec.blend,
+            hasVolumes: this.stencilShadowing,
+            hidden: spec.hidden,
+            blend: spec.blend,
         });
         mesh.receiveShadow = !spec.hidden;
 
@@ -4361,7 +4795,9 @@ export class PreviewViewport {
         }
 
         // The effect's own shader when there is one and it is switched on, the archetype otherwise.
-        const effect = this.translated.get((extras.alamoShader ?? '').toLowerCase());
+        const effect = this.translated.get(
+            (extras.alamoShader ?? "").toLowerCase(),
+        );
         if (this.translatedShaders && effect !== undefined) {
             const translated = new AlamoMaterial(effect, extras);
 
@@ -4370,13 +4806,13 @@ export class PreviewViewport {
                 translated.setColorization(this.colorization);
             }
 
-            translated.userData = {spec, extras};
+            translated.userData = { spec, extras };
             mesh.material = translated;
             return;
         }
 
         const shared = {
-            transparent: spec.blend !== 'opaque',
+            transparent: spec.blend !== "opaque",
             depthWrite: spec.depthWrite,
             side: THREE.FrontSide,
 
@@ -4395,11 +4831,14 @@ export class PreviewViewport {
         // is what the effect does.
         const material = spec.lit
             ? new THREE.MeshStandardMaterial({
-                ...shared, color: UNTINTED, metalness: 0, roughness: 0.85,
-            })
-            // White, not UNTINTED: nothing is going to light this, so any grey here just dims the
-            // texture the effect meant to show at full strength.
-            : new THREE.MeshBasicMaterial({...shared, color: 0xffffff});
+                  ...shared,
+                  color: UNTINTED,
+                  metalness: 0,
+                  roughness: 0.85,
+              })
+            : // White, not UNTINTED: nothing is going to light this, so any grey here just dims the
+              // texture the effect meant to show at full strength.
+              new THREE.MeshBasicMaterial({ ...shared, color: 0xffffff });
 
         // The archetype's own blend and depth, through the single place that knows how each one is
         // expressed in three. An additive ARCHETYPE means the engine's ONE, ONE - the same thing
@@ -4407,10 +4846,12 @@ export class PreviewViewport {
         // mesh does not shift when its effect finally arrives.
         applyBlend(material, spec.blend);
         applyDepth(material, {
-            depthTest: true, depthWrite: spec.depthWrite, depthFunc: 'lessEqual',
+            depthTest: true,
+            depthWrite: spec.depthWrite,
+            depthFunc: "lessEqual",
         });
 
-        material.userData = {spec, extras};
+        material.userData = { spec, extras };
         this.tint(material);
         mesh.material = material;
 
@@ -4418,9 +4859,14 @@ export class PreviewViewport {
         // and not only when the shader arrives, because every material rebuild - a shader toggle, a
         // faction change - throws the previous one away and would otherwise silently fall back to
         // the archetype's guess for the rest of the session.
-        const state = this.shaderStates.get((extras.alamoShader ?? '').toLowerCase());
+        const state = this.shaderStates.get(
+            (extras.alamoShader ?? "").toLowerCase(),
+        );
         if (state !== undefined) {
-            this.applyStoredShaderState((extras.alamoShader ?? '').toLowerCase(), state);
+            this.applyStoredShaderState(
+                (extras.alamoShader ?? "").toLowerCase(),
+                state,
+            );
         }
     }
 
@@ -4440,14 +4886,18 @@ export class PreviewViewport {
      * - a SHADOW VOLUME is an extruded silhouette whose interior is the point, so it stays
      *   translucent and writes no depth.
      */
-    private debugMaterial(extras: MaterialExtras, spec: MaterialSpec): THREE.Material {
+    private debugMaterial(
+        extras: MaterialExtras,
+        spec: MaterialSpec,
+    ): THREE.Material {
         // The effect's own declared colour where there is one, and the colour that effect DEFAULTS
         // to otherwise. A hull authored on `alDefault.fx` - 174 of them across the shipped models -
         // declares no swatch at all, so the fallback has to come from what KIND of hull this is, or
         // the Nebulon-B's `COLLISION` draws in the shadow volume's cyan.
-        const volume = spec.archetype === 'shadow-volume';
-        const colour = debugColour(extras)
-            ?? (volume ? {r: 0, g: 1, b: 1, a: 1} : {r: 0, g: 0, b: 1, a: 1});
+        const volume = spec.archetype === "shadow-volume";
+        const colour =
+            debugColour(extras) ??
+            (volume ? { r: 0, g: 1, b: 1, a: 1 } : { r: 0, g: 0, b: 1, a: 1 });
 
         const material = new THREE.MeshBasicMaterial({
             color: new THREE.Color(colour.r, colour.g, colour.b),
@@ -4461,7 +4911,7 @@ export class PreviewViewport {
             side: THREE.FrontSide,
         });
 
-        material.userData = {spec, extras};
+        material.userData = { spec, extras };
         return material;
     }
 
@@ -4478,8 +4928,11 @@ export class PreviewViewport {
      * standard material's own fragment shader, because nothing three offers expresses "multiply by
      * this colour only where the map's alpha says so".
      */
-    private tint(material: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial): void {
-        const spec = (material.userData as { spec?: { colorize?: boolean } }).spec;
+    private tint(
+        material: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial,
+    ): void {
+        const spec = (material.userData as { spec?: { colorize?: boolean } })
+            .spec;
         if (spec?.colorize !== true) {
             return;
         }
@@ -4487,8 +4940,9 @@ export class PreviewViewport {
         material.color.setHex(0xffffff);
         this.installColorization(material);
 
-        const uniform = (material.userData as { colorization?: { value: THREE.Color } })
-            .colorization;
+        const uniform = (
+            material.userData as { colorization?: { value: THREE.Color } }
+        ).colorization;
         if (uniform === undefined) {
             return;
         }
@@ -4499,7 +4953,11 @@ export class PreviewViewport {
             return;
         }
 
-        uniform.value.setRGB(this.colorization.r, this.colorization.g, this.colorization.b);
+        uniform.value.setRGB(
+            this.colorization.r,
+            this.colorization.g,
+            this.colorization.b,
+        );
     }
 
     /**
@@ -4512,29 +4970,37 @@ export class PreviewViewport {
     private installColorization(
         material: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial,
     ): void {
-        const data = material.userData as { colorization?: { value: THREE.Color } };
+        const data = material.userData as {
+            colorization?: { value: THREE.Color };
+        };
         if (data.colorization !== undefined) {
             return;
         }
 
-        const colorization = {value: new THREE.Color(1, 1, 1)};
+        const colorization = { value: new THREE.Color(1, 1, 1) };
         data.colorization = colorization;
 
-        material.onBeforeCompile = shader => {
+        material.onBeforeCompile = (shader) => {
             shader.uniforms.aetColorization = colorization;
 
             shader.fragmentShader = shader.fragmentShader
-                .replace('void main() {', 'uniform vec3 aetColorization;\nvoid main() {')
-                .replace('#include <map_fragment>', `#include <map_fragment>
+                .replace(
+                    "void main() {",
+                    "uniform vec3 aetColorization;\nvoid main() {",
+                )
+                .replace(
+                    "#include <map_fragment>",
+                    `#include <map_fragment>
 #ifdef USE_MAP
     diffuseColor.rgb = mix(
         diffuseColor.rgb, aetColorization * diffuseColor.rgb, sampledDiffuseColor.a);
-#endif`);
+#endif`,
+                );
         };
 
         // three caches programs by this key, so two materials differing only in the injection would
         // otherwise share one compiled shader.
-        material.customProgramCacheKey = () => 'aet-colorize';
+        material.customProgramCacheKey = () => "aet-colorize";
     }
 
     /**
@@ -4544,13 +5010,19 @@ export class PreviewViewport {
      * archetype does, and skipping it drew meshes that should be alpha-blended with depth writes on
      * - which is how an inner hull ends up occluding the model around it.
      */
-    private applyStoredShaderState(wanted: string, state: FxMaterialState): void {
-        this.forEachDrawnMesh(node => {
+    private applyStoredShaderState(
+        wanted: string,
+        state: FxMaterialState,
+    ): void {
+        this.forEachDrawnMesh((node) => {
             const material = node.material;
             const extras = node.userData.alamo as MaterialExtras | undefined;
 
-            if (Array.isArray(material) || !(material instanceof THREE.Material)
-                || (extras?.alamoShader ?? '').toLowerCase() !== wanted) {
+            if (
+                Array.isArray(material) ||
+                !(material instanceof THREE.Material) ||
+                (extras?.alamoShader ?? "").toLowerCase() !== wanted
+            ) {
                 return;
             }
 
@@ -4563,9 +5035,12 @@ export class PreviewViewport {
             }
 
             applyDepth(material, state);
-            material.side = state.cull === 'none'
-                ? THREE.DoubleSide
-                : state.cull === 'front' ? THREE.BackSide : THREE.FrontSide;
+            material.side =
+                state.cull === "none"
+                    ? THREE.DoubleSide
+                    : state.cull === "front"
+                      ? THREE.BackSide
+                      : THREE.FrontSide;
 
             // Two different mechanisms for the same declaration. An archetype material is one of
             // three's own, which reads `alphaTest` and injects the discard itself; a translated
@@ -4603,10 +5078,13 @@ export class PreviewViewport {
     private updateAlamoUniforms(): void {
         const materials: { mesh: THREE.Mesh; material: AlamoMaterial }[] = [];
 
-        this.modelRoot.traverse(node => {
-            if (node instanceof THREE.Mesh && node.material instanceof AlamoMaterial
-                && node.visible) {
-                materials.push({mesh: node, material: node.material});
+        this.modelRoot.traverse((node) => {
+            if (
+                node instanceof THREE.Mesh &&
+                node.material instanceof AlamoMaterial &&
+                node.visible
+            ) {
+                materials.push({ mesh: node, material: node.material });
             }
         });
 
@@ -4618,18 +5096,26 @@ export class PreviewViewport {
 
         const view = this.camera.matrixWorldInverse;
         const projection = this.camera.projectionMatrix;
-        const viewProjection = new THREE.Matrix4().multiplyMatrices(projection, view);
+        const viewProjection = new THREE.Matrix4().multiplyMatrices(
+            projection,
+            view,
+        );
         const eyeWorld = this.camera.getWorldPosition(new THREE.Vector3());
 
-        for (const {mesh, material} of materials) {
-            material.updateFrame(this.frameFor(mesh, view, projection, viewProjection, eyeWorld));
+        for (const { mesh, material } of materials) {
+            material.updateFrame(
+                this.frameFor(mesh, view, projection, viewProjection, eyeWorld),
+            );
         }
     }
 
     /** The engine's per-frame contract, as it stands for one mesh. */
     private frameFor(
-        mesh: THREE.Mesh, view: THREE.Matrix4, projection: THREE.Matrix4,
-        viewProjection: THREE.Matrix4, eyeWorld: THREE.Vector3,
+        mesh: THREE.Mesh,
+        view: THREE.Matrix4,
+        projection: THREE.Matrix4,
+        viewProjection: THREE.Matrix4,
+        eyeWorld: THREE.Vector3,
     ): AlamoFrame {
         const world = mesh.matrixWorld;
         const worldInverse = new THREE.Matrix4().copy(world).invert();
@@ -4649,14 +5135,20 @@ export class PreviewViewport {
 
         const lights = this.alamoLights.map((light, index) => {
             const direction = light.position.clone().normalize();
-            const rotationOnly = new THREE.Matrix4().extractRotation(worldInverse);
-            const inObject = direction.clone().applyMatrix4(rotationOnly).normalize();
+            const rotationOnly = new THREE.Matrix4().extractRotation(
+                worldInverse,
+            );
+            const inObject = direction
+                .clone()
+                .applyMatrix4(rotationOnly)
+                .normalize();
 
             return engineLight(
                 settings[index] ?? this.rig.sun,
                 this.rig.specular,
                 [direction.x, direction.y, direction.z],
-                [inObject.x, inObject.y, inObject.z]);
+                [inObject.x, inObject.y, inObject.z],
+            );
         });
 
         // The Alamo shaders do their own bone lookup, so the palette is handed over rather than
@@ -4666,9 +5158,8 @@ export class PreviewViewport {
         // Conjugating by the bind matrices is what three's own skinning does, and it lands the
         // result back in mesh-local space where the rest of the shader expects it. Without it the
         // turret's barrel flew off and its dome collapsed.
-        const skinMatrices = mesh instanceof THREE.SkinnedMesh
-            ? this.skinPalette(mesh)
-            : null;
+        const skinMatrices =
+            mesh instanceof THREE.SkinnedMesh ? this.skinPalette(mesh) : null;
 
         return {
             wind: this.wind,
@@ -4676,9 +5167,12 @@ export class PreviewViewport {
                 world: world.elements,
                 worldInverse: worldInverse.elements,
                 worldView: worldView.elements,
-                worldViewInverse: new THREE.Matrix4().copy(worldView).invert().elements,
-                worldViewProjection:
-                new THREE.Matrix4().multiplyMatrices(viewProjection, world).elements,
+                worldViewInverse: new THREE.Matrix4().copy(worldView).invert()
+                    .elements,
+                worldViewProjection: new THREE.Matrix4().multiplyMatrices(
+                    viewProjection,
+                    world,
+                ).elements,
                 view: view.elements,
                 viewInverse: this.camera.matrixWorld.elements,
                 viewProjection: viewProjection.elements,
@@ -4699,7 +5193,12 @@ export class PreviewViewport {
             ],
             lightScale: [1, 1, 1, 1],
             time: this.elapsed,
-            resolution: [this.canvas.clientWidth, this.canvas.clientHeight, 0, 0],
+            resolution: [
+                this.canvas.clientWidth,
+                this.canvas.clientHeight,
+                0,
+                0,
+            ],
             sphericalHarmonics: this.harmonics,
             sphericalHarmonicsFill: this.fillHarmonics,
             skinMatrices,
@@ -4725,8 +5224,8 @@ export class PreviewViewport {
     /** The roots of the subject that opened the scene. */
     private activeSubjectRoots(): THREE.Object3D[] {
         return [...this.parts.values()]
-            .filter(part => part.subjectId === ACTIVE_SUBJECT)
-            .map(part => part.root);
+            .filter((part) => part.subjectId === ACTIVE_SUBJECT)
+            .map((part) => part.root);
     }
 
     /**
@@ -4747,11 +5246,15 @@ export class PreviewViewport {
     private forEachDrawnMesh(visit: (mesh: THREE.Mesh) => void): void {
         // Every subject: how a mesh draws - its blend, its wireframe, its team tint - is the same
         // question whoever owns it. Only WHETHER it draws differs.
-        this.walkModelMeshes([...this.parts.values()].map(part => part.root), visit);
+        this.walkModelMeshes(
+            [...this.parts.values()].map((part) => part.root),
+            visit,
+        );
     }
 
     private walkModelMeshes(
-        roots: readonly THREE.Object3D[], visit: (mesh: THREE.Mesh) => void,
+        roots: readonly THREE.Object3D[],
+        visit: (mesh: THREE.Mesh) => void,
     ): void {
         // A manual walk rather than `traverse`, because this has to PRUNE. A particle system is
         // parented to a BONE so its smoke follows the hull as it animates - which puts it inside the
@@ -4766,7 +5269,10 @@ export class PreviewViewport {
             // The stencil volumes' counting meshes are this class's own scaffolding, not the
             // model's geometry. Left in, they took model materials, turned up as phantom tree rows
             // and were swept by the wireframe - the same shape of bug the particle prune fixes.
-            if (node instanceof THREE.Mesh && node.userData.aetShadowVolume !== true) {
+            if (
+                node instanceof THREE.Mesh &&
+                node.userData.aetShadowVolume !== true
+            ) {
                 visit(node);
             }
 
@@ -4802,9 +5308,10 @@ export class PreviewViewport {
         }
 
         const bones = mesh.skeleton.bones.length;
-        const palette = this.skinScratch.length === bones * 16
-            ? this.skinScratch
-            : (this.skinScratch = new Float32Array(bones * 16));
+        const palette =
+            this.skinScratch.length === bones * 16
+                ? this.skinScratch
+                : (this.skinScratch = new Float32Array(bones * 16));
 
         for (let i = 0; i < bones; i++) {
             SKIN_WORK.fromArray(source, i * 16);
@@ -4821,7 +5328,7 @@ export class PreviewViewport {
 
     /** Rebuilds every mesh's material for the current translated/archetype choice. */
     private rebuildMaterials(): void {
-        this.forEachDrawnMesh(mesh => this.applyMaterial(mesh));
+        this.forEachDrawnMesh((mesh) => this.applyMaterial(mesh));
 
         // Same reason as after a part loads: these are different material objects, and a flag set
         // on the ones they replace is gone.
@@ -4848,9 +5355,12 @@ export class PreviewViewport {
     private archetypeWants(wanted: string): boolean {
         let found = false;
 
-        this.modelRoot.traverse(node => {
-            if (found || !(node instanceof THREE.Mesh)
-                || node.material instanceof AlamoMaterial) {
+        this.modelRoot.traverse((node) => {
+            if (
+                found ||
+                !(node instanceof THREE.Mesh) ||
+                node.material instanceof AlamoMaterial
+            ) {
                 return;
             }
 
@@ -4865,7 +5375,11 @@ export class PreviewViewport {
         return found;
     }
 
-    private bindTextureIn(root: THREE.Object3D, name: string, texture: THREE.Texture): void {
+    private bindTextureIn(
+        root: THREE.Object3D,
+        name: string,
+        texture: THREE.Texture,
+    ): void {
         const wanted = name.toLowerCase();
 
         // ONE answer for the texture, taken from the whole model before anything is bound. The
@@ -4875,7 +5389,7 @@ export class PreviewViewport {
         // translated ones only replace them once the shaders arrive.
         applyBaseMapColourSpace(texture, this.archetypeWants(wanted));
 
-        root.traverse(node => {
+        root.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) {
                 return;
             }
@@ -4885,7 +5399,8 @@ export class PreviewViewport {
                 return;
             }
 
-            const material = node.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
+            const material = node.material as
+                THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
             const spec = material.userData?.spec;
             if (spec === undefined) {
                 return;
@@ -4899,8 +5414,10 @@ export class PreviewViewport {
 
             // Only a lit material has a normal map to put this in; an unlit one has no normal to
             // perturb, and assigning it would be a silent no-op that reads as a working bind.
-            if (spec.textures.normal?.toLowerCase() === wanted
-                && material instanceof THREE.MeshStandardMaterial) {
+            if (
+                spec.textures.normal?.toLowerCase() === wanted &&
+                material instanceof THREE.MeshStandardMaterial
+            ) {
                 material.normalMap = texture;
                 material.needsUpdate = true;
             }
@@ -4915,7 +5432,7 @@ export class PreviewViewport {
      * root and needs nothing.
      */
     private applyArcScale(arc: THREE.Mesh): void {
-        const inside = arc.userData.aetArcFrame === 'bone';
+        const inside = arc.userData.aetArcFrame === "bone";
 
         arc.scale.setScalar(inside ? 1 / this.modelScale : 1);
     }
@@ -4935,8 +5452,10 @@ export class PreviewViewport {
      * resolved on the hardpoint, which is the only place it exists.
      */
     private fireBoneAttachment(partId: string, bone: string): THREE.Object3D {
-        return this.parts.get('hull')?.bones.get(bone.toLowerCase())
-            ?? this.attachmentFor(partId, bone);
+        return (
+            this.parts.get("hull")?.bones.get(bone.toLowerCase()) ??
+            this.attachmentFor(partId, bone)
+        );
     }
 
     private clearFireArcs(): void {
@@ -4975,11 +5494,15 @@ export class PreviewViewport {
 
         this.modelRoot.updateWorldMatrix(true, false);
 
-        for (const {mesh, muzzle} of this.hullArcs) {
+        for (const { mesh, muzzle } of this.hullArcs) {
             // Fresh, because the mixer has moved the bone but world matrices are only recomputed at
             // render time.
             muzzle.updateWorldMatrix(true, false);
-            mesh.position.copy(this.modelRoot.worldToLocal(muzzle.getWorldPosition(this.muzzleScratch)));
+            mesh.position.copy(
+                this.modelRoot.worldToLocal(
+                    muzzle.getWorldPosition(this.muzzleScratch),
+                ),
+            );
         }
     }
 
@@ -5013,24 +5536,34 @@ export class PreviewViewport {
      * class having to compose them.
      */
     private buildTurretHandle(
-        handle: TurretHandle, axis: TurretAxis, bone: THREE.Object3D, radius: number,
+        handle: TurretHandle,
+        axis: TurretAxis,
+        bone: THREE.Object3D,
+        radius: number,
         followsYaw = false,
     ): TurretHandleParts {
-        const range = axis === 'yaw' ? handle.yaw : handle.pitch;
+        const range = axis === "yaw" ? handle.yaw : handle.pitch;
 
         const track = new THREE.LineSegments(
-            positionGeometry(trackSegments(range, radius, TURRET_TRACK_SEGMENTS)),
-            TURRET_TRACK_MATERIAL);
+            positionGeometry(
+                trackSegments(range, radius, TURRET_TRACK_SEGMENTS),
+            ),
+            TURRET_TRACK_MATERIAL,
+        );
         track.renderOrder = TURRET_HANDLE_RENDER_ORDER;
 
         const stops = new THREE.LineSegments(
-            positionGeometry(stopTicks(range, radius, radius * TURRET_STOP_TICK_FRACTION)),
-            TURRET_STOP_MATERIAL);
+            positionGeometry(
+                stopTicks(range, radius, radius * TURRET_STOP_TICK_FRACTION),
+            ),
+            TURRET_STOP_MATERIAL,
+        );
         stops.renderOrder = TURRET_HANDLE_RENDER_ORDER;
 
         const knob = new THREE.Mesh(
             new THREE.SphereGeometry(radius * TURRET_KNOB_FRACTION, 12, 8),
-            TURRET_KNOB_MATERIAL);
+            TURRET_KNOB_MATERIAL,
+        );
         knob.renderOrder = TURRET_HANDLE_RENDER_ORDER;
 
         // A CHILD of the track, so one parent carries the whole handle and nothing can be left
@@ -5053,7 +5586,16 @@ export class PreviewViewport {
         anchor.add(track);
         (bone.parent ?? bone).add(anchor);
 
-        const parts = {anchor, bone, followsYaw, track, stops, knob, radius, range};
+        const parts = {
+            anchor,
+            bone,
+            followsYaw,
+            track,
+            stops,
+            knob,
+            radius,
+            range,
+        };
         this.placeTurretAnchor(parts);
 
         return parts;
@@ -5093,7 +5635,7 @@ export class PreviewViewport {
      * barrel's own rotation - does not.
      */
     private placeTurretAnchor(parts: TurretHandleParts): void {
-        const {anchor, bone} = parts;
+        const { anchor, bone } = parts;
         const rest = this.sweepRest.get(bone) ?? bone.quaternion;
 
         anchor.position.copy(bone.position);
@@ -5101,7 +5643,10 @@ export class PreviewViewport {
         anchor.quaternion.copy(rest);
 
         if (parts.followsYaw) {
-            const live = this.twistScratch.copy(rest).invert().multiply(bone.quaternion);
+            const live = this.twistScratch
+                .copy(rest)
+                .invert()
+                .multiply(bone.quaternion);
             // Swing-twist about Z: keep only the Z component and renormalise. Guarded, because a
             // pure 180-degree swing leaves nothing to normalise.
             const length = Math.hypot(live.w, live.z);
@@ -5120,9 +5665,14 @@ export class PreviewViewport {
      * carries a copy of the hull's skeleton, and resolving a bone there applies the attachment
      * offset twice.
      */
-    private turretBoneNode(partId: string, bone: string): THREE.Object3D | undefined {
-        return this.parts.get('hull')?.bones.get(bone.toLowerCase())
-            ?? this.parts.get(partId)?.bones.get(bone.toLowerCase());
+    private turretBoneNode(
+        partId: string,
+        bone: string,
+    ): THREE.Object3D | undefined {
+        return (
+            this.parts.get("hull")?.bones.get(bone.toLowerCase()) ??
+            this.parts.get(partId)?.bones.get(bone.toLowerCase())
+        );
     }
 
     /** Poses every handled turret from its stored aim, and moves the knobs to match. */
@@ -5133,9 +5683,11 @@ export class PreviewViewport {
 
             if (nodes !== undefined) {
                 nodes.yaw.knob.position.set(
-                    ...knobPoint(handle.yaw, aim.yaw, nodes.yaw.radius));
+                    ...knobPoint(handle.yaw, aim.yaw, nodes.yaw.radius),
+                );
                 nodes.pitch.knob.position.set(
-                    ...knobPoint(handle.pitch, aim.pitch, nodes.pitch.radius));
+                    ...knobPoint(handle.pitch, aim.pitch, nodes.pitch.radius),
+                );
             }
 
             this.poseTurret(handle, aim);
@@ -5156,9 +5708,10 @@ export class PreviewViewport {
             return;
         }
 
-        const barrel = handle.barrelBone === null
-            ? undefined
-            : this.turretBoneNode(handle.partId, handle.barrelBone);
+        const barrel =
+            handle.barrelBone === null
+                ? undefined
+                : this.turretBoneNode(handle.partId, handle.barrelBone);
 
         // NEGATIVE elevation, so a positive pitch is nose up: rotating about +Y takes local +X,
         // which is forward, towards -Z, and Z is up.
@@ -5166,7 +5719,13 @@ export class PreviewViewport {
             this.aimBone(turret, TRAVERSE_AXIS, aim.yaw);
             this.aimBone(barrel, ELEVATION_AXIS, -aim.pitch);
         } else {
-            this.aimBone(turret, TRAVERSE_AXIS, aim.yaw, ELEVATION_AXIS, -aim.pitch);
+            this.aimBone(
+                turret,
+                TRAVERSE_AXIS,
+                aim.yaw,
+                ELEVATION_AXIS,
+                -aim.pitch,
+            );
         }
     }
 
@@ -5215,9 +5774,10 @@ export class PreviewViewport {
             // The barrel carries the elevation, when the model separates the two. A turret with no
             // barrel bone elevates on its own bone instead - 19 objects name a turret bone and only
             // 17 a barrel, so the pair is genuinely optional.
-            const barrel = sweep.barrelBone === null
-                ? undefined
-                : part?.bones.get(sweep.barrelBone.toLowerCase());
+            const barrel =
+                sweep.barrelBone === null
+                    ? undefined
+                    : part?.bones.get(sweep.barrelBone.toLowerCase());
 
             // NEGATIVE, so a positive elevation is nose UP. Rotating about +Y by a positive angle
             // takes local +X - which is forward - towards -Z, and Z is up.
@@ -5226,7 +5786,13 @@ export class PreviewViewport {
             } else if (turret !== undefined) {
                 // One bone doing both: the traverse is already on it, so the elevation composes
                 // after it rather than replacing it.
-                this.aimBone(turret, TRAVERSE_AXIS, pose.rotate, ELEVATION_AXIS, -pose.elevate);
+                this.aimBone(
+                    turret,
+                    TRAVERSE_AXIS,
+                    pose.rotate,
+                    ELEVATION_AXIS,
+                    -pose.elevate,
+                );
             }
         }
     }
@@ -5239,13 +5805,16 @@ export class PreviewViewport {
      * be reached through both. Same part, same bone, same bone node.
      */
     private sweepIsHandled(
-        sweep: { partId: string; turretBone: string }, heldId: string,
+        sweep: { partId: string; turretBone: string },
+        heldId: string,
     ): boolean {
-        const handle = this.turretHandles.find(one => one.id === heldId);
+        const handle = this.turretHandles.find((one) => one.id === heldId);
 
-        return handle !== undefined
-            && handle.partId === sweep.partId
-            && handle.turretBone.toLowerCase() === sweep.turretBone.toLowerCase();
+        return (
+            handle !== undefined &&
+            handle.partId === sweep.partId &&
+            handle.turretBone.toLowerCase() === sweep.turretBone.toLowerCase()
+        );
     }
 
     /**
@@ -5260,12 +5829,18 @@ export class PreviewViewport {
         secondAxis?: THREE.Vector3,
         secondDegrees?: number,
     ): void {
-        const turn = new THREE.Quaternion()
-            .setFromAxisAngle(axis, degrees * (Math.PI / 180));
+        const turn = new THREE.Quaternion().setFromAxisAngle(
+            axis,
+            degrees * (Math.PI / 180),
+        );
 
         if (secondAxis !== undefined && secondDegrees !== undefined) {
-            turn.multiply(new THREE.Quaternion()
-                .setFromAxisAngle(secondAxis, secondDegrees * (Math.PI / 180)));
+            turn.multiply(
+                new THREE.Quaternion().setFromAxisAngle(
+                    secondAxis,
+                    secondDegrees * (Math.PI / 180),
+                ),
+            );
         }
 
         bone.quaternion.copy(this.sweepRestOf(bone)).multiply(turn);
@@ -5301,7 +5876,8 @@ export class PreviewViewport {
                 // The GEOMETRY goes; the root stays. `Death_Explosions` fires where the piece
                 // finished, and once the root is gone nothing in the scene knows where that was -
                 // which is why the wreck simply vanished with no blast at all.
-                const subjectId = this.parts.get(debris.partId)?.subjectId ?? debris.partId;
+                const subjectId =
+                    this.parts.get(debris.partId)?.subjectId ?? debris.partId;
 
                 for (const child of [...debris.root.children]) {
                     this.dropRegistrations(subjectId, child);
@@ -5320,14 +5896,17 @@ export class PreviewViewport {
             debris.root.position.set(
                 debris.origin.x + pose.offset.x,
                 debris.origin.y + pose.offset.y,
-                debris.origin.z + pose.offset.z);
+                debris.origin.z + pose.offset.z,
+            );
 
             const spin = new THREE.Euler(
                 pose.rotation.x * (Math.PI / 180),
                 pose.rotation.y * (Math.PI / 180),
-                pose.rotation.z * (Math.PI / 180));
+                pose.rotation.z * (Math.PI / 180),
+            );
 
-            debris.root.quaternion.copy(debris.facing)
+            debris.root.quaternion
+                .copy(debris.facing)
                 .multiply(new THREE.Quaternion().setFromEuler(spin));
 
             alive.push(debris);
@@ -5364,13 +5943,19 @@ export class PreviewViewport {
             part.root.position.set(
                 home.position.x + pose.offset.x * travel,
                 home.position.y + pose.offset.y * travel,
-                home.position.z + pose.offset.z * travel);
+                home.position.z + pose.offset.z * travel,
+            );
 
             // Roll about the TRAVEL axis, which is Z - the blue one. Rolling about X while flying
             // along Z is a tumble end over end, not a corkscrew.
-            part.root.quaternion.copy(home.quaternion)
-                .multiply(new THREE.Quaternion().setFromAxisAngle(
-                    new THREE.Vector3(0, 0, 1), pose.roll));
+            part.root.quaternion
+                .copy(home.quaternion)
+                .multiply(
+                    new THREE.Quaternion().setFromAxisAngle(
+                        new THREE.Vector3(0, 0, 1),
+                        pose.roll,
+                    ),
+                );
         }
 
         if (pose.done) {
@@ -5401,7 +5986,7 @@ export class PreviewViewport {
 
         for (const entry of this.particleSystems.values()) {
             if (entry.attachToPartId === partId) {
-                entry.instance.hold('part', hidden);
+                entry.instance.hold("part", hidden);
             }
         }
     }
@@ -5422,7 +6007,7 @@ export class PreviewViewport {
     private dropRegistrations(subjectId: string, root: THREE.Object3D): void {
         const subject = this.subjectAnimation(subjectId);
         const inside: THREE.Object3D[] = [];
-        root.traverse(node => inside.push(node));
+        root.traverse((node) => inside.push(node));
 
         for (const node of inside) {
             if (node instanceof THREE.Mesh) {
@@ -5434,13 +6019,16 @@ export class PreviewViewport {
 
             // Only where THIS node is the one holding the name. `nodeByName` is first-wins, so one
             // part of a subject must not take another part's entry with it.
-            if (node.name !== '' && subject.nodeByName.get(node.name) === node) {
+            if (
+                node.name !== "" &&
+                subject.nodeByName.get(node.name) === node
+            ) {
                 subject.nodeByName.delete(node.name);
             }
         }
 
         const held = new Set(inside);
-        this.billboards = this.billboards.filter(node => !held.has(node));
+        this.billboards = this.billboards.filter((node) => !held.has(node));
     }
 
     private applyLevels(): void {
@@ -5449,15 +6037,19 @@ export class PreviewViewport {
         // and undid whatever the row chain had just settled, so a mesh hidden from the tree came
         // straight back on the next level or material refresh.
         for (const entry of this.particleSystems.values()) {
-            entry.levelVisible =
-                proxyVisibleAt(entry.levels, this.alt, this.lod, this.altDescending);
+            entry.levelVisible = proxyVisibleAt(
+                entry.levels,
+                this.alt,
+                this.lod,
+                this.altDescending,
+            );
         }
 
         // And what the stencil pass counts, which follows the level and the cloak rather than the
         // reader. It was set at LOAD and by the pass's own setup and nowhere else, so a cloak
         // engaged after the model was standing left all eight volumes casting - a shadow on the
         // ground under a ship that is not being drawn. An ALT change had the same hole.
-        this.forEachPartMesh(mesh => this.applyMeshVisibility(mesh));
+        this.forEachPartMesh((mesh) => this.applyMeshVisibility(mesh));
 
         // A passive subject has no rows, so `refreshRows` below will never speak for it. Its own
         // file's rules are re-applied instead - the same sweep that ran when it loaded.
@@ -5501,12 +6093,14 @@ export class PreviewViewport {
 
         const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
 
-        if (resolveMaterial(extras).archetype === 'shadow-volume') {
+        if (resolveMaterial(extras).archetype === "shadow-volume") {
             // A cloaked unit casts nothing. The volume is never DRAWN either way, so this is the
             // only place the cloak can reach it - and a stencil shadow lying on the ground under an
             // invisible ship is exactly the "something else is still shown" the swap rules out.
             this.shadowVolumes.setCounting(
-                mesh, !this.stealthed && isVisibleAt(extras, this.alt, this.lod));
+                mesh,
+                !this.stealthed && isVisibleAt(extras, this.alt, this.lod),
+            );
         }
     }
 
@@ -5523,7 +6117,9 @@ export class PreviewViewport {
         // Once, not once per row. This now runs on every frame of a playing clip, and `skeleton()`
         // rebuilds its list by walking the whole hull - which was affordable when this only ran on
         // a change and is not at sixty frames a second.
-        const bones = new Map(this.skeleton().map(bone => [bone.index, bone]));
+        const bones = new Map(
+            this.skeleton().map((bone) => [bone.index, bone]),
+        );
 
         // The SUBTREE answer, which a merged row needs as well as its own - see `subtreeFacts`.
         // Kept beside the row answer so a child asking about its ancestor gets the one that
@@ -5538,7 +6134,10 @@ export class PreviewViewport {
         for (const [rowId, target] of this.rowTargets) {
             const facts = this.factsFor(rowId, target, subtree, bones);
             const answer = resolveRow(
-                target.particleId === undefined ? facts : this.effectFacts(facts, target.particleId));
+                target.particleId === undefined
+                    ? facts
+                    : this.effectFacts(facts, target.particleId),
+            );
 
             resolutions.set(rowId, answer);
             meshAnswers.set(rowId, resolveRow(facts));
@@ -5552,7 +6151,10 @@ export class PreviewViewport {
             const visible = resolutions.get(rowId)?.visible ?? true;
 
             if (target.mesh !== undefined) {
-                setMeshDrawn(target.mesh, meshAnswers.get(rowId)?.visible ?? visible);
+                setMeshDrawn(
+                    target.mesh,
+                    meshAnswers.get(rowId)?.visible ?? visible,
+                );
             }
 
             if (target.boneIndex !== undefined) {
@@ -5583,7 +6185,8 @@ export class PreviewViewport {
 
         // The parent's SUBTREE answer, which is the one that reaches down here. Its own row answer
         // is about its mesh and stops there.
-        const parentResolution = parent === null ? undefined : subtree.get(parent);
+        const parentResolution =
+            parent === null ? undefined : subtree.get(parent);
 
         const facts: RowFacts = {
             inFile: true,
@@ -5593,16 +6196,18 @@ export class PreviewViewport {
             // the subtree answer, the proxy bone, so switching effects off would prune geometry.
             masters: [],
             override: this.rowOverrides.get(rowId),
-            ancestorHidden: parentResolution?.visible === false
-                ? this.rowNames.get(parent ?? '') ?? 'a bone above it'
-                : undefined,
+            ancestorHidden:
+                parentResolution?.visible === false
+                    ? (this.rowNames.get(parent ?? "") ?? "a bone above it")
+                    : undefined,
 
             // The ancestor as the MODEL leaves it, which is a different question: a bone the reader
             // unticked hides its subtree, but the model still draws every row in it. Without this
             // the whole subtree claimed the model did not draw it and went italic on one tick.
-            ancestorHiddenAuthored: parentResolution?.authored === false
-                ? this.rowNames.get(parent ?? '') ?? 'a bone above it'
-                : undefined,
+            ancestorHiddenAuthored:
+                parentResolution?.authored === false
+                    ? (this.rowNames.get(parent ?? "") ?? "a bone above it")
+                    : undefined,
         };
 
         if (target.mesh !== undefined) {
@@ -5628,21 +6233,27 @@ export class PreviewViewport {
 
             facts.inFile = shield
                 ? this.shieldRevealed
-                : (stealth ? this.stealthed : extras.alamoHidden !== true);
+                : stealth
+                  ? this.stealthed
+                  : extras.alamoHidden !== true;
 
-            facts.gated = spec.hidden
-                || !(shield
+            facts.gated =
+                spec.hidden ||
+                !(shield
                     ? isVisibleAtLevel(extras, this.alt, this.lod)
-                    : isVisibleAt(extras, this.alt, this.lod))
-                || this.collisionGatedOff(extras)
-                || (this.stealthed && !stealth);
+                    : isVisibleAt(extras, this.alt, this.lod)) ||
+                this.collisionGatedOff(extras) ||
+                (this.stealthed && !stealth);
 
             // A damage decal's bottom of the chain is the DAMAGE RULE, not the file - see
             // `damageMeshFacts`. It used to enter as a `gated` veto beside the level gates, which
             // reached the same answer only because no shipped decal is marked hidden.
-            const decal = (extras.alamoMesh ?? '').toLowerCase();
+            const decal = (extras.alamoMesh ?? "").toLowerCase();
             if (this.knownDecals.has(decal)) {
-                Object.assign(facts, damageMeshFacts(facts, this.shownDecals.has(decal)));
+                Object.assign(
+                    facts,
+                    damageMeshFacts(facts, this.shownDecals.has(decal)),
+                );
             }
 
             // A SKINNED mesh rides no bone, so every track below missed it - see `skinVisibility`.
@@ -5659,9 +6270,12 @@ export class PreviewViewport {
 
             if (skin.length > 0) {
                 const playing = this.active.action !== null;
-                const asked = skinHiddenByClip(skin, playing
-                    ? id => this.animatedVisibilityOf(id)
-                    : id => this.restingVisibilityOf(id));
+                const asked = skinHiddenByClip(
+                    skin,
+                    playing
+                        ? (id) => this.animatedVisibilityOf(id)
+                        : (id) => this.restingVisibilityOf(id),
+                );
 
                 if (asked === true) {
                     if (playing) {
@@ -5691,9 +6305,10 @@ export class PreviewViewport {
             // chain from below whenever the playing clip happened to be silent about a bone - so a
             // clip that shows a part the idle hides lost to the idle. Yoda's hilt is that: his
             // `attack_00` shows `b_hilt` and his `idle_00` hides it, and the hilt stayed away.
-            facts.resting = this.active.action === null
-                ? this.restingVisibilityOf(id)
-                : undefined;
+            facts.resting =
+                this.active.action === null
+                    ? this.restingVisibilityOf(id)
+                    : undefined;
         }
 
         return facts;
@@ -5721,7 +6336,7 @@ export class PreviewViewport {
 
             // The one master anyone legitimately keeps switched off while watching a clip: effects
             // are what obstructs the view of the thing being checked.
-            masters: [{id: 'effects', on: this.particlesVisible}],
+            masters: [{ id: "effects", on: this.particlesVisible }],
             inFile: entry?.gateVisible ?? true,
 
             // The cloak, in the same chain that swaps the meshes. A cloaked unit shows its stealth
@@ -5733,13 +6348,14 @@ export class PreviewViewport {
             // without the other. `gated` and not `inFile` because it is a STATE, and because it
             // leaves `gateVisible` holding what the effect rules last decided - so uncloaking
             // restores exactly what was playing rather than a guess at it.
-            gated: this.stealthed || (entry !== undefined && !entry.levelVisible),
+            gated:
+                this.stealthed || (entry !== undefined && !entry.levelVisible),
         };
     }
 
     /** A mesh a hardpoint names as its collision hull, which the engine never draws. */
     private collisionGatedOff(extras: MaterialExtras): boolean {
-        return this.collisionMeshes.has((extras.alamoMesh ?? '').toLowerCase());
+        return this.collisionMeshes.has((extras.alamoMesh ?? "").toLowerCase());
     }
 
     /**
@@ -5782,7 +6398,11 @@ export class PreviewViewport {
     private animatedVisibilityOf(id: BoneId | undefined): boolean | undefined {
         return this.active.action === null
             ? undefined
-            : this.trackedAt(this.active.action.getClip().name, id, this.active.action.time);
+            : this.trackedAt(
+                  this.active.action.getClip().name,
+                  id,
+                  this.active.action.time,
+              );
     }
 
     /**
@@ -5801,7 +6421,10 @@ export class PreviewViewport {
         }
 
         const byId = new Map(
-            [...hull.bonesByIndex.values()].map(node => [node.name, node] as const));
+            [...hull.bonesByIndex.values()].map(
+                (node) => [node.name, node] as const,
+            ),
+        );
         const id = resolveBoneId(byId.keys(), key);
 
         return id === undefined ? undefined : byId.get(id);
@@ -5830,26 +6453,35 @@ export class PreviewViewport {
         }
 
         const skinned = mesh as THREE.SkinnedMesh;
-        const ids = skinned.isSkinnedMesh === true
-            ? (skinned.skeleton?.bones ?? []).map(bone => bone.name)
-            : [];
+        const ids =
+            skinned.isSkinnedMesh === true
+                ? (skinned.skeleton?.bones ?? []).map((bone) => bone.name)
+                : [];
 
         this.skinBoneIds.set(mesh, ids);
 
         return ids;
     }
 
-    private trackedAt(clip: string, id: BoneId | undefined, seconds: number): boolean | undefined {
+    private trackedAt(
+        clip: string,
+        id: BoneId | undefined,
+        seconds: number,
+    ): boolean | undefined {
         const track = this.active.visibility.get(clip);
 
         if (id === undefined || track === undefined) {
             return undefined;
         }
 
-        const key = track.bones.has(id) ? id : resolveBoneId(track.bones.keys(), id);
+        const key = track.bones.has(id)
+            ? id
+            : resolveBoneId(track.bones.keys(), id);
         const bits = key === undefined ? undefined : track.bones.get(key);
 
-        return bits === undefined ? undefined : !hiddenAt(bits, track.fps, seconds);
+        return bits === undefined
+            ? undefined
+            : !hiddenAt(bits, track.fps, seconds);
     }
 
     /**
@@ -5862,12 +6494,15 @@ export class PreviewViewport {
     private effectRowName(systemId: string): string {
         const entry = this.particleSystems.get(systemId);
         if (entry === undefined) {
-            return '';
+            return "";
         }
 
         const heat = entry.instance.emitterIsHeat();
 
-        return entry.system.name + (heat.length > 0 && heat.every(Boolean) ? ' [heat]' : '');
+        return (
+            entry.system.name +
+            (heat.length > 0 && heat.every(Boolean) ? " [heat]" : "")
+        );
     }
 
     /**
@@ -5877,7 +6512,9 @@ export class PreviewViewport {
      * a row owns is applied from ONE answer - see `resolveRows`.
      */
     private claimRow(
-        rowId: string, name: string, parentId: string | null,
+        rowId: string,
+        name: string,
+        parentId: string | null,
         target: { boneIndex?: number; mesh?: THREE.Mesh; particleId?: string },
     ): void {
         this.rowTargets.set(rowId, target);
@@ -5915,7 +6552,6 @@ export class PreviewViewport {
         this.floor.scale.setScalar((size * 1.5) / 100);
         this.shadowCatcher.scale.copy(this.floor.scale);
 
-
         // The shadow frustum is sized off the model, so it has to be rebuilt with everything else
         // that scales - a frustum left at the last model's size either misses this one entirely or
         // spends its whole depth map on empty space around it.
@@ -5936,8 +6572,14 @@ export class PreviewViewport {
         // the following seconds, so a box around it measures a point at the origin however large the
         // effect is about to be - and a zero radius puts the camera on its own target, which draws
         // nothing at all, grid included.
-        const particleReach = !includeEffects ? 0 : Math.max(
-            0, ...[...this.particleSystems.values()].map(entry => entry.instance.extent()));
+        const particleReach = !includeEffects
+            ? 0
+            : Math.max(
+                  0,
+                  ...[...this.particleSystems.values()].map((entry) =>
+                      entry.instance.extent(),
+                  ),
+              );
 
         // Only what is on screen, and only geometry. See `modelBounds.ts` - the firing-arc cones
         // under this same root are thousands of units across and are not the model.
@@ -5949,25 +6591,26 @@ export class PreviewViewport {
         // have the camera measure the subject by it.
         const box = drawnBounds(
             this.modelRoot,
-            mesh => this.drawn(mesh) && !isShadowVolume(mesh),
+            (mesh) => this.drawn(mesh) && !isShadowVolume(mesh),
             // The arcs and handles are drawn and are meshes, so `drawn` alone let them in whenever
             // they were on screen: measured on the Gargantuan with its arcs showing, the framing
             // radius was 508 against a hull of 99, and every camera preset stood five times too far
             // off. The defect this function exists for, still open whenever the arcs were visible.
-            isOverlay);
+            isOverlay,
+        );
         const sphere = box.isEmpty()
-            ? {center: {x: 0, y: 0, z: 0}, radius: 0}
+            ? { center: { x: 0, y: 0, z: 0 }, radius: 0 }
             : (() => {
-                const s = box.getBoundingSphere(new THREE.Sphere());
-                return {
-                    center: {x: s.center.x, y: s.center.y, z: s.center.z},
-                    radius: s.radius,
-                };
-            })();
+                  const s = box.getBoundingSphere(new THREE.Sphere());
+                  return {
+                      center: { x: s.center.x, y: s.center.y, z: s.center.z },
+                      radius: s.radius,
+                  };
+              })();
 
         // Guards NaN as well as zero: `>` is false for NaN, so the fallback wins.
         const radius = Math.max(particleReach, sphere.radius);
-        return {center: sphere.center, radius: radius > 0 ? radius : 1};
+        return { center: sphere.center, radius: radius > 0 ? radius : 1 };
     }
 
     /**
@@ -5980,14 +6623,17 @@ export class PreviewViewport {
     private collectShadowVolumes(root: THREE.Object3D): void {
         const found: THREE.Mesh[] = [];
 
-        root.traverse(node => {
-            if (!(node instanceof THREE.Mesh) || node.userData.aetShadowVolume === true) {
+        root.traverse((node) => {
+            if (
+                !(node instanceof THREE.Mesh) ||
+                node.userData.aetShadowVolume === true
+            ) {
                 return;
             }
 
             const extras = (node.userData.alamo ?? {}) as MaterialExtras;
 
-            if (resolveMaterial(extras).archetype === 'shadow-volume') {
+            if (resolveMaterial(extras).archetype === "shadow-volume") {
                 found.push(node);
             }
         });
@@ -6010,7 +6656,9 @@ export class PreviewViewport {
             // The cloak as well as the level, so a model that finds its volumes while already
             // stealthed does not start out casting. Same pair as `applyMeshVisibility`.
             this.shadowVolumes.setCounting(
-                mesh, !this.stealthed && isVisibleAt(extras, this.alt, this.lod));
+                mesh,
+                !this.stealthed && isVisibleAt(extras, this.alt, this.lod),
+            );
         }
 
         // The model can only be known to have a volume AFTER one is found, and the materials were
@@ -6020,7 +6668,7 @@ export class PreviewViewport {
 
     /** Re-decides which meshes cast into the shadow map, now that the volumes are known. */
     private refreshShadowCasting(): void {
-        this.forEachDrawnMesh(mesh => {
+        this.forEachDrawnMesh((mesh) => {
             if (mesh.userData.aetShadowVolume === true) {
                 return;
             }
@@ -6029,7 +6677,9 @@ export class PreviewViewport {
             const spec = resolveMaterial(extras);
 
             mesh.castShadow = castsShadowMap({
-                hasVolumes: this.stencilShadowing, hidden: spec.hidden, blend: spec.blend,
+                hasVolumes: this.stencilShadowing,
+                hidden: spec.hidden,
+                blend: spec.blend,
             });
         });
     }
@@ -6041,13 +6691,17 @@ export class PreviewViewport {
      * wholesale - and a flag set on the materials that came before is simply gone.
      */
     private applyWireframe(): void {
-        this.forEachDrawnMesh(mesh => {
+        this.forEachDrawnMesh((mesh) => {
             for (const material of Array.isArray(mesh.material)
                 ? mesh.material
                 : [mesh.material]) {
-                if (material instanceof THREE.Material && 'wireframe' in material) {
-                    (material as THREE.Material & { wireframe: boolean }).wireframe =
-                        this.wireframe;
+                if (
+                    material instanceof THREE.Material &&
+                    "wireframe" in material
+                ) {
+                    (
+                        material as THREE.Material & { wireframe: boolean }
+                    ).wireframe = this.wireframe;
                 }
             }
         });
@@ -6066,7 +6720,11 @@ export class PreviewViewport {
      */
     private advancePassiveSubjects(dt: number): void {
         for (const [subjectId, subject] of this.subjects) {
-            if (subjectId === ACTIVE_SUBJECT || subject.action === null || subject.mixer === null) {
+            if (
+                subjectId === ACTIVE_SUBJECT ||
+                subject.action === null ||
+                subject.mixer === null
+            ) {
                 continue;
             }
 
@@ -6124,9 +6782,10 @@ export class PreviewViewport {
         // Looked up ONCE: this runs on every frame of a playing clip, and so does the emitter
         // gating below, which asks per particle system.
         const active = this.active;
-        const track = active.action === null
-            ? undefined
-            : active.visibility.get(active.action.getClip().name);
+        const track =
+            active.action === null
+                ? undefined
+                : active.visibility.get(active.action.getClip().name);
 
         if (track !== undefined && active.action !== null) {
             // Through the ROW CHAIN, which is the only thing that writes visibility - the clip is a
@@ -6175,7 +6834,10 @@ export class PreviewViewport {
         action: THREE.AnimationAction | null,
     ): void {
         for (const entry of this.particleSystems.values()) {
-            if (entry.attachBone === undefined || entry.attachBoneIndex === undefined) {
+            if (
+                entry.attachBone === undefined ||
+                entry.attachBoneIndex === undefined
+            ) {
                 continue;
             }
 
@@ -6183,13 +6845,19 @@ export class PreviewViewport {
                 continue;
             }
 
-            const bits = track?.bones.get(`${entry.attachBone}#${entry.attachBoneIndex}`);
+            const bits = track?.bones.get(
+                `${entry.attachBone}#${entry.attachBoneIndex}`,
+            );
 
             // A clip that says nothing about this proxy lifts only the CLIP's hold. It is not a
             // permission to spawn: the part this system is attached to may be hidden, and this runs
             // every frame, so voting yes here re-armed a held emitter one frame after it was held.
-            entry.instance.hold('clip', bits !== undefined && action !== null
-                && hiddenAt(bits, track!.fps, action.time));
+            entry.instance.hold(
+                "clip",
+                bits !== undefined &&
+                    action !== null &&
+                    hiddenAt(bits, track!.fps, action.time),
+            );
         }
     }
 
@@ -6216,7 +6884,8 @@ export class PreviewViewport {
     private subjectOfSystem(entry: ParticleEntry): string {
         return entry.attachToPartId === undefined
             ? ACTIVE_SUBJECT
-            : this.parts.get(entry.attachToPartId)?.subjectId ?? ACTIVE_SUBJECT;
+            : (this.parts.get(entry.attachToPartId)?.subjectId ??
+                  ACTIVE_SUBJECT);
     }
 
     /**
@@ -6235,7 +6904,11 @@ export class PreviewViewport {
             return false;
         }
 
-        for (let at: THREE.Object3D | null = mesh; at !== null; at = at.parent) {
+        for (
+            let at: THREE.Object3D | null = mesh;
+            at !== null;
+            at = at.parent
+        ) {
             if (!at.visible) {
                 return false;
             }
@@ -6249,36 +6922,53 @@ export class PreviewViewport {
     }
 
     private instantiate(
-        id: string, system: AlamoParticleContent, attachToPartId?: string, attachBone?: string,
-        attachBoneIndex?: number, scaleFactor = 1, at?: { x: number; y: number; z: number },
+        id: string,
+        system: AlamoParticleContent,
+        attachToPartId?: string,
+        attachBone?: string,
+        attachBoneIndex?: number,
+        scaleFactor = 1,
+        at?: { x: number; y: number; z: number },
     ): ParticleSystemInstance {
         // A marker at `at` where one was asked for and nothing is being hung on: the wreck's own
         // explosion has to go off where the wreck FINISHED, and a part-less system otherwise
         // anchors at the model root. An empty node rather than moving the instance, so the anchor
         // stays the one thing that decides where a system sits.
-        const anchor = at === undefined || attachToPartId !== undefined
-            ? null
-            : new THREE.Object3D();
+        const anchor =
+            at === undefined || attachToPartId !== undefined
+                ? null
+                : new THREE.Object3D();
 
         if (anchor !== null && at !== undefined) {
             anchor.position.set(at.x, at.y, at.z);
             this.modelRoot.add(anchor);
         }
 
-        const attachment = anchor
-            ?? this.attachmentFor(attachToPartId, attachBone, attachBoneIndex);
+        const attachment =
+            anchor ??
+            this.attachmentFor(attachToPartId, attachBone, attachBoneIndex);
 
         // Read once, here, rather than per spawn: the walk up the graph and the transform into the
         // attachment's space are the same answer every frame, and this runs thousands of times a
         // second on a `EveryVertex` emitter. `restartParticles` re-reads it, which is what picks up
         // a level switch that swapped the geometry underneath.
-        const source = emissionMeshFor(attachment, this.partRootOf(attachToPartId));
+        const source = emissionMeshFor(
+            attachment,
+            this.partRootOf(attachToPartId),
+        );
 
         // The model root is the space the particles are simulated in, so an effect the file does
         // not link to its emitter is genuinely left behind rather than dragged along by the bone
         // it is anchored on.
         const instance = new ParticleSystemInstance(
-            id, system, this.particleTextures, 1, source, this.modelRoot, scaleFactor);
+            id,
+            system,
+            this.particleTextures,
+            1,
+            source,
+            this.modelRoot,
+            scaleFactor,
+        );
         instance.attachTo(attachment);
         instance.setVisible(this.particlesVisible);
 
@@ -6309,7 +6999,9 @@ export class PreviewViewport {
 
     /** Where the climb for an emission mesh has to stop: the model the system was attached to. */
     private partRootOf(partId?: string): THREE.Object3D | null {
-        return partId === undefined ? this.modelRoot : this.parts.get(partId)?.root ?? null;
+        return partId === undefined
+            ? this.modelRoot
+            : (this.parts.get(partId)?.root ?? null);
     }
 
     /** Drops every fading system at once, for a reset that takes the whole scene with it. */
@@ -6360,7 +7052,9 @@ export class PreviewViewport {
 
     /** Every part belonging to one subject. */
     private partsOf(subjectId: string): LoadedPart[] {
-        return [...this.parts.values()].filter(part => part.subjectId === subjectId);
+        return [...this.parts.values()].filter(
+            (part) => part.subjectId === subjectId,
+        );
     }
 
     /**
@@ -6381,15 +7075,22 @@ export class PreviewViewport {
      * frame and it sits above the level gate, which is the same precedence `resolveRow` gives the
      * active subject.
      */
-    private applyOwnFileVisibility(subjectId: string, root: THREE.Object3D): void {
+    private applyOwnFileVisibility(
+        subjectId: string,
+        root: THREE.Object3D,
+    ): void {
         const subject = this.subjectAnimation(subjectId);
         const action = subject.action;
-        const track = action === null
-            ? undefined
-            : subject.visibility.get(action.getClip().name);
+        const track =
+            action === null
+                ? undefined
+                : subject.visibility.get(action.getClip().name);
 
-        root.traverse(node => {
-            if (!(node instanceof THREE.Mesh) || node.userData.aetShadowVolume === true) {
+        root.traverse((node) => {
+            if (
+                !(node instanceof THREE.Mesh) ||
+                node.userData.aetShadowVolume === true
+            ) {
                 return;
             }
 
@@ -6399,8 +7100,11 @@ export class PreviewViewport {
 
             const extras = (node.userData.alamo ?? {}) as MaterialExtras;
 
-            setMeshDrawn(node, !resolveMaterial(extras).hidden
-                && isVisibleAt(extras, this.alt, this.lod));
+            setMeshDrawn(
+                node,
+                !resolveMaterial(extras).hidden &&
+                    isVisibleAt(extras, this.alt, this.lod),
+            );
         });
     }
 
@@ -6437,7 +7141,7 @@ export class PreviewViewport {
     private updateBoneAxes(): void {
         const hull = this.hull();
         const nodes = [...this.selectedBones]
-            .map(index => hull?.bonesByIndex.get(index))
+            .map((index) => hull?.bonesByIndex.get(index))
             .filter((node): node is THREE.Object3D => node !== undefined);
 
         if (nodes.length === 0) {
@@ -6472,14 +7176,26 @@ export class PreviewViewport {
             // measured, see `AlamoFireBone.AimDirection` - so that axis gets an arrowhead and a longer
             // reach. Nothing else on the triad says which way the gun points, which was the complaint.
             const firing = this.fireBones.has(
-                (alamoBoneName(node.name)?.name ?? node.name).toLowerCase());
+                (alamoBoneName(node.name)?.name ?? node.name).toLowerCase(),
+            );
 
             for (const [direction, colour] of axes) {
                 const aim = firing && direction.x === 1;
                 const reach = aim ? length * 2.2 : length;
-                const tip = direction.clone().applyMatrix4(basis).multiplyScalar(reach).add(origin);
+                const tip = direction
+                    .clone()
+                    .applyMatrix4(basis)
+                    .multiplyScalar(reach)
+                    .add(origin);
 
-                positions.push(origin.x, origin.y, origin.z, tip.x, tip.y, tip.z);
+                positions.push(
+                    origin.x,
+                    origin.y,
+                    origin.z,
+                    tip.x,
+                    tip.y,
+                    tip.z,
+                );
                 colours.push(...colour, ...colour);
 
                 if (!aim) {
@@ -6488,16 +7204,35 @@ export class PreviewViewport {
 
                 // A four-barb head, drawn back down the shaft from the tip. Lines rather than a cone so
                 // it stays one draw with the rest of the triad and cannot be occluded differently.
-                const back = direction.clone().applyMatrix4(basis).multiplyScalar(-reach * 0.22);
+                const back = direction
+                    .clone()
+                    .applyMatrix4(basis)
+                    .multiplyScalar(-reach * 0.22);
                 const spread = reach * 0.09;
 
-                for (const side of [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]) {
-                    const out = side.clone().applyMatrix4(basis).multiplyScalar(spread);
+                for (const side of [
+                    new THREE.Vector3(0, 1, 0),
+                    new THREE.Vector3(0, 0, 1),
+                ]) {
+                    const out = side
+                        .clone()
+                        .applyMatrix4(basis)
+                        .multiplyScalar(spread);
 
                     for (const sign of [1, -1]) {
-                        const barb = tip.clone().add(back).addScaledVector(out, sign);
+                        const barb = tip
+                            .clone()
+                            .add(back)
+                            .addScaledVector(out, sign);
 
-                        positions.push(tip.x, tip.y, tip.z, barb.x, barb.y, barb.z);
+                        positions.push(
+                            tip.x,
+                            tip.y,
+                            tip.z,
+                            barb.x,
+                            barb.y,
+                            barb.z,
+                        );
                         colours.push(...colour, ...colour);
                     }
                 }
@@ -6506,7 +7241,9 @@ export class PreviewViewport {
 
         setPositions(this.boneAxes.geometry, positions);
         this.boneAxes.geometry.setAttribute(
-            'color', new THREE.Float32BufferAttribute(colours, 3));
+            "color",
+            new THREE.Float32BufferAttribute(colours, 3),
+        );
         this.boneAxes.visible = true;
     }
 
@@ -6519,7 +7256,9 @@ export class PreviewViewport {
     private updateSelectionBoxes(): void {
         const points: number[] = [];
 
-        const boxable = this.selectedRows.filter(row => row !== this.unboxedRow);
+        const boxable = this.selectedRows.filter(
+            (row) => row !== this.unboxedRow,
+        );
 
         for (const root of boxRoots(boxable, this.rowParents)) {
             const box = this.boxAround(root);
@@ -6559,7 +7298,7 @@ export class PreviewViewport {
         let found = false;
 
         part.root.updateWorldMatrix(true, true);
-        part.root.traverseVisible(node => {
+        part.root.traverseVisible((node) => {
             if ((node as THREE.Mesh).isMesh !== true) {
                 return;
             }
@@ -6587,9 +7326,10 @@ export class PreviewViewport {
                 found = true;
             }
 
-            const node = target?.boneIndex === undefined
-                ? undefined
-                : hull?.bonesByIndex.get(target.boneIndex);
+            const node =
+                target?.boneIndex === undefined
+                    ? undefined
+                    : hull?.bonesByIndex.get(target.boneIndex);
 
             if (node !== undefined) {
                 box.expandByPoint(node.getWorldPosition(new THREE.Vector3()));
@@ -6607,7 +7347,9 @@ export class PreviewViewport {
         const size = box.getSize(new THREE.Vector3());
 
         if (Math.max(size.x, size.y, size.z) < 1e-4) {
-            box.expandByScalar(Math.max(this.boundingSphere().radius * 0.02, 1e-3));
+            box.expandByScalar(
+                Math.max(this.boundingSphere().radius * 0.02, 1e-3),
+            );
         }
 
         return box;
@@ -6636,16 +7378,30 @@ export class PreviewViewport {
             points.push(world.x, world.y, world.z);
 
             const selected = this.selectedBones.has(index);
-            colours.push(selected ? 1 : 0.44, selected ? 0.62 : 0.7, selected ? 0.16 : 1);
+            colours.push(
+                selected ? 1 : 0.44,
+                selected ? 0.62 : 0.7,
+                selected ? 0.16 : 1,
+            );
 
             if (node.parent !== null && indexOf.has(node.parent)) {
                 node.parent.getWorldPosition(parentWorld);
-                lines.push(parentWorld.x, parentWorld.y, parentWorld.z, world.x, world.y, world.z);
+                lines.push(
+                    parentWorld.x,
+                    parentWorld.y,
+                    parentWorld.z,
+                    world.x,
+                    world.y,
+                    world.z,
+                );
             }
         }
 
         setPositions(this.joints.geometry, points);
-        this.joints.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+        this.joints.geometry.setAttribute(
+            "color",
+            new THREE.Float32BufferAttribute(colours, 3),
+        );
         setPositions(this.jointLines.geometry, lines);
     }
 
@@ -6664,7 +7420,11 @@ export class PreviewViewport {
             return;
         }
 
-        const wanted = labelCandidates(this.skeleton(), this.labelMode, this.selectedBones);
+        const wanted = labelCandidates(
+            this.skeleton(),
+            this.labelMode,
+            this.selectedBones,
+        );
         if (wanted.size === 0) {
             this.clearLabels();
             return;
@@ -6675,7 +7435,11 @@ export class PreviewViewport {
         const world = new THREE.Vector3();
 
         const projected: {
-            x: number; y: number; depth: number; text: string; selected: boolean;
+            x: number;
+            y: number;
+            depth: number;
+            text: string;
+            selected: boolean;
         }[] = [];
 
         for (const [index, node] of hull.bonesByIndex) {
@@ -6687,7 +7451,13 @@ export class PreviewViewport {
             const ndc = world.clone().project(this.camera);
 
             // Behind the camera or off screen: projecting those puts labels on the wrong edge.
-            if (ndc.z > 1 || ndc.x < -1 || ndc.x > 1 || ndc.y < -1 || ndc.y > 1) {
+            if (
+                ndc.z > 1 ||
+                ndc.x < -1 ||
+                ndc.x > 1 ||
+                ndc.y < -1 ||
+                ndc.y > 1
+            ) {
                 continue;
             }
 
@@ -6708,9 +7478,13 @@ export class PreviewViewport {
         for (const label of projected) {
             // The selection always gets its label, whatever it overlaps: it is the one the user asked
             // about, and silently dropping it looks like the click did nothing.
-            const crowded = !label.selected && placed.some(
-                p => Math.abs(p.x - label.x) < LABEL_SPACING
-                    && Math.abs(p.y - label.y) < LABEL_SPACING);
+            const crowded =
+                !label.selected &&
+                placed.some(
+                    (p) =>
+                        Math.abs(p.x - label.x) < LABEL_SPACING &&
+                        Math.abs(p.y - label.y) < LABEL_SPACING,
+                );
 
             if (crowded) {
                 continue;
@@ -6721,13 +7495,19 @@ export class PreviewViewport {
             const element = this.labelAt(used++);
             element.textContent = label.text;
             element.style.transform =
-                'translate(' + Math.round(label.x) + 'px, ' + Math.round(label.y) + 'px)';
-            element.className = label.selected ? 'bone-label selected' : 'bone-label';
-            element.style.display = '';
+                "translate(" +
+                Math.round(label.x) +
+                "px, " +
+                Math.round(label.y) +
+                "px)";
+            element.className = label.selected
+                ? "bone-label selected"
+                : "bone-label";
+            element.style.display = "";
         }
 
         for (let i = used; i < this.labelPool.length; i++) {
-            this.labelPool[i].style.display = 'none';
+            this.labelPool[i].style.display = "none";
         }
     }
 
@@ -6760,7 +7540,13 @@ export class PreviewViewport {
 
             // Behind the camera or off screen. Projecting those puts the mark on the wrong edge, and
             // a reticle in the corner of a ship you are looking past is worse than none.
-            if (ndc.z > 1 || ndc.x < -1 || ndc.x > 1 || ndc.y < -1 || ndc.y > 1) {
+            if (
+                ndc.z > 1 ||
+                ndc.x < -1 ||
+                ndc.x > 1 ||
+                ndc.y < -1 ||
+                ndc.y > 1
+            ) {
                 continue;
             }
 
@@ -6769,9 +7555,10 @@ export class PreviewViewport {
 
             element.style.width = `${size}px`;
             element.style.height = `${size}px`;
-            element.style.transform = 'translate('
-                + `${Math.round((ndc.x * 0.5 + 0.5) * width - half)}px, `
-                + `${Math.round((-ndc.y * 0.5 + 0.5) * height - half)}px)`;
+            element.style.transform =
+                "translate(" +
+                `${Math.round((ndc.x * 0.5 + 0.5) * width - half)}px, ` +
+                `${Math.round((-ndc.y * 0.5 + 0.5) * height - half)}px)`;
 
             // MASKED rather than drawn, so the shape can be tinted by health. The game colours a
             // reticle bright green at full health through yellow and orange to red at nothing, and
@@ -6780,7 +7567,10 @@ export class PreviewViewport {
 
             // The tracked art while the pointer is on it, which is what the game does - and what
             // replaced a seven-way dropdown asking the reader to pick a state by hand.
-            const art = this.hoveredReticle === mark.hardpointId ? mark.trackedUri : mark.iconUri;
+            const art =
+                this.hoveredReticle === mark.hardpointId
+                    ? mark.trackedUri
+                    : mark.iconUri;
 
             element.dataset.hardpoint = mark.hardpointId;
 
@@ -6794,12 +7584,12 @@ export class PreviewViewport {
                 element.style.backgroundColor = colour;
             }
 
-            element.title = `${mark.hardpointId}${mark.type === '' ? '' : ` - ${mark.type}`}`;
-            element.style.display = '';
+            element.title = `${mark.hardpointId}${mark.type === "" ? "" : ` - ${mark.type}`}`;
+            element.style.display = "";
         }
 
         for (let i = used; i < this.reticlePool.length; i++) {
-            this.reticlePool[i].style.display = 'none';
+            this.reticlePool[i].style.display = "none";
         }
     }
 
@@ -6811,7 +7601,10 @@ export class PreviewViewport {
      * bounding box per mark per tick, which walks every vertex of the geometry. Ten hardpoints at twelve
      * ticks a second made the viewport crawl.
      */
-    private reticleAnchor(mark: ReticleMark, into: THREE.Vector3): THREE.Vector3 | null {
+    private reticleAnchor(
+        mark: ReticleMark,
+        into: THREE.Vector3,
+    ): THREE.Vector3 | null {
         if (mark.bone === null) {
             return null;
         }
@@ -6859,30 +7652,30 @@ export class PreviewViewport {
     /** Pooled, like the labels: a moving camera must not churn the DOM every tick. */
     private reticleAt(index: number): HTMLElement {
         while (this.reticlePool.length <= index) {
-            const element = document.createElement('div');
-            element.className = 'reticle-mark';
+            const element = document.createElement("div");
+            element.className = "reticle-mark";
 
             // The marks are the one thing in the label layer that IS interactive: hovering shows
             // the tracked art the game would show under a cursor, and clicking picks the hardpoint.
             // The layer itself keeps `pointer-events: none` so nothing else steals the drag that
             // orbits the camera.
-            element.style.pointerEvents = 'auto';
-            element.style.cursor = 'pointer';
+            element.style.pointerEvents = "auto";
+            element.style.cursor = "pointer";
 
-            element.addEventListener('pointerenter', () => {
-                const id = element.dataset.hardpoint ?? '';
-                this.hoveredReticle = id === '' ? null : id;
+            element.addEventListener("pointerenter", () => {
+                const id = element.dataset.hardpoint ?? "";
+                this.hoveredReticle = id === "" ? null : id;
             });
 
-            element.addEventListener('pointerleave', () => {
+            element.addEventListener("pointerleave", () => {
                 this.hoveredReticle = null;
             });
 
-            element.addEventListener('click', event => {
+            element.addEventListener("click", (event) => {
                 event.stopPropagation();
-                const id = element.dataset.hardpoint ?? '';
+                const id = element.dataset.hardpoint ?? "";
 
-                if (id !== '') {
+                if (id !== "") {
                     this.onReticleClicked?.(id);
                 }
             });
@@ -6895,15 +7688,15 @@ export class PreviewViewport {
 
     private clearReticles(): void {
         for (const element of this.reticlePool) {
-            element.style.display = 'none';
+            element.style.display = "none";
         }
     }
 
     /** Pooled, so a moving camera does not churn the DOM on every tick. */
     private labelAt(index: number): HTMLElement {
         while (this.labelPool.length <= index) {
-            const element = document.createElement('div');
-            element.className = 'bone-label';
+            const element = document.createElement("div");
+            element.className = "bone-label";
             this.labelLayer.appendChild(element);
             this.labelPool.push(element);
         }
@@ -6913,7 +7706,7 @@ export class PreviewViewport {
 
     private clearLabels(): void {
         for (const element of this.labelPool) {
-            element.style.display = 'none';
+            element.style.display = "none";
         }
     }
 
@@ -6926,10 +7719,14 @@ export class PreviewViewport {
      * ray through a 12-segment sphere is not. It also lets a knob be grabbed through the hull,
      * which is the whole reason the handle draws with `depthTest: false`.
      */
-    private turretKnobAt(x: number, y: number): { id: string; axis: TurretAxis } | null {
+    private turretKnobAt(
+        x: number,
+        y: number,
+    ): { id: string; axis: TurretAxis } | null {
         const rect = this.canvas.getBoundingClientRect();
         const world = new THREE.Vector3();
-        let best: { id: string; axis: TurretAxis; distance: number } | null = null;
+        let best: { id: string; axis: TurretAxis; distance: number } | null =
+            null;
 
         for (const [id, nodes] of this.turretHandleNodes) {
             for (const axis of TURRET_AXES) {
@@ -6946,16 +7743,17 @@ export class PreviewViewport {
 
                 const distance = Math.hypot(
                     (ndc.x * 0.5 + 0.5) * rect.width - x,
-                    (-ndc.y * 0.5 + 0.5) * rect.height - y);
+                    (-ndc.y * 0.5 + 0.5) * rect.height - y,
+                );
 
                 if (best === null || distance < best.distance) {
-                    best = {id, axis, distance};
+                    best = { id, axis, distance };
                 }
             }
         }
 
         return best !== null && best.distance <= TURRET_KNOB_PICK_RADIUS
-            ? {id: best.id, axis: best.axis}
+            ? { id: best.id, axis: best.axis }
             : null;
     }
 
@@ -6973,10 +7771,15 @@ export class PreviewViewport {
         }
 
         const rect = this.canvas.getBoundingClientRect();
-        const found = this.turretKnobAt(event.clientX - rect.left, event.clientY - rect.top);
+        const found = this.turretKnobAt(
+            event.clientX - rect.left,
+            event.clientY - rect.top,
+        );
 
-        if (found?.id === this.hoveredTurretAxis?.id
-            && found?.axis === this.hoveredTurretAxis?.axis) {
+        if (
+            found?.id === this.hoveredTurretAxis?.id &&
+            found?.axis === this.hoveredTurretAxis?.axis
+        ) {
             return;
         }
 
@@ -6990,7 +7793,8 @@ export class PreviewViewport {
 
         for (const [id, nodes] of this.turretHandleNodes) {
             for (const axis of TURRET_AXES) {
-                const on = active !== null && active.id === id && active.axis === axis;
+                const on =
+                    active !== null && active.id === id && active.axis === axis;
 
                 nodes[axis].track.material = on
                     ? TURRET_TRACK_HOVER_MATERIAL
@@ -7005,17 +7809,19 @@ export class PreviewViewport {
     /** Moves the dragged turret to follow the pointer, clamped to what the engine allows. */
     private dragTurret(event: PointerEvent): void {
         const drag = this.turretDrag;
-        const handle = this.turretHandles.find(one => one.id === drag?.id);
+        const handle = this.turretHandles.find((one) => one.id === drag?.id);
 
         if (drag === undefined || drag === null || handle === undefined) {
             return;
         }
 
         const aim = dragToAim(
-            handle, drag.startAim,
-            drag.axis === 'yaw' ? event.clientX - drag.startX : 0,
-            drag.axis === 'pitch' ? event.clientY - drag.startY : 0,
-            TURRET_DEGREES_PER_PIXEL);
+            handle,
+            drag.startAim,
+            drag.axis === "yaw" ? event.clientX - drag.startX : 0,
+            drag.axis === "pitch" ? event.clientY - drag.startY : 0,
+            TURRET_DEGREES_PER_PIXEL,
+        );
 
         this.turretAims.set(drag.id, aim);
         this.applyTurretAims();
@@ -7036,7 +7842,9 @@ export class PreviewViewport {
     private onPointerDown = (event: PointerEvent): void => {
         const rect0 = this.canvas.getBoundingClientRect();
         const grabbed = this.turretKnobAt(
-            event.clientX - rect0.left, event.clientY - rect0.top);
+            event.clientX - rect0.left,
+            event.clientY - rect0.top,
+        );
 
         if (grabbed !== null) {
             // Before anything else, and it takes the event: a drag that also orbited the camera
@@ -7093,10 +7901,11 @@ export class PreviewViewport {
 
             const distance = Math.hypot(
                 (ndc.x * 0.5 + 0.5) * rect.width - x,
-                (-ndc.y * 0.5 + 0.5) * rect.height - y);
+                (-ndc.y * 0.5 + 0.5) * rect.height - y,
+            );
 
             if (best === null || distance < best.distance) {
-                best = {index, distance};
+                best = { index, distance };
             }
         }
 
@@ -7138,7 +7947,10 @@ export class PreviewViewport {
                 // The camera goes in because a streak's length is a screen-space measurement:
                 // a spark flying at the viewer has no tail to draw.
                 entry.instance.update(
-                    dt * this.particleSpeed, this.camera.matrixWorldInverse, this.windVector);
+                    dt * this.particleSpeed,
+                    this.camera.matrixWorldInverse,
+                    this.windVector,
+                );
 
                 // A death explosion is over once it stops emitting and its last spark dies.
                 if (this.transient.has(id) && entry.instance.exhausted) {
@@ -7154,7 +7966,10 @@ export class PreviewViewport {
                 const instance = this.fadingParticles[at];
 
                 instance.update(
-                    dt * this.particleSpeed, this.camera.matrixWorldInverse, this.windVector);
+                    dt * this.particleSpeed,
+                    this.camera.matrixWorldInverse,
+                    this.windVector,
+                );
 
                 // `empty`, not `exhausted`: it has been told to stop spawning, so "finished" will
                 // never come for a continuous emitter. What is left is the only question.
@@ -7232,7 +8047,9 @@ export class PreviewViewport {
         // level and infinitely far however the camera is turned.
         if (this.sky !== null && this.sky.visible) {
             this.sky.position.copy(this.camera.position);
-            this.sky.scale.setScalar(Math.max(this.camera.near * 4, this.camera.far * 0.4));
+            this.sky.scale.setScalar(
+                Math.max(this.camera.near * 4, this.camera.far * 0.4),
+            );
         }
 
         // The stars need the same treatment, and for a reason that took a regression to notice:
@@ -7242,7 +8059,8 @@ export class PreviewViewport {
         // whole sky fell outside it and the stars simply went out.
         if (this.stars !== null && this.stars.visible) {
             this.stars.scale.setScalar(
-                Math.max(this.camera.near * 4, this.camera.far * 0.4));
+                Math.max(this.camera.near * 4, this.camera.far * 0.4),
+            );
         }
     }
 
@@ -7258,7 +8076,9 @@ export class PreviewViewport {
      */
     private renderFrame(): void {
         const bending = this.distorting();
-        const bloom = this.bloomEnabled ? (this.bloom ??= new BloomPass()) : null;
+        const bloom = this.bloomEnabled
+            ? (this.bloom ??= new BloomPass())
+            : null;
 
         // Everything draws to the CANVAS and the next step copies it, which is the structure the
         // reference renderer uses for both effects - `StretchRect(pBackBuffer -> pBloomSurface)` in
@@ -7272,7 +8092,12 @@ export class PreviewViewport {
         // management at all: every surface it composites through is a plain `D3DFMT_A8R8G8B8`.
         if (bending) {
             this.heat ??= new HeatPass(HEAT_LAYER);
-            this.heat.render(this.renderer, this.scene, this.camera, this.heatDebug);
+            this.heat.render(
+                this.renderer,
+                this.scene,
+                this.camera,
+                this.heatDebug,
+            );
         } else {
             this.renderer.setRenderTarget(null);
             this.renderer.render(this.scene, this.camera);
@@ -7300,7 +8125,10 @@ export class PreviewViewport {
 
         if (this.frameCopy === null) {
             this.frameCopy = new THREE.FramebufferTexture(width, height);
-        } else if (this.frameCopy.image.width !== width || this.frameCopy.image.height !== height) {
+        } else if (
+            this.frameCopy.image.width !== width ||
+            this.frameCopy.image.height !== height
+        ) {
             // It cannot be resized in place - the copy would land in a buffer of the wrong shape.
             this.frameCopy.dispose();
             this.frameCopy = new THREE.FramebufferTexture(width, height);
@@ -7323,9 +8151,9 @@ export class PreviewViewport {
         }
 
         // The direction the light TRAVELS, which is the reverse of where it stands.
-        const light = BILLBOARD_LIGHT
-            .copy(lightDirection(this.lightAzimuth, this.lightElevation))
-            .negate();
+        const light = BILLBOARD_LIGHT.copy(
+            lightDirection(this.lightAzimuth, this.lightElevation),
+        ).negate();
 
         for (const node of this.billboards) {
             const type = billboardTypeOf(node);
@@ -7337,7 +8165,12 @@ export class PreviewViewport {
             node.getWorldPosition(BILLBOARD_AT);
             node.getWorldQuaternion(BILLBOARD_BONE);
 
-            const world = billboardRotation(type, this.camera, light, BILLBOARD_AT);
+            const world = billboardRotation(
+                type,
+                this.camera,
+                light,
+                BILLBOARD_AT,
+            );
 
             for (const child of node.children) {
                 if (child instanceof THREE.Mesh) {
@@ -7345,7 +8178,11 @@ export class PreviewViewport {
                     // `ObjectTemplate::DoBillboard` does - it must not replace the world rotation,
                     // because that throws away the exporter's Z-up-to-Y-up root correction and lays
                     // every tree's shadow card flat. See `billboardLocalRotation`.
-                    billboardLocalRotation(BILLBOARD_BONE, world, child.quaternion);
+                    billboardLocalRotation(
+                        BILLBOARD_BONE,
+                        world,
+                        child.quaternion,
+                    );
                 }
             }
         }
@@ -7359,7 +8196,12 @@ export class PreviewViewport {
      * flame is culled halfway along and reads as an effect that stops.
      */
     private applyClipPlanes(sphere: BoundingSphere, distance: number): void {
-        const planes = clipPlanes(sphere, distance, this.effectReach(), this.drawDistance);
+        const planes = clipPlanes(
+            sphere,
+            distance,
+            this.effectReach(),
+            this.drawDistance,
+        );
 
         this.camera.near = planes.near;
         this.camera.far = planes.far;
@@ -7431,14 +8273,21 @@ function isOverlay(node: THREE.Object3D): boolean {
 function isShadowVolume(mesh: THREE.Mesh): boolean {
     const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
 
-    return resolveMaterial(extras).archetype === 'shadow-volume';
+    return resolveMaterial(extras).archetype === "shadow-volume";
 }
 
 /** The twelve edges of one box, as line-segment pairs, appended to a position buffer. */
 function appendBoxEdges(into: number[], box: THREE.Box3): void {
-    const {min, max} = box;
-    const corner = (x: number, y: number, z: number): [number, number, number] =>
-        [x === 0 ? min.x : max.x, y === 0 ? min.y : max.y, z === 0 ? min.z : max.z];
+    const { min, max } = box;
+    const corner = (
+        x: number,
+        y: number,
+        z: number,
+    ): [number, number, number] => [
+        x === 0 ? min.x : max.x,
+        y === 0 ? min.y : max.y,
+        z === 0 ? min.z : max.z,
+    ];
 
     // Each edge joins two corners differing in exactly one coordinate, which is what this walk
     // enumerates - four edges along each axis, twelve in all, no duplicates.
@@ -7459,7 +8308,8 @@ function appendBoxEdges(into: number[], box: THREE.Box3): void {
 
 /** Replaces a buffer geometry's positions, reallocating only when the length changes. */
 function setPositions(geometry: THREE.BufferGeometry, values: number[]): void {
-    const existing = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    const existing = geometry.getAttribute("position") as
+        THREE.BufferAttribute | undefined;
 
     if (existing !== undefined && existing.array.length === values.length) {
         (existing.array as Float32Array).set(values);
@@ -7467,18 +8317,23 @@ function setPositions(geometry: THREE.BufferGeometry, values: number[]): void {
         return;
     }
 
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(values, 3));
+    geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(values, 3),
+    );
 }
 
 /** Releases GPU memory for a subtree; the renderer does not do it on removal. */
 function disposeTree(root: THREE.Object3D): void {
-    root.traverse(node => {
+    root.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) {
             return;
         }
 
         node.geometry.dispose();
-        for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
+        for (const material of Array.isArray(node.material)
+            ? node.material
+            : [node.material]) {
             material.dispose();
         }
     });

@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 /** What the overview draws for a node: the mounted node's own silhouette, roughed in. */
-export type LodShape = 'rect' | 'circle' | 'diamond';
+export type LodShape = "rect" | "circle" | "diamond";
 
 /**
  * The shape a node keeps when it is too small to mount.
@@ -19,13 +19,13 @@ export type LodShape = 'rect' | 'circle' | 'diamond';
  */
 export function lodShape(kind: string): LodShape {
     switch (kind) {
-        case 'AndJunction':
-        case 'StagingAnd':
-            return 'circle';
-        case 'OrJunction':
-        case 'StagingOr':
-            return 'diamond';
+        case "AndJunction":
+        case "StagingAnd":
+            return "circle";
+        case "OrJunction":
+        case "StagingOr":
+            return "diamond";
         default:
-            return 'rect';
+            return "rect";
     }
 }

@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 /**
  * The extension's "EaWEdit" output channel, shared by the activation code and the panels so a
@@ -14,7 +14,7 @@ export function setLogChannel(next: vscode.OutputChannel | undefined): void {
 }
 
 export function logLine(msg: string): void {
-    const ts = new Date().toISOString().replace('T', ' ').replace('Z', '');
+    const ts = new Date().toISOString().replace("T", " ").replace("Z", "");
     try {
         channel?.appendLine(`[${ts}] ${msg}`);
     } catch {

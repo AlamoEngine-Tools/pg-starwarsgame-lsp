@@ -1,34 +1,44 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import assert from 'node:assert/strict';
-import {describe, it} from 'node:test';
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
-import type {PreviewHardpoint, PreviewReticles} from '../../protocol/modelPreview';
+import type {
+    PreviewHardpoint,
+    PreviewReticles,
+} from "../../protocol/modelPreview";
 
-import {healthColour, RETICLE_STATES, reticleFor, reticleMarks, reticleSizePx, trackedStateOf,} from './reticles';
+import {
+    healthColour,
+    RETICLE_STATES,
+    reticleFor,
+    reticleMarks,
+    reticleSizePx,
+    trackedStateOf,
+} from "./reticles";
 
 const RETICLES: PreviewReticles = {
     byType: {
         HARD_POINT_WEAPON_LASER: {
-            enemy: 'I_Hard_Point_Reticle_Weapons',
-            enemyTracked: 'I_Hard_Point_Reticle_Weapons_Tracked',
-            friendly: 'I_Hard_Point_Reticle_Weapons',
-            friendlyTracked: 'I_Hard_Point_Reticle_Weapons_Tracked',
-            friendlyRepairing: 'I_Hard_Point_Reticle_Weapons_Repair',
-            friendlyDisabled: 'I_Hard_Point_Reticle_Weapons',
-            friendlyDisabledTracked: 'I_Hard_Point_Reticle_Weapons_Tracked',
+            enemy: "I_Hard_Point_Reticle_Weapons",
+            enemyTracked: "I_Hard_Point_Reticle_Weapons_Tracked",
+            friendly: "I_Hard_Point_Reticle_Weapons",
+            friendlyTracked: "I_Hard_Point_Reticle_Weapons_Tracked",
+            friendlyRepairing: "I_Hard_Point_Reticle_Weapons_Repair",
+            friendlyDisabled: "I_Hard_Point_Reticle_Weapons",
+            friendlyDisabledTracked: "I_Hard_Point_Reticle_Weapons_Tracked",
         },
         HARD_POINT_ENGINE: {
-            enemy: 'I_Hard_Point_Reticle_Engines',
+            enemy: "I_Hard_Point_Reticle_Engines",
             enemyTracked: null,
         },
     },
     icons: {
-        I_Hard_Point_Reticle_Weapons: 'data:image/png;base64,AAAA',
-        I_Hard_Point_Reticle_Weapons_Tracked: 'data:image/png;base64,BBBB',
-        I_Hard_Point_Reticle_Weapons_Repair: 'data:image/png;base64,CCCC',
-        I_Hard_Point_Reticle_Engines: 'data:image/png;base64,DDDD',
+        I_Hard_Point_Reticle_Weapons: "data:image/png;base64,AAAA",
+        I_Hard_Point_Reticle_Weapons_Tracked: "data:image/png;base64,BBBB",
+        I_Hard_Point_Reticle_Weapons_Repair: "data:image/png;base64,CCCC",
+        I_Hard_Point_Reticle_Engines: "data:image/png;base64,DDDD",
     },
     enemyScreenSize: 0.03,
     friendlyScreenSize: 0.04,
@@ -36,10 +46,10 @@ const RETICLES: PreviewReticles = {
 
 function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
     return {
-        id: 'HP_Star_Destroyer_Weapon_FL',
-        partId: 'hp:HP_Star_Destroyer_Weapon_FL',
-        type: 'HARD_POINT_WEAPON_LASER',
-        attachBone: 'HP_F-L_BONE',
+        id: "HP_Star_Destroyer_Weapon_FL",
+        partId: "hp:HP_Star_Destroyer_Weapon_FL",
+        type: "HARD_POINT_WEAPON_LASER",
+        attachBone: "HP_F-L_BONE",
         isDestroyable: true,
         isTargetable: true,
         engineDeathHidesEngineParticles: false,
@@ -47,225 +57,304 @@ function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
     };
 }
 
-describe('reticleMarks', () => {
-    it('marks a targetable hardpoint with the icon its type names', () => {
-        const marks = reticleMarks([hardpoint()], RETICLES, 'enemy', new Set());
+describe("reticleMarks", () => {
+    it("marks a targetable hardpoint with the icon its type names", () => {
+        const marks = reticleMarks([hardpoint()], RETICLES, "enemy", new Set());
 
         assert.equal(marks.length, 1);
-        assert.equal(marks[0].hardpointId, 'HP_Star_Destroyer_Weapon_FL');
-        assert.equal(marks[0].iconUri, 'data:image/png;base64,AAAA');
+        assert.equal(marks[0].hardpointId, "HP_Star_Destroyer_Weapon_FL");
+        assert.equal(marks[0].iconUri, "data:image/png;base64,AAAA");
     });
 
-    it('looks the type up EXACTLY as the hardpoint spells it', () => {
+    it("looks the type up EXACTLY as the hardpoint spells it", () => {
         // The wire used to camel-case dictionary keys, so `HARD_POINT_WEAPON_LASER` arrived as
         // `harD_POINT_WEAPON_LASER` and this lookup found nothing - silently, because a type with no
         // mapping is a legitimate state. Measured against a live server; see the server-side guard.
         const mangled: PreviewReticles = {
             ...RETICLES,
-            byType: {harD_POINT_WEAPON_LASER: RETICLES.byType.HARD_POINT_WEAPON_LASER},
+            byType: {
+                harD_POINT_WEAPON_LASER:
+                    RETICLES.byType.HARD_POINT_WEAPON_LASER,
+            },
         };
 
-        assert.deepEqual(reticleMarks([hardpoint()], mangled, 'enemy', new Set()), []);
+        assert.deepEqual(
+            reticleMarks([hardpoint()], mangled, "enemy", new Set()),
+            [],
+        );
     });
 
-    it('draws nothing over a hardpoint the game will not let you target', () => {
+    it("draws nothing over a hardpoint the game will not let you target", () => {
         // 97 of foc's hardpoints say Is_Targetable No.
         assert.deepEqual(
-            reticleMarks([hardpoint({isTargetable: false})], RETICLES, 'enemy', new Set()), []);
+            reticleMarks(
+                [hardpoint({ isTargetable: false })],
+                RETICLES,
+                "enemy",
+                new Set(),
+            ),
+            [],
+        );
     });
 
-    it('draws nothing over a hardpoint that has been shot away', () => {
+    it("draws nothing over a hardpoint that has been shot away", () => {
         assert.deepEqual(
-            reticleMarks([hardpoint()], RETICLES, 'enemy',
-                new Set(['HP_Star_Destroyer_Weapon_FL'])), []);
+            reticleMarks(
+                [hardpoint()],
+                RETICLES,
+                "enemy",
+                new Set(["HP_Star_Destroyer_Weapon_FL"]),
+            ),
+            [],
+        );
     });
 
-    it('anchors on the ATTACHMENT BONE, which is the hull s', () => {
+    it("anchors on the ATTACHMENT BONE, which is the hull s", () => {
         // Corrected 2026-08-23 off user feedback. It used to centre on the attached model's bounds,
         // which was both wrong - the game draws the mark on the attachment bone - and slow, since
         // it walked a whole part's geometry per mark per tick and made the viewport crawl.
-        const mark = reticleMarks([hardpoint()], RETICLES, 'enemy', new Set())[0];
+        const mark = reticleMarks(
+            [hardpoint()],
+            RETICLES,
+            "enemy",
+            new Set(),
+        )[0];
 
-        assert.equal(mark.partId, 'hull');
-        assert.equal(mark.bone, 'HP_F-L_BONE');
+        assert.equal(mark.partId, "hull");
+        assert.equal(mark.bone, "HP_F-L_BONE");
     });
 
-    it('carries how worn the hardpoint is, for the colour', () => {
+    it("carries how worn the hardpoint is, for the colour", () => {
         const marks = reticleMarks(
-            [hardpoint({health: 400})], RETICLES, 'enemy', new Set(),
-            {HP_Star_Destroyer_Weapon_FL: 100});
+            [hardpoint({ health: 400 })],
+            RETICLES,
+            "enemy",
+            new Set(),
+            { HP_Star_Destroyer_Weapon_FL: 100 },
+        );
 
         assert.equal(marks[0].healthFraction, 0.25);
     });
 
-    it('has no health fraction for a hardpoint that declares none', () => {
+    it("has no health fraction for a hardpoint that declares none", () => {
         // 210 of foc's hardpoints declare no Health, and they never wear down.
         assert.equal(
-            reticleMarks([hardpoint({health: null})], RETICLES, 'enemy', new Set())[0]
-                .healthFraction, null);
+            reticleMarks(
+                [hardpoint({ health: null })],
+                RETICLES,
+                "enemy",
+                new Set(),
+            )[0].healthFraction,
+            null,
+        );
     });
 
-    it('falls back to the hull bone for a hardpoint that attaches no model', () => {
+    it("falls back to the hull bone for a hardpoint that attaches no model", () => {
         // 137 hardpoints name no Model_To_Attach - the tractor beam and the fighter bay among them -
         // and their attach bone is a bone of the hull.
         const marks = reticleMarks(
-            [hardpoint({partId: null, attachBone: 'HP_trac_bone'})], RETICLES, 'enemy', new Set());
+            [hardpoint({ partId: null, attachBone: "HP_trac_bone" })],
+            RETICLES,
+            "enemy",
+            new Set(),
+        );
 
-        assert.equal(marks[0].partId, 'hull');
-        assert.equal(marks[0].bone, 'HP_trac_bone');
+        assert.equal(marks[0].partId, "hull");
+        assert.equal(marks[0].bone, "HP_trac_bone");
     });
 
-    it('skips a type the reticle map says nothing about', () => {
+    it("skips a type the reticle map says nothing about", () => {
         // Shipped data never hits this - every type used has a mapping in both trees - but a mod
         // overriding GameConstants can.
         assert.deepEqual(
-            reticleMarks([hardpoint({type: 'HARD_POINT_INVENTED'})], RETICLES, 'enemy', new Set()),
-            []);
+            reticleMarks(
+                [hardpoint({ type: "HARD_POINT_INVENTED" })],
+                RETICLES,
+                "enemy",
+                new Set(),
+            ),
+            [],
+        );
     });
 
-    it('skips a state the type leaves blank rather than drawing the wrong art', () => {
-        const engine = hardpoint({id: 'HP_Engines', type: 'HARD_POINT_ENGINE'});
+    it("skips a state the type leaves blank rather than drawing the wrong art", () => {
+        const engine = hardpoint({
+            id: "HP_Engines",
+            type: "HARD_POINT_ENGINE",
+        });
 
-        assert.equal(reticleMarks([engine], RETICLES, 'enemy', new Set()).length, 1);
-        assert.deepEqual(reticleMarks([engine], RETICLES, 'enemyTracked', new Set()), []);
+        assert.equal(
+            reticleMarks([engine], RETICLES, "enemy", new Set()).length,
+            1,
+        );
+        assert.deepEqual(
+            reticleMarks([engine], RETICLES, "enemyTracked", new Set()),
+            [],
+        );
     });
 
-    it('skips a name the server could not decode', () => {
+    it("skips a name the server could not decode", () => {
         // Icons are absent when no game directory is configured. The map still arrives, so the
         // client must not draw a broken image over every hardpoint.
-        const noArt: PreviewReticles = {...RETICLES, icons: {}};
+        const noArt: PreviewReticles = { ...RETICLES, icons: {} };
 
-        assert.deepEqual(reticleMarks([hardpoint()], noArt, 'enemy', new Set()), []);
+        assert.deepEqual(
+            reticleMarks([hardpoint()], noArt, "enemy", new Set()),
+            [],
+        );
     });
 
-    it('has no marks at all without a reticle map', () => {
-        assert.deepEqual(reticleMarks([hardpoint()], null, 'enemy', new Set()), []);
-        assert.deepEqual(reticleMarks([hardpoint()], undefined, 'enemy', new Set()), []);
+    it("has no marks at all without a reticle map", () => {
+        assert.deepEqual(
+            reticleMarks([hardpoint()], null, "enemy", new Set()),
+            [],
+        );
+        assert.deepEqual(
+            reticleMarks([hardpoint()], undefined, "enemy", new Set()),
+            [],
+        );
     });
 
-    it('offers every state the engine declares, enemy first', () => {
+    it("offers every state the engine declares, enemy first", () => {
         // Seven, though on shipped data the disabled pair reuses the plain and tracked art. A modder
         // giving them separate art needs somewhere to see it.
         assert.equal(RETICLE_STATES.length, 7);
-        assert.equal(RETICLE_STATES[0].id, 'enemy');
+        assert.equal(RETICLE_STATES[0].id, "enemy");
     });
 });
 
-describe('reticleSizePx', () => {
+describe("reticleSizePx", () => {
     /** Binary floating point: 720 * 0.03 lands a whisker under 21.6. */
     const near = (actual: number, expected: number) =>
-        assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
+        assert.ok(
+            Math.abs(actual - expected) < 1e-9,
+            `${actual} is not ${expected}`,
+        );
 
-    it('is a fraction of the viewport HEIGHT', () => {
+    it("is a fraction of the viewport HEIGHT", () => {
         near(reticleSizePx(0.03, 1000, 720), 21.6);
         near(reticleSizePx(0.03, 400, 720), 21.6);
     });
 
-    it('takes the enemy or friendly size according to the state being shown', () => {
+    it("takes the enemy or friendly size according to the state being shown", () => {
         near(reticleSizePx(RETICLES.enemyScreenSize, 1000, 720), 21.6);
         near(reticleSizePx(RETICLES.friendlyScreenSize, 1000, 720), 28.8);
     });
 
-    it('never collapses to nothing, whatever the data says', () => {
+    it("never collapses to nothing, whatever the data says", () => {
         assert.ok(reticleSizePx(0, 1000, 720) >= 8);
         assert.ok(reticleSizePx(null, 1000, 720) >= 8);
         assert.ok(reticleSizePx(undefined, 1000, 720) >= 8);
     });
 
-    it('does not blow up on a viewport that has not been laid out yet', () => {
+    it("does not blow up on a viewport that has not been laid out yet", () => {
         assert.ok(reticleSizePx(0.03, 0, 0) >= 8);
     });
 });
 
-describe('healthColour', () => {
-    it('runs green to red as the hardpoint is worn down', () => {
+describe("healthColour", () => {
+    it("runs green to red as the hardpoint is worn down", () => {
         // The game's own ramp, as the user gave it: bright green at full health through yellow and
         // orange to red at nothing left.
-        assert.equal(healthColour(1), '#3cd63c');
-        assert.equal(healthColour(0), '#e02020');
+        assert.equal(healthColour(1), "#3cd63c");
+        assert.equal(healthColour(0), "#e02020");
     });
 
-    it('passes through yellow and THEN orange', () => {
+    it("passes through yellow and THEN orange", () => {
         // Order matters and it is the conventional one - yellow is the healthier of the two.
         const yellow = healthColour(0.66);
         const orange = healthColour(0.33);
 
         assert.notEqual(yellow, orange);
-        assert.equal(yellow, '#d6d63c');
-        assert.equal(orange, '#e08a20');
+        assert.equal(yellow, "#d6d63c");
+        assert.equal(orange, "#e08a20");
     });
 
-    it('is green for a hardpoint that declares no health at all', () => {
+    it("is green for a hardpoint that declares no health at all", () => {
         // 210 of foc's hardpoints declare none. They cannot be worn down, so they are never
         // anything but whole - showing them red would report damage that cannot happen.
-        assert.equal(healthColour(null), '#3cd63c');
+        assert.equal(healthColour(null), "#3cd63c");
     });
 
-    it('clamps rather than inventing a colour off either end', () => {
+    it("clamps rather than inventing a colour off either end", () => {
         assert.equal(healthColour(2), healthColour(1));
         assert.equal(healthColour(-1), healthColour(0));
     });
 });
 
-describe('trackedStateOf', () => {
-    it('gives the tracked twin of a plain state', () => {
+describe("trackedStateOf", () => {
+    it("gives the tracked twin of a plain state", () => {
         // The game swaps to it under the cursor, so hovering is the honest way to see it.
-        assert.equal(trackedStateOf('enemy'), 'enemyTracked');
-        assert.equal(trackedStateOf('friendly'), 'friendlyTracked');
-        assert.equal(trackedStateOf('friendlyDisabled'), 'friendlyDisabledTracked');
+        assert.equal(trackedStateOf("enemy"), "enemyTracked");
+        assert.equal(trackedStateOf("friendly"), "friendlyTracked");
+        assert.equal(
+            trackedStateOf("friendlyDisabled"),
+            "friendlyDisabledTracked",
+        );
     });
 
-    it('leaves a state that is already tracked alone', () => {
+    it("leaves a state that is already tracked alone", () => {
         // Hovering it should change nothing rather than fall back to something unrelated.
-        assert.equal(trackedStateOf('enemyTracked'), 'enemyTracked');
-        assert.equal(trackedStateOf('friendlyRepairing'), 'friendlyRepairing');
+        assert.equal(trackedStateOf("enemyTracked"), "enemyTracked");
+        assert.equal(trackedStateOf("friendlyRepairing"), "friendlyRepairing");
     });
 });
 
-describe('the tracked art on a mark', () => {
-    it('carries both, so the hover needs no second pass', () => {
-        const mark = reticleMarks([hardpoint()], RETICLES, 'enemy', new Set())[0];
+describe("the tracked art on a mark", () => {
+    it("carries both, so the hover needs no second pass", () => {
+        const mark = reticleMarks(
+            [hardpoint()],
+            RETICLES,
+            "enemy",
+            new Set(),
+        )[0];
 
-        assert.equal(mark.iconUri, 'data:image/png;base64,AAAA');
-        assert.equal(mark.trackedUri, 'data:image/png;base64,BBBB');
+        assert.equal(mark.iconUri, "data:image/png;base64,AAAA");
+        assert.equal(mark.trackedUri, "data:image/png;base64,BBBB");
     });
 
-    it('falls back to the plain art where a type declares no tracked form', () => {
-        const engine = hardpoint({id: 'HP_Engines', type: 'HARD_POINT_ENGINE'});
-        const mark = reticleMarks([engine], RETICLES, 'enemy', new Set())[0];
+    it("falls back to the plain art where a type declares no tracked form", () => {
+        const engine = hardpoint({
+            id: "HP_Engines",
+            type: "HARD_POINT_ENGINE",
+        });
+        const mark = reticleMarks([engine], RETICLES, "enemy", new Set())[0];
 
         assert.equal(mark.trackedUri, mark.iconUri);
     });
 });
 
-describe('reticleFor', () => {
+describe("reticleFor", () => {
     const reticles = {
-        byType: {HARD_POINT_WEAPON_LASER: {enemy: 'I_RET_LASER'}},
-        icons: {I_RET_LASER: 'data:image/png;base64,AAAA'},
+        byType: { HARD_POINT_WEAPON_LASER: { enemy: "I_RET_LASER" } },
+        icons: { I_RET_LASER: "data:image/png;base64,AAAA" },
     };
 
-    it('finds the art a hardpoint TYPE resolves to', () => {
+    it("finds the art a hardpoint TYPE resolves to", () => {
         // Two levels on purpose: thirteen hardpoint types share five artwork families, so the type
         // names an icon and the icon names the pixels.
-        assert.equal(reticleFor(reticles, 'HARD_POINT_WEAPON_LASER'), 'data:image/png;base64,AAAA');
+        assert.equal(
+            reticleFor(reticles, "HARD_POINT_WEAPON_LASER"),
+            "data:image/png;base64,AAAA",
+        );
     });
 
-    it('is null for a type the catalog does not cover', () => {
-        assert.equal(reticleFor(reticles, 'HARD_POINT_SHIELD'), null);
+    it("is null for a type the catalog does not cover", () => {
+        assert.equal(reticleFor(reticles, "HARD_POINT_SHIELD"), null);
     });
 
-    it('is null when there is no catalog at all', () => {
+    it("is null when there is no catalog at all", () => {
         // A workspace with no game directory gets the map and no images, and a scene is perfectly
         // usable without them - so this is a quiet absence, not a problem to report.
-        assert.equal(reticleFor(undefined, 'HARD_POINT_WEAPON_LASER'), null);
+        assert.equal(reticleFor(undefined, "HARD_POINT_WEAPON_LASER"), null);
     });
 
-    it('is null for a hardpoint that declares no type', () => {
+    it("is null for a hardpoint that declares no type", () => {
         assert.equal(reticleFor(reticles, null), null);
     });
 });
 
-describe('healthColour, banded in quarters', () => {
+describe("healthColour, banded in quarters", () => {
     /**
      * Four colours, four equal bands, switching at 75, 50 and 25 percent.
      *
@@ -273,28 +362,28 @@ describe('healthColour, banded in quarters', () => {
      * switches at 83, 50 and 17 percent - bands the reader cannot predict and nothing in the game
      * asks for. The colours are the user's; the thresholds were ours and were arbitrary.
      */
-    it('is green down to three quarters', () => {
-        assert.equal(healthColour(1), '#3cd63c');
-        assert.equal(healthColour(0.76), '#3cd63c');
+    it("is green down to three quarters", () => {
+        assert.equal(healthColour(1), "#3cd63c");
+        assert.equal(healthColour(0.76), "#3cd63c");
     });
 
-    it('is yellow from three quarters down to a half', () => {
-        assert.equal(healthColour(0.75), '#d6d63c');
-        assert.equal(healthColour(0.51), '#d6d63c');
+    it("is yellow from three quarters down to a half", () => {
+        assert.equal(healthColour(0.75), "#d6d63c");
+        assert.equal(healthColour(0.51), "#d6d63c");
     });
 
-    it('is orange from a half down to a quarter', () => {
-        assert.equal(healthColour(0.5), '#e08a20');
-        assert.equal(healthColour(0.26), '#e08a20');
+    it("is orange from a half down to a quarter", () => {
+        assert.equal(healthColour(0.5), "#e08a20");
+        assert.equal(healthColour(0.26), "#e08a20");
     });
 
-    it('is red at a quarter and below', () => {
-        assert.equal(healthColour(0.25), '#e02020');
-        assert.equal(healthColour(0), '#e02020');
+    it("is red at a quarter and below", () => {
+        assert.equal(healthColour(0.25), "#e02020");
+        assert.equal(healthColour(0), "#e02020");
     });
 
-    it('clamps rather than running off either end', () => {
-        assert.equal(healthColour(2), '#3cd63c');
-        assert.equal(healthColour(-1), '#e02020');
+    it("clamps rather than running off either end", () => {
+        assert.equal(healthColour(2), "#3cd63c");
+        assert.equal(healthColour(-1), "#e02020");
     });
 });

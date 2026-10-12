@@ -12,10 +12,15 @@
 // rows and a Star Destroyer sub-mesh is 3814 faces, so the next page is fetched as the scroller
 // nears its end. `geometryRows` holds what has arrived and decides when to ask.
 
-import {useEffect, useRef} from 'react';
+import { useEffect, useRef } from "react";
 
-import {type GeometryRows, geometryTabs, nearEnd, nextOffset} from '../preview/geometryRows';
-import {type GeometryTable} from '../../protocol/modelPreview';
+import {
+    type GeometryRows,
+    geometryTabs,
+    nearEnd,
+    nextOffset,
+} from "../preview/geometryRows";
+import { type GeometryTable } from "../../protocol/modelPreview";
 
 /**
  * Which table is being read.
@@ -23,24 +28,31 @@ import {type GeometryTable} from '../../protocol/modelPreview';
  * A real tablist: the three are one choice, and the box below is the chosen one's panel. Written as
  * three independent switches first, which told a screen reader the wrong thing.
  */
-export function GeometryTabs(
-    {rows, selected, disabled, onSelect}: {
-        /** What is in hand, so the open tab can carry its row count. */
-        rows: GeometryRows | null;
-        /**
-         * The open tab. Held apart from the rows: a tab is open from the moment it is chosen, not
-         * from the moment its first page lands - deriving it from the rows left nothing selected
-         * while the box waited, which is what made it read as a flyout.
-         */
-        selected: GeometryTable | null;
-        /** No mesh index means nothing can be fetched, so the choice is shown but inert. */
-        disabled: boolean;
-        onSelect: (table: GeometryTable) => void;
-    },
-): React.JSX.Element {
+export function GeometryTabs({
+    rows,
+    selected,
+    disabled,
+    onSelect,
+}: {
+    /** What is in hand, so the open tab can carry its row count. */
+    rows: GeometryRows | null;
+    /**
+     * The open tab. Held apart from the rows: a tab is open from the moment it is chosen, not
+     * from the moment its first page lands - deriving it from the rows left nothing selected
+     * while the box waited, which is what made it read as a flyout.
+     */
+    selected: GeometryTable | null;
+    /** No mesh index means nothing can be fetched, so the choice is shown but inert. */
+    disabled: boolean;
+    onSelect: (table: GeometryTable) => void;
+}): React.JSX.Element {
     return (
-        <div className="geometry-tabs" role="tablist" aria-label="Which table to read">
-            {geometryTabs(rows).map(tab => {
+        <div
+            className="geometry-tabs"
+            role="tablist"
+            aria-label="Which table to read"
+        >
+            {geometryTabs(rows).map((tab) => {
                 const open = selected === tab.id;
 
                 return (
@@ -48,7 +60,7 @@ export function GeometryTabs(
                         key={tab.id}
                         type="button"
                         role="tab"
-                        className={'geometry-tab' + (open ? ' open' : '')}
+                        className={"geometry-tab" + (open ? " open" : "")}
                         aria-selected={open}
                         disabled={disabled}
                         title={tab.title}
@@ -56,7 +68,9 @@ export function GeometryTabs(
                     >
                         {tab.label}
                         {tab.count !== null && (
-                            <span className="section-count">{tab.count.toLocaleString()}</span>
+                            <span className="section-count">
+                                {tab.count.toLocaleString()}
+                            </span>
                         )}
                     </button>
                 );
@@ -72,13 +86,14 @@ export function GeometryTabs(
  * the previous/next pair that used to sit under this made them drive it forty times to read one
  * Star Destroyer sub-mesh.
  */
-export function GeometryRowsTable(
-    {rows, onMore}: {
-        rows: GeometryRows;
-        /** Asked for the next offset. Called only while there is more to come. */
-        onMore: (table: GeometryTable, offset: number) => void;
-    },
-): React.JSX.Element {
+export function GeometryRowsTable({
+    rows,
+    onMore,
+}: {
+    rows: GeometryRows;
+    /** Asked for the next offset. Called only while there is more to come. */
+    onMore: (table: GeometryTable, offset: number) => void;
+}): React.JSX.Element {
     const box = useRef<HTMLDivElement>(null);
 
     // Asked for at most once per arrival: `rows` changes when a page lands, so the effect runs
@@ -119,12 +134,20 @@ export function GeometryRowsTable(
             <div className="geometry-scroll" ref={box} onScroll={onScroll}>
                 <table className="geometry-table">
                     <thead>
-                    <tr>{rows.columns.map(column => <th key={column}>{column}</th>)}</tr>
+                        <tr>
+                            {rows.columns.map((column) => (
+                                <th key={column}>{column}</th>
+                            ))}
+                        </tr>
                     </thead>
                     <tbody>
-                    {rows.rows.map((row, at) => (
-                        <tr key={at}>{row.map((cell, col) => <td key={col}>{cell}</td>)}</tr>
-                    ))}
+                        {rows.rows.map((row, at) => (
+                            <tr key={at}>
+                                {row.map((cell, col) => (
+                                    <td key={col}>{cell}</td>
+                                ))}
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
             </div>
@@ -137,7 +160,8 @@ export function GeometryRowsTable(
                 EXISTED rather than whenever one was in flight, which is a different thing and was
                 wrong every time the reader stopped scrolling. */}
             <div className="geometry-foot">
-                {rows.rows.length.toLocaleString()} of {rows.total.toLocaleString()}
+                {rows.rows.length.toLocaleString()} of{" "}
+                {rows.total.toLocaleString()}
             </div>
         </div>
     );

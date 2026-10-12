@@ -8,7 +8,10 @@
 // what killed it - which is the weapon built in the attacker panel - and a turret's traverse is a
 // number in the XML until something sweeps through it.
 
-import type {PreviewDeathClone, PreviewTurret} from '../../protocol/modelPreview';
+import type {
+    PreviewDeathClone,
+    PreviewTurret,
+} from "../../protocol/modelPreview";
 
 /**
  * One card in the Gameplay dock's Death clone section.
@@ -43,7 +46,7 @@ export interface DeathCloneRow {
  * all special kills (`Damage_Force_Whirlwind` 27, `Damage_Force_Lightning` 27, `Damage_Crush` 11,
  * `Damage_Fire` 4). Not one row omits the type, so the catch-all below never fires on shipped data.
  */
-const ORDINARY_DEATH = 'damage_normal';
+const ORDINARY_DEATH = "damage_normal";
 
 /**
  * The clone the given damage type would produce.
@@ -59,30 +62,39 @@ const ORDINARY_DEATH = 'damage_normal';
  * leave nothing behind - that is the file's own answer, not a gap.
  */
 export function cloneForDamage(
-    clones: readonly PreviewDeathClone[], damageType: string,
+    clones: readonly PreviewDeathClone[],
+    damageType: string,
 ): PreviewDeathClone | null {
-    const named = (type: string): PreviewDeathClone | undefined => clones.find(
-        clone => (clone.damageType ?? '').toLowerCase() === type);
+    const named = (type: string): PreviewDeathClone | undefined =>
+        clones.find((clone) => (clone.damageType ?? "").toLowerCase() === type);
 
-    return named(damageType.toLowerCase())
-        ?? named(ORDINARY_DEATH)
-        ?? clones.find(clone => (clone.damageType ?? '') === '')
-        ?? null;
+    return (
+        named(damageType.toLowerCase()) ??
+        named(ORDINARY_DEATH) ??
+        clones.find((clone) => (clone.damageType ?? "") === "") ??
+        null
+    );
 }
 
 /** A row per declared clone, with the one the current weapon would produce marked. */
 export function deathCloneRows(
-    clones: readonly PreviewDeathClone[], damageType: string,
+    clones: readonly PreviewDeathClone[],
+    damageType: string,
 ): DeathCloneRow[] {
     const chosen = cloneForDamage(clones, damageType);
 
-    return clones.map(clone => ({
+    return clones.map((clone) => ({
         objectId: clone.objectId,
         // A row naming no damage type is the catch-all, and saying so beats a blank cell.
-        label: (clone.damageType ?? '') === '' ? 'Any other damage' : clone.damageType!,
-        resolved: (clone.modelFile ?? '') !== '',
-        selected: chosen !== null && chosen.objectId === clone.objectId
-            && (chosen.damageType ?? null) === (clone.damageType ?? null),
+        label:
+            (clone.damageType ?? "") === ""
+                ? "Any other damage"
+                : clone.damageType!,
+        resolved: (clone.modelFile ?? "") !== "",
+        selected:
+            chosen !== null &&
+            chosen.objectId === clone.objectId &&
+            (chosen.damageType ?? null) === (clone.damageType ?? null),
     }));
 }
 
@@ -126,12 +138,13 @@ export function sweepAngles(turret: PreviewTurret, phase: number): SweepPose {
     const elevateExtent = turret.elevateExtentDegrees ?? 0;
 
     if (rotateExtent <= 0 && elevateExtent <= 0) {
-        return {rotate: rest, elevate: 0};
+        return { rotate: rest, elevate: 0 };
     }
 
-    const rotate = rotateExtent >= CONTINUOUS_TURN_DEGREES
-        ? rest + phase * 360
-        : rest + Math.sin(phase * 2 * Math.PI) * rotateExtent;
+    const rotate =
+        rotateExtent >= CONTINUOUS_TURN_DEGREES
+            ? rest + phase * 360
+            : rest + Math.sin(phase * 2 * Math.PI) * rotateExtent;
 
     // Elevation runs on its OWN extent, which is usually far smaller - AT_AA is 360 by 45 - so one
     // number for both would tip a turret through the hull it stands on.
@@ -175,20 +188,25 @@ export interface TurretSource {
  * naive union sweeps one bone twice and the second pass fights the first.
  */
 export function turretSweeps(
-    hardpoints: readonly TurretSource[], weapons: readonly TurretSource[],
+    hardpoints: readonly TurretSource[],
+    weapons: readonly TurretSource[],
 ): TurretSweep[] {
     const seen = new Set<string>();
     const sweeps: TurretSweep[] = [];
 
     for (const source of [...hardpoints, ...weapons]) {
         const turret = source.turret;
-        const bone = turret?.turretBone ?? '';
+        const bone = turret?.turretBone ?? "";
 
         // A turret with no bone has nothing to turn, and one with no traverse has nowhere to turn
         // to - inventing either would claim a reach the unit has not got.
-        if (turret === null || turret === undefined || bone === ''
-            || ((turret.rotateExtentDegrees ?? 0) <= 0
-                && (turret.elevateExtentDegrees ?? 0) <= 0)) {
+        if (
+            turret === null ||
+            turret === undefined ||
+            bone === "" ||
+            ((turret.rotateExtentDegrees ?? 0) <= 0 &&
+                (turret.elevateExtentDegrees ?? 0) <= 0)
+        ) {
             continue;
         }
 

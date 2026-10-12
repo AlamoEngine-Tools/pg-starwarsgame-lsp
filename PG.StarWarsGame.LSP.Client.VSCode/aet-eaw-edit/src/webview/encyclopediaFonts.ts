@@ -4,7 +4,7 @@
 // Which CSS face the card draws a game font name with. Split out of encyclopediaCard.tsx so it can
 // be unit-tested. The ask-then-degrade rule itself is shared - see shared/gameFontStack.
 
-import {gameFontStack} from './shared/gameFontStack';
+import { gameFontStack } from "./shared/gameFontStack";
 
 /**
  * The face the popup is drawn in: the one the component names, unless the preview cannot have it.
@@ -28,10 +28,10 @@ export function cssFontStack(gameFontName: string): string {
     // gets the real thing, including the dollar glyph that is the credits coin; everyone else gets
     // the fallback chain, which is what this returned unconditionally before.
     if (isSubstitutedFont(family)) {
-        return gameFontStack(family, ['Trebuchet MS', 'Segoe UI', 'Tahoma']);
+        return gameFontStack(family, ["Trebuchet MS", "Segoe UI", "Tahoma"]);
     }
 
-    return gameFontStack(family, ['Tahoma']);
+    return gameFontStack(family, ["Tahoma"]);
 }
 
 /**

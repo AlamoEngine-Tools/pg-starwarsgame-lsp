@@ -1,17 +1,29 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import {basename} from 'path';
-import * as vscode from 'vscode';
+import { basename } from "path";
+import * as vscode from "vscode";
 
-import {CreditsPreviewPanel} from './creditsPreviewPanel';
-import {LspGateway} from './lsp/lspGateway';
-import {readDialogGeometry, saveDialogGeometry} from './dialogGeometryStorage';
-import {StoredGeometry} from './webview/shared/modalGeometry';
-import {LocalisationPanelState} from './webview/localisationPanelState';
-import {KeyedCommand, mergeMembers, partitionCommands} from './webview/loc/locSetMerge';
-import {siblingsOf} from './webview/localisationTreeModel';
-import {PanelRegistry, panelSetKey, WebviewMessage, WebviewPanelHost,} from './webviewPanelHost';
+import { CreditsPreviewPanel } from "./creditsPreviewPanel";
+import { LspGateway } from "./lsp/lspGateway";
+import {
+    readDialogGeometry,
+    saveDialogGeometry,
+} from "./dialogGeometryStorage";
+import { StoredGeometry } from "./webview/shared/modalGeometry";
+import { LocalisationPanelState } from "./webview/localisationPanelState";
+import {
+    KeyedCommand,
+    mergeMembers,
+    partitionCommands,
+} from "./webview/loc/locSetMerge";
+import { siblingsOf } from "./webview/localisationTreeModel";
+import {
+    PanelRegistry,
+    panelSetKey,
+    WebviewMessage,
+    WebviewPanelHost,
+} from "./webviewPanelHost";
 import {
     ApplyLocalisationBatchResult,
     CreateLocalisationLanguageFileResult,
@@ -22,7 +34,7 @@ import {
     LOC_CATEGORY,
     LocRowDto,
     ValidateLocalisationBatchResult,
-} from './protocol';
+} from "./protocol";
 
 /**
  * One file of an open set, and what is known about it.
@@ -47,7 +59,8 @@ interface Member {
  * its own close, so the queue is mirrored here as it changes.
  */
 export class LocalisationEditorPanel extends WebviewPanelHost {
-    private static readonly _panels = new PanelRegistry<LocalisationEditorPanel>();
+    private static readonly _panels =
+        new PanelRegistry<LocalisationEditorPanel>();
 
     /** The tab a title-bar command applies to. */
     private static _active: LocalisationEditorPanel | null = null;
@@ -77,7 +90,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         private readonly _label: string,
         private readonly _category: string,
         private readonly _extensionUri: vscode.Uri,
-        private readonly _lsp: LspGateway
+        private readonly _lsp: LspGateway,
     ) {
         // Two view types, so a menu contribution can target one kind of file. The credits editor
         // has a crawl to preview; the translation editor has nothing of the sort.
@@ -88,17 +101,22 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         // repeatedly. The category comes from the tree, so the choice is made before the webview
         // exists - the script cannot be swapped afterwards.
         super(_extensionUri, {
-            viewType: isCredits(_category) ? 'aetCreditsEditor' : 'aetTranslationEditor',
+            viewType: isCredits(_category)
+                ? "aetCreditsEditor"
+                : "aetTranslationEditor",
             title: `Loc: ${_label}`,
             column: vscode.ViewColumn.Active,
-            script: isCredits(_category) ? 'creditsEditor.js' : 'translationEditor.js',
+            script: isCredits(_category)
+                ? "creditsEditor.js"
+                : "translationEditor.js",
             enableFindWidget: true,
             // The grid fills the tab exactly. Without this the editor sits inside whatever margin
             // and padding the host's default stylesheet gives the body, and a full-height layout
             // then overflows by that much - which pushes the footer under the table off the bottom
             // of the window.
-            bodyStyle: '  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }\n'
-                + '  #root { height: 100%; }',
+            bodyStyle:
+                "  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }\n" +
+                "  #root { height: 100%; }",
         });
 
         this.onDidDispose(() => {
@@ -110,7 +128,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
         // Tracked so a command contributed to the editor title bar knows which tab it belongs to -
         // a menu command carries no argument identifying the panel it was clicked on.
-        this.panel.onDidChangeViewState(e => {
+        this.panel.onDidChangeViewState((e) => {
             if (e.webviewPanel.active) {
                 LocalisationEditorPanel._active = this;
             }
@@ -129,9 +147,19 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
     }
 
     static show(
-        filePath: string, label: string, category: string, extensionUri: vscode.Uri, lsp: LspGateway
+        filePath: string,
+        label: string,
+        category: string,
+        extensionUri: vscode.Uri,
+        lsp: LspGateway,
     ): void {
-        LocalisationEditorPanel.showSet([filePath], label, category, extensionUri, lsp);
+        LocalisationEditorPanel.showSet(
+            [filePath],
+            label,
+            category,
+            extensionUri,
+            lsp,
+        );
     }
 
     /**
@@ -144,8 +172,12 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      *     other columns are hidden, not absent, so they are one click away in the column menu.
      */
     static showSet(
-        filePaths: string[], label: string, category: string, extensionUri: vscode.Uri,
-        lsp: LspGateway, focusLanguage?: string
+        filePaths: string[],
+        label: string,
+        category: string,
+        extensionUri: vscode.Uri,
+        lsp: LspGateway,
+        focusLanguage?: string,
     ): void {
         const id = panelSetKey(filePaths);
         const existing = LocalisationEditorPanel._panels.get(id);
@@ -162,7 +194,14 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         LocalisationEditorPanel._panels.track(
             id,
             new LocalisationEditorPanel(
-                filePaths, focusLanguage, label, category, extensionUri, lsp));
+                filePaths,
+                focusLanguage,
+                label,
+                category,
+                extensionUri,
+                lsp,
+            ),
+        );
     }
 
     /**
@@ -174,7 +213,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      */
     static invalidateAll(): void {
         for (const panel of LocalisationEditorPanel._panels.all) {
-            panel.post({type: 'invalidate', dirty: panel._state.isDirty});
+            panel.post({ type: "invalidate", dirty: panel._state.isDirty });
         }
     }
 
@@ -186,7 +225,10 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      * is asked for its staged rows first - the preview is of what you are about to save.
      */
     static previewCrawl(fullScreen: boolean): void {
-        LocalisationEditorPanel._active?.post({type: 'requestCrawlRows', fullScreen});
+        LocalisationEditorPanel._active?.post({
+            type: "requestCrawlRows",
+            fullScreen,
+        });
     }
 
     static disposeAll(): void {
@@ -195,38 +237,44 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
     protected async onMessage(msg: WebviewMessage): Promise<void> {
         switch (msg.type) {
-            case 'ready':
-            case 'fetch':
+            case "ready":
+            case "fetch":
                 await this._sendRows();
                 break;
-            case 'pendingSync':
-                this._state.syncPending(msg.commands as Record<string, unknown>[]);
+            case "pendingSync":
+                this._state.syncPending(
+                    msg.commands as Record<string, unknown>[],
+                );
                 break;
-            case 'validateBatch':
+            case "validateBatch":
                 await this._validate(msg.commands as Record<string, unknown>[]);
                 break;
-            case 'saveBatch':
+            case "saveBatch":
                 await this._save(msg.commands as Record<string, unknown>[]);
                 break;
-            case 'requestBaseline':
+            case "requestBaseline":
                 await this._sendBaseline();
                 break;
-            case 'crawlRows':
+            case "crawlRows":
                 this._sendCrawlRows(msg);
                 break;
-            case 'convertFormat':
+            case "convertFormat":
                 await this._convertFormat(msg.targetFormat as string);
                 break;
-            case 'addLanguageFile':
+            case "addLanguageFile":
                 await this._addLanguageFile(msg.language as string);
                 break;
-            case 'saveDialogGeometry':
-                saveDialogGeometry(msg.id as string, msg.geometry as StoredGeometry);
+            case "saveDialogGeometry":
+                saveDialogGeometry(
+                    msg.id as string,
+                    msg.geometry as StoredGeometry,
+                );
                 break;
-            case 'exportDat':
+            case "exportDat":
                 await vscode.commands.executeCommand(
-                    'aet-eaw-edit.lsp.exportLocalisationToDat',
-                    {project: {filePath: this._filePath}});
+                    "aet-eaw-edit.lsp.exportLocalisationToDat",
+                    { project: { filePath: this._filePath } },
+                );
                 break;
             default:
                 break;
@@ -241,20 +289,25 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      */
     private _focusOn(language: string | undefined): void {
         this._focusLanguage = language;
-        this.post({type: 'focusLanguage', language: language ?? null});
+        this.post({ type: "focusLanguage", language: language ?? null });
     }
 
     /** Forwards the editor's staged rows to the preview beside it, if one is open. */
     private _sendCrawlRows(msg: Record<string, unknown>): void {
         const payload = {
-            type: 'crawl',
+            type: "crawl",
             rows: msg.rows,
             languages: msg.languages,
             language: msg.language,
         };
 
         if (msg.open === true) {
-            CreditsPreviewPanel.show(this._filePath, this._label, this._extensionUri, payload);
+            CreditsPreviewPanel.show(
+                this._filePath,
+                this._label,
+                this._extensionUri,
+                payload,
+            );
         } else {
             CreditsPreviewPanel.update(this._filePath, payload);
         }
@@ -272,7 +325,10 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         }
 
         const result = await this._lsp.requestOr<GetLanguagesResult>(
-            'aet/getLanguages', {}, {languages: []});
+            "aet/getLanguages",
+            {},
+            { languages: [] },
+        );
         this._supportedLanguages = result.languages ?? [];
         return this._supportedLanguages;
     }
@@ -287,20 +343,23 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         const results: GetLocalisationRowsResult[] = [];
         for (const filePath of this._filePaths) {
             const outcome = await this._lsp.request<GetLocalisationRowsResult>(
-                'aet/getLocalisationRows', {projectFilePath: filePath});
+                "aet/getLocalisationRows",
+                { projectFilePath: filePath },
+            );
 
             if (!outcome.ok) {
                 this.post({
-                    type: 'error',
-                    message: outcome.reason === 'offline'
-                        ? 'LSP server is not running.'
-                        : `Cannot read ${basename(filePath)}: ${outcome.message}`,
+                    type: "error",
+                    message:
+                        outcome.reason === "offline"
+                            ? "LSP server is not running."
+                            : `Cannot read ${basename(filePath)}: ${outcome.message}`,
                 });
                 return;
             }
 
             if (outcome.value.error) {
-                this.post({type: 'error', message: outcome.value.error});
+                this.post({ type: "error", message: outcome.value.error });
                 return;
             }
             results.push(outcome.value);
@@ -311,7 +370,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         // over - and each announcement made every open tab hand its webview every row again, reset
         // its selection, sort and inherited toggle, and re-fetch the baseline. See shouldDeliver.
         // For a set the hashes are combined, so any one file moving counts as the set moving.
-        const combinedHash = results.map(r => r.contentHash).join('|');
+        const combinedHash = results.map((r) => r.contentHash).join("|");
         if (!this._state.shouldDeliver(combinedHash)) {
             return;
         }
@@ -322,9 +381,13 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             contentHash: results[i].contentHash,
         }));
 
-        const merged = mergeMembers(this._members.map((m, i) => ({
-            filePath: m.filePath, languages: m.languages, rows: results[i].rows,
-        })));
+        const merged = mergeMembers(
+            this._members.map((m, i) => ({
+                filePath: m.filePath,
+                languages: m.languages,
+                rows: results[i].rows,
+            })),
+        );
 
         this._state.noteRead(combinedHash);
         this.post({
@@ -332,14 +395,15 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             // Sent with the file so a dialog knows where it belongs on its first render - asking
             // for it when one opens would show it centred and then move it.
             dialogGeometry: readDialogGeometry(),
-            type: 'rows',
+            type: "rows",
             rows: merged.rows,
             languages: merged.languages,
             category: results[0].category,
             ordered: results[0].ordered,
             // A set is several single-language files, so a language is a file, not a column - the
             // grid offers "add language" as a new sibling either way.
-            canAddLanguage: this._members.length === 1 && results[0].canAddLanguage,
+            canAddLanguage:
+                this._members.length === 1 && results[0].canAddLanguage,
             addLanguageCreatesFile: results[0].addLanguageCreatesFile,
             focusLanguage: this._focusLanguage ?? null,
         });
@@ -364,21 +428,31 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      */
     private async _sendSeedSources(): Promise<void> {
         const listed = await this._lsp.requestOr<GetLocalisationProjectsResult>(
-            'aet/getLocalisationProjects', {}, {projects: []});
+            "aet/getLocalisationProjects",
+            {},
+            { projects: [] },
+        );
 
         const self = (listed.projects ?? []).find(
-            p => p.filePath.toLowerCase() === this._filePath.toLowerCase());
+            (p) => p.filePath.toLowerCase() === this._filePath.toLowerCase(),
+        );
         if (self === undefined) {
             return;
         }
 
         const sources: {
-            filePath: string; label: string; language: string; rowCount: number; rows: LocRowDto[];
+            filePath: string;
+            label: string;
+            language: string;
+            rowCount: number;
+            rows: LocRowDto[];
         }[] = [];
 
         for (const sibling of siblingsOf(self, listed.projects ?? [])) {
             const read = await this._lsp.request<GetLocalisationRowsResult>(
-                'aet/getLocalisationRows', {projectFilePath: sibling.filePath});
+                "aet/getLocalisationRows",
+                { projectFilePath: sibling.filePath },
+            );
             if (!read.ok || read.value.error) {
                 continue;
             }
@@ -392,14 +466,14 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             sources.push({
                 filePath: sibling.filePath,
                 label: sibling.label,
-                language: sibling.language ?? '',
+                language: sibling.language ?? "",
                 rowCount: rows.length,
                 rows,
             });
         }
 
         if (sources.length > 0) {
-            this.post({type: 'seedSources', sources});
+            this.post({ type: "seedSources", sources });
         }
     }
 
@@ -411,8 +485,13 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      */
     private async _convertFormat(targetFormat: string): Promise<void> {
         await vscode.commands.executeCommand(
-            'aet-eaw-edit.lsp.convertLocalisationFormat',
-            {filePath: this._filePath, targetFormat, category: this._category});
+            "aet-eaw-edit.lsp.convertLocalisationFormat",
+            {
+                filePath: this._filePath,
+                targetFormat,
+                category: this._category,
+            },
+        );
     }
 
     /**
@@ -423,27 +502,37 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      * result is offered for opening rather than left for the user to find in the tree.
      */
     private async _addLanguageFile(language: string): Promise<void> {
-        const result = await this._lsp.requestOrReport<CreateLocalisationLanguageFileResult>(
-            'aet/createLocalisationLanguageFile',
-            {projectFilePath: this._filePath, language},
-            `could not create the ${language} file`);
+        const result =
+            await this._lsp.requestOrReport<CreateLocalisationLanguageFileResult>(
+                "aet/createLocalisationLanguageFile",
+                { projectFilePath: this._filePath, language },
+                `could not create the ${language} file`,
+            );
         if (result === undefined) {
             return;
         }
 
         if (result.error || !result.writtenPath) {
-            vscode.window.showErrorMessage(`EaWEdit: ${result.error ?? 'could not create the file.'}`);
+            vscode.window.showErrorMessage(
+                `EaWEdit: ${result.error ?? "could not create the file."}`,
+            );
             return;
         }
 
         const writtenPath = result.writtenPath;
         const choice = await vscode.window.showInformationMessage(
             `EaWEdit: Created ${writtenPath} with every key from this file, ready to translate.`,
-            'Open');
+            "Open",
+        );
 
-        if (choice === 'Open') {
+        if (choice === "Open") {
             LocalisationEditorPanel.show(
-                writtenPath, basename(writtenPath), this._category, this._extensionUri, this._lsp);
+                writtenPath,
+                basename(writtenPath),
+                this._category,
+                this._extensionUri,
+                this._lsp,
+            );
         }
     }
 
@@ -457,27 +546,36 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      */
     private async _sendBaseline(): Promise<void> {
         const result = await this._lsp.requestOr<GetBaselineEntriesResult>(
-            'aet/getBaselineEntries', {projectFilePath: this._filePath}, {entries: []});
-        this.post({type: 'baselineRows', entries: result.entries ?? []});
+            "aet/getBaselineEntries",
+            { projectFilePath: this._filePath },
+            { entries: [] },
+        );
+        this.post({ type: "baselineRows", entries: result.entries ?? [] });
     }
 
-    private async _validate(commands: Record<string, unknown>[]): Promise<void> {
+    private async _validate(
+        commands: Record<string, unknown>[],
+    ): Promise<void> {
         // The Validate tag reads out whatever comes back, so a failure has to arrive as a result
         // too - otherwise the tag sits on the previous run's verdict, describing a document that no
         // longer exists.
-        const outcome = await this._lsp.request<ValidateLocalisationBatchResult>(
-            isCredits(this._category)
-                ? 'aet/validateCreditsBatch'
-                : 'aet/validateTranslationBatch',
-            {projectFilePath: this._filePath, commands});
+        const outcome =
+            await this._lsp.request<ValidateLocalisationBatchResult>(
+                isCredits(this._category)
+                    ? "aet/validateCreditsBatch"
+                    : "aet/validateTranslationBatch",
+                { projectFilePath: this._filePath, commands },
+            );
 
-        this.post(outcome.ok
-            ? {
-                type: 'problems',
-                problems: outcome.value.problems ?? [],
-                error: outcome.value.error ?? null,
-            }
-            : {type: 'problems', problems: [], error: outcome.message});
+        this.post(
+            outcome.ok
+                ? {
+                      type: "problems",
+                      problems: outcome.value.problems ?? [],
+                      error: outcome.value.error ?? null,
+                  }
+                : { type: "problems", problems: [], error: outcome.message },
+        );
     }
 
     /**
@@ -494,25 +592,49 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         // queue neither written nor released, which looks exactly like the button doing nothing.
         if (!this._lsp.isRunning) {
             void vscode.window.showWarningMessage(
-                'EaWEdit LSP: Server is not running; the edits are still staged.');
-            this.post({type: 'saveResult', success: false});
+                "EaWEdit LSP: Server is not running; the edits are still staged.",
+            );
+            this.post({ type: "saveResult", success: false });
             return;
         }
 
-        const method = isCredits(this._category) ? 'aet/applyCreditsBatch' : 'aet/applyTranslationBatch';
+        const method = isCredits(this._category)
+            ? "aet/applyCreditsBatch"
+            : "aet/applyTranslationBatch";
 
         // A set that has not been read yet has no members; fall back to the file it was opened on.
-        const members = this._members.length > 0
-            ? this._members
-            : [{filePath: this._filePath, languages: [], contentHash: this._state.contentHash}];
+        const members =
+            this._members.length > 0
+                ? this._members
+                : [
+                      {
+                          filePath: this._filePath,
+                          languages: [],
+                          contentHash: this._state.contentHash,
+                      },
+                  ];
 
-        const batches = members.length === 1
-            ? new Map([[members[0].filePath, commands as unknown as KeyedCommand[]]])
-            : partitionCommands(commands as unknown as KeyedCommand[], members.map(m => ({
-                filePath: m.filePath, languages: m.languages, rows: [],
-            })));
+        const batches =
+            members.length === 1
+                ? new Map([
+                      [
+                          members[0].filePath,
+                          commands as unknown as KeyedCommand[],
+                      ],
+                  ])
+                : partitionCommands(
+                      commands as unknown as KeyedCommand[],
+                      members.map((m) => ({
+                          filePath: m.filePath,
+                          languages: m.languages,
+                          rows: [],
+                      })),
+                  );
 
-        const failures: { member: Member; result: ApplyLocalisationBatchResult }[] = [];
+        const failures: {
+            member: Member;
+            result: ApplyLocalisationBatchResult;
+        }[] = [];
         let firstFailedIndex: number | null = null;
 
         for (const member of members) {
@@ -526,34 +648,42 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             // A rejected write is a failure of this file like any other, so it joins the list
             // rather than escaping. Before, it left the loop mid-set: the files already written
             // stayed written, and the user was told nothing at all.
-            const outcome = await this._lsp.request<ApplyLocalisationBatchResult>(method, {
-                projectFilePath: member.filePath,
-                expectedContentHash: member.contentHash,
-                commands: batch,
-            });
+            const outcome =
+                await this._lsp.request<ApplyLocalisationBatchResult>(method, {
+                    projectFilePath: member.filePath,
+                    expectedContentHash: member.contentHash,
+                    commands: batch,
+                });
 
             const result: ApplyLocalisationBatchResult = outcome.ok
                 ? outcome.value
-                : {success: false, error: outcome.message};
+                : { success: false, error: outcome.message };
 
             if (result.success) {
-                member.contentHash = result.newContentHash ?? member.contentHash;
+                member.contentHash =
+                    result.newContentHash ?? member.contentHash;
                 continue;
             }
 
-            failures.push({member, result});
+            failures.push({ member, result });
             firstFailedIndex ??= result.failedIndex ?? null;
         }
 
         if (failures.length > 0) {
             this._state.noteSaveFailed();
             await this._reportSetSaveFailure(failures);
-            this.post({type: 'saveResult', success: false, failedIndex: firstFailedIndex});
+            this.post({
+                type: "saveResult",
+                success: false,
+                failedIndex: firstFailedIndex,
+            });
             return;
         }
 
-        this._state.noteSaved(members.map(m => m.contentHash ?? '').join('|'));
-        this.post({type: 'saveResult', success: true});
+        this._state.noteSaved(
+            members.map((m) => m.contentHash ?? "").join("|"),
+        );
+        this.post({ type: "saveResult", success: true });
     }
 
     /** Names the languages that would not take the write, so the user knows what is still staged. */
@@ -566,14 +696,19 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         }
 
         const named = failures
-            .map(f => `${f.member.languages.join('/') || basename(f.member.filePath)}: `
-                + `${f.result.error ?? 'unknown error'}`)
-            .join('; ');
+            .map(
+                (f) =>
+                    `${f.member.languages.join("/") || basename(f.member.filePath)}: ` +
+                    `${f.result.error ?? "unknown error"}`,
+            )
+            .join("; ");
 
         const choice = await vscode.window.showErrorMessage(
-            `EaWEdit: Could not save - ${named}. The edits are still staged.`, 'Reload');
+            `EaWEdit: Could not save - ${named}. The edits are still staged.`,
+            "Reload",
+        );
 
-        if (choice === 'Reload') {
+        if (choice === "Reload") {
             await this._sendRows();
         }
     }
@@ -582,13 +717,20 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      * A refused save is nearly always the file having moved on disk, and the only way forward is a
      * reload - so the message offers it rather than leaving the user to find it.
      */
-    private async _reportSaveFailure(result: ApplyLocalisationBatchResult): Promise<void> {
+    private async _reportSaveFailure(
+        result: ApplyLocalisationBatchResult,
+    ): Promise<void> {
         const failed = result.failedIndex;
-        const where = failed !== null && failed !== undefined ? ` (change ${failed + 1})` : '';
+        const where =
+            failed !== null && failed !== undefined
+                ? ` (change ${failed + 1})`
+                : "";
         const choice = await vscode.window.showErrorMessage(
-            `EaWEdit: Could not save - ${result.error ?? 'unknown error'}${where}`, 'Reload');
+            `EaWEdit: Could not save - ${result.error ?? "unknown error"}${where}`,
+            "Reload",
+        );
 
-        if (choice === 'Reload') {
+        if (choice === "Reload") {
             await this._sendRows();
         }
     }
@@ -600,15 +742,16 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
         const count = this._state.pendingCount;
         const choice = await vscode.window.showWarningMessage(
-            `EaWEdit: ${count} unsaved localisation ${count === 1 ? 'change' : 'changes'} `
-            + `in '${this._filePath}'.`,
-            {modal: true}, 'Save');
+            `EaWEdit: ${count} unsaved localisation ${count === 1 ? "change" : "changes"} ` +
+                `in '${this._filePath}'.`,
+            { modal: true },
+            "Save",
+        );
 
-        if (choice === 'Save') {
+        if (choice === "Save") {
             await this._save(this._state.pending);
         }
     }
-
 }
 
 /**

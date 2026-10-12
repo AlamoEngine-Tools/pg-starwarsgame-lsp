@@ -15,10 +15,10 @@
 // readout goes to the far end of the label, because it is a value someone reads a number off; and
 // the note goes UNDER the control, because it is support text and the control is the point.
 
-import {ReactNode} from 'react';
+import { ReactNode } from "react";
 
-import {type BadgeSeverity} from './badges';
-import {InfoBadge} from './InfoBadge';
+import { type BadgeSeverity } from "./badges";
+import { InfoBadge } from "./InfoBadge";
 
 export interface FieldProps {
     label: ReactNode;
@@ -68,7 +68,7 @@ export interface FieldProps {
      * ONE control: a label containing two belongs to neither, and one containing a button swallows
      * the press. Hence `div` as the default - it is the shape that is always correct.
      */
-    as?: 'div' | 'label';
+    as?: "div" | "label";
 
     /**
      * The control sits BESIDE its name rather than under it.
@@ -88,18 +88,30 @@ export interface FieldProps {
 }
 
 export function Field({
-                          label, info, infoSeverity, value, valueTitle, note, warn, as = 'div', inline,
-                          children,
-                      }: FieldProps): React.JSX.Element {
+    label,
+    info,
+    infoSeverity,
+    value,
+    valueTitle,
+    note,
+    warn,
+    as = "div",
+    inline,
+    children,
+}: FieldProps): React.JSX.Element {
     const Box = as;
 
     const named = (
         <>
             <span className="field-label">
                 {label}
-                {info !== undefined && <InfoBadge severity={infoSeverity}>{info}</InfoBadge>}
+                {info !== undefined && (
+                    <InfoBadge severity={infoSeverity}>{info}</InfoBadge>
+                )}
                 {value !== undefined && (
-                    <span className="section-count" title={valueTitle}>{value}</span>
+                    <span className="section-count" title={valueTitle}>
+                        {value}
+                    </span>
                 )}
             </span>
 
@@ -112,7 +124,7 @@ export function Field({
             {inline ? <span className="view-row">{named}</span> : named}
 
             {note !== undefined && (
-                <p className={warn ? 'field-warn' : 'field-note'}>{note}</p>
+                <p className={warn ? "field-warn" : "field-note"}>{note}</p>
             )}
         </Box>
     );

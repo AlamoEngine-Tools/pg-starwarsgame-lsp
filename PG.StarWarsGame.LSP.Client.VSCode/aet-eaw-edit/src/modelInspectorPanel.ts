@@ -12,11 +12,11 @@
 // own inspector, and the reader is looking at one row at a time - so the tab retargets the way the
 // preview itself does when it is asked for a different subject.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {LspGateway} from './lsp/lspGateway';
-import {subMeshGeometryReply} from './lsp/subMeshGeometry';
-import {WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
+import { LspGateway } from "./lsp/lspGateway";
+import { subMeshGeometryReply } from "./lsp/subMeshGeometry";
+import { WebviewMessage, WebviewPanelHost } from "./webviewPanelHost";
 
 /**
  * The page CSS the inspector needs before its bundle runs.
@@ -25,10 +25,10 @@ import {WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
  * `height: 100%` resolves against #root, and a plain div is auto-height.
  */
 const MODEL_INSPECTOR_BODY_STYLE =
-    'html, body, #root { height: 100%; margin: 0; padding: 0; }';
+    "html, body, #root { height: 100%; margin: 0; padding: 0; }";
 
 export class ModelInspectorPanel extends WebviewPanelHost {
-    static readonly viewType = 'aetModelInspector';
+    static readonly viewType = "aetModelInspector";
 
     /**
      * The one open inspector.
@@ -50,15 +50,18 @@ export class ModelInspectorPanel extends WebviewPanelHost {
     /** Whether the webview has come up and been given what it is describing. */
     private live = false;
 
-    private constructor(extensionUri: vscode.Uri, private readonly lsp: LspGateway) {
+    private constructor(
+        extensionUri: vscode.Uri,
+        private readonly lsp: LspGateway,
+    ) {
         super(extensionUri, {
             viewType: ModelInspectorPanel.viewType,
-            title: 'Model inspector',
+            title: "Model inspector",
 
             // Beside, not Active: the whole reason this is a tab and not a page inside the preview
             // is that the two are read together.
             column: vscode.ViewColumn.Beside,
-            script: 'modelInspector.js',
+            script: "modelInspector.js",
             bodyStyle: MODEL_INSPECTOR_BODY_STYLE,
 
             // A vertex table is exactly the sort of thing a reader hits Ctrl+F in.
@@ -84,9 +87,17 @@ export class ModelInspectorPanel extends WebviewPanelHost {
      *     row in the tree, and stealing focus to another tab means the next row they click is a
      *     click to come back rather than a click on the row.
      */
-    static show(extensionUri: vscode.Uri, lsp: LspGateway, subject: unknown): ModelInspectorPanel {
-        const panel = ModelInspectorPanel.current
-            ?? (ModelInspectorPanel.current = new ModelInspectorPanel(extensionUri, lsp));
+    static show(
+        extensionUri: vscode.Uri,
+        lsp: LspGateway,
+        subject: unknown,
+    ): ModelInspectorPanel {
+        const panel =
+            ModelInspectorPanel.current ??
+            (ModelInspectorPanel.current = new ModelInspectorPanel(
+                extensionUri,
+                lsp,
+            ));
 
         panel.setSubject(subject);
         panel.reveal(true);
@@ -104,12 +115,12 @@ export class ModelInspectorPanel extends WebviewPanelHost {
 
     protected async onMessage(message: WebviewMessage): Promise<void> {
         switch (message.type) {
-            case 'ready':
+            case "ready":
                 this.live = true;
-                this.post({type: 'setSubject', subject: this.pending});
+                this.post({ type: "setSubject", subject: this.pending });
                 return;
 
-            case 'requestSubMeshGeometry':
+            case "requestSubMeshGeometry":
                 this.post(await subMeshGeometryReply(this.lsp, message));
                 return;
 
@@ -124,6 +135,6 @@ export class ModelInspectorPanel extends WebviewPanelHost {
             return;
         }
 
-        this.post({type: 'setSubject', subject});
+        this.post({ type: "setSubject", subject });
     }
 }

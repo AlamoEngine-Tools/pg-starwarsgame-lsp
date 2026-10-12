@@ -32,8 +32,10 @@ export class FrameNotifier {
      * and since the flag below is raised before the call, both notifiers then went silently dead
      * and the story graph stopped rendering.
      */
-    constructor(private readonly _schedule: (fn: () => void) => void = fn => requestAnimationFrame(fn)) {
-    }
+    constructor(
+        private readonly _schedule: (fn: () => void) => void = (fn) =>
+            requestAnimationFrame(fn),
+    ) {}
 
     subscribe(callback: () => void): Unsubscribe {
         this._subscribers.add(callback);

@@ -19,9 +19,9 @@
 // fired yet". A tooltip giving only the reason leaves a reader who has never opened the thing with
 // no idea what it was going to be.
 
-import {ReactNode} from 'react';
+import { ReactNode } from "react";
 
-import {Icon, type IconName} from './Icon';
+import { Icon, type IconName } from "./Icon";
 
 /**
  * Either the control always acts, or it can be disabled AND says why.
@@ -43,44 +43,54 @@ interface Pressable {
     onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
-export type ButtonProps = Omit<Pressable, 'onClick'> & Enablement & {
-    /**
-     * What pressing it does. Optional only because a submit button has nothing of its own to
-     * do - the form it sits in handles the press.
-     */
-    onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+export type ButtonProps = Omit<Pressable, "onClick"> &
+    Enablement & {
+        /**
+         * What pressing it does. Optional only because a submit button has nothing of its own to
+         * do - the form it sits in handles the press.
+         */
+        onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 
-    /**
-     * More than the label says, where there is more to say. Optional, unlike on an icon button:
-     * the label already names this control, and "Cancel" titled "Cancel" is noise.
-     */
-    title?: string;
+        /**
+         * More than the label says, where there is more to say. Optional, unlike on an icon button:
+         * the label already names this control, and "Cancel" titled "Cancel" is noise.
+         */
+        title?: string;
 
-    /** Tighter padding, for a button sharing a row with others. */
-    compact?: boolean;
+        /** Tighter padding, for a button sharing a row with others. */
+        compact?: boolean;
 
-    /** A variant such as `primary`. Added to the base class, never replacing it. */
-    className?: string;
+        /** A variant such as `primary`. Added to the base class, never replacing it. */
+        className?: string;
 
-    /**
-     * This button submits the form it is in.
-     *
-     * Everything defaults to type="button" on purpose - a stray submit is how a menu entry ends up
-     * reloading the page - so the one control that IS the submit has to say so. Enter in a text
-     * field then confirms the dialog, which is what a reader expects of one.
-     */
-    submit?: boolean;
+        /**
+         * This button submits the form it is in.
+         *
+         * Everything defaults to type="button" on purpose - a stray submit is how a menu entry ends up
+         * reloading the page - so the one control that IS the submit has to say so. Enter in a text
+         * field then confirms the dialog, which is what a reader expects of one.
+         */
+        submit?: boolean;
 
-    children: ReactNode;
-};
+        children: ReactNode;
+    };
 
 export function Button({
-                           title, onClick, disabled, disabledReason, compact, className, submit, children,
-                       }: ButtonProps): React.JSX.Element {
+    title,
+    onClick,
+    disabled,
+    disabledReason,
+    compact,
+    className,
+    submit,
+    children,
+}: ButtonProps): React.JSX.Element {
     return (
         <button
-            type={submit ? 'submit' : 'button'}
-            className={['btn', compact ? 'compact' : null, className].filter(Boolean).join(' ')}
+            type={submit ? "submit" : "button"}
+            className={["btn", compact ? "compact" : null, className]
+                .filter(Boolean)
+                .join(" ")}
             title={disabled ? disabledReason : title}
             disabled={disabled}
             onClick={onClick}
@@ -90,67 +100,68 @@ export function Button({
     );
 }
 
-export type IconButtonProps = Pressable & Enablement & {
-    icon: IconName;
+export type IconButtonProps = Pressable &
+    Enablement & {
+        icon: IconName;
 
-    /**
-     * Required here, unlike on a labelled button: there is no text to fall back on, so this
-     * normally names the control to a reader hovering it and to a screen reader both.
-     */
-    title: string;
+        /**
+         * Required here, unlike on a labelled button: there is no text to fall back on, so this
+         * normally names the control to a reader hovering it and to a screen reader both.
+         */
+        title: string;
 
-    /**
-     * A shorter accessible name, where the title is a sentence.
-     *
-     * "Choose which language columns to show" is the right tooltip and the wrong thing to hear read
-     * aloud before every other control on the row; that button wants to be called "Columns". Only
-     * worth giving when the two genuinely differ - by default the title does both jobs.
-     */
-    label?: string;
+        /**
+         * A shorter accessible name, where the title is a sentence.
+         *
+         * "Choose which language columns to show" is the right tooltip and the wrong thing to hear read
+         * aloud before every other control on the row; that button wants to be called "Columns". Only
+         * worth giving when the two genuinely differ - by default the title does both jobs.
+         */
+        label?: string;
 
-    /** A placement or state variant such as `header-right`. Added to the base class, never replacing it. */
-    className?: string;
+        /** A placement or state variant such as `header-right`. Added to the base class, never replacing it. */
+        className?: string;
 
-    size?: number;
+        size?: number;
 
-    /**
-     * This control has a state rather than performing a one-off - it is a toggle.
-     *
-     * Given here rather than written as `aria-pressed` at each call site, because a toggle that
-     * does not report its state is indistinguishable from an action to anything that is not looking
-     * at the screen.
-     */
-    pressed?: boolean;
+        /**
+         * This control has a state rather than performing a one-off - it is a toggle.
+         *
+         * Given here rather than written as `aria-pressed` at each call site, because a toggle that
+         * does not report its state is indistinguishable from an action to anything that is not looking
+         * at the screen.
+         */
+        pressed?: boolean;
 
-    /** This control opens something, and that thing is currently open. */
-    expanded?: boolean;
+        /** This control opens something, and that thing is currently open. */
+        expanded?: boolean;
 
-    /**
-     * A count beside the glyph - staged edits waiting to be saved, problems waiting to be read.
-     *
-     * Part of the button rather than a sibling, because it belongs to the same hit area: pressing
-     * the number has to do what pressing the glyph does.
-     */
-    badge?: ReactNode;
+        /**
+         * A count beside the glyph - staged edits waiting to be saved, problems waiting to be read.
+         *
+         * Part of the button rather than a sibling, because it belongs to the same hit area: pressing
+         * the number has to do what pressing the glyph does.
+         */
+        badge?: ReactNode;
 
-    /** For a control something has to measure - a menu positioned under the button that opens it. */
-    ref?: React.Ref<HTMLButtonElement>;
-};
+        /** For a control something has to measure - a menu positioned under the button that opens it. */
+        ref?: React.Ref<HTMLButtonElement>;
+    };
 
 export function IconButton({
-                               icon,
-                               title,
-                               label,
-                               onClick,
-                               disabled,
-                               disabledReason,
-                               className,
-                               size,
-                               pressed,
-                               expanded,
-                               badge,
-                               ref,
-                           }: IconButtonProps): React.JSX.Element {
+    icon,
+    title,
+    label,
+    onClick,
+    disabled,
+    disabledReason,
+    className,
+    size,
+    pressed,
+    expanded,
+    badge,
+    ref,
+}: IconButtonProps): React.JSX.Element {
     // There is no text to fall back on, so one string has to name the control. The reason it cannot
     // be pressed outranks both: it is the only thing worth saying while the control is dead.
     const hover = disabled ? disabledReason : title;
@@ -160,7 +171,9 @@ export function IconButton({
         <button
             ref={ref}
             type="button"
-            className={className === undefined ? 'icon-btn' : `icon-btn ${className}`}
+            className={
+                className === undefined ? "icon-btn" : `icon-btn ${className}`
+            }
             title={hover}
             aria-label={spoken}
             aria-pressed={pressed}
@@ -168,7 +181,7 @@ export function IconButton({
             disabled={disabled}
             onClick={onClick}
         >
-            <Icon name={icon} size={size}/>
+            <Icon name={icon} size={size} />
             {badge}
         </button>
     );

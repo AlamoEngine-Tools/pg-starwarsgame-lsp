@@ -47,6 +47,9 @@ export function shouldShowOverview(zoom: number, detailZoom: number): boolean {
  * A function of the mounted set alone. `windowed` is not the same question: it is about cost, while
  * unmounting also happens for zoom, on graphs of every size, whenever the overview is up.
  */
-export function needsFullMountForLayout(mountedCount: number, modelCount: number): boolean {
+export function needsFullMountForLayout(
+    mountedCount: number,
+    modelCount: number,
+): boolean {
     return mountedCount < modelCount;
 }

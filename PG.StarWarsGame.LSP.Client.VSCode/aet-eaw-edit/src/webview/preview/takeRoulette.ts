@@ -15,7 +15,7 @@
 // The roll comes in from the caller rather than being taken here, so the whole thing is a pure
 // function of a number and the panel is the only part that needs `Math.random`.
 
-import {type AnimationTake} from './animationNames';
+import { type AnimationTake } from "./animationNames";
 
 /**
  * How much more often take zero comes up than any other.
@@ -34,7 +34,7 @@ export const FIRST_TAKE_WEIGHT = 2;
  * first row in the list is not the favoured recording.
  */
 export function takeWeights(takes: readonly AnimationTake[]): number[] {
-    return takes.map(entry => (entry.take === 0 ? FIRST_TAKE_WEIGHT : 1));
+    return takes.map((entry) => (entry.take === 0 ? FIRST_TAKE_WEIGHT : 1));
 }
 
 /**
@@ -44,7 +44,10 @@ export function takeWeights(takes: readonly AnimationTake[]): number[] {
  *     stays a pure function; a roll of exactly 1 still yields the last take rather than nothing,
  *     because a clip that fails to play is a worse answer than a slightly wrong one.
  */
-export function pickTake(takes: readonly AnimationTake[], roll: number): AnimationTake {
+export function pickTake(
+    takes: readonly AnimationTake[],
+    roll: number,
+): AnimationTake {
     const weights = takeWeights(takes);
     const total = weights.reduce((sum, weight) => sum + weight, 0);
 

@@ -19,8 +19,14 @@
 // drained pools reset on open, because the opening rules beat persistence. Nor is the SUBJECT's own
 // state - its damage stage and detail level - which is per subject and resets with it.
 
-import {type Attacker, DEFAULT_ATTACKER} from './attacker';
-import {asRecord, boolean_, nullableString, number_, string_} from './storedValue';
+import { type Attacker, DEFAULT_ATTACKER } from "./attacker";
+import {
+    asRecord,
+    boolean_,
+    nullableString,
+    number_,
+    string_,
+} from "./storedValue";
 
 /** A saved attacker, with a name to recall it by. */
 export interface AttackerPreset extends Attacker {
@@ -82,7 +88,10 @@ function attackerFrom(stored: unknown): Attacker {
     const raw = asRecord(stored);
 
     return {
-        damage: number_(raw.damage, DEFAULT_ATTACKER.damage, {min: 0, max: 1_000_000}),
+        damage: number_(raw.damage, DEFAULT_ATTACKER.damage, {
+            min: 0,
+            max: 1_000_000,
+        }),
         damageType: string_(raw.damageType, DEFAULT_ATTACKER.damageType),
         shield: boolean_(raw.shield, DEFAULT_ATTACKER.shield),
         energy: boolean_(raw.energy, DEFAULT_ATTACKER.energy),
@@ -90,13 +99,20 @@ function attackerFrom(stored: unknown): Attacker {
 
         // An older stored attacker has none of these, and falls back to no blast - which is what it
         // behaved as when it was written.
-        blastDamage: number_(raw.blastDamage, DEFAULT_ATTACKER.blastDamage,
-            {min: 0, max: 1_000_000}),
-        blastRange: number_(raw.blastRange, DEFAULT_ATTACKER.blastRange,
-            {min: 0, max: 1_000_000}),
+        blastDamage: number_(raw.blastDamage, DEFAULT_ATTACKER.blastDamage, {
+            min: 0,
+            max: 1_000_000,
+        }),
+        blastRange: number_(raw.blastRange, DEFAULT_ATTACKER.blastRange, {
+            min: 0,
+            max: 1_000_000,
+        }),
         blastDropoff: boolean_(raw.blastDropoff, DEFAULT_ATTACKER.blastDropoff),
-        blastDropoffTiers: number_(raw.blastDropoffTiers, DEFAULT_ATTACKER.blastDropoffTiers,
-            {min: 0, max: 16}),
+        blastDropoffTiers: number_(
+            raw.blastDropoffTiers,
+            DEFAULT_ATTACKER.blastDropoffTiers,
+            { min: 0, max: 16 },
+        ),
     };
 }
 
@@ -110,15 +126,20 @@ function attackerPresetsFrom(stored: unknown): AttackerPreset[] {
 
     for (const entry of stored) {
         const raw = asRecord(entry);
-        const {id, name} = raw;
+        const { id, name } = raw;
 
         // A preset with no name is a blank row in the list, and one with no id cannot be recalled
         // or deleted. Neither is worth keeping.
-        if (typeof id !== 'string' || id === '' || typeof name !== 'string' || name === '') {
+        if (
+            typeof id !== "string" ||
+            id === "" ||
+            typeof name !== "string" ||
+            name === ""
+        ) {
             continue;
         }
 
-        presets.push({id, name, ...attackerFrom(entry)});
+        presets.push({ id, name, ...attackerFrom(entry) });
     }
 
     return presets;

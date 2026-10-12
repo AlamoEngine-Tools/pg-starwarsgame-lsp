@@ -7,13 +7,12 @@
 // tested directly. Everything here answers a question about one archive entry or one download;
 // `shaderSources.ts` does the fetching and writing.
 
-import {createHash} from 'node:crypto';
-import * as path from 'node:path';
+import { createHash } from "node:crypto";
+import * as path from "node:path";
 
 /** What an archive entry is allowed to become, or why it was refused. */
 export type EntryVerdict =
-    | { keep: true; relativePath: string }
-    | { keep: false; reason: string };
+    { keep: true; relativePath: string } | { keep: false; reason: string };
 
 /**
  * The extensions worth extracting.
@@ -21,7 +20,7 @@ export type EntryVerdict =
  * An allow-list rather than "everything in the zip": we are unpacking a third-party archive into a
  * directory the extension later reads, and the only thing wanted from it is shader source text.
  */
-const WANTED = ['.fx', '.fxh'];
+const WANTED = [".fx", ".fxh"];
 
 /**
  * Whether one archive entry may be written, and where.
@@ -32,20 +31,23 @@ const WANTED = ['.fx', '.fxh'];
  * RESOLVED path rather than by looking for `..` in the text, because `a/../../b` and backslash
  * separators both slip a naive scan.
  */
-export function entryVerdict(entryName: string, targetDirectory: string): EntryVerdict {
+export function entryVerdict(
+    entryName: string,
+    targetDirectory: string,
+): EntryVerdict {
     // Zip paths are '/'-separated by spec, but archives in the wild carry backslashes too.
-    const normalised = entryName.replace(/\\/g, '/');
+    const normalised = entryName.replace(/\\/g, "/");
 
-    if (normalised === '' || normalised.endsWith('/')) {
-        return {keep: false, reason: 'directory entry'};
+    if (normalised === "" || normalised.endsWith("/")) {
+        return { keep: false, reason: "directory entry" };
     }
 
     if (path.isAbsolute(normalised) || /^[A-Za-z]:/.test(normalised)) {
-        return {keep: false, reason: 'absolute path'};
+        return { keep: false, reason: "absolute path" };
     }
 
     if (!WANTED.includes(path.extname(normalised).toLowerCase())) {
-        return {keep: false, reason: 'not a shader source'};
+        return { keep: false, reason: "not a shader source" };
     }
 
     // Flattened deliberately: the archive nests everything under `Shaders/`, and the resolver looks
@@ -55,23 +57,23 @@ export function entryVerdict(entryName: string, targetDirectory: string): EntryV
     const destination = path.resolve(targetDirectory, leaf);
     const root = path.resolve(targetDirectory);
 
-    if (destination !== path.join(root, leaf)
-        || !destination.startsWith(root + path.sep)) {
-        return {keep: false, reason: 'escapes the target directory'};
+    if (
+        destination !== path.join(root, leaf) ||
+        !destination.startsWith(root + path.sep)
+    ) {
+        return { keep: false, reason: "escapes the target directory" };
     }
 
-    return {keep: true, relativePath: leaf};
+    return { keep: true, relativePath: leaf };
 }
 
 /** The SHA-256 of some bytes, lower-case hex - the form the pinned constant is written in. */
 export function sha256(bytes: Uint8Array): string {
-    return createHash('sha256').update(bytes).digest('hex');
+    return createHash("sha256").update(bytes).digest("hex");
 }
 
 /** What a download turned out to be. */
-export type ArchiveCheck =
-    | { ok: true }
-    | { ok: false; problem: string };
+export type ArchiveCheck = { ok: true } | { ok: false; problem: string };
 
 /**
  * Whether a downloaded archive is the one we pinned.
@@ -82,10 +84,12 @@ export type ArchiveCheck =
  * ingestion of different bytes.
  */
 export function checkArchive(
-    bytes: Uint8Array, expectedSha256: string, expectedBytes?: number,
+    bytes: Uint8Array,
+    expectedSha256: string,
+    expectedBytes?: number,
 ): ArchiveCheck {
     if (bytes.length === 0) {
-        return {ok: false, problem: 'the download was empty'};
+        return { ok: false, problem: "the download was empty" };
     }
 
     if (expectedBytes !== undefined && bytes.length !== expectedBytes) {
@@ -99,12 +103,13 @@ export function checkArchive(
     if (actual.toLowerCase() !== expectedSha256.toLowerCase()) {
         return {
             ok: false,
-            problem: 'the checksum did not match. The archive may have been re-published, or '
-                + `something on the network replaced it. Expected ${expectedSha256}, got ${actual}`,
+            problem:
+                "the checksum did not match. The archive may have been re-published, or " +
+                `something on the network replaced it. Expected ${expectedSha256}, got ${actual}`,
         };
     }
 
-    return {ok: true};
+    return { ok: true };
 }
 
 /**
@@ -116,6 +121,6 @@ export function checkArchive(
  */
 export function extractionVerdict(written: number): ArchiveCheck {
     return written > 0
-        ? {ok: true}
-        : {ok: false, problem: 'the archive held no .fx files'};
+        ? { ok: true }
+        : { ok: false, problem: "the archive held no .fx files" };
 }

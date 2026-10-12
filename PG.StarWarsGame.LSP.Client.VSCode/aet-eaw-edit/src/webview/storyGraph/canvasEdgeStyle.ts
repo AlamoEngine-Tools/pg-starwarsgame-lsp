@@ -13,10 +13,10 @@
 // No glow, no shadow. Those are what cost the overview its frame rate before. A plain coloured stroke,
 // bucketed so each distinct style is stroked once per frame.
 
-import {type BranchColour, EDGE_KINDS} from './palette';
+import { type BranchColour, EDGE_KINDS } from "./palette";
 
 /** The stroke an edge with no colour of its own takes - what every canvas edge used to be. */
-export const MUTED_EDGE_TOKEN = '--colour-muted';
+export const MUTED_EDGE_TOKEN = "--colour-muted";
 
 export interface CanvasEdgeStyle {
     readonly token: string;
@@ -26,21 +26,28 @@ export interface CanvasEdgeStyle {
     readonly key: string;
 }
 
-const kindStyles = new Map(EDGE_KINDS
-    .filter(kind => kind.kind !== 'Prereq')
-    .map(kind => [kind.kind, style(kind.token, kind.dash)]));
+const kindStyles = new Map(
+    EDGE_KINDS.filter((kind) => kind.kind !== "Prereq").map((kind) => [
+        kind.kind,
+        style(kind.token, kind.dash),
+    ]),
+);
 // The stub side of a tactical attachment is the same relation, drawn the same way.
-kindStyles.set('TacticalEntry', kindStyles.get('Tactical')!);
+kindStyles.set("TacticalEntry", kindStyles.get("Tactical")!);
 
-const muted = style(MUTED_EDGE_TOKEN, '');
+const muted = style(MUTED_EDGE_TOKEN, "");
 
 /**
  * @param branch The branch the edge feeds, as `edgeBranchFrom` resolves it - only ever set for
  *               Requires edges, and only Requires edges take it.
  */
-export function canvasEdgeStyle(kind: string, branch: string | null, colourOf: BranchColour): CanvasEdgeStyle {
-    if (kind === 'Prereq') {
-        return branch ? style(colourOf(branch), '') : muted;
+export function canvasEdgeStyle(
+    kind: string,
+    branch: string | null,
+    colourOf: BranchColour,
+): CanvasEdgeStyle {
+    if (kind === "Prereq") {
+        return branch ? style(colourOf(branch), "") : muted;
     }
     return kindStyles.get(kind) ?? muted;
 }
@@ -48,7 +55,7 @@ export function canvasEdgeStyle(kind: string, branch: string | null, colourOf: B
 function style(token: string, dash: string): CanvasEdgeStyle {
     return {
         token,
-        dash: dash === '' ? [] : dash.split(/\s+/).map(Number),
+        dash: dash === "" ? [] : dash.split(/\s+/).map(Number),
         key: `${token}|${dash}`,
     };
 }

@@ -7,8 +7,8 @@
 // most of the keys in it are the game's, and the game already ships them in that language. The
 // values come from the baseline the editor has already fetched for the Inherited toggle.
 
-import {LocRow} from './locRow';
-import {BaselineRow} from '../translationInherited';
+import { LocRow } from "./locRow";
+import { BaselineRow } from "../translationInherited";
 
 export interface LanguageFillValue {
     key: string;
@@ -24,13 +24,17 @@ export interface LanguageFillValue {
  * is nothing to copy, and inventing something would be worse than a visible gap.
  */
 export function languageFillValues(
-    language: string, rows: LocRow[], baseline: BaselineRow[]
+    language: string,
+    rows: LocRow[],
+    baseline: BaselineRow[],
 ): LanguageFillValue[] {
     const wanted = language.toUpperCase();
 
     const fromBaseline = new Map<string, string>();
     for (const entry of baseline) {
-        const value = entry.values.find(v => v.language.toUpperCase() === wanted)?.value;
+        const value = entry.values.find(
+            (v) => v.language.toUpperCase() === wanted,
+        )?.value;
         if (value) {
             fromBaseline.set(entry.key, value);
         }
@@ -46,7 +50,7 @@ export function languageFillValues(
 
         const value = fromBaseline.get(row.key);
         if (value !== undefined) {
-            filled.push({key: row.key, value});
+            filled.push({ key: row.key, value });
         }
     }
 

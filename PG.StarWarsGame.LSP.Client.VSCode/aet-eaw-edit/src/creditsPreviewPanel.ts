@@ -1,9 +1,14 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {panelKey, PanelRegistry, WebviewMessage, WebviewPanelHost,} from './webviewPanelHost';
+import {
+    panelKey,
+    PanelRegistry,
+    WebviewMessage,
+    WebviewPanelHost,
+} from "./webviewPanelHost";
 
 /**
  * The credits crawl in its own tab beside the editor, the way a Markdown or LaTeX preview opens.
@@ -20,12 +25,13 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
 
     private constructor(label: string, extensionUri: vscode.Uri) {
         super(extensionUri, {
-            viewType: 'aetCreditsPreview',
+            viewType: "aetCreditsPreview",
             title: `Preview: ${label}`,
             column: vscode.ViewColumn.Beside,
-            script: 'creditsPreview.js',
-            bodyStyle: '  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }\n'
-                + '  #root { height: 100%; position: relative; }',
+            script: "creditsPreview.js",
+            bodyStyle:
+                "  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }\n" +
+                "  #root { height: 100%; position: relative; }",
         });
     }
 
@@ -35,13 +41,20 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
      * Reveals without stealing focus: the user is editing, and the preview updating beside them
      * should not take the caret out of the cell they are typing in.
      */
-    static show(filePath: string, label: string, extensionUri: vscode.Uri, payload: unknown): void {
+    static show(
+        filePath: string,
+        label: string,
+        extensionUri: vscode.Uri,
+        payload: unknown,
+    ): void {
         const key = panelKey(filePath);
         let panel = CreditsPreviewPanel._panels.get(key);
 
         if (panel === undefined) {
             panel = CreditsPreviewPanel._panels.track(
-                key, new CreditsPreviewPanel(label, extensionUri));
+                key,
+                new CreditsPreviewPanel(label, extensionUri),
+            );
         } else {
             panel.reveal(true);
         }
@@ -63,7 +76,7 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
     }
 
     protected onMessage(msg: WebviewMessage): void {
-        if (msg.type === 'ready') {
+        if (msg.type === "ready") {
             // Rows may have arrived before the webview finished loading; hold them until it
             // says it is listening, or the first preview opens empty.
             this._ready = true;
@@ -72,7 +85,7 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
                 this._pending = null;
             }
         }
-        if (msg.type === 'close') {
+        if (msg.type === "close") {
             this.dispose();
         }
     }

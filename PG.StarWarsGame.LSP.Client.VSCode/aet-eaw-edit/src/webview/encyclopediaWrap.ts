@@ -24,11 +24,11 @@ export function wrapByCharacterBudget(text: string, budget: number): string[] {
     // A component that declares no usable Size X gives no budget to wrap against. Taking it
     // literally would compare every length against zero and emit one character per line.
     if (!Number.isFinite(budget) || budget < 2) {
-        return text.split('\n');
+        return text.split("\n");
     }
 
     const out: string[] = [];
-    for (const paragraph of text.split('\n')) {
+    for (const paragraph of text.split("\n")) {
         wrapOne(paragraph, budget, out);
     }
     return out;
@@ -43,18 +43,18 @@ export function wrapByCharacterBudget(text: string, budget: number): string[] {
  */
 function wrapOne(paragraph: string, budget: number, out: string[]): void {
     if (paragraph.length === 0) {
-        out.push('');
+        out.push("");
         return;
     }
 
-    let line = '';
+    let line = "";
     // Where the last space sits within `line`, or -1 when this run has none to cut at.
     let lastSpace = -1;
 
     for (let i = 0; i < paragraph.length; i++) {
         const ch = paragraph[i];
         line += ch;
-        if (ch === ' ') {
+        if (ch === " ") {
             lastSpace = line.length - 1;
         }
 
@@ -71,7 +71,7 @@ function wrapOne(paragraph: string, budget: number, out: string[]): void {
             // Cut at the space, which is consumed rather than carried to the next line.
             out.push(line.slice(0, lastSpace));
             line = line.slice(lastSpace + 1);
-            lastSpace = line.lastIndexOf(' ');
+            lastSpace = line.lastIndexOf(" ");
         }
     }
 

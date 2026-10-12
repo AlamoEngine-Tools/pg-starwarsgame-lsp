@@ -33,7 +33,10 @@ export const DEFAULT_LIGHT_ELEVATION_DEGREES = 45;
  * Returned as a direction rather than a position because the distance is the shadow frustum's
  * business, not the caller's - a directional light has no position that matters to its shading.
  */
-export function lightDirection(azimuthDegrees: number, elevationDegrees: number): Vector3 {
+export function lightDirection(
+    azimuthDegrees: number,
+    elevationDegrees: number,
+): Vector3 {
     const azimuth = (azimuthDegrees * Math.PI) / 180;
     const elevation = (elevationDegrees * Math.PI) / 180;
     const horizontal = Math.cos(elevation);
@@ -57,8 +60,12 @@ export function lightDirection(azimuthDegrees: number, elevationDegrees: number)
  * behind the model relative to the light still has to be inside the frustum to be drawn into the
  * depth map.
  */
-export function shadowFrustum(radius: number): { extent: number; near: number; far: number } {
+export function shadowFrustum(radius: number): {
+    extent: number;
+    near: number;
+    far: number;
+} {
     const extent = Math.max(radius, 1) * 1.6;
 
-    return {extent, near: 0.01 * extent, far: extent * 6};
+    return { extent, near: 0.01 * extent, far: extent * 6 };
 }

@@ -25,7 +25,7 @@
 //   Root excluded. `sabre_light`'s own set contains bone 0, which nothing ever hides, so counting
 //   it would stop the rule ever firing on anything at all.
 
-import {type BoneId, boneIndexOf} from './boneIds';
+import { type BoneId, boneIndexOf } from "./boneIds";
 
 /**
  * Whether a clip hides a skinned mesh on this frame - or undefined, meaning it has said nothing.
@@ -42,11 +42,11 @@ export function skinHiddenByClip(
     skinBones: readonly BoneId[],
     hiddenBy: (id: BoneId) => boolean | undefined,
 ): boolean | undefined {
-    const driven = skinBones.filter(id => boneIndexOf(id) !== 0);
+    const driven = skinBones.filter((id) => boneIndexOf(id) !== 0);
 
     if (driven.length === 0) {
         return undefined;
     }
 
-    return driven.every(id => hiddenBy(id) === false) ? true : undefined;
+    return driven.every((id) => hiddenBy(id) === false) ? true : undefined;
 }

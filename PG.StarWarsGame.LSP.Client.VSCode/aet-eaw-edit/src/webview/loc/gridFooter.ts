@@ -11,8 +11,12 @@
  * same view described as 19,222 rows with 18,019 filtered out by 2 filters is the truth, and says
  * why the rest is missing without the user having to go looking for the control that hid it.
  */
-export function gridFooterLabel(total: number, shown: number, activeFilters: number): string {
-    const parts = [`${format(total)} ${total === 1 ? 'row' : 'rows'}`];
+export function gridFooterLabel(
+    total: number,
+    shown: number,
+    activeFilters: number,
+): string {
+    const parts = [`${format(total)} ${total === 1 ? "row" : "rows"}`];
 
     const hidden = total - shown;
     if (hidden > 0) {
@@ -22,12 +26,14 @@ export function gridFooterLabel(total: number, shown: number, activeFilters: num
     // Reported even when nothing is currently hidden: a filter that matches everything today will
     // start hiding rows the moment the file changes, and its being on is not otherwise obvious.
     if (activeFilters > 0) {
-        parts.push(`${activeFilters} ${activeFilters === 1 ? 'filter' : 'filters'} active`);
+        parts.push(
+            `${activeFilters} ${activeFilters === 1 ? "filter" : "filters"} active`,
+        );
     }
 
-    return parts.join(', ');
+    return parts.join(", ");
 }
 
 function format(n: number): string {
-    return n.toLocaleString('en-US');
+    return n.toLocaleString("en-US");
 }

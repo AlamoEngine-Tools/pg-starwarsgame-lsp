@@ -34,14 +34,14 @@ export interface CameraBinding {
     id: string;
 
     /** What the rule matches ON. Ordered by how specific it is: object, then type, then category. */
-    kind: 'object' | 'type' | 'category';
+    kind: "object" | "type" | "category";
 
     value: string;
     presetId: string;
 }
 
 /** Most specific first. A per-object rule always beats a type, and a type always beats a category. */
-const ORDER: CameraBinding['kind'][] = ['object', 'type', 'category'];
+const ORDER: CameraBinding["kind"][] = ["object", "type", "category"];
 
 /**
  * The rule that decides this subject's opening shot, or null when none applies.
@@ -50,11 +50,13 @@ const ORDER: CameraBinding['kind'][] = ['object', 'type', 'category'];
  * it - taking the last would make adding a rule silently change what an existing one does.
  */
 export function bindingFor(
-    subject: PreviewSubject, bindings: readonly CameraBinding[],
+    subject: PreviewSubject,
+    bindings: readonly CameraBinding[],
 ): CameraBinding | null {
     for (const kind of ORDER) {
         const match = bindings.find(
-            binding => binding.kind === kind && matches(subject, binding));
+            (binding) => binding.kind === kind && matches(subject, binding),
+        );
 
         if (match !== undefined) {
             return match;
@@ -68,20 +70,22 @@ function matches(subject: PreviewSubject, binding: CameraBinding): boolean {
     const wanted = binding.value.trim();
 
     // A rule with nothing in it would match everything, which is never what an empty field means.
-    if (wanted === '') {
+    if (wanted === "") {
         return false;
     }
 
     switch (binding.kind) {
-        case 'object':
+        case "object":
             return same(subject.objectId, wanted);
 
-        case 'type':
+        case "type":
             return same(subject.objectType, wanted);
 
-        case 'category':
+        case "category":
             // Membership, not equality - see PreviewSubject.categories.
-            return subject.categories.some(category => same(category, wanted));
+            return subject.categories.some((category) =>
+                same(category, wanted),
+            );
 
         default:
             return false;

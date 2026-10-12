@@ -8,7 +8,7 @@
 // sees red and green differently. The vanilla data makes the point on its own: Bothan, Hostile and
 // Sarlacc all ship 153,21,223, and Empire and Imperial both ship 54,134,242.
 
-import type {PreviewRgba} from '../../protocol/modelPreview';
+import type { PreviewRgba } from "../../protocol/modelPreview";
 
 /** CIE L*a*b*. */
 export interface Lab {
@@ -18,11 +18,11 @@ export interface Lab {
 }
 
 /** The three dichromacies worth simulating. */
-export type ColourBlindness = 'protanopia' | 'deuteranopia' | 'tritanopia';
+export type ColourBlindness = "protanopia" | "deuteranopia" | "tritanopia";
 
 /** Something worth telling the author about a colour. */
 export interface ColourFinding {
-    severity: 'warning' | 'info';
+    severity: "warning" | "info";
     message: string;
 }
 
@@ -37,8 +37,8 @@ const COLLISION_DELTA_E = 12;
 
 /** The dark of space, and a mid daylight terrain, as the two backdrops a unit is seen against. */
 const BACKDROPS: { name: string; colour: PreviewRgba }[] = [
-    {name: 'the space backdrop', colour: {r: 10, g: 12, b: 20, a: 255}},
-    {name: 'daylight terrain', colour: {r: 138, g: 132, b: 112, a: 255}},
+    { name: "the space backdrop", colour: { r: 10, g: 12, b: 20, a: 255 } },
+    { name: "daylight terrain", colour: { r: 138, g: 132, b: 112, a: 255 } },
 ];
 
 /**
@@ -62,7 +62,9 @@ const BACKDROP_DELTA_E = 20;
 
 function channelToLinear(value: number): number {
     const scaled = Math.min(255, Math.max(0, value)) / 255;
-    return scaled <= 0.04045 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
+    return scaled <= 0.04045
+        ? scaled / 12.92
+        : ((scaled + 0.055) / 1.055) ** 2.4;
 }
 
 /** sRGB to CIE L*a*b*, through XYZ under the D65 white point. */
@@ -78,7 +80,11 @@ export function rgbToLab(colour: PreviewRgba): Lab {
     const f = (t: number): number =>
         t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
 
-    return {l: 116 * f(y) - 16, a: 500 * (f(x) - f(y)), b: 200 * (f(y) - f(z))};
+    return {
+        l: 116 * f(y) - 16,
+        a: 500 * (f(x) - f(y)),
+        b: 200 * (f(y) - f(z)),
+    };
 }
 
 const toRadians = (degrees: number): number => (degrees * Math.PI) / 180;
@@ -141,33 +147,38 @@ export function deltaE2000(first: Lab, second: Lab): number {
         avgH /= 2;
     }
 
-    const t = 1
-        - 0.17 * Math.cos(toRadians(avgH - 30))
-        + 0.24 * Math.cos(toRadians(2 * avgH))
-        + 0.32 * Math.cos(toRadians(3 * avgH + 6))
-        - 0.2 * Math.cos(toRadians(4 * avgH - 63));
+    const t =
+        1 -
+        0.17 * Math.cos(toRadians(avgH - 30)) +
+        0.24 * Math.cos(toRadians(2 * avgH)) +
+        0.32 * Math.cos(toRadians(3 * avgH + 6)) -
+        0.2 * Math.cos(toRadians(4 * avgH - 63));
 
-    const sl = 1 + (0.015 * (avgL - 50) ** 2) / Math.sqrt(20 + (avgL - 50) ** 2);
+    const sl =
+        1 + (0.015 * (avgL - 50) ** 2) / Math.sqrt(20 + (avgL - 50) ** 2);
     const sc = 1 + 0.045 * avgCp;
     const sh = 1 + 0.015 * avgCp * t;
 
-    const rt = -2
-        * Math.sqrt(avgCp ** 7 / (avgCp ** 7 + 25 ** 7))
-        * Math.sin(toRadians(60 * Math.exp(-(((avgH - 275) / 25) ** 2))));
+    const rt =
+        -2 *
+        Math.sqrt(avgCp ** 7 / (avgCp ** 7 + 25 ** 7)) *
+        Math.sin(toRadians(60 * Math.exp(-(((avgH - 275) / 25) ** 2))));
 
     return Math.sqrt(
-        (deltaL / sl) ** 2
-        + (deltaC / sc) ** 2
-        + (deltaH / sh) ** 2
-        + rt * (deltaC / sc) * (deltaH / sh),
+        (deltaL / sl) ** 2 +
+            (deltaC / sc) ** 2 +
+            (deltaH / sh) ** 2 +
+            rt * (deltaC / sc) * (deltaH / sh),
     );
 }
 
 /** WCAG relative luminance. */
 function relativeLuminance(colour: PreviewRgba): number {
-    return 0.2126 * channelToLinear(colour.r)
-        + 0.7152 * channelToLinear(colour.g)
-        + 0.0722 * channelToLinear(colour.b);
+    return (
+        0.2126 * channelToLinear(colour.r) +
+        0.7152 * channelToLinear(colour.g) +
+        0.0722 * channelToLinear(colour.b)
+    );
 }
 
 /** WCAG contrast ratio, between 1 and 21. Order does not matter. */
@@ -205,16 +216,18 @@ const SIMULATION: Record<ColourBlindness, number[][]> = {
 
 function linearToChannel(value: number): number {
     const clamped = Math.min(1, Math.max(0, value));
-    const encoded = clamped <= 0.0031308
-        ? clamped * 12.92
-        : 1.055 * clamped ** (1 / 2.4) - 0.055;
+    const encoded =
+        clamped <= 0.0031308
+            ? clamped * 12.92
+            : 1.055 * clamped ** (1 / 2.4) - 0.055;
 
     return Math.round(encoded * 255);
 }
 
 /** How a colour reads to someone with one of the three dichromacies. */
 export function simulateColourBlindness(
-    colour: PreviewRgba, kind: ColourBlindness,
+    colour: PreviewRgba,
+    kind: ColourBlindness,
 ): PreviewRgba {
     const [row0, row1, row2] = SIMULATION[kind];
 
@@ -248,7 +261,9 @@ export interface NamedColour {
  * an author can act on; "dE 3.4" is a number they have to go and look up first.
  */
 export function reviewFactionColour(
-    colour: PreviewRgba, name: string, others: readonly NamedColour[],
+    colour: PreviewRgba,
+    name: string,
+    others: readonly NamedColour[],
 ): ColourFinding[] {
     const findings: ColourFinding[] = [];
     const lab = rgbToLab(colour);
@@ -262,23 +277,29 @@ export function reviewFactionColour(
         const distance = deltaE2000(lab, rgbToLab(against));
         if (distance < COLLISION_DELTA_E) {
             findings.push({
-                severity: 'warning',
-                message: distance < 1
-                    ? `The same colour as ${other.name}.`
-                    : `Hard to tell apart from ${other.name}.`,
+                severity: "warning",
+                message:
+                    distance < 1
+                        ? `The same colour as ${other.name}.`
+                        : `Hard to tell apart from ${other.name}.`,
             });
             continue;
         }
 
         // Only worth mentioning when normal vision separates them but a dichromat's does not.
-        for (const kind of ['protanopia', 'deuteranopia', 'tritanopia'] as const) {
+        for (const kind of [
+            "protanopia",
+            "deuteranopia",
+            "tritanopia",
+        ] as const) {
             const simulated = deltaE2000(
                 rgbToLab(simulateColourBlindness(colour, kind)),
-                rgbToLab(simulateColourBlindness(against, kind)));
+                rgbToLab(simulateColourBlindness(against, kind)),
+            );
 
             if (simulated < COLLISION_DELTA_E) {
                 findings.push({
-                    severity: 'warning',
+                    severity: "warning",
                     message: `Indistinguishable from ${other.name} under ${kind}.`,
                 });
                 break;
@@ -287,12 +308,14 @@ export function reviewFactionColour(
     }
 
     for (const backdrop of BACKDROPS) {
-        const lowContrast = contrastRatio(colour, backdrop.colour) < MIN_CONTRAST;
-        const closeInHue = deltaE2000(lab, rgbToLab(backdrop.colour)) < BACKDROP_DELTA_E;
+        const lowContrast =
+            contrastRatio(colour, backdrop.colour) < MIN_CONTRAST;
+        const closeInHue =
+            deltaE2000(lab, rgbToLab(backdrop.colour)) < BACKDROP_DELTA_E;
 
         if (lowContrast && closeInHue) {
             findings.push({
-                severity: 'info',
+                severity: "info",
                 message: `Hard to pick out against ${backdrop.name}.`,
             });
         }

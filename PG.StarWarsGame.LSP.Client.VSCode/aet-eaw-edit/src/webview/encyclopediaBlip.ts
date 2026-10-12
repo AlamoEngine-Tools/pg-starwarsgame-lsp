@@ -14,6 +14,12 @@
  *
  * Split out of the card so it can be tested without a DOM, like the rest of the webview's logic.
  */
-export function drawsPopulationBlip(populationValue: number | null | undefined): boolean {
-    return populationValue !== null && populationValue !== undefined && populationValue !== 0;
+export function drawsPopulationBlip(
+    populationValue: number | null | undefined,
+): boolean {
+    return (
+        populationValue !== null &&
+        populationValue !== undefined &&
+        populationValue !== 0
+    );
 }
