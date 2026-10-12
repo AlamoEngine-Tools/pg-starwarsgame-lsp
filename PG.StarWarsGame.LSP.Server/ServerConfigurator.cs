@@ -27,8 +27,10 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
+using PG.StarWarsGame.LSP.Lua.Analysis.Generated;
 using PG.StarWarsGame.LSP.Lua.Analyzer;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
+using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
@@ -339,7 +341,12 @@ public static class ServerConfigurator
                     ConfigDirectory = Path.Combine(Path.GetTempPath(), "aetswg-emmylua",
                         Environment.ProcessId.ToString(CultureInfo.InvariantCulture))
                 }, sp.GetRequiredService<ILogger<LuaAnalyzerHost>>()));
-                services.AddSingleton<ILuaAnalyzer>(sp => sp.GetRequiredService<LuaAnalyzerHost>());
+                // Every handler talks to the analyzer through generated documents: annotations this
+                // server knows, inserted above the script's functions in the text the analyzer reads.
+                services.AddSingleton<ILuaAnalyzer>(sp => new GeneratedAnalyzerDocuments(
+                    sp.GetRequiredService<LuaAnalyzerHost>(),
+                    [new StubOverrideAnnotations(sp.GetRequiredService<ILuaApiSchemaProvider>())],
+                    sp.GetRequiredService<IFileHelper>()));
                 services.AddSingleton<ILuaAnalyzerStarter>(sp => new LuaAnalyzerStarter(
                     sp.GetRequiredService<LuaAnalyzerHost>(),
                     sp.GetRequiredService<ILspConfigurationProvider>(),

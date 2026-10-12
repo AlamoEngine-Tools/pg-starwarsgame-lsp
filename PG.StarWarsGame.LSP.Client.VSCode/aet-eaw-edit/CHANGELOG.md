@@ -43,6 +43,11 @@
   - Entry points on hover: the functions the game or a library calls by name, per kind of script
   - Hover on a script's own definition of an engine function: the engine's documentation
   - An entry point the game calls is not renamed
+- **Engine types in a script's own definition of an engine function** - its parameters and return value typed
+  from the engine's documentation, in the definition and at its calls
+  ([#251](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/251))
+  - The script's text is unchanged; an annotation the script already has wins
+  - Open scripts only
 
 ### Fixes
 
