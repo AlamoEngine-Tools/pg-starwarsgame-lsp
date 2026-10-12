@@ -892,18 +892,6 @@
             "default": true,
             "markdownDescription": "Enables symbol rename in Lua script files. Also required for global rename of XML objects that are referenced from Lua scripts.\n\nChanging this setting automatically restarts the LSP server."
           },
-          "aet-eaw-edit.features.lua.codeLens": {
-            "order": 1600,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "Enables code lenses in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
-          },
-          "aet-eaw-edit.features.lua.inlayHints": {
-            "order": 1700,
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "Enables inlay hints in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
-          },
           "aet-eaw-edit.features.lua.codeActions": {
             "order": 1800,
             "type": "boolean",

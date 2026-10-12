@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -32,7 +33,11 @@ public sealed class LuaAnalyzerHandlersTest
     public async Task DocumentSymbols_AreTheAnalyzers()
     {
         var theirs = new SymbolInformationOrDocumentSymbolContainer(new SymbolInformationOrDocumentSymbol(
-            new DocumentSymbol { Name = "Story_Mode_Service", Kind = SymbolKind.Function, Range = new Range(0, 0, 4, 3), SelectionRange = new Range(0, 9, 0, 27) }));
+            new DocumentSymbol
+            {
+                Name = "Story_Mode_Service", Kind = SymbolKind.Function, Range = new Range(0, 0, 4, 3),
+                SelectionRange = new Range(0, 9, 0, 27)
+            }));
         var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/documentSymbol", theirs);
 
         var result = await new LuaDocumentSymbolHandler(analyzer)
@@ -46,12 +51,14 @@ public sealed class LuaAnalyzerHandlersTest
     {
         var theirs = new SignatureHelp
         {
-            Signatures = new Container<SignatureInformation>(new SignatureInformation { Label = "Find_Player(name: string)" })
+            Signatures = new Container<SignatureInformation>(new SignatureInformation
+                { Label = "Find_Player(name: string)" })
         };
         var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/signatureHelp", theirs);
 
         var result = await new LuaSignatureHelpHandler(analyzer)
-            .Handle(new SignatureHelpParams { TextDocument = Lua, Position = new Position(0, 12) }, CancellationToken.None);
+            .Handle(new SignatureHelpParams { TextDocument = Lua, Position = new Position(0, 12) },
+                CancellationToken.None);
 
         Assert.Equal("Find_Player(name: string)", Assert.Single(result!.Signatures).Label);
     }
@@ -69,11 +76,106 @@ public sealed class LuaAnalyzerHandlersTest
     }
 
     [Fact]
+    public async Task InlayHints_AreTheAnalyzers()
+    {
+        var theirs = new InlayHintContainer(new InlayHint
+        {
+            Position = new Position(4, 22), Label = new StringOrInlayHintLabelParts("faction_name:")
+        });
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/inlayHint", theirs);
+
+        var result = await new LuaInlayHintHandler(analyzer).Handle(new InlayHintParams
+        {
+            TextDocument = Lua, Range = new Range(0, 0, 9, 0)
+        }, CancellationToken.None);
+
+        Assert.Equal(22, Assert.Single(result!).Position.Character);
+    }
+
+    [Fact]
+    public async Task CodeLenses_AreTheAnalyzers()
+    {
+        var theirs = new CodeLensContainer(new CodeLens { Range = new Range(2, 0, 2, 0) });
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/codeLens", theirs);
+
+        var result = await new LuaCodeLensHandler(analyzer)
+            .Handle(new CodeLensParams { TextDocument = Lua }, CancellationToken.None);
+
+        Assert.Equal(2, Assert.Single(result!).Range.Start.Line);
+    }
+
+    // The analyzer sends its lenses without a command and fills it on resolve.
+    [Fact]
+    public async Task ACodeLens_IsResolvedByTheAnalyzer()
+    {
+        var resolved = new CodeLens { Range = new Range(2, 0, 2, 0), Command = new Command { Title = "3 usages" } };
+        var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", resolved);
+
+        var result = await new LuaCodeLensHandler(analyzer)
+            .Handle(new CodeLens { Range = new Range(2, 0, 2, 0) }, CancellationToken.None);
+
+        Assert.Equal("3 usages", result.Command!.Title);
+    }
+
+    // Measured (0.25.1): a lens whose data carries any key besides its own comes back unresolved.
+    [Fact]
+    public async Task ACodeLens_IsSentToResolveWithoutTheRoutingKey()
+    {
+        var analyzer = new ScriptedLuaAnalyzer();
+        var lens = new CodeLens
+        {
+            Range = new Range(2, 0, 2, 0),
+            Data = JObject.Parse("""{"DeclId":"373|15","$$__handler_id__$$":"8f41a571"}""")
+        };
+
+        await new LuaCodeLensHandler(analyzer).Handle(lens, CancellationToken.None);
+
+        var sent = (CodeLens)Assert.Single(analyzer.Requests).Parameters;
+        Assert.Equal("""{"DeclId":"373|15"}""", sent.Data!.ToString(Newtonsoft.Json.Formatting.None));
+    }
+
+    // The analyzer names the editor's command, or its own extension's under --editor vscode (both
+    // measured, 0.25.1); ours takes the arguments as the protocol sends them, in the same order.
+    [Theory]
+    [InlineData("editor.action.showReferences")]
+    [InlineData("emmy.showReferences")]
+    public async Task AResolvedShowReferencesCommand_IsOurs(string theirs)
+    {
+        var resolved = new CodeLens
+        {
+            Range = new Range(2, 0, 2, 0),
+            Command = new Command
+            {
+                Name = theirs, Title = "2 usages",
+                Arguments = JArray.Parse("""["file:///a.lua"]""")
+            }
+        };
+        var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", resolved);
+
+        var result = await new LuaCodeLensHandler(analyzer)
+            .Handle(new CodeLens { Range = new Range(2, 0, 2, 0) }, CancellationToken.None);
+
+        Assert.Equal("aet-eaw-edit.lsp.showReferences", result.Command!.Name);
+        Assert.Equal("file:///a.lua", result.Command.Arguments![0].ToString());
+    }
+
+    [Fact]
+    public async Task ACodeLens_TheAnalyzerSilent_ComesBackAsSent()
+    {
+        var lens = new CodeLens { Range = new Range(2, 0, 2, 0) };
+
+        var result = await new LuaCodeLensHandler(new ScriptedLuaAnalyzer()).Handle(lens, CancellationToken.None);
+
+        Assert.Same(lens, result);
+    }
+
+    [Fact]
     public async Task ANonLuaDocument_IsNeverSentToTheAnalyzer()
     {
         var analyzer = new ScriptedLuaAnalyzer();
 
-        await new LuaFoldingRangeHandler(analyzer).Handle(new FoldingRangeRequestParam { TextDocument = Xml }, CancellationToken.None);
+        await new LuaFoldingRangeHandler(analyzer).Handle(new FoldingRangeRequestParam { TextDocument = Xml },
+            CancellationToken.None);
 
         Assert.Empty(analyzer.Requests);
     }
@@ -96,7 +198,8 @@ public sealed class LuaAnalyzerHandlersTest
     {
         // line 0 col 0 len 5; line 2 col 4 len 3; line 2 col 10 len 2; line 5 col 0 len 1
         var full = ImmutableArray.Create(0, 0, 5, 15, 0, 2, 4, 3, 8, 0, 0, 6, 2, 12, 1, 3, 0, 1, 15, 0);
-        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/semanticTokens/full", new SemanticTokens { Data = full });
+        var analyzer =
+            new ScriptedLuaAnalyzer().Answer("textDocument/semanticTokens/full", new SemanticTokens { Data = full });
 
         var result = await new LuaSemanticTokensHandler(analyzer).Handle(new SemanticTokensRangeParams
         {

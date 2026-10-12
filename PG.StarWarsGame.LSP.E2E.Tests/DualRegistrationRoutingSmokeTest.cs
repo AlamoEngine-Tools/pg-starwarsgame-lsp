@@ -91,9 +91,10 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
             Assert.All(xmlResult.Items, i => Assert.Equal(CompletionItemKind.Property, i.Kind));
             Assert.DoesNotContain(xmlResult.Items, i => i.Kind == CompletionItemKind.Function);
 
-            // ── Lua: identifier completion of a known engine API function ──────
-            var (luaLine, luaCol) = FindIdentifierEndBeforeParen(luaLines, "Find_Object_Type");
-            Assert.True(luaLine >= 0, "Could not find 'Find_Object_Type(' in Interdictor.lua");
+            // ── Lua: the object names an engine function's string argument takes ──
+            // Identifiers are the analyzer's (#155); a tagged string argument is still this server's.
+            var (luaLine, luaCol) = FindStringArgumentStart(luaLines, "Find_Object_Type");
+            Assert.True(luaLine >= 0, "Could not find 'Find_Object_Type(\"' in Interdictor.lua");
 
             using var luaCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var luaResult = await _fixture.Client.RequestCompletion(
@@ -104,9 +105,8 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
                 }, luaCts.Token);
 
             Assert.NotNull(luaResult);
-            Assert.Contains(luaResult.Items, i =>
-                i.Label == "Find_Object_Type" && i.Kind == CompletionItemKind.Function);
-            Assert.DoesNotContain(luaResult.Items, i => i.Kind == CompletionItemKind.Property);
+            Assert.NotEmpty(luaResult.Items);
+            Assert.All(luaResult.Items, i => Assert.Equal(CompletionItemKind.Reference, i.Kind));
         }
         finally
         {
@@ -217,18 +217,17 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
     // ── helpers ────────────────────────────────────────────────────────────────
 
     /// <summary>
-    ///     Returns the 0-based (line, column) immediately after <paramref name="identifier" />
-    ///     in a call like <c>identifier(...)</c> - i.e. a position inside the identifier token
-    ///     itself, so it classifies as a Lua identifier-completion context.
+    ///     Returns the 0-based (line, column) just inside the opening quote of the first string
+    ///     argument in a call like <c>identifier("...")</c>.
     /// </summary>
-    private static (int line, int col) FindIdentifierEndBeforeParen(string[] lines, string identifier)
+    private static (int line, int col) FindStringArgumentStart(string[] lines, string identifier)
     {
-        var marker = $"{identifier}(";
+        var marker = $"{identifier}(\"";
         for (var i = 0; i < lines.Length; i++)
         {
             var idx = lines[i].IndexOf(marker, StringComparison.OrdinalIgnoreCase);
             if (idx < 0) continue;
-            return (i, idx + identifier.Length);
+            return (i, idx + marker.Length);
         }
 
         return (-1, -1);

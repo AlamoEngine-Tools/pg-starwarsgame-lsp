@@ -26,8 +26,6 @@ public sealed class LuaStorySymbolCollectionTest
         var parser = new LuaGameDocumentParser(
             new LuaApiSchemaProvider(apiSchema is null ? [] : [apiSchema]),
             new FileHelper(new MockFileSystem()),
-            NullLogger<LuaGameDocumentParser>.Instance,
-            new LuaAnnotationRepository(),
             configProvider: config);
         return await parser.ParseAsync(Uri, lua, 1, CancellationToken.None);
     }
@@ -93,7 +91,7 @@ public sealed class LuaStorySymbolCollectionTest
     {
         const string api = """
                            ---@param flagName string
-                           ---@xmlref XmlObject:StoryFlag
+                           ---@aetref XmlObject:StoryFlag
                            function Check_Story_Flag(flagName) end
                            """;
 

@@ -50,26 +50,12 @@ public interface ILuaApiSchemaProvider
     ///     or an empty list if none. Lookup is case-insensitive.
     /// </summary>
     IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName);
-
-    /// <summary>
-    ///     Returns all documented members of the given engine type (from <c>function TypeName.X</c>
-    ///     / <c>function TypeName:X</c> declarations). Empty when the type is unknown.
-    /// </summary>
-    IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName);
-
-    /// <summary>
-    ///     Returns the <c>---@class</c> definition for the given type name as declared in
-    ///     the engine API schema (<c>api.d.lua</c>), or <c>null</c> if not found.
-    ///     Lookup is case-insensitive.
-    /// </summary>
-    LuaClassDefinition? GetClassDefinition(string typeName);
 }
 
 /// <summary>
 ///     Describes one reference-carrying string parameter of an engine function: which parameter,
-///     what kind of thing its value names (<c>---@aetref &lt;ReferenceKind&gt;[:&lt;referenceType&gt;]</c>;
-///     the older <c>---@xmlref</c> spelling is read the same way) and, for an XML object, the
-///     object type it must have.
+///     what kind of thing its value names (<c>---@aetref &lt;ReferenceKind&gt;[:&lt;referenceType&gt;]</c>)
+///     and, for an XML object, the object type it must have.
 /// </summary>
 /// <param name="Literals">
 ///     String literals the parameter's declared type names (<c>string|"local"</c>): values the
@@ -80,10 +66,3 @@ public readonly record struct XmlRefEntry(
     string? ExpectedTypeName,
     ReferenceKind Kind = ReferenceKind.XmlObject,
     IReadOnlyList<string>? Literals = null);
-
-/// <summary>Describes one member of an engine-exposed Lua type.</summary>
-public readonly record struct LuaTypeMember(
-    string Name,
-    bool IsMethod,
-    string? Description,
-    string? ReturnTypeName);

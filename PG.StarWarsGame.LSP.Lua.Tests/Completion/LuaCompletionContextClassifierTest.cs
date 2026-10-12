@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Lua.Tests.Completion;
 
 public sealed class LuaCompletionContextClassifierTest
 {
-    private static LuaCompletionContext? Classify(string text, int line = 0, int character = -1)
+    private static StringArgContext? Classify(string text, int line = 0, int character = -1)
     {
         var lines = text.Split('\n');
         var col = character < 0 ? line < lines.Length ? lines[line].TrimEnd('\r').Length : 0 : character;
@@ -55,91 +55,14 @@ public sealed class LuaCompletionContextClassifierTest
         Assert.Null(ctx);
     }
 
-    // ── member access context ─────────────────────────────────────────────────
-
-    [Fact]
-    public void Classify_CursorAfterDot_ReturnsMemberAccessContextFieldAccess()
+    // Identifiers and members are the analyzer's to complete (#155).
+    [Theory]
+    [InlineData("unit.")]
+    [InlineData("unit:Get")]
+    [InlineData("local x = Fin")]
+    [InlineData("")]
+    public void Classify_OutsideAStringArgument_ReturnsNull(string text)
     {
-        // "playerObj." - cursor right after the dot
-        const string text = "playerObj.";
-        var ctx = Classify(text, character: text.Length);
-        var m = Assert.IsType<MemberAccessContext>(ctx);
-        Assert.False(m.IsMethodCall);
-    }
-
-    [Fact]
-    public void Classify_CursorAfterDot_ReceiverNameExtracted()
-    {
-        const string text = "playerObj.";
-        var ctx = Classify(text, character: text.Length);
-        var m = Assert.IsType<MemberAccessContext>(ctx);
-        Assert.Equal("playerObj", m.ReceiverName);
-    }
-
-    [Fact]
-    public void Classify_CursorAfterColon_ReturnsMemberAccessContextMethodCall()
-    {
-        const string text = "playerObj:";
-        var ctx = Classify(text, character: text.Length);
-        var m = Assert.IsType<MemberAccessContext>(ctx);
-        Assert.True(m.IsMethodCall);
-    }
-
-    [Fact]
-    public void Classify_CursorAfterColon_ReceiverNameExtracted()
-    {
-        const string text = "playerObj:";
-        var ctx = Classify(text, character: text.Length);
-        var m = Assert.IsType<MemberAccessContext>(ctx);
-        Assert.Equal("playerObj", m.ReceiverName);
-    }
-
-    [Fact]
-    public void Classify_CursorAfterDot_WithLeadingWhitespace_ReceiverNameExtracted()
-    {
-        const string text = "    self.";
-        var ctx = Classify(text, character: text.Length);
-        var m = Assert.IsType<MemberAccessContext>(ctx);
-        Assert.Equal("self", m.ReceiverName);
-    }
-
-    // ── identifier context ────────────────────────────────────────────────────
-
-    [Fact]
-    public void Classify_CursorAtBareIdentifier_ReturnsIdentifierContext()
-    {
-        // "GetP" - partial identifier
-        const string text = "GetP";
-        var ctx = Classify(text, character: text.Length);
-        Assert.IsType<IdentifierContext>(ctx);
-    }
-
-    [Fact]
-    public void Classify_CursorAtStartOfLine_IdentifierContextAtStatementStartTrue()
-    {
-        // line 1 starts with only whitespace before the cursor → statement start
-        const string text = "function Foo()\n    ";
-        var ctx = Classify(text, 1, 4);
-        var id = Assert.IsType<IdentifierContext>(ctx);
-        Assert.True(id.AtStatementStart);
-    }
-
-    [Fact]
-    public void Classify_CursorAfterAssignment_IdentifierContextAtStatementStartFalse()
-    {
-        // "local x = Get" - cursor after "= "
-        const string text = "local x = Get";
-        var ctx = Classify(text, character: text.Length);
-        var id = Assert.IsType<IdentifierContext>(ctx);
-        Assert.False(id.AtStatementStart);
-    }
-
-    [Fact]
-    public void Classify_EmptyLine_IdentifierContextAtStatementStartTrue()
-    {
-        const string text = "";
-        var ctx = Classify(text, character: 0);
-        var id = Assert.IsType<IdentifierContext>(ctx);
-        Assert.True(id.AtStatementStart);
+        Assert.Null(Classify(text));
     }
 }

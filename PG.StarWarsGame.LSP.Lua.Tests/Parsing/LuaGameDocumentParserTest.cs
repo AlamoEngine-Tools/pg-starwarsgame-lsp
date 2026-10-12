@@ -20,16 +20,16 @@ public sealed class LuaGameDocumentParserTest
         return new LuaApiSchemaProvider([
             """
             ---@param typeName string
-            ---@xmlref XmlObject
+            ---@aetref XmlObject
             function Find_First_Object(typeName) end
             ---@param typeName string
-            ---@xmlref XmlObject
+            ---@aetref XmlObject
             function Find_Object_Type(typeName) end
             ---@param typeName string
-            ---@xmlref XmlObject
+            ---@aetref XmlObject
             function Find_All_Objects_Of_Type(typeName) end
             ---@param playerName string|"local"
-            ---@xmlref XmlObject:Faction
+            ---@aetref XmlObject:Faction
             function Find_Player(playerName) end
             ---@param textId string
             ---@aetref LocalisationKey
@@ -179,32 +179,9 @@ public sealed class LuaGameDocumentParserTest
         Assert.DoesNotContain(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
     }
 
-    private static LuaGameDocumentParser Build(LuaAnnotationRepository? repo = null)
+    private static LuaGameDocumentParser Build()
     {
-        return new LuaGameDocumentParser(BuildSchema(),
-            new FileHelper(new MockFileSystem()),
-            NullLogger<LuaGameDocumentParser>.Instance,
-            repo ?? new LuaAnnotationRepository());
-    }
-
-    // ── statistics ───────────────────────────────────────────────────────────
-
-    /// <summary>
-    ///     The parser keeps one serialized annotation state per file it ever parsed (that is what
-    ///     the snapshot persists). Exact bytes, because they are byte arrays.
-    /// </summary>
-    [Fact]
-    public async Task Snapshot_CountsParserStateEntriesAndTheirBytes()
-    {
-        var parser = Build();
-        await parser.ParseAsync("file:///c:/mod/a.lua", "---@class Foo\nlocal Foo = {}\n", 1, CancellationToken.None);
-        await parser.ParseAsync("file:///c:/mod/b.lua", "local x = 1\n", 1, CancellationToken.None);
-
-        var stats = ((PG.StarWarsGame.LSP.Core.Caching.ICacheStatisticsSource)parser).Snapshot();
-
-        Assert.Equal("lua-parser-state", stats.Name);
-        Assert.Equal(2, stats.Entries);
-        Assert.True(stats.ApproximateBytes > 0);
+        return new LuaGameDocumentParser(BuildSchema(), new FileHelper(new MockFileSystem()));
     }
 
     // ── CanParse ─────────────────────────────────────────────────────────────
@@ -594,207 +571,20 @@ public sealed class LuaGameDocumentParserTest
         Assert.Equal("eawx-std/ModContentLoader", result.RequireArgs[1]);
     }
 
-    // ── annotation repository population ─────────────────────────────────────
+    // ── a global function's doc comment ──────────────────────────────────────
 
     [Fact]
-    public async Task ParseAsync_FunctionWithAnnotations_PopulatesRepository()
+    public async Task ParseAsync_AGlobalFunctionsProse_IsItsSymbolsDescription()
     {
-        var repo = new LuaAnnotationRepository();
-        const string uri = "file:///funcs.lua";
         const string text = """
                             --- Runs the named mission.
                             ---@param name string
                             function RunMission(name) end
                             """;
 
-        await Build(repo).ParseAsync(uri, text, 1, default);
+        var result = await Build().ParseAsync("file:///funcs.lua", text, 1, default);
 
-        Assert.True(repo.All.ContainsKey(uri));
-        var annotations = repo.All[uri];
-        Assert.Contains(annotations, a => !a.Params.IsDefaultOrEmpty);
-    }
-
-    [Fact]
-    public async Task ParseAsync_ClassDeclarationAboveAssignment_PopulatesRepositoryWithClassDef()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string uri = "file:///types.lua";
-        const string text = """
-                            ---@class PGUnit
-                            ---@field name string
-                            ---@field id integer
-                            PGUnit = {}
-                            """;
-
-        await Build(repo).ParseAsync(uri, text, 1, default);
-
-        repo.RebuildIndex();
-        var cls = repo.Current.GetClass("PGUnit");
-        Assert.NotNull(cls);
-        Assert.Equal("PGUnit", cls!.Name);
-        Assert.Equal(2, cls.Fields.Length);
-    }
-
-    [Fact]
-    public async Task ParseAsync_AliasDeclarationAboveAssignment_PopulatesRepositoryWithAliasDef()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string uri = "file:///types.lua";
-        const string text = """
-                            ---@alias GameCommandType string
-                            GameCommandType = nil
-                            """;
-
-        await Build(repo).ParseAsync(uri, text, 1, default);
-
-        repo.RebuildIndex();
-        Assert.NotNull(repo.Current.GetAlias("GameCommandType"));
-    }
-
-    [Fact]
-    public async Task ParseAsync_EnumDeclarationAboveAssignment_PopulatesRepositoryWithEnumDef()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string uri = "file:///types.lua";
-        const string text = """
-                            ---@enum PlanetStatus
-                            PlanetStatus = { Owned = 0, Contested = 1 }
-                            """;
-
-        await Build(repo).ParseAsync(uri, text, 1, default);
-
-        repo.RebuildIndex();
-        Assert.NotNull(repo.Current.GetEnum("PlanetStatus"));
-    }
-
-    [Fact]
-    public async Task ParseAsync_MixedDeclarationFile_PopulatesAllTypeKinds()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string uri = "file:///api.d.lua";
-        const string text = """
-                            ---@class GameEntity
-                            ---@field id integer
-                            GameEntity = {}
-
-                            ---@alias GameEntityId integer
-                            GameEntityId = nil
-
-                            --- Finds by name.
-                            ---@param name string
-                            function Find_Entity(name) end
-                            """;
-
-        await Build(repo).ParseAsync(uri, text, 1, default);
-
-        repo.RebuildIndex();
-        Assert.NotNull(repo.Current.GetClass("GameEntity"));
-        Assert.NotNull(repo.Current.GetAlias("GameEntityId"));
-    }
-
-    [Fact]
-    public async Task ParseAsync_NoFunctions_RegistersEmptyAnnotationsForUri()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string uri = "file:///empty.lua";
-
-        await Build(repo).ParseAsync(uri, "local x = 1", 1, default);
-
-        Assert.True(repo.All.ContainsKey(uri));
-        Assert.Empty(repo.All[uri]);
-    }
-
-    // ── function annotation index ─────────────────────────────────────────────
-
-    [Fact]
-    public async Task ParseAsync_GlobalFunctionWithDocComment_RegistersFunctionAnnotationByName()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string lua = """
-                           --- Runs the mission.
-                           ---@param missionName string The mission to run.
-                           ---@return boolean
-                           function RunMission(missionName) end
-                           """;
-
-        await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
-
-        var ann = repo.GetFunctionAnnotation("RunMission");
-        Assert.NotNull(ann);
-        Assert.Equal("Runs the mission.", ann!.Description);
-        Assert.Single(ann.Params);
-        Assert.Equal("missionName", ann.Params[0].Name);
-        Assert.Single(ann.Returns);
-        Assert.Equal("boolean", ann.Returns[0].Type.Raw);
-    }
-
-    [Fact]
-    public async Task ParseAsync_GlobalFunctionWithoutDocComment_RegistersEmptyAnnotationByName()
-    {
-        var repo = new LuaAnnotationRepository();
-
-        await Build(repo).ParseAsync("file:///s.lua", "function NoDoc() end", 1, default);
-
-        var ann = repo.GetFunctionAnnotation("NoDoc");
-        Assert.NotNull(ann);
-        Assert.Null(ann!.Description);
-        Assert.True(ann.Params.IsDefaultOrEmpty);
-    }
-
-    [Fact]
-    public async Task ParseAsync_LocalFunctionWithDocComment_RegistersFunctionAnnotationByName()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string lua = """
-                           --- Local helper.
-                           ---@param x number
-                           local function Helper(x) end
-                           """;
-
-        await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
-
-        var ann = repo.GetFunctionAnnotation("Helper");
-        Assert.NotNull(ann);
-        Assert.Equal("Local helper.", ann!.Description);
-        Assert.Single(ann.Params);
-        Assert.Equal("x", ann.Params[0].Name);
-    }
-
-    [Fact]
-    public async Task ParseAsync_MemberFunctionWithDocComment_RegistersFunctionAnnotationBySimpleName()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string lua = """
-                           --- Sets the value.
-                           ---@param value number
-                           function Obj.SetValue(value) end
-                           """;
-
-        await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
-
-        var ann = repo.GetFunctionAnnotation("SetValue");
-        Assert.NotNull(ann);
-        Assert.Equal("Sets the value.", ann!.Description);
-        Assert.Single(ann.Params);
-        Assert.Equal("value", ann.Params[0].Name);
-    }
-
-    [Fact]
-    public async Task ParseAsync_MethodFunctionWithDocComment_RegistersFunctionAnnotationBySimpleName()
-    {
-        var repo = new LuaAnnotationRepository();
-        const string lua = """
-                           --- Gets the value.
-                           ---@return number
-                           function Obj:GetValue() end
-                           """;
-
-        await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
-
-        var ann = repo.GetFunctionAnnotation("GetValue");
-        Assert.NotNull(ann);
-        Assert.Equal("Gets the value.", ann!.Description);
-        Assert.Single(ann.Returns);
-        Assert.Equal("number", ann.Returns[0].Type.Raw);
+        var symbol = Assert.Single(result.Symbols, s => s.Id == "RunMission");
+        Assert.Equal("Runs the named mission.", symbol.Description);
     }
 }

@@ -60,8 +60,9 @@ public static partial class LuaAnalyzerAnswers
             string.IsNullOrEmpty(m.Language) ? m.Value : $"```{m.Language}\n{m.Value}\n```") ?? []);
     }
 
-    // The analyzer renders tags it does not know as text; ours (@aetref, @xmlref) are this
-    // server's to show, as the reference card. Measured in the spike: "@*xmlref* XmlObject".
+    // The analyzer renders tags it does not know as text; ours (@aetref) is this server's to show,
+    // as the reference card. Measured in the spike, when the tag was still spelled @xmlref:
+    // "@*xmlref* XmlObject".
     private static string CleanAnalyzerMarkdown(string markdown)
     {
         var kept = ReferenceTagLine().Replace(markdown, "");
@@ -73,7 +74,7 @@ public static partial class LuaAnalyzerAnswers
         return new MarkedStringsOrMarkupContent(new MarkupContent { Kind = MarkupKind.Markdown, Value = markdown });
     }
 
-    [GeneratedRegex(@"^[ \t]*@\*?(aetref|xmlref)\*?.*$", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^[ \t]*@\*?aetref\*?.*$", RegexOptions.Multiline)]
     private static partial Regex ReferenceTagLine();
 
     [GeneratedRegex(@"\n{3,}")]

@@ -66,7 +66,7 @@ public sealed class LuaApiSchemaProviderTest
     {
         const string content = """
                                ---@param typeName string
-                               ---@xmlref XmlObject
+                               ---@aetref XmlObject
                                function Find_First_Object(typeName) end
                                """;
         var entry = Assert.Single(Build(content).GetXmlRefs("Find_First_Object"));
@@ -79,7 +79,7 @@ public sealed class LuaApiSchemaProviderTest
     {
         const string content = """
                                ---@param factionName string
-                               ---@xmlref XmlObject:Faction
+                               ---@aetref XmlObject:Faction
                                function Find_Player(factionName) end
                                """;
         var entry = Assert.Single(Build(content).GetXmlRefs("Find_Player"));
@@ -93,7 +93,7 @@ public sealed class LuaApiSchemaProviderTest
         const string content = """
                                ---@param first string
                                ---@param second string
-                               ---@xmlref XmlObject
+                               ---@aetref XmlObject
                                function Foo(first, second) end
                                """;
         var entry = Assert.Single(Build(content).GetXmlRefs("Foo"));
@@ -106,7 +106,7 @@ public sealed class LuaApiSchemaProviderTest
     {
         const string content = """
                                ---@param typeName string
-                               ---@xmlref XmlObject
+                               ---@aetref XmlObject
                                ---@param pos userdata
                                ---@param player userdata
                                function Spawn_Unit(typeName, pos, player) end
@@ -120,9 +120,9 @@ public sealed class LuaApiSchemaProviderTest
     {
         const string content = """
                                ---@param typeA string
-                               ---@xmlref XmlObject
+                               ---@aetref XmlObject
                                ---@param typeB string
-                               ---@xmlref XmlObject:Faction
+                               ---@aetref XmlObject:Faction
                                function Multi(typeA, typeB) end
                                """;
         var entries = Build(content).GetXmlRefs("Multi");
@@ -136,7 +136,7 @@ public sealed class LuaApiSchemaProviderTest
     {
         const string content = """
                                ---@param typeName string
-                               ---@xmlref XmlObject
+                               ---@aetref XmlObject
                                function Find_First_Object(typeName) end
                                """;
         var provider = Build(content);
@@ -217,7 +217,6 @@ public sealed class LuaApiSchemaProviderTest
         Assert.Equal(0, entry.ParamIndex);
         Assert.Equal(ReferenceKind.XmlObject, entry.Kind);
         Assert.Equal("SFXEvent", entry.ExpectedTypeName);
-        Assert.Contains("Play_SFX_Event", provider.GetMembersOf("GameObject").Select(m => m.Name));
     }
 
     [Fact]
@@ -286,17 +285,16 @@ public sealed class LuaApiSchemaProviderTest
         Assert.Null(entry.ExpectedTypeName);
     }
 
+    // The pre-#151 spelling was dropped in #155; nothing shipped uses it.
     [Fact]
-    public void GetXmlRefs_LegacyXmlrefTag_IsAnXmlObjectRef()
+    public void GetXmlRefs_TheOldXmlrefSpelling_IsNoReferenceTag()
     {
         const string content = """
                                ---@param factionName string
                                ---@xmlref XmlObject:Faction
                                function Find_Player(factionName) end
                                """;
-        var entry = Assert.Single(Build(content).GetXmlRefs("Find_Player"));
-        Assert.Equal(ReferenceKind.XmlObject, entry.Kind);
-        Assert.Equal("Faction", entry.ExpectedTypeName);
+        Assert.Empty(Build(content).GetXmlRefs("Find_Player"));
     }
 
     [Fact]
@@ -379,76 +377,19 @@ public sealed class LuaApiSchemaProviderTest
         Assert.DoesNotContain("helper", provider.DeclaredGlobalNames);
     }
 
-    // ── GetClassDefinition ────────────────────────────────────────────────────
-
+    // A class block between functions does not leak into the function after it.
     [Fact]
-    public void GetClassDefinition_ReturnsNull_WhenNotRegistered()
-    {
-        var provider = Build("function Foo() end");
-        Assert.Null(provider.GetClassDefinition("NoSuchType"));
-    }
-
-    [Fact]
-    public void GetClassDefinition_ReturnsClass_WhenDeclaredInContent()
-    {
-        var provider = Build("""
-                             ---@class PGUnit
-                             ---@field name string
-                             ---@field id integer
-                             PGUnit = {}
-                             """);
-
-        var cls = provider.GetClassDefinition("PGUnit");
-        Assert.NotNull(cls);
-        Assert.Equal("PGUnit", cls!.Name);
-        Assert.Equal(2, cls.Fields.Length);
-        Assert.Equal("name", cls.Fields[0].Name);
-        Assert.Equal("id", cls.Fields[1].Name);
-    }
-
-    [Fact]
-    public void GetClassDefinition_LookupIsCaseInsensitive()
-    {
-        var provider = Build("""
-                             ---@class GameEntity
-                             GameEntity = {}
-                             """);
-
-        Assert.NotNull(provider.GetClassDefinition("gameentity"));
-        Assert.NotNull(provider.GetClassDefinition("GAMEENTITY"));
-    }
-
-    [Fact]
-    public void GetClassDefinition_DoesNotInterfereWithFunctionParsing()
+    public void AClassBlock_DoesNotInterfereWithFunctionParsing()
     {
         var provider = Build("""
                              ---@class PGUnit
                              PGUnit = {}
                              ---@param typeName string
-                             ---@xmlref XmlObject
+                             ---@aetref XmlObject
                              function Find_First_Object(typeName) end
                              """);
 
-        Assert.NotNull(provider.GetClassDefinition("PGUnit"));
         Assert.Contains("Find_First_Object", provider.AllFunctionNames);
-    }
-
-    [Fact]
-    public void LuaApiSchemaProxy_GetClassDefinition_ReturnsNull_BeforeConfigure()
-    {
-        var proxy = new LuaApiSchemaProxy();
-        Assert.Null(proxy.GetClassDefinition("Anything"));
-    }
-
-    [Fact]
-    public void LuaApiSchemaProxy_GetClassDefinition_DelegatesToInnerAfterConfigure()
-    {
-        var proxy = new LuaApiSchemaProxy();
-        proxy.Configure(Build("""
-                              ---@class PGUnit
-                              PGUnit = {}
-                              """));
-
-        Assert.NotNull(proxy.GetClassDefinition("PGUnit"));
+        Assert.Equal(0, Assert.Single(provider.GetXmlRefs("Find_First_Object")).ParamIndex);
     }
 }

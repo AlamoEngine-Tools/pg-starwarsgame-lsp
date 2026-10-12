@@ -205,11 +205,14 @@ Every EaW XML file is read as the game reads it and, when the game keeps it, as 
 
 Scripts under the declared `scripts` directories are indexed and checked.
 
-- Completion
+- Completion of string arguments that name game objects, text keys and modules
 - Go to definition
 - Rename, including XML objects referenced from Lua
-- Code lenses, inlay hints, quick fixes
+- Quick fixes
 - Hover and diagnostics _(work in progress)_
+- **Lua analyzer** (`aet-eaw-edit.features.lua.analyzer`) - identifier and member completion, the workspace's own
+  functions and types on hover, references, symbols, signature help, folding, semantic highlighting, code lenses
+  and inlay hints _(work in progress)_
 - **Engine surface from measured stubs** - the 133 registered engine functions, the 9 wrapper classes with their
   methods, the standard library the game opens (Lua 5.0: no `math`, `io` or `os`) and the globals each script
   host maps in, as `---@meta` files in the [schema repository](https://github.com/AlamoEngine-Tools/eaw-schema)
@@ -694,8 +697,6 @@ Lua:
 | `aet-eaw-edit.features.lua.diagnostics` | `false` | Diagnostics _(work in progress)_ |
 | `aet-eaw-edit.features.lua.goToDefinition` | `true` | Go to definition |
 | `aet-eaw-edit.features.lua.rename` | `true` | Symbol rename, including XML objects referenced from Lua |
-| `aet-eaw-edit.features.lua.codeLens` | `true` | Code lenses |
-| `aet-eaw-edit.features.lua.inlayHints` | `true` | Inlay hints |
 | `aet-eaw-edit.features.lua.codeActions` | `true` | Code actions (quick fixes) |
 | `aet-eaw-edit.features.lua.debugger` | `false` | Lua debugger: debug type, Lua Scripts view, `aet-eaw-edit.game.*` _(work in progress)_ |
 | `aet-eaw-edit.features.lua.analyzer` | `false` | Lua analyzer (`emmylua_ls`) behind the server, open scripts mirrored to it; needs `AET_EMMYLUA_LS` or an `emmylua` folder beside the server _(work in progress)_ |

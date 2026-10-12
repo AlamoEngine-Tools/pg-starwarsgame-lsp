@@ -66,7 +66,6 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             schemaProvider,
             new EaWXmlContext(fileHelper),
             new NullProjectIndexCache(),
-            new LuaAnnotationRepository(),
             new StoryChainProblemStore(),
             new FakeLspConfigurationProvider(),
             NoMegEntries.Instance,

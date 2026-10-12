@@ -380,8 +380,6 @@ function resolveFeatureFlags() {
             diagnostics: flag('lua.diagnostics', false),
             goToDefinition: flag('lua.goToDefinition', true),
             rename: flag('lua.rename', true),
-            codeLens: flag('lua.codeLens', true),
-            inlayHints: flag('lua.inlayHints', true),
             codeActions: flag('lua.codeActions', true),
             debugger: flag('lua.debugger', false),
             analyzer: flag('lua.analyzer', false),

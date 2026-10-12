@@ -45,4 +45,44 @@ public sealed class LuaFrameScopeTest
         Assert.DoesNotContain(locals, l => l.IsParameter);
         Assert.DoesNotContain(locals, l => l.Name == "speed");
     }
+
+    private static IReadOnlyList<LuaFrameLocal> LocalsAt(string text, int line, int character = 0)
+    {
+        return LuaFrameScope.LocalsAt(ParsedLuaDocument.Parse(text).Tree, text, line, character);
+    }
+
+    [Fact]
+    public void ALocalDeclaredAfterThePosition_IsNotInScope()
+    {
+        Assert.DoesNotContain(LocalsAt("\nlocal x = 1", 0), l => l.Name == "x");
+    }
+
+    [Fact]
+    public void OnlyTheLocalsDeclaredAbove_AreInScope()
+    {
+        var locals = LocalsAt("local a = 1\n\nlocal b = 2", 1);
+
+        Assert.Contains(new LuaFrameLocal("a", false), locals);
+        Assert.DoesNotContain(locals, l => l.Name == "b");
+    }
+
+    [Fact]
+    public void AFunctionsLocal_IsNotVisibleAfterIt()
+    {
+        Assert.DoesNotContain(LocalsAt("function Foo()\n    local y = 1\nend\n", 3), l => l.Name == "y");
+    }
+
+    [Fact]
+    public void EveryParameter_IsInScopeInsideTheBody()
+    {
+        var locals = LocalsAt("function Foo(a, b, c)\n    \nend", 1, 4);
+
+        Assert.Equal(["a", "b", "c"], locals.Where(l => l.IsParameter).Select(l => l.Name));
+    }
+
+    [Fact]
+    public void AnAnonymousFunctionsParameter_IsInScopeInsideIt()
+    {
+        Assert.Contains(new LuaFrameLocal("evt", true), LocalsAt("Register(function(evt)\n    \nend)", 1, 4));
+    }
 }

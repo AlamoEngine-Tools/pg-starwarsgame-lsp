@@ -330,8 +330,6 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.True(features.Lua.Diagnostics);
         Assert.True(features.Lua.GoToDefinition);
         Assert.True(features.Lua.Rename);
-        Assert.True(features.Lua.CodeLens);
-        Assert.True(features.Lua.InlayHints);
         Assert.True(features.Lua.CodeActions);
         Assert.True(features.Tools.Localisation);
         Assert.True(features.Tools.Variants);
@@ -466,7 +464,7 @@ public sealed class LspConfigurationProviderTest : IDisposable
             features = new
             {
                 xml = new { goToDefinition = false, inlayHints = false, linkedEditing = false },
-                lua = new { codeLens = false, hover = false },
+                lua = new { codeActions = false, hover = false },
                 tools = new { localisation = false }
             }
         }));
@@ -475,7 +473,7 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.False(features.Xml.GoToDefinition);
         Assert.False(features.Xml.InlayHints);
         Assert.False(features.Xml.LinkedEditing);
-        Assert.False(features.Lua.CodeLens);
+        Assert.False(features.Lua.CodeActions);
         Assert.False(features.Lua.Hover);
         Assert.False(features.Tools.Localisation);
         // Untouched leaves keep their defaults.
@@ -509,12 +507,12 @@ public sealed class LspConfigurationProviderTest : IDisposable
     [Fact]
     public void Merge_InitOptionsFeaturesWinWholesaleOverFileFeatures()
     {
-        // File disables Xml.Hover and Lua.CodeLens; init options send a features node that
+        // File disables Xml.Hover and Lua.CodeActions; init options send a features node that
         // only disables Xml.Completion. The init options node replaces the file node wholesale
         // (the client always sends the complete resolved object), so the file's flags are gone.
         File.WriteAllText(
             Path.Combine(_tempDir, ".pg-lsp.json"),
-            """{"Features":{"Xml":{"Hover":false},"Lua":{"CodeLens":false}}}""");
+            """{"Features":{"Xml":{"Hover":false},"Lua":{"CodeActions":false}}}""");
 
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
         provider.LoadFrom(Json(new
@@ -525,7 +523,7 @@ public sealed class LspConfigurationProviderTest : IDisposable
 
         Assert.False(provider.Current.Features.Xml.Completion);
         Assert.True(provider.Current.Features.Xml.Hover);
-        Assert.True(provider.Current.Features.Lua.CodeLens);
+        Assert.True(provider.Current.Features.Lua.CodeActions);
     }
 
     [Fact]
