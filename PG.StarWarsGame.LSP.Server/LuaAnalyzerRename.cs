@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -13,6 +14,30 @@ namespace PG.StarWarsGame.LSP.Server;
 /// </summary>
 internal static class LuaAnalyzerRename
 {
+    /// <summary>
+    ///     The edits within the rename's scope from <paramref name="from" />: the analyzer renames over
+    ///     one namespace, the game has one per script, joined where a shared file names the global
+    ///     (#249). The analyzer's edit is its list of files naming it.
+    /// </summary>
+    public static WorkspaceEdit KeepWithinState(WorkspaceEdit edit, LuaSandbox sandbox, string from)
+    {
+        var naming = (edit.Changes?.Keys ?? []).Concat(edit.DocumentChanges?
+                .Where(c => c.IsTextDocumentEdit)
+                .Select(c => c.TextDocumentEdit!.TextDocument.Uri) ?? [])
+            .Select(u => u.ToString());
+        var inScope = sandbox.RenameScope(from, naming);
+        return edit with
+        {
+            Changes = edit.Changes?
+                .Where(c => inScope(c.Key.ToString()))
+                .ToDictionary(c => c.Key, c => c.Value),
+            DocumentChanges = edit.DocumentChanges is null
+                ? null
+                : new Container<WorkspaceEditDocumentChange>(edit.DocumentChanges.Where(c =>
+                    !c.IsTextDocumentEdit || inScope(c.TextDocumentEdit!.TextDocument.Uri.ToString())))
+        };
+    }
+
     public static void EnsureWithinProject(WorkspaceEdit edit, IProjectLayerMap? layers)
     {
         if (layers is null || layers.Layers.Count == 0) return;

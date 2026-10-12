@@ -2,10 +2,14 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -28,6 +32,70 @@ public sealed class LuaAnalyzerHandlersTest
         }, CancellationToken.None);
 
         Assert.Equal(3, Assert.Single(result!).Range.Start.Line);
+    }
+
+    // ── the sandbox (#249) ───────────────────────────────────────────────────
+
+    private const string Interdictor = "file:///mod/data/scripts/gameobject/interdictor.lua";
+    private const string Vader = "file:///mod/data/scripts/gameobject/darthvader.lua";
+    private const string StateMachine = "file:///mod/data/scripts/library/pgstatemachine.lua";
+
+    /// <summary>Two object scripts, each requiring the state machine: two states.</summary>
+    private static FixedSandbox TwoObjectScripts()
+    {
+        var documents = new (string Uri, string[] Requires)[]
+            {
+                (Interdictor, ["PGStateMachine"]), (Vader, ["PGStateMachine"]), (StateMachine, [])
+            }
+            .ToImmutableDictionary(s => s.Uri, s => new DocumentIndex(s.Uri, 1, [], [], [.. s.Requires]));
+        return new FixedSandbox(LuaSandbox.Build(documents,
+            new FileHelper(new MockFileSystem())));
+    }
+
+    private static Location At(string uri, int line)
+    {
+        return new Location { Uri = DocumentUri.From(uri), Range = new Range(line, 9, line, 20) };
+    }
+
+    // Measured on the EaW scripts: from Interdictor.lua's Definitions the analyzer answered 216
+    // locations in 207 files - every other script's Definitions among them.
+    [Fact]
+    public async Task References_InAnotherScriptsState_AreDropped()
+    {
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/references",
+            new LocationContainer(At(Interdictor, 44), At(Vader, 70), At(StateMachine, 172)));
+
+        var result = await new LuaReferencesHandler(analyzer, TwoObjectScripts()).Handle(new ReferenceParams
+        {
+            TextDocument = new TextDocumentIdentifier(DocumentUri.From(Interdictor)), Position = new Position(44, 12),
+            Context = new ReferenceContext { IncludeDeclaration = true }
+        }, CancellationToken.None);
+
+        Assert.Equal([Interdictor, StateMachine], result!.Select(l => l.Uri.ToString()));
+    }
+
+    [Fact]
+    public async Task ACodeLens_CountsOnlyTheScriptsOwnState()
+    {
+        var locations = JArray.FromObject(new[] { At(Interdictor, 44), At(Vader, 70), At(StateMachine, 172) },
+            JsonSerializer.Create(new JsonSerializerSettings
+                { ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver() }));
+        var resolved = new CodeLens
+        {
+            Range = new Range(44, 9, 44, 20),
+            Command = new Command
+            {
+                Name = "emmy.showReferences", Title = "3 usages",
+                Arguments = new JArray(Interdictor, JObject.FromObject(new { line = 44, character = 9 }), locations)
+            }
+        };
+        var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", resolved);
+
+        var result = await new LuaCodeLensHandler(analyzer, TwoObjectScripts())
+            .Handle(new CodeLens { Range = new Range(44, 9, 44, 20) }, CancellationToken.None);
+
+        Assert.Equal("2 usages", result.Command!.Title);
+        Assert.Equal(2, ((JArray)result.Command.Arguments![2]).Count);
     }
 
     [Fact]

@@ -163,15 +163,19 @@ public sealed class SchemaBootstrapperTest
     // Every listed file is read, from the same release as the XML schema; a release from before
     // the manifest existed still has api.d.lua alone.
 
-    private static RoutingHttpHandler StubServer(IReadOnlyDictionary<string, string> luaFiles, bool manifest = true)
+    private static RoutingHttpHandler StubServer(IReadOnlyDictionary<string, string> luaFiles, bool manifest = true,
+        string? entryPoints = null)
     {
         return new RoutingHttpHandler(request =>
         {
             var path = request.RequestUri!.AbsolutePath;
             if (path.EndsWith("/lua/_files.json"))
                 return manifest
-                    ? Ok($$"""{ "files": [{{string.Join(", ", luaFiles.Keys.Select(k => $"\"{k}\""))}}] }""")
+                    ? Ok(
+                        $$"""{ "files": [{{string.Join(", ", luaFiles.Keys.Select(k => $"\"{k}\""))}}]{{(entryPoints is null ? "" : ", \"entryPoints\": \"entrypoints.json\"")}} }""")
                     : new HttpResponseMessage(HttpStatusCode.NotFound);
+            if (entryPoints is not null && path.EndsWith("/lua/entrypoints.json"))
+                return Ok(entryPoints);
             foreach (var (name, content) in luaFiles)
                 if (path.EndsWith("/lua/" + name))
                     return Ok(content);
@@ -202,6 +206,47 @@ public sealed class SchemaBootstrapperTest
         Assert.Contains(handler.Urls, u => u.EndsWith("/lua/_files.json"));
         Assert.Contains("Find_Player", lua.AllFunctionNames);
         Assert.Contains("tostring", lua.AllFunctionNames);
+    }
+
+    // Functions a script defines for the game or a library to call: documentation, no declared global.
+    private const string EntryPointsJson = """
+                                           { "entryPoints": [
+                                             { "name": "main", "caller": "engine", "kinds": ["object", "story"], "description": "The script's thread." },
+                                             { "name": "Definitions", "caller": "library", "libraries": ["PGStateMachine"], "kinds": ["object"],
+                                               "description": "The script's own setup." }
+                                           ] }
+                                           """;
+
+    [Fact]
+    public async Task LoadAsync_Http_ReadsTheEntryPointsTheManifestNames()
+    {
+        var handler = StubServer(new Dictionary<string, string> { ["api.d.lua"] = "function Find_Player(name) end\n" },
+            entryPoints: EntryPointsJson);
+        var bootstrapper = Build(new FakeHttpClientFactory(handler), new RecordingUserNotifier(), out _,
+            out var lua);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(LuaEntryPointCaller.ENGINE, lua.GetEntryPoint("main")?.Caller);
+        Assert.Equal(["PGStateMachine"], lua.GetEntryPoint("Definitions")!.Libraries);
+        Assert.DoesNotContain("main", lua.DeclaredGlobalNames);
+    }
+
+    [Fact]
+    public void LoadLuaSchemaFromDisk_ReadsTheEntryPointsTheManifestNames()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile(@"C:\schema\lua\_files.json",
+            new MockFileData("""{ "files": ["api.d.lua"], "entryPoints": "entrypoints.json" }"""));
+        fs.AddFile(@"C:\schema\lua\api.d.lua", new MockFileData("function Find_Player(name) end\n"));
+        fs.AddFile(@"C:\schema\lua\entrypoints.json", new MockFileData(EntryPointsJson));
+        var bootstrapper = Build(new FakeHttpClientFactory(StubServer(new Dictionary<string, string>())),
+            new RecordingUserNotifier(), out _, out var lua, fileSystem: fs);
+
+        bootstrapper.LoadLuaSchemaFromDisk(@"C:\schema\eaw");
+
+        Assert.Equal("The script's thread.", lua.GetEntryPoint("MAIN")?.Description);
+        Assert.Null(lua.GetEntryPoint("Find_Player"));
     }
 
     [Fact]

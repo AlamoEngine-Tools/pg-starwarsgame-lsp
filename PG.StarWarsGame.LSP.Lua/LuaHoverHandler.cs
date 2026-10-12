@@ -158,13 +158,21 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         };
     }
 
+    // A name the schema knows, used or defined: an engine function from the stubs, or an entry point.
+    // The name in a script's own `function X(` counts too - the analyzer shows neither the stub's
+    // documentation nor its types there (measured, 0.25.1), so the card is ours (#249).
     private static Hover? TryBuildEngineFunctionHover(
         SyntaxNode root, int line, int character, ILuaApiSchemaProvider schema)
     {
-        foreach (var id in root.DescendantNodes().OfType<IdentifierNameSyntax>())
+        var uses = root.DescendantNodes().OfType<IdentifierNameSyntax>()
+            .Select(id => (id.Name, Location: id.GetLocation()));
+        var definitions = root.DescendantNodes().OfType<FunctionDeclarationStatementSyntax>()
+            .Select(f => f.Name).OfType<SimpleFunctionNameSyntax>()
+            .Select(n => (Name: n.Name.Text, Location: n.Name.GetLocation()));
+
+        foreach (var (name, location) in uses.Concat(definitions))
         {
-            var loc = id.GetLocation();
-            var span = loc.GetLineSpan();
+            var span = location.GetLineSpan();
             var start = span.StartLinePosition;
             var end = span.EndLinePosition;
 
@@ -176,12 +184,23 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 new Position(start.Line, start.Character),
                 new Position(end.Line, end.Character));
 
-            if (schema.AllFunctionNames.Contains(id.Name))
-                return BuildHover(BuildFunctionHoverMarkdown(id.Name, schema.GetFunctionDescription(id.Name),
-                    schema.GetFunctionParams(id.Name), schema.GetReturnTypeName(id.Name)), range);
+            if (schema.AllFunctionNames.Contains(name))
+                return BuildHover(BuildFunctionHoverMarkdown(name, schema.GetFunctionDescription(name),
+                    schema.GetFunctionParams(name), schema.GetReturnTypeName(name)), range);
+            if (schema.GetEntryPoint(name) is { } entryPoint)
+                return BuildHover(BuildEntryPointHoverMarkdown(entryPoint), range);
         }
 
         return null;
+    }
+
+    private static string BuildEntryPointHoverMarkdown(LuaEntryPoint entryPoint)
+    {
+        var caller = entryPoint.Caller == LuaEntryPointCaller.ENGINE
+            ? "Called by the game"
+            : $"Called by {string.Join(", ", entryPoint.Libraries.Select(l => $"`{l}`"))}, if defined";
+        return $"**function** `{entryPoint.Name}` - entry point\n{entryPoint.Description}\n\n" +
+               $"{caller} - scripts: {string.Join(", ", entryPoint.Kinds)}";
     }
 
     private static string BuildFunctionHoverMarkdown(string name, string? description,

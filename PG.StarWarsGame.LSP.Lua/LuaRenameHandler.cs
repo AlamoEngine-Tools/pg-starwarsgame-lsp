@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Rename;
 using PG.StarWarsGame.LSP.Lua.Schema;
@@ -24,6 +25,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
     private readonly ILogger<LuaRenameHandler> _logger;
     private readonly ILuaApiSchemaProvider? _luaSchema;
     private readonly ILuaParseCache _parseCache;
+    private readonly ILuaSandboxProvider? _sandbox;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
 
@@ -35,13 +37,16 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         ISchemaProvider schema,
         ILogger<LuaRenameHandler> logger,
         // Optional: names the engine binds are claimed too, so the analyzer never renames them.
-        ILuaApiSchemaProvider? luaSchema = null)
+        ILuaApiSchemaProvider? luaSchema = null,
+        // Optional: a Lua global is renamed within the script's own state, an XML object everywhere.
+        ILuaSandboxProvider? sandbox = null)
     {
         _parseCache = parseCache;
         _textSource = textSource;
         _schema = schema;
         _logger = logger;
         _luaSchema = luaSchema;
+        _sandbox = sandbox;
     }
 
     public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
@@ -62,10 +67,32 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         // Fall back to Lua global (cursor on an identifier that is a known LuaGlobal).
         var luaGlobalId = FindLuaGlobalAtCursor(parsed.Tree, request.Position.Line, request.Position.Character,
             index);
+        // The game calls an engine entry point by name: renamed, it is never called again.
+        if (luaGlobalId is not null && IsEngineEntryPoint(luaGlobalId)) return null;
         if (luaGlobalId is not null)
-            return LuaGlobalRenameBuilder.Build(luaGlobalId, request.NewName, index, _parseCache, _logger);
+            return LuaGlobalRenameBuilder.Build(luaGlobalId, request.NewName, index, _parseCache, _logger,
+                InScope(uri, luaGlobalId, index));
 
         return null;
+    }
+
+    private bool IsEngineEntryPoint(string name)
+    {
+        return _luaSchema?.GetEntryPoint(name) is { Caller: LuaEntryPointCaller.ENGINE };
+    }
+
+    // The files a rename of <id> from <uri> may edit (#249): the script's state, joined with every
+    // state holding a shared file that names <id>.
+    private Func<string, bool>? InScope(string uri, string id, GameIndex index)
+    {
+        if (_sandbox is null) return null;
+        var definitions = index.WorkspaceDefinitions.TryGetValue(id, out var defs)
+            ? defs.Select(s => s.Origin).OfType<FileOrigin>().Select(o => o.Uri)
+            : [];
+        var references = index.WorkspaceReferences.TryGetValue(id, out var refs)
+            ? refs.Select(r => r.DocumentUri)
+            : [];
+        return _sandbox.Current.RenameScope(uri, definitions.Concat(references));
     }
 
     public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
@@ -76,7 +103,11 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
             var hit = LuaPositionResolver.FindAtPosition(docIndex, line, character);
             if (hit is not null)
             {
-                if (!index.IsLeafOwned(hit.Value.Id)) return null;
+                if (IsEngineEntryPoint(hit.Value.Id)) return null;
+                // An XML file is in no script's state, so an XML object's definitions all count.
+                if (!LuaGlobalRenameBuilder.IsLeafOwned(hit.Value.Id, index,
+                        InScope(uri, hit.Value.Id, index) ?? (_ => true)))
+                    return null;
 
                 var range = hit.Value.Range;
                 // Zero-length means cursor is on a declaration; extend by the symbol name length.

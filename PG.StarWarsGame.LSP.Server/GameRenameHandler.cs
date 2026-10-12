@@ -9,6 +9,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Xml;
 
 namespace PG.StarWarsGame.LSP.Server;
@@ -21,6 +22,7 @@ public sealed class GameRenameHandler : RenameHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly IProjectLayerMap? _layers;
     private readonly ILuaRenameProvider _luaProvider;
+    private readonly ILuaSandboxProvider? _sandbox;
     private readonly IXmlRenameProvider _xmlProvider;
 
     public GameRenameHandler(
@@ -32,8 +34,10 @@ public sealed class GameRenameHandler : RenameHandlerBase
         // Optional: with the analyzer running, what we do not claim (locals, fields) is its to
         // rename - within the project only, checked against the layers.
         ILuaAnalyzer? analyzer = null,
-        IProjectLayerMap? layers = null)
+        IProjectLayerMap? layers = null,
+        ILuaSandboxProvider? sandbox = null)
     {
+        _sandbox = sandbox;
         _indexService = indexService;
         _xmlProvider = xmlProvider;
         _luaProvider = luaProvider;
@@ -57,7 +61,10 @@ public sealed class GameRenameHandler : RenameHandlerBase
             return _luaProvider.HandleRename(uri, request, index);
 
         var edit = await _analyzer.RequestAsync<WorkspaceEdit>("textDocument/rename", request, ct);
-        if (edit is not null) LuaAnalyzerRename.EnsureWithinProject(edit, _layers);
+        if (edit is null) return null;
+        // Another script's state first: its file is no part of this rename, wherever it lives.
+        if (_sandbox is not null) edit = LuaAnalyzerRename.KeepWithinState(edit, _sandbox.Current, uri);
+        LuaAnalyzerRename.EnsureWithinProject(edit, _layers);
         return edit;
     }
 

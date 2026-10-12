@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -31,7 +32,7 @@ public sealed class LuaDefinitionHandlerTest
     }
 
     private static LuaDefinitionHandler BuildHandler(GameIndex index, FakeWorkspaceHost? host = null,
-        ILspConfigurationProvider? config = null, ILuaAnalyzer? analyzer = null)
+        ILspConfigurationProvider? config = null, ILuaAnalyzer? analyzer = null, ILuaSandboxProvider? sandbox = null)
     {
         return new LuaDefinitionHandler(
             new FakeIndexService { Current = index },
@@ -39,7 +40,8 @@ public sealed class LuaDefinitionHandlerTest
             new FileHelper(new MockFileSystem()),
             NullLogger<LuaDefinitionHandler>.Instance,
             config ?? new FakeLspConfigurationProvider(),
-            analyzer);
+            analyzer,
+            sandbox);
     }
 
     // ── ours, else the analyzer's (#154) ─────────────────────────────────────
@@ -65,6 +67,54 @@ public sealed class LuaDefinitionHandlerTest
             .Handle(RequestAt(1, 7), CancellationToken.None);
 
         Assert.Equal(7, Assert.Single(result!).Location!.Range.Start.Line);
+    }
+
+    // Measured on the EaW scripts: go to definition on Interdictor.lua's Definitions call jumped to
+    // another script's Definitions. Two object scripts are two states (#249).
+    [Fact]
+    public async Task TheAnalyzersDefinition_InAnotherScriptsState_IsDropped()
+    {
+        const string interdictor = "file:///mod/data/scripts/gameobject/interdictor.lua";
+        const string vader = "file:///mod/data/scripts/gameobject/darthvader.lua";
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(interdictor, "Definitions()", 1);
+        var documents = ImmutableDictionary.CreateRange(new[]
+        {
+            KeyValuePair.Create(interdictor, new DocumentIndex(interdictor, 1, [], [])),
+            KeyValuePair.Create(vader, new DocumentIndex(vader, 1, [], []))
+        });
+        var index = MakeIndex(documents: [(interdictor, documents[interdictor]), (vader, documents[vader])]);
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/definition", new LocationOrLocationLinks(
+            new Location { Uri = DocumentUri.From(vader), Range = new Range(3, 9, 3, 20) },
+            new Location { Uri = DocumentUri.From(interdictor), Range = new Range(8, 9, 8, 20) }));
+        var sandbox = new FixedSandbox(LuaSandbox.Build(documents, new FileHelper(new MockFileSystem())));
+
+        var result = await BuildHandler(index, host, analyzer: analyzer, sandbox: sandbox)
+            .Handle(RequestAt(0, 3, interdictor), CancellationToken.None);
+
+        Assert.Equal(interdictor, Assert.Single(result!).Location!.Uri.ToString());
+    }
+
+    // Our own index holds every script's globals; a Lua global resolves within the script's state.
+    [Fact]
+    public async Task OurLuaGlobal_ResolvesInTheScriptsOwnState()
+    {
+        const string mine = "file:///game/data/scripts/gameobject/interdictor.lua";
+        const string another = "file:///mod/data/scripts/gameobject/darthvader.lua";
+        var myDef = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null, new FileOrigin(mine, 4, 9), null);
+        var theirDef = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null, new FileOrigin(another, 7, 9),
+            null);
+        var call = new GameReference("Definitions", GameSymbolKind.LuaGlobal, null, mine, 0, 0, 11);
+        var documents = ImmutableDictionary<string, DocumentIndex>.Empty
+            .Add(mine, new DocumentIndex(mine, 1, [myDef], [call], LayerRank: 0))
+            .Add(another, new DocumentIndex(another, 1, [theirDef], [], LayerRank: 1));
+        var index = MakeIndex([("Definitions", ImmutableArray.Create(myDef, theirDef))],
+            (mine, documents[mine]), (another, documents[another]));
+        var sandbox = new FixedSandbox(LuaSandbox.Build(documents, new FileHelper(new MockFileSystem())));
+
+        var result = await BuildHandler(index, sandbox: sandbox).Handle(RequestAt(0, 3, mine), CancellationToken.None);
+
+        Assert.Equal(mine, Assert.Single(result!).LocationLink!.TargetUri.ToString());
     }
 
     [Fact]

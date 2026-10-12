@@ -27,6 +27,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaDefinitionHandler> _logger;
     private readonly ILuaParseCache _parseCache;
+    private readonly ILuaSandboxProvider? _sandbox;
 
     public LuaDefinitionHandler(
         IGameIndexService indexService,
@@ -35,7 +36,8 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         ILogger<LuaDefinitionHandler> logger,
         ILspConfigurationProvider config,
         // Optional: with the analyzer running, it answers where we have nothing.
-        ILuaAnalyzer? analyzer = null)
+        ILuaAnalyzer? analyzer = null,
+        ILuaSandboxProvider? sandbox = null)
     {
         _indexService = indexService;
         _parseCache = parseCache;
@@ -43,6 +45,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         _logger = logger;
         _config = config;
         _analyzer = analyzer;
+        _sandbox = sandbox;
     }
 
     public override async Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken ct)
@@ -52,7 +55,15 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         if (_analyzer is null || !_config.Current.Features.Lua.GoToDefinition ||
             !request.TextDocument.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return ours;
-        return await _analyzer.RequestAsync<LocationOrLocationLinks>("textDocument/definition", request, ct) ?? ours;
+        var theirs = await _analyzer.RequestAsync<LocationOrLocationLinks>("textDocument/definition", request, ct);
+        if (theirs is null || _sandbox is null) return theirs ?? ours;
+
+        // The analyzer sees one namespace, the game one per script (#249).
+        var current = _sandbox.Current;
+        var from = request.TextDocument.Uri.ToString();
+        var kept = theirs.Where(l => current.ShareAState(from,
+            (l.IsLocation ? l.Location!.Uri : l.LocationLink!.TargetUri).ToString())).ToList();
+        return kept.Count > 0 ? new LocationOrLocationLinks(kept) : ours;
     }
 
     private Task<LocationOrLocationLinks?> HandleOurs(DefinitionParams request)
@@ -74,7 +85,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             var hit = LuaPositionResolver.FindAtPosition(docIndex, line, character);
             if (hit is not null)
             {
-                var symbol = index.Resolve(hit.Value.Id);
+                var symbol = ResolveInState(index, hit.Value.Id, uri);
                 if (symbol is null || symbol.Origin is not FileOrigin fo)
                 {
                     _logger.LogDebug("Go-to-def: {Id} resolved to non-navigable origin", hit.Value.Id);
@@ -108,6 +119,19 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         _logger.LogDebug("Go-to-def (require): -> {Uri}", resolved.Value.Target);
         return Task.FromResult<LocationOrLocationLinks?>(
             new LocationOrLocationLinks(new LocationOrLocationLink(targetLink)));
+    }
+
+    // The index holds every script's globals; one in another script's state is a different global
+    // of the same name (#249). An XML file is in no state, so XML objects resolve as before.
+    private GameSymbol? ResolveInState(GameIndex index, string id, string uri)
+    {
+        if (_sandbox is null || !index.WorkspaceDefinitions.TryGetValue(id, out var definitions))
+            return index.Resolve(id);
+        var current = _sandbox.Current;
+        return definitions
+            .Where(s => s.Origin is not FileOrigin fo || current.ShareAState(uri, fo.Uri))
+            .OrderByDescending(index.LayerRankOf)
+            .FirstOrDefault();
     }
 
     private static (string Target, LspRange Origin)? TryResolveRequireAtPosition(
