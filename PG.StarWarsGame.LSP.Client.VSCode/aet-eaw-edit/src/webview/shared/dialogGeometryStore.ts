@@ -11,7 +11,7 @@
 // The host owns the actual storage (workspaceState), so the placement follows the project rather
 // than the machine, and a different mod opens with its own layout.
 
-import { StoredGeometry } from './modalGeometry';
+import { StoredGeometry } from "./modalGeometry";
 
 /**
  * Identifies a dialog across sessions.
@@ -21,14 +21,14 @@ import { StoredGeometry } from './modalGeometry';
  * cheapest way to notice two dialogs sharing one.
  */
 export const DIALOG_IDS = {
-    addLanguage: 'loc.add-language',
-    fillLanguage: 'loc.fill-language',
-    convertFormat: 'loc.convert-format',
-    exportDat: 'loc.export-dat',
-    addTranslation: 'loc.add-translation',
+    addLanguage: "loc.add-language",
+    fillLanguage: "loc.fill-language",
+    convertFormat: "loc.convert-format",
+    exportDat: "loc.export-dat",
+    addTranslation: "loc.add-translation",
 } as const;
 
-export type DialogId = typeof DIALOG_IDS[keyof typeof DIALOG_IDS];
+export type DialogId = (typeof DIALOG_IDS)[keyof typeof DIALOG_IDS];
 
 let remembered = new Map<string, StoredGeometry>();
 let publish: ((id: string, geometry: StoredGeometry) => void) | null = null;

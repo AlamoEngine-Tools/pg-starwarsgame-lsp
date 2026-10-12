@@ -13,16 +13,22 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 public enum ProjectProblem
 {
     None,
+
     /// <summary>No <c>.pgproj</c> under any workspace root.</summary>
     Missing,
+
     /// <summary>More than one <c>.pgproj</c> under one root.</summary>
     Ambiguous,
+
     /// <summary>Not readable as the JSON object a project file is.</summary>
     Unparseable,
+
     /// <summary>A project file format this server refuses.</summary>
     UnsupportedVersion,
+
     /// <summary>Parsed, but its contents fail validation.</summary>
     Invalid,
+
     /// <summary>The project loaded and indexing was refused because no baseline is loaded.</summary>
     BaselineRefused
 }

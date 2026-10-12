@@ -10,7 +10,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 /// <remarks>
 ///     Measured in the 2018 build: the game's XML reader takes two tokens for a per-faction value or
-///     planet and three for a force deployment, and ignores anything after them. So <c>Rebel, 1000, Empire, 2000</c> sets Rebel's credits and
+///     planet and three for a force deployment, and ignores anything after them. So <c>Rebel, 1000, Empire, 2000</c> sets
+///     Rebel's credits and
 ///     silently loses Empire's - repeating the tag is the only way to give a second entry.
 /// </remarks>
 internal static class OneEntryPerTag

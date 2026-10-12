@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import { useEffect, useRef, useState } from 'react';
-import { IconButton } from '../shared/Button';
+import { useEffect, useRef, useState } from "react";
+import { IconButton } from "../shared/Button";
 
 export interface LocColumnMenuProps {
     languages: string[];
@@ -28,39 +28,57 @@ export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
     const open = at !== null;
 
     const toggle = (): void => {
-        if (open) { setAt(null); return; }
+        if (open) {
+            setAt(null);
+            return;
+        }
 
         const box = buttonRef.current?.getBoundingClientRect();
-        if (box) { setAt({ top: box.bottom + 2, right: window.innerWidth - box.right }); }
+        if (box) {
+            setAt({
+                top: box.bottom + 2,
+                right: window.innerWidth - box.right,
+            });
+        }
     };
 
     // Any click that is not inside the flyout closes it, which is what makes it feel like a menu
     // rather than a panel you have to put away.
     useEffect(() => {
-        if (!open) { return; }
+        if (!open) {
+            return;
+        }
 
         const onDown = (e: MouseEvent): void => {
-            if (!ref.current?.contains(e.target as Node)) { setAt(null); }
+            if (!ref.current?.contains(e.target as Node)) {
+                setAt(null);
+            }
         };
         const onKey = (e: KeyboardEvent): void => {
-            if (e.key === 'Escape') { setAt(null); }
+            if (e.key === "Escape") {
+                setAt(null);
+            }
         };
         // Pinned to the viewport, so it would otherwise sit still while the table moved under it.
         const onScrollOrResize = (): void => setAt(null);
 
-        window.addEventListener('mousedown', onDown);
-        window.addEventListener('keydown', onKey);
-        window.addEventListener('resize', onScrollOrResize);
-        document.querySelector('.grid-area')?.addEventListener('scroll', onScrollOrResize);
+        window.addEventListener("mousedown", onDown);
+        window.addEventListener("keydown", onKey);
+        window.addEventListener("resize", onScrollOrResize);
+        document
+            .querySelector(".grid-area")
+            ?.addEventListener("scroll", onScrollOrResize);
         return () => {
-            window.removeEventListener('mousedown', onDown);
-            window.removeEventListener('keydown', onKey);
-            window.removeEventListener('resize', onScrollOrResize);
-            document.querySelector('.grid-area')?.removeEventListener('scroll', onScrollOrResize);
+            window.removeEventListener("mousedown", onDown);
+            window.removeEventListener("keydown", onKey);
+            window.removeEventListener("resize", onScrollOrResize);
+            document
+                .querySelector(".grid-area")
+                ?.removeEventListener("scroll", onScrollOrResize);
         };
     }, [open]);
 
-    const shown = props.languages.filter(l => !props.hidden.has(l));
+    const shown = props.languages.filter((l) => !props.hidden.has(l));
 
     return (
         <div className="cell column-menu" ref={ref}>
@@ -81,17 +99,24 @@ export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
                 >
                     <div className="column-flyout-title">
                         Columns
-                        <span className="section-count">{shown.length} of {props.languages.length}</span>
+                        <span className="section-count">
+                            {shown.length} of {props.languages.length}
+                        </span>
                     </div>
-                    {props.languages.map(language => (
+                    {props.languages.map((language) => (
                         <label key={language} className="check-field">
                             <input
                                 type="checkbox"
                                 checked={!props.hidden.has(language)}
                                 // The last column standing cannot be hidden - a grid of keys with
                                 // no values is not a view anyone asked for.
-                                disabled={shown.length === 1 && !props.hidden.has(language)}
-                                onChange={e => props.onToggle(language, e.target.checked)}
+                                disabled={
+                                    shown.length === 1 &&
+                                    !props.hidden.has(language)
+                                }
+                                onChange={(e) =>
+                                    props.onToggle(language, e.target.checked)
+                                }
                             />
                             <span>{language}</span>
                         </label>

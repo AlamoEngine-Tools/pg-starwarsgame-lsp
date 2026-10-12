@@ -13,9 +13,9 @@
 // trusts what it is handed: a missing field takes its default, a wrong one is refused, and nothing
 // throws. A preview that opens blank because of a bad string in a settings file has no way back.
 
-import { type CameraBinding } from './cameraBindings';
-import { type CameraPreset } from './cameraPresets';
-import { asRecord, boolean_, names, nullableString, number_, string_ } from './storedValue';
+import { type CameraBinding } from "./cameraBindings";
+import { type CameraPreset } from "./cameraPresets";
+import { asRecord, boolean_, names, number_, string_ } from "./storedValue";
 
 /** Red, green and blue, each 0..1 - the range three.js and the effects both work in. */
 export type Colour = readonly [number, number, number];
@@ -32,24 +32,30 @@ export interface DirectionalSetting {
 }
 
 /** What is drawn behind the model. */
-export type BackgroundKind = 'flat' | 'starfield' | 'sky';
+export type BackgroundKind = "flat" | "starfield" | "sky";
 
 /** The three directionals, by the names the engine numbers them in. */
-export type DirectionalName = 'sun' | 'fill1' | 'fill2';
+export type DirectionalName = "sun" | "fill1" | "fill2";
 
 /** In engine order, so index 0 is the sun a shader asks for as DIR_LIGHT_VEC_0. */
-export const LIGHT_NAMES: readonly DirectionalName[] = ['sun', 'fill1', 'fill2'];
+export const LIGHT_NAMES: readonly DirectionalName[] = [
+    "sun",
+    "fill1",
+    "fill2",
+];
 
 export const LIGHT_LABELS: Record<DirectionalName, string> = {
-    sun: 'Sun',
-    fill1: 'Fill 1',
-    fill2: 'Fill 2',
+    sun: "Sun",
+    fill1: "Fill 1",
+    fill2: "Fill 2",
 };
 
 /** A colour as an `input type=color` wants it. */
 export function hexFromColour(colour: Colour): string {
     const channel = (value: number): string =>
-        Math.round(Math.min(1, Math.max(0, value)) * 255).toString(16).padStart(2, '0');
+        Math.round(Math.min(1, Math.max(0, value)) * 255)
+            .toString(16)
+            .padStart(2, "0");
 
     return `#${channel(colour[0])}${channel(colour[1])}${channel(colour[2])}`;
 }
@@ -64,7 +70,11 @@ export function colourFromHex(hex: string): Colour {
 
     const value = Number.parseInt(match[1], 16);
 
-    return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255];
+    return [
+        ((value >> 16) & 255) / 255,
+        ((value >> 8) & 255) / 255,
+        (value & 255) / 255,
+    ];
 }
 
 export interface LightRig {
@@ -175,7 +185,6 @@ export interface ViewerSettings {
     particles: boolean;
     particleSpeed: number;
     cameraPreset: string;
-
 }
 
 const WHITE: Colour = [1, 1, 1];
@@ -197,8 +206,18 @@ export const DEFAULT_LIGHTS: LightRig = {
     // with no shading left in it. The blue fills are what put the cool tone back into the shadowed
     // faces, and they are the difference you see against AloViewer side by side.
     sun: { azimuth: 0, elevation: 45, colour: WHITE, intensity: 0.5 },
-    fill1: { azimuth: 210, elevation: -10, colour: [0.25, 0.25, 0.5], intensity: 0.5 },
-    fill2: { azimuth: 120, elevation: -10, colour: [0.25, 0.25, 0.5], intensity: 0.5 },
+    fill1: {
+        azimuth: 210,
+        elevation: -10,
+        colour: [0.25, 0.25, 0.5],
+        intensity: 0.5,
+    },
+    fill2: {
+        azimuth: 120,
+        elevation: -10,
+        colour: [0.25, 0.25, 0.5],
+        intensity: 0.5,
+    },
     ambient: { colour: WHITE, intensity: 0.1 },
     specular: WHITE,
 
@@ -221,7 +240,7 @@ export const DEFAULT_VIEWER_SETTINGS: ViewerSettings = {
     heat: true,
     heatDebug: false,
     bloom: false,
-    background: 'flat',
+    background: "flat",
     drawDistance: 1,
     lights: DEFAULT_LIGHTS,
     cameraPresets: [],
@@ -232,15 +251,15 @@ export const DEFAULT_VIEWER_SETTINGS: ViewerSettings = {
     // interesting in motion, and zero would look like the feature is missing.
     wind: { heading: 90, speed: 1 },
     skeleton: false,
-    boneLabels: 'none',
+    boneLabels: "none",
     fireArcs: false,
     effectShaders: false,
     particles: true,
     particleSpeed: 1,
-    cameraPreset: 'threeQuarter',
+    cameraPreset: "threeQuarter",
 };
 
-const BACKGROUNDS: BackgroundKind[] = ['flat', 'starfield', 'sky'];
+const BACKGROUNDS: BackgroundKind[] = ["flat", "starfield", "sky"];
 
 /** The ranges the controls offer, so a stored value can never put the viewer somewhere unusable. */
 const RANGES: Record<string, { min: number; max: number }> = {
@@ -281,18 +300,30 @@ function presetsFrom(stored: unknown): CameraPreset[] {
         const raw = asRecord(entry);
         const { id, name, distance, pitch, yaw, bone } = raw;
 
-        if (typeof id !== 'string' || id === '' || typeof name !== 'string'
+        if (
+            typeof id !== "string" ||
+            id === "" ||
+            typeof name !== "string" ||
             // A distance of zero or less is not a shot - it is a camera at the centre of the model
             // looking at itself.
-            || typeof distance !== 'number' || !Number.isFinite(distance) || distance <= 0
-            || typeof pitch !== 'number' || !Number.isFinite(pitch)
-            || typeof yaw !== 'number' || !Number.isFinite(yaw)) {
+            typeof distance !== "number" ||
+            !Number.isFinite(distance) ||
+            distance <= 0 ||
+            typeof pitch !== "number" ||
+            !Number.isFinite(pitch) ||
+            typeof yaw !== "number" ||
+            !Number.isFinite(yaw)
+        ) {
             continue;
         }
 
         presets.push({
-            id, name, distance, pitch, yaw,
-            bone: typeof bone === 'string' && bone !== '' ? bone : null,
+            id,
+            name,
+            distance,
+            pitch,
+            yaw,
+            bone: typeof bone === "string" && bone !== "" ? bone : null,
         });
     }
 
@@ -305,7 +336,7 @@ function bindingsFrom(stored: unknown): CameraBinding[] {
         return [];
     }
 
-    const kinds = new Set(['object', 'type', 'category']);
+    const kinds = new Set(["object", "type", "category"]);
     const bindings: CameraBinding[] = [];
 
     for (const entry of stored) {
@@ -314,14 +345,25 @@ function bindingsFrom(stored: unknown): CameraBinding[] {
 
         // A rule nobody can evaluate is worse than no rule at all: it would sit in the list looking
         // like the subject was bound while never firing.
-        if (typeof id !== 'string' || id === ''
-            || typeof kind !== 'string' || !kinds.has(kind)
-            || typeof value !== 'string' || value.trim() === ''
-            || typeof presetId !== 'string' || presetId === '') {
+        if (
+            typeof id !== "string" ||
+            id === "" ||
+            typeof kind !== "string" ||
+            !kinds.has(kind) ||
+            typeof value !== "string" ||
+            value.trim() === "" ||
+            typeof presetId !== "string" ||
+            presetId === ""
+        ) {
             continue;
         }
 
-        bindings.push({ id, kind: kind as CameraBinding['kind'], value, presetId });
+        bindings.push({
+            id,
+            kind: kind as CameraBinding["kind"],
+            value,
+            presetId,
+        });
     }
 
     return bindings;
@@ -332,26 +374,34 @@ export function viewerSettingsFrom(stored: unknown): ViewerSettings {
 
     // Anything written before a field changed meaning has to give that field up. Only that field:
     // a version bump is a migration, not a reset.
-    const version = typeof raw.version === 'number' ? raw.version : 1;
+    const version = typeof raw.version === "number" ? raw.version : 1;
     const lights = lightsFrom(raw.lights);
 
     return {
         version: SETTINGS_VERSION,
         grid: boolean_(raw.grid, DEFAULT_VIEWER_SETTINGS.grid),
         floor: boolean_(raw.floor, DEFAULT_VIEWER_SETTINGS.floor),
-        floorLevel: number_(raw.floorLevel, DEFAULT_VIEWER_SETTINGS.floorLevel, RANGES.floorLevel),
+        floorLevel: number_(
+            raw.floorLevel,
+            DEFAULT_VIEWER_SETTINGS.floorLevel,
+            RANGES.floorLevel,
+        ),
         wireframe: boolean_(raw.wireframe, DEFAULT_VIEWER_SETTINGS.wireframe),
         heat: boolean_(raw.heat, DEFAULT_VIEWER_SETTINGS.heat),
         heatDebug: boolean_(raw.heatDebug, DEFAULT_VIEWER_SETTINGS.heatDebug),
         bloom: boolean_(raw.bloom, DEFAULT_VIEWER_SETTINGS.bloom),
         background: BACKGROUNDS.includes(raw.background as BackgroundKind)
-            ? raw.background as BackgroundKind
+            ? (raw.background as BackgroundKind)
             : DEFAULT_VIEWER_SETTINGS.background,
-        drawDistance: number_(raw.drawDistance, DEFAULT_VIEWER_SETTINGS.drawDistance,
-            RANGES.drawDistance),
-        lights: version >= 2
-            ? lights
-            : { ...lights, shadow: DEFAULT_LIGHTS.shadow },
+        drawDistance: number_(
+            raw.drawDistance,
+            DEFAULT_VIEWER_SETTINGS.drawDistance,
+            RANGES.drawDistance,
+        ),
+        lights:
+            version >= 2
+                ? lights
+                : { ...lights, shadow: DEFAULT_LIGHTS.shadow },
         cameraPresets: presetsFrom(raw.cameraPresets),
         cameraBindings: bindingsFrom(raw.cameraBindings),
         collapsedPanels: names(raw.collapsedPanels),
@@ -359,11 +409,20 @@ export function viewerSettingsFrom(stored: unknown): ViewerSettings {
         skeleton: boolean_(raw.skeleton, DEFAULT_VIEWER_SETTINGS.skeleton),
         boneLabels: string_(raw.boneLabels, DEFAULT_VIEWER_SETTINGS.boneLabels),
         fireArcs: boolean_(raw.fireArcs, DEFAULT_VIEWER_SETTINGS.fireArcs),
-        effectShaders: boolean_(raw.effectShaders, DEFAULT_VIEWER_SETTINGS.effectShaders),
+        effectShaders: boolean_(
+            raw.effectShaders,
+            DEFAULT_VIEWER_SETTINGS.effectShaders,
+        ),
         particles: boolean_(raw.particles, DEFAULT_VIEWER_SETTINGS.particles),
-        particleSpeed: number_(raw.particleSpeed, DEFAULT_VIEWER_SETTINGS.particleSpeed,
-            RANGES.particleSpeed),
-        cameraPreset: string_(raw.cameraPreset, DEFAULT_VIEWER_SETTINGS.cameraPreset),
+        particleSpeed: number_(
+            raw.particleSpeed,
+            DEFAULT_VIEWER_SETTINGS.particleSpeed,
+            RANGES.particleSpeed,
+        ),
+        cameraPreset: string_(
+            raw.cameraPreset,
+            DEFAULT_VIEWER_SETTINGS.cameraPreset,
+        ),
     };
 }
 
@@ -371,8 +430,16 @@ function windFrom(stored: unknown): Wind {
     const raw = asRecord(stored);
 
     return {
-        heading: number_(raw.heading, DEFAULT_VIEWER_SETTINGS.wind.heading, RANGES.azimuth),
-        speed: number_(raw.speed, DEFAULT_VIEWER_SETTINGS.wind.speed, RANGES.windSpeed),
+        heading: number_(
+            raw.heading,
+            DEFAULT_VIEWER_SETTINGS.wind.heading,
+            RANGES.azimuth,
+        ),
+        speed: number_(
+            raw.speed,
+            DEFAULT_VIEWER_SETTINGS.wind.speed,
+            RANGES.windSpeed,
+        ),
     };
 }
 
@@ -386,15 +453,21 @@ function lightsFrom(stored: unknown): LightRig {
         fill2: directionalFrom(raw.fill2, DEFAULT_LIGHTS.fill2),
         ambient: {
             colour: colourFrom(ambient.colour, DEFAULT_LIGHTS.ambient.colour),
-            intensity: number_(ambient.intensity, DEFAULT_LIGHTS.ambient.intensity,
-                RANGES.intensity),
+            intensity: number_(
+                ambient.intensity,
+                DEFAULT_LIGHTS.ambient.intensity,
+                RANGES.intensity,
+            ),
         },
         specular: colourFrom(raw.specular, DEFAULT_LIGHTS.specular),
         shadow: colourFrom(raw.shadow, DEFAULT_LIGHTS.shadow),
     };
 }
 
-function directionalFrom(stored: unknown, fallback: DirectionalSetting): DirectionalSetting {
+function directionalFrom(
+    stored: unknown,
+    fallback: DirectionalSetting,
+): DirectionalSetting {
     const raw = asRecord(stored);
 
     return {
@@ -410,11 +483,13 @@ function colourFrom(stored: unknown, fallback: Colour): Colour {
         return fallback;
     }
 
-    const channels = stored.map(
-        channel => typeof channel === 'number' && Number.isFinite(channel) ? channel : Number.NaN);
+    const channels = stored.map((channel) =>
+        typeof channel === "number" && Number.isFinite(channel)
+            ? channel
+            : Number.NaN,
+    );
 
-    return channels.every(channel => channel >= 0 && channel <= 1)
+    return channels.every((channel) => channel >= 0 && channel <= 1)
         ? [channels[0], channels[1], channels[2]]
         : fallback;
 }
-

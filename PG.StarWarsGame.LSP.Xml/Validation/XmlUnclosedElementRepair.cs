@@ -173,13 +173,6 @@ internal static class XmlUnclosedElementRepair
         }
     }
 
-    private enum Shape
-    {
-        Unknown,
-        Leaf,
-        Container
-    }
-
     // What the other elements of this name hold, by majority: a value or nothing (a leaf), or
     // child elements (a container). The unclosed element itself is left out.
     private static Shape Evidence(string s, string name, int except)
@@ -260,5 +253,12 @@ internal static class XmlUnclosedElementRepair
         var width = 0;
         for (var i = LineStart(s, at); i < at; i++) width += s[i] == '\t' ? TabWidth : 1;
         return width;
+    }
+
+    private enum Shape
+    {
+        Unknown,
+        Leaf,
+        Container
     }
 }

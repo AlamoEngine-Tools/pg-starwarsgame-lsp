@@ -27,33 +27,39 @@ export interface FlattenedShader {
  * included: the shipped headers include each other freely, and repeating one would redeclare every
  * uniform in it.
  */
-export function flattenIncludes(source: string, read: ShaderReader): FlattenedShader {
+export function flattenIncludes(
+    source: string,
+    read: ShaderReader,
+): FlattenedShader {
     const included: string[] = [];
     const missing: string[] = [];
     const seen = new Set<string>();
 
     const expand = (text: string, stack: readonly string[]): string => {
-        return text.replace(/^[ \t]*#include\s+"([^"]+)"[ \t]*$/gm, (_, rawName: string) => {
-            const name = rawName.trim();
-            const key = name.toLowerCase();
+        return text.replace(
+            /^[ \t]*#include\s+"([^"]+)"[ \t]*$/gm,
+            (_, rawName: string) => {
+                const name = rawName.trim();
+                const key = name.toLowerCase();
 
-            // A cycle would otherwise recurse until the stack gives out. The headers do include each
-            // other, so this is a real shape rather than a defensive flourish.
-            if (stack.includes(key) || seen.has(key)) {
-                return '';
-            }
+                // A cycle would otherwise recurse until the stack gives out. The headers do include each
+                // other, so this is a real shape rather than a defensive flourish.
+                if (stack.includes(key) || seen.has(key)) {
+                    return "";
+                }
 
-            const body = read(name);
-            if (body === null) {
-                missing.push(name);
-                return '';
-            }
+                const body = read(name);
+                if (body === null) {
+                    missing.push(name);
+                    return "";
+                }
 
-            seen.add(key);
-            included.push(name);
+                seen.add(key);
+                included.push(name);
 
-            return expand(body, [...stack, key]);
-        });
+                return expand(body, [...stack, key]);
+            },
+        );
     };
 
     return { text: expand(source, []), included, missing };

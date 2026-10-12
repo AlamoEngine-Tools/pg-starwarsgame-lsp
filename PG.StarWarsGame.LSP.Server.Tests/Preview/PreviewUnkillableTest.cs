@@ -42,7 +42,7 @@ public sealed class PreviewUnkillableTest
     ///     <para>
     ///         The engine's damage path replaces the name it looks a hardpoint up by with
     ///         the hardpoint's OWN <c>Collision_Mesh</c> when the hit is aimed at that hardpoint
-    ///        , and in a second path taken from the attacker. The
+    ///         , and in a second path taken from the attacker. The
     ///         exact <c>_stricmp</c> then compares the value with itself and matches whether or not the
     ///         model has it, so aimed fire lands. The Gargantuan proves it in the shipped data: all
     ///         eight hardpoints write <c>..._COL</c> or <c>..._COLL</c> against models carrying

@@ -13,7 +13,7 @@
 // able to disagree with the one that did the work.
 
 /** How a pool is named in a line. The hull is the default and goes unsaid. */
-export type DamagePool = 'hull' | 'shield' | 'energy';
+export type DamagePool = "hull" | "shield" | "energy";
 
 /** One thing one shot did to one target. */
 export interface DamageLogEntry {
@@ -35,7 +35,7 @@ export interface DamageLogEntry {
      * record of what happened to the unit, not of shots. A reader who repairs mid-session and then
      * reads the numbers back has to be able to see where the pools were refilled.
      */
-    kind?: 'damage' | 'repair';
+    kind?: "damage" | "repair";
     /**
      * The arithmetic behind {@link amount}, one line each, or absent where there is none to show.
      *
@@ -56,11 +56,11 @@ export const LOG_LIMIT = 200;
  * damage type to name and no armour factor that applied. An easter egg the user asked for by name,
  * and one constant to change if it wears thin.
  */
-export const BY_HAND = 'The Force';
+export const BY_HAND = "The Force";
 
 /** One line, as the user asked for it. */
 export function damageLine(entry: DamageLogEntry): string {
-    if (entry.kind === 'repair') {
+    if (entry.kind === "repair") {
         // No armour column and no pool: nothing was scaled and nothing was defended against. The
         // numbers, where there are any, ride on the workings under the line.
         return Number.isFinite(entry.amount) && entry.amount > 0
@@ -76,14 +76,15 @@ export function damageLine(entry: DamageLogEntry): string {
     const did = Number.isFinite(entry.amount)
         ? entry.amount > 0
             ? `did ${round(entry.amount)} damage`
-            : 'did no damage'
-        : 'did infinite damage';
+            : "did no damage"
+        : "did infinite damage";
 
     // The hull is the ordinary case and goes unsaid; the shield stopping a bolt is a different
     // event and worth naming.
-    const where = entry.pool === 'hull' ? '' : ` to the ${entry.pool}`;
-    const armor = entry.armor === null || entry.armor === '' ? '' : ` (${entry.armor})`;
-    const finished = entry.destroyed ? ' - destroyed' : '';
+    const where = entry.pool === "hull" ? "" : ` to the ${entry.pool}`;
+    const armor =
+        entry.armor === null || entry.armor === "" ? "" : ` (${entry.armor})`;
+    const finished = entry.destroyed ? " - destroyed" : "";
 
     return `${entry.source} ${did}${where} to ${entry.target}${armor}${finished}`;
 }
@@ -95,7 +96,8 @@ export function damageLine(entry: DamageLogEntry): string {
  * the order the damage was applied in and reading it backwards would misdescribe a falloff.
  */
 export function appendShot(
-    log: readonly DamageLogEntry[], shot: readonly DamageLogEntry[],
+    log: readonly DamageLogEntry[],
+    shot: readonly DamageLogEntry[],
 ): DamageLogEntry[] {
     return [...shot, ...log].slice(0, LOG_LIMIT);
 }

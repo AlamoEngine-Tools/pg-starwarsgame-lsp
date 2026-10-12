@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Lua.Analyzer.Tests;
 public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
 {
     private static readonly IReadOnlyList<ProjectLayer> Layers =
-        [new ProjectLayer(0, "Mod", [], ["D:/Mods/MyMod/Data/Scripts"], [], [], null)];
+        [new(0, "Mod", [], ["D:/Mods/MyMod/Data/Scripts"], [], [], null)];
 
     private readonly LuaAnalyzerHost _host = new(new LuaAnalyzerOptions
     {
@@ -54,7 +54,7 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
     [Fact]
     public async Task NoExecutable_TheAnalyzerDoesNotStart()
     {
-        await Starter(true, executableFound: false).ConfigureAsync(Layers);
+        await Starter(true, false).ConfigureAsync(Layers);
 
         Assert.Equal(0, _host.Starts);
     }
@@ -77,6 +77,21 @@ public sealed class LuaAnalyzerStarterTest : IAsyncDisposable
         Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(resolved));
         Assert.Equal(root.TrimEnd(Path.DirectorySeparatorChar), resolved.TrimEnd(Path.DirectorySeparatorChar),
             StringComparer.Ordinal);
+    }
+
+    // A project may declare a scripts folder it does not have yet (measured: the E2E workspace).
+    // The analyzer then still compares the editor's URIs against the root, so the part that exists
+    // must be in its case on disk.
+    [Fact]
+    public void ARootNotYetOnDisk_KeepsTheCaseOfThePartThatIs()
+    {
+        if (!OperatingSystem.IsWindows()) Assert.Skip("Case-insensitive file systems only.");
+        var existing = Path.Combine(Path.GetTempPath(), "AetCaseProbe" + Guid.NewGuid().ToString("N")[..6], "Mod");
+        Directory.CreateDirectory(existing);
+
+        var resolved = PathCasing.OnDisk(Path.Combine(existing, "data", "scripts").ToLowerInvariant());
+
+        Assert.Equal(Path.Combine(Path.GetFullPath(existing), "data", "scripts"), resolved, StringComparer.Ordinal);
     }
 
     [Fact]

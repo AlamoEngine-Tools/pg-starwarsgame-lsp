@@ -78,7 +78,7 @@ public sealed class PgNetDatagramCodecTest
         var datagram = _codec.EncodeAck(1);
         datagram[0] ^= 0x01;
 
-        Assert.Equal(1u, _codec.Decode(datagram, validateCrc: false).PacketId);
+        Assert.Equal(1u, _codec.Decode(datagram, false).PacketId);
     }
 
     [Fact]

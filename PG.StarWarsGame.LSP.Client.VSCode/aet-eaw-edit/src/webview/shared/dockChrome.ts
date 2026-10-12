@@ -18,7 +18,7 @@
 // gets it to every one of them without touching a single call site. The tile properties that used
 // to be declared here in full now live in tokens.ts with the reasoning that fitted them.
 
-import {tokensCss} from './tokens';
+import { tokensCss } from "./tokens";
 
 export const dockChromeCss = `
 ${tokensCss}

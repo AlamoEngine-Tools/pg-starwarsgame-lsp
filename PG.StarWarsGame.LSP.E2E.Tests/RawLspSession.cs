@@ -22,6 +22,7 @@ public sealed class RawLspSession : IAsyncDisposable
     private readonly TaskCompletionSource<JObject> _initializeResult =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private readonly ConcurrentDictionary<int, TaskCompletionSource<JObject>> _pending = new();
     private readonly Process _process;
     private readonly ConcurrentQueue<JObject> _received = new();
     private readonly TaskCompletionSource _scanComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -66,7 +67,10 @@ public sealed class RawLspSession : IAsyncDisposable
     }
 
     /// <summary>Starts the server, initializes it, and waits until its workspace scan is complete.</summary>
-    public static async Task<RawLspSession> StartAsync(object clientCapabilities, object initializationOptions)
+    /// <param name="workspace">The workspace root; the suite's TestData folder when omitted.</param>
+    /// <param name="environment">Variables set on the server process (a null value removes one).</param>
+    public static async Task<RawLspSession> StartAsync(object clientCapabilities, object initializationOptions,
+        string? workspace = null, IReadOnlyDictionary<string, string?>? environment = null)
     {
         var assemblyDir = Path.GetDirectoryName(typeof(RawLspSession).Assembly.Location)!;
         var startInfo = new ProcessStartInfo("dotnet",
@@ -78,9 +82,12 @@ public sealed class RawLspSession : IAsyncDisposable
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        foreach (var (name, value) in environment ?? new Dictionary<string, string?>())
+            if (value is null) startInfo.Environment.Remove(name);
+            else startInfo.Environment[name] = value;
         var session = new RawLspSession(Process.Start(startInfo)!);
 
-        var workspace = Path.Combine(assemblyDir, "TestData");
+        workspace ??= Path.Combine(assemblyDir, "TestData");
         await session.SendAsync(new
         {
             jsonrpc = "2.0",
@@ -99,6 +106,25 @@ public sealed class RawLspSession : IAsyncDisposable
         await session.SendAsync(new { jsonrpc = "2.0", method = "initialized", @params = new { } });
         await session._scanComplete.Task.WaitAsync(TimeSpan.FromSeconds(60));
         return session;
+    }
+
+    /// <summary>Sends a notification.</summary>
+    public Task NotifyAsync(string method, object parameters)
+    {
+        return SendAsync(new { jsonrpc = "2.0", method, @params = parameters });
+    }
+
+    /// <summary>Sends a request and returns its result; null for a null result.</summary>
+    public async Task<JToken?> RequestAsync(string method, object parameters, TimeSpan timeout)
+    {
+        var id = Interlocked.Increment(ref _nextId);
+        var answer = new TaskCompletionSource<JObject>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pending[id] = answer;
+        await SendAsync(new { jsonrpc = "2.0", id, method, @params = parameters });
+        var response = await answer.Task.WaitAsync(timeout);
+        if (response["error"] is { Type: not JTokenType.Null } error)
+            throw new InvalidOperationException($"{method} failed: {error}");
+        return response["result"] is { Type: not JTokenType.Null } result ? result : null;
     }
 
     private async Task SendAsync(object message)
@@ -132,7 +158,10 @@ public sealed class RawLspSession : IAsyncDisposable
                 _received.Enqueue(message);
 
                 var method = (string?)message["method"];
-                if (method is null && message["result"] is JObject result) _initializeResult.TrySetResult(result);
+                if (method is null && message["id"]?.Type == JTokenType.Integer &&
+                    _pending.TryRemove((int)message["id"]!, out var answer))
+                    answer.TrySetResult(message);
+                else if (method is null && message["result"] is JObject result) _initializeResult.TrySetResult(result);
                 else if (method == "$/workspaceScanComplete") _scanComplete.TrySetResult();
                 else if (method is not null && message["id"] is { } id)
                     await SendAsync(new { jsonrpc = "2.0", id, result = (object?)null });
@@ -154,7 +183,8 @@ public sealed class RawLspSession : IAsyncDisposable
             header.Append((char)one[0]);
         }
 
-        var line = header.ToString().Split("\r\n").First(l => l.StartsWith("Content-Length:", StringComparison.Ordinal));
+        var line = header.ToString().Split("\r\n")
+            .First(l => l.StartsWith("Content-Length:", StringComparison.Ordinal));
         return int.Parse(line["Content-Length:".Length..].Trim());
     }
 }

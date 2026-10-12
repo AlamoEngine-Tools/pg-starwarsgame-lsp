@@ -17,6 +17,15 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlTagValueFact>
 {
+    /// <summary>
+    ///     Vanilla's "this slot carries no art" filler. <c>&lt;Icon_Alternate_Texture_Name&gt;</c>
+    ///     is indexed BY ABILITY SLOT, so a slot with no icon still needs a word in it, and vanilla
+    ///     writes this one - 23 occurrences in <c>commandbarcomponents.xml</c>, in both corpora. The
+    ///     engine has no such string in it and simply fails to load the texture, which is what the
+    ///     author meant to happen.
+    /// </summary>
+    private const string UnusedSlotMarker = "NOT_USED";
+
     protected abstract ReferenceKind TargetKind { get; }
 
     private AssetKindRule Rule => AssetKindRules.For(TargetKind)
@@ -78,15 +87,6 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
 
         return results;
     }
-
-    /// <summary>
-    ///     Vanilla's "this slot carries no art" filler. <c>&lt;Icon_Alternate_Texture_Name&gt;</c>
-    ///     is indexed BY ABILITY SLOT, so a slot with no icon still needs a word in it, and vanilla
-    ///     writes this one - 23 occurrences in <c>commandbarcomponents.xml</c>, in both corpora. The
-    ///     engine has no such string in it and simply fails to load the texture, which is what the
-    ///     author meant to happen.
-    /// </summary>
-    private const string UnusedSlotMarker = "NOT_USED";
 
     private static bool IsListValued(XmlValueType valueType)
     {

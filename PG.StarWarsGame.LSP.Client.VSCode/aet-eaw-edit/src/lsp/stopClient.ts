@@ -37,12 +37,12 @@ export const STOP_TIMEOUT_MS = 5000;
 
 /** What happened, for the caller that has to decide whether to start a new client. */
 export type StopOutcome =
-/** The handshake completed; the server is gone. */
-    | 'stopped'
+    /** The handshake completed; the server is gone. */
+    | "stopped"
     /** There was nothing to stop. */
-    | 'idle'
+    | "idle"
     /** The stop threw, so the server was killed instead. A restart is safe either way. */
-    | 'abandoned';
+    | "abandoned";
 
 export interface StopOptions {
     /** Overrides {@link STOP_TIMEOUT_MS}. */
@@ -78,13 +78,13 @@ export async function stopClient(
     options: StopOptions = {},
 ): Promise<StopOutcome> {
     if (client === undefined) {
-        return 'idle';
+        return "idle";
     }
 
-    log('Stopping LSP server.');
+    log("Stopping LSP server.");
     try {
         await client.stop(options.timeoutMs ?? STOP_TIMEOUT_MS);
-        return 'stopped';
+        return "stopped";
     } catch (err) {
         // The library clears its own connection in a `finally`, so it cannot be asked to try
         // again, and `dispose()` would only report that the client is no longer running. Killing
@@ -99,7 +99,7 @@ export async function stopClient(
             // start behaves strangely.
             log(`Killing the LSP server failed: ${describe(killErr)}.`);
         }
-        return 'abandoned';
+        return "abandoned";
     }
 }
 

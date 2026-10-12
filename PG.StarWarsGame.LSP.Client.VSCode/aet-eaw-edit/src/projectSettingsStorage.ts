@@ -1,9 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import { projectSettingsFrom, type ProjectSettings } from './webview/preview/projectSettings';
+import {
+    type ProjectSettings,
+    projectSettingsFrom,
+} from "./webview/preview/projectSettings";
 
 /**
  * What the preview remembers about THIS PROJECT: the weapon bench, the faction and its colour.
@@ -17,7 +20,7 @@ import { projectSettingsFrom, type ProjectSettings } from './webview/preview/pro
  * beside it: the preview is opened from several call sites and none of them otherwise cares about
  * storage.
  */
-const KEY = 'aet-eaw-edit.previewProjectSettings';
+const KEY = "aet-eaw-edit.previewProjectSettings";
 
 let store: vscode.Memento | undefined;
 
@@ -49,6 +52,10 @@ export function saveProjectSettings(settings: unknown): void {
         return;
     }
 
-    void Promise.resolve(store.update(KEY, projectSettingsFrom(settings)))
-        .then(undefined, () => { /* a saved weapon is not worth reporting a failure over */ });
+    void Promise.resolve(store.update(KEY, projectSettingsFrom(settings))).then(
+        undefined,
+        () => {
+            /* a saved weapon is not worth reporting a failure over */
+        },
+    );
 }

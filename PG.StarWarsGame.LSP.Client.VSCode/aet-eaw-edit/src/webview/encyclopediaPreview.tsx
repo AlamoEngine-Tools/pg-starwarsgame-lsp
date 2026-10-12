@@ -16,26 +16,36 @@
 // dock is the wrong home for them and LocProblemsBar already records why: it is narrow, so messages
 // are truncated, and a list that appears and disappears there shoves everything around it.
 
-import {useEffect, useRef, useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import styled from 'styled-components';
+import { useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import styled from "styled-components";
 
-import {GetEncyclopediaEntryResult} from '../protocol/encyclopedia';
-import {EncyclopediaCard} from './encyclopediaCard';
-import {encyclopediaNotices, noticeSeverity} from './encyclopediaNotices';
+import { GetEncyclopediaEntryResult } from "../protocol/encyclopedia";
+import { EncyclopediaCard } from "./encyclopediaCard";
+import { encyclopediaNotices, noticeSeverity } from "./encyclopediaNotices";
 import {
-    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
-} from './shared/dockChrome';
-import {DockSection} from './shared/DockSection';
-import {Field} from './shared/Field';
-import {ProblemsPanel} from './shared/ProblemsPanel';
-import {problemLook} from './shared/problemLook';
-import {RightDock} from './shared/RightDock';
+    dockBodyCss,
+    dockChromeCss,
+    dockHeaderCss,
+    dockOverviewCss,
+    problemsPanelCss,
+    rightDockCss,
+} from "./shared/dockChrome";
+import { DockSection } from "./shared/DockSection";
+import { Field } from "./shared/Field";
+import { ProblemsPanel } from "./shared/ProblemsPanel";
+import { problemLook } from "./shared/problemLook";
+import { RightDock } from "./shared/RightDock";
 
-import {initPanelLayout} from './shared/panelLayoutBridge';
-import {SeverityTag} from './shared/SeverityTag';
-import {ModeSelector} from './shared/ModeSelector';
-import {BODY_MODES, bodyModeOf, factionModes, factionSlotOf} from './encyclopediaModes';
+import { initPanelLayout } from "./shared/panelLayoutBridge";
+import { SeverityTag } from "./shared/SeverityTag";
+import { ModeSelector } from "./shared/ModeSelector";
+import {
+    BODY_MODES,
+    bodyModeOf,
+    factionModes,
+    factionSlotOf,
+} from "./encyclopediaModes";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
@@ -57,7 +67,10 @@ const ZOOM_MAX = 5;
 const ZOOM_STEP = 0.25;
 
 const clampZoom = (z: number): number =>
-    Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z / ZOOM_STEP) * ZOOM_STEP));
+    Math.min(
+        ZOOM_MAX,
+        Math.max(ZOOM_MIN, Math.round(z / ZOOM_STEP) * ZOOM_STEP),
+    );
 
 // Module-level so a remount - the webview reloads when its tab is restored - keeps the dock width,
 // the same way the localisation grid does.
@@ -208,7 +221,10 @@ const Shell = styled.div`
         overflow-y: auto;
         border: var(--space-1) solid var(--vscode-panel-border, #444);
         border-radius: var(--radius-3);
-        background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
+        background: var(
+            --vscode-editorWidget-background,
+            rgba(128, 128, 128, 0.06)
+        );
     }
 
     .name-list li {
@@ -225,7 +241,10 @@ const Shell = styled.div`
 
     .name-list li.drawn {
         border-left-color: var(--vscode-focusBorder, #007fd4);
-        background: var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.14));
+        background: var(
+            --vscode-list-inactiveSelectionBackground,
+            rgba(128, 128, 128, 0.14)
+        );
         font-weight: 600;
     }
 
@@ -292,11 +311,13 @@ function App(): React.JSX.Element {
 
         const onWheel = (e: WheelEvent): void => {
             e.preventDefault();
-            setZoom(z => clampZoom(z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)));
+            setZoom((z) =>
+                clampZoom(z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)),
+            );
         };
 
-        stage.addEventListener('wheel', onWheel, {passive: false});
-        return () => stage.removeEventListener('wheel', onWheel);
+        stage.addEventListener("wheel", onWheel, { passive: false });
+        return () => stage.removeEventListener("wheel", onWheel);
     }, []);
 
     useEffect(() => {
@@ -307,63 +328,74 @@ function App(): React.JSX.Element {
                 multiplayer?: boolean;
                 shipName?: string | null;
             };
-            if (msg.type !== 'entry' || msg.entry === undefined) {
+            if (msg.type !== "entry" || msg.entry === undefined) {
                 return;
             }
             setEntry(msg.entry);
             setShipName(msg.shipName ?? null);
             // The mode the host actually requested. Note this is not `usedMultiplayerBody` - it is
             // what was asked for, which is what the toggle represents.
-            if (typeof msg.multiplayer === 'boolean') {
+            if (typeof msg.multiplayer === "boolean") {
                 setMultiplayer(msg.multiplayer);
             }
         };
 
-        window.addEventListener('message', handle);
-        vscode.postMessage({type: 'ready'});
-        return () => window.removeEventListener('message', handle);
+        window.addEventListener("message", handle);
+        vscode.postMessage({ type: "ready" });
+        return () => window.removeEventListener("message", handle);
     }, []);
 
     const onToggleMultiplayer = (next: boolean): void => {
         setMultiplayer(next);
-        vscode.postMessage({type: 'setMultiplayer', multiplayer: next});
+        vscode.postMessage({ type: "setMultiplayer", multiplayer: next });
     };
 
-    const stage = entry === null
-        ? <p className="empty">Waiting for the editor...</p>
-        : entry.found
-            ? (
-                <EncyclopediaCard
-                    entry={shipName === null ? entry : {...entry, unitClass: shipName}}
-                    zoom={zoom}
-                    factionSlot={factionSlot}
-                />
-            )
-            : <p className="empty">No encyclopedia entry for &apos;{entry.objectId}&apos;.</p>;
+    const stage =
+        entry === null ? (
+            <p className="empty">Waiting for the editor...</p>
+        ) : entry.found ? (
+            <EncyclopediaCard
+                entry={
+                    shipName === null
+                        ? entry
+                        : { ...entry, unitClass: shipName }
+                }
+                zoom={zoom}
+                factionSlot={factionSlot}
+            />
+        ) : (
+            <p className="empty">
+                No encyclopedia entry for &apos;{entry.objectId}&apos;.
+            </p>
+        );
 
     // One entry per slot encyclopedia_back declares. Offered only when there is a choice to make -
     // a mod that ships a single frame gets no picker rather than a control with one option.
     const factionFrames = entry?.chrome?.factionFrames ?? [];
 
     // Everything the preview has to report about this card, in one place - see encyclopediaNotices.
-    const notices = encyclopediaNotices(entry, {multiplayer, factionSlot});
+    const notices = encyclopediaNotices(entry, { multiplayer, factionSlot });
     const severity = noticeSeverity(notices);
-    const noticeWord = notices.length === 1 ? 'note' : 'notes';
+    const noticeWord = notices.length === 1 ? "note" : "notes";
     // Counted heading, the shape the other two editors' bars use. The warning count is only worth
     // showing when it is not simply the total - "2 notes, 2 warnings" says the same thing twice.
-    const warnings = notices.filter(n => n.severity === 'warning').length;
+    const warnings = notices.filter((n) => n.severity === "warning").length;
     const noticeTitle = `Notes (${notices.length}${
         warnings > 0 && warnings < notices.length
-            ? `, ${warnings} warning${warnings === 1 ? '' : 's'}`
-            : ''})`;
-    const title = entry === null
-        ? 'Encyclopedia'
-        : entry.displayName?.trim() || entry.objectId;
+            ? `, ${warnings} warning${warnings === 1 ? "" : "s"}`
+            : ""
+    })`;
+    const title =
+        entry === null
+            ? "Encyclopedia"
+            : entry.displayName?.trim() || entry.objectId;
 
     return (
         <Shell>
             <div className="stage-column">
-                <div className="preview-stage" ref={stageRef}>{stage}</div>
+                <div className="preview-stage" ref={stageRef}>
+                    {stage}
+                </div>
 
                 {noticesOpen && notices.length > 0 && (
                     <ProblemsPanel
@@ -374,14 +406,23 @@ function App(): React.JSX.Element {
                         onClose={() => setNoticesOpen(false)}
                     >
                         <div className="problem-list">
-                            {notices.map(notice => (
-                                <div key={notice.message} className="problem-row">
+                            {notices.map((notice) => (
+                                <div
+                                    key={notice.message}
+                                    className="problem-row"
+                                >
                                     <span
-                                        className={'codicon sev-' + notice.severity + ' codicon-'
-                                            + problemLook(notice.severity).icon}
+                                        className={
+                                            "codicon sev-" +
+                                            notice.severity +
+                                            " codicon-" +
+                                            problemLook(notice.severity).icon
+                                        }
                                         aria-hidden="true"
                                     />
-                                    <span className="problem-msg">{notice.message}</span>
+                                    <span className="problem-msg">
+                                        {notice.message}
+                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -394,93 +435,123 @@ function App(): React.JSX.Element {
                 initialWidth={220}
                 minWidth={180}
                 maxWidth={420}
-                header={<>
-                    <span className="header-title" title={entry?.objectId}>{title}</span>
-                    <SeverityTag
-                        severity={severity}
-                        count={notices.length}
-                        expanded={noticesOpen}
-                        disabled={notices.length === 0}
-                        disabledReason="Nothing to report about this card"
-                        title={`${notices.length} ${noticeWord} about this card. `
-                            + `Press to ${noticesOpen ? 'hide' : 'read'} them.`}
-                        onClick={() => setNoticesOpen(open => !open)}
-                    />
-                </>}
-                content={<>
-                    <DockSection title="Ship names" count={entry?.shipNames?.names.length}>
-                        {/* Three cases, and the middle one is why this is not a ternary: a pool
+                header={
+                    <>
+                        <span className="header-title" title={entry?.objectId}>
+                            {title}
+                        </span>
+                        <SeverityTag
+                            severity={severity}
+                            count={notices.length}
+                            expanded={noticesOpen}
+                            disabled={notices.length === 0}
+                            disabledReason="Nothing to report about this card"
+                            title={
+                                `${notices.length} ${noticeWord} about this card. ` +
+                                `Press to ${noticesOpen ? "hide" : "read"} them.`
+                            }
+                            onClick={() => setNoticesOpen((open) => !open)}
+                        />
+                    </>
+                }
+                content={
+                    <>
+                        <DockSection
+                            title="Ship names"
+                            count={entry?.shipNames?.names.length}
+                        >
+                            {/* Three cases, and the middle one is why this is not a ternary: a pool
                             that read empty must not draw an empty bordered box, and must not be
                             described as "not registered" either - it IS wired up, and the notes
                             bar carries the reason it came back empty. */}
-                        {entry?.shipNames && entry.shipNames.names.length > 0 && (
-                            <ul className="name-list">
-                                {entry.shipNames.names.map(name => (
-                                    <li
-                                        key={name}
-                                        className={name === shipName ? 'drawn' : undefined}
-                                    >
-                                        <span>{name}</span>
-                                        {name === shipName && (
-                                            <span className="drawn-tag">on the card</span>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        {entry?.shipNames && entry.shipNames.names.length === 0 && (
-                            <div className="dock-hint">
-                                This object is wired up for individual names, but none could be
-                                read. See the notes for why.
-                            </div>
-                        )}
-                        {entry !== null && !entry.shipNames && (
-                            <div className="dock-hint">
-                                This object shows its class line. Only objects registered in
-                                GameConstants under ShipNameTextFiles draw an individual name here.
-                            </div>
-                        )}
-                    </DockSection>
-                </>}
-                overview={<>
-                    <Field label={`Zoom ${zoom.toFixed(2)}x`} as="label">
-                        <input
-                            type="range"
-                            min={ZOOM_MIN}
-                            max={ZOOM_MAX}
-                            step={ZOOM_STEP}
-                            value={zoom}
-                            onChange={e => setZoom(clampZoom(Number(e.target.value)))}
-                            title="Drag, or scroll over the preview"
-                        />
-                    </Field>
+                            {entry?.shipNames &&
+                                entry.shipNames.names.length > 0 && (
+                                    <ul className="name-list">
+                                        {entry.shipNames.names.map((name) => (
+                                            <li
+                                                key={name}
+                                                className={
+                                                    name === shipName
+                                                        ? "drawn"
+                                                        : undefined
+                                                }
+                                            >
+                                                <span>{name}</span>
+                                                {name === shipName && (
+                                                    <span className="drawn-tag">
+                                                        on the card
+                                                    </span>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            {entry?.shipNames &&
+                                entry.shipNames.names.length === 0 && (
+                                    <div className="dock-hint">
+                                        This object is wired up for individual
+                                        names, but none could be read. See the
+                                        notes for why.
+                                    </div>
+                                )}
+                            {entry !== null && !entry.shipNames && (
+                                <div className="dock-hint">
+                                    This object shows its class line. Only
+                                    objects registered in GameConstants under
+                                    ShipNameTextFiles draw an individual name
+                                    here.
+                                </div>
+                            )}
+                        </DockSection>
+                    </>
+                }
+                overview={
+                    <>
+                        <Field label={`Zoom ${zoom.toFixed(2)}x`} as="label">
+                            <input
+                                type="range"
+                                min={ZOOM_MIN}
+                                max={ZOOM_MAX}
+                                step={ZOOM_STEP}
+                                value={zoom}
+                                onChange={(e) =>
+                                    setZoom(clampZoom(Number(e.target.value)))
+                                }
+                                title="Drag, or scroll over the preview"
+                            />
+                        </Field>
 
-                    {/* Both of these pick one of a handful, and in both the alternatives are the
+                        {/* Both of these pick one of a handful, and in both the alternatives are the
                         point - so they read as joined buttons rather than hiding every option but
                         one behind a click. The faction row stays VISIBLE when there is nothing to
                         switch to, disabled and saying why: that is the arrangement where a reader
                         most needs telling the choice exists at all. */}
-                    <Field label="Faction frame">
-                        <ModeSelector
-                            label="Faction frame"
-                            value={String(factionSlot)}
-                            options={factionModes(factionFrames)}
-                            onSelect={id => setFactionSlot(factionSlotOf(id))}
-                        />
-                    </Field>
+                        <Field label="Faction frame">
+                            <ModeSelector
+                                label="Faction frame"
+                                value={String(factionSlot)}
+                                options={factionModes(factionFrames)}
+                                onSelect={(id) =>
+                                    setFactionSlot(factionSlotOf(id))
+                                }
+                            />
+                        </Field>
 
-                    <Field label="Body">
-                        <ModeSelector
-                            label="Body text"
-                            value={bodyModeOf(multiplayer)}
-                            options={BODY_MODES}
-                            onSelect={id => onToggleMultiplayer(id === 'mp')}
-                        />
-                    </Field>
-                </>}
+                        <Field label="Body">
+                            <ModeSelector
+                                label="Body text"
+                                value={bodyModeOf(multiplayer)}
+                                options={BODY_MODES}
+                                onSelect={(id) =>
+                                    onToggleMultiplayer(id === "mp")
+                                }
+                            />
+                        </Field>
+                    </>
+                }
             />
         </Shell>
     );
 }
 
-createRoot(document.getElementById('root')!).render(<App/>);
+createRoot(document.getElementById("root")!).render(<App />);

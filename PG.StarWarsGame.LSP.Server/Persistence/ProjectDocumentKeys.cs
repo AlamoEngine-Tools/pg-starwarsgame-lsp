@@ -3,7 +3,6 @@
 
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Persistence;

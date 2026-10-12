@@ -27,7 +27,11 @@ const DEFAULT_LAYER = 0;
 
 /** The parts of an Object3D this module touches. Narrow so it can be tested without three. */
 export interface Layered {
-    layers: { enable(channel: number): void; disable(channel: number): void; mask: number };
+    layers: {
+        enable(channel: number): void;
+        disable(channel: number): void;
+        mask: number;
+    };
 }
 
 /**

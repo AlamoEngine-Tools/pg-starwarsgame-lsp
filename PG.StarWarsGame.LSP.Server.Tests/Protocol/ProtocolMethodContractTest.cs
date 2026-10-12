@@ -161,7 +161,8 @@ public sealed class ProtocolMethodContractTest
     {
         var root = Path.Combine(
             RepoRoot, "PG.StarWarsGame.LSP.Client.VSCode", "aet-eaw-edit", "src");
-        var methods = Scan(root, ["*.ts", "*.tsx"], @"'(aet/[A-Za-z]+)'",
+        // Either quote: the client is formatted by Prettier, whose default is double quotes.
+        var methods = Scan(root, ["*.ts", "*.tsx"], @"[""'](aet/[A-Za-z]+)[""']",
             f => f.Contains(".test.", StringComparison.Ordinal));
 
         Assert.NotEmpty(methods);

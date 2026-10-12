@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import { ReactNode } from 'react';
+import { ReactNode } from "react";
 
 export interface LocTileProps {
     /** Codicon name, without the `codicon-` prefix. */
@@ -33,7 +33,7 @@ export function LocTile(props: LocTileProps): React.JSX.Element {
         <button
             // A badge makes the tile three rows tall; the class is what keeps the label to one
             // line so all tiles stay the same height whatever they carry.
-            className={`dock-tile${props.badge !== undefined ? ' with-badge' : ''}`}
+            className={`dock-tile${props.badge !== undefined ? " with-badge" : ""}`}
             title={props.title}
             onClick={props.onClick}
             draggable={props.draggable}
@@ -42,7 +42,9 @@ export function LocTile(props: LocTileProps): React.JSX.Element {
         >
             <span className={`codicon codicon-${props.icon}`} />
             <span className="tile-label">{props.label}</span>
-            {props.badge !== undefined && <span className="tile-badge">{props.badge}</span>}
+            {props.badge !== undefined && (
+                <span className="tile-badge">{props.badge}</span>
+            )}
         </button>
     );
 }

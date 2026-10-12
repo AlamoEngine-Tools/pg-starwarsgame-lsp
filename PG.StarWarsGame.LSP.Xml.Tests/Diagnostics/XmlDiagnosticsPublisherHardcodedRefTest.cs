@@ -51,7 +51,11 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
 
     private static HardcodedReferenceSetValue DeprecatedValue(string name, params string[] groups)
     {
-        return new HardcodedReferenceSetValue { Name = name, Groups = groups, Notes = [new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>())] };
+        return new HardcodedReferenceSetValue
+        {
+            Name = name, Groups = groups,
+            Notes = [new SchemaNote(SchemaNoteKind.Deprecated, new Dictionary<string, string>())]
+        };
     }
 
     private static XmlTagDefinition BehaviorTag(string tagName, params string[] valueGroups)

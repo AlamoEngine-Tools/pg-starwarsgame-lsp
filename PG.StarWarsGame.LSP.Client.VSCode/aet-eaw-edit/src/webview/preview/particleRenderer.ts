@@ -6,19 +6,32 @@
 // Kept apart from the simulation so the arithmetic stays testable: nothing here decides where a
 // particle goes, only how it is put on screen.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
 import type {
-    AlamoEmitter, AlamoParticleContent, AlamoVector3,
-} from '../../protocol/modelPreview';
+    AlamoEmitter,
+    AlamoParticleContent,
+    AlamoVector3,
+} from "../../protocol/modelPreview";
 import {
-    emissionMultiplier, emissionPoint, offsetAlongNormal,
-    type EmissionCursor, type EmissionMesh,
-} from './meshEmission';
+    type EmissionCursor,
+    type EmissionMesh,
+    emissionMultiplier,
+    emissionPoint,
+    offsetAlongNormal,
+} from "./meshEmission";
 import {
-    accelerationIn, appearanceOf, atlasColumns, seededRandom, SpawnClock, spawnParticle,
-    stepParticle, systemExtent, type Particle, type Random,
-} from './particleSim';
+    accelerationIn,
+    appearanceOf,
+    atlasColumns,
+    type Particle,
+    type Random,
+    seededRandom,
+    SpawnClock,
+    spawnParticle,
+    stepParticle,
+    systemExtent,
+} from "./particleSim";
 
 /**
  * Ceiling on live particles per emitter.
@@ -89,14 +102,19 @@ const BUMP_ALPHA_REF = 8 / 255;
  * colour - a bright fireball came out ringed by dark squares, one per sprite quad.
  */
 export function blendingFor(mode: string): ParticleBlend {
-    const base = { blending: THREE.CustomBlending, depthWrite: false, alphaTest: 0 } as const;
+    const base = {
+        blending: THREE.CustomBlending,
+        depthWrite: false,
+        alphaTest: 0,
+    } as const;
 
     switch (mode) {
         // PrimAdditive.fx, PrimDepthSpriteAdditive.fx
-        case 'Additive':
-        case 'DepthAdditive':
+        case "Additive":
+        case "DepthAdditive":
             return {
-                ...base, alphaGated: false,
+                ...base,
+                alphaGated: false,
                 blendSrc: THREE.OneFactor,
                 blendDst: THREE.OneFactor,
                 blendSrcAlpha: THREE.ZeroFactor,
@@ -104,12 +122,13 @@ export function blendingFor(mode: string): ParticleBlend {
             };
 
         // PrimModulate.fx, PrimDepthSpriteModulate.fx - a multiply, which darkens.
-        case 'Inverse':
-        case 'DepthInverse':
-        case 'StencilDarken':
-        case 'StencilDarkenBlur':
+        case "Inverse":
+        case "DepthInverse":
+        case "StencilDarken":
+        case "StencilDarkenBlur":
             return {
-                ...base, alphaGated: false,
+                ...base,
+                alphaGated: false,
                 blendSrc: THREE.ZeroFactor,
                 blendDst: THREE.SrcColorFactor,
                 blendSrcAlpha: THREE.ZeroFactor,
@@ -117,9 +136,10 @@ export function blendingFor(mode: string): ParticleBlend {
             };
 
         // PrimDecalBumpAlpha.fx - `DESTCOLOR / SRCCOLOR`, a decal multiply.
-        case 'DecalBump':
+        case "DecalBump":
             return {
-                ...base, alphaGated: false,
+                ...base,
+                alphaGated: false,
                 blendSrc: THREE.DstColorFactor,
                 blendDst: THREE.SrcColorFactor,
                 blendSrcAlpha: THREE.ZeroFactor,
@@ -127,9 +147,12 @@ export function blendingFor(mode: string): ParticleBlend {
             };
 
         // PrimOpaque.fx - the one mode that is not blended at all, and the one that writes depth.
-        case 'None':
+        case "None":
             return {
-                blending: THREE.NoBlending, depthWrite: true, alphaGated: false, alphaTest: 0,
+                blending: THREE.NoBlending,
+                depthWrite: true,
+                alphaGated: false,
+                alphaTest: 0,
             };
 
         /*
@@ -140,9 +163,10 @@ export function blendingFor(mode: string): ParticleBlend {
          * selects this mode; the 127 heat particles in the corpus set the `isHeatParticle` FLAG on
          * an ordinary Transparent or Additive mode instead.
          */
-        case 'Heat':
+        case "Heat":
             return {
-                ...base, alphaGated: false,
+                ...base,
+                alphaGated: false,
                 blendSrc: THREE.SrcAlphaFactor,
                 blendDst: THREE.OneFactor,
                 blendSrcAlpha: THREE.ZeroFactor,
@@ -156,12 +180,12 @@ export function blendingFor(mode: string): ParticleBlend {
             return {
                 ...base,
                 alphaGated: true,
-                alphaTest: mode === 'Bump' ? BUMP_ALPHA_REF : 0,
+                alphaTest: mode === "Bump" ? BUMP_ALPHA_REF : 0,
                 // The one blended mode the engine lets write depth - `PrimParticleBumpAlpha.fx`
                 // declares `ZWriteEnable = true` where every other Prim shader turns it off. It
                 // can afford to, because it is alpha TESTED at `AlphaRef = 8`, so the depth it
                 // writes belongs to the solid part of the sprite rather than to its whole quad.
-                depthWrite: mode === 'Bump',
+                depthWrite: mode === "Bump",
                 blendSrc: THREE.SrcAlphaFactor,
                 blendDst: THREE.OneMinusSrcAlphaFactor,
                 blendSrcAlpha: THREE.OneFactor,
@@ -367,10 +391,7 @@ export interface EmitterFrame {
  * `vec3(spun.x, 0.0, spun.y)` the vertex shader builds - if the two disagreed the tail would trail
  * off at right angles to the direction of travel.
  */
-const GROUND_BASIS = new THREE.Matrix3().set(
-    1, 0, 0,
-    0, 0, 1,
-    0, 0, 0);
+const GROUND_BASIS = new THREE.Matrix3().set(1, 0, 0, 0, 0, 1, 0, 0, 0);
 
 /**
  * How much of the emitter's movement a particle is carried along by.
@@ -380,7 +401,7 @@ const GROUND_BASIS = new THREE.Matrix3().set(
  * double-count. `EmitterTranslaterPlugin` is the first (all or nothing); `EmitterInstance.cpp:545`
  * is the second, a fraction.
  */
-export function followFactor(properties: AlamoEmitter['properties']): number {
+export function followFactor(properties: AlamoEmitter["properties"]): number {
     return (properties.linkToSystem ? 1 : 0) + properties.parentLinkStrength;
 }
 
@@ -405,7 +426,9 @@ export interface TailGeometry {
  * A tailed emitter also ignores its rotation track: the direction of travel decides the angle.
  */
 export function tailGeometry(
-    properties: AlamoEmitter['properties'], velocity: AlamoVector3, speed: number,
+    properties: AlamoEmitter["properties"],
+    velocity: AlamoVector3,
+    speed: number,
 ): TailGeometry | null {
     if (!properties.hasTail) {
         return null;
@@ -419,13 +442,14 @@ export function tailGeometry(
     // is merely keeping up with its hull barely streaks at all.
     const mult = properties.parentLinkStrength !== 0 ? speed / 1000 : 1;
     const planar = Math.hypot(velocity.x, velocity.y);
-    const length = properties.tailSize * mult * planar / speed;
+    const length = (properties.tailSize * mult * planar) / speed;
 
     return {
         stretch: Math.max(1, length / Math.SQRT2),
         // The corner being pulled sits on the quad's 135 degree diagonal, so the extra eighth of a
         // turn lands it opposite the direction of travel.
-        turns: (Math.atan2(velocity.y, velocity.x) + Math.PI / 4) / (Math.PI * 2),
+        turns:
+            (Math.atan2(velocity.y, velocity.x) + Math.PI / 4) / (Math.PI * 2),
     };
 }
 
@@ -477,19 +501,43 @@ class EmitterRenderer {
         this.clock = new SpawnClock(emitter);
 
         this.geometry = new THREE.InstancedBufferGeometry();
-        this.geometry.setAttribute('corner', new THREE.BufferAttribute(
-            new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), 2));
+        this.geometry.setAttribute(
+            "corner",
+            new THREE.BufferAttribute(
+                new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]),
+                2,
+            ),
+        );
         this.geometry.setIndex([0, 1, 2, 0, 2, 3]);
 
-        this.geometry.setAttribute('iOffset', new THREE.InstancedBufferAttribute(this.offsets, 3));
-        this.geometry.setAttribute('iColor', new THREE.InstancedBufferAttribute(this.colors, 3));
-        this.geometry.setAttribute('iAlpha', new THREE.InstancedBufferAttribute(this.alphas, 1));
-        this.geometry.setAttribute('iSize', new THREE.InstancedBufferAttribute(this.sizes, 1));
         this.geometry.setAttribute(
-            'iRotation', new THREE.InstancedBufferAttribute(this.rotations, 1));
-        this.geometry.setAttribute('iFrame', new THREE.InstancedBufferAttribute(this.frames, 1));
+            "iOffset",
+            new THREE.InstancedBufferAttribute(this.offsets, 3),
+        );
         this.geometry.setAttribute(
-            'iStretch', new THREE.InstancedBufferAttribute(this.stretches, 1));
+            "iColor",
+            new THREE.InstancedBufferAttribute(this.colors, 3),
+        );
+        this.geometry.setAttribute(
+            "iAlpha",
+            new THREE.InstancedBufferAttribute(this.alphas, 1),
+        );
+        this.geometry.setAttribute(
+            "iSize",
+            new THREE.InstancedBufferAttribute(this.sizes, 1),
+        );
+        this.geometry.setAttribute(
+            "iRotation",
+            new THREE.InstancedBufferAttribute(this.rotations, 1),
+        );
+        this.geometry.setAttribute(
+            "iFrame",
+            new THREE.InstancedBufferAttribute(this.frames, 1),
+        );
+        this.geometry.setAttribute(
+            "iStretch",
+            new THREE.InstancedBufferAttribute(this.stretches, 1),
+        );
         this.geometry.instanceCount = 0;
 
         const heat = emitter.properties.isHeatParticle;
@@ -498,7 +546,7 @@ class EmitterRenderer {
         // blend over one another - the blend mode the emitter names describes the colour it would
         // have contributed, and it contributes none.
         const { alphaGated, alphaTest, ...blendState } = heat
-            ? blendingFor('Transparent')
+            ? blendingFor("Transparent")
             : blendingFor(emitter.properties.blendMode);
 
         this.material = new THREE.ShaderMaterial({
@@ -507,10 +555,14 @@ class EmitterRenderer {
                 uMap: { value: texture },
                 uHasMap: { value: texture === null ? 0 : 1 },
                 uMissing: { value: 0 },
-                uColumns: { value: atlasColumns(emitter.properties.textureSize) },
+                uColumns: {
+                    value: atlasColumns(emitter.properties.textureSize),
+                },
                 uAlphaGated: { value: alphaGated ? 1 : 0 },
                 uAlphaTest: { value: alphaTest },
-                uWorldOriented: { value: emitter.properties.worldOriented ? 1 : 0 },
+                uWorldOriented: {
+                    value: emitter.properties.worldOriented ? 1 : 0,
+                },
             },
             vertexShader: QUAD_VERTEX_SHADER,
             fragmentShader: heat ? HEAT_FRAGMENT_SHADER : QUAD_FRAGMENT_SHADER,
@@ -544,6 +596,36 @@ class EmitterRenderer {
         return this.emitter.colorTexture;
     }
 
+    /** True once the emitter has finished and its last particle has died. */
+    get exhausted(): boolean {
+        return this.clock.finished && this.particles.length === 0;
+    }
+
+    /** The live particles, for the tests and diagnostics that need to read the simulation. */
+    get live(): readonly Particle[] {
+        return this.particles;
+    }
+
+    /**
+     * How fast a child emits, per parent particle.
+     *
+     * The engine gives every parent particle its OWN emitter instance, so the rate is per particle
+     * and not shared - a hundred sparks each drag a full trail.
+     */
+    get rate(): number {
+        const properties = this.emitter.properties;
+
+        return properties.useBursts
+            ? properties.particlesPerBurst /
+                  Math.max(properties.burstDelay, 1e-3)
+            : properties.particlesPerSecond;
+    }
+
+    /** A whole burst of it, for a death child, which the engine fires as one. */
+    get burstSize(): number {
+        return Math.max(1, this.emitter.properties.particlesPerBurst);
+    }
+
     /**
      * Supplies the texture once it arrives.
      *
@@ -573,16 +655,6 @@ class EmitterRenderer {
         this.material.needsUpdate = true;
     }
 
-    /** True once the emitter has finished and its last particle has died. */
-    get exhausted(): boolean {
-        return this.clock.finished && this.particles.length === 0;
-    }
-
-    /** The live particles, for the tests and diagnostics that need to read the simulation. */
-    get live(): readonly Particle[] {
-        return this.particles;
-    }
-
     /**
      * Advances the emitter a step, and reports where its particles died.
      *
@@ -590,7 +662,11 @@ class EmitterRenderer {
      * not run their own clock: the engine only ever creates them from the parent, and letting one
      * emit on its own put an explosion's smoke trail at the blast's centre as a puff.
      */
-    update(dt: number, frame: EmitterFrame = stillFrame(), dependent = false): AlamoVector3[] {
+    update(
+        dt: number,
+        frame: EmitterFrame = stillFrame(),
+        dependent = false,
+    ): AlamoVector3[] {
         const follow = followFactor(this.emitter.properties);
         const acceleration = this.accelerationIn(frame);
         const deaths: AlamoVector3[] = [];
@@ -598,7 +674,15 @@ class EmitterRenderer {
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const particle = this.particles[i];
 
-            if (!stepParticle(particle, this.emitter, dt, frame.groundY, acceleration)) {
+            if (
+                !stepParticle(
+                    particle,
+                    this.emitter,
+                    dt,
+                    frame.groundY,
+                    acceleration,
+                )
+            ) {
                 deaths.push(particle.position);
 
                 // Swap-remove: draw order does not matter here, and splice on a few thousand
@@ -626,25 +710,38 @@ class EmitterRenderer {
         // An emitter nobody is drawing does not spawn, and its clock is held with it - the same
         // rule the system as a whole follows, one level down. Unticking one emitter in the dock
         // otherwise let it fill its buffer unseen and hand the reader a burst that was over.
-        const wanted = dependent || !this.mesh.visible
-            ? 0
-            : this.clock.advance(dt) * emissionMultiplier(mode, this.emissionMesh);
+        const wanted =
+            dependent || !this.mesh.visible
+                ? 0
+                : this.clock.advance(dt) *
+                  emissionMultiplier(mode, this.emissionMesh);
 
         for (let i = 0; i < wanted; i++) {
             if (this.particles.length >= MAX_PARTICLES) {
                 this.particles.shift();
             }
 
-            const particle = spawnParticle(this.emitter, this.random, frame.wind);
+            const particle = spawnParticle(
+                this.emitter,
+                this.random,
+                frame.wind,
+            );
 
             // Born ON the mesh rather than inside the emitter's shape volume. The shape still
             // decides the VELOCITY; only the position moves.
-            if (mode !== 'Disabled' && this.emissionMesh !== null) {
-                const point = emissionPoint(mode, this.emissionMesh, this.cursor, this.random);
+            if (mode !== "Disabled" && this.emissionMesh !== null) {
+                const point = emissionPoint(
+                    mode,
+                    this.emissionMesh,
+                    this.cursor,
+                    this.random,
+                );
 
                 if (point !== null) {
                     particle.position = offsetAlongNormal(
-                        point, this.emitter.properties.emitFromMeshOffset);
+                        point,
+                        this.emitter.properties.emitFromMeshOffset,
+                    );
                 }
             }
 
@@ -677,7 +774,11 @@ class EmitterRenderer {
                 this.particles.shift();
             }
 
-            const particle = spawnParticle(this.emitter, this.random, frame.wind);
+            const particle = spawnParticle(
+                this.emitter,
+                this.random,
+                frame.wind,
+            );
             this.place(particle, frame);
 
             // The shape volume still decides the SPREAD; the parent decides where that spread is
@@ -697,23 +798,9 @@ class EmitterRenderer {
         this.writeBuffers(frame);
     }
 
-    /**
-     * How fast a child emits, per parent particle.
-     *
-     * The engine gives every parent particle its OWN emitter instance, so the rate is per particle
-     * and not shared - a hundred sparks each drag a full trail.
-     */
-    get rate(): number {
-        const properties = this.emitter.properties;
-
-        return properties.useBursts
-            ? properties.particlesPerBurst / Math.max(properties.burstDelay, 1e-3)
-            : properties.particlesPerSecond;
-    }
-
-    /** A whole burst of it, for a death child, which the engine fires as one. */
-    get burstSize(): number {
-        return Math.max(1, this.emitter.properties.particlesPerBurst);
+    dispose(): void {
+        this.geometry.dispose();
+        this.material.dispose();
     }
 
     /**
@@ -735,9 +822,11 @@ class EmitterRenderer {
             return accelerationIn(properties);
         }
 
-        SPAWN_SCRATCH
-            .set(properties.acceleration.x, properties.acceleration.y, properties.acceleration.z)
-            .applyMatrix3(frame.rotation);
+        SPAWN_SCRATCH.set(
+            properties.acceleration.x,
+            properties.acceleration.y,
+            properties.acceleration.z,
+        ).applyMatrix3(frame.rotation);
 
         return {
             x: SPAWN_SCRATCH.x,
@@ -754,18 +843,35 @@ class EmitterRenderer {
      * along the model's own axes.
      */
     private place(particle: Particle, frame: EmitterFrame): void {
-        SPAWN_SCRATCH.set(particle.position.x, particle.position.y, particle.position.z)
-            .applyMatrix4(frame.matrix);
-        particle.position = { x: SPAWN_SCRATCH.x, y: SPAWN_SCRATCH.y, z: SPAWN_SCRATCH.z };
+        SPAWN_SCRATCH.set(
+            particle.position.x,
+            particle.position.y,
+            particle.position.z,
+        ).applyMatrix4(frame.matrix);
+        particle.position = {
+            x: SPAWN_SCRATCH.x,
+            y: SPAWN_SCRATCH.y,
+            z: SPAWN_SCRATCH.z,
+        };
 
         // The direction it was born in travels with the velocity: the inward pull is measured from
         // it for the particle's whole life, and half the corpus's emitters use one.
-        SPAWN_SCRATCH.set(particle.inward.x, particle.inward.y, particle.inward.z)
-            .applyMatrix3(frame.rotation);
-        particle.inward = { x: SPAWN_SCRATCH.x, y: SPAWN_SCRATCH.y, z: SPAWN_SCRATCH.z };
+        SPAWN_SCRATCH.set(
+            particle.inward.x,
+            particle.inward.y,
+            particle.inward.z,
+        ).applyMatrix3(frame.rotation);
+        particle.inward = {
+            x: SPAWN_SCRATCH.x,
+            y: SPAWN_SCRATCH.y,
+            z: SPAWN_SCRATCH.z,
+        };
 
-        SPAWN_SCRATCH.set(particle.velocity.x, particle.velocity.y, particle.velocity.z)
-            .applyMatrix3(frame.rotation);
+        SPAWN_SCRATCH.set(
+            particle.velocity.x,
+            particle.velocity.y,
+            particle.velocity.z,
+        ).applyMatrix3(frame.rotation);
 
         // `parentLinkStrength` again, in its other role: a particle is born already carrying its
         // share of the emitter's own motion, so debris thrown off a moving hull keeps up with it.
@@ -813,8 +919,15 @@ class EmitterRenderer {
 
         this.geometry.instanceCount = this.particles.length;
 
-        const written = ['iOffset', 'iColor', 'iAlpha', 'iSize', 'iRotation', 'iFrame'];
-        for (const name of tailed ? [...written, 'iStretch'] : written) {
+        const written = [
+            "iOffset",
+            "iColor",
+            "iAlpha",
+            "iSize",
+            "iRotation",
+            "iFrame",
+        ];
+        for (const name of tailed ? [...written, "iStretch"] : written) {
             this.geometry.attributes[name].needsUpdate = true;
         }
     }
@@ -827,19 +940,26 @@ class EmitterRenderer {
      * the camera is standing rather than about the particle.
      */
     private kiteFor(particle: Particle, frame: EmitterFrame): TailGeometry {
-        const speed = Math.hypot(particle.velocity.x, particle.velocity.y, particle.velocity.z);
+        const speed = Math.hypot(
+            particle.velocity.x,
+            particle.velocity.y,
+            particle.velocity.z,
+        );
 
         this.viewVelocity
             .set(particle.velocity.x, particle.velocity.y, particle.velocity.z)
-            .applyMatrix3(this.emitter.properties.worldOriented ? GROUND_BASIS : frame.toView);
+            .applyMatrix3(
+                this.emitter.properties.worldOriented
+                    ? GROUND_BASIS
+                    : frame.toView,
+            );
 
-        return tailGeometry(this.emitter.properties, this.viewVelocity, speed)
-            ?? { stretch: 1, turns: 0 };
-    }
-
-    dispose(): void {
-        this.geometry.dispose();
-        this.material.dispose();
+        return (
+            tailGeometry(this.emitter.properties, this.viewVelocity, speed) ?? {
+                stretch: 1,
+                turns: 0,
+            }
+        );
     }
 }
 
@@ -850,7 +970,7 @@ class EmitterRenderer {
  *   `part`     - the part it is anchored on is off screen, so nobody could watch it burn.
  *   `released` - it has been taken out of the scene and is finishing what it already threw.
  */
-export type EmissionHold = 'clip' | 'part' | 'released';
+export type EmissionHold = "clip" | "part" | "released";
 
 /**
  * One running particle system.
@@ -936,14 +1056,18 @@ export class ParticleSystemInstance {
                 seededRandom(seed + index * 7919),
                 textures.get(emitter.colorTexture.toLowerCase()) ?? null,
                 emissionMesh,
-                scaleFactor);
+                scaleFactor,
+            );
 
             this.emitters.push(renderer);
             this.root.add(renderer.mesh);
         });
 
         for (const emitter of system.emitters) {
-            for (const child of [emitter.spawnOnDeath, emitter.spawnDuringLife]) {
+            for (const child of [
+                emitter.spawnOnDeath,
+                emitter.spawnDuringLife,
+            ]) {
                 if (child >= 0 && child < system.emitters.length) {
                     this.dependent.add(child);
                 }
@@ -953,27 +1077,9 @@ export class ParticleSystemInstance {
         this.root.name = `particles:${name}`;
     }
 
-    /** Every texture this system's emitters want, lowercased and de-duplicated. */
-    textureNames(): string[] {
-        return [...new Set(
-            this.emitters
-                .map(emitter => emitter.textureName.toLowerCase())
-                .filter(name => name !== ''))];
-    }
-
-    /**
-     * Roughly how far this system's particles reach, for framing.
-     *
-     * Taken from the emitter description rather than the geometry: the buffers start full of zeros
-     * and fill in over the next seconds, so measuring them frames a point.
-     */
-    extent(): number {
-        return systemExtent(this.emitters.map(emitter => emitter.description));
-    }
-
     /** True once every emitter has finished and its last particle has died. */
     get exhausted(): boolean {
-        return this.emitters.every(emitter => emitter.exhausted);
+        return this.emitters.every((emitter) => emitter.exhausted);
     }
 
     /**
@@ -984,22 +1090,88 @@ export class ParticleSystemInstance {
      * never come, so what decides when it can be disposed is simply whether anything is left.
      */
     get empty(): boolean {
-        return this.emitters.every(emitter => emitter.live.length === 0);
+        return this.emitters.every((emitter) => emitter.live.length === 0);
+    }
+
+    /** Whether anything here needs the distortion pass, which is not worth its targets otherwise. */
+    get hasVisibleHeat(): boolean {
+        return (
+            this.root.visible &&
+            this.emitters.some(
+                (emitter) =>
+                    emitter.description.properties.isHeatParticle &&
+                    emitter.mesh.visible,
+            )
+        );
+    }
+
+    /** Whether anything is currently holding the emitters, and what. */
+    get heldBy(): EmissionHold[] {
+        return [...this.holds];
+    }
+
+    /** The bone this system is anchored on, for the callers that describe where an effect sits. */
+    get anchorNode(): THREE.Object3D | null {
+        return this.anchor;
+    }
+
+    /**
+     * Whether the emitters may spawn this step.
+     *
+     * Every gate resolved HERE rather than by several writers of one flag: the reasons in
+     * {@link holds}, and being drawn at all. A system nobody can see is not running - the
+     * reader's tick, the effects master, the level gate and the quiet-on-open rule all hold an
+     * effect back by not drawing it, and an emitter that goes on firing behind that is spending its
+     * life where nobody can watch it. For a burst that is fatal: `p_explosion_empire_atat00` was
+     * exhausted seconds before its row could be ticked on, so switching it on showed nothing at all.
+     *
+     * The clock is held with it - `EmitterRenderer.update` only advances it when it may spawn - so
+     * a held system starts from its first frame rather than resuming somewhere in the middle.
+     */
+    private get spawning(): boolean {
+        return this.holds.size === 0 && this.root.visible;
+    }
+
+    /** Every texture this system's emitters want, lowercased and de-duplicated. */
+    textureNames(): string[] {
+        return [
+            ...new Set(
+                this.emitters
+                    .map((emitter) => emitter.textureName.toLowerCase())
+                    .filter((name) => name !== ""),
+            ),
+        ];
+    }
+
+    /**
+     * Roughly how far this system's particles reach, for framing.
+     *
+     * Taken from the emitter description rather than the geometry: the buffers start full of zeros
+     * and fill in over the next seconds, so measuring them frames a point.
+     */
+    extent(): number {
+        return systemExtent(
+            this.emitters.map((emitter) => emitter.description),
+        );
     }
 
     /** The emitters in file order. Names repeat - p_explosion_huge01 has three called "debre". */
     emitterNames(): string[] {
-        return this.emitters.map(emitter => emitter.mesh.name);
+        return this.emitters.map((emitter) => emitter.mesh.name);
     }
 
     /** Whether one emitter lies flat on the ground rather than facing the camera. */
     emitterWorldOriented(index: number): boolean {
-        return this.emitters[index]?.description.properties.worldOriented ?? false;
+        return (
+            this.emitters[index]?.description.properties.worldOriented ?? false
+        );
     }
 
     /** Which of them are heat distortions rather than sprites, so the dock can say so. */
     emitterIsHeat(): boolean[] {
-        return this.emitters.map(emitter => emitter.description.properties.isHeatParticle);
+        return this.emitters.map(
+            (emitter) => emitter.description.properties.isHeatParticle,
+        );
     }
 
     /** Whether one emitter is currently drawn. */
@@ -1010,12 +1182,6 @@ export class ParticleSystemInstance {
     /** One emitter's drawn object, for the callers that need to ask about its layer or bounds. */
     emitterMesh(index: number): THREE.Mesh | null {
         return this.emitters[index]?.mesh ?? null;
-    }
-
-    /** Whether anything here needs the distortion pass, which is not worth its targets otherwise. */
-    get hasVisibleHeat(): boolean {
-        return this.root.visible && this.emitters.some(
-            emitter => emitter.description.properties.isHeatParticle && emitter.mesh.visible);
     }
 
     /**
@@ -1078,11 +1244,6 @@ export class ParticleSystemInstance {
         }
     }
 
-    /** Whether anything is currently holding the emitters, and what. */
-    get heldBy(): EmissionHold[] {
-        return [...this.holds];
-    }
-
     /**
      * Names the bone this system is anchored on.
      *
@@ -1100,11 +1261,6 @@ export class ParticleSystemInstance {
         this.previous = null;
     }
 
-    /** The bone this system is anchored on, for the callers that describe where an effect sits. */
-    get anchorNode(): THREE.Object3D | null {
-        return this.anchor;
-    }
-
     /**
      * Cuts the system loose from its bone, leaving everything it has thrown exactly where it is.
      *
@@ -1116,24 +1272,11 @@ export class ParticleSystemInstance {
         this.attachTo(null);
     }
 
-    /**
-     * Whether the emitters may spawn this step.
-     *
-     * Every gate resolved HERE rather than by several writers of one flag: the reasons in
-     * {@link holds}, and being drawn at all. A system nobody can see is not running - the
-     * reader's tick, the effects master, the level gate and the quiet-on-open rule all hold an
-     * effect back by not drawing it, and an emitter that goes on firing behind that is spending its
-     * life where nobody can watch it. For a burst that is fatal: `p_explosion_empire_atat00` was
-     * exhausted seconds before its row could be ticked on, so switching it on showed nothing at all.
-     *
-     * The clock is held with it - `EmitterRenderer.update` only advances it when it may spawn - so
-     * a held system starts from its first frame rather than resuming somewhere in the middle.
-     */
-    private get spawning(): boolean {
-        return this.holds.size === 0 && this.root.visible;
-    }
-
-    update(dt: number, view: THREE.Matrix4 | null = null, wind?: AlamoVector3): void {
+    update(
+        dt: number,
+        view: THREE.Matrix4 | null = null,
+        wind?: AlamoVector3,
+    ): void {
         const step = Math.min(Math.max(dt, 0), MAX_STEP_SECONDS);
         const frame = this.frameOf(step, view);
 
@@ -1144,9 +1287,9 @@ export class ParticleSystemInstance {
         // Parents first, so a child sees this step's particles and this step's deaths.
         // Gated emission reuses the `dependent` path, which is already "step, but do not spawn".
         const held = !this.spawning;
-        const deaths = this.emitters.map(
-            (emitter, index) => emitter.update(
-                step, frame, this.dependent.has(index) || held));
+        const deaths = this.emitters.map((emitter, index) =>
+            emitter.update(step, frame, this.dependent.has(index) || held),
+        );
 
         // The chains are emission too. A trail dragged off a particle that is still in the air
         // while the system is held would keep spawning behind the reader's back, which is the same
@@ -1155,7 +1298,21 @@ export class ParticleSystemInstance {
             return;
         }
 
-        this.emitters.forEach((parent, index) => this.runChains(parent, index, deaths, step, frame));
+        this.emitters.forEach((parent, index) =>
+            this.runChains(parent, index, deaths, step, frame),
+        );
+    }
+
+    setVisible(visible: boolean): void {
+        this.root.visible = visible;
+    }
+
+    dispose(): void {
+        for (const emitter of this.emitters) {
+            emitter.dispose();
+        }
+
+        this.root.removeFromParent();
     }
 
     /**
@@ -1167,8 +1324,11 @@ export class ParticleSystemInstance {
      * the only thing that makes them emit at all.
      */
     private runChains(
-        parent: EmitterRenderer, index: number, deaths: AlamoVector3[][],
-        step: number, frame: EmitterFrame,
+        parent: EmitterRenderer,
+        index: number,
+        deaths: AlamoVector3[][],
+        step: number,
+        frame: EmitterFrame,
     ): void {
         const trail = this.childOf(parent.description.spawnDuringLife);
 
@@ -1199,7 +1359,9 @@ export class ParticleSystemInstance {
 
     /** The emitter at a chain index, or null when the file names none. */
     private childOf(index: number): EmitterRenderer | null {
-        return index >= 0 && index < this.emitters.length ? this.emitters[index] : null;
+        return index >= 0 && index < this.emitters.length
+            ? this.emitters[index]
+            : null;
     }
 
     /**
@@ -1223,7 +1385,10 @@ export class ParticleSystemInstance {
             space.updateWorldMatrix(true, false);
 
             this.root.matrixAutoUpdate = false;
-            this.root.matrix.copy(parent.matrixWorld).invert().multiply(space.matrixWorld);
+            this.root.matrix
+                .copy(parent.matrixWorld)
+                .invert()
+                .multiply(space.matrixWorld);
             this.root.matrixWorldNeedsUpdate = true;
         }
 
@@ -1268,7 +1433,9 @@ export class ParticleSystemInstance {
         }
 
         this.previous.copy(MOTION_SCRATCH);
-        this.frame.velocity.copy(this.frame.delta).divideScalar(Math.max(dt, 1e-6));
+        this.frame.velocity
+            .copy(this.frame.delta)
+            .divideScalar(Math.max(dt, 1e-6));
 
         this.viewFrom(simulation, view);
 
@@ -1285,20 +1452,10 @@ export class ParticleSystemInstance {
      * camera is standing.
      */
     private viewFrom(space: THREE.Object3D, view: THREE.Matrix4 | null): void {
-        this.frame.toView.setFromMatrix4(view === null
-            ? IDENTITY
-            : VIEW_SCRATCH.multiplyMatrices(view, space.matrixWorld));
-    }
-
-    setVisible(visible: boolean): void {
-        this.root.visible = visible;
-    }
-
-    dispose(): void {
-        for (const emitter of this.emitters) {
-            emitter.dispose();
-        }
-
-        this.root.removeFromParent();
+        this.frame.toView.setFromMatrix4(
+            view === null
+                ? IDENTITY
+                : VIEW_SCRATCH.multiplyMatrices(view, space.matrixWorld),
+        );
     }
 }

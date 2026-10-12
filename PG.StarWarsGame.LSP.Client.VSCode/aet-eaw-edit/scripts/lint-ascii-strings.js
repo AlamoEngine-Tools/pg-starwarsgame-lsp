@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { stringOffences, LANGS } = require('./asciiStringRules');
+const {stringOffences, LANGS} = require('./asciiStringRules');
 
 const CLIENT = path.join(__dirname, '..', 'src');
 const REPO = path.join(__dirname, '..', '..', '..');
@@ -39,7 +39,7 @@ function sources(dir, extensions) {
     let entries;
 
     try {
-        entries = fs.readdirSync(dir, { withFileTypes: true });
+        entries = fs.readdirSync(dir, {withFileTypes: true});
     } catch {
         return [];
     }
@@ -66,7 +66,7 @@ for (const [file, lang] of files) {
     const text = fs.readFileSync(file, 'utf8');
     const where = path.relative(REPO, file);
 
-    for (const offence of stringOffences(text, { lang })) {
+    for (const offence of stringOffences(text, {lang})) {
         const hint = offence.suggestion === null ? '' : ` - write ${offence.suggestion}`;
 
         console.error(`${where}:${offence.line}  '${offence.char}' in a string literal${hint}`);

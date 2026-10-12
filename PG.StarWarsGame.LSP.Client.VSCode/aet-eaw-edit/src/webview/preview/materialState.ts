@@ -14,9 +14,13 @@
 // scaling by alpha multiplied its wings away entirely. The engine adds them at full strength, which
 // is why the model has wings in game and had none here.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
-import { type FxBlend, type FxDepthFunc, type FxMaterialState } from './fx/renderState';
+import {
+    type FxBlend,
+    type FxDepthFunc,
+    type FxMaterialState,
+} from "./fx/renderState";
 
 /**
  * Puts an Alamo blend onto a three material.
@@ -26,17 +30,17 @@ import { type FxBlend, type FxDepthFunc, type FxMaterialState } from './fx/rende
  */
 export function applyBlend(material: THREE.Material, blend: FxBlend): void {
     switch (blend) {
-        case 'opaque':
+        case "opaque":
             material.transparent = false;
             material.blending = THREE.NormalBlending;
             break;
 
-        case 'alpha':
+        case "alpha":
             material.transparent = true;
             material.blending = THREE.NormalBlending;
             break;
 
-        case 'additive':
+        case "additive":
             // ONE, ONE - the source added as it is. NOT three's AdditiveBlending.
             material.transparent = true;
             material.blending = THREE.CustomBlending;
@@ -45,13 +49,13 @@ export function applyBlend(material: THREE.Material, blend: FxBlend): void {
             material.blendDst = THREE.OneFactor;
             break;
 
-        case 'additiveAlpha':
+        case "additiveAlpha":
             // SRCALPHA, ONE - which is exactly what three calls AdditiveBlending.
             material.transparent = true;
             material.blending = THREE.AdditiveBlending;
             break;
 
-        case 'multiply':
+        case "multiply":
             material.transparent = true;
             material.blending = THREE.MultiplyBlending;
             break;
@@ -88,8 +92,10 @@ const DEPTH_FUNCS: Record<FxDepthFunc, THREE.DepthModes> = {
  * every comparison outright still flickered by the same amount - so a bias would have been a change
  * with a reason attached to it that was not true.
  */
-export function applyDepth(material: THREE.Material, state: Pick<FxMaterialState,
-    'depthTest' | 'depthWrite' | 'depthFunc'>): void {
+export function applyDepth(
+    material: THREE.Material,
+    state: Pick<FxMaterialState, "depthTest" | "depthWrite" | "depthFunc">,
+): void {
     material.depthTest = state.depthTest;
     material.depthWrite = state.depthWrite;
     material.depthFunc = DEPTH_FUNCS[state.depthFunc];
@@ -119,12 +125,16 @@ export function applyDepth(material: THREE.Material, state: Pick<FxMaterialState
  * value - and using it would darken to a fifth where the reader asked for a half. That exact trap
  * cost the stencil darken a cycle already.
  */
-export function shadowCatcherOpacity(multiplier: THREE.ColorRepresentation): number {
+export function shadowCatcherOpacity(
+    multiplier: THREE.ColorRepresentation,
+): number {
     const hex = new THREE.Color(multiplier).getHex(THREE.SRGBColorSpace);
 
-    const luminance = (0.2126 * ((hex >> 16) & 0xff)
-        + 0.7152 * ((hex >> 8) & 0xff)
-        + 0.0722 * (hex & 0xff)) / 0xff;
+    const luminance =
+        (0.2126 * ((hex >> 16) & 0xff) +
+            0.7152 * ((hex >> 8) & 0xff) +
+            0.0722 * (hex & 0xff)) /
+        0xff;
 
     return Math.min(1, Math.max(0, 1 - luminance));
 }
@@ -156,7 +166,10 @@ export function shadowCatcherOpacity(multiplier: THREE.ColorRepresentation): num
  * both directions, which is what the ordering demands: textures arrive and bind while the materials
  * are still archetypes, and the translated ones only replace them once the shaders turn up.
  */
-export function applyBaseMapColourSpace(texture: THREE.Texture, usedByArchetype: boolean): void {
+export function applyBaseMapColourSpace(
+    texture: THREE.Texture,
+    usedByArchetype: boolean,
+): void {
     const wanted = usedByArchetype ? THREE.SRGBColorSpace : THREE.NoColorSpace;
 
     if (texture.colorSpace === wanted) {
@@ -190,7 +203,10 @@ export function applyBaseMapColourSpace(texture: THREE.Texture, usedByArchetype:
  * prefix whatever its effect is, so the two genuinely overlap, and a plain assignment would drop
  * the tint on exactly those meshes.
  */
-export function applyColourScale(material: THREE.Material, scale: number): void {
+export function applyColourScale(
+    material: THREE.Material,
+    scale: number,
+): void {
     const data = material.userData as { colourScale?: { value: number } };
 
     if (data.colourScale !== undefined) {
@@ -219,12 +235,18 @@ export function applyColourScale(material: THREE.Material, scale: number): void 
         // into - which is what the stage's own result is. Unguarded by USE_MAP: the stage doubles
         // whatever it produced, and a mesh with no base texture modulates against white.
         shader.fragmentShader = shader.fragmentShader
-            .replace('void main() {', 'uniform float aetColourScale;\nvoid main() {')
-            .replace('#include <map_fragment>',
-                '#include <map_fragment>\n    diffuseColor.rgb *= aetColourScale;');
+            .replace(
+                "void main() {",
+                "uniform float aetColourScale;\nvoid main() {",
+            )
+            .replace(
+                "#include <map_fragment>",
+                "#include <map_fragment>\n    diffuseColor.rgb *= aetColourScale;",
+            );
     };
 
     // Composed with whatever key was already there, so a material carrying both injections cannot
     // share a compiled program with one carrying only the other.
-    material.customProgramCacheKey = () => `${earlierKey.call(material)}|aet-scale`;
+    material.customProgramCacheKey = () =>
+        `${earlierKey.call(material)}|aet-scale`;
 }

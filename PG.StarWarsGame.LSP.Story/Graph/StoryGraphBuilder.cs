@@ -5,6 +5,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Story.Model;
+using PG.StarWarsGame.LSP.Story.Sim;
 
 namespace PG.StarWarsGame.LSP.Story.Graph;
 
@@ -32,6 +33,9 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
     private const string RefStoryFlag = StoryReferenceTypes.Flag;
     private const string RefStoryPlotFile = StoryReferenceTypes.PlotFile;
     private const string RefStoryBranch = StoryReferenceTypes.Branch;
+
+    /// <summary>The generic the tutorial dialog's Continue button raises (measured); compared case-insensitively.</summary>
+    public const string ContinueTutorialGeneric = "Continue_Tutorial";
 
     /// <param name="threads">Every thread assembled into the campaign (main plots and tactical plots alike).</param>
     /// <param name="tacticalManifestThreads">
@@ -209,7 +213,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
                 .Select(id => threadEvents.First(n => n.Id == id))
                 .Where(n => string.Equals(n.Event!.EventType, "STORY_GENERIC", StringComparison.OrdinalIgnoreCase)
                             && NameTokens(n.Event.EventParams.FirstOrDefault(p => p.Position == 0)?.RawValue)
-                                .Contains(Sim.StorySimulator.BattleEndClosed))
+                                .Contains(StorySimulator.BattleEndClosed))
                 .ToDictionary(n => n.Id, n => n.Event!.Name, StringComparer.Ordinal);
             if (summaries.Count == 0) continue;
             if (!ArmsOnlyAfter(state, thread, threadEvents, summaries).TryGetValue(node.Id, out var summaryListener))
@@ -274,10 +278,10 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         return new StoryGraph(state.Nodes, state.Edges, state.Problems);
     }
 
-    /// <summary>The generic the tutorial dialog's Continue button raises (measured); compared case-insensitively.</summary>
-    public const string ContinueTutorialGeneric = "Continue_Tutorial";
-
-    /// <summary>A string-list parameter's names, split as the engine splits (whitespace and commas), compared case-insensitively.</summary>
+    /// <summary>
+    ///     A string-list parameter's names, split as the engine splits (whitespace and commas), compared
+    ///     case-insensitively.
+    /// </summary>
     public static HashSet<string> NameTokens(string? raw)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -382,7 +386,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
 
             foreach (var token in group.Tokens)
             foreach (var source in ResolveEventName(state, thread, token.Text, token.Range,
-                         StoryGraphProblemKind.DanglingPrereq, "Prerequisite", campaignWide: false))
+                         StoryGraphProblemKind.DanglingPrereq, "Prerequisite", false))
                 state.AddEdge(new StoryEdge(source.Id, groupSinkId, StoryEdgeKind.Prereq));
         }
     }

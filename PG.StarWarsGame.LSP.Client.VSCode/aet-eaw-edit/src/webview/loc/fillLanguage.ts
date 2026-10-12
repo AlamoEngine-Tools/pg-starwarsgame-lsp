@@ -11,11 +11,11 @@
 /** Where the text being filled in comes from. */
 export type FillSource =
     /** Another language column of this same file. */
-    | 'language'
+    | "language"
     /** What the game itself ships. */
-    | 'baseline'
+    | "baseline"
     /** A sibling language file of this project, copied in wholesale. */
-    | 'file';
+    | "file";
 
 /**
  * The source actually in effect, given what this file can offer.
@@ -29,16 +29,21 @@ export type FillSource =
  * never produce anything - which is what left Fill permanently disabled.
  */
 export function resolveFillSource(
-    chosen: FillSource, offers: { canCopy: boolean; canSeed: boolean },
+    chosen: FillSource,
+    offers: { canCopy: boolean; canSeed: boolean },
 ): FillSource {
-    if (chosen === 'file' && offers.canSeed) { return 'file'; }
-    if (chosen === 'language' && offers.canCopy) { return 'language'; }
-    return 'baseline';
+    if (chosen === "file" && offers.canSeed) {
+        return "file";
+    }
+    if (chosen === "language" && offers.canCopy) {
+        return "language";
+    }
+    return "baseline";
 }
 
 /** Whether this file has two languages to copy between at all. */
 export function canCopyBetweenLanguages(languages: readonly string[]): boolean {
-    return copyFromOptions(languages, '').length > 1;
+    return copyFromOptions(languages, "").length > 1;
 }
 
 /**
@@ -50,14 +55,17 @@ export function canCopyBetweenLanguages(languages: readonly string[]): boolean {
  * arrive as pairs rather than as dictionary keys.
  */
 export function copyFromOptions(
-    languages: readonly string[], fillInto: string,
+    languages: readonly string[],
+    fillInto: string,
 ): string[] {
     const target = fillInto.toUpperCase();
     const seen = new Set<string>();
 
-    return languages.filter(language => {
+    return languages.filter((language) => {
         const upper = language.toUpperCase();
-        if (upper === target || seen.has(upper)) { return false; }
+        if (upper === target || seen.has(upper)) {
+            return false;
+        }
         seen.add(upper);
         return true;
     });
@@ -71,10 +79,12 @@ export function copyFromOptions(
  * with two languages, is the only one left and therefore the only thing the user could have meant.
  */
 export function nextCopyFrom(
-    languages: readonly string[], fillInto: string, current: string,
+    languages: readonly string[],
+    fillInto: string,
+    current: string,
 ): string {
     const options = copyFromOptions(languages, fillInto);
-    return options.some(l => l.toUpperCase() === current.toUpperCase())
+    return options.some((l) => l.toUpperCase() === current.toUpperCase())
         ? current
-        : options[0] ?? '';
+        : (options[0] ?? "");
 }

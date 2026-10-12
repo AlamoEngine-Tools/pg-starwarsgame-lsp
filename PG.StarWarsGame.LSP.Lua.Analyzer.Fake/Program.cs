@@ -10,6 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using OmniSharp.Extensions.LanguageServer.Server;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 // A stand-in for emmylua_ls: full document sync, a diagnostic per open and change that echoes
 // what arrived, and a hover that reports how the process was started. Behaviour switches:
@@ -108,7 +109,7 @@ internal sealed class FakeSync(ILanguageServerFacade server) : TextDocumentSyncH
             Uri = uri,
             Diagnostics = new Container<Diagnostic>(new Diagnostic
             {
-                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(0, 0, 0, 1),
+                Range = new Range(0, 0, 0, 1),
                 Message = message,
                 Code = "fake"
             })

@@ -20,8 +20,11 @@
  *
  * Only a layout with nothing recognisable in it is refused, which is a genuine first open.
  */
-export function canReuseStoredLayout(eventKeys: readonly string[], stored: ReadonlySet<string>): boolean {
-    return eventKeys.some(key => stored.has(key));
+export function canReuseStoredLayout(
+    eventKeys: readonly string[],
+    stored: ReadonlySet<string>,
+): boolean {
+    return eventKeys.some((key) => stored.has(key));
 }
 
 /** The shape of a node and of a stored entry this module keys by; both the DTOs satisfy it. */
@@ -47,14 +50,16 @@ export interface LayoutEntryLike {
  * made relative. The two spaces cannot collide: an event key holds a space, a node id never does.
  */
 export function nodeLayoutKey(node: LayoutNodeLike): string {
-    return node.kind === 'Event'
-        ? `${node.threadUri ?? ''} ${node.label ?? ''}`.toLowerCase()
-        : node.id ?? '';
+    return node.kind === "Event"
+        ? `${node.threadUri ?? ""} ${node.label ?? ""}`.toLowerCase()
+        : (node.id ?? "");
 }
 
 /** The same key for a stored entry, so the two sides meet in one map. */
 export function layoutEntryKey(entry: LayoutEntryLike): string {
-    return entry.nodeId ? entry.nodeId : `${entry.threadUri} ${entry.eventName}`.toLowerCase();
+    return entry.nodeId
+        ? entry.nodeId
+        : `${entry.threadUri} ${entry.eventName}`.toLowerCase();
 }
 
 /**
@@ -66,6 +71,9 @@ export function layoutEntryKey(entry: LayoutEntryLike): string {
  * landed wherever `placeNewNode` guessed instead of under the cursor. Nothing failed loudly - the
  * fallback is a perfectly good position, just not the one that was asked for.
  */
-export function newEventLayoutKey(threadUri: string | null | undefined, eventName: string): string {
-    return nodeLayoutKey({kind: 'Event', threadUri, label: eventName});
+export function newEventLayoutKey(
+    threadUri: string | null | undefined,
+    eventName: string,
+): string {
+    return nodeLayoutKey({ kind: "Event", threadUri, label: eventName });
 }

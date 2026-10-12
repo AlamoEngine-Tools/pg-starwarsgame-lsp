@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -14,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Lua.Schema;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Diagnostics;
 
@@ -65,7 +67,7 @@ public sealed class LuaDiagnosticsPublisherTest
         return new Diagnostic
         {
             Code = rule, Severity = DiagnosticSeverity.Warning, Message = rule + " here",
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(line, 0, line, 1)
+            Range = new Range(line, 0, line, 1)
         };
     }
 
@@ -143,7 +145,7 @@ public sealed class LuaDiagnosticsPublisherTest
     [Fact]
     public void WithoutTheAnalyzer_OurOwnParserStillReportsSyntaxErrors()
     {
-        var (published, host, _, index) = BuildWithAnalyzer(running: false);
+        var (published, host, _, index) = BuildWithAnalyzer(false);
         host.Set(LuaUri, "local broken = {1 2}");
 
         index.Fire(GameIndex.Empty);
@@ -158,42 +160,9 @@ public sealed class LuaDiagnosticsPublisherTest
         var (published, host, analyzer, _) = BuildWithAnalyzer();
         host.Set(LuaUri, $"-- aetswg:suppress {DiagnosticIds.LuaAnalyzerUnused}\nlocal x = 1");
 
-        analyzer.Raise(LuaUri, AnalyzerFinding("unused", line: 1));
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused", 1));
 
         Assert.DoesNotContain(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(published.Last()));
-    }
-
-    private sealed class FakeAnalyzer : ILuaAnalyzer
-    {
-        public bool IsRunning { get; set; }
-
-        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
-
-        public void DidOpen(string uri, string text, int version)
-        {
-        }
-
-        public void DidChange(string uri, string text, int version)
-        {
-        }
-
-        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
-        {
-            return Task.FromResult<T?>(null);
-        }
-
-        public void DidClose(string uri)
-        {
-        }
-
-        public void Raise(string uri, params Diagnostic[] diagnostics)
-        {
-            DiagnosticsPublished?.Invoke(new PublishDiagnosticsParams
-            {
-                Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(uri),
-                Diagnostics = new Container<Diagnostic>(diagnostics)
-            });
-        }
     }
 
     // ── feature flag ─────────────────────────────────────────────────────────
@@ -261,21 +230,6 @@ public sealed class LuaDiagnosticsPublisherTest
         indexService.Fire(index);
 
         Assert.Empty(Assert.Single(published).Diagnostics!);
-    }
-
-    private sealed class StubLocalisationIndex(params string[] keys) : ILocalisationIndex
-    {
-        public IEnumerable<string> Keys => keys;
-
-        public bool ContainsKey(string key)
-        {
-            return keys.Contains(key, StringComparer.OrdinalIgnoreCase);
-        }
-
-        public string? GetValue(string key)
-        {
-            return ContainsKey(key) ? key : null;
-        }
     }
 
     // ── shared parse (cache) ──────────────────────────────────────────────────
@@ -666,6 +620,54 @@ public sealed class LuaDiagnosticsPublisherTest
         var clear = Assert.Single(published);
         Assert.Equal(LuaUri, clear.Uri.ToString());
         Assert.Empty(clear.Diagnostics!);
+    }
+
+    private sealed class FakeAnalyzer : ILuaAnalyzer
+    {
+        public bool IsRunning { get; set; }
+
+        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
+
+        public void DidOpen(string uri, string text, int version)
+        {
+        }
+
+        public void DidChange(string uri, string text, int version)
+        {
+        }
+
+        public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
+        {
+            return Task.FromResult<T?>(null);
+        }
+
+        public void DidClose(string uri)
+        {
+        }
+
+        public void Raise(string uri, params Diagnostic[] diagnostics)
+        {
+            DiagnosticsPublished?.Invoke(new PublishDiagnosticsParams
+            {
+                Uri = DocumentUri.From(uri),
+                Diagnostics = new Container<Diagnostic>(diagnostics)
+            });
+        }
+    }
+
+    private sealed class StubLocalisationIndex(params string[] keys) : ILocalisationIndex
+    {
+        public IEnumerable<string> Keys => keys;
+
+        public bool ContainsKey(string key)
+        {
+            return keys.Contains(key, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public string? GetValue(string key)
+        {
+            return ContainsKey(key) ? key : null;
+        }
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

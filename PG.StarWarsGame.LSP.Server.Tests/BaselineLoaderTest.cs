@@ -18,6 +18,17 @@ namespace PG.StarWarsGame.LSP.Server.Tests;
 
 public sealed class BaselineLoaderTest
 {
+    // ── which path was taken, for the bug report ─────────────────────────────
+    //
+    // Every outcome below used to be a log line and nothing else, so a report could not tell a
+    // fresh download from a week-old cache from the empty fallback.
+
+    private static readonly BaselineSourceConfig HttpSource = new()
+    {
+        Type = BaselineSourceType.Http,
+        Url = "https://example.com/foc-baseline.bin"
+    };
+
     private static string CacheDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".aetswg", "baselines");
@@ -269,17 +280,6 @@ public sealed class BaselineLoaderTest
 
         Assert.True(result.Symbols.ContainsKey("UNIT_A"));
     }
-
-    // ── which path was taken, for the bug report ─────────────────────────────
-    //
-    // Every outcome below used to be a log line and nothing else, so a report could not tell a
-    // fresh download from a week-old cache from the empty fallback.
-
-    private static readonly BaselineSourceConfig HttpSource = new()
-    {
-        Type = BaselineSourceType.Http,
-        Url = "https://example.com/foc-baseline.bin"
-    };
 
     [Fact]
     public async Task LoadAsync_Http_Success_RecordsNetwork()

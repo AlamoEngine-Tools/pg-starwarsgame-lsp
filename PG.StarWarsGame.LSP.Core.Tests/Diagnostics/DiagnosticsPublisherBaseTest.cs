@@ -1,9 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Util;
-using System.IO.Abstractions.TestingHelpers;
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
@@ -11,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -18,6 +18,14 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
 
 public sealed class DiagnosticsPublisherBaseTest
 {
+    // ── origin ────────────────────────────────────────────────────────────────
+    //
+    // One server per open project means a Problems view fed by several servers. Every diagnostic
+    // names the project that raised it, and a diagnostic on a dependency's file names the layer,
+    // so "which project said this" is answered where the diagnostic is read. Applied in the base,
+    // once, rather than at every site that builds a Diagnostic.
+
+    private static string DriveRoot => Path.GetPathRoot(Path.GetFullPath("."))!;
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static GameIndex IndexWithDoc(string uri)
@@ -44,15 +52,6 @@ public sealed class DiagnosticsPublisherBaseTest
         return (publisher, published, indexService, workspaceHost);
     }
 
-    // ── origin ────────────────────────────────────────────────────────────────
-    //
-    // One server per open project means a Problems view fed by several servers. Every diagnostic
-    // names the project that raised it, and a diagnostic on a dependency's file names the layer,
-    // so "which project said this" is answered where the diagnostic is read. Applied in the base,
-    // once, rather than at every site that builds a Diagnostic.
-
-    private static string DriveRoot => Path.GetPathRoot(Path.GetFullPath("."))!;
-
     private static (ProjectLayerMap Map, string DepXml, string ModXml) LayeredMap()
     {
         var depXml = Path.Combine(DriveRoot, "dep", "data", "xml");
@@ -69,7 +68,7 @@ public sealed class DiagnosticsPublisherBaseTest
     {
         return new Diagnostic
         {
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(new Position(0, 0),
+            Range = new LspRange(new Position(0, 0),
                 new Position(0, 1)),
             Message = "a problem",
             Code = new DiagnosticCode("AET-001-0001"),

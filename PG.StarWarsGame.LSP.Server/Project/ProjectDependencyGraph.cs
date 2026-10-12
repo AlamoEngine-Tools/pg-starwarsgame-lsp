@@ -95,14 +95,6 @@ public sealed class ProjectDependencyGraph
             ordered.Add((normalizedPath, file));
     }
 
-    /// <summary>What the walk counts as it goes, for <see cref="ProjectDependencyShape" />.</summary>
-    private sealed class Tally
-    {
-        public int Depth;
-        public int Direct;
-        public int Unresolved;
-    }
-
     private static string Normalize(string path)
     {
         return path.Replace('\\', '/').ToLowerInvariant();
@@ -127,5 +119,13 @@ public sealed class ProjectDependencyGraph
         return ProjectPathResolution.IsRooted(candidate)
             ? candidate
             : ProjectPathResolution.Resolve(directory, candidate);
+    }
+
+    /// <summary>What the walk counts as it goes, for <see cref="ProjectDependencyShape" />.</summary>
+    private sealed class Tally
+    {
+        public int Depth;
+        public int Direct;
+        public int Unresolved;
     }
 }

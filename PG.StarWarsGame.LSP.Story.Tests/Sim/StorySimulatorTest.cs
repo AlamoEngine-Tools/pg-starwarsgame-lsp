@@ -170,6 +170,114 @@ public sealed class StorySimulatorTest
         "\t</Event>\n" +
         "</Story>\n";
 
+    // ── World facts (chunk 3) ────────────────────────────────────────────────
+
+    private const string WorldThreadText =
+        "<Story>\n" +
+        "\t<Event Name=\"Conq\">\n" +
+        "\t\t<Event_Type>STORY_CONQUER</Event_Type>\n" +
+        "\t\t<Event_Param1>Kuat Corellia</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Build\">\n" +
+        "\t\t<Event_Type>STORY_CONSTRUCT</Event_Type>\n" +
+        "\t\t<Event_Param1>X_Wing</Event_Param1>\n" +
+        "\t\t<Event_Param2>2</Event_Param2>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Tech\">\n" +
+        "\t\t<Event_Type>STORY_TECH_LEVEL</Event_Type>\n" +
+        "\t\t<Event_Param1>3</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Win\">\n" +
+        "\t\t<Event_Type>STORY_VICTORY</Event_Type>\n" +
+        "\t\t<Event_Param1>Rebel</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"TwoWins\">\n" +
+        "\t\t<Event_Type>STORY_WIN_BATTLES</Event_Type>\n" +
+        "\t\t<Event_Param1>2</Event_Param1>\n" +
+        "\t\t<Event_Param4>Kuat</Event_Param4>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Rich\">\n" +
+        "\t\t<Event_Type>STORY_ACCUMULATE</Event_Type>\n" +
+        "\t\t<Event_Param1>1000</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Wreck\">\n" +
+        "\t\t<Event_Type>STORY_TACTICAL_DESTROY</Event_Type>\n" +
+        "\t\t<Event_Param1>TIE_Fighter</Event_Param1>\n" +
+        "\t\t<Event_Param3>2</Event_Param3>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Give\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>PLANET_FACTION</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Kuat</Reward_Param1>\n" +
+        "\t\t<Reward_Param2>Empire</Reward_Param2>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Untyped\">\n" +
+        "\t\t<Event_Type>STORY_CLICK_GUI</Event_Type>\n" +
+        "\t\t<Event_Param1>Button_Build</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "</Story>\n";
+
+    // ── Lua overlay (chunk 4) ────────────────────────────────────────────────
+
+    private const string LuaUri = "file:///ws/data/scripts/story/story_lua.lua";
+
+    private const string LuaThreadText =
+        "<Story>\n" +
+        "\t<Event Name=\"Act_Begin\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>TRIGGER_EVENT</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Second</Reward_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Line_Done\">\n" +
+        "\t\t<Event_Type>STORY_AI_NOTIFICATION</Event_Type>\n" +
+        "\t\t<Event_Param1>LINE_ONE</Event_Param1>\n" +
+        "\t\t<Prereq>Act_Begin</Prereq>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Second\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Third\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t</Event>\n" +
+        "</Story>\n";
+
+    private const string TimerChainText =
+        "<Story>\n" +
+        "\t<Event Name=\"T0\">\n" +
+        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
+        "\t\t<Event_Param1>1</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"T1\">\n" +
+        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
+        "\t\t<Event_Param1>1</Event_Param1>\n" +
+        "\t\t<Prereq>T0</Prereq>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Decision\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Prereq>T1</Prereq>\n" +
+        "\t</Event>\n" +
+        "</Story>\n";
+
+    private static readonly StoryCampaignSeed Seed = new(
+        ["Kuat", "Corellia", "Hoth"],
+        [new StoryStartingForce("Rebel", "Hoth", "X_Wing"), new StoryStartingForce("Empire", "Kuat", "TIE_Fighter")],
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = 2 },
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = 500 },
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = "Hoth" });
+
+    private static readonly LuaStoryMachine Machine = new(LuaUri, "story_lua",
+    [
+        new LuaStoryState("Act_Begin", "State_Act_Begin",
+            new LuaStoryPhase([new LuaStoryEmission("LINE_ONE", 5)], [], [new LuaStorySpawn("X_Wing", "Hoth")],
+                ["Talk"]),
+            LuaStoryPhase.Empty,
+            new LuaStoryPhase([new LuaStoryEmission("BYE", 0)], [], [], [])),
+        new LuaStoryState("Second", "State_Second",
+            new LuaStoryPhase([new LuaStoryEmission("SECOND", 0)], [], [], []),
+            LuaStoryPhase.Empty, LuaStoryPhase.Empty),
+        new LuaStoryState("Third", "State_Third", LuaStoryPhase.Empty, LuaStoryPhase.Empty, LuaStoryPhase.Empty)
+    ]);
+
     private static (StorySimulator Sim, StoryCampaignModel Model) Build()
     {
         var schema = new SimSchemaProvider();
@@ -311,60 +419,6 @@ public sealed class StorySimulatorTest
         Assert.Equal(NodeId(model, "Root"), followerFired.SourceNodeId);
         Assert.True(armed.Seq < followerFired.Seq);
     }
-
-    // ── World facts (chunk 3) ────────────────────────────────────────────────
-
-    private const string WorldThreadText =
-        "<Story>\n" +
-        "\t<Event Name=\"Conq\">\n" +
-        "\t\t<Event_Type>STORY_CONQUER</Event_Type>\n" +
-        "\t\t<Event_Param1>Kuat Corellia</Event_Param1>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Build\">\n" +
-        "\t\t<Event_Type>STORY_CONSTRUCT</Event_Type>\n" +
-        "\t\t<Event_Param1>X_Wing</Event_Param1>\n" +
-        "\t\t<Event_Param2>2</Event_Param2>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Tech\">\n" +
-        "\t\t<Event_Type>STORY_TECH_LEVEL</Event_Type>\n" +
-        "\t\t<Event_Param1>3</Event_Param1>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Win\">\n" +
-        "\t\t<Event_Type>STORY_VICTORY</Event_Type>\n" +
-        "\t\t<Event_Param1>Rebel</Event_Param1>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"TwoWins\">\n" +
-        "\t\t<Event_Type>STORY_WIN_BATTLES</Event_Type>\n" +
-        "\t\t<Event_Param1>2</Event_Param1>\n" +
-        "\t\t<Event_Param4>Kuat</Event_Param4>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Rich\">\n" +
-        "\t\t<Event_Type>STORY_ACCUMULATE</Event_Type>\n" +
-        "\t\t<Event_Param1>1000</Event_Param1>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Wreck\">\n" +
-        "\t\t<Event_Type>STORY_TACTICAL_DESTROY</Event_Type>\n" +
-        "\t\t<Event_Param1>TIE_Fighter</Event_Param1>\n" +
-        "\t\t<Event_Param3>2</Event_Param3>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Give\">\n" +
-        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
-        "\t\t<Reward_Type>PLANET_FACTION</Reward_Type>\n" +
-        "\t\t<Reward_Param1>Kuat</Reward_Param1>\n" +
-        "\t\t<Reward_Param2>Empire</Reward_Param2>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Untyped\">\n" +
-        "\t\t<Event_Type>STORY_CLICK_GUI</Event_Type>\n" +
-        "\t\t<Event_Param1>Button_Build</Event_Param1>\n" +
-        "\t</Event>\n" +
-        "</Story>\n";
-
-    private static readonly StoryCampaignSeed Seed = new(
-        ["Kuat", "Corellia", "Hoth"],
-        [new StoryStartingForce("Rebel", "Hoth", "X_Wing"), new StoryStartingForce("Empire", "Kuat", "TIE_Fighter")],
-        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = 2 },
-        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = 500 },
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = "Hoth" });
 
     private static (StorySimulator Sim, StoryCampaignModel Model) BuildWorld(IStoryWorldSymbols? symbols = null)
     {
@@ -550,53 +604,6 @@ public sealed class StorySimulatorTest
         Assert.Equal("Button_Build", click.Suggested!.Name);
     }
 
-    private sealed class KnownSymbols(IEnumerable<string> planets) : IStoryWorldSymbols
-    {
-        private readonly HashSet<string> _planets = new(planets, StringComparer.OrdinalIgnoreCase);
-
-        public bool Exists(string kind, string name)
-        {
-            return kind != StoryWorldSymbolKind.Planet || _planets.Contains(name);
-        }
-    }
-
-    // ── Lua overlay (chunk 4) ────────────────────────────────────────────────
-
-    private const string LuaUri = "file:///ws/data/scripts/story/story_lua.lua";
-
-    private const string LuaThreadText =
-        "<Story>\n" +
-        "\t<Event Name=\"Act_Begin\">\n" +
-        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
-        "\t\t<Reward_Type>TRIGGER_EVENT</Reward_Type>\n" +
-        "\t\t<Reward_Param1>Second</Reward_Param1>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Line_Done\">\n" +
-        "\t\t<Event_Type>STORY_AI_NOTIFICATION</Event_Type>\n" +
-        "\t\t<Event_Param1>LINE_ONE</Event_Param1>\n" +
-        "\t\t<Prereq>Act_Begin</Prereq>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Second\">\n" +
-        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Third\">\n" +
-        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
-        "\t</Event>\n" +
-        "</Story>\n";
-
-    private static readonly LuaStoryMachine Machine = new(LuaUri, "story_lua",
-    [
-        new LuaStoryState("Act_Begin", "State_Act_Begin",
-            new LuaStoryPhase([new LuaStoryEmission("LINE_ONE", 5)], [], [new LuaStorySpawn("X_Wing", "Hoth")],
-                ["Talk"]),
-            LuaStoryPhase.Empty,
-            new LuaStoryPhase([new LuaStoryEmission("BYE", 0)], [], [], [])),
-        new LuaStoryState("Second", "State_Second",
-            new LuaStoryPhase([new LuaStoryEmission("SECOND", 0)], [], [], []),
-            LuaStoryPhase.Empty, LuaStoryPhase.Empty),
-        new LuaStoryState("Third", "State_Third", LuaStoryPhase.Empty, LuaStoryPhase.Empty, LuaStoryPhase.Empty)
-    ]);
-
     private static (StorySimulator Sim, StoryCampaignModel Model) BuildLua()
     {
         var schema = new SimSchemaProvider();
@@ -712,23 +719,6 @@ public sealed class StorySimulatorTest
             e => e.Kind == StoryEdgeKind.LuaLink && e.FromId == state.Id && e.ToId == NodeId(model, "Line_Done") &&
                  e.Label == "LINE_ONE");
     }
-
-    private const string TimerChainText =
-        "<Story>\n" +
-        "\t<Event Name=\"T0\">\n" +
-        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
-        "\t\t<Event_Param1>1</Event_Param1>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"T1\">\n" +
-        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
-        "\t\t<Event_Param1>1</Event_Param1>\n" +
-        "\t\t<Prereq>T0</Prereq>\n" +
-        "\t</Event>\n" +
-        "\t<Event Name=\"Decision\">\n" +
-        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
-        "\t\t<Prereq>T1</Prereq>\n" +
-        "\t</Event>\n" +
-        "</Story>\n";
 
     private static (StorySimulator Sim, StoryCampaignModel Model) BuildTimerChain(string? text = null)
     {
@@ -1108,6 +1098,16 @@ public sealed class StorySimulatorTest
         }
 
         Assert.Equal(Run(), Run());
+    }
+
+    private sealed class KnownSymbols(IEnumerable<string> planets) : IStoryWorldSymbols
+    {
+        private readonly HashSet<string> _planets = new(planets, StringComparer.OrdinalIgnoreCase);
+
+        public bool Exists(string kind, string name)
+        {
+            return kind != StoryWorldSymbolKind.Planet || _planets.Contains(name);
+        }
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

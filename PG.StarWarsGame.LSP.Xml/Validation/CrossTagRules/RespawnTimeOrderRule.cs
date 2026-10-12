@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 /// <remarks>
 ///     <para>
 ///         <c>Error: (%s) Min_Respawn_Time cannot be greater than Max_Respawn_Time!</c>
-///        . The engine picks a time between the two, so a reversed pair leaves it
+///         . The engine picks a time between the two, so a reversed pair leaves it
 ///         with an empty interval.
 ///     </para>
 ///     <para>

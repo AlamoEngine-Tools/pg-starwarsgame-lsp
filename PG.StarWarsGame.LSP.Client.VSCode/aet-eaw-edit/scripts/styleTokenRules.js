@@ -122,4 +122,4 @@ function tokenOffences(body, {
     return found.sort((a, b) => a.index - b.index);
 }
 
-module.exports = { KINDS, SCALE_PROPERTY, tokenOffences };
+module.exports = {KINDS, SCALE_PROPERTY, tokenOffences};

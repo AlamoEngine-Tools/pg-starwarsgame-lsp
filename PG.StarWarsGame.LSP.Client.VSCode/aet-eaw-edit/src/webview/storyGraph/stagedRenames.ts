@@ -20,6 +20,10 @@ const MAX_CHAIN = 64;
 export class StagedRenames {
     private readonly _chain = new Map<string, string>();
 
+    get size(): number {
+        return this._chain.size;
+    }
+
     /** Records that `from` is now called `to`. */
     record(from: string, to: string): void {
         this._chain.set(from.toLowerCase(), to);
@@ -27,10 +31,6 @@ export class StagedRenames {
 
     clear(): void {
         this._chain.clear();
-    }
-
-    get size(): number {
-        return this._chain.size;
     }
 
     /**
@@ -45,7 +45,9 @@ export class StagedRenames {
         for (let i = 0; i < MAX_CHAIN; i++) {
             const next = this._chain.get(current.toLowerCase());
             // A self-rename is a fixed point, not a link: following it would spin until the bound.
-            if (next === undefined || next === current) { break; }
+            if (next === undefined || next === current) {
+                break;
+            }
             current = next;
         }
 

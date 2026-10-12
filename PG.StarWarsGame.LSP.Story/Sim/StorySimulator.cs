@@ -123,18 +123,23 @@ public sealed partial class StorySimulator
     private const string SpeechDone = "STORY_SPEECH_DONE";
     private const string MovieDone = "STORY_MOVIE_DONE";
 
+    /// <summary>The listeners a battle's outcome fires when it is decided (see <c>WorldVerdict</c>).</summary>
+    private static readonly HashSet<string> OutcomeEventTypes = new(StringComparer.OrdinalIgnoreCase)
+        { "STORY_VICTORY", "STORY_MISSION_LOST", "STORY_MISSION_FAILED" };
+
+    private readonly Dictionary<string, string> _battleOfListener;
+
     private readonly Dictionary<string, List<StoryNode>> _dependantsById;
-    private readonly Dictionary<(string Type, int Position), string> _eventParamTypes;
-    private readonly IReadOnlyList<StoryNode> _eventNodes;
-    private readonly Dictionary<string, List<StoryNode>> _eventsByName;
     private readonly StoryEvaluator _evaluator;
+    private readonly IReadOnlyList<StoryNode> _eventNodes;
+    private readonly Dictionary<(string Type, int Position), string> _eventParamTypes;
+    private readonly Dictionary<string, List<StoryNode>> _eventsByName;
     private readonly StoryCampaignModel _model;
     private readonly Dictionary<string, StoryNode> _nodesById;
     private readonly Dictionary<string, List<List<string>>> _prereqLinesById;
     private readonly Dictionary<(string Type, int Position), string> _rewardParamTypes;
     private readonly List<string> _startupNotes = [];
     private readonly IStoryWorldSymbols? _symbols;
-    private readonly Dictionary<string, string> _battleOfListener;
 
     /// <summary>
     ///     <paramref name="symbols" /> answers whether a planet, unit type or faction the author
@@ -217,10 +222,6 @@ public sealed partial class StorySimulator
     public string? Scope { get; }
 
     public StorySimOptions Options { get; }
-
-    /// <summary>The listeners a battle's outcome fires when it is decided (see <c>WorldVerdict</c>).</summary>
-    private static readonly HashSet<string> OutcomeEventTypes = new(StringComparer.OrdinalIgnoreCase)
-        { "STORY_VICTORY", "STORY_MISSION_LOST", "STORY_MISSION_FAILED" };
 
     /// <summary>
     ///     What a battle can write into the shared flag table: every flag its events' SET_FLAG and
@@ -437,7 +438,10 @@ public sealed partial class StorySimulator
             StringComparer.Ordinal);
     }
 
-    /// <summary>The battle a tactical listener waits on: the one it is inside, or the one whose link it follows. Null for any other event.</summary>
+    /// <summary>
+    ///     The battle a tactical listener waits on: the one it is inside, or the one whose link it follows. Null for any
+    ///     other event.
+    /// </summary>
     public string? BattleOf(string nodeId)
     {
         return Scope ?? _battleOfListener.GetValueOrDefault(nodeId);
@@ -557,7 +561,7 @@ public sealed partial class StorySimulator
                 var target = int.TryParse(rawTarget, out var parsed) ? parsed : 0;
                 if (!snapshot.Runtime.Flags.TryGetValue(flag, out var value))
                     return new StorySimGate($"{flag} unset", 0);
-                var progress = target <= 0 ? (value == target ? 1 : 0) : Math.Clamp((double)value / target, 0, 1);
+                var progress = target <= 0 ? value == target ? 1 : 0 : Math.Clamp((double)value / target, 0, 1);
                 return new StorySimGate($"{flag} {value} of {target}", progress);
             }
             default:

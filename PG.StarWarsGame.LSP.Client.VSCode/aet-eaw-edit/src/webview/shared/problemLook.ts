@@ -14,13 +14,13 @@ export interface ProblemLook {
     /** Codicon name, without the `codicon-` prefix. */
     icon: string;
     /** Which of the three colour bands the icon takes. */
-    tone: 'error' | 'warning' | 'info';
+    tone: "error" | "warning" | "info";
 }
 
 const LOOKS: Record<string, ProblemLook> = {
-    error: { icon: 'error', tone: 'error' },
-    warning: { icon: 'warning', tone: 'warning' },
-    info: { icon: 'info', tone: 'info' },
+    error: { icon: "error", tone: "error" },
+    warning: { icon: "warning", tone: "warning" },
+    info: { icon: "info", tone: "info" },
 };
 
 /**
@@ -44,11 +44,12 @@ export function problemLook(severity: string): ProblemLook {
  * not say where they are, and there it is the thing a reader scans for.
  */
 export function problemWhere(
-    hardpointId: string | null | undefined, message: string,
+    hardpointId: string | null | undefined,
+    message: string,
 ): string | null {
-    const id = (hardpointId ?? '').trim();
+    const id = (hardpointId ?? "").trim();
 
-    if (id === '' || message.toLowerCase().includes(id.toLowerCase())) {
+    if (id === "" || message.toLowerCase().includes(id.toLowerCase())) {
         return null;
     }
 
@@ -76,20 +77,22 @@ export interface ProblemTag {
  * Saying "render-time" is better than leaving the chip blank: the blank reads as an id that failed
  * to arrive, and sends the reader looking for a bug in the wrong half of the product.
  */
-export function problemTag(diagnosticId: string | null | undefined): ProblemTag {
-    const id = (diagnosticId ?? '').trim();
+export function problemTag(
+    diagnosticId: string | null | undefined,
+): ProblemTag {
+    const id = (diagnosticId ?? "").trim();
 
-    if (id === '') {
+    if (id === "") {
         return {
-            text: 'render-time',
-            title: 'Found while rendering. Not in the files, so it has no position and no id.',
+            text: "render-time",
+            title: "Found while rendering. Not in the files, so it has no position and no id.",
             isDiagnostic: false,
         };
     }
 
     return {
         text: id,
-        title: 'Diagnostic id. Name it in a suppression comment to silence this finding.',
+        title: "Diagnostic id. Name it in a suppression comment to silence this finding.",
         isDiagnostic: true,
     };
 }

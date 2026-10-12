@@ -60,23 +60,23 @@ export interface FxEffect {
  * A plain regex sweep would eat the `//` inside any quoted path and leave the file unparseable.
  */
 export function stripComments(text: string): string {
-    let out = '';
+    let out = "";
     let i = 0;
 
     while (i < text.length) {
         const two = text.slice(i, i + 2);
 
-        if (two === '//') {
-            const end = text.indexOf('\n', i);
+        if (two === "//") {
+            const end = text.indexOf("\n", i);
             i = end === -1 ? text.length : end;
             continue;
         }
 
-        if (two === '/*') {
-            const end = text.indexOf('*/', i + 2);
+        if (two === "/*") {
+            const end = text.indexOf("*/", i + 2);
             i = end === -1 ? text.length : end + 2;
             // Replaced with a space so `a/*x*/b` does not become the identifier `ab`.
-            out += ' ';
+            out += " ";
             continue;
         }
 
@@ -97,7 +97,10 @@ export function stripComments(text: string): string {
 
 /** The body of a `{}` or `<>` block starting at `open`, and where it ends. */
 function readBlock(
-    text: string, open: number, opener: string, closer: string,
+    text: string,
+    open: number,
+    opener: string,
+    closer: string,
 ): { body: string; end: number } | null {
     if (text[open] !== opener) {
         return null;
@@ -130,26 +133,27 @@ function skipSpace(text: string, from: number): number {
 function parseAnnotations(text: string): FxAnnotations {
     const annotations: FxAnnotations = {};
 
-    const strings = /\b(?:string|bool)\s+(_ALAMO_[A-Z_]+)\s*=\s*("([^"]*)"|true|false)\s*;/g;
+    const strings =
+        /\b(?:string|bool)\s+(_ALAMO_[A-Z_]+)\s*=\s*("([^"]*)"|true|false)\s*;/g;
 
     for (const match of text.matchAll(strings)) {
         const value = match[3] ?? match[2];
 
         switch (match[1]) {
-            case '_ALAMO_RENDER_PHASE':
+            case "_ALAMO_RENDER_PHASE":
                 annotations.renderPhase = value;
                 break;
-            case '_ALAMO_VERTEX_PROC':
+            case "_ALAMO_VERTEX_PROC":
                 annotations.vertexProc = value;
                 break;
-            case '_ALAMO_VERTEX_TYPE':
+            case "_ALAMO_VERTEX_TYPE":
                 annotations.vertexType = value;
                 break;
-            case '_ALAMO_TANGENT_SPACE':
-                annotations.tangentSpace = value === 'true';
+            case "_ALAMO_TANGENT_SPACE":
+                annotations.tangentSpace = value === "true";
                 break;
-            case '_ALAMO_SHADOW_VOLUME':
-                annotations.shadowVolume = value === 'true';
+            case "_ALAMO_SHADOW_VOLUME":
+                annotations.shadowVolume = value === "true";
                 break;
             default:
                 // Another annotation this build does not model. Ignored rather than refused: the
@@ -162,7 +166,7 @@ function parseAnnotations(text: string): FxAnnotations {
 }
 
 function parseIncludes(text: string): string[] {
-    return [...text.matchAll(/#include\s+"([^"]+)"/g)].map(match => match[1]);
+    return [...text.matchAll(/#include\s+"([^"]+)"/g)].map((match) => match[1]);
 }
 
 /**
@@ -173,14 +177,18 @@ function parseIncludes(text: string): string[] {
  * describes a vertex layout, not something to bind.
  */
 function parseParameters(text: string): FxParameter[] {
-    const withoutStructs = text.replace(/\bstruct\b[^{]*\{[^}]*\}\s*;/g, ' ');
+    const withoutStructs = text.replace(/\bstruct\b[^{]*\{[^}]*\}\s*;/g, " ");
 
     const declarations =
         /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*;/g;
 
     return [...withoutStructs.matchAll(declarations)]
-        .filter(match => match[1] !== 'return')
-        .map(match => ({ type: match[1], name: match[2], semantic: match[3] }));
+        .filter((match) => match[1] !== "return")
+        .map((match) => ({
+            type: match[1],
+            name: match[2],
+            semantic: match[3],
+        }));
 }
 
 /**
@@ -212,17 +220,20 @@ function entryPoint(rightHandSide: string): string | undefined {
     //   VertexShader = (vs_main_bin);              a precompiled binary, parenthesised
     //   VertexShader = vs_main;                    bare
     // Any arguments are left behind: nothing downstream could pass them on.
-    const bare = value.replace(/^\(\s*/, '');
+    const bare = value.replace(/^\(\s*/, "");
 
-    return /^compile\s+[A-Za-z0-9_]+\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(bare)?.[1]
-        ?? /^([A-Za-z_][A-Za-z0-9_]*)/.exec(bare)?.[1];
+    return (
+        /^compile\s+[A-Za-z0-9_]+\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(
+            bare,
+        )?.[1] ?? /^([A-Za-z_][A-Za-z0-9_]*)/.exec(bare)?.[1]
+    );
 }
 
 function parsePass(name: string, body: string): FxPass {
     const pass: FxPass = { name, states: {} };
 
     for (const match of body.matchAll(SHADER_ASSIGNMENT)) {
-        if (match[1].toLowerCase() === 'vertexshader') {
+        if (match[1].toLowerCase() === "vertexshader") {
             pass.vertexShader = entryPoint(match[2]);
         } else {
             pass.pixelShader = entryPoint(match[2]);
@@ -233,13 +244,14 @@ function parsePass(name: string, body: string): FxPass {
     // entirely through indexed state - `ColorOp[0]=MODULATE2X;` - and a key pattern of bare
     // identifiers matched none of it, so every stage op was silently dropped.
     for (const match of body.matchAll(
-        /\b([A-Za-z_][A-Za-z0-9_]*(?:\s*\[\s*\d+\s*\])?)\s*=\s*\(?\s*([A-Za-z0-9_.]+)\s*\)?\s*;/g)) {
+        /\b([A-Za-z_][A-Za-z0-9_]*(?:\s*\[\s*\d+\s*\])?)\s*=\s*\(?\s*([A-Za-z0-9_.]+)\s*\)?\s*;/g,
+    )) {
         // Whitespace inside the brackets is stripped so one written form is one key.
-        const key = match[1].toLowerCase().replace(/\s+/g, '');
+        const key = match[1].toLowerCase().replace(/\s+/g, "");
 
         // The shader assignments are read above. A bare `VertexShader = NULL;` matches this pattern
         // too, and letting it through would file a shader name where a blend factor belongs.
-        if (key === 'vertexshader' || key === 'pixelshader') {
+        if (key === "vertexshader" || key === "pixelshader") {
             continue;
         }
 
@@ -259,8 +271,8 @@ function parseTechniques(text: string): FxTechnique[] {
         let lod: string | undefined;
 
         // Annotations come in angle brackets between the name and the body.
-        if (text[cursor] === '<') {
-            const annotation = readBlock(text, cursor, '<', '>');
+        if (text[cursor] === "<") {
+            const annotation = readBlock(text, cursor, "<", ">");
             if (annotation === null) {
                 continue;
             }
@@ -269,7 +281,7 @@ function parseTechniques(text: string): FxTechnique[] {
             cursor = skipSpace(text, annotation.end);
         }
 
-        const body = readBlock(text, cursor, '{', '}');
+        const body = readBlock(text, cursor, "{", "}");
         if (body === null) {
             continue;
         }
@@ -279,7 +291,11 @@ function parseTechniques(text: string): FxTechnique[] {
 
         for (const passMatch of body.body.matchAll(passHeader)) {
             const passBody = readBlock(
-                body.body, skipSpace(body.body, passMatch.index + passMatch[0].length), '{', '}');
+                body.body,
+                skipSpace(body.body, passMatch.index + passMatch[0].length),
+                "{",
+                "}",
+            );
 
             if (passBody !== null) {
                 passes.push(parsePass(passMatch[1], passBody.body));
@@ -313,12 +329,17 @@ export function parseFxManifest(source: string): FxEffect {
  * this ladder they would have fallen through to the unannotated last resort, which is usually an
  * editor-only pass and worse than either. Plain `DX8` is preferred over the vendor variant.
  */
-export const TECHNIQUE_PREFERENCE: readonly string[] =
-    ['DX9', 'DX8', 'DX8ATI', 'FIXEDFUNCTION', 'FF'];
+export const TECHNIQUE_PREFERENCE: readonly string[] = [
+    "DX9",
+    "DX8",
+    "DX8ATI",
+    "FIXEDFUNCTION",
+    "FF",
+];
 
 /** Whether a technique has any shader to translate, as opposed to render state alone. */
 export function hasProgrammableShader(technique: FxTechnique): boolean {
-    return technique.passes.some(pass => pass.vertexShader !== undefined);
+    return technique.passes.some((pass) => pass.vertexShader !== undefined);
 }
 
 /**
@@ -328,16 +349,21 @@ export function hasProgrammableShader(technique: FxTechnique): boolean {
  * like `max_viewport`.
  */
 export function selectTechnique(
-    effect: FxEffect, preferred: readonly string[] = TECHNIQUE_PREFERENCE,
+    effect: FxEffect,
+    preferred: readonly string[] = TECHNIQUE_PREFERENCE,
 ): FxTechnique | null {
     for (const lod of preferred) {
         const match = effect.techniques.find(
-            technique => technique.lod?.toUpperCase() === lod.toUpperCase());
+            (technique) => technique.lod?.toUpperCase() === lod.toUpperCase(),
+        );
 
         if (match !== undefined) {
             return match;
         }
     }
 
-    return effect.techniques.find(technique => technique.lod === undefined) ?? null;
+    return (
+        effect.techniques.find((technique) => technique.lod === undefined) ??
+        null
+    );
 }

@@ -9,12 +9,12 @@
 // it. That is the whole point: a single component that branched on the kind of file is what put
 // credits behaviour into translation files three separate times.
 
-import { ReactNode, useEffect, useRef } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { ReactNode, useEffect, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
-import { LocRow } from '../loc/locRow';
-import { RightDock } from '../shared/RightDock';
-import { Shell } from './locGridStyles';
+import { LocRow } from "../loc/locRow";
+import { RightDock } from "../shared/RightDock";
+import { Shell } from "./locGridStyles";
 
 const ROW_HEIGHT = 26;
 
@@ -81,21 +81,29 @@ export function LocGridShell(props: LocGridShellProps): React.JSX.Element {
     // Takes the user to a freshly inserted row. Two steps, because the grid is virtualised: the row
     // has to be scrolled into range before it exists in the DOM to be focused.
     useEffect(() => {
-        if (focusRowIndex === null || focusRowIndex === undefined) { return; }
+        if (focusRowIndex === null || focusRowIndex === undefined) {
+            return;
+        }
 
-        const position = rows.findIndex(r => r.index === focusRowIndex);
-        if (position < 0) { return; }
+        const position = rows.findIndex((r) => r.index === focusRowIndex);
+        if (position < 0) {
+            return;
+        }
 
         // 'auto' scrolls only when the row is out of view, and then by the least amount. Centring
         // would yank the viewport on every insert, so a row inserted next to one you can already
         // see would jump away from the pointer that asked for it.
-        virtualizer.scrollToIndex(position, { align: 'auto' });
+        virtualizer.scrollToIndex(position, { align: "auto" });
 
         const timer = window.setTimeout(() => {
-            const row = scrollRef.current?.querySelector(`[data-row-index="${focusRowIndex}"]`);
-            const field = row?.querySelector<HTMLElement>('input, select');
+            const row = scrollRef.current?.querySelector(
+                `[data-row-index="${focusRowIndex}"]`,
+            );
+            const field = row?.querySelector<HTMLElement>("input, select");
             field?.focus();
-            if (field instanceof HTMLInputElement) { field.select(); }
+            if (field instanceof HTMLInputElement) {
+                field.select();
+            }
             onFocused?.();
         }, 0);
 
@@ -109,65 +117,95 @@ export function LocGridShell(props: LocGridShellProps): React.JSX.Element {
                 {/* The table and its footer share a column so the footer stays put while the grid
                     scrolls under it. */}
                 <div className="grid-column">
-                <div
-                    className="grid-area"
-                    ref={scrollRef}
-                    onDragOver={props.onGridDragOver}
-                    onDrop={props.onGridDrop}
-                    onDragLeave={props.onGridDragLeave}
-                    onContextMenu={e => {
-                        // Only when the click missed every row: a file with nothing in it has no
-                        // row to right-click, and the menu is the only way to add one.
-                        if ((e.target as HTMLElement).closest('.data-row') === null) {
-                            props.onEmptyAreaContextMenu?.(e);
-                        }
-                    }}
-                >
-                    {/* Divs on one shared grid template rather than a table: a <table> whose tbody
+                    <div
+                        className="grid-area"
+                        ref={scrollRef}
+                        onDragOver={props.onGridDragOver}
+                        onDrop={props.onGridDrop}
+                        onDragLeave={props.onGridDragLeave}
+                        onContextMenu={(e) => {
+                            // Only when the click missed every row: a file with nothing in it has no
+                            // row to right-click, and the menu is the only way to add one.
+                            if (
+                                (e.target as HTMLElement).closest(
+                                    ".data-row",
+                                ) === null
+                            ) {
+                                props.onEmptyAreaContextMenu?.(e);
+                            }
+                        }}
+                    >
+                        {/* Divs on one shared grid template rather than a table: a <table> whose tbody
                         is display:block and whose rows are absolutely positioned cannot keep its
                         header and body columns aligned, and the row/cell display overrides fight
                         the table layout algorithm. One template string drives both. */}
-                    {/* min-content, not fit-content: the columns' own minimums decide how narrow
+                        {/* min-content, not fit-content: the columns' own minimums decide how narrow
                         the table may get, not whatever text happens to be in the rows currently
                         mounted. With a virtualised list fit-content made the width depend on the
                         scroll position. */}
-                    <div className="grid" style={{ minWidth: 'min-content' }}>
-                        <div className="head-row" style={{ gridTemplateColumns: props.columns }}>
-                            {props.header}
-                        </div>
+                        <div
+                            className="grid"
+                            style={{ minWidth: "min-content" }}
+                        >
+                            <div
+                                className="head-row"
+                                style={{ gridTemplateColumns: props.columns }}
+                            >
+                                {props.header}
+                            </div>
 
-                        <div className="rows" style={{ height: `${virtualizer.getTotalSize()}px` }}>
-                            {virtualizer.getVirtualItems().map(item => {
-                                const row = props.rows[item.index];
-                                return (
-                                    <div
-                                        key={item.key}
-                                        data-row-index={row.index}
-                                        className={['data-row', props.rowClassName?.(row) ?? '']
-                                            .filter(Boolean).join(' ')}
-                                        title={props.rowTitle?.(row)}
-                                        onFocusCapture={() => props.onRowFocus?.(row)}
-                                        onContextMenu={e => props.onRowContextMenu?.(row, e)}
-                                        style={{
-                                            gridTemplateColumns: props.columns,
-                                            transform: `translateY(${item.start}px)`,
-                                            height: `${ROW_HEIGHT}px`,
-                                        }}
-                                    >
-                                        {props.renderRow(row)}
-                                    </div>
-                                );
-                            })}
+                            <div
+                                className="rows"
+                                style={{
+                                    height: `${virtualizer.getTotalSize()}px`,
+                                }}
+                            >
+                                {virtualizer.getVirtualItems().map((item) => {
+                                    const row = props.rows[item.index];
+                                    return (
+                                        <div
+                                            key={item.key}
+                                            data-row-index={row.index}
+                                            className={[
+                                                "data-row",
+                                                props.rowClassName?.(row) ?? "",
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" ")}
+                                            title={props.rowTitle?.(row)}
+                                            onFocusCapture={() =>
+                                                props.onRowFocus?.(row)
+                                            }
+                                            onContextMenu={(e) =>
+                                                props.onRowContextMenu?.(row, e)
+                                            }
+                                            style={{
+                                                gridTemplateColumns:
+                                                    props.columns,
+                                                transform: `translateY(${item.start}px)`,
+                                                height: `${ROW_HEIGHT}px`,
+                                            }}
+                                        >
+                                            {props.renderRow(row)}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
-                </div>
-                {/* Fixed to the viewport, because the boundary it marks is reported in viewport
+                    {/* Fixed to the viewport, because the boundary it marks is reported in viewport
                     coordinates and the grid underneath it scrolls. */}
-                {props.dropIndicatorY !== null && props.dropIndicatorY !== undefined && (
-                    <div className="drop-indicator" style={{ top: props.dropIndicatorY }} />
-                )}
-                {props.problemsBar}
-                {props.footer && <div className="grid-footer">{props.footer}</div>}
+                    {props.dropIndicatorY !== null &&
+                        props.dropIndicatorY !== undefined && (
+                            <div
+                                className="drop-indicator"
+                                style={{ top: props.dropIndicatorY }}
+                            />
+                        )}
+                    {props.problemsBar}
+                    {props.footer && (
+                        <div className="grid-footer">{props.footer}</div>
+                    )}
                 </div>
 
                 <RightDock
@@ -185,6 +223,12 @@ export function LocGridShell(props: LocGridShellProps): React.JSX.Element {
 }
 
 /** A message in place of the grid - an error, or the moment before the first rows arrive. */
-export function LocGridMessage(props: { children: ReactNode }): React.JSX.Element {
-    return <Shell><p className="message">{props.children}</p></Shell>;
+export function LocGridMessage(props: {
+    children: ReactNode;
+}): React.JSX.Element {
+    return (
+        <Shell>
+            <p className="message">{props.children}</p>
+        </Shell>
+    );
 }

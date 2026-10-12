@@ -518,7 +518,15 @@
             "type": "string",
             "default": "",
             "format": "uri-reference",
-            "markdownDescription": "Path to `PG.StarWarsGame.LSP.Server.exe`. Download the server archive from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases), extract it, and point this setting at the `.exe`.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode.enabled#` is `false`.",
+            "markdownDescription": "Path to a `PG.StarWarsGame.LSP.Server.exe` (or `.dll`) to run instead of the server bundled with the extension. Leave empty for the bundled server.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode.enabled#` is `false`.\n\nChanging this setting automatically restarts the LSP server.",
+            "scope": "machine-overridable"
+          },
+          "aet-eaw-edit.lua.analyzerPath": {
+            "order": 210,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "Path to an `emmylua_ls` executable to run instead of the Lua analyzer bundled with the extension. Leave empty for the bundled analyzer.\n\nOnly applies when `#aet-eaw-edit.features.lua.analyzer#` is on.\n\nChanging this setting automatically restarts the LSP server.",
             "scope": "machine-overridable"
           },
           "aet-eaw-edit.diagnostics.workspaceOnStartup": {
@@ -652,7 +660,7 @@
             "type": "string",
             "default": "",
             "format": "uri-reference",
-            "markdownDescription": "Path to the local EaW XML schema directory (`schema/eaw/`).\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `local`.",
+            "markdownDescription": "Path to the schema repository's `eaw` folder, the one holding `_index.json` (`schema/eaw/`, not the repository root). The Lua stubs are read from the `lua` folder beside it.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `local`.",
             "scope": "machine-overridable"
           },
           "aet-eaw-edit.localisation.format": {
@@ -744,7 +752,7 @@
             "order": 1950,
             "type": "string",
             "default": "Information",
-            "markdownDescription": "How much the LSP server writes to its own log file. `Debug` adds the lines that say whether a document reached a sync handler, which is what a session publishing no diagnostics has to be diagnosed from.\n\nThis is the server's FILE log, not the output panel - see `#aet-eaw-edit.lsp.debug.traceServer#` for wire traffic. Takes effect on the next server start.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "markdownDescription": "How much the LSP server logs. The lines appear in the output channel *Alamo Engine Tools - Empire at War Edit*; a Debug build of the server also writes them to a log file in the first workspace folder. `Debug` adds the lines that say whether a document reached a sync handler, which is what a session publishing no diagnostics has to be diagnosed from.\n\nWire traffic is `#aet-eaw-edit.lsp.debug.traceServer#`. Takes effect on the next server start.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
             "enum": [
               "Trace",
               "Debug",
@@ -907,8 +915,8 @@
           "aet-eaw-edit.features.lua.analyzer": {
             "order": 1830,
             "type": "boolean",
-            "default": false,
-            "markdownDescription": "Runs the Lua analyzer (`emmylua_ls`) behind the language server, with the open Lua scripts mirrored to it. Needs the analyzer executable: the `AET_EMMYLUA_LS` environment variable, or an `emmylua` folder beside the server.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "default": true,
+            "markdownDescription": "Runs the Lua analyzer (`emmylua_ls`, bundled) behind the language server, with the open Lua scripts mirrored to it. It supplies identifier and member completion, hover for the workspace's own functions and types, references, symbols, signature help, folding, semantic highlighting, code lenses, inlay hints and its own diagnostics. `#aet-eaw-edit.lua.analyzerPath#` runs another copy.\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.story.discovery": {
             "order": 1850,
@@ -1110,7 +1118,8 @@
     "watch:tsc": "tsc -p ./ --noEmit --watch",
     "test:unit": "node esbuild.test.js && node --test \"out/test-unit/**/*.test.js\" && node --test \"scripts/**/*.test.js\"",
     "pretest": "npm run compile && npm run lint",
-    "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && eslint src",
+    "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && eslint src && prettier --check \"src/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "test": "vscode-test",
     "package": "vsce package --no-dependencies"
   },
@@ -1140,6 +1149,7 @@
     "@vscode/vsce": "^3.5.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
+    "prettier": "3.9.10",
     "typescript": "^6.0.0"
   },
   "dependencies": {

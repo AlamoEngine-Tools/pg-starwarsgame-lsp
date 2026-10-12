@@ -56,7 +56,10 @@ export function hullFrameBasis(): [Point, Point, Point] {
  * cone of any kind. See {@link coneDirection}.
  */
 export function fireConePoints(
-    widthDegrees: number, heightDegrees: number, range: number, segments: number,
+    widthDegrees: number,
+    heightDegrees: number,
+    range: number,
+    segments: number,
 ): { apex: Point; rim: Point[] } {
     const halfWidth = halfYaw(widthDegrees);
     const halfHeight = halfElevation(heightDegrees);
@@ -110,7 +113,10 @@ export function fireConePoints(
  * 360-degree traverse is a full ring rather than something needing a clamp.
  */
 function coneDirection(
-    halfWidth: number, halfHeight: number, ring: number, around: number,
+    halfWidth: number,
+    halfHeight: number,
+    ring: number,
+    around: number,
 ): [number, number, number] {
     const cos = Math.cos(around);
     const sin = Math.sin(around);
@@ -118,12 +124,14 @@ function coneDirection(
     // How far the rectangle's border lies at this azimuth - its polar radius. `min` is what makes
     // it a rectangle rather than a rounded shape: whichever limit is reached FIRST stops the ray,
     // which is the same "either check may reject" the engine applies.
-    const toSide = Math.abs(cos) < MIN_HALF_ANGLE
-        ? Infinity
-        : Math.max(halfWidth, MIN_HALF_ANGLE) / Math.abs(cos);
-    const toTop = Math.abs(sin) < MIN_HALF_ANGLE
-        ? Infinity
-        : Math.max(halfHeight, MIN_HALF_ANGLE) / Math.abs(sin);
+    const toSide =
+        Math.abs(cos) < MIN_HALF_ANGLE
+            ? Infinity
+            : Math.max(halfWidth, MIN_HALF_ANGLE) / Math.abs(cos);
+    const toTop =
+        Math.abs(sin) < MIN_HALF_ANGLE
+            ? Infinity
+            : Math.max(halfHeight, MIN_HALF_ANGLE) / Math.abs(sin);
 
     const radius = ring * Math.min(toSide, toTop);
     const yaw = radius * cos;
@@ -193,8 +201,10 @@ function halfElevation(degrees: number): number {
  * The row still states the true range in units, so nothing is hidden - only drawn shorter.
  */
 export function drawnConeRange(
-    range: number, modelSize: number,
-    widthDegrees = 0, heightDegrees = 0,
+    range: number,
+    modelSize: number,
+    widthDegrees = 0,
+    heightDegrees = 0,
 ): number {
     const size = Number.isFinite(modelSize) && modelSize > 0 ? modelSize : 100;
     const limit = size * spanFactor(widthDegrees, heightDegrees);
@@ -211,7 +221,10 @@ export function drawnConeRange(
  * near-hemispherical widths capital ships declare.
  */
 function spanFactor(widthDegrees: number, heightDegrees: number): number {
-    const widest = Math.max(halfYaw(widthDegrees), halfElevation(heightDegrees));
+    const widest = Math.max(
+        halfYaw(widthDegrees),
+        halfElevation(heightDegrees),
+    );
     const from = Math.PI / 12;
     const to = Math.PI / 2;
 
@@ -240,8 +253,11 @@ const WIDE_SPAN = 0.5;
  * hold the shape at the Nebulon B's 175 by 160 degrees.
  */
 export function fireConeSurface(
-    widthDegrees: number, heightDegrees: number, range: number,
-    segments: number, rings: number,
+    widthDegrees: number,
+    heightDegrees: number,
+    range: number,
+    segments: number,
+    rings: number,
 ): number[] {
     if (range <= 0) {
         return [];
@@ -309,8 +325,11 @@ export function fireConeSurface(
  * exactly on the surface it edges rather than near it.
  */
 export function fireConeOutline(
-    widthDegrees: number, heightDegrees: number, range: number,
-    segments: number, ribs: number,
+    widthDegrees: number,
+    heightDegrees: number,
+    range: number,
+    segments: number,
+    ribs: number,
 ): number[] {
     if (range <= 0) {
         return [];

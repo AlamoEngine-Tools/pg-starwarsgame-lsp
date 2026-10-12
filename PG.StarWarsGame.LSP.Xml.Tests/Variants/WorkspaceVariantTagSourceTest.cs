@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -84,7 +83,7 @@ public sealed class WorkspaceVariantTagSourceTest
 
         source.TryGetTags("A");
         source.TryGetTags("B");
-        var stats = ((ICacheStatisticsSource)source).Snapshot();
+        var stats = source.Snapshot();
 
         Assert.Equal("variant-tags", stats.Name);
         Assert.Equal(2, stats.Entries);

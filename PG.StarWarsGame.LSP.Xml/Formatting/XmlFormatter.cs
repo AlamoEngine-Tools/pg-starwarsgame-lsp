@@ -36,13 +36,6 @@ public sealed record XmlFormatResult(IReadOnlyList<XmlTextEdit> Edits, string? R
 /// </summary>
 public static class XmlFormatter
 {
-    private enum Kind
-    {
-        Start,
-        End,
-        Other
-    }
-
     /// <param name="doc">The document; its text is what the edits are computed against.</param>
     /// <param name="indentUnit">One level of indentation: a tab, or the editor's spaces.</param>
     /// <param name="range">Only edits lying wholly inside these offsets [start, end] are returned.</param>
@@ -194,5 +187,12 @@ public static class XmlFormatter
             }
 
         return sb.ToString();
+    }
+
+    private enum Kind
+    {
+        Start,
+        End,
+        Other
     }
 }

@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.Files.MTD.Services;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Serialization;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Project;
@@ -52,12 +52,6 @@ public sealed class IconCatalogProvider : IIconCatalogProvider, ICacheStatistics
     private readonly IconPackLoader _packLoader;
     private IconPack? _baseline;
 
-    /// <summary>Catalogs built, one per layer set seen; each holds decoded icon bytes.</summary>
-    public CacheStatistics Snapshot()
-    {
-        return new CacheStatistics("icon-catalogs", _catalogs.Count);
-    }
-
     public IconCatalogProvider(
         IconPackLoader packLoader,
         IMtdService mtdFileService,
@@ -70,6 +64,12 @@ public sealed class IconCatalogProvider : IIconCatalogProvider, ICacheStatistics
         _fileHelper = fileHelper;
         _config = config;
         _logger = logger;
+    }
+
+    /// <summary>Catalogs built, one per layer set seen; each holds decoded icon bytes.</summary>
+    public CacheStatistics Snapshot()
+    {
+        return new CacheStatistics("icon-catalogs", _catalogs.Count);
     }
 
     public async Task<IconCatalog> GetAsync(IReadOnlyList<IconLayer> layers, CancellationToken ct)

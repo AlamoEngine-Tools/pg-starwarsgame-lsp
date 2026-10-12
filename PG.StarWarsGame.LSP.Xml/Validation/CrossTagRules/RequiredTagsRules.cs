@@ -40,7 +40,7 @@ public sealed class DemolitionBombTypeRule : RequiredTagsRuleBase
 ///     <c>Error: (%s) You must specify an Attack_Animation!</c>, referenced by
 ///     exactly three classes: <c>ArcSweepAttackAbilityClass</c>,
 ///     <c>GenericAttackAbilityClass</c> and <c>EatAttackAbilityClass</c>
-///    . All 19 shipped instances across <c>eaw/</c> and <c>foc/</c> set the tag,
+///     . All 19 shipped instances across <c>eaw/</c> and <c>foc/</c> set the tag,
 ///     so the base game agrees with the engine and the rule is silent on vanilla data.
 /// </remarks>
 public sealed class ArcSweepAttackAnimationRule : RequiredTagsRuleBase

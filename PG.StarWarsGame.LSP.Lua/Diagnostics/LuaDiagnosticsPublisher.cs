@@ -31,17 +31,18 @@ namespace PG.StarWarsGame.LSP.Lua.Diagnostics;
 
 public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 {
+    private readonly ILuaAnalyzer? _analyzer;
+
+    // The analyzer's latest findings per document, already mapped to this server's ids.
+    private readonly ConcurrentDictionary<string, IReadOnlyList<LspDiagnostic>> _analyzerFindings =
+        new(DocumentUris.Comparer);
+
     private readonly ILspConfigurationProvider? _configProvider;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaDiagnosticsPublisher> _logger;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
-    private readonly ILuaAnalyzer? _analyzer;
     private readonly IGameWorkspaceHost _workspaceHost;
-
-    // The analyzer's latest findings per document, already mapped to this server's ids.
-    private readonly ConcurrentDictionary<string, IReadOnlyList<LspDiagnostic>> _analyzerFindings =
-        new(DocumentUris.Comparer);
 
     public LuaDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -92,6 +93,12 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         if (analyzer is not null) analyzer.DiagnosticsPublished += OnAnalyzerPublished;
     }
 
+    protected override string FileExtension => ".lua";
+
+    // Feature-flag gate: a null provider (test convenience ctor) means always enabled.
+    protected override bool DiagnosticsEnabled =>
+        _configProvider?.Current.Features.Lua.Diagnostics ?? true;
+
     // The analyzer reports on its own schedule, per document: keep the kept findings and publish
     // that document again, so the editor sees one set from one server.
     private void OnAnalyzerPublished(LspPublishParams p)
@@ -106,12 +113,6 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
             .ToList();
         RepublishDocument(uri);
     }
-
-    protected override string FileExtension => ".lua";
-
-    // Feature-flag gate: a null provider (test convenience ctor) means always enabled.
-    protected override bool DiagnosticsEnabled =>
-        _configProvider?.Current.Features.Lua.Diagnostics ?? true;
 
     protected override void PublishForDocument(string uri, string text, GameIndex index)
     {

@@ -11,7 +11,7 @@
 // 10 declare `_Dropoff` with `_Dropoff_Tiers` of 3, 4 or 5, and `_Max_Victims` appears on 2. So a
 // flat blast inside a radius is the normal case and tiered falloff is the exception.
 
-import type { PreviewProjectile } from '../../protocol/modelPreview';
+import type { PreviewProjectile } from "../../protocol/modelPreview";
 
 /** A hardpoint and how far it is from where the shot landed, in engine units. */
 export interface BlastCandidate {
@@ -64,20 +64,27 @@ export function blastVictims(
     const blast = projectile.blastAreaDamage ?? 0;
 
     if (range <= 0 || blast <= 0) {
-        return [{
-            id: targetId, directDamage: direct, blastDamage: 0, tier: null,
-            wasted: destroyed.has(targetId),
-        }];
+        return [
+            {
+                id: targetId,
+                directDamage: direct,
+                blastDamage: 0,
+                tier: null,
+                wasted: destroyed.has(targetId),
+            },
+        ];
     }
 
-    const tiers = projectile.blastAreaDropoff ? projectile.blastAreaDropoffTiers ?? null : null;
+    const tiers = projectile.blastAreaDropoff
+        ? (projectile.blastAreaDropoffTiers ?? null)
+        : null;
 
     // The target, whether or not anything could be LOCATED. `candidatesFrom` returns an empty list
     // when the target's own bone position is unknown - a part whose geometry has not loaded, a
     // hardpoint with no attachment bone - and every shot comes through here now that the attacker
     // carries its own blast. Without this, such a shot vanished: no direct damage, no blast, and
     // nothing on screen to say why. The rule above already said the target is always included.
-    const withTarget = candidates.some(c => c.id === targetId)
+    const withTarget = candidates.some((c) => c.id === targetId)
         ? candidates
         : [{ id: targetId, distance: 0 }, ...candidates];
 
@@ -87,7 +94,7 @@ export function blastVictims(
     // against a ship that has already lost hardpoints: the more wreckage inside the radius, the more
     // of every blast is thrown away.
     const inRange = withTarget
-        .filter(c => c.id === targetId || c.distance <= range)
+        .filter((c) => c.id === targetId || c.distance <= range)
         .sort((a, b) => a.distance - b.distance);
 
     // DIVIDED, not repeated. `blast * falloff / count` per victim, so the total a blast delivers is
@@ -97,11 +104,18 @@ export function blastVictims(
     // distance sets only the delay before its share lands.
     const share = inRange.length > 0 ? 1 / inRange.length : 0;
 
-    const caught = inRange.map(c => ({
+    const caught = inRange.map((c) => ({
         id: c.id,
         directDamage: c.id === targetId ? direct : 0,
-        blastDamage: blast * share * blastShare(
-            0, range, projectile.blastAreaDropoff, projectile.blastAreaDropoffTiers),
+        blastDamage:
+            blast *
+            share *
+            blastShare(
+                0,
+                range,
+                projectile.blastAreaDropoff,
+                projectile.blastAreaDropoffTiers,
+            ),
         tier: tiers === null ? null : bandOf(c.distance, range, tiers),
         /** Whether this share lands on wreckage and is thrown away. */
         wasted: destroyed.has(c.id),
@@ -125,9 +139,18 @@ export function blastVictims(
  * confirmed. It affects 10 projectiles in the whole of foc.
  */
 export function blastShare(
-    distance: number, range: number, dropoff: boolean, tiers: number | null | undefined,
+    distance: number,
+    range: number,
+    dropoff: boolean,
+    tiers: number | null | undefined,
 ): number {
-    if (!dropoff || tiers === null || tiers === undefined || tiers <= 0 || range <= 0) {
+    if (
+        !dropoff ||
+        tiers === null ||
+        tiers === undefined ||
+        tiers <= 0 ||
+        range <= 0
+    ) {
         return 1;
     }
 
@@ -156,7 +179,8 @@ export interface Point3 {
  * them. If the TARGET has no position there is nothing to measure from, so nothing is caught.
  */
 export function candidatesFrom(
-    positions: Readonly<Record<string, Point3 | null>>, targetId: string,
+    positions: Readonly<Record<string, Point3 | null>>,
+    targetId: string,
 ): BlastCandidate[] {
     const origin = positions[targetId] ?? null;
 
@@ -168,6 +192,10 @@ export function candidatesFrom(
         .filter((entry): entry is [string, Point3] => entry[1] !== null)
         .map(([id, at]) => ({
             id,
-            distance: Math.hypot(at.x - origin.x, at.y - origin.y, at.z - origin.z),
+            distance: Math.hypot(
+                at.x - origin.x,
+                at.y - origin.y,
+                at.z - origin.z,
+            ),
         }));
 }

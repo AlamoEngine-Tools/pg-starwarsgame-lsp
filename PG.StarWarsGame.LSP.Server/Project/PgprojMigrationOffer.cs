@@ -36,13 +36,6 @@ public sealed class PgprojMigrationOffer(
 
     private readonly ConcurrentQueue<Pending> _pending = new();
 
-    public void Migrated(string pgprojPath, JsonNode migrated, IReadOnlyList<string> notices)
-    {
-        // Queued rather than asked here: this runs inside a load, during startup or a reload, where
-        // a question is either ignored or asked several times over.
-        _pending.Enqueue(new Pending(pgprojPath, migrated, notices));
-    }
-
     /// <summary>Asks about everything migrated since the last call. Never throws.</summary>
     public async Task OfferPendingAsync(CancellationToken ct)
     {
@@ -61,6 +54,13 @@ public sealed class PgprojMigrationOffer(
                 logger.LogWarning(ex, "Could not offer to update '{Path}'", pending.Path);
             }
         }
+    }
+
+    public void Migrated(string pgprojPath, JsonNode migrated, IReadOnlyList<string> notices)
+    {
+        // Queued rather than asked here: this runs inside a load, during startup or a reload, where
+        // a question is either ignored or asked several times over.
+        _pending.Enqueue(new Pending(pgprojPath, migrated, notices));
     }
 
     private async Task OfferAsync(Pending pending, CancellationToken ct)

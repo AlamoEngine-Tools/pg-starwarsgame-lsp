@@ -14,17 +14,24 @@
 //     |- once  Death_Explosion_Particles
 //     '- if Engine_Death_Hide_Engine_Particles: put the engine glow out
 
-import { PREVIEW_PARTICLE_GATE, type PreviewHardpoint } from '../../protocol/modelPreview';
+import {
+    PREVIEW_PARTICLE_GATE,
+    type PreviewHardpoint,
+} from "../../protocol/modelPreview";
 
 /** The ids of the hardpoints currently blown off. */
 export type Destroyed = ReadonlySet<string>;
 
 /** Whether an attached part should be hidden, because the hardpoint holding it is gone. */
 export function partHidden(
-    partId: string, hardpoints: readonly PreviewHardpoint[], destroyed: Destroyed,
+    partId: string,
+    hardpoints: readonly PreviewHardpoint[],
+    destroyed: Destroyed,
 ): boolean {
     return hardpoints.some(
-        hardpoint => hardpoint.partId === partId && destroyed.has(hardpoint.id));
+        (hardpoint) =>
+            hardpoint.partId === partId && destroyed.has(hardpoint.id),
+    );
 }
 
 /**
@@ -46,7 +53,10 @@ export interface EffectGate {
  * `startsVisible` always has the final say: an effect the model itself ships switched off - like
  * `pi_damage_elec_SD00` - must not appear just because something was destroyed.
  */
-export function effectPlays(particle: EffectGate, destroyed: Destroyed): boolean {
+export function effectPlays(
+    particle: EffectGate,
+    destroyed: Destroyed,
+): boolean {
     // The proxy's own default. Separate from the damage question below, and separable: an ability
     // proxy ships switched off precisely BECAUSE its ability is what turns it on, so a caller that
     // has a better answer than the default asks `hardpointGateAllows` instead.
@@ -67,7 +77,10 @@ export function effectPlays(particle: EffectGate, destroyed: Destroyed): boolean
  * damage gate still applies either way: smoke that belongs to a destroyed hardpoint must not appear
  * just because an ability is on.
  */
-export function hardpointGateAllows(particle: EffectGate, destroyed: Destroyed): boolean {
+export function hardpointGateAllows(
+    particle: EffectGate,
+    destroyed: Destroyed,
+): boolean {
     const owner = particle.hardpointId ?? null;
 
     if (particle.gate === PREVIEW_PARTICLE_GATE.hardpointDestroyed) {
@@ -89,13 +102,14 @@ export function hardpointGateAllows(particle: EffectGate, destroyed: Destroyed):
  * until the hardpoint is destroyed; the preview starts them hidden for the same reason.
  */
 export function decalNames(
-    hardpoints: readonly PreviewHardpoint[], destroyed: Destroyed,
+    hardpoints: readonly PreviewHardpoint[],
+    destroyed: Destroyed,
 ): ReadonlySet<string> {
     const names = new Set<string>();
 
     for (const hardpoint of hardpoints) {
-        const decal = hardpoint.damageDecalBone ?? '';
-        if (decal !== '' && destroyed.has(hardpoint.id)) {
+        const decal = hardpoint.damageDecalBone ?? "";
+        if (decal !== "" && destroyed.has(hardpoint.id)) {
             names.add(decal.toLowerCase());
         }
     }
@@ -125,9 +139,12 @@ export function collisionMeshNames(
     const names = new Set<string>();
 
     for (const hardpoint of hardpoints) {
-        const mesh = (hardpoint.collisionMeshBone ?? '').toLowerCase();
+        const mesh = (hardpoint.collisionMeshBone ?? "").toLowerCase();
 
-        if (mesh !== '' && mesh !== (hardpoint.attachBone ?? '').toLowerCase()) {
+        if (
+            mesh !== "" &&
+            mesh !== (hardpoint.attachBone ?? "").toLowerCase()
+        ) {
             names.add(mesh);
         }
     }
@@ -141,8 +158,10 @@ export function collisionMeshNames(
  * The rest are still listed, marked as indestructible rather than quietly inert - a shield generator
  * that cannot be shot off is a fact the author wants to see.
  */
-export function destroyable(hardpoints: readonly PreviewHardpoint[]): PreviewHardpoint[] {
-    return hardpoints.filter(hardpoint => hardpoint.isDestroyable);
+export function destroyable(
+    hardpoints: readonly PreviewHardpoint[],
+): PreviewHardpoint[] {
+    return hardpoints.filter((hardpoint) => hardpoint.isDestroyable);
 }
 
 /** What decides whether an effect is running the moment the model opens. */
@@ -216,11 +235,15 @@ export function playsOnOpen(effect: OpeningEffect): boolean {
  * fires and dust stay off until they are asked for, while its engines run. A gated one is left to
  * {@link effectPlays}: damage smoke lights when its hardpoint dies, however it is named.
  */
-export function effectPlaysNow(effect: OpeningEffect, destroyed: Destroyed): boolean {
+export function effectPlaysNow(
+    effect: OpeningEffect,
+    destroyed: Destroyed,
+): boolean {
     if (!effectPlays(effect, destroyed)) {
         return false;
     }
 
-    return effect.gate === PREVIEW_PARTICLE_GATE.always ? playsOnOpen(effect) : true;
+    return effect.gate === PREVIEW_PARTICLE_GATE.always
+        ? playsOnOpen(effect)
+        : true;
 }
-

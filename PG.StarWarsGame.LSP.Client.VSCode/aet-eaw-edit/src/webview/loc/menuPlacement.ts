@@ -33,21 +33,26 @@ export function placeMenu(
     return {
         left: axis(anchor.x, size.width, viewport.width),
         top: axis(anchor.y, size.height, viewport.height),
-        maxHeight: size.height > viewport.height - MARGIN * 2
-            ? viewport.height - MARGIN * 2
-            : null,
+        maxHeight:
+            size.height > viewport.height - MARGIN * 2
+                ? viewport.height - MARGIN * 2
+                : null,
     };
 }
 
 function axis(at: number, extent: number, available: number): number {
     // Fits going forward - the ordinary case.
-    if (at + extent <= available - MARGIN) { return at; }
+    if (at + extent <= available - MARGIN) {
+        return at;
+    }
 
     // Flip to the other side of the pointer. The flipped menu ends at the pointer, so this only
     // helps when the pointer is itself inside the window - which is not a given, since the anchor
     // is whatever coordinate the caller passed.
     const flipped = at - extent;
-    if (flipped >= MARGIN && at <= available - MARGIN) { return flipped; }
+    if (flipped >= MARGIN && at <= available - MARGIN) {
+        return flipped;
+    }
 
     // Fits neither way: clamp inside the window.
     return Math.max(MARGIN, available - extent - MARGIN);

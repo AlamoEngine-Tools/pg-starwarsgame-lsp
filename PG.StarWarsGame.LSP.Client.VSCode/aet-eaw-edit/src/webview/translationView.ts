@@ -7,12 +7,16 @@
 // Nothing here is reachable from the credits editor, which is the point: sorting and duplicate-key
 // counting are both meaningless in a file whose order is content and whose keys repeat by design.
 
-import { LocRow } from './loc/locRow';
+import { LocRow } from "./loc/locRow";
 
 /** 'key', or a language identifier. */
 export type SortColumn = string;
-export type SortDirection = 'asc' | 'desc';
-export interface SortState { column: SortColumn; direction: SortDirection; }
+export type SortDirection = "asc" | "desc";
+
+export interface SortState {
+    column: SortColumn;
+    direction: SortDirection;
+}
 
 /**
  * Orders rows for display.
@@ -22,11 +26,18 @@ export interface SortState { column: SortColumn; direction: SortDirection; }
  * the file has on disk.
  */
 export function sortRows(rows: LocRow[], sort: SortState | null): LocRow[] {
-    if (sort === null) { return rows; }
+    if (sort === null) {
+        return rows;
+    }
 
     return [...rows].sort((a, b) => {
-        const compared = compare(sortKeyOf(a, sort.column), sortKeyOf(b, sort.column));
-        if (compared !== 0) { return sort.direction === 'asc' ? compared : -compared; }
+        const compared = compare(
+            sortKeyOf(a, sort.column),
+            sortKeyOf(b, sort.column),
+        );
+        if (compared !== 0) {
+            return sort.direction === "asc" ? compared : -compared;
+        }
         // Equal cells fall back to document order, in both directions: identity is the index, and
         // rows that look alike should not shuffle between renders.
         return a.index - b.index;
@@ -39,9 +50,16 @@ export function sortRows(rows: LocRow[], sort: SortState | null): LocRow[] {
  * The third state is not cycling back to ascending because document order is the order on disk,
  * and without it there would be no way to return to the view the file actually has.
  */
-export function nextSort(current: SortState | null, column: SortColumn): SortState | null {
-    if (current === null || current.column !== column) { return { column, direction: 'asc' }; }
-    if (current.direction === 'asc') { return { column, direction: 'desc' }; }
+export function nextSort(
+    current: SortState | null,
+    column: SortColumn,
+): SortState | null {
+    if (current === null || current.column !== column) {
+        return { column, direction: "asc" };
+    }
+    if (current.direction === "asc") {
+        return { column, direction: "desc" };
+    }
     return null;
 }
 
@@ -56,7 +74,11 @@ export function countDuplicateKeys(rows: LocRow[]): number {
     const seen = new Set<string>();
     let duplicates = 0;
     for (const row of rows) {
-        if (seen.has(row.key)) { duplicates++; } else { seen.add(row.key); }
+        if (seen.has(row.key)) {
+            duplicates++;
+        } else {
+            seen.add(row.key);
+        }
     }
     return duplicates;
 }
@@ -67,14 +89,19 @@ export function countDuplicateKeys(rows: LocRow[]): number {
  * Do not "fix" this by pushing blanks to the end.
  */
 function sortKeyOf(row: LocRow, column: SortColumn): string {
-    if (column === 'key') { return row.key; }
+    if (column === "key") {
+        return row.key;
+    }
     // A row that does not carry the language sorts as empty rather than being dropped or thrown
     // to an arbitrary end - the same place an explicitly empty cell goes.
-    return row.values.find(v => v.language === column)?.value ?? '';
+    return row.values.find((v) => v.language === column)?.value ?? "";
 }
 
 function compare(a: string, b: string): number {
     // Numeric so TEXT_ITEM_2 precedes TEXT_ITEM_10, and base sensitivity so case and accents do not
     // split names that read as neighbours.
-    return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    return a.localeCompare(b, undefined, {
+        numeric: true,
+        sensitivity: "base",
+    });
 }

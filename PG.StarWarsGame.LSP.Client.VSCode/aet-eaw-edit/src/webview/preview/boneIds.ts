@@ -22,7 +22,7 @@ export type BoneId = string;
 
 /** The name a person reads, with the exporter's disambiguator taken off. */
 export function displayName(id: BoneId): string {
-    const hash = id.lastIndexOf('#');
+    const hash = id.lastIndexOf("#");
 
     // The LAST hash is the exporter's. A bone may legitimately carry one of its own - `Crusher#0` is
     // a real sub-mesh name on the rancor - so splitting on the first would cut the name in half.
@@ -31,8 +31,8 @@ export function displayName(id: BoneId): string {
 
 /** The skeleton index the id carries, or null when it is a bare name. */
 export function boneIndexOf(id: BoneId): number | null {
-    const hash = id.lastIndexOf('#');
-    const tail = hash > 0 ? id.slice(hash + 1) : '';
+    const hash = id.lastIndexOf("#");
+    const tail = hash > 0 ? id.slice(hash + 1) : "";
 
     return isIndex(tail) ? Number.parseInt(tail, 10) : null;
 }
@@ -47,11 +47,14 @@ export function boneIndexOf(id: BoneId): number | null {
  *
  * Case-insensitive throughout: the engine uppercases bone names and the files do not.
  */
-export function resolveBoneId(ids: Iterable<BoneId>, key: string): BoneId | undefined {
+export function resolveBoneId(
+    ids: Iterable<BoneId>,
+    key: string,
+): BoneId | undefined {
     const all = [...ids];
     const wanted = key.toLowerCase();
 
-    const exact = all.find(id => id.toLowerCase() === wanted);
+    const exact = all.find((id) => id.toLowerCase() === wanted);
     if (exact !== undefined) {
         return exact;
     }
@@ -59,8 +62,13 @@ export function resolveBoneId(ids: Iterable<BoneId>, key: string): BoneId | unde
     // Sorted, so a model with two bones of one name resolves the bare name the same way twice.
     const named = [...all].sort();
 
-    return named.find(id => displayName(id).toLowerCase() === wanted)
-        ?? named.find(id => displayName(id).toLowerCase().replaceAll('.', '') === wanted);
+    return (
+        named.find((id) => displayName(id).toLowerCase() === wanted) ??
+        named.find(
+            (id) =>
+                displayName(id).toLowerCase().replaceAll(".", "") === wanted,
+        )
+    );
 }
 
 function isIndex(value: string): boolean {

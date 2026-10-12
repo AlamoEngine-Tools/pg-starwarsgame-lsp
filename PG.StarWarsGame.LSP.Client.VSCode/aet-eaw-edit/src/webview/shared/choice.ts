@@ -14,7 +14,7 @@
 // it would still demand an angle for one variant and reject it for the other, so the union would
 // survive, just hidden one level down.
 
-import { type IconName } from './Icon';
+import { type IconName } from "./Icon";
 
 /**
  * One option in a one-of-N choice.

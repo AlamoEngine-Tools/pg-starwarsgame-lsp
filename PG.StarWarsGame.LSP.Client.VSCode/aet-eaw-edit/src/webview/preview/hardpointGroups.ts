@@ -10,7 +10,7 @@
 //
 // The same shape the story graph uses for its events and rewards.
 
-import { type HardpointCard } from './hardpointCards';
+import { type HardpointCard } from "./hardpointCards";
 
 /** One heading and the cards under it. */
 export interface HardpointGroup {
@@ -34,14 +34,15 @@ export interface HardpointGroup {
  * hull - an alphabet would throw it away and give nothing back.
  */
 export function groupHardpoints(
-    cards: readonly HardpointCard[], filter: string,
+    cards: readonly HardpointCard[],
+    filter: string,
 ): HardpointGroup[] {
     const wanted = filter.trim().toLowerCase();
 
     const matches = (card: HardpointCard): boolean =>
-        wanted === ''
-        || (card.type ?? '').toLowerCase().includes(wanted)
-        || card.id.toLowerCase().includes(wanted);
+        wanted === "" ||
+        (card.type ?? "").toLowerCase().includes(wanted) ||
+        card.id.toLowerCase().includes(wanted);
 
     const groups = new Map<string, HardpointGroup>();
 
@@ -50,11 +51,15 @@ export function groupHardpoints(
             continue;
         }
 
-        const type = card.type ?? '';
+        const type = card.type ?? "";
         const group = groups.get(type);
 
         if (group === undefined) {
-            groups.set(type, { type, label: typeLabel(card.type), cards: [card] });
+            groups.set(type, {
+                type,
+                label: typeLabel(card.type),
+                cards: [card],
+            });
         } else {
             group.cards.push(card);
         }
@@ -74,13 +79,17 @@ export function groupHardpoints(
  * type deserves the same heading as a shipped one.
  */
 export function typeLabel(type: string | null | undefined): string {
-    if (type === null || type === undefined || type.trim() === '') {
-        return 'No type declared';
+    if (type === null || type === undefined || type.trim() === "") {
+        return "No type declared";
     }
 
-    const words = type.replace(/^HARD_?POINT_/i, '').replace(/_/g, ' ').trim().toLowerCase();
+    const words = type
+        .replace(/^HARD_?POINT_/i, "")
+        .replace(/_/g, " ")
+        .trim()
+        .toLowerCase();
 
-    return words === '' ? type : words.charAt(0).toUpperCase() + words.slice(1);
+    return words === "" ? type : words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /**
@@ -92,7 +101,11 @@ export function typeLabel(type: string | null | undefined): string {
  * card the reader has filtered away.
  */
 export function groupOf(
-    groups: readonly HardpointGroup[], cardId: string,
+    groups: readonly HardpointGroup[],
+    cardId: string,
 ): string | null {
-    return groups.find(group => group.cards.some(card => card.id === cardId))?.type ?? null;
+    return (
+        groups.find((group) => group.cards.some((card) => card.id === cardId))
+            ?.type ?? null
+    );
 }

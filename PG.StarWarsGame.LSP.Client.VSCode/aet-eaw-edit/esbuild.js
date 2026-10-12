@@ -20,12 +20,12 @@ const watch = process.argv.includes('--watch');
  * published extension (it only works in dev because the folder happens to exist locally).
  */
 function copyCodicons() {
-  const source = path.join(__dirname, 'node_modules', '@vscode', 'codicons', 'dist');
-  const target = path.join(__dirname, 'out', 'codicons');
-  fs.mkdirSync(target, { recursive: true });
-  for (const file of ['codicon.css', 'codicon.ttf']) {
-    fs.copyFileSync(path.join(source, file), path.join(target, file));
-  }
+    const source = path.join(__dirname, 'node_modules', '@vscode', 'codicons', 'dist');
+    const target = path.join(__dirname, 'out', 'codicons');
+    fs.mkdirSync(target, {recursive: true});
+    for (const file of ['codicon.css', 'codicon.ttf']) {
+        fs.copyFileSync(path.join(source, file), path.join(target, file));
+    }
 }
 
 /**
@@ -34,83 +34,89 @@ function copyCodicons() {
  * @returns {import('esbuild').Plugin}
  */
 const problemMatcherPlugin = (emitSentinels) => ({
-  name: 'esbuild-problem-matcher',
-  setup(build) {
-    build.onStart(() => { if (emitSentinels) { console.log('[watch] build started'); } });
-    build.onEnd((result) => {
-      for (const { text, location } of result.errors) {
-        if (location) {
-          console.error(`    ${location.file}:${location.line}:${location.column}: error: ${text}`);
-        } else {
-          console.error(`    error: ${text}`);
-        }
-      }
-      if (emitSentinels) { console.log('[watch] build finished'); }
-    });
-  },
+    name: 'esbuild-problem-matcher',
+    setup(build) {
+        build.onStart(() => {
+            if (emitSentinels) {
+                console.log('[watch] build started');
+            }
+        });
+        build.onEnd((result) => {
+            for (const {text, location} of result.errors) {
+                if (location) {
+                    console.error(`    ${location.file}:${location.line}:${location.column}: error: ${text}`);
+                } else {
+                    console.error(`    error: ${text}`);
+                }
+            }
+            if (emitSentinels) {
+                console.log('[watch] build finished');
+            }
+        });
+    },
 });
 
 async function main() {
-  copyCodicons();
+    copyCodicons();
 
-  // The webview bundle builds first (and fully, in watch mode too) so the sentinel-emitting
-  // extension context always signals "finished" last.
-  const webviewCtx = await esbuild.context({
-    // One context, one entry per webview: watch mode then covers both, and both share the same
-    // browser/iife settings. outdir rather than outfile because there is more than one output.
-    entryPoints: [
-      'src/webview/storyGraph.tsx',
-      'src/webview/translationEditor.tsx',
-      'src/webview/creditsEditor.tsx',
-      'src/webview/creditsPreview.tsx',
-      'src/webview/encyclopediaPreview.tsx',
-      'src/webview/modelPreview.tsx',
-      'src/webview/modelInspector.tsx',
-    ],
-    bundle: true,
-    format: 'iife',
-    platform: 'browser',
-    outdir: 'out/webview',
-    // The missing-texture marker is imported as a data URI: the webview's localResourceRoots only
-    // cover out/, so a file under resources/ is not addressable from it at all.
-    loader: { '.png': 'dataurl' },
-    // The auto-arrange plugin imports the node-flavoured elkjs entry (worker files); the
-    // bundled build is the self-contained browser variant with the same ELK constructor.
-    alias: { elkjs: 'elkjs/lib/elk.bundled.js' },
-    define: { 'process.env.NODE_ENV': production ? '"production"' : '"development"' },
-    minify: production,
-    sourcemap: !production,
-    sourcesContent: false,
-    logLevel: 'silent',
-    plugins: [problemMatcherPlugin(false)],
-  });
+    // The webview bundle builds first (and fully, in watch mode too) so the sentinel-emitting
+    // extension context always signals "finished" last.
+    const webviewCtx = await esbuild.context({
+        // One context, one entry per webview: watch mode then covers both, and both share the same
+        // browser/iife settings. outdir rather than outfile because there is more than one output.
+        entryPoints: [
+            'src/webview/storyGraph.tsx',
+            'src/webview/translationEditor.tsx',
+            'src/webview/creditsEditor.tsx',
+            'src/webview/creditsPreview.tsx',
+            'src/webview/encyclopediaPreview.tsx',
+            'src/webview/modelPreview.tsx',
+            'src/webview/modelInspector.tsx',
+        ],
+        bundle: true,
+        format: 'iife',
+        platform: 'browser',
+        outdir: 'out/webview',
+        // The missing-texture marker is imported as a data URI: the webview's localResourceRoots only
+        // cover out/, so a file under resources/ is not addressable from it at all.
+        loader: {'.png': 'dataurl'},
+        // The auto-arrange plugin imports the node-flavoured elkjs entry (worker files); the
+        // bundled build is the self-contained browser variant with the same ELK constructor.
+        alias: {elkjs: 'elkjs/lib/elk.bundled.js'},
+        define: {'process.env.NODE_ENV': production ? '"production"' : '"development"'},
+        minify: production,
+        sourcemap: !production,
+        sourcesContent: false,
+        logLevel: 'silent',
+        plugins: [problemMatcherPlugin(false)],
+    });
 
-  const ctx = await esbuild.context({
-    entryPoints: ['src/extension.ts'],
-    bundle: true,
-    format: 'cjs',
-    platform: 'node',
-    outfile: 'out/extension.js',
-    external: ['vscode'],
-    minify: production,
-    sourcemap: !production,
-    sourcesContent: false,
-    logLevel: 'silent',
-    plugins: [problemMatcherPlugin(true)],
-  });
+    const ctx = await esbuild.context({
+        entryPoints: ['src/extension.ts'],
+        bundle: true,
+        format: 'cjs',
+        platform: 'node',
+        outfile: 'out/extension.js',
+        external: ['vscode'],
+        minify: production,
+        sourcemap: !production,
+        sourcesContent: false,
+        logLevel: 'silent',
+        plugins: [problemMatcherPlugin(true)],
+    });
 
-  if (watch) {
-    await webviewCtx.watch();
-    await ctx.watch();
-  } else {
-    await webviewCtx.rebuild();
-    await webviewCtx.dispose();
-    await ctx.rebuild();
-    await ctx.dispose();
-  }
+    if (watch) {
+        await webviewCtx.watch();
+        await ctx.watch();
+    } else {
+        await webviewCtx.rebuild();
+        await webviewCtx.dispose();
+        await ctx.rebuild();
+        await ctx.dispose();
+    }
 }
 
 main().catch((e) => {
-  console.error(e);
-  process.exit(1);
+    console.error(e);
+    process.exit(1);
 });

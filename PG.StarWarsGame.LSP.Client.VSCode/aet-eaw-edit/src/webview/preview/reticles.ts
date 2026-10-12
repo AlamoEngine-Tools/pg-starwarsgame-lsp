@@ -12,7 +12,11 @@
 // keeps the mark the same size when the panel is made wider, which is how the rest of the game's
 // HUD behaves. If it turns out to be width, this is the one function to change.
 
-import type { PreviewHardpoint, PreviewReticleStates, PreviewReticles } from '../../protocol/modelPreview';
+import type {
+    PreviewHardpoint,
+    PreviewReticles,
+    PreviewReticleStates,
+} from "../../protocol/modelPreview";
 
 /** Which of the seven states a hardpoint is being shown in. */
 export type ReticleState = keyof PreviewReticleStates;
@@ -25,13 +29,13 @@ export type ReticleState = keyof PreviewReticleStates;
  * for the disabled pair - a mod giving them separate art has nowhere else to see it.
  */
 export const RETICLE_STATES: readonly { id: ReticleState; label: string }[] = [
-    { id: 'enemy', label: 'Enemy' },
-    { id: 'enemyTracked', label: 'Enemy, tracked' },
-    { id: 'friendly', label: 'Friendly' },
-    { id: 'friendlyTracked', label: 'Friendly, tracked' },
-    { id: 'friendlyRepairing', label: 'Repairing' },
-    { id: 'friendlyDisabled', label: 'Disabled' },
-    { id: 'friendlyDisabledTracked', label: 'Disabled, tracked' },
+    { id: "enemy", label: "Enemy" },
+    { id: "enemyTracked", label: "Enemy, tracked" },
+    { id: "friendly", label: "Friendly" },
+    { id: "friendlyTracked", label: "Friendly, tracked" },
+    { id: "friendlyRepairing", label: "Repairing" },
+    { id: "friendlyDisabled", label: "Disabled" },
+    { id: "friendlyDisabledTracked", label: "Disabled, tracked" },
 ];
 
 /** One mark the viewport projects and draws. */
@@ -102,10 +106,10 @@ export function healthColour(fraction: number | null | undefined): string {
  * strict `>` would fall off the end of the list.
  */
 const RAMP: readonly (readonly [number, string])[] = [
-    [0.75, '#3cd63c'],
-    [0.5, '#d6d63c'],
-    [0.25, '#e08a20'],
-    [-1, '#e02020'],
+    [0.75, "#3cd63c"],
+    [0.5, "#d6d63c"],
+    [0.25, "#e08a20"],
+    [-1, "#e02020"],
 ];
 
 /**
@@ -138,11 +142,13 @@ export function reticleMarks(
             continue;
         }
 
-        const type = hardpoint.type ?? '';
+        const type = hardpoint.type ?? "";
 
         // EXACTLY as the hardpoint spells it. A case-insensitive scan would have papered over the
         // camel-cased keys the wire used to send, and left the real defect on the server.
-        const states = Object.hasOwn(reticles.byType, type) ? reticles.byType[type] : undefined;
+        const states = Object.hasOwn(reticles.byType, type)
+            ? reticles.byType[type]
+            : undefined;
         const icon = states?.[state] ?? null;
 
         if (icon === null || !Object.hasOwn(reticles.icons, icon)) {
@@ -151,9 +157,10 @@ export function reticleMarks(
 
         // The tracked twin of whatever state is being shown, for the hover.
         const trackedIcon = states?.[trackedStateOf(state)] ?? null;
-        const trackedUri = trackedIcon !== null && Object.hasOwn(reticles.icons, trackedIcon)
-            ? reticles.icons[trackedIcon]
-            : reticles.icons[icon];
+        const trackedUri =
+            trackedIcon !== null && Object.hasOwn(reticles.icons, trackedIcon)
+                ? reticles.icons[trackedIcon]
+                : reticles.icons[icon];
 
         // The mark is attached to the ATTACHMENT BONE, which belongs to whatever the hardpoint is attached
         // TO - the hull, in every shipped case - not to the attached model.
@@ -162,14 +169,18 @@ export function reticleMarks(
 
         marks.push({
             hardpointId: hardpoint.id,
-            partId: 'hull',
+            partId: "hull",
             bone: hardpoint.attachBone ?? null,
             type,
             iconUri: reticles.icons[icon],
             trackedUri,
-            healthFraction: full === null || full <= 0 || left === null || left === undefined
-                ? null
-                : Math.min(1, Math.max(0, left / full)),
+            healthFraction:
+                full === null ||
+                full <= 0 ||
+                left === null ||
+                left === undefined
+                    ? null
+                    : Math.min(1, Math.max(0, left / full)),
         });
     }
 
@@ -184,10 +195,14 @@ export function reticleMarks(
  */
 export function trackedStateOf(state: ReticleState): ReticleState {
     switch (state) {
-        case 'enemy': return 'enemyTracked';
-        case 'friendly': return 'friendlyTracked';
-        case 'friendlyDisabled': return 'friendlyDisabledTracked';
-        default: return state;
+        case "enemy":
+            return "enemyTracked";
+        case "friendly":
+            return "friendlyTracked";
+        case "friendlyDisabled":
+            return "friendlyDisabledTracked";
+        default:
+            return state;
     }
 }
 
@@ -204,7 +219,9 @@ const ASSUMED_HEIGHT = 720;
  * `0`, and a mark of no pixels is indistinguishable from one that failed to load.
  */
 export function reticleSizePx(
-    screenSize: number | null | undefined, _width: number, height: number,
+    screenSize: number | null | undefined,
+    _width: number,
+    height: number,
 ): number {
     const usable = height > 0 ? height : ASSUMED_HEIGHT;
     const fraction = screenSize ?? 0;
@@ -214,9 +231,10 @@ export function reticleSizePx(
 
 /** The size to use for one state: the friendly figure for the friendly states, enemy otherwise. */
 export function reticleScreenSize(
-    reticles: PreviewReticles | null | undefined, state: ReticleState,
+    reticles: PreviewReticles | null | undefined,
+    state: ReticleState,
 ): number | null | undefined {
-    return state.startsWith('friendly')
+    return state.startsWith("friendly")
         ? reticles?.friendlyScreenSize
         : reticles?.enemyScreenSize;
 }
@@ -233,15 +251,25 @@ export function reticleScreenSize(
  * images, and a scene is perfectly usable without them.
  */
 export function reticleFor(
-    reticles: { byType?: Record<string, PreviewReticleStates>; icons?: Record<string, string> }
-        | null | undefined,
+    reticles:
+        | {
+              byType?: Record<string, PreviewReticleStates>;
+              icons?: Record<string, string>;
+          }
+        | null
+        | undefined,
     type: string | null | undefined,
 ): string | null {
-    if (reticles === null || reticles === undefined || type === null || type === undefined) {
+    if (
+        reticles === null ||
+        reticles === undefined ||
+        type === null ||
+        type === undefined
+    ) {
         return null;
     }
 
     const icon = reticles.byType?.[type]?.enemy ?? null;
 
-    return icon === null ? null : reticles.icons?.[icon] ?? null;
+    return icon === null ? null : (reticles.icons?.[icon] ?? null);
 }

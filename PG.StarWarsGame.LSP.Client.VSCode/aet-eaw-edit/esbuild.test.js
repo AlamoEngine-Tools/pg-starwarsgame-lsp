@@ -17,7 +17,7 @@ const watch = process.argv.includes('--watch');
 /** Every *.test.ts under src, so adding a test file needs no build change. */
 function findTests(dir) {
     const results = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
             results.push(...findTests(full));
@@ -37,9 +37,9 @@ async function main() {
 
     const options = {
         entryPoints,
-    // The missing-texture marker is imported as a data URI: the webview's localResourceRoots only
-    // cover out/, so a file under resources/ is not addressable from it at all.
-    loader: { '.png': 'dataurl' },
+        // The missing-texture marker is imported as a data URI: the webview's localResourceRoots only
+        // cover out/, so a file under resources/ is not addressable from it at all.
+        loader: {'.png': 'dataurl'},
         bundle: true,
         format: 'cjs',
         platform: 'node',

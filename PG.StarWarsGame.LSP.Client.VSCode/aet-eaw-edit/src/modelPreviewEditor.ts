@@ -8,10 +8,10 @@
 // the model. A command would leave the default binary editor as what happens by default, which is
 // the behaviour this replaces.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import { LspGateway } from './lsp/lspGateway';
-import { ModelPreviewPanel, PreviewSubject } from './modelPreviewPanel';
+import { LspGateway } from "./lsp/lspGateway";
+import { ModelPreviewPanel, PreviewSubject } from "./modelPreviewPanel";
 
 /**
  * A document with no content of its own.
@@ -21,24 +21,27 @@ import { ModelPreviewPanel, PreviewSubject } from './modelPreviewPanel';
  * answer to "which model is this".
  */
 class PreviewDocument implements vscode.CustomDocument {
-    constructor(readonly uri: vscode.Uri) { }
+    constructor(readonly uri: vscode.Uri) {}
 
     dispose(): void {
         // Nothing held.
     }
 }
 
-export class ModelPreviewEditorProvider implements vscode.CustomReadonlyEditorProvider {
+export class ModelPreviewEditorProvider
+    implements vscode.CustomReadonlyEditorProvider
+{
     /** Matches the `customEditors` contribution in package.json. */
-    static readonly viewType = 'aet-eaw-edit.modelPreview';
+    static readonly viewType = "aet-eaw-edit.modelPreview";
 
     constructor(
         private readonly extensionUri: vscode.Uri,
         private readonly lsp: LspGateway,
-    ) { }
+    ) {}
 
     static register(
-        context: vscode.ExtensionContext, lsp: LspGateway,
+        context: vscode.ExtensionContext,
+        lsp: LspGateway,
     ): vscode.Disposable {
         return vscode.window.registerCustomEditorProvider(
             ModelPreviewEditorProvider.viewType,
@@ -49,7 +52,8 @@ export class ModelPreviewEditorProvider implements vscode.CustomReadonlyEditorPr
                 webviewOptions: { retainContextWhenHidden: true },
                 // Two tabs on one model would mean two GPU contexts for the same picture.
                 supportsMultipleEditorsPerDocument: false,
-            });
+            },
+        );
     }
 
     openCustomDocument(uri: vscode.Uri): vscode.CustomDocument {
@@ -57,11 +61,16 @@ export class ModelPreviewEditorProvider implements vscode.CustomReadonlyEditorPr
     }
 
     resolveCustomEditor(
-        document: vscode.CustomDocument, panel: vscode.WebviewPanel,
+        document: vscode.CustomDocument,
+        panel: vscode.WebviewPanel,
     ): void {
         ModelPreviewPanel.adopt(
-            this.extensionUri, this.lsp, subjectFor(document.uri),
-            basename(document.uri), panel);
+            this.extensionUri,
+            this.lsp,
+            subjectFor(document.uri),
+            basename(document.uri),
+            panel,
+        );
     }
 }
 
@@ -75,13 +84,13 @@ export class ModelPreviewEditorProvider implements vscode.CustomReadonlyEditorPr
 function subjectFor(uri: vscode.Uri): PreviewSubject {
     const reference = uri.toString();
 
-    return uri.path.toLowerCase().endsWith('.ala')
-        ? { kind: 'animation', animationReference: reference }
-        : { kind: 'model', modelReference: reference };
+    return uri.path.toLowerCase().endsWith(".ala")
+        ? { kind: "animation", animationReference: reference }
+        : { kind: "model", modelReference: reference };
 }
 
 function basename(uri: vscode.Uri): string {
     const path = uri.path;
-    const slash = path.lastIndexOf('/');
+    const slash = path.lastIndexOf("/");
     return slash >= 0 ? path.slice(slash + 1) : path;
 }

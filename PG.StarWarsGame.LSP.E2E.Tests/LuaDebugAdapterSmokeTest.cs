@@ -36,16 +36,16 @@ public sealed class LuaDebugAdapterSmokeTest : IAsyncLifetime
                                       """;
 
     private static readonly TimeSpan Step = TimeSpan.FromSeconds(20);
+    private readonly List<BreakpointEvent> _breakpoints = [];
 
     private readonly FakeGameDebugServer _game = new();
     private readonly Lock _gate = new();
     private readonly List<StoppedEvent> _stopped = [];
-    private readonly List<BreakpointEvent> _breakpoints = [];
     private readonly List<TerminatedEvent> _terminated = [];
-    private string _root = null!;
+    private DebugAdapterClient _client = null!;
     private string _heroPath = null!;
     private Process _process = null!;
-    private DebugAdapterClient _client = null!;
+    private string _root = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -76,10 +76,7 @@ public sealed class LuaDebugAdapterSmokeTest : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         _client.Dispose();
-        if (!_process.HasExited)
-        {
-            _process.Kill();
-        }
+        if (!_process.HasExited) _process.Kill();
 
         await _process.WaitForExitAsync();
         _process.Dispose();
@@ -136,7 +133,7 @@ public sealed class LuaDebugAdapterSmokeTest : IAsyncLifetime
         Assert.Equal(2, stack.StackFrames!.Count());
         var top = stack.StackFrames!.First();
         Assert.Equal(4, top.Line);
-        Assert.Equal(_heroPath, top.Source!.Path, ignoreCase: true);
+        Assert.Equal(_heroPath, top.Source!.Path, true);
 
         var scopes = await SendAsync<ScopesResponse>("scopes", new ScopesArguments { FrameId = top.Id });
         var locals = Assert.Single(scopes.Scopes);
@@ -157,7 +154,7 @@ public sealed class LuaDebugAdapterSmokeTest : IAsyncLifetime
         Assert.Equal(LuaRunStates.Running, scripts.RunState);
         var script = Assert.Single(scripts.Scripts);
         Assert.Equal(Hero, script.ScriptId);
-        Assert.Equal(_heroPath, script.Path, ignoreCase: true);
+        Assert.Equal(_heroPath, script.Path, true);
 
         await SendAsync<DisconnectResponse>("disconnect", new DisconnectArguments());
         await WaitUntilAsync(() => _game.GoodbyeReceived);

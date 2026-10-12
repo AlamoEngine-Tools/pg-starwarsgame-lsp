@@ -20,7 +20,10 @@
  * Font names come from a mod's XML, so they are untrusted: quotes are stripped rather than emitted,
  * which stops a name from closing the CSS string and appending a declaration of its own.
  */
-export function gameFontStack(gameFontName: string, fallbacks: readonly string[]): string {
+export function gameFontStack(
+    gameFontName: string,
+    fallbacks: readonly string[],
+): string {
     const asked: string[] = [];
     const family = clean(gameFontName);
 
@@ -29,7 +32,7 @@ export function gameFontStack(gameFontName: string, fallbacks: readonly string[]
 
         // "EmpireAtWar-Bold" -> also try "EmpireAtWar". Only when it differs, so a name with no
         // suffix is not listed twice.
-        const base = family.split('-')[0].trim();
+        const base = family.split("-")[0].trim();
         if (base.length > 0 && base !== family) {
             asked.push(base);
         }
@@ -38,10 +41,10 @@ export function gameFontStack(gameFontName: string, fallbacks: readonly string[]
     const families = dedupe([
         ...asked,
         ...asked.flatMap(metricTwinsFor),
-        ...fallbacks.map(clean).filter(f => f.length > 0),
-        ...fallbacks.flatMap(f => metricTwinsFor(clean(f))),
+        ...fallbacks.map(clean).filter((f) => f.length > 0),
+        ...fallbacks.flatMap((f) => metricTwinsFor(clean(f))),
     ]);
-    return [...families.map(f => `'${f}'`), 'sans-serif'].join(', ');
+    return [...families.map((f) => `'${f}'`), "sans-serif"].join(", ");
 }
 
 /**
@@ -60,14 +63,14 @@ export function gameFontStack(gameFontName: string, fallbacks: readonly string[]
  * only whether the drawn text fits the space the card gives it.
  */
 const METRIC_TWINS: Readonly<Record<string, readonly string[]>> = {
-    'arial': ['Liberation Sans', 'Arimo', 'Helvetica'],
-    'helvetica': ['Liberation Sans', 'Arimo'],
-    'tahoma': ['DejaVu Sans', 'Verdana'],
-    'verdana': ['DejaVu Sans'],
-    'times new roman': ['Liberation Serif', 'Tinos'],
-    'courier new': ['Liberation Mono', 'Cousine'],
-    'trebuchet ms': ['Fira Sans', 'DejaVu Sans'],
-    'segoe ui': ['Selawik', 'DejaVu Sans'],
+    arial: ["Liberation Sans", "Arimo", "Helvetica"],
+    helvetica: ["Liberation Sans", "Arimo"],
+    tahoma: ["DejaVu Sans", "Verdana"],
+    verdana: ["DejaVu Sans"],
+    "times new roman": ["Liberation Serif", "Tinos"],
+    "courier new": ["Liberation Mono", "Cousine"],
+    "trebuchet ms": ["Fira Sans", "DejaVu Sans"],
+    "segoe ui": ["Selawik", "DejaVu Sans"],
 };
 
 function metricTwinsFor(family: string): readonly string[] {
@@ -76,7 +79,7 @@ function metricTwinsFor(family: string): readonly string[] {
 
 function dedupe(families: readonly string[]): string[] {
     const seen = new Set<string>();
-    return families.filter(f => {
+    return families.filter((f) => {
         const key = f.toLowerCase();
         if (seen.has(key)) {
             return false;
@@ -88,5 +91,5 @@ function dedupe(families: readonly string[]): string[] {
 
 /** A family name safe to sit inside a single-quoted CSS string. */
 function clean(name: string): string {
-    return name.replace(/['"\\]/g, '').trim();
+    return name.replace(/['"\\]/g, "").trim();
 }

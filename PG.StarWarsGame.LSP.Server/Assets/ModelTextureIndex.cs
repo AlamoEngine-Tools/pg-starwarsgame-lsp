@@ -3,9 +3,9 @@
 
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -34,8 +34,6 @@ public sealed class ModelTextureIndex(
     IGameIndexService index,
     ILogger<ModelTextureIndex> logger) : IModelTextureIndex, ICacheStatisticsSource
 {
-    private readonly IGameIndexService _index = index;
-
     /// <summary>
     ///     Parsed texture lists, by the reference as the XML wrote it.
     /// </summary>
@@ -46,6 +44,14 @@ public sealed class ModelTextureIndex(
     /// </remarks>
     private readonly ConcurrentDictionary<string, IReadOnlyList<string>> _cache =
         new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly IGameIndexService _index = index;
+
+    /// <summary>Models answered by parsing rather than by the catalog; never cleared in production.</summary>
+    public CacheStatistics Snapshot()
+    {
+        return new CacheStatistics("model-textures", _cache.Count);
+    }
 
     /// <inheritdoc />
     public IReadOnlyList<string> TexturesOf(string modelReference)
@@ -67,12 +73,6 @@ public sealed class ModelTextureIndex(
             return known;
 
         return _cache.GetOrAdd(reference, Read);
-    }
-
-    /// <summary>Models answered by parsing rather than by the catalog; never cleared in production.</summary>
-    public CacheStatistics Snapshot()
-    {
-        return new CacheStatistics("model-textures", _cache.Count);
     }
 
     /// <summary>Forgets everything, for when the asset layers underneath have moved.</summary>

@@ -18,14 +18,27 @@
  * No ellipsis: at this zoom every character is worth more than a marker saying characters are
  * missing, and the view is plainly schematic already.
  */
-export function fitLabel(text: string, maxWidth: number, measure: (s: string) => number): string {
-    if (maxWidth <= 0) { return ''; }
-    if (measure(text) <= maxWidth) { return text; }
+export function fitLabel(
+    text: string,
+    maxWidth: number,
+    measure: (s: string) => number,
+): string {
+    if (maxWidth <= 0) {
+        return "";
+    }
+    if (measure(text) <= maxWidth) {
+        return text;
+    }
 
     // Proportional from the average advance, then walk back until it really fits - one or two
     // steps in practice, and no per-character measuring.
-    let end = Math.min(text.length, Math.max(0, Math.floor(maxWidth / (measure(text) / text.length))));
-    while (end > 0 && measure(text.slice(0, end)) > maxWidth) { end--; }
+    let end = Math.min(
+        text.length,
+        Math.max(0, Math.floor(maxWidth / (measure(text) / text.length))),
+    );
+    while (end > 0 && measure(text.slice(0, end)) > maxWidth) {
+        end--;
+    }
     return text.slice(0, end);
 }
 
@@ -62,7 +75,9 @@ export function linesThatFit(height: number, fontPx: number): number {
  * One sizer per frame: the boxes are in SCREEN pixels, so every size changes with the zoom.
  */
 export function createLabelSizer(
-    longest: string, advancePerPx: number, maxPx: number,
+    longest: string,
+    advancePerPx: number,
+    maxPx: number,
 ): (width: number, height: number) => { fontPx: number; maxLines: number } {
     const cache = new Map<string, { fontPx: number; maxLines: number }>();
     return (width, height) => {
@@ -91,12 +106,20 @@ export function createLabelSizer(
  * per frame from the real font - the old code assumed 0.55 and cut labels in the wrong place.
  */
 export function labelLayout(
-    longest: string, width: number, height: number, advancePerPx: number, maxPx: number,
+    longest: string,
+    width: number,
+    height: number,
+    advancePerPx: number,
+    maxPx: number,
 ): { fontPx: number; maxLines: number } {
     const linesAt = (px: number): number => linesThatFit(height, px);
 
-    if (longest.length === 0 || advancePerPx <= 0 || !Number.isFinite(width)
-        || !Number.isFinite(height)) {
+    if (
+        longest.length === 0 ||
+        advancePerPx <= 0 ||
+        !Number.isFinite(width) ||
+        !Number.isFinite(height)
+    ) {
         return { fontPx: maxPx, maxLines: linesAt(maxPx) };
     }
 
@@ -104,9 +127,15 @@ export function labelLayout(
     for (let px = Math.max(floor, Math.floor(maxPx)); px > floor; px--) {
         const maxLines = linesAt(px);
         // One line of slack in the budget: coming back under it means nothing was dropped.
-        const wrapped = wrapLabel(longest, width, maxLines + 1,
-            s => s.length * advancePerPx * px);
-        if (wrapped.length > 0 && wrapped.length <= maxLines) { return { fontPx: px, maxLines }; }
+        const wrapped = wrapLabel(
+            longest,
+            width,
+            maxLines + 1,
+            (s) => s.length * advancePerPx * px,
+        );
+        if (wrapped.length > 0 && wrapped.length <= maxLines) {
+            return { fontPx: px, maxLines };
+        }
     }
     return { fontPx: floor, maxLines: linesAt(floor) };
 }
@@ -124,34 +153,49 @@ export function labelLayout(
  * segment too long for a line on its own is split mid-word rather than overflowing.
  */
 export function wrapLabel(
-    text: string, maxWidth: number, maxLines: number, measure: (s: string) => number,
+    text: string,
+    maxWidth: number,
+    maxLines: number,
+    measure: (s: string) => number,
 ): string[] {
-    if (maxWidth <= 0 || maxLines <= 0) { return []; }
+    if (maxWidth <= 0 || maxLines <= 0) {
+        return [];
+    }
 
     // Keep each separator attached to the chunk it follows, so a break reads as a word boundary.
     const chunks = text.split(/(?<=[_.\- ])/);
     const lines: string[] = [];
-    let current = '';
+    let current = "";
 
     for (const chunk of chunks) {
-        if (current !== '' && measure(current + chunk) > maxWidth) {
+        if (current !== "" && measure(current + chunk) > maxWidth) {
             lines.push(current);
-            if (lines.length === maxLines) { return lines; }
-            current = '';
+            if (lines.length === maxLines) {
+                return lines;
+            }
+            current = "";
         }
         // Still too wide alone: hard-split it across as many lines as it needs.
         let rest = chunk;
-        while (measure(current + rest) > maxWidth && current === '') {
+        while (measure(current + rest) > maxWidth && current === "") {
             const head = fitLabel(rest, maxWidth, measure);
-            if (head === '') { break; }
-            if (head === rest) { break; }
+            if (head === "") {
+                break;
+            }
+            if (head === rest) {
+                break;
+            }
             lines.push(head);
-            if (lines.length === maxLines) { return lines; }
+            if (lines.length === maxLines) {
+                return lines;
+            }
             rest = rest.slice(head.length);
         }
         current += rest;
     }
 
-    if (current !== '') { lines.push(current); }
+    if (current !== "") {
+        lines.push(current);
+    }
     return lines.slice(0, maxLines);
 }

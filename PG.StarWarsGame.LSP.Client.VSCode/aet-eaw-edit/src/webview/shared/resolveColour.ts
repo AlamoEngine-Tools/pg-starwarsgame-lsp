@@ -21,9 +21,9 @@
 // if step 1 does turn out to be a no-op is therefore the same colour by a longer route, never a
 // missing one.
 
-import { colourTokens } from './tokens';
+import { colourTokens } from "./tokens";
 
-const BY_NAME = new Map(colourTokens.map(token => [token.name, token]));
+const BY_NAME = new Map(colourTokens.map((token) => [token.name, token]));
 
 /** Reads one custom property off a computed style. Injected so the chain itself is testable. */
 export type PropertyReader = (name: string) => string;
@@ -38,7 +38,7 @@ export function resolveColourWith(read: PropertyReader, token: string): string {
     const known = BY_NAME.get(token);
 
     if (!known) {
-        return '';
+        return "";
     }
 
     return read(token).trim() || read(known.from).trim() || known.fallback;
@@ -56,11 +56,14 @@ export function colourResolver(element: Element): (token: string) => string {
     const style = getComputedStyle(element);
     const resolved = new Map<string, string>();
 
-    return token => {
+    return (token) => {
         let value = resolved.get(token);
 
         if (value === undefined) {
-            value = resolveColourWith(name => style.getPropertyValue(name), token);
+            value = resolveColourWith(
+                (name) => style.getPropertyValue(name),
+                token,
+            );
             resolved.set(token, value);
         }
 

@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Story.Sim;
@@ -114,7 +113,7 @@ public sealed class StorySimulatorMediaTest
     [Fact]
     public void MediaNotAssumedToComplete_LeavesTheSpeechDoneToTheAuthor_ForGood()
     {
-        var sim = new StorySimulator(Model(), Schema, options: new StorySimOptions(AssumeMediaCompletes: false));
+        var sim = new StorySimulator(Model(), Schema, options: new StorySimOptions(false));
 
         var start = sim.Start();
         Assert.Contains(sim.GetInterventions(start), i => i.EventName == "WelcomeDone");
@@ -165,7 +164,7 @@ public sealed class StorySimulatorMediaTest
     public void ASecondSpeech_EndsTheOnePlaying_EvenWhenMediaIsLeftToTheAuthor()
     {
         var sim = new StorySimulator(Model(TwoSpeechesText), Schema,
-            options: new StorySimOptions(AssumeMediaCompletes: false));
+            options: new StorySimOptions(false));
 
         var start = sim.Start();
 

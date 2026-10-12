@@ -19,7 +19,7 @@
 // two constants are CHOSEN, and marked as such below. Everything else on this page came out of the
 // corpus or out of the engine's own table.
 
-import type { PreviewSpinAway } from '../../protocol/modelPreview';
+import type { PreviewSpinAway } from "../../protocol/modelPreview";
 
 /**
  * The engine's tick, and the reason `Max_Speed` needs multiplying.
@@ -72,7 +72,10 @@ export interface SpinAwayPose {
 }
 
 /** Where the wreck has got to `elapsed` seconds after it died. */
-export function spinAwayPose(spin: PreviewSpinAway, elapsed: number): SpinAwayPose {
+export function spinAwayPose(
+    spin: PreviewSpinAway,
+    elapsed: number,
+): SpinAwayPose {
     const time = spin.timeSeconds > 0 ? spin.timeSeconds : 0;
     const at = Math.max(0, elapsed);
     const progress = time > 0 ? Math.min(1, at / time) : 1;
@@ -106,7 +109,11 @@ export function spinAwayPose(spin: PreviewSpinAway, elapsed: number): SpinAwayPo
  * hull instead, because the hull is hidden in the same breath and three prunes a hidden subtree,
  * effects included - the trap the ship's own death blast already exists to dodge.
  */
-export function spinAwayEnd(spin: PreviewSpinAway): { x: number; y: number; z: number } {
+export function spinAwayEnd(spin: PreviewSpinAway): {
+    x: number;
+    y: number;
+    z: number;
+} {
     return spinAwayPose(spin, spin.timeSeconds).offset;
 }
 

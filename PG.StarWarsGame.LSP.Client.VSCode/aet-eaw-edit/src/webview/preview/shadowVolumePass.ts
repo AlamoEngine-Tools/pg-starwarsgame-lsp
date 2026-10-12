@@ -23,7 +23,7 @@
 // Nothing of Petroglyph's shader text is reproduced here - this implements the published algorithm
 // with the parameters their data implies.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
 /** Reused so a draw allocates nothing. */
 const INVERSE_WORLD = new THREE.Matrix4();
@@ -42,7 +42,7 @@ const OBJECT_LIGHT = new THREE.Vector3();
 export const EXTRUSION_RADII = 4;
 
 /** Where the one shadow colour can actually be seen. */
-export type ShadowTintReach = 'ground' | 'model' | 'both' | 'none';
+export type ShadowTintReach = "ground" | "model" | "both" | "none";
 
 /**
  * What the shadow colour reaches right now, which is what decides whether its control is live.
@@ -58,16 +58,19 @@ export type ShadowTintReach = 'ground' | 'model' | 'both' | 'none';
  *
  * Only the last case is honestly dead, and that is the only one the control should refuse in.
  */
-export function shadowTintReach(floor: boolean, stencilCasting: boolean): ShadowTintReach {
+export function shadowTintReach(
+    floor: boolean,
+    stencilCasting: boolean,
+): ShadowTintReach {
     if (floor && stencilCasting) {
-        return 'both';
+        return "both";
     }
 
     if (floor) {
-        return 'ground';
+        return "ground";
     }
 
-    return stencilCasting ? 'model' : 'none';
+    return stencilCasting ? "model" : "none";
 }
 
 /**
@@ -101,7 +104,7 @@ const STENCIL_MASK = 0x3f;
  * degenerate edge quad opens, the volume is left with holes, and the stencil count leaks out across
  * the whole background.
  */
-const VOLUME_VERTEX = /* glsl */`
+const VOLUME_VERTEX = /* glsl */ `
 uniform vec3 uToLightObject;
 uniform float uExtrusion;
 
@@ -148,17 +151,17 @@ void main() {
 `;
 
 /** Only ever seen in the debug view; the counting pass writes no colour at all. */
-const VOLUME_FRAGMENT = /* glsl */`
+const VOLUME_FRAGMENT = /* glsl */ `
 uniform vec3 uDebugColour;
 void main() { gl_FragColor = vec4(uDebugColour, 1.0); }
 `;
 
 /** A quad in clip space, so the darken covers the frame whatever the camera is doing. */
-const DARKEN_VERTEX = /* glsl */`
+const DARKEN_VERTEX = /* glsl */ `
 void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }
 `;
 
-const DARKEN_FRAGMENT = /* glsl */`
+const DARKEN_FRAGMENT = /* glsl */ `
 uniform vec3 uColour;
 
 // The colorspace PARS chunk is deliberately not included: three already prepends it to every
@@ -188,17 +191,13 @@ void main() {
  * frame is going to the canvas, through the heat composite, or on to bloom.
  */
 export class ShadowVolumePass {
-    /** Front faces: increment where the volume is behind what was already drawn. */
-    private readonly front: THREE.ShaderMaterial;
-
-    /** Back faces: decrement, so a ray that leaves the volume again is not counted as inside. */
-    private readonly back: THREE.ShaderMaterial;
-
-    private readonly darkenMaterial: THREE.ShaderMaterial;
-
     /** The full-screen darken, added to the scene once. */
     readonly darken: THREE.Mesh;
-
+    /** Front faces: increment where the volume is behind what was already drawn. */
+    private readonly front: THREE.ShaderMaterial;
+    /** Back faces: decrement, so a ray that leaves the volume again is not counted as inside. */
+    private readonly back: THREE.ShaderMaterial;
+    private readonly darkenMaterial: THREE.ShaderMaterial;
     /** The extra meshes this pass owns, one per volume sub-mesh per face direction. */
     private readonly drawn: THREE.Mesh[] = [];
 
@@ -225,7 +224,10 @@ export class ShadowVolumePass {
             uDebugColour: { value: new THREE.Color(0, 1, 1) },
         });
 
-        const volume = (zFail: THREE.StencilOp, side: THREE.Side): THREE.ShaderMaterial =>
+        const volume = (
+            zFail: THREE.StencilOp,
+            side: THREE.Side,
+        ): THREE.ShaderMaterial =>
             new THREE.ShaderMaterial({
                 uniforms: uniforms(),
                 vertexShader: VOLUME_VERTEX,
@@ -297,11 +299,14 @@ export class ShadowVolumePass {
             stencilZPass: THREE.KeepStencilOp,
         });
 
-        this.darken = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.darkenMaterial);
+        this.darken = new THREE.Mesh(
+            new THREE.PlaneGeometry(2, 2),
+            this.darkenMaterial,
+        );
         this.darken.frustumCulled = false;
         this.darken.renderOrder = renderOrder + 1;
         this.darken.visible = false;
-        this.darken.name = 'aetShadowDarken';
+        this.darken.name = "aetShadowDarken";
     }
 
     /**
@@ -313,7 +318,9 @@ export class ShadowVolumePass {
      * casting nothing whatsoever in the mode that has no volumes.
      */
     get active(): boolean {
-        return this.drawn.some(mesh => !this.uncounted.has(mesh.parent as THREE.Mesh));
+        return this.drawn.some(
+            (mesh) => !this.uncounted.has(mesh.parent as THREE.Mesh),
+        );
     }
 
     /**
@@ -325,7 +332,6 @@ export class ShadowVolumePass {
     add(source: THREE.Mesh): void {
         const skinned = source instanceof THREE.SkinnedMesh;
 
-
         for (const [at, template] of [this.front, this.back].entries()) {
             // Cloned per mesh, not shared: the light vector is in the mesh's OWN object space now,
             // so one material cannot answer for two meshes that sit at different transforms.
@@ -333,7 +339,11 @@ export class ShadowVolumePass {
 
             // Front cyan, back magenta, so the debug view says which side of the volume each
             // surface is - an open volume shows as one colour where the other should be.
-            material.uniforms.uDebugColour.value.setRGB(at === 0 ? 0 : 1, 1, at === 0 ? 1 : 0);
+            material.uniforms.uDebugColour.value.setRGB(
+                at === 0 ? 0 : 1,
+                1,
+                at === 0 ? 1 : 0,
+            );
             material.colorWrite = this.debug;
             material.depthWrite = this.debug;
 
@@ -356,7 +366,9 @@ export class ShadowVolumePass {
             // one hook that runs after the world matrices are up to date.
             mesh.onBeforeRender = (): void => {
                 INVERSE_WORLD.copy(mesh.matrixWorld).invert();
-                OBJECT_LIGHT.copy(this.worldLight).transformDirection(INVERSE_WORLD).normalize();
+                OBJECT_LIGHT.copy(this.worldLight)
+                    .transformDirection(INVERSE_WORLD)
+                    .normalize();
                 material.uniforms.uToLightObject.value.copy(OBJECT_LIGHT);
                 material.uniforms.uExtrusion.value = this.extrusion;
             };
@@ -427,17 +439,6 @@ export class ShadowVolumePass {
         }
 
         this.refreshDrawn();
-    }
-
-    /** `visible` is the product of the two gates, and only this writes it. */
-    private refreshDrawn(): void {
-        for (const [source, meshes] of this.bySource) {
-            for (const mesh of meshes) {
-                mesh.visible = this.enabled && !this.uncounted.has(source);
-            }
-        }
-
-        this.darken.visible = this.enabled && this.active;
     }
 
     /** Drops every volume mesh, for a part being unloaded. */
@@ -513,5 +514,16 @@ export class ShadowVolumePass {
         this.back.dispose();
         this.darkenMaterial.dispose();
         this.darken.geometry.dispose();
+    }
+
+    /** `visible` is the product of the two gates, and only this writes it. */
+    private refreshDrawn(): void {
+        for (const [source, meshes] of this.bySource) {
+            for (const mesh of meshes) {
+                mesh.visible = this.enabled && !this.uncounted.has(source);
+            }
+        }
+
+        this.darken.visible = this.enabled && this.active;
     }
 }

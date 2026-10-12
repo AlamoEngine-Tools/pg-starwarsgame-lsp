@@ -13,12 +13,13 @@
 // back on and your picks are still there.
 
 import type {
-    PreviewHardpoint, PreviewTurret, PreviewWeapon,
-} from '../../protocol/modelPreview';
-import type { TreeItem } from './previewTree';
-
-import { PREVIEW_WEAPON_SOURCE } from '../../protocol/modelPreview';
-import { axisRange, turretEnvelopes } from './turretHandles';
+    PreviewHardpoint,
+    PreviewTurret,
+    PreviewWeapon,
+} from "../../protocol/modelPreview";
+import { PREVIEW_WEAPON_SOURCE } from "../../protocol/modelPreview";
+import type { TreeItem } from "./previewTree";
+import { axisRange, turretEnvelopes } from "./turretHandles";
 
 /** One cone the viewport draws, tagged with the weapon it belongs to. */
 /**
@@ -32,7 +33,7 @@ import { axisRange, turretEnvelopes } from './turretHandles';
  *   discards its rotation, rebuilding the frame from `owner->Get_Facing()`. A rotated `MuzzleA`
  *   bone therefore moves where the shot STARTS and not which way the unit may shoot.
  */
-export type WeaponArcFrame = 'bone' | 'hull';
+export type WeaponArcFrame = "bone" | "hull";
 
 /**
  * Which envelope an arc is, because a turret hardpoint keeps two that are not the same shape.
@@ -45,7 +46,7 @@ export type WeaponArcFrame = 'bone' | 'hull';
  * elevation-limited and the shot is not - the opposite way round from what the tag names suggest,
  * and invisible unless the two are drawn apart.
  */
-export type WeaponArcKind = 'fire' | 'rotation';
+export type WeaponArcKind = "fire" | "rotation";
 
 export interface WeaponArc {
     /** The `PreviewWeapon.id` this came from, so a weapon can be switched without a rebuild. */
@@ -114,16 +115,19 @@ export interface WeaponScene {
  * it - the row reads that state rather than keeping a second copy of it.
  */
 export function weaponRows(
-    scene: WeaponScene, destroyed: ReadonlySet<string>,
+    scene: WeaponScene,
+    destroyed: ReadonlySet<string>,
 ): WeaponRow[] {
     // A hardpoint with no `Model_To_Attach` contributes no part - 137 of them do not - but it still
     // names fire bones, and those belong to the hull.
     const partOf = new Map(
-        scene.hardpoints.map(h => [h.id, h.partId ?? 'hull'] as const));
+        scene.hardpoints.map((h) => [h.id, h.partId ?? "hull"] as const),
+    );
 
-    return scene.weapons.map(weapon => {
+    return scene.weapons.map((weapon) => {
         const hardpointId = weapon.hardpointId ?? null;
-        const partId = hardpointId === null ? 'hull' : partOf.get(hardpointId) ?? 'hull';
+        const partId =
+            hardpointId === null ? "hull" : (partOf.get(hardpointId) ?? "hull");
 
         return {
             id: weapon.id,
@@ -145,8 +149,10 @@ export function weaponRows(
             // A unit weapon belongs to the hull, which is the subject itself and is never in the
             // destroyed set - guarding on the source keeps it that way if a hardpoint is ever named
             // after the hull part.
-            destroyed: weapon.source === PREVIEW_WEAPON_SOURCE.hardpoint
-                && hardpointId !== null && destroyed.has(hardpointId),
+            destroyed:
+                weapon.source === PREVIEW_WEAPON_SOURCE.hardpoint &&
+                hardpointId !== null &&
+                destroyed.has(hardpointId),
         };
     });
 }
@@ -159,15 +165,17 @@ export function weaponRows(
  * shoots.
  */
 export function visibleArcs(
-    rows: readonly WeaponRow[], master: boolean, hiddenWeapons: ReadonlySet<string>,
+    rows: readonly WeaponRow[],
+    master: boolean,
+    hiddenWeapons: ReadonlySet<string>,
 ): WeaponArc[] {
     if (!master) {
         return [];
     }
 
     return rows
-        .filter(row => !row.destroyed && !hiddenWeapons.has(row.id))
-        .flatMap(row => row.arcs);
+        .filter((row) => !row.destroyed && !hiddenWeapons.has(row.id))
+        .flatMap((row) => row.arcs);
 }
 
 /**
@@ -178,12 +186,12 @@ export function visibleArcs(
  */
 export function weaponTitle(row: WeaponRow): string {
     if (row.destroyed) {
-        return 'This hardpoint has been shot away, so it no longer fires';
+        return "This hardpoint has been shot away, so it no longer fires";
     }
 
     return row.arcs.length > 0
         ? "Draw this weapon's cone"
-        : 'This weapon declares no range, so there is no cone to draw';
+        : "This weapon declares no range, so there is no cone to draw";
 }
 
 /** Same, for the fire-bone buttons: a bone off the hardpoint's model is not in the hull's tree. */
@@ -211,7 +219,7 @@ export function boneRowIndex(items: readonly TreeItem[]): Map<string, string> {
     for (const item of items) {
         // Skeleton order, first one wins. Two bones may share a name, and the reader clicking the
         // same button twice must land on the same one both times.
-        if (item.kind === 'bone' && !index.has(item.name.toLowerCase())) {
+        if (item.kind === "bone" && !index.has(item.name.toLowerCase())) {
             index.set(item.name.toLowerCase(), item.id);
         }
     }
@@ -247,14 +255,14 @@ function arcsOf(weapon: PreviewWeapon, partId: string): WeaponArc[] {
     }
 
     const frame: WeaponArcFrame =
-        weapon.source === PREVIEW_WEAPON_SOURCE.hardpoint ? 'bone' : 'hull';
+        weapon.source === PREVIEW_WEAPON_SOURCE.hardpoint ? "bone" : "hull";
 
     const fire = weapon.fireBones.map((bone): WeaponArc => ({
         weaponId: weapon.id,
         partId,
         bone,
         frame,
-        kind: 'fire',
+        kind: "fire",
         widthDegrees: weapon.coneWidthDegrees ?? 0,
         heightDegrees: weapon.coneHeightDegrees ?? 0,
         range,
@@ -271,26 +279,32 @@ function arcsOf(weapon: PreviewWeapon, partId: string): WeaponArc[] {
  * identical outline over the first is not a comparison. That is also why this drops out when the
  * elevation is unbounded: same shape, no second envelope.
  */
-function rotationArcsOf(weapon: PreviewWeapon, fire: readonly WeaponArc[]): WeaponArc[] {
+function rotationArcsOf(
+    weapon: PreviewWeapon,
+    fire: readonly WeaponArc[],
+): WeaponArc[] {
     const turret = weapon.turret;
 
-    if (weapon.source !== PREVIEW_WEAPON_SOURCE.hardpoint
-        || turret === null || turret === undefined) {
+    if (
+        weapon.source !== PREVIEW_WEAPON_SOURCE.hardpoint ||
+        turret === null ||
+        turret === undefined
+    ) {
         return [];
     }
 
     const { rotation } = turretEnvelopes({
-        yaw: axisRange('yaw', turret.rotateExtentDegrees),
-        pitch: axisRange('pitch', turret.elevateExtentDegrees),
+        yaw: axisRange("yaw", turret.rotateExtentDegrees),
+        pitch: axisRange("pitch", turret.elevateExtentDegrees),
     });
 
     if (rotation.pitchDegrees >= FULL_TURN_DEGREES) {
         return [];
     }
 
-    return fire.map(arc => ({
+    return fire.map((arc) => ({
         ...arc,
-        kind: 'rotation' as const,
+        kind: "rotation" as const,
         widthDegrees: rotation.yawDegrees,
         heightDegrees: rotation.pitchDegrees,
     }));
@@ -306,7 +320,7 @@ function cadenceText(weapon: PreviewWeapon): string | null {
     const recharge = weapon.rechargeSeconds ?? null;
 
     if (shots !== null) {
-        parts.push(`${num(shots)} shot${shots === 1 ? '' : 's'}`);
+        parts.push(`${num(shots)} shot${shots === 1 ? "" : "s"}`);
     }
 
     // The gap between shots of one volley. With a single shot there is no gap, so a delay the data
@@ -319,7 +333,7 @@ function cadenceText(weapon: PreviewWeapon): string | null {
         parts.push(`${num(recharge)}s recharge`);
     }
 
-    return parts.length === 0 ? null : parts.join(', ');
+    return parts.length === 0 ? null : parts.join(", ");
 }
 
 function damageText(weapon: PreviewWeapon): string | null {
@@ -330,7 +344,9 @@ function damageText(weapon: PreviewWeapon): string | null {
         return type;
     }
 
-    return type === null ? `${num(damage)} damage` : `${num(damage)} damage, ${type}`;
+    return type === null
+        ? `${num(damage)} damage`
+        : `${num(damage)} damage, ${type}`;
 }
 
 function reachText(weapon: PreviewWeapon): string | null {
@@ -371,7 +387,7 @@ function coneText(weapon: PreviewWeapon): string | null {
  */
 function inaccuracyText(weapon: PreviewWeapon): string | null {
     if (weapon.firesForward) {
-        return 'None - Fires_Forward skips spread and target leading';
+        return "None - Fires_Forward skips spread and target leading";
     }
 
     // Defended rather than trusted, though the type says it is always there: a scene from an older
@@ -384,7 +400,7 @@ function inaccuracyText(weapon: PreviewWeapon): string | null {
         return null;
     }
 
-    return rows.map(row => `${row.category} ${num(row.distance)}`).join(', ');
+    return rows.map((row) => `${row.category} ${num(row.distance)}`).join(", ");
 }
 
 /** A number as a person writes it: the XML's `2.0000` is `2`, and `0.10` is `0.1`. */
@@ -404,5 +420,7 @@ function num(value: number): string {
  * way, and listing it would make the pill's "n of m weapons" count lie.
  */
 export function allWeaponIds(rows: readonly WeaponRow[]): ReadonlySet<string> {
-    return new Set(rows.filter(row => row.arcs.length > 0).map(row => row.id));
+    return new Set(
+        rows.filter((row) => row.arcs.length > 0).map((row) => row.id),
+    );
 }

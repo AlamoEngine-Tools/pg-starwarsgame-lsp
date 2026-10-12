@@ -80,7 +80,7 @@ public sealed class ServerStatusRecorder
     /// <summary>Whether a <c>.pgproj</c> was found under the workspace roots. Null until startup asks.</summary>
     public bool? ProjectDetected { get; private set; }
 
-    /// <summary>Why the project could not be used, or <see cref="ProjectProblem.None" />.</summary>
+    /// <summary>Why the project could not be used, or <see cref="Project.ProjectProblem.None" />.</summary>
     public ProjectProblem ProjectProblem { get; private set; }
 
     /// <summary>
@@ -88,6 +88,12 @@ public sealed class ServerStatusRecorder
     ///     (false). Null for a local schema, or when the load never got that far.
     /// </summary>
     public bool? SchemaFromCache { get; private set; }
+
+    /// <summary>
+    ///     Project files under the root besides the one this server loaded. A count, never names:
+    ///     the status is pasted into public issues.
+    /// </summary>
+    public int OtherProjectFiles { get; private set; }
 
     public void RecordSchema(StatusSchemaSource source, SchemaVersionCheck? check, bool? fromCache = null)
     {
@@ -117,12 +123,6 @@ public sealed class ServerStatusRecorder
         ProjectDetected = detected;
         ProjectProblem = problem;
     }
-
-    /// <summary>
-    ///     Project files under the root besides the one this server loaded. A count, never names:
-    ///     the status is pasted into public issues.
-    /// </summary>
-    public int OtherProjectFiles { get; private set; }
 
     public void RecordOtherProjectFiles(int count)
     {

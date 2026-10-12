@@ -7,7 +7,7 @@
 // Split from `panelLayout.ts` so that module stays testable under `node --test`, which has no DOM
 // and no VS Code API.
 
-import { applyStoredLayout, setPanelSizeReporter } from './panelLayout';
+import { applyStoredLayout, setPanelSizeReporter } from "./panelLayout";
 
 /** The minimum of the VS Code webview API this needs. */
 interface MessagePoster {
@@ -23,8 +23,8 @@ interface MessagePoster {
  * extension origin and no `'unsafe-inline'`, which is worth keeping.
  */
 export function initPanelLayout(poster: MessagePoster): void {
-    const raw = document.getElementById('root')?.dataset.panelLayout;
-    if (raw !== undefined && raw !== '') {
+    const raw = document.getElementById("root")?.dataset.panelLayout;
+    if (raw !== undefined && raw !== "") {
         try {
             applyStoredLayout(JSON.parse(raw));
         } catch {
@@ -34,6 +34,6 @@ export function initPanelLayout(poster: MessagePoster): void {
     }
 
     setPanelSizeReporter(([key, value]) => {
-        poster.postMessage({ type: 'setPanelLayout', key, value });
+        poster.postMessage({ type: "setPanelLayout", key, value });
     });
 }

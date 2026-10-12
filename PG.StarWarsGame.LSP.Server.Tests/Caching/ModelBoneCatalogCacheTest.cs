@@ -132,7 +132,7 @@ public sealed class ModelBoneCatalogCacheTest
         var fs = new MockFileSystem();
         var cache = Build(fs);
         cache.Save(PgprojPath, "fp-1", Bones());
-        cache.Save(PgprojPath, "fp-2", new Dictionary<string, ModelCatalogEntry> {["only.alo"] = new(["b"], [])});
+        cache.Save(PgprojPath, "fp-2", new Dictionary<string, ModelCatalogEntry> { ["only.alo"] = new(["b"], []) });
 
         Assert.Null(cache.TryLoad(PgprojPath, "fp-1"));
         var loaded = cache.TryLoad(PgprojPath, "fp-2");

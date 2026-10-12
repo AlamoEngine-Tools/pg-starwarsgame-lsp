@@ -9,7 +9,7 @@
 // (`branchColours`), so no fixed legend can say which branch is which - the key has to be built from
 // the branches actually in the graph.
 
-import type { BranchColour } from './palette';
+import type { BranchColour } from "./palette";
 
 export interface BranchKeyEntry {
     readonly branch: string;
@@ -26,20 +26,34 @@ export interface BranchKeyEntry {
  *                 swatch can disagree with the node it describes.
  */
 export function branchKey(
-    nodes: readonly { readonly kind: string; readonly branch?: string | null }[],
+    nodes: readonly {
+        readonly kind: string;
+        readonly branch?: string | null;
+    }[],
     colourOf: BranchColour,
 ): BranchKeyEntry[] {
     // Events only: a junction's glow is inherited from its owner event, which is already counted.
-    const names = [...new Set(nodes
-        .filter(node => node.kind === 'Event' && node.branch !== null && node.branch !== undefined && node.branch !== '')
-        .map(node => node.branch as string))]
-        .sort();
+    const names = [
+        ...new Set(
+            nodes
+                .filter(
+                    (node) =>
+                        node.kind === "Event" &&
+                        node.branch !== null &&
+                        node.branch !== undefined &&
+                        node.branch !== "",
+                )
+                .map((node) => node.branch as string),
+        ),
+    ].sort();
 
-    const tokens = new Map(names.map(name => [name, colourOf(name)]));
+    const tokens = new Map(names.map((name) => [name, colourOf(name)]));
 
-    return names.map(name => ({
+    return names.map((name) => ({
         branch: name,
         token: tokens.get(name)!,
-        sharedWith: names.filter(other => other !== name && tokens.get(other) === tokens.get(name)),
+        sharedWith: names.filter(
+            (other) => other !== name && tokens.get(other) === tokens.get(name),
+        ),
     }));
 }

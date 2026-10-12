@@ -23,6 +23,11 @@ namespace PG.StarWarsGame.LSP.Xml.Tests;
 
 public sealed class XmlDiagnosticsPublisherTest
 {
+    // ── XML strictness ──────────────────────────────────────────────────────
+
+    private const string StrayAmpersandDoc = "<?xml version=\"1.0\"?>\n<Root>\n\t<A>Tom & Jerry</A>\n</Root>";
+
+    private const string DroppedFileDoc = "<?xml version=\"1.0\"?>\n<Root>\n\t<A>1</B>\n</Root>";
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private static GameIndex IndexWithDoc(string uri, int version = 1)
@@ -485,11 +490,6 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.NotNull(pub);
         Assert.Contains(pub.Diagnostics!, d => d.Message.Contains("UNIT_A"));
     }
-
-    // ── XML strictness ──────────────────────────────────────────────────────
-
-    private const string StrayAmpersandDoc = "<?xml version=\"1.0\"?>\n<Root>\n\t<A>Tom & Jerry</A>\n</Root>";
-    private const string DroppedFileDoc = "<?xml version=\"1.0\"?>\n<Root>\n\t<A>1</B>\n</Root>";
 
     private static FakeLspConfigurationProvider StrictnessOff()
     {

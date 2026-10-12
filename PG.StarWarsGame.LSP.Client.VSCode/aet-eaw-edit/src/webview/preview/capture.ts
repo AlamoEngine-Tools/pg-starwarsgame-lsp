@@ -24,7 +24,13 @@ export interface CaptureSize {
 }
 
 function square(side: number, what: string): CaptureSize {
-    return {id: String(side), width: side, height: side, label: String(side), title: `${side} - ${what}`};
+    return {
+        id: String(side),
+        width: side,
+        height: side,
+        label: String(side),
+        title: `${side} - ${what}`,
+    };
 }
 
 /**
@@ -34,19 +40,19 @@ function square(side: number, what: string): CaptureSize {
  * of 52 or more doubles the slot that way, so a large icon is 100x50 or 100x100.
  */
 export const CAPTURE_SIZES: readonly CaptureSize[] = [
-    square(24, 'passive ability icon'),
-    square(26, 'special ability icon'),
-    square(40, 'upgrade icon'),
-    {...square(50, 'build icon'), iconPrefix: ''},
+    square(24, "passive ability icon"),
+    square(26, "special ability icon"),
+    square(40, "upgrade icon"),
+    { ...square(50, "build icon"), iconPrefix: "" },
     {
-        id: '100x50',
+        id: "100x50",
         width: 100,
         height: 50,
-        label: '100x50',
-        title: '100x50 - large icon, double width',
-        iconPrefix: 'big_'
+        label: "100x50",
+        title: "100x50 - large icon, double width",
+        iconPrefix: "big_",
     },
-    {...square(100, 'large icon, double both ways'), iconPrefix: 'big_'},
+    { ...square(100, "large icon, double both ways"), iconPrefix: "big_" },
 ];
 
 /** The build icon: the size most captures are for. */
@@ -62,8 +68,11 @@ export const DEFAULT_CAPTURE_SIZE: CaptureSize = CAPTURE_SIZES[3];
 export const MAX_SIDE = 4096;
 
 /** What the capture will actually render, whatever it was asked for. */
-export function captureSize(width: number, height: number): { width: number; height: number } {
-    return {width: side(width), height: side(height)};
+export function captureSize(
+    width: number,
+    height: number,
+): { width: number; height: number } {
+    return { width: side(width), height: side(height) };
 }
 
 function side(value: number): number {
@@ -81,18 +90,22 @@ function side(value: number): number {
  * one per unit in a roster - and they have to be tellable apart in a file list without opening any.
  * A square names its side once; any other shape names both.
  */
-export function captureFileName(subject: string, width: number, height: number): string {
+export function captureFileName(
+    subject: string,
+    width: number,
+    height: number,
+): string {
     // Everything a filesystem refuses, plus the extension the subject may already carry: an
     // `EV_StarDestroyer.ALO` capture should not be called `EV_StarDestroyer.ALO_128.png`.
     const cleaned = subject
-        .replace(/\.(alo|ala)$/i, '')
-        .replace(/[\/:*?"<>|]+/g, ' ')
+        .replace(/\.(alo|ala)$/i, "")
+        .replace(/[\/:*?"<>|]+/g, " ")
         .trim()
-        .replace(/\s+/g, '_');
+        .replace(/\s+/g, "_");
     const w = side(width);
     const h = side(height);
 
-    return `${cleaned === '' ? 'capture' : cleaned}_${w === h ? w : `${w}x${h}`}.png`;
+    return `${cleaned === "" ? "capture" : cleaned}_${w === h ? w : `${w}x${h}`}.png`;
 }
 
 /**
@@ -104,14 +117,17 @@ export function captureFileName(subject: string, width: number, height: number):
  * renamed before the game can use it. The icon's own extension goes: the file written is a png,
  * whatever the icon is packed as.
  */
-export function iconFileName(size: CaptureSize | null, iconName: string | null | undefined): string | null {
-    const stem = (iconName ?? '')
+export function iconFileName(
+    size: CaptureSize | null,
+    iconName: string | null | undefined,
+): string | null {
+    const stem = (iconName ?? "")
         .trim()
-        .replace(/\.(tga|dds|png|bmp|jpe?g)$/i, '')
-        .replace(/[\/\\:*?"<>|]+/g, '_');
+        .replace(/\.(tga|dds|png|bmp|jpe?g)$/i, "")
+        .replace(/[\/\\:*?"<>|]+/g, "_");
 
     const prefix = size?.iconPrefix;
-    return prefix !== undefined && stem !== '' ? `${prefix}${stem}.png` : null;
+    return prefix !== undefined && stem !== "" ? `${prefix}${stem}.png` : null;
 }
 
 /**
@@ -119,8 +135,12 @@ export function iconFileName(size: CaptureSize | null, iconName: string | null |
  * centred. Drawn over the viewport while a size is chosen, and the capture renders exactly this
  * region (a view offset on the camera), so the frame and the file always agree.
  */
-export function captureFrame(viewWidth: number, viewHeight: number, width: number, height: number):
-    { x: number; y: number; width: number; height: number } {
+export function captureFrame(
+    viewWidth: number,
+    viewHeight: number,
+    width: number,
+    height: number,
+): { x: number; y: number; width: number; height: number } {
     const aspect = width / Math.max(height, 1);
     const frameWidth = Math.min(viewWidth, viewHeight * aspect);
     const frameHeight = frameWidth / aspect;

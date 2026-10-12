@@ -272,13 +272,6 @@ public sealed partial class StorySimulator
         return snapshot;
     }
 
-    private enum Verdict
-    {
-        Skip,
-        Count,
-        Fire
-    }
-
     /// <summary>
     ///     One listener's answer to a change. Counting types answer Count until their threshold,
     ///     which mirrors the engine decrementing a per-event counter on every matching dispatch.
@@ -776,5 +769,12 @@ public sealed partial class StorySimulator
             "NOT_EQUAL_TO" => false,
             _ => value > target
         };
+    }
+
+    private enum Verdict
+    {
+        Skip,
+        Count,
+        Fire
     }
 }

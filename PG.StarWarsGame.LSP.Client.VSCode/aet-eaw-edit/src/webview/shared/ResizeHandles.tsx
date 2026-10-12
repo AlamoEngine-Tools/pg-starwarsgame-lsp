@@ -1,8 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import { ResizeDirection } from './modalGeometry';
-import { RESIZE_DIRECTIONS } from './useMovableDialog';
+import { ResizeDirection } from "./modalGeometry";
+import { RESIZE_DIRECTIONS } from "./useMovableDialog";
 
 export interface ResizeHandlesProps {
     handleProps: (direction: ResizeDirection) => Record<string, unknown>;
@@ -22,7 +22,7 @@ export interface ResizeHandlesProps {
 export function ResizeHandles(props: ResizeHandlesProps): React.JSX.Element {
     return (
         <>
-            {RESIZE_DIRECTIONS.map(direction => (
+            {RESIZE_DIRECTIONS.map((direction) => (
                 <div
                     key={direction}
                     className={`modal-resize modal-resize-${direction}`}

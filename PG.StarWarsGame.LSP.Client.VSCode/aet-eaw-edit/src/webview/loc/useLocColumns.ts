@@ -8,10 +8,10 @@
 // reason it is shared rather than merely similar: if one editor ever changed the key column's
 // width, the two grids would stop lining up and nothing would catch it.
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from "react";
 
-import { defaultHiddenLanguages } from './columnVisibility';
-import { LocRow } from './locRow';
+import { defaultHiddenLanguages } from "./columnVisibility";
+import { LocRow } from "./locRow";
 
 export interface LocColumns {
     /** The languages hidden right now, whether by default or by hand. */
@@ -40,7 +40,9 @@ export function useLocColumns(options: {
      * language they have just added and not yet written anything in.
      */
     hiddenLanguages: Set<string> | null;
-    setHiddenLanguages: React.Dispatch<React.SetStateAction<Set<string> | null>>;
+    setHiddenLanguages: React.Dispatch<
+        React.SetStateAction<Set<string> | null>
+    >;
     /**
      * The language to show alone, when the tab was opened on one language of a set. Null for the
      * ordinary case, where the default is to hide the empty columns instead.
@@ -56,7 +58,12 @@ export function useLocColumns(options: {
     onHidden?: (language: string) => void;
 }): LocColumns {
     const {
-        rows, languages, hiddenLanguages, setHiddenLanguages, focusLanguage = null, onHidden,
+        rows,
+        languages,
+        hiddenLanguages,
+        setHiddenLanguages,
+        focusLanguage = null,
+        onHidden,
     } = options;
 
     // Read by toggleLanguage, which must not be re-created on every row change - it is passed to
@@ -72,36 +79,56 @@ export function useLocColumns(options: {
 
     /** The default both the render and the first click must agree on. */
     const currentDefault = (): string[] =>
-        defaultHiddenLanguages(rowsRef.current, languagesRef.current, focusRef.current);
+        defaultHiddenLanguages(
+            rowsRef.current,
+            languagesRef.current,
+            focusRef.current,
+        );
 
     const hidden = useMemo(
-        () => hiddenLanguages ?? new Set(defaultHiddenLanguages(rows, languages, focusLanguage)),
-        [hiddenLanguages, rows, languages, focusLanguage]);
+        () =>
+            hiddenLanguages ??
+            new Set(defaultHiddenLanguages(rows, languages, focusLanguage)),
+        [hiddenLanguages, rows, languages, focusLanguage],
+    );
 
     const shownLanguages = useMemo(
-        () => languages.filter(l => !hidden.has(l)), [languages, hidden]);
+        () => languages.filter((l) => !hidden.has(l)),
+        [languages, hidden],
+    );
 
     // A trailing track for the column picker, which sits at the right-hand end of the header.
     const columns = useMemo(
-        () => `260px ${shownLanguages.map(() => 'minmax(160px, 1fr)').join(' ')} 32px`,
-        [shownLanguages]);
+        () =>
+            `260px ${shownLanguages.map(() => "minmax(160px, 1fr)").join(" ")} 32px`,
+        [shownLanguages],
+    );
 
     const materialise = useCallback(() => {
         // Materialises the default, so a later explicit choice does not silently reveal every
         // column the default was hiding.
-        setHiddenLanguages(current => new Set(current ?? currentDefault()));
+        setHiddenLanguages((current) => new Set(current ?? currentDefault()));
     }, [setHiddenLanguages]);
 
-    const toggleLanguage = useCallback((language: string, visible: boolean) => {
-        setHiddenLanguages(current => {
-            // Seeded from what is actually on screen, so ticking a second language ADDS it rather
-            // than replacing the whole selection with a different default.
-            const next = new Set(current ?? currentDefault());
-            if (visible) { next.delete(language); } else { next.add(language); }
-            return next;
-        });
-        if (!visible) { onHidden?.(language); }
-    }, [setHiddenLanguages, onHidden]);
+    const toggleLanguage = useCallback(
+        (language: string, visible: boolean) => {
+            setHiddenLanguages((current) => {
+                // Seeded from what is actually on screen, so ticking a second language ADDS it rather
+                // than replacing the whole selection with a different default.
+                const next = new Set(current ?? currentDefault());
+                if (visible) {
+                    next.delete(language);
+                } else {
+                    next.add(language);
+                }
+                return next;
+            });
+            if (!visible) {
+                onHidden?.(language);
+            }
+        },
+        [setHiddenLanguages, onHidden],
+    );
 
     return { hidden, shownLanguages, columns, toggleLanguage, materialise };
 }

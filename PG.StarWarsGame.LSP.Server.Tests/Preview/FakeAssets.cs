@@ -13,6 +13,8 @@ internal sealed class FakeAssets(params string[] resolvable) : IGameAssetResolve
 
     private readonly Dictionary<string, byte[]> _content = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly Dictionary<string, GameAssetLocation> _located = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly HashSet<string> _resolvable =
         new(resolvable.Select(r => "Data/Art/Models/" + r), StringComparer.OrdinalIgnoreCase);
 
@@ -45,8 +47,6 @@ internal sealed class FakeAssets(params string[] resolvable) : IGameAssetResolve
 
     public GameAssetTiers Tiers => new(1, false, false, 0);
 
-    private readonly Dictionary<string, GameAssetLocation> _located = new(StringComparer.OrdinalIgnoreCase);
-
     public GameAssetLocation? Locate(string gameRelativePath)
     {
         if (_located.TryGetValue(gameRelativePath, out var located))
@@ -55,6 +55,14 @@ internal sealed class FakeAssets(params string[] resolvable) : IGameAssetResolve
         return _resolvable.Contains(gameRelativePath)
             ? new GameAssetLocation(gameRelativePath, gameRelativePath, GameAssetTier.Workspace)
             : null;
+    }
+
+    public byte[]? Read(string gameRelativePath)
+    {
+        if (Locate(gameRelativePath) is null)
+            return null;
+
+        return _content.GetValueOrDefault(gameRelativePath, EmptyModel);
     }
 
     /// <summary>
@@ -66,14 +74,6 @@ internal sealed class FakeAssets(params string[] resolvable) : IGameAssetResolve
         var path = "Data/Art/Models/" + name;
         _located[path] = new GameAssetLocation(path, resolvedPath, tier);
         return this;
-    }
-
-    public byte[]? Read(string gameRelativePath)
-    {
-        if (Locate(gameRelativePath) is null)
-            return null;
-
-        return _content.GetValueOrDefault(gameRelativePath, EmptyModel);
     }
 
     /// <summary>

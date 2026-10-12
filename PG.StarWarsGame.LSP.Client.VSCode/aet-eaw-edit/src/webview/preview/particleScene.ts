@@ -24,7 +24,7 @@ import {
     PREVIEW_PARTICLE_GATE,
     type PreviewHardpoint,
     type PreviewParticle,
-} from '../../protocol/modelPreview';
+} from "../../protocol/modelPreview";
 
 /**
  * Where a loaded particle system came from.
@@ -38,7 +38,7 @@ import {
  * and every attempt to tell them apart afterwards has to guess from the anchor - which is exactly
  * what put `p_explosion_big00` under Root in the model tree with a checkbox that did nothing.
  */
-export type ParticleOrigin = 'model' | 'gameplay';
+export type ParticleOrigin = "model" | "gameplay";
 
 /**
  * Whether a loaded effect belongs in the MODEL tree.
@@ -49,11 +49,11 @@ export type ParticleOrigin = 'model' | 'gameplay';
  * dead. It stays visible to the Gameplay lens, which is what owns it.
  */
 export function listedInModelTree(origin: ParticleOrigin): boolean {
-    return origin === 'model';
+    return origin === "model";
 }
 
 /** Whether a group is a named family or a stem nothing could be said about. */
-export type ParticleGroupSource = 'family' | 'prefix';
+export type ParticleGroupSource = "family" | "prefix";
 
 /** One bulk-switchable set of particle systems. */
 export interface ParticleGroup {
@@ -93,9 +93,9 @@ export interface GroupingContext {
  * Corvette and the Tartan both carry `pe_` and `pte_` effects that must not merge.
  */
 export function effectPrefix(systemRef: string): string {
-    const parts = systemRef.toLowerCase().split('_');
+    const parts = systemRef.toLowerCase().split("_");
 
-    return parts[0] === 'p' && parts.length > 1 ? `p_${parts[1]}` : parts[0];
+    return parts[0] === "p" && parts.length > 1 ? `p_${parts[1]}` : parts[0];
 }
 
 /**
@@ -140,21 +140,26 @@ interface EffectFamily {
 /** The families, in the order the panel lists them. Fixed, so the list never shuffles. */
 const FAMILIES: readonly EffectFamily[] = [
     {
-        id: 'engines',
-        label: 'Engines',
+        id: "engines",
+        label: "Engines",
         gates: [PREVIEW_PARTICLE_GATE.hardpointAlive],
-        prefixes: ['pe'],
+        prefixes: ["pe"],
     },
     {
-        id: 'hardpointDamage',
-        label: 'Hardpoint damage',
+        id: "hardpointDamage",
+        label: "Hardpoint damage",
         gates: [PREVIEW_PARTICLE_GATE.hardpointDestroyed],
-        prefixes: ['p_hp'],
+        prefixes: ["p_hp"],
     },
-    { id: 'turbo', label: 'Turbo engines', prefixes: ['pte'], replaces: 'engines' },
-    { id: 'powerToWeapons', label: 'Power to weapons', prefixes: ['pptw'] },
-    { id: 'missileShield', label: 'Missile shield', prefixes: ['prs'] },
-    { id: 'gravityWell', label: 'Gravity well', prefixes: ['pgw'] },
+    {
+        id: "turbo",
+        label: "Turbo engines",
+        prefixes: ["pte"],
+        replaces: "engines",
+    },
+    { id: "powerToWeapons", label: "Power to weapons", prefixes: ["pptw"] },
+    { id: "missileShield", label: "Missile shield", prefixes: ["prs"] },
+    { id: "gravityWell", label: "Gravity well", prefixes: ["pgw"] },
     // ION STUN, not "internal damage" - the user's correction, and the name was a guess from the
     // start. An ion-stunned ship is what this draws: the tag is `Projectile_Ion_Stun_On_Detonation`,
     // carried by exactly TWO shipped projectiles (`Proj_Ion_Cannon_Planetary` and
@@ -163,13 +168,15 @@ const FAMILIES: readonly EffectFamily[] = [
     //
     // The three assets agree: `Pi_damage_elec_cap00`, `_sd00` and `_small00` - electrical damage in
     // capital, Star Destroyer and small sizes, which is what a stunned hull crackles with.
-    { id: 'ionStun', label: 'Ion stun', prefixes: ['pi'] },
+    { id: "ionStun", label: "Ion stun", prefixes: ["pi"] },
 ];
 
 /** Whether a family recognises this system, by either kind of evidence. */
 function claims(family: EffectFamily, particle: PreviewParticle): boolean {
-    return (family.gates?.includes(particle.gate) ?? false)
-        || (family.prefixes?.includes(effectPrefix(particle.systemRef)) ?? false);
+    return (
+        (family.gates?.includes(particle.gate) ?? false) ||
+        (family.prefixes?.includes(effectPrefix(particle.systemRef)) ?? false)
+    );
 }
 
 /**
@@ -216,13 +223,14 @@ export function replacedByAbility(
         // The ability has to be driving THIS family. An active ability that claims something else
         // entirely leaves the engines alone - the Tartan carries pe_, pte_ and pptw_ at once.
         const driving = particles.some(
-            particle => driven.has(particle.id) && claims(family, particle));
+            (particle) => driven.has(particle.id) && claims(family, particle),
+        );
 
         if (!driving) {
             continue;
         }
 
-        const replaced = FAMILIES.find(other => other.id === family.replaces);
+        const replaced = FAMILIES.find((other) => other.id === family.replaces);
         if (replaced === undefined) {
             continue;
         }
@@ -261,8 +269,9 @@ export function particleGroups(context: GroupingContext): ParticleGroup[] {
     const named = new Set<string>();
 
     for (const family of FAMILIES) {
-        const ids = particles.filter(particle => claims(family, particle))
-            .map(particle => particle.id);
+        const ids = particles
+            .filter((particle) => claims(family, particle))
+            .map((particle) => particle.id);
 
         if (ids.length === 0) {
             continue;
@@ -272,7 +281,12 @@ export function particleGroups(context: GroupingContext): ParticleGroup[] {
             named.add(id);
         }
 
-        groups.push({ id: `family:${family.id}`, label: family.label, source: 'family', ids });
+        groups.push({
+            id: `family:${family.id}`,
+            label: family.label,
+            source: "family",
+            ids,
+        });
     }
 
     // What no family recognised, gathered under the only thing that can honestly be said about it.
@@ -301,7 +315,7 @@ export function particleGroups(context: GroupingContext): ParticleGroup[] {
         .map(([prefix, ids]) => ({
             id: `prefix:${prefix}`,
             label: prefixLabel(prefix),
-            source: 'prefix' as const,
+            source: "prefix" as const,
             ids,
         }));
 
@@ -310,13 +324,13 @@ export function particleGroups(context: GroupingContext): ParticleGroup[] {
 
 /** `p_krayt` as a heading. Enough to scan; not a translation, because none can be asserted. */
 function prefixLabel(prefix: string): string {
-    const spaced = prefix.replace(/_/g, ' ');
+    const spaced = prefix.replace(/_/g, " ");
 
     return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 /** Whether a group is fully on, fully off, or split. */
-export type GroupState = 'all' | 'some' | 'none';
+export type GroupState = "all" | "some" | "none";
 
 /**
  * What a group's switch should read, given which systems are actually drawn.
@@ -324,25 +338,28 @@ export type GroupState = 'all' | 'some' | 'none';
  * Derived rather than stored - that is the whole point. Switching one system off in the tree makes
  * its groups read `some` without anything having to tell them.
  */
-export function groupState(group: ParticleGroup, shown: ReadonlySet<string>): GroupState {
-    const on = group.ids.filter(id => shown.has(id)).length;
+export function groupState(
+    group: ParticleGroup,
+    shown: ReadonlySet<string>,
+): GroupState {
+    const on = group.ids.filter((id) => shown.has(id)).length;
 
     if (on === 0) {
-        return 'none';
+        return "none";
     }
 
-    return on === group.ids.length ? 'all' : 'some';
+    return on === group.ids.length ? "all" : "some";
 }
 
 /** What switches this group on, in words. Empty when nothing does. */
 export function describeGate(gate: string, hardpointId: string | null): string {
     if (gate === PREVIEW_PARTICLE_GATE.hardpointDestroyed) {
-        return `when ${hardpointId ?? 'its hardpoint'} is destroyed`;
+        return `when ${hardpointId ?? "its hardpoint"} is destroyed`;
     }
 
     if (gate === PREVIEW_PARTICLE_GATE.hardpointAlive) {
-        return `until ${hardpointId ?? 'its hardpoint'} is destroyed`;
+        return `until ${hardpointId ?? "its hardpoint"} is destroyed`;
     }
 
-    return '';
+    return "";
 }

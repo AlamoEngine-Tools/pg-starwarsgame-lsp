@@ -11,15 +11,15 @@
 // archive the extension is forbidden to redistribute, so it happens because someone asked for it,
 // at the moment they asked.
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { promisify } from 'node:util';
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { promisify } from "node:util";
 
-import * as vscode from 'vscode';
-import * as yauzl from 'yauzl';
+import * as vscode from "vscode";
+import * as yauzl from "yauzl";
 
-import { checkArchive, entryVerdict, extractionVerdict } from './shaderArchive';
-import { hasShaderSources } from './shaderLayout';
+import { checkArchive, entryVerdict, extractionVerdict } from "./shaderArchive";
+import { hasShaderSources } from "./shaderLayout";
 
 export { hasShaderSources };
 
@@ -31,7 +31,8 @@ export { hasShaderSources };
  * fork builds and diff reviewability. The control that matters is the checksum below, which rejects
  * a swapped or tampered file - something secrecy would never have caught.
  */
-export const SHADER_ARCHIVE_URL = 'https://www.petroglyphgames.com/eawmodtool/foc_shaders.zip';
+export const SHADER_ARCHIVE_URL =
+    "https://www.petroglyphgames.com/eawmodtool/foc_shaders.zip";
 
 /**
  * SHA-256 of that archive, verified 2026-08-15 (190933 bytes, unchanged since 2023-11-14).
@@ -40,7 +41,7 @@ export const SHADER_ARCHIVE_URL = 'https://www.petroglyphgames.com/eawmodtool/fo
  * of different bytes.
  */
 export const SHADER_ARCHIVE_SHA256 =
-    '88b9cb03322aab9be7451968ca514e9d2c810973d83f65459fd8cb52e7f96f8d';
+    "88b9cb03322aab9be7451968ca514e9d2c810973d83f65459fd8cb52e7f96f8d";
 
 /** Its size, checked before hashing so a truncated or redirected download fails on the cheap test. */
 export const SHADER_ARCHIVE_BYTES = 190933;
@@ -54,15 +55,19 @@ export const SHADER_ARCHIVE_BYTES = 190933;
  * at their download.
  */
 export const SHADER_LICENCE_NOTE =
-    'The base game shader sources are published by Petroglyph for mod tooling. '
-    + 'EaWEdit never redistributes them - it only reads a copy you supply.';
+    "The base game shader sources are published by Petroglyph for mod tooling. " +
+    "EaWEdit never redistributes them - it only reads a copy you supply.";
 
 /** The managed directory, or undefined when the user has not supplied one. */
 export function shaderDirectory(): string | undefined {
-    const configured = vscode.workspace.getConfiguration()
-        .get<string>('aet-eaw-edit.shaders.directory')?.trim();
+    const configured = vscode.workspace
+        .getConfiguration()
+        .get<string>("aet-eaw-edit.shaders.directory")
+        ?.trim();
 
-    return configured !== undefined && configured !== '' ? configured : undefined;
+    return configured !== undefined && configured !== ""
+        ? configured
+        : undefined;
 }
 
 /**
@@ -79,38 +84,45 @@ export async function offerShaderSources(
 
     if (hasShaderSources(configured)) {
         void vscode.window.showInformationMessage(
-            `EaWEdit: Base shader sources found in "${configured!}".`);
+            `EaWEdit: Base shader sources found in "${configured!}".`,
+        );
         return;
     }
 
     // Download first when it is available: it is the answer most people want, and the manual route
     // stays for proxies, air-gapped machines and anyone who would rather see the bytes first.
-    const choices = context === undefined
-        ? ['Open download page', 'Choose folder']
-        : ['Download now', 'Open download page', 'Choose folder'];
+    const choices =
+        context === undefined
+            ? ["Open download page", "Choose folder"]
+            : ["Download now", "Open download page", "Choose folder"];
 
     const choice = await vscode.window.showInformationMessage(
-        `EaWEdit: The preview can use the base game's shader sources for a closer match. `
-        + `${SHADER_LICENCE_NOTE} They are fetched from Petroglyph's own published download and `
-        + 'checked against a pinned SHA-256.',
+        `EaWEdit: The preview can use the base game's shader sources for a closer match. ` +
+            `${SHADER_LICENCE_NOTE} They are fetched from Petroglyph's own published download and ` +
+            "checked against a pinned SHA-256.",
         ...choices,
     );
 
-    if (choice === 'Download now' && context !== undefined) {
+    if (choice === "Download now" && context !== undefined) {
         await downloadShaderSources(context);
         return;
     }
 
-    if (choice === 'Open download page') {
-        const url = vscode.workspace.getConfiguration()
-            .get<string>('aet-eaw-edit.shaders.sourceUrl')?.trim();
+    if (choice === "Open download page") {
+        const url = vscode.workspace
+            .getConfiguration()
+            .get<string>("aet-eaw-edit.shaders.sourceUrl")
+            ?.trim();
 
-        await vscode.env.openExternal(vscode.Uri.parse(
-            url !== undefined && url !== '' ? url : SHADER_ARCHIVE_URL));
+        await vscode.env.openExternal(
+            vscode.Uri.parse(
+                url !== undefined && url !== "" ? url : SHADER_ARCHIVE_URL,
+            ),
+        );
         return;
     }
 
-    if (choice !== 'Choose folder') {
+    if (choice !== "Choose folder") {
         return;
     }
 
@@ -118,7 +130,7 @@ export async function offerShaderSources(
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
-        openLabel: 'Use these shaders',
+        openLabel: "Use these shaders",
     });
 
     if (picked === undefined || picked.length === 0) {
@@ -129,23 +141,32 @@ export async function offerShaderSources(
 
     if (!hasShaderSources(directory)) {
         void vscode.window.showWarningMessage(
-            `EaWEdit: No .fx files found in "${directory}". `
-            + 'Pick the folder the archive extracted to.');
+            `EaWEdit: No .fx files found in "${directory}". ` +
+                "Pick the folder the archive extracted to.",
+        );
         return;
     }
 
     // Machine-scoped: where someone keeps a download is a property of their machine, not of a
     // workspace that might be shared or committed.
-    await vscode.workspace.getConfiguration().update(
-        'aet-eaw-edit.shaders.directory', directory, vscode.ConfigurationTarget.Global);
+    await vscode.workspace
+        .getConfiguration()
+        .update(
+            "aet-eaw-edit.shaders.directory",
+            directory,
+            vscode.ConfigurationTarget.Global,
+        );
 
     void vscode.window.showInformationMessage(
-        'EaWEdit: Base shader sources set. Reload the window to pick them up.');
+        "EaWEdit: Base shader sources set. Reload the window to pick them up.",
+    );
 }
 
 /** Where a fetched copy is kept: the extension's own storage, not the workspace. */
-export function managedShaderDirectory(context: vscode.ExtensionContext): string {
-    return path.join(context.globalStorageUri.fsPath, 'shaders');
+export function managedShaderDirectory(
+    context: vscode.ExtensionContext,
+): string {
+    return path.join(context.globalStorageUri.fsPath, "shaders");
 }
 
 /**
@@ -159,89 +180,117 @@ export function managedShaderDirectory(context: vscode.ExtensionContext): string
 export async function downloadShaderSources(
     context: vscode.ExtensionContext,
 ): Promise<boolean> {
-    const configured = vscode.workspace.getConfiguration()
-        .get<string>('aet-eaw-edit.shaders.sourceUrl')?.trim();
-    const url = configured !== undefined && configured !== '' ? configured : SHADER_ARCHIVE_URL;
+    const configured = vscode.workspace
+        .getConfiguration()
+        .get<string>("aet-eaw-edit.shaders.sourceUrl")
+        ?.trim();
+    const url =
+        configured !== undefined && configured !== ""
+            ? configured
+            : SHADER_ARCHIVE_URL;
 
-    return vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: 'EaWEdit: Base shader sources',
-        cancellable: true,
-    }, async (progress, token) => {
-        progress.report({ message: 'downloading...' });
+    return vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: "EaWEdit: Base shader sources",
+            cancellable: true,
+        },
+        async (progress, token) => {
+            progress.report({ message: "downloading..." });
 
-        let bytes: Uint8Array;
-        try {
-            bytes = await fetchArchive(url, token);
-        } catch (error) {
-            if (token.isCancellationRequested) {
+            let bytes: Uint8Array;
+            try {
+                bytes = await fetchArchive(url, token);
+            } catch (error) {
+                if (token.isCancellationRequested) {
+                    return false;
+                }
+
+                // Offline, a proxy that needs configuring, DNS, TLS - all land here, and the message is
+                // the only thing the reader has to go on.
+                void vscode.window.showErrorMessage(
+                    `EaWEdit: Could not download the shader sources from ${url}. ` +
+                        `${error instanceof Error ? error.message : String(error)} ` +
+                        "If you are behind a proxy, set it in VS Code's proxy settings, or download the " +
+                        'archive yourself and use "Choose folder".',
+                );
                 return false;
             }
 
-            // Offline, a proxy that needs configuring, DNS, TLS - all land here, and the message is
-            // the only thing the reader has to go on.
-            void vscode.window.showErrorMessage(
-                `EaWEdit: Could not download the shader sources from ${url}. `
-                + `${error instanceof Error ? error.message : String(error)} `
-                + 'If you are behind a proxy, set it in VS Code\'s proxy settings, or download the '
-                + 'archive yourself and use "Choose folder".');
-            return false;
-        }
+            progress.report({ message: "verifying..." });
 
-        progress.report({ message: 'verifying...' });
+            const checked = checkArchive(
+                bytes,
+                SHADER_ARCHIVE_SHA256,
+                SHADER_ARCHIVE_BYTES,
+            );
+            if (!checked.ok) {
+                void vscode.window.showErrorMessage(
+                    `EaWEdit: The shader archive was not what was expected - ${checked.problem}. ` +
+                        "Nothing has been written.",
+                );
+                return false;
+            }
 
-        const checked = checkArchive(bytes, SHADER_ARCHIVE_SHA256, SHADER_ARCHIVE_BYTES);
-        if (!checked.ok) {
-            void vscode.window.showErrorMessage(
-                `EaWEdit: The shader archive was not what was expected - ${checked.problem}. `
-                + 'Nothing has been written.');
-            return false;
-        }
+            progress.report({ message: "extracting..." });
 
-        progress.report({ message: 'extracting...' });
+            const directory = managedShaderDirectory(context);
+            let written: number;
+            try {
+                written = await extractShaders(bytes, directory);
+            } catch (error) {
+                void vscode.window.showErrorMessage(
+                    `EaWEdit: Could not unpack the shader archive. ` +
+                        `${error instanceof Error ? error.message : String(error)}`,
+                );
+                return false;
+            }
 
-        const directory = managedShaderDirectory(context);
-        let written: number;
-        try {
-            written = await extractShaders(bytes, directory);
-        } catch (error) {
-            void vscode.window.showErrorMessage(
-                `EaWEdit: Could not unpack the shader archive. `
-                + `${error instanceof Error ? error.message : String(error)}`);
-            return false;
-        }
+            const extracted = extractionVerdict(written);
+            if (!extracted.ok) {
+                void vscode.window.showErrorMessage(
+                    `EaWEdit: ${extracted.problem}, so nothing was configured.`,
+                );
+                return false;
+            }
 
-        const extracted = extractionVerdict(written);
-        if (!extracted.ok) {
-            void vscode.window.showErrorMessage(
-                `EaWEdit: ${extracted.problem}, so nothing was configured.`);
-            return false;
-        }
+            // Machine-scoped, and written out rather than left implicit: the reader can see where the
+            // files went, point somewhere else, or clear it.
+            await vscode.workspace
+                .getConfiguration()
+                .update(
+                    "aet-eaw-edit.shaders.directory",
+                    directory,
+                    vscode.ConfigurationTarget.Global,
+                );
 
-        // Machine-scoped, and written out rather than left implicit: the reader can see where the
-        // files went, point somewhere else, or clear it.
-        await vscode.workspace.getConfiguration().update(
-            'aet-eaw-edit.shaders.directory', directory, vscode.ConfigurationTarget.Global);
+            void vscode.window.showInformationMessage(
+                `EaWEdit: ${written} shader sources ready. ${SHADER_LICENCE_NOTE}`,
+            );
 
-        void vscode.window.showInformationMessage(
-            `EaWEdit: ${written} shader sources ready. ${SHADER_LICENCE_NOTE}`);
-
-        return true;
-    });
+            return true;
+        },
+    );
 }
 
 /** Downloads the archive, honouring a cancel. */
 async function fetchArchive(
-    url: string, token: vscode.CancellationToken,
+    url: string,
+    token: vscode.CancellationToken,
 ): Promise<Uint8Array> {
     const controller = new AbortController();
     const cancel = token.onCancellationRequested(() => controller.abort());
 
     try {
-        const response = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+        const response = await fetch(url, {
+            signal: controller.signal,
+            redirect: "follow",
+        });
 
         if (!response.ok) {
-            throw new Error(`The server answered ${response.status} ${response.statusText}.`);
+            throw new Error(
+                `The server answered ${response.status} ${response.statusText}.`,
+            );
         }
 
         return new Uint8Array(await response.arrayBuffer());
@@ -256,19 +305,24 @@ async function fetchArchive(
  * `entryVerdict` decides what may be written; this loop does no path arithmetic of its own, so the
  * zip-slip rule has exactly one home and one set of tests.
  */
-async function extractShaders(archive: Uint8Array, directory: string): Promise<number> {
+async function extractShaders(
+    archive: Uint8Array,
+    directory: string,
+): Promise<number> {
     await fs.promises.mkdir(directory, { recursive: true });
 
-    const open = promisify<Buffer, yauzl.Options, yauzl.ZipFile>(yauzl.fromBuffer);
+    const open = promisify<Buffer, yauzl.Options, yauzl.ZipFile>(
+        yauzl.fromBuffer,
+    );
     const zip = await open(Buffer.from(archive), { lazyEntries: true });
 
     return new Promise<number>((resolve, reject) => {
         let written = 0;
 
-        zip.on('error', reject);
-        zip.on('end', () => resolve(written));
+        zip.on("error", reject);
+        zip.on("end", () => resolve(written));
 
-        zip.on('entry', (entry: yauzl.Entry) => {
+        zip.on("entry", (entry: yauzl.Entry) => {
             const verdict = entryVerdict(entry.fileName, directory);
             if (!verdict.keep) {
                 zip.readEntry();
@@ -281,11 +335,13 @@ async function extractShaders(archive: Uint8Array, directory: string): Promise<n
                     return;
                 }
 
-                const out = fs.createWriteStream(path.join(directory, verdict.relativePath));
+                const out = fs.createWriteStream(
+                    path.join(directory, verdict.relativePath),
+                );
                 stream.pipe(out);
 
-                out.on('error', reject);
-                out.on('close', () => {
+                out.on("error", reject);
+                out.on("close", () => {
                     written++;
                     zip.readEntry();
                 });

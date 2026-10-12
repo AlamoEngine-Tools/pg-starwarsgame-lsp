@@ -39,23 +39,24 @@ export interface AttachmentFound {
  * where there is one, because bone names repeat.
  */
 export function attachmentProblem(
-    request: AttachmentRequest, found: AttachmentFound,
+    request: AttachmentRequest,
+    found: AttachmentFound,
 ): string | null {
     if (!found.part) {
         return `'${request.partId}' has not loaded, so nothing can attach to ${describe(request)}.`;
     }
 
     if (request.bone !== undefined && !found.bone) {
-        return `'${request.partId}' has no bone '${request.bone}'`
-            + `${request.boneIndex === undefined ? '' : ` (index ${request.boneIndex})`}`
-            + ', so nothing can attach to it.';
+        return (
+            `'${request.partId}' has no bone '${request.bone}'` +
+            `${request.boneIndex === undefined ? "" : ` (index ${request.boneIndex})`}` +
+            ", so nothing can attach to it."
+        );
     }
 
     return null;
 }
 
 function describe(request: AttachmentRequest): string {
-    return request.bone === undefined
-        ? 'it'
-        : `its bone '${request.bone}'`;
+    return request.bone === undefined ? "it" : `its bone '${request.bone}'`;
 }

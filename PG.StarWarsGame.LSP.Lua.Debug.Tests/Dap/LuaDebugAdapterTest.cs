@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
+using System.Net;
+using System.Net.Sockets;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Events;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
@@ -127,8 +129,8 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
     public async Task Attach_NobodyListening_FailsWithAHint()
     {
         using var silent =
-            new System.Net.Sockets.UdpClient(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
-        var port = ((System.Net.IPEndPoint)silent.Client.LocalEndPoint!).Port;
+            new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        var port = ((IPEndPoint)silent.Client.LocalEndPoint!).Port;
 
         var attach = _harness.Client.SendRequest("attach", new { host = "127.0.0.1", port })
             .Returning<AttachResponse>(None);
@@ -346,7 +348,7 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
     [Fact]
     public async Task Variables_TableWithUnsafeExpansion_ExpandsThroughTheGame()
     {
-        await AttachAsync(unsafeTables: true);
+        await AttachAsync(true);
         var stopped = await SuspendHeroAtAsync(4);
         var trace = await _harness.Client.RequestStackTrace(
             new StackTraceArguments { ThreadId = stopped.ThreadId!.Value }, None);
@@ -454,7 +456,7 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
 
         await _harness.Client.RequestNext(new NextArguments { ThreadId = stopped.ThreadId!.Value }, None);
         await WaitUntilAsync(() => _game.Armed == ArmedBreakKind.Step);
-        var again = await SuspendHeroAtAsync(5, stopsSoFar: 1);
+        var again = await SuspendHeroAtAsync(5, 1);
 
         Assert.Equal(StoppedEventReason.Step, again.Reason);
         Assert.Empty(_game.Violations);
@@ -559,8 +561,8 @@ public sealed class LuaDebugAdapterTest : IAsyncLifetime
     {
         _harness.Launcher.ExitImmediatelyWith = 7;
         using var silent =
-            new System.Net.Sockets.UdpClient(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
-        var port = ((System.Net.IPEndPoint)silent.Client.LocalEndPoint!).Port;
+            new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        var port = ((IPEndPoint)silent.Client.LocalEndPoint!).Port;
 
         var launch = _harness.Client.SendRequest("launch", new { program = @"D:\Game\StarWarsI.exe", port })
             .Returning<LaunchResponse>(None);

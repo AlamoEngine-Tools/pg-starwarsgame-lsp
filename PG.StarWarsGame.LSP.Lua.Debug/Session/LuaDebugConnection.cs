@@ -15,23 +15,24 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
     /// <summary>How often pending resends and the silence watchdog are checked.</summary>
     private static readonly TimeSpan Tick = TimeSpan.FromMilliseconds(250);
 
-    private readonly IUdpTransportFactory _transports;
-    private readonly IPgNetDatagramCodec _datagrams;
-    private readonly IConnectHandshake _handshake;
-    private readonly ILuaMessageCodec _messages;
     private readonly IReliableChannel _channel;
-    private readonly TimeProvider _time;
-    private readonly ILogger<LuaDebugConnection> _logger;
-    private readonly Channel<LuaDebugMessage> _inbound = Channel.CreateUnbounded<LuaDebugMessage>();
+    private readonly IPgNetDatagramCodec _datagrams;
     private readonly Lock _gate = new();
+    private readonly IConnectHandshake _handshake;
+    private readonly Channel<LuaDebugMessage> _inbound = Channel.CreateUnbounded<LuaDebugMessage>();
+    private readonly ILogger<LuaDebugConnection> _logger;
+    private readonly ILuaMessageCodec _messages;
+    private readonly TimeProvider _time;
 
-    private IUdpTransport? _transport;
+    private readonly IUdpTransportFactory _transports;
+    private bool _closed;
+    private TaskCompletionSource _drained = Completed();
+    private long _lastActivity;
     private CancellationTokenSource? _loops;
     private Task _receiveLoop = Task.CompletedTask;
     private Task _tickLoop = Task.CompletedTask;
-    private long _lastActivity;
-    private TaskCompletionSource _drained = Completed();
-    private bool _closed;
+
+    private IUdpTransport? _transport;
 
     public LuaDebugConnection(
         IUdpTransportFactory transports,
@@ -117,7 +118,6 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
             return;
 
         if (IsConnected)
-        {
             try
             {
                 await SendAsync(new GoodbyeMessage(), cancellationToken).ConfigureAwait(false);
@@ -133,7 +133,6 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
             {
                 // Already gone; nothing left to say goodbye to.
             }
-        }
 
         Close(null);
         // Both loops end on their own once the socket is gone; waiting makes shutdown deterministic.

@@ -8,13 +8,14 @@
 // appears before you save, which is the whole point of previewing an ordered format. The editor
 // pushes its rows here whenever they change.
 
-import { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
+import { useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
 
-import { CreditsCrawl } from './creditsCrawl';
-import { LocRow } from './loc/locRow';
+import { CreditsCrawl } from "./creditsCrawl";
+import { LocRow } from "./loc/locRow";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
+
 const vscode = acquireVsCodeApi();
 
 interface CrawlPayload {
@@ -29,7 +30,9 @@ function App(): React.JSX.Element {
     useEffect(() => {
         const handle = (event: MessageEvent): void => {
             const msg = event.data as { type: string; [key: string]: unknown };
-            if (msg.type !== 'crawl') { return; }
+            if (msg.type !== "crawl") {
+                return;
+            }
             setPayload({
                 rows: msg.rows as LocRow[],
                 languages: msg.languages as string[],
@@ -37,13 +40,17 @@ function App(): React.JSX.Element {
             });
         };
 
-        window.addEventListener('message', handle);
-        vscode.postMessage({ type: 'ready' });
-        return () => window.removeEventListener('message', handle);
+        window.addEventListener("message", handle);
+        vscode.postMessage({ type: "ready" });
+        return () => window.removeEventListener("message", handle);
     }, []);
 
     if (payload === null) {
-        return <p style={{ padding: 12, opacity: 0.7 }}>Waiting for the editor...</p>;
+        return (
+            <p style={{ padding: 12, opacity: 0.7 }}>
+                Waiting for the editor...
+            </p>
+        );
     }
 
     return (
@@ -52,9 +59,9 @@ function App(): React.JSX.Element {
             languages={payload.languages}
             initialLanguage={payload.language}
             // Closing the crawl closes the panel: it is the only thing here.
-            onClose={() => vscode.postMessage({ type: 'close' })}
+            onClose={() => vscode.postMessage({ type: "close" })}
         />
     );
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById("root")!).render(<App />);

@@ -4,7 +4,7 @@
 // How a decoded texture should be addressed. Kept free of three.js and the DOM so it can be tested.
 
 /** What to set on a texture's wrapS/wrapT. */
-export type Addressing = 'repeat' | 'clamp';
+export type Addressing = "repeat" | "clamp";
 
 /**
  * The addressing mode a texture of this size should use.
@@ -19,10 +19,18 @@ export type Addressing = 'repeat' | 'clamp';
  * black - a worse failure than the one being fixed. That costs nothing here: of 1750 shipped
  * textures only 24 are NPOT, and every one of those is interface art rather than model skin.
  */
-export function addressingFor(width: number | undefined, height: number | undefined): Addressing {
-    return isPowerOfTwo(width) && isPowerOfTwo(height) ? 'repeat' : 'clamp';
+export function addressingFor(
+    width: number | undefined,
+    height: number | undefined,
+): Addressing {
+    return isPowerOfTwo(width) && isPowerOfTwo(height) ? "repeat" : "clamp";
 }
 
 function isPowerOfTwo(value: number | undefined): boolean {
-    return value !== undefined && Number.isInteger(value) && value > 0 && (value & (value - 1)) === 0;
+    return (
+        value !== undefined &&
+        Number.isInteger(value) &&
+        value > 0 &&
+        (value & (value - 1)) === 0
+    );
 }

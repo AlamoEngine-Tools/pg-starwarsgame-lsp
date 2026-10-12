@@ -15,7 +15,7 @@
 
 /** Forward slashes, no trailing separator, lower case - the only form these are compared in. */
 function canonical(path: string): string {
-    return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }
 
 /**
@@ -23,7 +23,7 @@ function canonical(path: string): string {
  * counting as covered by a folder open on `Rev`.
  */
 function covers(outer: string, inner: string): boolean {
-    return inner === outer || inner.startsWith(outer + '/');
+    return inner === outer || inner.startsWith(outer + "/");
 }
 
 /**
@@ -44,7 +44,7 @@ export function directoriesNeedingOwnWatcher(
             continue;
         }
         seen.add(key);
-        if (!folders.some(folder => covers(folder, key))) {
+        if (!folders.some((folder) => covers(folder, key))) {
             need.push(directory);
         }
     }

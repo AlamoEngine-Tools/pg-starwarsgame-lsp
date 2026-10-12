@@ -25,6 +25,58 @@ public sealed class TupleItemsTest
         ]
     };
 
+    // ── ListMap: an item is a key when it IS one, wherever it sits ─────────────
+    //
+    // Measured in the engine: every item is tried as a key first and only then added to the current
+    // key's list. So "Empire, A, B, Rebel, C" is two groups, and an object that happens to be named
+    // like a key starts a group of its own.
+
+    private static readonly XmlTagDefinition Buildables = new()
+    {
+        Tag = "Tactical_Buildable_Objects_Multiplayer",
+        ValueType = XmlValueType.ListMap,
+        Slots =
+        [
+            new TupleSlotDefinition
+            {
+                Label = "Faction", ReferenceKind = ReferenceKind.XmlObject,
+                ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
+            },
+            new TupleSlotDefinition
+            {
+                Label = "Object", ReferenceKind = ReferenceKind.XmlObject,
+                ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
+            }
+        ]
+    };
+
+    private static readonly XmlTagDefinition Presence = new()
+    {
+        Tag = "Presence_Induced_Animations",
+        ValueType = XmlValueType.ListMap,
+        Slots =
+        [
+            new TupleSlotDefinition
+            {
+                Label = "Animation", ReferenceKind = ReferenceKind.Enum,
+                Enum = new EnumDefinition
+                {
+                    Name = "AnimationType", Kind = EnumKind.SchemaFixed,
+                    Values =
+                    [
+                        new EnumValueDefinition { Name = "Attention" }, new EnumValueDefinition { Name = "Idle" },
+                        new EnumValueDefinition { Name = "Turn Left" }
+                    ]
+                }
+            },
+            new TupleSlotDefinition
+            {
+                Label = "Unit", ReferenceKind = ReferenceKind.XmlObject,
+                ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
+            }
+        ]
+    };
+
     [Fact]
     public void Read_AlternatesTheSlots()
     {
@@ -83,58 +135,6 @@ public sealed class TupleItemsTest
         Assert.Equal("`Terrain, Model` pairs", TupleItems.Describe(TerrainModel));
         Assert.Equal("comma-separated pairs", TupleItems.Describe(TerrainModel with { Slots = [] }));
     }
-
-    // ── ListMap: an item is a key when it IS one, wherever it sits ─────────────
-    //
-    // Measured in the engine: every item is tried as a key first and only then added to the current
-    // key's list. So "Empire, A, B, Rebel, C" is two groups, and an object that happens to be named
-    // like a key starts a group of its own.
-
-    private static readonly XmlTagDefinition Buildables = new()
-    {
-        Tag = "Tactical_Buildable_Objects_Multiplayer",
-        ValueType = XmlValueType.ListMap,
-        Slots =
-        [
-            new TupleSlotDefinition
-            {
-                Label = "Faction", ReferenceKind = ReferenceKind.XmlObject,
-                ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
-            },
-            new TupleSlotDefinition
-            {
-                Label = "Object", ReferenceKind = ReferenceKind.XmlObject,
-                ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
-            }
-        ]
-    };
-
-    private static readonly XmlTagDefinition Presence = new()
-    {
-        Tag = "Presence_Induced_Animations",
-        ValueType = XmlValueType.ListMap,
-        Slots =
-        [
-            new TupleSlotDefinition
-            {
-                Label = "Animation", ReferenceKind = ReferenceKind.Enum,
-                Enum = new EnumDefinition
-                {
-                    Name = "AnimationType", Kind = EnumKind.SchemaFixed,
-                    Values =
-                    [
-                        new EnumValueDefinition { Name = "Attention" }, new EnumValueDefinition { Name = "Idle" },
-                        new EnumValueDefinition { Name = "Turn Left" }
-                    ]
-                }
-            },
-            new TupleSlotDefinition
-            {
-                Label = "Unit", ReferenceKind = ReferenceKind.XmlObject,
-                ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
-            }
-        ]
-    };
 
     private static GameIndex IndexOf(params (string Id, string Type)[] symbols)
     {

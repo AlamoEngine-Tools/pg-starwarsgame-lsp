@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Model;
+using PG.StarWarsGame.LSP.Story.Sim;
 
 namespace PG.StarWarsGame.LSP.Story.Graph;
 
@@ -50,13 +51,13 @@ public sealed record StoryBattle(
 /// </summary>
 public static class StoryGraphScoper
 {
+    private const string TacticalPrefix = "tactical#";
+
     /// <summary>The event types that listen for a battle's outcome on the galactic side.</summary>
     private static readonly HashSet<string> OutcomeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "STORY_VICTORY", "STORY_MISSION_LOST", "STORY_MISSION_FAILED"
     };
-
-    private const string TacticalPrefix = "tactical#";
 
     /// <summary>The scope key of a tactical manifest reference, the same normalisation the builder's stub id uses.</summary>
     public static string BattleKey(string manifestReference)
@@ -202,11 +203,9 @@ public static class StoryGraphScoper
             var fromIn = kept.Contains(e.FromId) || from.Kind == StoryNodeKind.LuaState;
             var toIn = kept.Contains(e.ToId) || to.Kind == StoryNodeKind.LuaState;
             if (from.Kind == StoryNodeKind.LuaState && to.Kind == StoryNodeKind.LuaState)
-            {
                 // A state-to-state link belongs to whichever scope shows both states; the pass
                 // below adds it once the states are known to be used here.
                 continue;
-            }
 
             if (fromIn && toIn)
             {
@@ -449,7 +448,7 @@ public static class StoryGraphScoper
         return node.Event is { } storyEvent
                && string.Equals(storyEvent.EventType, "STORY_GENERIC", StringComparison.OrdinalIgnoreCase)
                && StoryGraphBuilder.NameTokens(storyEvent.EventParams.FirstOrDefault(p => p.Position == 0)?.RawValue)
-                   .Contains(Sim.StorySimulator.BattleEndClosed);
+                   .Contains(StorySimulator.BattleEndClosed);
     }
 
     /// <summary>
@@ -467,7 +466,6 @@ public static class StoryGraphScoper
         var seen = new HashSet<string>(StringComparer.Ordinal) { entryId };
         var queue = new Queue<string>([entryId]);
         while (queue.Count > 0)
-        {
             foreach (var id in next[queue.Dequeue()])
             {
                 if (!seen.Add(id) || !nodesById.TryGetValue(id, out var node)) continue;
@@ -487,6 +485,5 @@ public static class StoryGraphScoper
                     yield return (node, false);
                 }
             }
-        }
     }
 }

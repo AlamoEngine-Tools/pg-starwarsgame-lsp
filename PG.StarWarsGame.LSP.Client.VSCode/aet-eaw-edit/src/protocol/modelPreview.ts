@@ -9,34 +9,34 @@
 /** What the scene was built from. Mirrors the C# `PreviewSceneKind`. */
 export const PREVIEW_SCENE_KIND = {
     /** A single `.alo`, opened directly. */
-    model: 'Model',
+    model: "Model",
     /** A GameObject, assembled from its model and everything its XML mounts on it. */
-    object: 'Object',
+    object: "Object",
     /**
      * A particle system, opened directly.
      *
      * Shares the `.alo` extension with models, so the server classifies by root chunk and says which
      * it found. A particle scene takes `aet/getParticleSystem`, never `aet/getModelGlb`.
      */
-    particle: 'Particle',
+    particle: "Particle",
 } as const;
 
 /** What decides whether a particle system is playing. Mirrors the C# `PreviewParticleGate`. */
 export const PREVIEW_PARTICLE_GATE = {
     /** Plays whenever the model is shown, subject to the proxy's own visibility flag. */
-    always: 'Always',
+    always: "Always",
     /** Damage smoke: off until its hardpoint is destroyed. */
-    hardpointDestroyed: 'HardpointDestroyed',
+    hardpointDestroyed: "HardpointDestroyed",
     /** Engine glow: on until its hardpoint dies, for hardpoints whose death puts it out. */
-    hardpointAlive: 'HardpointAlive',
+    hardpointAlive: "HardpointAlive",
 } as const;
 
 /** Why a part is in the scene. Mirrors the C# `PreviewPartOrigin`. */
 export const PREVIEW_PART_ORIGIN = {
     /** The object's own tactical model. */
-    hull: 'Hull',
+    hull: "Hull",
     /** A hardpoint's `Model_To_Attach`. */
-    hardpoint: 'Hardpoint',
+    hardpoint: "Hardpoint",
 } as const;
 
 /** Four 0-255 channels, alpha last, exactly as the game writes them. */
@@ -71,16 +71,16 @@ export interface PreviewPart {
 
 /** Where a weapon is declared. Mirrors the C# `PreviewWeaponSource`. */
 export const PREVIEW_WEAPON_SOURCE = {
-    hardpoint: 'Hardpoint',
-    unit: 'Unit',
+    hardpoint: "Hardpoint",
+    unit: "Unit",
 } as const;
 
 /** How the engine picks which fire point a shot leaves from. Mirrors `PreviewFirePointMode`. */
 export const PREVIEW_FIRE_POINT_MODE = {
     /** Each bone in turn, one per volley. What every shipped hardpoint does. */
-    cycleBones: 'CycleBones',
+    cycleBones: "CycleBones",
     /** Any random point along the line between the fire bones. */
-    randomAlongLine: 'RandomAlongLine',
+    randomAlongLine: "RandomAlongLine",
 } as const;
 
 /**
@@ -144,14 +144,14 @@ export interface PreviewWeapon {
 /** How the engine puts a projectile on screen. Mirrors `PreviewProjectileRender`. */
 export const PREVIEW_PROJECTILE_RENDER = {
     /** Drawn from its `.alo`. */
-    model: 'Model',
+    model: "Model",
     /**
      * Drawn by the engine as a textured quad.
      *
      * NOT exclusive with naming a model - 40 of foc's 63 custom-rendered projectiles carry one
      * anyway - so the flag decides how it draws and `modelFile` travels regardless.
      */
-    customQuad: 'CustomQuad',
+    customQuad: "CustomQuad",
 } as const;
 
 /**
@@ -935,7 +935,7 @@ export interface ProxyDetail {
 // whole buffer on the wire.
 
 /** Which table a page is of. */
-export type GeometryTable = 'vertices' | 'faces' | 'boneMapping';
+export type GeometryTable = "vertices" | "faces" | "boneMapping";
 
 export interface GetSubMeshGeometryParams {
     modelReference: string;
@@ -1002,35 +1002,53 @@ export interface BoneMappingRow {
 // making for a preview.
 
 /** Mirrors the C# `AlamoSpawnShape`. */
-export type AlamoSpawnShape = 'Point' | 'Box' | 'Cube' | 'Sphere' | 'Cylinder';
+export type AlamoSpawnShape = "Point" | "Box" | "Cube" | "Sphere" | "Cylinder";
 
 /** Mirrors the C# `AlamoTrackInterpolation`. */
-export type AlamoTrackInterpolation = 'Linear' | 'Smooth' | 'Step';
+export type AlamoTrackInterpolation = "Linear" | "Smooth" | "Step";
 
 /** Mirrors the C# `AlamoTrackChannel`. */
 export type AlamoTrackChannel =
-    | 'Red' | 'Green' | 'Blue' | 'Alpha' | 'Scale' | 'TextureIndex' | 'RotationSpeed';
+    | "Red"
+    | "Green"
+    | "Blue"
+    | "Alpha"
+    | "Scale"
+    | "TextureIndex"
+    | "RotationSpeed";
 
 /** Mirrors the C# `AlamoParticleBlendMode`. */
 export type AlamoParticleBlendMode =
-    | 'None' | 'Additive' | 'Transparent' | 'Inverse'
-    | 'DepthAdditive' | 'DepthTransparent' | 'DepthInverse' | 'DiffuseTransparent'
-    | 'StencilDarken' | 'StencilDarkenBlur' | 'Heat' | 'Bump' | 'DecalBump' | 'Scanlines';
+    | "None"
+    | "Additive"
+    | "Transparent"
+    | "Inverse"
+    | "DepthAdditive"
+    | "DepthTransparent"
+    | "DepthInverse"
+    | "DiffuseTransparent"
+    | "StencilDarken"
+    | "StencilDarkenBlur"
+    | "Heat"
+    | "Bump"
+    | "DecalBump"
+    | "Scanlines";
 
-export type AlamoGroundBehavior = 'None' | 'Disappear' | 'Bounce' | 'Stick';
-export type AlamoEmitFromMesh = 'Disabled' | 'RandomVertex' | 'RandomMesh' | 'EveryVertex';
+export type AlamoGroundBehavior = "None" | "Disappear" | "Bounce" | "Stick";
+export type AlamoEmitFromMesh =
+    "Disabled" | "RandomVertex" | "RandomMesh" | "EveryVertex";
 
 export interface AlamoVector3 {
     x: number;
     y: number;
-    z: number
+    z: number;
 }
 
 export interface AlamoVector4 {
     x: number;
     y: number;
     z: number;
-    w: number
+    w: number;
 }
 
 /**

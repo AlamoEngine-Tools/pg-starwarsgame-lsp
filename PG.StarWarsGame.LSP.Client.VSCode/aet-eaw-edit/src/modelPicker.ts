@@ -4,7 +4,7 @@
 // The "Preview Model" picker's items and its choice. Kept free of `vscode` so the unit harness can
 // run it; extension.ts owns the QuickPick itself.
 
-import {type PreviewModelEntry} from './protocol/modelPreview';
+import { type PreviewModelEntry } from "./protocol/modelPreview";
 
 /** One row of the picker. Structurally a `vscode.QuickPickItem`. */
 export interface ModelPickItem {
@@ -13,8 +13,13 @@ export interface ModelPickItem {
 }
 
 /** The picker's rows, in the server's order. */
-export function modelPickItems(models: readonly PreviewModelEntry[]): ModelPickItem[] {
-    return models.map(m => ({label: m.name, description: m.baseGame ? 'Base game' : 'Project'}));
+export function modelPickItems(
+    models: readonly PreviewModelEntry[],
+): ModelPickItem[] {
+    return models.map((m) => ({
+        label: m.name,
+        description: m.baseGame ? "Base game" : "Project",
+    }));
 }
 
 /**
@@ -24,11 +29,14 @@ export function modelPickItems(models: readonly PreviewModelEntry[]): ModelPickI
  * catalog can lag the disk - a model saved a moment ago must still open by name, as it did before
  * the list existed.
  */
-export function pickedModelName(active: { label: string } | undefined, typed: string): string | null {
+export function pickedModelName(
+    active: { label: string } | undefined,
+    typed: string,
+): string | null {
     if (active !== undefined) {
         return active.label;
     }
 
     const name = typed.trim();
-    return name === '' ? null : name;
+    return name === "" ? null : name;
 }

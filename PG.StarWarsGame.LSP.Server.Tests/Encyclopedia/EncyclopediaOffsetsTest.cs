@@ -96,8 +96,8 @@ public sealed class EncyclopediaOffsetsTest
     {
         var o = EncyclopediaOffsets.Shipped;
 
-        Assert.Equal(68 - 11, o.NameFor(hasBlip: false, hasIcon: true));
-        Assert.Equal(39 - 11, o.IconXFor(hasBlip: false));
+        Assert.Equal(68 - 11, o.NameFor(false, true));
+        Assert.Equal(39 - 11, o.IconXFor(false));
     }
 
     [Fact]
@@ -105,8 +105,8 @@ public sealed class EncyclopediaOffsetsTest
     {
         var o = EncyclopediaOffsets.Shipped;
 
-        Assert.Equal(68, o.NameFor(hasBlip: true, hasIcon: true));
-        Assert.Equal(39, o.IconXFor(hasBlip: true));
+        Assert.Equal(68, o.NameFor(true, true));
+        Assert.Equal(39, o.IconXFor(true));
     }
 
     /// <summary>
@@ -116,7 +116,7 @@ public sealed class EncyclopediaOffsetsTest
     [Fact]
     public void WithNeitherBlipNorPortrait_TheNameTakesTheBlipsPlace()
     {
-        Assert.Equal(11, EncyclopediaOffsets.Shipped.NameFor(hasBlip: false, hasIcon: false));
+        Assert.Equal(11, EncyclopediaOffsets.Shipped.NameFor(false, false));
     }
 
     /// <summary>A blip but no portrait closes only the portrait's share of the gap.</summary>
@@ -124,6 +124,6 @@ public sealed class EncyclopediaOffsetsTest
     public void WithABlipButNoPortrait_TheNameClosesThePortraitsGap()
     {
         Assert.Equal(68 - (39 - 11),
-            EncyclopediaOffsets.Shipped.NameFor(hasBlip: true, hasIcon: false));
+            EncyclopediaOffsets.Shipped.NameFor(true, false));
     }
 }

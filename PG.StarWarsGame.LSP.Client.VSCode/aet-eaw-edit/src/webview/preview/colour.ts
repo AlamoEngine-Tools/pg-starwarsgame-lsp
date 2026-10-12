@@ -4,7 +4,7 @@
 // Faction colours, between the three forms they take: the game's 0-255 channels, the picker's hex,
 // and the renderer's 0-1.
 
-import type { PreviewFaction, PreviewRgba } from '../../protocol/modelPreview';
+import type { PreviewFaction, PreviewRgba } from "../../protocol/modelPreview";
 
 /** Normalised channels, as the renderer wants them. */
 export interface NormalisedColour {
@@ -21,7 +21,7 @@ function clampChannel(value: number): number {
 /** A colour as `#rrggbb`, which is the only form `<input type="color">` accepts. */
 export function toHex(colour: PreviewRgba): string {
     const channel = (value: number): string =>
-        clampChannel(value).toString(16).padStart(2, '0');
+        clampChannel(value).toString(16).padStart(2, "0");
 
     return `#${channel(colour.r)}${channel(colour.g)}${channel(colour.b)}`;
 }
@@ -93,11 +93,18 @@ export function affiliationColour(
     factions: readonly PreviewFaction[],
     affiliation: string | null | undefined,
 ): PreviewRgba | null {
-    if (affiliation === null || affiliation === undefined || affiliation.length === 0) {
+    if (
+        affiliation === null ||
+        affiliation === undefined ||
+        affiliation.length === 0
+    ) {
         return null;
     }
 
-    return factions.find(faction => faction.name === affiliation)?.noColorizationColor ?? null;
+    return (
+        factions.find((faction) => faction.name === affiliation)
+            ?.noColorizationColor ?? null
+    );
 }
 
 export function teamColour(colour: PreviewRgba): NormalisedColour {

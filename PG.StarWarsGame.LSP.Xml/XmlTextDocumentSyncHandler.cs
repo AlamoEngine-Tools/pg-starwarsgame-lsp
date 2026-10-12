@@ -20,8 +20,8 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IStartupGate _gate;
     private readonly IGameIndexService _indexService;
-    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILogger<XmlTextDocumentSyncHandler>? _logger;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService,
         IFileHelper fileHelper, IEaWXmlContext eaWXmlContext, IStartupGate gate,

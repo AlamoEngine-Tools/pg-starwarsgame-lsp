@@ -407,7 +407,7 @@ public sealed class PreviewSceneBuilder(
             stages,
             DamageTable(effective),
             EngineScaleFactor.Of(Tag(effective, "Scale_Factor")),
-            IconName: Tag(effective, EncyclopediaTags.IconName));
+            Tag(effective, EncyclopediaTags.IconName));
     }
 
     /// <summary>

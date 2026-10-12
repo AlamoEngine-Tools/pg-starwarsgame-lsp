@@ -11,7 +11,7 @@
 // The engine's own answer is to draw the Petroglyph logo, which is unmistakable at any size and any
 // tint. This does the same with the AET logo the extension already ships as its icon.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
 /**
  * The glyph, as bytes.
@@ -20,7 +20,7 @@ import * as THREE from 'three';
  * `resources/` is not addressable from the webview at all, and the CSP already admits `data:` for
  * images. esbuild inlines it at build time - see the `.png` loader in esbuild.js.
  */
-import logo from '../../../resources/icons/alamo-engine-tools.png';
+import logo from "../../../resources/icons/alamo-engine-tools.png";
 
 export const MISSING_TEXTURE_SOURCE = logo;
 
@@ -74,21 +74,29 @@ async function decode(): Promise<THREE.Texture> {
     image.src = MISSING_TEXTURE_SOURCE;
     await image.decode();
 
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement("canvas");
     canvas.width = MISSING_TEXTURE_SIZE;
     canvas.height = MISSING_TEXTURE_SIZE;
 
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext("2d");
 
     if (context === null) {
-        throw new Error('no 2d context for the missing-texture marker');
+        throw new Error("no 2d context for the missing-texture marker");
     }
 
     context.drawImage(image, 0, 0, MISSING_TEXTURE_SIZE, MISSING_TEXTURE_SIZE);
 
-    const decoded = context.getImageData(0, 0, MISSING_TEXTURE_SIZE, MISSING_TEXTURE_SIZE);
+    const decoded = context.getImageData(
+        0,
+        0,
+        MISSING_TEXTURE_SIZE,
+        MISSING_TEXTURE_SIZE,
+    );
     const texture = new THREE.DataTexture(
-        markerPixels(decoded.data), MISSING_TEXTURE_SIZE, MISSING_TEXTURE_SIZE);
+        markerPixels(decoded.data),
+        MISSING_TEXTURE_SIZE,
+        MISSING_TEXTURE_SIZE,
+    );
 
     // Clamped, because it is one image rather than a tile, and linear because a particle draws it
     // at whatever handful of pixels it happens to occupy.

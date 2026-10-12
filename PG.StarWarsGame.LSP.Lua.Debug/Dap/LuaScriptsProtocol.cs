@@ -47,7 +47,10 @@ public static class LuaScriptsChangedReasons
     public const string StateChanged = "stateChanged";
 }
 
-/// <summary>Arguments of <see cref="LuaCustomMessages.Refresh" />: a script id reloads that script's threads, none reloads the list.</summary>
+/// <summary>
+///     Arguments of <see cref="LuaCustomMessages.Refresh" />: a script id reloads that script's threads, none reloads
+///     the list.
+/// </summary>
 public sealed record LuaRefreshArguments
 {
     public int? ScriptId { get; init; }

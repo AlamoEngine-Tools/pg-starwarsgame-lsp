@@ -11,8 +11,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///         Error: (%s) You should set either Can_Assassinate_Minor_Heroes or
 ///         Can_Assassinate_Major_Heroes to 'Yes', otherwise this ability won't do anything.
 ///     </c>
-///    , referenced by the engine's load-time validation
-///    . No vanilla object uses this ability class at all - it is one of the three
+///     , referenced by the engine's load-time validation
+///     . No vanilla object uses this ability class at all - it is one of the three
 ///     abandoned hero abilities - so the rule exists for mods, which are the only things that can
 ///     reach it.
 /// </remarks>
@@ -28,8 +28,8 @@ public sealed class HeroAssassinTargetsRule : EitherOrRequirementRuleBase
 /// </summary>
 /// <remarks>
 ///     <c>Error: (%s) You should set either Destroy_Starbase or Destroy_Land_Base to "Yes"</c>
-///    , referenced by the engine's load-time validation
-///    . The only shipped instance is the Death Star's, and it is commented out -
+///     , referenced by the engine's load-time validation
+///     . The only shipped instance is the Death Star's, and it is commented out -
 ///     though it sets <c>Destroy_Starbase</c> and would pass regardless.
 /// </remarks>
 public sealed class BaseDestructionTargetsRule : EitherOrRequirementRuleBase
@@ -48,8 +48,8 @@ public sealed class BaseDestructionTargetsRule : EitherOrRequirementRuleBase
 ///             Warning: (%s) You should set either Can_Neutralize_Minor_Heroes or
 ///             Can_Neutralize_Major_Heroes to "Yes", otherwise this ability won't do anything!
 ///         </c>
-///        , referenced by the engine's load-time validation
-///        .
+///         , referenced by the engine's load-time validation
+///         .
 ///     </para>
 ///     <para>
 ///         This rule is NOT in the harvested rule list: the harvest keyed on the <c>Error: (%s) </c>

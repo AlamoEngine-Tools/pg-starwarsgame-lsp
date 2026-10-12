@@ -15,8 +15,6 @@ public sealed class StoryGraphScoperTest
     private const string M2 = "Story_Plots_M2_Land.xml";
     private const string M5 = "Story_Plots_M5_Space.xml";
 
-    private static ISchemaProvider Schema { get; } = new ScoperSchemaProvider();
-
     // The galaxy links M2 in from E, listens for its victory in Win, and reads a flag M2 writes.
     private const string GalaxyText =
         "<Story>" +
@@ -33,6 +31,8 @@ public sealed class StoryGraphScoperTest
         "<Event Name=\"Reinforcements\"><Event_Type>STORY_TRIGGER</Event_Type><Prereq>Ambush</Prereq>" +
         "<Reward_Type>SET_FLAG</Reward_Type><Reward_Param1>F</Reward_Param1></Event>" +
         "</Story>";
+
+    private static ISchemaProvider Schema { get; } = new ScoperSchemaProvider();
 
     private static StoryCampaignModel Model(params (string Uri, string Text)[] extra)
     {

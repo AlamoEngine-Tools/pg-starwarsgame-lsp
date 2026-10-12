@@ -7,16 +7,16 @@
 // The preview earns its place beyond being fun: row order and blank spacer rows are exactly what
 // the ordered model exists to preserve, and this is the only place a user can see both at once.
 
-import { LocRow } from './loc/locRow';
+import { LocRow } from "./loc/locRow";
 
 export interface CrawlBlock {
-    kind: 'line' | 'gap';
+    kind: "line" | "gap";
     /**
      * 'header' for a label line - a role, or a section title - and 'line' for the centred line
      * beneath it. Taken from the row's key, which in a credits file is a formatting directive
      * rather than an identifier; that is why the format allows the same "key" hundreds of times.
      */
-    style: 'header' | 'line';
+    style: "header" | "line";
     text: string;
     /** True when the chosen language had no value and the key is standing in for it. */
     untranslated: boolean;
@@ -27,19 +27,19 @@ export interface CrawlBlock {
  * shipped `creditstext_english.dat` and is never text - rendering it literally would print it
  * across the whole crawl.
  */
-export const BLANK_SENTINEL_VALUE = '[TBL]';
+export const BLANK_SENTINEL_VALUE = "[TBL]";
 
 const BLANK_SENTINEL = BLANK_SENTINEL_VALUE.toLowerCase();
 
 /** The directive the engine uses for a label line - a role, or a section heading. */
-const HEADER_DIRECTIVE = 'header';
+const HEADER_DIRECTIVE = "header";
 
 /**
  * The formatting directives a credits row's key may carry. In a credits file the key is an
  * instruction to the renderer rather than an identifier, which is why the format repeats it: the
  * whole shipped file uses only these two.
  */
-export const CREDITS_DIRECTIVES = ['CENTER', 'HEADER'] as const;
+export const CREDITS_DIRECTIVES = ["CENTER", "HEADER"] as const;
 
 /** True when the value is the blank-line sentinel (tolerant of padding and casing). */
 export function isBlankSentinel(value: string): boolean {
@@ -61,8 +61,10 @@ export function isSpacerRow(row: LocRow): boolean {
     // into every column, came out right. A row that is merely empty everywhere is NOT a spacer:
     // nothing marks it as one, and it stays visible and editable rather than becoming a marker
     // that cannot be typed into.
-    return row.values.some(v => isBlankSentinel(v.value))
-        && row.values.every(v => isBlank(v.value));
+    return (
+        row.values.some((v) => isBlankSentinel(v.value)) &&
+        row.values.every((v) => isBlank(v.value))
+    );
 }
 
 function isBlank(value: string): boolean {
@@ -82,17 +84,30 @@ export function buildCrawl(rows: LocRow[], language: string): CrawlBlock[] {
 
     for (const row of rows) {
         const value = valueFor(row, language);
-        const style = row.key.trim().toLowerCase() === HEADER_DIRECTIVE ? 'header' : 'line';
+        const style =
+            row.key.trim().toLowerCase() === HEADER_DIRECTIVE
+                ? "header"
+                : "line";
 
         if (!isBlank(value)) {
-            blocks.push({ kind: 'line', style, text: value, untranslated: false });
+            blocks.push({
+                kind: "line",
+                style,
+                text: value,
+                untranslated: false,
+            });
             continue;
         }
 
         // Blank here but filled elsewhere: a translation gap, worth showing as the key - unless
         // this row is a spacer in every language, in which case there is nothing missing.
         if (hasAnyValue(row)) {
-            blocks.push({ kind: 'line', style, text: row.key, untranslated: true });
+            blocks.push({
+                kind: "line",
+                style,
+                text: row.key,
+                untranslated: true,
+            });
             continue;
         }
 
@@ -103,7 +118,7 @@ export function buildCrawl(rows: LocRow[], language: string): CrawlBlock[] {
 }
 
 function valueFor(row: LocRow, language: string): string {
-    return row.values.find(v => v.language === language)?.value ?? '';
+    return row.values.find((v) => v.language === language)?.value ?? "";
 }
 
 /**
@@ -111,19 +126,25 @@ function valueFor(row: LocRow, language: string): string {
  * spacer in every language, so treating it as "translated elsewhere" would print its key.
  */
 function hasAnyValue(row: LocRow): boolean {
-    return row.values.some(v => !isBlank(v.value));
+    return row.values.some((v) => !isBlank(v.value));
 }
 
 function pushGap(blocks: CrawlBlock[]): void {
     // One pause, however many blank rows produced it.
-    if (blocks.length > 0 && blocks[blocks.length - 1].kind === 'gap') { return; }
-    blocks.push({ kind: 'gap', style: 'line', text: '', untranslated: false });
+    if (blocks.length > 0 && blocks[blocks.length - 1].kind === "gap") {
+        return;
+    }
+    blocks.push({ kind: "gap", style: "line", text: "", untranslated: false });
 }
 
 function trimGaps(blocks: CrawlBlock[]): CrawlBlock[] {
     let start = 0;
     let end = blocks.length;
-    while (start < end && blocks[start].kind === 'gap') { start++; }
-    while (end > start && blocks[end - 1].kind === 'gap') { end--; }
+    while (start < end && blocks[start].kind === "gap") {
+        start++;
+    }
+    while (end > start && blocks[end - 1].kind === "gap") {
+        end--;
+    }
     return blocks.slice(start, end);
 }

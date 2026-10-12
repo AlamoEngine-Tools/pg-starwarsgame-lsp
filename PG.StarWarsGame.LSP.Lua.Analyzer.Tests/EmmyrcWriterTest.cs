@@ -9,17 +9,17 @@ namespace PG.StarWarsGame.LSP.Lua.Analyzer.Tests;
 /// <summary>The analyzer's configuration, from the project's layers.</summary>
 public sealed class EmmyrcWriterTest
 {
-    private static ProjectLayer Layer(int rank, string name, params string[] scriptRoots)
-    {
-        return new ProjectLayer(rank, name, [], scriptRoots, [], [], null);
-    }
-
     private static readonly IReadOnlyList<ProjectLayer> Layers =
     [
         Layer(0, "Empire at War", "C:/Games/EaW/Data/Scripts"),
         Layer(1, "Forces of Corruption", "C:/Games/FoC/Data/Scripts"),
         Layer(2, "My Mod", "D:/Mods/MyMod/Data/Scripts")
     ];
+
+    private static ProjectLayer Layer(int rank, string name, params string[] scriptRoots)
+    {
+        return new ProjectLayer(rank, name, [], scriptRoots, [], [], null);
+    }
 
     [Fact]
     public void TheLeafIsTheWorkspace_LowerLayersAndTheStubsAreTheLibrary()

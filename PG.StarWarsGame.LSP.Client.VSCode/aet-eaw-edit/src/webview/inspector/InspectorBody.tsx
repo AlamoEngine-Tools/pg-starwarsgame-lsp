@@ -8,29 +8,37 @@
 // `inspectPanels`, the same function the preview's flyout used, so moving the inspector into its
 // own tab did not fork how a mesh's facts are described.
 
-import {Fragment} from 'react';
+import { Fragment } from "react";
 
-import {inspectPanels} from '../preview/inspector';
-import {geometryKeyOf, type InspectorSubject} from '../preview/inspectorSubject';
-import {type GeometryRows} from '../preview/geometryRows';
-import {GeometryRowsTable, GeometryTabs} from './GeometryTables';
-import {type GeometryTable} from '../../protocol/modelPreview';
+import { inspectPanels } from "../preview/inspector";
+import {
+    geometryKeyOf,
+    type InspectorSubject,
+} from "../preview/inspectorSubject";
+import { type GeometryRows } from "../preview/geometryRows";
+import { GeometryRowsTable, GeometryTabs } from "./GeometryTables";
+import { type GeometryTable } from "../../protocol/modelPreview";
 
-export function InspectorBody(
-    {subject, selectedTable, geometry, geometryError, onGeometry, onOpenTable}: {
-        /** The row being described, or null before the preview has sent one. */
-        subject: InspectorSubject | null;
-        /** The open geometry tab, or null for a row with no geometry. */
-        selectedTable: GeometryTable | null;
-        /** Everything gathered for the open table, or null before one is opened. */
-        geometry: GeometryRows | null;
-        geometryError: string | null;
-        /** Fetches one more page of the open table. */
-        onGeometry: (table: GeometryTable, offset: number) => void;
-        /** Switches tab, which starts that table again from row zero. */
-        onOpenTable: (table: GeometryTable) => void;
-    },
-): React.JSX.Element {
+export function InspectorBody({
+    subject,
+    selectedTable,
+    geometry,
+    geometryError,
+    onGeometry,
+    onOpenTable,
+}: {
+    /** The row being described, or null before the preview has sent one. */
+    subject: InspectorSubject | null;
+    /** The open geometry tab, or null for a row with no geometry. */
+    selectedTable: GeometryTable | null;
+    /** Everything gathered for the open table, or null before one is opened. */
+    geometry: GeometryRows | null;
+    geometryError: string | null;
+    /** Fetches one more page of the open table. */
+    onGeometry: (table: GeometryTable, offset: number) => void;
+    /** Switches tab, which starts that table again from row zero. */
+    onOpenTable: (table: GeometryTable) => void;
+}): React.JSX.Element {
     if (subject === null) {
         return (
             <div className="inspect-empty">
@@ -42,9 +50,10 @@ export function InspectorBody(
         );
     }
 
-    const panels = subject.sources.length === 0
-        ? null
-        : inspectPanels(subject.sources, subject.modelDetail ?? undefined);
+    const panels =
+        subject.sources.length === 0
+            ? null
+            : inspectPanels(subject.sources, subject.modelDetail ?? undefined);
 
     if (panels === null) {
         return (
@@ -61,7 +70,9 @@ export function InspectorBody(
             <div className="inspect-page-head">
                 <h1 className="inspect-page-title">{panels.title}</h1>
                 {panels.subtitle !== undefined && (
-                    <span className="inspect-page-subtitle">{panels.subtitle}</span>
+                    <span className="inspect-page-subtitle">
+                        {panels.subtitle}
+                    </span>
                 )}
             </div>
 
@@ -69,7 +80,7 @@ export function InspectorBody(
                 Mesh, Material, Bone - and stacking them down a full-width tab left the reader
                 scrolling past a column of whitespace to reach the geometry. */}
             <div className="inspect-columns">
-                {panels.sections.map(section => (
+                {panels.sections.map((section) => (
                     <div className="inspect-group" key={section.title}>
                         <div className="inspect-title">{section.title}</div>
 
@@ -83,12 +94,19 @@ export function InspectorBody(
                         <dl className="inspect-rows">
                             {section.rows.map((row, at) => (
                                 <Fragment key={`${section.title}:${at}`}>
-                                    <dt title={row.hint ?? row.label}>{row.label}</dt>
-                                    <dd className={row.kind} title={row.hint ?? row.value}>
+                                    <dt title={row.hint ?? row.label}>
+                                        {row.label}
+                                    </dt>
+                                    <dd
+                                        className={row.kind}
+                                        title={row.hint ?? row.value}
+                                    >
                                         {row.swatch !== undefined && (
                                             <span
                                                 className="inspect-swatch"
-                                                style={{background: row.swatch}}
+                                                style={{
+                                                    background: row.swatch,
+                                                }}
                                             />
                                         )}
                                         {row.value}
@@ -118,23 +136,26 @@ export function InspectorBody(
                 />
 
                 {key === null && (
-                    <div className="field-note">
-                        This item has no geometry.
-                    </div>
+                    <div className="field-note">This item has no geometry.</div>
                 )}
 
-                {geometryError !== null && <div className="field-note">{geometryError}</div>}
+                {geometryError !== null && (
+                    <div className="field-note">{geometryError}</div>
+                )}
 
-                {geometry !== null && geometry.table === selectedTable
-                    ? <GeometryRowsTable rows={geometry} onMore={onGeometry}/>
-                    : selectedTable !== null && geometryError === null && (
-                    // Open and waiting on its first page: the panel is there at its full size
-                    // straight away, so nothing below it jumps when the rows land.
-                    <div className="geometry-panel" role="tabpanel">
-                        <div className="geometry-scroll">
-                            <div className="field-note">Loading</div>
+                {geometry !== null && geometry.table === selectedTable ? (
+                    <GeometryRowsTable rows={geometry} onMore={onGeometry} />
+                ) : (
+                    selectedTable !== null &&
+                    geometryError === null && (
+                        // Open and waiting on its first page: the panel is there at its full size
+                        // straight away, so nothing below it jumps when the rows land.
+                        <div className="geometry-panel" role="tabpanel">
+                            <div className="geometry-scroll">
+                                <div className="field-note">Loading</div>
+                            </div>
                         </div>
-                    </div>
+                    )
                 )}
             </div>
         </>

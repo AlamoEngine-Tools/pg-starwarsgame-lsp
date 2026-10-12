@@ -9,7 +9,11 @@
 //
 // Kept free of three.js so the motion can be read against the XML it comes from.
 
-import type { PreviewBreakoffProp, PreviewHardpoint, PreviewVector3 } from '../../protocol/modelPreview';
+import type {
+    PreviewBreakoffProp,
+    PreviewHardpoint,
+    PreviewVector3,
+} from "../../protocol/modelPreview";
 
 /** Where a piece of debris is, relative to the hardpoint it came off. */
 export interface BreakoffPose {
@@ -44,7 +48,8 @@ export interface BreakoffAnchor {
  * and its size is the bone's distance from the origin.
  */
 export function breakoffAnchor(
-    hullPartId: string, hardpoint: PreviewHardpoint,
+    hullPartId: string,
+    hardpoint: PreviewHardpoint,
 ): BreakoffAnchor {
     if (hardpoint.partId !== null && hardpoint.partId !== undefined) {
         return { partId: hardpoint.partId };
@@ -65,16 +70,19 @@ export function breakoffAnchor(
  * the author sees the typo; there is just no model to drop.
  */
 export function breakoffFor(
-    hardpoint: PreviewHardpoint, props: readonly PreviewBreakoffProp[],
+    hardpoint: PreviewHardpoint,
+    props: readonly PreviewBreakoffProp[],
 ): PreviewBreakoffProp | null {
-    const wanted = (hardpoint.deathBreakoffProp ?? '').trim().toLowerCase();
-    if (wanted === '') {
+    const wanted = (hardpoint.deathBreakoffProp ?? "").trim().toLowerCase();
+    if (wanted === "") {
         return null;
     }
 
-    const prop = props.find(candidate => candidate.id.toLowerCase() === wanted);
+    const prop = props.find(
+        (candidate) => candidate.id.toLowerCase() === wanted,
+    );
 
-    return prop === undefined || !prop.resolved || (prop.modelRef ?? '') === ''
+    return prop === undefined || !prop.resolved || (prop.modelRef ?? "") === ""
         ? null
         : prop;
 }
@@ -135,7 +143,10 @@ const FRAMES_PER_SECOND = 1 / ALAMO_FRAME_SECONDS;
  *
  * A prop declaring no vector simply stays where the hardpoint was, which is ordinary authoring.
  */
-export function breakoffPose(prop: PreviewBreakoffProp, seconds: number): BreakoffPose {
+export function breakoffPose(
+    prop: PreviewBreakoffProp,
+    seconds: number,
+): BreakoffPose {
     const frames = seconds * FRAMES_PER_SECOND;
 
     return {
@@ -154,7 +165,10 @@ function intoSceneAxes(vector: PreviewVector3): PreviewVector3 {
     return { x: vector.x, y: vector.z, z: -vector.y + 0 };
 }
 
-function scaled(vector: PreviewVector3 | null | undefined, by: number): PreviewVector3 {
+function scaled(
+    vector: PreviewVector3 | null | undefined,
+    by: number,
+): PreviewVector3 {
     if (vector === null || vector === undefined) {
         return { x: 0, y: 0, z: 0 };
     }

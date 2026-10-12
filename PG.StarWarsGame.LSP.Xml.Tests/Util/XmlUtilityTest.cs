@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Util;
@@ -24,7 +25,7 @@ public sealed class XmlUtilityTest
     {
         var doc = XmlUtility.CreateHtmlDocument("<Root><Title><A>1</A></Title></Root>");
         var title = doc.DocumentNode.SelectSingleNode("//title")!;
-        Assert.Single(title.ChildNodes, n => n.NodeType == HtmlAgilityPack.HtmlNodeType.Element);
+        Assert.Single(title.ChildNodes, n => n.NodeType == HtmlNodeType.Element);
     }
 
     // ── SplitListWithOffsets ─────────────────────────────────────────────────

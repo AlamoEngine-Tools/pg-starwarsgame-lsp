@@ -7,8 +7,8 @@
 // one means knowing its exact name, which until now meant going and reading the game's own file.
 // The baseline is already loaded for the Inherited toggle, so this costs no extra server call.
 
-import { LocValue } from './loc/locRow';
-import { BaselineRow } from './translationInherited';
+import { LocValue } from "./loc/locRow";
+import { BaselineRow } from "./translationInherited";
 
 export interface BaselineSuggestion {
     key: string;
@@ -33,32 +33,38 @@ export function suggestBaselineKeys(
     languages: string[],
 ): BaselineSuggestion[] {
     const needle = query.trim().toLowerCase();
-    if (needle.length === 0) { return []; }
+    if (needle.length === 0) {
+        return [];
+    }
 
-    const taken = new Set(existingKeys.map(key => key.toLowerCase()));
+    const taken = new Set(existingKeys.map((key) => key.toLowerCase()));
     const prefix: BaselineRow[] = [];
     const substring: BaselineRow[] = [];
 
     for (const row of baseline) {
         const key = row.key.toLowerCase();
-        if (taken.has(key)) { continue; }
+        if (taken.has(key)) {
+            continue;
+        }
 
-        if (key.startsWith(needle)) { prefix.push(row); } else if (key.includes(needle)) {
+        if (key.startsWith(needle)) {
+            prefix.push(row);
+        } else if (key.includes(needle)) {
             substring.push(row);
         }
 
-        if (prefix.length >= MAX_SUGGESTIONS) { break; }
+        if (prefix.length >= MAX_SUGGESTIONS) {
+            break;
+        }
     }
 
-    return [...prefix, ...substring]
-        .slice(0, MAX_SUGGESTIONS)
-        .map(row => ({
-            key: row.key,
-            // Every displayed language gets a cell, empty where the baseline has none, so the
-            // dialog never shows a ragged row.
-            values: languages.map(language => ({
-                language,
-                value: row.values.find(v => v.language === language)?.value ?? '',
-            })),
-        }));
+    return [...prefix, ...substring].slice(0, MAX_SUGGESTIONS).map((row) => ({
+        key: row.key,
+        // Every displayed language gets a cell, empty where the baseline has none, so the
+        // dialog never shows a ragged row.
+        values: languages.map((language) => ({
+            language,
+            value: row.values.find((v) => v.language === language)?.value ?? "",
+        })),
+    }));
 }

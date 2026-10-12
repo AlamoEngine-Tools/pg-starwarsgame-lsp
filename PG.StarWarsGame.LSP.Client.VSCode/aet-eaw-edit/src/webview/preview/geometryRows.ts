@@ -11,8 +11,11 @@
 // 3814 faces - it stopped being the reader's problem. This module holds what has arrived, says what
 // to ask for next, and says when the scroller is close enough to its end to want it.
 
-import { geometryTable } from './inspector';
-import { type GeometryTable, type SubMeshGeometryPage } from '../../protocol/modelPreview';
+import { geometryTable } from "./inspector";
+import {
+    type GeometryTable,
+    type SubMeshGeometryPage,
+} from "../../protocol/modelPreview";
 
 /**
  * Rows per request.
@@ -25,13 +28,19 @@ export const GEOMETRY_PAGE = 500;
 /** The tables, in the order the tabs offer them. */
 const TABLES: readonly { id: GeometryTable; label: string; title: string }[] = [
     {
-        id: 'vertices', label: 'Vertices',
-        title: 'Position, normal, UVs, tangents, colour and bone binding, per vertex',
+        id: "vertices",
+        label: "Vertices",
+        title: "Position, normal, UVs, tangents, colour and bone binding, per vertex",
     },
-    { id: 'faces', label: 'Faces', title: 'Each triangle as the three vertex indices it draws' },
     {
-        id: 'boneMapping', label: 'Bone mapping',
-        title: 'Which model bone each local bone slot of this sub-mesh resolves to',
+        id: "faces",
+        label: "Faces",
+        title: "Each triangle as the three vertex indices it draws",
+    },
+    {
+        id: "boneMapping",
+        label: "Bone mapping",
+        title: "Which model bone each local bone slot of this sub-mesh resolves to",
     },
 ];
 
@@ -63,7 +72,7 @@ export interface GeometryTab {
  * other two carry null rather than a zero. A zero would be a claim, and the wrong one.
  */
 export function geometryTabs(rows: GeometryRows | null = null): GeometryTab[] {
-    return TABLES.map(entry => ({
+    return TABLES.map((entry) => ({
         ...entry,
         count: rows !== null && rows.table === entry.id ? rows.total : null,
     }));
@@ -83,16 +92,20 @@ export function geometryTabs(rows: GeometryRows | null = null): GeometryTab[] {
  *   accepting it would silently mis-label every row after the gap.
  */
 export function appendPage(
-    current: GeometryRows | null, page: SubMeshGeometryPage,
+    current: GeometryRows | null,
+    page: SubMeshGeometryPage,
 ): GeometryRows {
     const view = geometryTable(page);
     const table = page.table as GeometryTable;
 
     // The bone mapping is not paged - there are a handful of slots at most - so its own length is
     // its total. The other two are pages of something the server has counted for us.
-    const total = table === 'faces'
-        ? page.totalFaces
-        : table === 'vertices' ? page.totalVertices : view.rows.length;
+    const total =
+        table === "faces"
+            ? page.totalFaces
+            : table === "vertices"
+              ? page.totalVertices
+              : view.rows.length;
 
     const fresh: GeometryRows = {
         table,
@@ -140,8 +153,12 @@ const RUNWAY = 1;
  * end, which is how the second page gets asked for at all when the first one left no room to
  * scroll - without that the table would stall at 500 rows on a tall screen.
  */
-export function nearEnd(
-    view: { scrollTop: number; scrollHeight: number; clientHeight: number },
-): boolean {
-    return view.scrollTop + view.clientHeight * (1 + RUNWAY) >= view.scrollHeight;
+export function nearEnd(view: {
+    scrollTop: number;
+    scrollHeight: number;
+    clientHeight: number;
+}): boolean {
+    return (
+        view.scrollTop + view.clientHeight * (1 + RUNWAY) >= view.scrollHeight
+    );
 }

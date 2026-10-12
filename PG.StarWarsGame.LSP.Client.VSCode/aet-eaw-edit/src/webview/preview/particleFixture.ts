@@ -9,14 +9,18 @@
 // every emitter a one-second lifetime of zero and draws nothing.
 
 import type {
-    AlamoEmitter, AlamoEmitterProperties, AlamoParticleContent, AlamoSpawnVolume, AlamoTrack,
-} from '../../protocol/modelPreview';
+    AlamoEmitter,
+    AlamoEmitterProperties,
+    AlamoParticleContent,
+    AlamoSpawnVolume,
+    AlamoTrack,
+} from "../../protocol/modelPreview";
 
 export const ZERO = { x: 0, y: 0, z: 0 };
 
 export function volume(over: Partial<AlamoSpawnVolume> = {}): AlamoSpawnVolume {
     return {
-        shape: 'Point',
+        shape: "Point",
         min: { ...ZERO },
         max: { ...ZERO },
         sideLength: 0,
@@ -31,9 +35,11 @@ export function volume(over: Partial<AlamoSpawnVolume> = {}): AlamoSpawnVolume {
 }
 
 /** The engine's defaults, which the server always fills in. */
-export function properties(over: Partial<AlamoEmitterProperties> = {}): AlamoEmitterProperties {
+export function properties(
+    over: Partial<AlamoEmitterProperties> = {},
+): AlamoEmitterProperties {
     return {
-        blendMode: 'Additive',
+        blendMode: "Additive",
         triangleCount: 2,
         useBursts: false,
         linkToSystem: false,
@@ -56,12 +62,12 @@ export function properties(over: Partial<AlamoEmitterProperties> = {}): AlamoEmi
         randomColors: { x: 0, y: 0, z: 0, w: 0 },
         colorAddGrayscale: false,
         worldOriented: false,
-        groundBehavior: 'None',
+        groundBehavior: "None",
         bounciness: 0.2,
         affectedByWind: false,
         freezeTime: 0,
         skipTime: 0,
-        emitFromMesh: 'Disabled',
+        emitFromMesh: "Disabled",
         objectSpaceAcceleration: false,
         isHeatParticle: false,
         emitFromMeshOffset: 0.5,
@@ -78,15 +84,22 @@ export function properties(over: Partial<AlamoEmitterProperties> = {}): AlamoEmi
     };
 }
 
-export function track(channel: AlamoTrack['channel'], keys: [number, number][],
-    interpolation: AlamoTrack['interpolation'] = 'Linear'): AlamoTrack {
-    return { channel, interpolation, keys: keys.map(([time, value]) => ({ time, value })) };
+export function track(
+    channel: AlamoTrack["channel"],
+    keys: [number, number][],
+    interpolation: AlamoTrack["interpolation"] = "Linear",
+): AlamoTrack {
+    return {
+        channel,
+        interpolation,
+        keys: keys.map(([time, value]) => ({ time, value })),
+    };
 }
 
 export function emitter(over: Partial<AlamoEmitter> = {}): AlamoEmitter {
     return {
-        name: 'test',
-        colorTexture: 'p_particle_master.tga',
+        name: "test",
+        colorTexture: "p_particle_master.tga",
         normalTexture: null,
         speed: volume(),
         lifetime: volume(),
@@ -100,6 +113,9 @@ export function emitter(over: Partial<AlamoEmitter> = {}): AlamoEmitter {
 }
 
 /** A system wrapping the given emitters, for the renderer's sake. */
-export function testSystem(emitters: AlamoEmitter[], name = 'test'): AlamoParticleContent {
+export function testSystem(
+    emitters: AlamoEmitter[],
+    name = "test",
+): AlamoParticleContent {
     return { name, leaveParticles: false, emitters };
 }

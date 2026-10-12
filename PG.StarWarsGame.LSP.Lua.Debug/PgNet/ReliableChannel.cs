@@ -21,9 +21,9 @@ public sealed class ReliableChannel : IReliableChannel
     private const long IdModulus = PgNetPacket.MaxPacketId + 1L;
 
     private readonly IPgNetDatagramCodec _codec;
-    private readonly TimeProvider _time;
     private readonly List<PendingPacket> _pending = [];
     private readonly Dictionary<uint, BitBuffer> _queued = [];
+    private readonly TimeProvider _time;
     private LargeSequence? _largeSequence;
 
     public ReliableChannel(IPgNetDatagramCodec codec, TimeProvider time) : this(codec, time, 0, 0)

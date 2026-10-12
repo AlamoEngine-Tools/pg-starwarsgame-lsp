@@ -46,12 +46,28 @@ export interface ServerStatusWorkspace {
 /** The opt-in tier: counts that help rebuild a setup as a test case. */
 export interface ServerStatusExtended {
     /** `layers` counts project layers, the root included. */
-    dependencies: { direct: number; total: number; depth: number; unresolved: number; layers: number };
+    dependencies: {
+        direct: number;
+        total: number;
+        depth: number;
+        unresolved: number;
+        layers: number;
+    };
     indexDurationMs: number | null;
     /** Indexed documents: the root project's own layer, every other layer, and by language. */
-    files: { projectFiles: number; dependencyFiles: number; xmlFiles: number; luaFiles: number };
+    files: {
+        projectFiles: number;
+        dependencyFiles: number;
+        xmlFiles: number;
+        luaFiles: number;
+    };
     /** Story dialog files are not in the game index, so there is no dialog count. */
-    symbols: { xml: number; lua: number; baseline: number; localisationKeys: number };
+    symbols: {
+        xml: number;
+        lua: number;
+        baseline: number;
+        localisationKeys: number;
+    };
     /** Every extension the asset catalog records, the empty ones included. */
     assets: { extension: string; total: number; baseGame: number }[];
     /** `schema` is Hit, Rebuilt or NotUsed. */
@@ -79,7 +95,12 @@ export interface ServerStatusExtended {
         largeObjectHeapFragmentedBytes: number;
         workingSetBytes: number;
         gen2Collections: number;
-        layers: { rank: number; documents: number; symbols: number; references: number }[];
+        layers: {
+            rank: number;
+            documents: number;
+            symbols: number;
+            references: number;
+        }[];
         caches: {
             name: string;
             entries: number;

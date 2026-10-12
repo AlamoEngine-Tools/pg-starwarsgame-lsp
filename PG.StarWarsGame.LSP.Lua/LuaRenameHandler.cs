@@ -8,11 +8,11 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Rename;
+using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Lua.Util;
 using LorLocation = Loretta.CodeAnalysis.Location;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -22,9 +22,9 @@ namespace PG.StarWarsGame.LSP.Lua;
 public sealed class LuaRenameHandler : ILuaRenameProvider
 {
     private readonly ILogger<LuaRenameHandler> _logger;
+    private readonly ILuaApiSchemaProvider? _luaSchema;
     private readonly ILuaParseCache _parseCache;
     private readonly ISchemaProvider _schema;
-    private readonly ILuaApiSchemaProvider? _luaSchema;
     private readonly IDocumentTextSource _textSource;
 
     // textSource stays alongside the parse cache: XmlObjectRenameBuilder edits XML documents,
@@ -95,6 +95,24 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         return FindXmlObjectStringRange(parsed.Tree, line, character, index);
     }
 
+    public bool Claims(string uri, int line, int character, GameIndex index)
+    {
+        if (index.Documents.TryGetValue(uri, out var docIndex) &&
+            LuaPositionResolver.FindAtPosition(docIndex, line, character) is not null)
+            return true;
+
+        // Nothing parsed: nothing to hand on either - ours, answered as a refusal.
+        if (_parseCache.GetOrParse(uri) is not { } parsed) return true;
+        var tree = parsed.Tree;
+        if (FindXmlObjectAtCursor(tree, line, character, index) is not null) return true;
+        if (FindLuaGlobalAtCursor(tree, line, character, index) is not null) return true;
+
+        // An engine name: the game binds it, and renaming it breaks every script that calls it.
+        return _luaSchema is not null && tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>()
+            .Any(id => LocationContainsPosition(id.GetLocation(), line, character) &&
+                       _luaSchema.DeclaredGlobalNames.Contains(id.Name));
+    }
+
     private RangeOrPlaceholderRange? FindXmlObjectStringRange(
         SyntaxTree tree, int line, int character, GameIndex index)
     {
@@ -162,24 +180,6 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         }
 
         return null;
-    }
-
-    public bool Claims(string uri, int line, int character, GameIndex index)
-    {
-        if (index.Documents.TryGetValue(uri, out var docIndex) &&
-            LuaPositionResolver.FindAtPosition(docIndex, line, character) is not null)
-            return true;
-
-        // Nothing parsed: nothing to hand on either - ours, answered as a refusal.
-        if (_parseCache.GetOrParse(uri) is not { } parsed) return true;
-        var tree = parsed.Tree;
-        if (FindXmlObjectAtCursor(tree, line, character, index) is not null) return true;
-        if (FindLuaGlobalAtCursor(tree, line, character, index) is not null) return true;
-
-        // An engine name: the game binds it, and renaming it breaks every script that calls it.
-        return _luaSchema is not null && tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>()
-            .Any(id => LocationContainsPosition(id.GetLocation(), line, character) &&
-                       _luaSchema.DeclaredGlobalNames.Contains(id.Name));
     }
 
     private static bool IsKnownXmlObject(string name, GameIndex index)

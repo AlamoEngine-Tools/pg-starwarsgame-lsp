@@ -32,7 +32,9 @@ export const FIT_MARGIN = 0.9;
  * than magnified.
  */
 export function fitZoom(view: Extent, content: Extent): number | null {
-    if (!isUsable(view.width) || !isUsable(view.height)) { return null; }
+    if (!isUsable(view.width) || !isUsable(view.height)) {
+        return null;
+    }
 
     // A single node, or every node on one row, gives a zero-extent axis; one unit keeps the
     // division finite and lets the other axis (or the 1:1 clamp) decide.
@@ -42,7 +44,8 @@ export function fitZoom(view: Extent, content: Extent): number | null {
     return Math.min(
         (view.height / contentHeight) * FIT_MARGIN,
         (view.width / contentWidth) * FIT_MARGIN,
-        1);
+        1,
+    );
 }
 
 function isUsable(size: number): boolean {

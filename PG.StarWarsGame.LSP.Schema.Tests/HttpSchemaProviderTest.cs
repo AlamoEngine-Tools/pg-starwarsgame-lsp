@@ -19,6 +19,10 @@ public sealed class HttpSchemaProviderTest
 
     private const string BaseUrl = "http://schema.test/";
 
+    // ── release tags ─────────────────────────────────────────────────────────
+
+    private const string MassYaml = "tags:\n  - tag: Mass\n    type: Float\n";
+
     private static HttpResponseMessage JsonResponse(object payload, string? etag = null)
     {
         var msg = new HttpResponseMessage(HttpStatusCode.OK)
@@ -49,7 +53,8 @@ public sealed class HttpSchemaProviderTest
 
     private static SchemaHttpCache NoOpCache()
     {
-        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), new NullCrossProcessLock(), NullLogger<SchemaHttpCache>.Instance);
+        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), new NullCrossProcessLock(),
+            NullLogger<SchemaHttpCache>.Instance);
     }
 
     private static (HttpSchemaProvider provider, FakeHttpMessageHandler fake) Build(
@@ -277,10 +282,6 @@ public sealed class HttpSchemaProviderTest
         Assert.True(provider.ReadyAsync.IsCompleted);
     }
 
-    // ── release tags ─────────────────────────────────────────────────────────
-
-    private const string MassYaml = "tags:\n  - tag: Mass\n    type: Float\n";
-
     private static string ManifestJson(string schemaVersion = "2.1.0")
     {
         return JsonSerializer.Serialize(new { schemaVersion, tags = new[] { "tags/Unit.yaml" } });
@@ -288,7 +289,8 @@ public sealed class HttpSchemaProviderTest
 
     private static SchemaHttpCache CacheHolding(string tag, string schemaVersion = "2.1.0")
     {
-        var cache = new SchemaHttpCache(new FileHelper(new MockFileSystem()), new NullCrossProcessLock(), NullLogger<SchemaHttpCache>.Instance);
+        var cache = new SchemaHttpCache(new FileHelper(new MockFileSystem()), new NullCrossProcessLock(),
+            NullLogger<SchemaHttpCache>.Instance);
         cache.Update(ManifestJson(schemaVersion), [("tags/Unit.yaml", MassYaml)], tag: tag);
         return cache;
     }

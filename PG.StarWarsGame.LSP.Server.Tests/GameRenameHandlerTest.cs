@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Xml;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -21,6 +22,11 @@ public sealed class GameRenameHandlerTest
     private const string XmlUri = "file:///test.xml";
     private const string LuaUri = "file:///script.lua";
     private const string TxtUri = "file:///data.txt";
+
+    // ── what we do not claim is the analyzer's (#154) ───────────────────────
+
+    private const string ModScript = "file:///c:/mods/mymod/data/scripts/story/a.lua";
+    private const string BaseScript = "file:///c:/games/eaw/data/scripts/library/pgbase.lua";
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -51,11 +57,6 @@ public sealed class GameRenameHandlerTest
             layers);
     }
 
-    // ── what we do not claim is the analyzer's (#154) ───────────────────────
-
-    private const string ModScript = "file:///c:/mods/mymod/data/scripts/story/a.lua";
-    private const string BaseScript = "file:///c:/games/eaw/data/scripts/library/pgbase.lua";
-
     private static ProjectLayerMap Layers()
     {
         var map = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
@@ -75,7 +76,7 @@ public sealed class GameRenameHandlerTest
                 new TextEdit
                 {
                     NewText = "renamed",
-                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(0, 0, 0, 1)
+                    Range = new Range(0, 0, 0, 1)
                 }
             ])
         };
@@ -115,55 +116,6 @@ public sealed class GameRenameHandlerTest
             handler.Handle(RenameAt(ModScript), CancellationToken.None));
 
         Assert.StartsWith("Rename refused: ", refusal.Message, StringComparison.Ordinal);
-    }
-
-    private sealed class ClaimsNothing : ILuaRenameProvider
-    {
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
-        {
-            throw new InvalidOperationException("not claimed, never asked");
-        }
-
-        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
-        {
-            throw new InvalidOperationException("not claimed, never asked");
-        }
-
-        public bool Claims(string uri, int line, int character, GameIndex index)
-        {
-            return false;
-        }
-    }
-
-    internal sealed class AnswerOnce(string method, object answer) : ILuaAnalyzer
-    {
-        public bool Asked { get; private set; }
-
-        public bool IsRunning => true;
-
-        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished
-        {
-            add { }
-            remove { }
-        }
-
-        public void DidOpen(string uri, string text, int version)
-        {
-        }
-
-        public void DidChange(string uri, string text, int version)
-        {
-        }
-
-        public void DidClose(string uri)
-        {
-        }
-
-        public Task<T?> RequestAsync<T>(string asked, object parameters, CancellationToken ct) where T : class
-        {
-            Asked = true;
-            return Task.FromResult(asked == method ? answer as T : null);
-        }
     }
 
     // ── feature flags ──────────────────────────────────────────────────────────
@@ -255,6 +207,55 @@ public sealed class GameRenameHandlerTest
         var result = await BuildHandler(new NullXmlProvider())
             .Handle(RenameAt(XmlUri), CancellationToken.None);
         Assert.Null(result);
+    }
+
+    private sealed class ClaimsNothing : ILuaRenameProvider
+    {
+        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
+        {
+            throw new InvalidOperationException("not claimed, never asked");
+        }
+
+        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        {
+            throw new InvalidOperationException("not claimed, never asked");
+        }
+
+        public bool Claims(string uri, int line, int character, GameIndex index)
+        {
+            return false;
+        }
+    }
+
+    internal sealed class AnswerOnce(string method, object answer) : ILuaAnalyzer
+    {
+        public bool Asked { get; private set; }
+
+        public bool IsRunning => true;
+
+        public event Action<PublishDiagnosticsParams>? DiagnosticsPublished
+        {
+            add { }
+            remove { }
+        }
+
+        public void DidOpen(string uri, string text, int version)
+        {
+        }
+
+        public void DidChange(string uri, string text, int version)
+        {
+        }
+
+        public void DidClose(string uri)
+        {
+        }
+
+        public Task<T?> RequestAsync<T>(string asked, object parameters, CancellationToken ct) where T : class
+        {
+            Asked = true;
+            return Task.FromResult(asked == method ? answer as T : null);
+        }
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────

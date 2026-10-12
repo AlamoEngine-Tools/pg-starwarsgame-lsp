@@ -13,8 +13,8 @@
 // being shown in that state - so the state is read off the clip, and the weapons are swapped once, here,
 // ahead of everything that draws an arc or clamps a handle.
 
-import type { PreviewWeapon } from '../../protocol/modelPreview';
-import type { AnimationAction } from './animationNames';
+import type { PreviewWeapon } from "../../protocol/modelPreview";
+import type { AnimationAction } from "./animationNames";
 
 /**
  * Whether the clip on the playhead shows the unit deployed.
@@ -24,13 +24,14 @@ import type { AnimationAction } from './animationNames';
  * deployed. The undeploy clip is the way out and never counts.
  */
 export function isDeployedClip(
-    action: Pick<AnimationAction, 'action' | 'stance'> | null, atEnd: boolean,
+    action: Pick<AnimationAction, "action" | "stance"> | null,
+    atEnd: boolean,
 ): boolean {
     if (action === null) {
         return false;
     }
 
-    if (action.stance === 'deployed') {
+    if (action.stance === "deployed") {
         return true;
     }
 
@@ -45,16 +46,24 @@ export function isDeployedClip(
  * per weapon that carries deployed values - only unit weapons on a unit that can deploy do - with the arc
  * and the turret limits replaced. Everything downstream keeps reading the ordinary fields.
  */
-export function weaponsInState(weapons: readonly PreviewWeapon[], deployed: boolean): readonly PreviewWeapon[] {
+export function weaponsInState(
+    weapons: readonly PreviewWeapon[],
+    deployed: boolean,
+): readonly PreviewWeapon[] {
     if (!deployed) {
         return weapons;
     }
 
-    return weapons.map(weapon => {
+    return weapons.map((weapon) => {
         const turret = weapon.turret;
-        const hasArc = present(weapon.deployedConeWidthDegrees) || present(weapon.deployedConeHeightDegrees);
-        const hasSwing = turret !== null && turret !== undefined
-            && (present(turret.deployedRotateExtentDegrees) || present(turret.deployedElevateExtentDegrees));
+        const hasArc =
+            present(weapon.deployedConeWidthDegrees) ||
+            present(weapon.deployedConeHeightDegrees);
+        const hasSwing =
+            turret !== null &&
+            turret !== undefined &&
+            (present(turret.deployedRotateExtentDegrees) ||
+                present(turret.deployedElevateExtentDegrees));
 
         if (!hasArc && !hasSwing) {
             return weapon;
@@ -62,15 +71,22 @@ export function weaponsInState(weapons: readonly PreviewWeapon[], deployed: bool
 
         return {
             ...weapon,
-            coneWidthDegrees: weapon.deployedConeWidthDegrees ?? weapon.coneWidthDegrees,
-            coneHeightDegrees: weapon.deployedConeHeightDegrees ?? weapon.coneHeightDegrees,
-            turret: hasSwing && turret !== null && turret !== undefined
-                ? {
-                    ...turret,
-                    rotateExtentDegrees: turret.deployedRotateExtentDegrees ?? turret.rotateExtentDegrees,
-                    elevateExtentDegrees: turret.deployedElevateExtentDegrees ?? turret.elevateExtentDegrees,
-                }
-                : turret,
+            coneWidthDegrees:
+                weapon.deployedConeWidthDegrees ?? weapon.coneWidthDegrees,
+            coneHeightDegrees:
+                weapon.deployedConeHeightDegrees ?? weapon.coneHeightDegrees,
+            turret:
+                hasSwing && turret !== null && turret !== undefined
+                    ? {
+                          ...turret,
+                          rotateExtentDegrees:
+                              turret.deployedRotateExtentDegrees ??
+                              turret.rotateExtentDegrees,
+                          elevateExtentDegrees:
+                              turret.deployedElevateExtentDegrees ??
+                              turret.elevateExtentDegrees,
+                      }
+                    : turret,
         };
     });
 }

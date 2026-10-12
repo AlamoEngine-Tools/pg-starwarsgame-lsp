@@ -62,11 +62,14 @@ export function percentOf(pool: Pool): number {
  *     half only: hardpoints follow the hull whatever it says.
  */
 export function leashed(
-    hull: Pool, hardpoints: Pool, constraint: number, diesWithHardpoints: boolean,
+    hull: Pool,
+    hardpoints: Pool,
+    constraint: number,
+    diesWithHardpoints: boolean,
 ): Leashed {
     // No destroyable hardpoints means neither correction runs at all.
     if (hardpoints.max <= 0) {
-        return {hull, hardpoints};
+        return { hull, hardpoints };
     }
 
     let hullNow = hull;
@@ -75,19 +78,22 @@ export function leashed(
         const cap = Math.min(1, percentOf(hardpoints) + constraint);
         if (percentOf(hullNow) > cap) {
             // A flat assignment through Set_Health_Percent, not damage applied to the pool.
-            hullNow = {...hullNow, current: cap * hullNow.max};
+            hullNow = { ...hullNow, current: cap * hullNow.max };
         }
     }
 
     const cap = Math.min(1, percentOf(hullNow) + constraint);
     if (percentOf(hardpoints) <= cap) {
-        return {hull: hullNow, hardpoints};
+        return { hull: hullNow, hardpoints };
     }
 
     // Damage, distributed across the destroyable hardpoints in proportion to their CURRENT health -
     // so every one loses the same fraction of what it had, and the total lands exactly on the cap
     // in a single tick rather than converging over several.
-    return {hull: hullNow, hardpoints: {...hardpoints, current: cap * hardpoints.max}};
+    return {
+        hull: hullNow,
+        hardpoints: { ...hardpoints, current: cap * hardpoints.max },
+    };
 }
 
 /**
@@ -98,7 +104,9 @@ export function leashed(
  * which is why shooting the palace's generators moves nothing visible.
  */
 export function displayPercent(
-    hull: Pool, hardpoints: Pool, diesWithHardpoints: boolean,
+    hull: Pool,
+    hardpoints: Pool,
+    diesWithHardpoints: boolean,
 ): number {
     const hullPercent = percentOf(hull);
 

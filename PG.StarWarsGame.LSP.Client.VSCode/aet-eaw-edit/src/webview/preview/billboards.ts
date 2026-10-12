@@ -15,7 +15,7 @@
 // supplies the orientation. That is what is reproduced here - as a WORLD rotation the caller puts on
 // the geometry, never on the bone, so a billboarded bone's children are left where the file put them.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
 /**
  * The modes, exactly as `AlamoBillboardType` names them.
@@ -24,10 +24,23 @@ import * as THREE from 'three';
  * the answer.
  */
 export type BillboardType =
-    'Parallel' | 'Face' | 'ZAxisView' | 'ZAxisLight' | 'ZAxisWind' | 'SunlightGlow' | 'Sun';
+    | "Parallel"
+    | "Face"
+    | "ZAxisView"
+    | "ZAxisLight"
+    | "ZAxisWind"
+    | "SunlightGlow"
+    | "Sun";
 
-const TYPES = new Set<string>(
-    ['Parallel', 'Face', 'ZAxisView', 'ZAxisLight', 'ZAxisWind', 'SunlightGlow', 'Sun']);
+const TYPES = new Set<string>([
+    "Parallel",
+    "Face",
+    "ZAxisView",
+    "ZAxisLight",
+    "ZAxisWind",
+    "SunlightGlow",
+    "Sun",
+]);
 
 /**
  * The axis a billboarded quad's face points along before anything turns it.
@@ -50,8 +63,8 @@ const BASIS = new THREE.Matrix4();
 export function billboardTypeOf(node: THREE.Object3D): BillboardType | null {
     const declared = node.userData.alamoBillboard;
 
-    return typeof declared === 'string' && TYPES.has(declared)
-        ? declared as BillboardType
+    return typeof declared === "string" && TYPES.has(declared)
+        ? (declared as BillboardType)
         : null;
 }
 
@@ -71,24 +84,24 @@ export function billboardRotation(
     at: THREE.Vector3,
 ): THREE.Quaternion {
     switch (type) {
-        case 'Face':
-        case 'Parallel':
-        case 'Sun':
-        case 'SunlightGlow':
+        case "Face":
+        case "Parallel":
+        case "Sun":
+        case "SunlightGlow":
             // The camera's own orientation, which is what `m_billboardView` is - the inverse view
             // rotation. `Sun` and `SunlightGlow` also displace the card towards the sun in the
             // engine; the preview models no sun position, so they keep the facing and stay put.
             return camera.quaternion.clone();
 
-        case 'ZAxisWind':
+        case "ZAxisWind":
             // Towards the wind, and the preview has no wind. Holding still is better than turning
             // to some arbitrary heading that would read as a bug.
             return new THREE.Quaternion();
 
-        case 'ZAxisView':
+        case "ZAxisView":
             return yawTowards(TO_TARGET.subVectors(camera.position, at));
 
-        case 'ZAxisLight':
+        case "ZAxisLight":
             // Towards where the light comes FROM, which is the direction it travels, reversed.
             return yawTowards(TO_TARGET.copy(light).negate());
     }
@@ -112,7 +125,9 @@ function yawTowards(direction: THREE.Vector3): THREE.Quaternion {
 
     // Built from the basis rather than `setFromUnitVectors`, which picks the SHORTEST arc between
     // the two vectors and so tips the card out of upright the moment the target is off the plane.
-    const right = new THREE.Vector3().crossVectors(BILLBOARD_UP, FLATTENED).normalize();
+    const right = new THREE.Vector3()
+        .crossVectors(BILLBOARD_UP, FLATTENED)
+        .normalize();
     BASIS.makeBasis(right, BILLBOARD_UP, FLATTENED);
 
     return new THREE.Quaternion().setFromRotationMatrix(BASIS);

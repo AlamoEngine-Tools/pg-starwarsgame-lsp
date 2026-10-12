@@ -11,6 +11,63 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Completion.Strategies;
 
 public sealed class TupleValueCompletionStrategyTest
 {
+    // ── TupleList: proposals follow the tag's slots ───────────────────────────
+    //
+    // The validation id used to pick the proposals - music events for context-name-pair, nothing
+    // for context-name-list - so a terrain/model list completed nothing at all. The slots say what
+    // each item is, and the item index runs past 1 because a list alternates for its whole length.
+
+    private static readonly XmlTagDefinition MusicList = Tag("Music_Event_List_Ambient", XmlValueType.TupleList) with
+    {
+        Slots =
+        [
+            new TupleSlotDefinition { Label = "Context" },
+            new TupleSlotDefinition
+            {
+                Label = "Music event", ReferenceKind = ReferenceKind.XmlObject,
+                ObjectType = new GameObjectTypeDefinition { TypeName = "MusicEvent" }
+            }
+        ]
+    };
+
+    private static readonly XmlTagDefinition TerrainModel =
+        Tag("Land_Terrain_Model_Mapping", XmlValueType.TupleList) with
+        {
+            Slots =
+            [
+                new TupleSlotDefinition
+                {
+                    Label = "Terrain", ReferenceKind = ReferenceKind.Enum,
+                    Enum = new EnumDefinition
+                    {
+                        Name = "TerrainType", Kind = EnumKind.SchemaFixed,
+                        Values = [new EnumValueDefinition { Name = "TEMPERATE" }]
+                    }
+                },
+                new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }
+            ]
+        };
+
+    // ── ListMap: the first item is a key; any later one may be a key or an item ─
+
+    private static readonly XmlTagDefinition Buildables =
+        Tag("Tactical_Buildable_Objects_Multiplayer", XmlValueType.ListMap) with
+        {
+            Slots =
+            [
+                new TupleSlotDefinition
+                {
+                    Label = "Faction", ReferenceKind = ReferenceKind.XmlObject,
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
+                },
+                new TupleSlotDefinition
+                {
+                    Label = "Object", ReferenceKind = ReferenceKind.XmlObject,
+                    ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
+                }
+            ]
+        };
+
     private static TagValueCompletionContext Ctx(
         XmlTagDefinition tagDef, int tupleSlotIndex, string partialValue = "",
         ISchemaProvider? schema = null)
@@ -210,43 +267,6 @@ public sealed class TupleValueCompletionStrategyTest
         Assert.Null(proposals.LastTag);
     }
 
-    // ── TupleList: proposals follow the tag's slots ───────────────────────────
-    //
-    // The validation id used to pick the proposals - music events for context-name-pair, nothing
-    // for context-name-list - so a terrain/model list completed nothing at all. The slots say what
-    // each item is, and the item index runs past 1 because a list alternates for its whole length.
-
-    private static readonly XmlTagDefinition MusicList = Tag("Music_Event_List_Ambient", XmlValueType.TupleList) with
-    {
-        Slots =
-        [
-            new TupleSlotDefinition { Label = "Context" },
-            new TupleSlotDefinition
-            {
-                Label = "Music event", ReferenceKind = ReferenceKind.XmlObject,
-                ObjectType = new GameObjectTypeDefinition { TypeName = "MusicEvent" }
-            }
-        ]
-    };
-
-    private static readonly XmlTagDefinition TerrainModel =
-        Tag("Land_Terrain_Model_Mapping", XmlValueType.TupleList) with
-        {
-            Slots =
-            [
-                new TupleSlotDefinition
-                {
-                    Label = "Terrain", ReferenceKind = ReferenceKind.Enum,
-                    Enum = new EnumDefinition
-                    {
-                        Name = "TerrainType", Kind = EnumKind.SchemaFixed,
-                        Values = [new EnumValueDefinition { Name = "TEMPERATE" }]
-                    }
-                },
-                new TupleSlotDefinition { Label = "Model", ReferenceKind = ReferenceKind.ModelFile }
-            ]
-        };
-
     [Fact]
     public void TupleList_AnUntypedSlot_ProposesNothing()
     {
@@ -299,26 +319,6 @@ public sealed class TupleValueCompletionStrategyTest
 
         Assert.Equal(ReferenceKind.ModelFile, completion.LastTag?.ReferenceKind);
     }
-
-    // ── ListMap: the first item is a key; any later one may be a key or an item ─
-
-    private static readonly XmlTagDefinition Buildables =
-        Tag("Tactical_Buildable_Objects_Multiplayer", XmlValueType.ListMap) with
-        {
-            Slots =
-            [
-                new TupleSlotDefinition
-                {
-                    Label = "Faction", ReferenceKind = ReferenceKind.XmlObject,
-                    ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
-                },
-                new TupleSlotDefinition
-                {
-                    Label = "Object", ReferenceKind = ReferenceKind.XmlObject,
-                    ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
-                }
-            ]
-        };
 
     [Fact]
     public void ListMap_TheFirstItem_ProposesKeysOnly()

@@ -14,10 +14,9 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
+using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
-using PG.StarWarsGame.LSP.Server.Assets;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -866,7 +865,11 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     {
         public bool IsOpen => true;
 
-        public event Action? Opened { add { } remove { } }
+        public event Action? Opened
+        {
+            add { }
+            remove { }
+        }
 
         public Task RunOrBufferAsync(Func<CancellationToken, Task> action, CancellationToken ct)
         {

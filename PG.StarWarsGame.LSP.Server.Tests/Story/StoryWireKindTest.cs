@@ -171,7 +171,7 @@ public sealed class StoryWireKindTest
             "Could not find the EDGE_KINDS array in palette.ts - this test parses it, so a change to "
             + "its shape needs a change here.");
 
-        var kinds = Regex.Matches(block.Groups[1].Value, @"\{\s*kind:\s*'([A-Za-z]+)'")
+        var kinds = Regex.Matches(block.Groups[1].Value, @"\{\s*kind:\s*[""']([A-Za-z]+)[""']")
             .Select(m => m.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -183,7 +183,7 @@ public sealed class StoryWireKindTest
     private static HashSet<string> AliasedEdgeKinds()
     {
         var text = ClientFile("storyGraph", "canvasEdgeStyle.ts");
-        return Regex.Matches(text, @"kindStyles\.set\(\s*'([A-Za-z]+)'")
+        return Regex.Matches(text, @"kindStyles\.set\(\s*[""']([A-Za-z]+)[""']")
             .Select(m => m.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
     }
@@ -209,16 +209,17 @@ public sealed class StoryWireKindTest
     {
         var kinds = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (Match m in Regex.Matches(ClientFile("storyGraph", "lodShape.ts"), @"case\s*'([A-Za-z]+)'"))
+        // Either quote: the client is formatted by Prettier, whose default is double quotes.
+        foreach (Match m in Regex.Matches(ClientFile("storyGraph", "lodShape.ts"), @"case\s*[""']([A-Za-z]+)[""']"))
             kinds.Add(m.Groups[1].Value);
 
         var simModel = ClientFile("storyGraph", "simModel.ts");
         foreach (Match set in Regex.Matches(simModel, @"(?:AND|OR)_KINDS\s*=\s*new Set\(\[([^\]]*)\]"))
-        foreach (Match m in Regex.Matches(set.Groups[1].Value, @"'([A-Za-z]+)'"))
+        foreach (Match m in Regex.Matches(set.Groups[1].Value, @"[""']([A-Za-z]+)[""']"))
             kinds.Add(m.Groups[1].Value);
 
         foreach (Match m in Regex.Matches(ClientFile("storyGraph.tsx"),
-                     @"\b(?:dto|node|n)\.kind === '([A-Z][A-Za-z]*)'"))
+                     @"\b(?:dto|node|n)\.kind === [""']([A-Z][A-Za-z]*)[""']"))
             kinds.Add(m.Groups[1].Value);
 
         Assert.NotEmpty(kinds);

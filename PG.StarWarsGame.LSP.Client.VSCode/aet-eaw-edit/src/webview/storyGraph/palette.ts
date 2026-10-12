@@ -15,17 +15,17 @@
 // var(). Both start from the same name.
 
 /** The lifecycles an event node can be in, in the order the colour key lists them. */
-export type Lifecycle = 'Waiting' | 'Armed' | 'Fired' | 'Disabled';
+export type Lifecycle = "Waiting" | "Armed" | "Fired" | "Disabled";
 
 /**
  * The colour a node's border and its colour key swatch take - and its overview rect, unless the node
  * belongs to a branch, which then wins there (see BRANCH_PALETTE).
  */
 export const LIFECYCLE_TOKENS: Readonly<Record<Lifecycle, string>> = {
-    Waiting: '--colour-data-blue',
-    Armed: '--colour-data-green',
-    Fired: '--colour-data-purple',
-    Disabled: '--colour-data-red',
+    Waiting: "--colour-data-blue",
+    Armed: "--colour-data-green",
+    Fired: "--colour-data-purple",
+    Disabled: "--colour-data-red",
 };
 
 /**
@@ -38,10 +38,10 @@ export const LIFECYCLE_TOKENS: Readonly<Record<Lifecycle, string>> = {
  * is neutral here for the same reason a plain Prereq edge is (see EDGE_KINDS): the default
  * relation is not a state, and colouring it says otherwise.
  */
-export const JUNCTION_TOKEN = '--colour-data-neutral';
+export const JUNCTION_TOKEN = "--colour-data-neutral";
 
 /** An event whose lifecycle the server did not name. Quiet, because it says nothing. */
-export const UNKNOWN_LIFECYCLE_TOKEN = '--colour-faint';
+export const UNKNOWN_LIFECYCLE_TOKEN = "--colour-faint";
 
 /**
  * What an edge's colour and dash pattern mean.
@@ -70,15 +70,45 @@ export interface EdgeKindStyle {
 }
 
 export const EDGE_KINDS: readonly EdgeKindStyle[] = [
-    {kind: 'Prereq', token: '--colour-data-neutral', dash: '', label: 'Requires'},
-    {kind: 'Control', token: '--colour-data-orange', dash: '', label: 'Activates or suspends'},
-    {kind: 'Tactical', token: '--colour-data-yellow', dash: '8 4', label: 'Tactical battle'},
-    {kind: 'Flag', token: '--colour-data-blue', dash: '2 4', label: 'Story flag'},
+    {
+        kind: "Prereq",
+        token: "--colour-data-neutral",
+        dash: "",
+        label: "Requires",
+    },
+    {
+        kind: "Control",
+        token: "--colour-data-orange",
+        dash: "",
+        label: "Activates or suspends",
+    },
+    {
+        kind: "Tactical",
+        token: "--colour-data-yellow",
+        dash: "8 4",
+        label: "Tactical battle",
+    },
+    {
+        kind: "Flag",
+        token: "--colour-data-blue",
+        dash: "2 4",
+        label: "Story flag",
+    },
     // The engine's own link from a reward to the listeners it reaches - a speech to its speech-done,
     // a battle to its outcome and summary listeners. Dash-dot so it reads as neither the dashed
     // tactical edge nor the dotted flag edge, and in the neutral grey so no branch hue claims it.
-    {kind: 'Implicit', token: '--colour-data-neutral', dash: '8 3 2 3', label: 'Engine link'},
-    {kind: 'LuaLink', token: '--colour-muted', dash: '', label: 'Lua script link'},
+    {
+        kind: "Implicit",
+        token: "--colour-data-neutral",
+        dash: "8 3 2 3",
+        label: "Engine link",
+    },
+    {
+        kind: "LuaLink",
+        token: "--colour-muted",
+        dash: "",
+        label: "Lua script link",
+    },
 ];
 
 /**
@@ -93,12 +123,12 @@ export const EDGE_KINDS: readonly EdgeKindStyle[] = [
  * and says which one wins instead.
  */
 export const BRANCH_PALETTE: readonly string[] = [
-    '--colour-data-blue',
-    '--colour-data-green',
-    '--colour-data-orange',
-    '--colour-data-purple',
-    '--colour-data-red',
-    '--colour-data-yellow',
+    "--colour-data-blue",
+    "--colour-data-green",
+    "--colour-data-orange",
+    "--colour-data-purple",
+    "--colour-data-red",
+    "--colour-data-yellow",
 ];
 
 /**
@@ -110,13 +140,13 @@ export const BRANCH_PALETTE: readonly string[] = [
  * takes the chart foreground, which reads as the lane that was not given a hue.
  */
 export const LANE_PALETTE: readonly string[] = [
-    '--colour-data-blue',
-    '--colour-data-green',
-    '--colour-data-orange',
-    '--colour-data-purple',
-    '--colour-data-yellow',
-    '--colour-data-red',
-    '--colour-data-neutral',
+    "--colour-data-blue",
+    "--colour-data-green",
+    "--colour-data-orange",
+    "--colour-data-purple",
+    "--colour-data-yellow",
+    "--colour-data-red",
+    "--colour-data-neutral",
 ];
 
 /** The token a branch is drawn in. */
@@ -135,13 +165,19 @@ export type BranchColour = (branch: string) => string;
  * list does not name yet - typed into an edit, ahead of the server's next facet list - falls back to
  * its name hash, so it still gets a colour and the same one every time.
  */
-export function branchColours(campaignBranches: readonly string[]): BranchColour {
-    const order = [...new Set(campaignBranches.filter(branch => branch !== ''))].sort();
+export function branchColours(
+    campaignBranches: readonly string[],
+): BranchColour {
+    const order = [
+        ...new Set(campaignBranches.filter((branch) => branch !== "")),
+    ].sort();
     const slot = new Map(order.map((branch, index) => [branch, index]));
 
-    return branch => {
+    return (branch) => {
         const index = slot.get(branch);
-        return index === undefined ? branchToken(branch) : BRANCH_PALETTE[index % BRANCH_PALETTE.length];
+        return index === undefined
+            ? branchToken(branch)
+            : BRANCH_PALETTE[index % BRANCH_PALETTE.length];
     };
 }
 

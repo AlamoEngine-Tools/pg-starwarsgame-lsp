@@ -13,8 +13,8 @@
 // glTF and the material extras arrive as parsed JSON - so the whole subject survives the structured
 // clone without a conversion step.
 
-import { type Inspection, type MeshInspection } from './inspector';
-import { type ModelDetail } from '../../protocol/modelPreview';
+import { type Inspection, type MeshInspection } from "./inspector";
+import { type ModelDetail } from "../../protocol/modelPreview";
 
 /** One tree row, as everything that describes it. */
 export interface InspectorSubject {
@@ -43,13 +43,17 @@ export interface GeometryKey {
  * rows under the right name.
  */
 export function geometryKeyOf(subject: InspectorSubject): GeometryKey | null {
-    const mesh = subject.sources
-        .find((source): source is MeshInspection => source.kind === 'mesh');
+    const mesh = subject.sources.find(
+        (source): source is MeshInspection => source.kind === "mesh",
+    );
 
     // Explicitly against undefined: sub-mesh 0 is the first sub-mesh and the commonest case, so a
     // truthiness check here drops the majority of rows.
-    if (mesh?.meshIndex === undefined || mesh.subMeshIndex === undefined
-        || subject.modelReference === null) {
+    if (
+        mesh?.meshIndex === undefined ||
+        mesh.subMeshIndex === undefined ||
+        subject.modelReference === null
+    ) {
         return null;
     }
 
@@ -68,12 +72,17 @@ export function geometryKeyOf(subject: InspectorSubject): GeometryKey | null {
  * turns up as a new object saying exactly the same thing, and comparing by identity threw away the
  * table the reader was three pages into.
  */
-export function sameGeometryKey(a: GeometryKey | null, b: GeometryKey | null): boolean {
+export function sameGeometryKey(
+    a: GeometryKey | null,
+    b: GeometryKey | null,
+): boolean {
     if (a === null || b === null) {
         return a === b;
     }
 
-    return a.modelReference === b.modelReference
-        && a.meshIndex === b.meshIndex
-        && a.subMeshIndex === b.subMeshIndex;
+    return (
+        a.modelReference === b.modelReference &&
+        a.meshIndex === b.meshIndex &&
+        a.subMeshIndex === b.subMeshIndex
+    );
 }

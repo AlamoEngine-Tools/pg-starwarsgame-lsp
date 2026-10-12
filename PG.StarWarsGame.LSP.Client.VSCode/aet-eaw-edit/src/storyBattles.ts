@@ -8,7 +8,11 @@
 // galactic story reaches the battles in); this is the client's reading of that answer for the
 // navigator and for the portals. Pure: no `vscode` import, so the unit harness covers it.
 
-import type {StoryBattleDto, StoryFactionDto, StoryPlotThreadDto} from './protocol';
+import type {
+    StoryBattleDto,
+    StoryFactionDto,
+    StoryPlotThreadDto,
+} from "./protocol";
 
 /** One battle with the plot threads its manifest claims, as the navigator lists them. */
 export interface BattleBranch {
@@ -26,7 +30,7 @@ export interface FactionTree {
  * The id prefix of a battle's stand-in on the galactic graph. The server names the node
  * `tactical#<battle key>`, so the key that opens the battle's own panel is in the id itself.
  */
-const TACTICAL_STUB_PREFIX = 'tactical#';
+const TACTICAL_STUB_PREFIX = "tactical#";
 
 /**
  * A faction's threads at the galactic level and its battles with theirs.
@@ -39,8 +43,13 @@ const TACTICAL_STUB_PREFIX = 'tactical#';
  * in play order (the server's rank), not in the order the feed happened to list them.
  */
 export function factionTree(faction: StoryFactionDto): FactionTree {
-    const battles = [...(faction.battles ?? [])].sort((a, b) => a.rank - b.rank);
-    const branches: BattleBranch[] = battles.map(battle => ({battle, threads: [...battle.threads]}));
+    const battles = [...(faction.battles ?? [])].sort(
+        (a, b) => a.rank - b.rank,
+    );
+    const branches: BattleBranch[] = battles.map((battle) => ({
+        battle,
+        threads: [...battle.threads],
+    }));
     const claimed = new Set<string>();
     for (const branch of branches) {
         for (const thread of branch.threads) {
@@ -49,8 +58,10 @@ export function factionTree(faction: StoryFactionDto): FactionTree {
             }
         }
     }
-    const galacticThreads = faction.threads.filter(t => !(t.uri && claimed.has(t.uri.toLowerCase())));
-    return {galacticThreads, battles: branches};
+    const galacticThreads = faction.threads.filter(
+        (t) => !(t.uri && claimed.has(t.uri.toLowerCase())),
+    );
+    return { galacticThreads, battles: branches };
 }
 
 /**
@@ -61,7 +72,7 @@ export function factionTree(faction: StoryFactionDto): FactionTree {
  */
 export function battleLabelOf(reference: string): string {
     const file = reference.split(/[\\/]/).pop() ?? reference;
-    return file.replace(/\.[^.]+$/, '');
+    return file.replace(/\.[^.]+$/, "");
 }
 
 /** The battle key a tactical stub node stands for, or undefined for any other node. */

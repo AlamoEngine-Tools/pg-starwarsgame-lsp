@@ -10,11 +10,6 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
 
 public sealed class ReferenceResolutionEvaluatorTest
 {
-    private static GameSymbol Symbol(string id, string typeName)
-    {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin("file:///a.xml", 0, null), null);
-    }
-
     // ── kind references ───────────────────────────────────────────────────────
     //
     // A planet slot asks what the object IS. The index types a planet "GameObjectType" like
@@ -25,6 +20,11 @@ public sealed class ReferenceResolutionEvaluatorTest
     {
         Kind = "Planet", Behaviors = ["PLANET"]
     };
+
+    private static GameSymbol Symbol(string id, string typeName)
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin("file:///a.xml", 0, null), null);
+    }
 
     private static GameIndex IndexWith(string id, params string[] behaviors)
     {
@@ -125,7 +125,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_Unresolved_ExpectedTypeHasNoIndexedInstances_IsInformation()
     {
         var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
-            indexedTypeNames: new HashSet<string> { "Faction", "GameObjectType" });
+            new HashSet<string> { "Faction", "GameObjectType" });
 
         Assert.NotNull(result);
         Assert.Equal(XmlDiagnosticSeverity.Information, result!.Value.Severity);
@@ -137,7 +137,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // Never UnresolvedReference: suppressing "we cannot check this yet" must not suppress every
         // genuine unresolved reference along with it.
         var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
-            indexedTypeNames: new HashSet<string> { "Faction" });
+            new HashSet<string> { "Faction" });
 
         Assert.Equal(DiagnosticIds.ReferenceTypeNotIndexed, result!.Value.Id);
     }
@@ -146,7 +146,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     public void Evaluate_Unresolved_ExpectedTypeHasNoIndexedInstances_MessageDoesNotBlameTheAuthor()
     {
         var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
-            indexedTypeNames: new HashSet<string> { "Faction" });
+            new HashSet<string> { "Faction" });
 
         Assert.DoesNotContain("No object with this name exists", result!.Value.Message);
         Assert.Contains("AIPlayerType", result.Value.Message);
@@ -158,7 +158,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // The AI tree is a later milestone: the gap is the tool's, and the notice has to say so
         // rather than read as "nothing is indexed" - which sounds like the data is missing.
         var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
-            indexedTypeNames: new HashSet<string> { "Faction" });
+            new HashSet<string> { "Faction" });
 
         Assert.Equal("Cannot verify reference 'BasicEmpire': Checking AIPlayerType references is not supported yet.",
             result!.Value.Message);
@@ -170,7 +170,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // The type indexes fine and the name is still missing: that is a typo, and it keeps the
         // error it has always had.
         var result = ReferenceResolutionEvaluator.Evaluate("MISPELLED", "Faction", null,
-            indexedTypeNames: new HashSet<string> { "Faction" });
+            new HashSet<string> { "Faction" });
 
         Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
         Assert.Equal(DiagnosticIds.UnresolvedReference, result.Value.Id);
@@ -183,7 +183,7 @@ public sealed class ReferenceResolutionEvaluatorTest
         // is unsupported". Reading it the other way would downgrade every missing reference in the
         // workspace to a notice until indexing finished.
         var result = ReferenceResolutionEvaluator.Evaluate("MISSING", "SpaceUnit", null,
-            indexedTypeNames: new HashSet<string>());
+            new HashSet<string>());
 
         Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
         Assert.Equal(DiagnosticIds.UnresolvedReference, result.Value.Id);

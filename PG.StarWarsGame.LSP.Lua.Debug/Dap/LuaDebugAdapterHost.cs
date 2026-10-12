@@ -7,6 +7,7 @@ using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
 using OmniSharp.Extensions.DebugAdapter.Server;
 using OmniSharp.Extensions.JsonRpc;
@@ -99,7 +100,7 @@ public static class LuaDebugAdapterHost
             .OnPause(Surfacing<PauseArguments, PauseResponse>(adapter.PauseAsync))
             .OnLoadedSources(Surfacing<LoadedSourcesArguments, LoadedSourcesResponse>(adapter.LoadedSourcesAsync))
             // The scripts view's own requests; VS Code sends them through DebugSession.customRequest.
-            .OnRequest(LuaCustomMessages.Scripts, Surfacing<LuaScriptsResult>(adapter.ScriptsAsync))
+            .OnRequest(LuaCustomMessages.Scripts, Surfacing(adapter.ScriptsAsync))
             .OnRequest(LuaCustomMessages.Refresh,
                 Surfacing<LuaRefreshArguments?, LuaScriptsResult>(adapter.RefreshAsync))
             .OnRequest(LuaCustomMessages.SelectScript,
@@ -148,7 +149,7 @@ public static class LuaDebugAdapterHost
     }
 
     private static void CopyCapabilities(InitializeResponse from,
-        OmniSharp.Extensions.DebugAdapter.Protocol.Models.Capabilities to)
+        Capabilities to)
     {
         to.SupportsConfigurationDoneRequest = from.SupportsConfigurationDoneRequest;
         to.SupportsEvaluateForHovers = from.SupportsEvaluateForHovers;

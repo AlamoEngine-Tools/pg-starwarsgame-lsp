@@ -25,6 +25,15 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 /// </summary>
 public sealed class SchemaBootstrapper : ISchemaBootstrapper
 {
+    // ── the Lua stub files ───────────────────────────────────────────────────
+    // The schema repository's lua/ directory holds several ---@meta files - the engine API, the
+    // standard library it opens, the per-script globals - listed in lua/_files.json in load order.
+    // A schema release from before that manifest existed has api.d.lua alone, so a missing
+    // manifest means exactly that list.
+
+    private const string LuaManifestName = "_files.json";
+    private const string LuaApiFileName = "api.d.lua";
+    private static readonly JsonSerializerOptions LuaManifestJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly SchemaHttpCache _cache;
     private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
@@ -35,10 +44,10 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     private readonly SchemaLocationResolver _locations;
     private readonly ILogger<SchemaBootstrapper> _logger;
     private readonly LuaApiSchemaProxy _luaProxy;
+    private readonly LuaStubLocation? _luaStubs;
     private readonly IUserNotifier _notifier;
     private readonly SchemaProviderProxy _proxy;
     private readonly ServerStatusRecorder? _status;
-    private readonly LuaStubLocation? _luaStubs;
 
     public SchemaBootstrapper(
         ILspConfigurationProvider config,
@@ -84,6 +93,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         if (isLocal)
         {
             realProvider = new LocalFileSchemaProvider(src.LocalPath!, _fileSystem, _localLogger);
+            ReportEmptyLocalSchema(realProvider, src.LocalPath!);
         }
         else
         {
@@ -146,6 +156,21 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         _notifier.ShowError(check.Message);
     }
 
+    /// <summary>
+    ///     Surfaces a local schema folder that holds no schema. Nothing works without one, and the
+    ///     usual cause is a path one level off (measured: the schema repository's root instead of its
+    ///     eaw folder), which the log alone leaves unexplained.
+    /// </summary>
+    private void ReportEmptyLocalSchema(ISchemaProvider provider, string localPath)
+    {
+        if (provider.AllTags.Count > 0) return;
+
+        var message = $"No schema in {localPath}. Point \"aet-eaw-edit.lsp.schema.localPath\" at the schema's eaw "
+                      + "folder, the one holding _index.json";
+        _logger.LogError("{Message}", message);
+        _notifier.ShowError(message);
+    }
+
     private async Task LoadEaWSchemaAsync(HttpSchemaProvider provider, CancellationToken ct)
     {
         try
@@ -157,16 +182,6 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
             _logger.LogError(ex, "HTTP schema load failed; proceeding with whatever was cached.");
         }
     }
-
-    // ── the Lua stub files ───────────────────────────────────────────────────
-    // The schema repository's lua/ directory holds several ---@meta files - the engine API, the
-    // standard library it opens, the per-script globals - listed in lua/_files.json in load order.
-    // A schema release from before that manifest existed has api.d.lua alone, so a missing
-    // manifest means exactly that list.
-
-    private const string LuaManifestName = "_files.json";
-    private const string LuaApiFileName = "api.d.lua";
-    private static readonly JsonSerializerOptions LuaManifestJsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     internal void LoadLuaSchemaFromDisk(string eawLocalPath)
     {

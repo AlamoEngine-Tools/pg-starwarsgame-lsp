@@ -83,6 +83,27 @@ jobs:
     - name: Build
       run: dotnet build PG.StarWarsGame.LSP.slnx --configuration Release
 
+    # The C# format check: JetBrains' command-line cleanup, the engine Rider formats with, pinned in
+    # dotnet-tools.json, then any change it made is a failure. Measured against Rider's own output:
+    # no content change (it only rewrites line endings, hence --ignore-cr-at-eol). Without the
+    # personal and global settings layers, so only .editorconfig and the built-in rules count -
+    # what every contributor shares. dotnet format is NOT equivalent: it disagreed with Rider in
+    # 1845 places. Windows only; one run is enough.
+    - name: C# format check
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        dotnet tool restore
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        dotnet jb cleanupcode PG.StarWarsGame.LSP.slnx --profile="Built-in: Reformat Code" --include="**/*.cs" `
+          --disable-settings-layers="GlobalAll;GlobalPerProduct;SolutionPersonal;ProjectPersonal" --verbosity=WARN
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        git diff --ignore-cr-at-eol --exit-code --stat -- '*.cs'
+        if ($LASTEXITCODE -ne 0) {
+          Write-Output "::error::C# files are not formatted as Rider formats them - run Reformat Code (Ctrl+Alt+L) on the files above"
+          exit 1
+        }
+
     # One SBOM per shippable artifact, not one per repo: the language server is a standalone
     # deliverable that could front any editor, so it and the VS Code extension are inventoried
     # separately. Runs AFTER the build on purpose - there are no packages.lock.json files here, so
@@ -146,3 +167,32 @@ jobs:
           echo "::error::Test projects failed:$failed"
           exit 1
         fi
+
+    # The client, and the package a release would ship: built here so a missing bundled file or a
+    # failing client check shows on the pull request, not in the release run. Windows only - the
+    # package is win32-x64. Packaging also type-checks (vscode:prepublish). The lint carries the
+    # TypeScript format check: prettier --check, Prettier with its defaults, pinned in package.json.
+    - name: Client checks
+      if: runner.os == 'Windows'
+      working-directory: PG.StarWarsGame.LSP/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
+      shell: pwsh
+      run: |
+        npm ci
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        npm run lint
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        npm run test:unit
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+    - name: Package the extension
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        ./scripts/stage-bundled-executables.ps1
+        # vsce does not create the folder it writes to.
+        New-Item dist -ItemType Directory -Force | Out-Null
+        Push-Location PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit
+        npx --yes @vscode/vsce package --no-dependencies --target win32-x64 --out ../../dist/aet-eaw-edit-check.vsix
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        Pop-Location
+        ./scripts/check-vsix.ps1 dist/aet-eaw-edit-check.vsix

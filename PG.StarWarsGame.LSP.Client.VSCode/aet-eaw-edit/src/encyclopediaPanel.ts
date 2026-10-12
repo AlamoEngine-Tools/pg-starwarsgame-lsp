@@ -1,11 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {GetEncyclopediaEntryResult} from './protocol';
-import {WebviewMessage, WebviewPanelHost} from './webviewPanelHost';
-import {pickShipName} from './shipNamePick';
+import { GetEncyclopediaEntryResult } from "./protocol";
+import { WebviewMessage, WebviewPanelHost } from "./webviewPanelHost";
+import { pickShipName } from "./shipNamePick";
 
 /**
  * The in-game encyclopedia popup for one GameObject, beside the editor.
@@ -41,12 +41,13 @@ export class EncyclopediaPanel extends WebviewPanelHost {
 
     private constructor(extensionUri: vscode.Uri) {
         super(extensionUri, {
-            viewType: 'aetEncyclopediaPreview',
-            title: 'Encyclopedia',
+            viewType: "aetEncyclopediaPreview",
+            title: "Encyclopedia",
             column: vscode.ViewColumn.Beside,
-            script: 'encyclopediaPreview.js',
-            bodyStyle: '  html, body { margin: 0; padding: 0; height: 100%; }\n'
-                + '  #root { height: 100%; }',
+            script: "encyclopediaPreview.js",
+            bodyStyle:
+                "  html, body { margin: 0; padding: 0; height: 100%; }\n" +
+                "  #root { height: 100%; }",
         });
 
         this.onDidDispose(() => {
@@ -54,25 +55,6 @@ export class EncyclopediaPanel extends WebviewPanelHost {
                 EncyclopediaPanel._instance = undefined;
             }
         });
-    }
-
-    protected onMessage(msg: WebviewMessage): void {
-        if (msg.type === 'ready') {
-            // The entry may have been pushed before the bundle finished loading; hold it until the
-            // webview says it is listening, or the first preview opens blank.
-            this._ready = true;
-            if (this._pending !== null) {
-                this.post(this._pending);
-                this._pending = null;
-            }
-        }
-        if (msg.type === 'setMultiplayer') {
-            this._multiplayer = msg.multiplayer === true;
-            this._reload?.(this._multiplayer);
-        }
-        if (msg.type === 'close') {
-            this.dispose();
-        }
     }
 
     /**
@@ -86,8 +68,9 @@ export class EncyclopediaPanel extends WebviewPanelHost {
         entry: GetEncyclopediaEntryResult,
         reload: (multiplayer: boolean) => void,
     ): void {
-        const panel = EncyclopediaPanel._instance
-            ?? (EncyclopediaPanel._instance = new EncyclopediaPanel(extensionUri));
+        const panel =
+            EncyclopediaPanel._instance ??
+            (EncyclopediaPanel._instance = new EncyclopediaPanel(extensionUri));
 
         panel._reload = reload;
         panel.panel.title = entry.displayName?.trim()
@@ -132,6 +115,25 @@ export class EncyclopediaPanel extends WebviewPanelHost {
         EncyclopediaPanel._instance?.dispose();
     }
 
+    protected onMessage(msg: WebviewMessage): void {
+        if (msg.type === "ready") {
+            // The entry may have been pushed before the bundle finished loading; hold it until the
+            // webview says it is listening, or the first preview opens blank.
+            this._ready = true;
+            if (this._pending !== null) {
+                this.post(this._pending);
+                this._pending = null;
+            }
+        }
+        if (msg.type === "setMultiplayer") {
+            this._multiplayer = msg.multiplayer === true;
+            this._reload?.(this._multiplayer);
+        }
+        if (msg.type === "close") {
+            this.dispose();
+        }
+    }
+
     /**
      * Sends an entry together with the mode it was requested in.
      *
@@ -141,7 +143,7 @@ export class EncyclopediaPanel extends WebviewPanelHost {
      */
     private _sendEntry(entry: GetEncyclopediaEntryResult): void {
         this._send({
-            type: 'entry',
+            type: "entry",
             entry,
             multiplayer: this._multiplayer,
             shipName: this._drawShipName(entry),

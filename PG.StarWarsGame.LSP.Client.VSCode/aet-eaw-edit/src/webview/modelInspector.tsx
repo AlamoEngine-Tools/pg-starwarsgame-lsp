@@ -13,17 +13,26 @@
 // runs the same `inspectPanels` over them and fetches its own geometry pages, which were always a
 // server round trip.
 
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import styled from 'styled-components';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import styled from "styled-components";
 
-import {InspectorBody} from './inspector/InspectorBody';
-import {GEOMETRY_PAGE, appendPage, type GeometryRows} from './preview/geometryRows';
+import { InspectorBody } from "./inspector/InspectorBody";
 import {
-    geometryKeyOf, sameGeometryKey, type InspectorSubject,
-} from './preview/inspectorSubject';
-import {dockChromeCss, inspectorCss} from './shared/dockChrome';
-import {type GeometryTable, type GetSubMeshGeometryResult} from '../protocol/modelPreview';
+    appendPage,
+    GEOMETRY_PAGE,
+    type GeometryRows,
+} from "./preview/geometryRows";
+import {
+    geometryKeyOf,
+    type InspectorSubject,
+    sameGeometryKey,
+} from "./preview/inspectorSubject";
+import { dockChromeCss, inspectorCss } from "./shared/dockChrome";
+import {
+    type GeometryTable,
+    type GetSubMeshGeometryResult,
+} from "../protocol/modelPreview";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
@@ -45,7 +54,9 @@ const Shell = styled.div`
     font-size: var(--font-size-12);
     color: var(--vscode-foreground);
 
-    > .inspect-page-head, > .inspect-columns, > .inspect-empty {
+    > .inspect-page-head,
+    > .inspect-columns,
+    > .inspect-empty {
         flex-shrink: 0;
     }
 
@@ -99,7 +110,9 @@ function ModelInspector(): React.JSX.Element {
     const [subject, setSubject] = useState<InspectorSubject | null>(null);
     const [geometry, setGeometry] = useState<GeometryRows | null>(null);
     const [geometryError, setGeometryError] = useState<string | null>(null);
-    const [selectedTable, setSelectedTable] = useState<GeometryTable | null>(null);
+    const [selectedTable, setSelectedTable] = useState<GeometryTable | null>(
+        null,
+    );
 
     // What has been ASKED for, so the same offset is never asked for twice. The scroller fires far
     // more often than a page comes back, and every one of those firings sees the same short table
@@ -108,34 +121,39 @@ function ModelInspector(): React.JSX.Element {
 
     useEffect(() => {
         const handle = (event: MessageEvent): void => {
-            const message = event.data as { type: string; [key: string]: unknown };
+            const message = event.data as {
+                type: string;
+                [key: string]: unknown;
+            };
 
-            if (message.type === 'setSubject') {
+            if (message.type === "setSubject") {
                 setSubject(message.subject as InspectorSubject | null);
                 return;
             }
 
-            if (message.type === 'subMeshGeometry') {
+            if (message.type === "subMeshGeometry") {
                 // Wrapped in `result` the way every other host reply is - the request either
                 // answered or said why, and both halves travel together.
-                const result = (message.result ?? {}) as GetSubMeshGeometryResult;
+                const result = (message.result ??
+                    {}) as GetSubMeshGeometryResult;
 
                 asked.current = null;
 
                 // Folded into what is already in hand rather than replacing it - the reader is
                 // scrolling one long table, and the pages behind it are ours to keep track of.
-                setGeometry(current =>
+                setGeometry((current) =>
                     result.page === null || result.page === undefined
                         ? current
-                        : appendPage(current, result.page));
+                        : appendPage(current, result.page),
+                );
 
                 setGeometryError(result.error ?? null);
             }
         };
 
-        window.addEventListener('message', handle);
-        vscode.postMessage({type: 'ready'});
-        return () => window.removeEventListener('message', handle);
+        window.addEventListener("message", handle);
+        vscode.postMessage({ type: "ready" });
+        return () => window.removeEventListener("message", handle);
     }, []);
 
     // A page belongs to the sub-mesh it is OF, so it survives everything that does not change which
@@ -150,50 +168,56 @@ function ModelInspector(): React.JSX.Element {
         setGeometry(null);
         setGeometryError(null);
         // A row with geometry opens on Vertices: a tab box always has a tab open.
-        setSelectedTable(key === null ? null : 'vertices');
+        setSelectedTable(key === null ? null : "vertices");
         asked.current = null;
     }
 
     // `useCallback` because the scroller's effect depends on it: a fresh function every render
     // would re-run that effect every render, and it is the thing that asks for pages.
-    const requestGeometry = useCallback((table: GeometryTable, offset: number): void => {
-        if (key === null) {
-            return;
-        }
+    const requestGeometry = useCallback(
+        (table: GeometryTable, offset: number): void => {
+            if (key === null) {
+                return;
+            }
 
-        // One request in flight, and never the same one twice. Every scroll event sees the same
-        // short table until the page it asked for lands, so without this a single flick of the
-        // wheel posts the same offset a dozen times.
-        const wanted = `${table}:${offset}`;
-        if (asked.current === wanted) {
-            return;
-        }
+            // One request in flight, and never the same one twice. Every scroll event sees the same
+            // short table until the page it asked for lands, so without this a single flick of the
+            // wheel posts the same offset a dozen times.
+            const wanted = `${table}:${offset}`;
+            if (asked.current === wanted) {
+                return;
+            }
 
-        asked.current = wanted;
-        setGeometryError(null);
-        vscode.postMessage({
-            type: 'requestSubMeshGeometry',
-            modelReference: key.modelReference,
-            meshIndex: key.meshIndex,
-            subMeshIndex: key.subMeshIndex,
-            table,
-            offset,
-            count: GEOMETRY_PAGE,
-        });
-    }, [key?.modelReference, key?.meshIndex, key?.subMeshIndex]);
+            asked.current = wanted;
+            setGeometryError(null);
+            vscode.postMessage({
+                type: "requestSubMeshGeometry",
+                modelReference: key.modelReference,
+                meshIndex: key.meshIndex,
+                subMeshIndex: key.subMeshIndex,
+                table,
+                offset,
+                count: GEOMETRY_PAGE,
+            });
+        },
+        [key?.modelReference, key?.meshIndex, key?.subMeshIndex],
+    );
 
     // Switching tab starts that table again from row zero: the rows in hand belong to the table
     // they came from, and `appendPage` replaces rather than appends when the table changes.
     // Pressing the tab that is already open does nothing - it is a tab, not a reload.
-    const openTable = useCallback((table: GeometryTable): void => {
-        if (table === selectedTable && geometry?.table === table) {
-            return;
-        }
+    const openTable = useCallback(
+        (table: GeometryTable): void => {
+            if (table === selectedTable && geometry?.table === table) {
+                return;
+            }
 
-        setSelectedTable(table);
-        asked.current = null;
-        requestGeometry(table, 0);
-    }, [requestGeometry, selectedTable, geometry?.table]);
+            setSelectedTable(table);
+            asked.current = null;
+            requestGeometry(table, 0);
+        },
+        [requestGeometry, selectedTable, geometry?.table],
+    );
 
     // The first page of the open tab, fetched as soon as a row with geometry is shown. Keyed on
     // the sub-mesh, so a tree rebuild that keeps the same row does not fetch it again.
@@ -201,7 +225,14 @@ function ModelInspector(): React.JSX.Element {
         if (key !== null && selectedTable !== null && geometry === null) {
             requestGeometry(selectedTable, 0);
         }
-    }, [key?.modelReference, key?.meshIndex, key?.subMeshIndex, selectedTable, geometry, requestGeometry]);
+    }, [
+        key?.modelReference,
+        key?.meshIndex,
+        key?.subMeshIndex,
+        selectedTable,
+        geometry,
+        requestGeometry,
+    ]);
 
     return (
         <Shell>
@@ -217,4 +248,4 @@ function ModelInspector(): React.JSX.Element {
     );
 }
 
-createRoot(document.getElementById('root')!).render(<ModelInspector/>);
+createRoot(document.getElementById("root")!).render(<ModelInspector />);

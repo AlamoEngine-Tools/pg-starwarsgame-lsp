@@ -8,8 +8,8 @@
 // so every message was truncated, and a list that appears and disappears there shifts the controls
 // above it.
 
-import { ProblemsPanel } from '../shared/ProblemsPanel';
-import { LocProblem } from './useLocPanel';
+import { ProblemsPanel } from "../shared/ProblemsPanel";
+import { LocProblem } from "./useLocPanel";
 
 export function LocProblemsBar(props: {
     problems: LocProblem[];
@@ -19,13 +19,14 @@ export function LocProblemsBar(props: {
     jumpTo: (problem: LocProblem) => (() => void) | null;
     onClose: () => void;
 }): React.JSX.Element {
-    const errors = props.problems.filter(p => p.severity === 'error').length;
+    const errors = props.problems.filter((p) => p.severity === "error").length;
     // The error count is only worth showing when it is not simply the total - "3 problems, 3
     // errors" says the same thing twice.
     const title = `Problems (${props.problems.length}${
         errors > 0 && errors < props.problems.length
-            ? `, ${errors} error${errors === 1 ? '' : 's'}`
-            : ''})`;
+            ? `, ${errors} error${errors === 1 ? "" : "s"}`
+            : ""
+    })`;
 
     return (
         <ProblemsPanel
@@ -41,19 +42,31 @@ export function LocProblemsBar(props: {
                     return (
                         <div
                             key={i}
-                            className={`problem-row${jump ? ' clickable' : ''}`}
-                            title={jump ? 'Click to show this entry in the table' : undefined}
+                            className={`problem-row${jump ? " clickable" : ""}`}
+                            title={
+                                jump
+                                    ? "Click to show this entry in the table"
+                                    : undefined
+                            }
                             onClick={jump ?? undefined}
                         >
                             <span
                                 className={`codicon codicon-${
-                                    problem.severity === 'error' ? 'error'
-                                        : problem.severity === 'info' ? 'info' : 'warning'
+                                    problem.severity === "error"
+                                        ? "error"
+                                        : problem.severity === "info"
+                                          ? "info"
+                                          : "warning"
                                 } sev-${problem.severity}`}
                                 aria-hidden="true"
                             />
-                            <span className="problem-target">{props.labelOf(problem)}</span>
-                            <span className="problem-msg" title={problem.message}>
+                            <span className="problem-target">
+                                {props.labelOf(problem)}
+                            </span>
+                            <span
+                                className="problem-msg"
+                                title={problem.message}
+                            >
                                 {problem.message}
                             </span>
                         </div>

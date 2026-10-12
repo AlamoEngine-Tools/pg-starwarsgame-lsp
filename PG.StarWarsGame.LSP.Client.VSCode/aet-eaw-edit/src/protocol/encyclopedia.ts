@@ -102,9 +102,9 @@ export interface EncyclopediaRgba {
  */
 export const ENCYCLOPEDIA_TEXT_ALIGNMENT = {
     /** Neither justify tag set, which is how `encyclopedia_center_text` is encoded. */
-    center: 'center',
-    left: 'left',
-    right: 'right',
+    center: "center",
+    left: "left",
+    right: "right",
 } as const;
 
 /**
@@ -368,10 +368,7 @@ export interface EncyclopediaFactionFrame {
  * placeholder so the card still has a portrait slot.
  */
 export type EncyclopediaIconSource =
-    | 'WorkspaceMegaTexture'
-    | 'LooseSource'
-    | 'Baseline'
-    | 'Fallback';
+    "WorkspaceMegaTexture" | "LooseSource" | "Baseline" | "Fallback";
 
 /**
  * A resolved icon, pre-encoded by the server so the webview needs no decoding step - and no blob

@@ -19,6 +19,11 @@ public sealed class ProjectDocumentKeysTest
     private const string ProjectDir = "C:/mods/mymod";
     private const string Pgproj = ProjectDir + "/mod.pgproj";
 
+    // ── documents in a referenced project ────────────────────────────────────
+
+    private const string CoreDir = "C:/mods/core";
+    private const string CorePgproj = CoreDir + "/core.pgproj";
+
     private static ProjectDocumentKeys Build(MockFileSystem? fs = null, bool withProject = true)
     {
         var layers = withProject
@@ -130,11 +135,6 @@ public sealed class ProjectDocumentKeysTest
     {
         Assert.Null(Build().NodeKeyForBaseName("story_main.xml", "Start"));
     }
-
-    // ── documents in a referenced project ────────────────────────────────────
-
-    private const string CoreDir = "C:/mods/core";
-    private const string CorePgproj = CoreDir + "/core.pgproj";
 
     /// <summary>A leaf over a dependency, leaf ranked higher.</summary>
     private static ProjectDocumentKeys BuildLayered()

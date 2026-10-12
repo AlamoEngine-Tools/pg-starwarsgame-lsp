@@ -11,8 +11,8 @@
 // Both producers answer in the same shape, so the editor has one path that turns seed rows into
 // staged inserts however they were sourced.
 
-import { LocRow } from './locRow';
-import { BaselineRow } from '../translationInherited';
+import { LocRow } from "./locRow";
+import { BaselineRow } from "../translationInherited";
 
 /** One line to add: the formatting directive it uses, and what it says. */
 export interface CreditsSeedRow {
@@ -29,14 +29,19 @@ export interface CreditsSeedRow {
  * pauses.
  */
 export function creditsBaselineSeed(
-    language: string, baseline: readonly BaselineRow[],
+    language: string,
+    baseline: readonly BaselineRow[],
 ): CreditsSeedRow[] {
     const wanted = language.toUpperCase();
     const seeded: CreditsSeedRow[] = [];
 
     for (const entry of baseline) {
-        const value = entry.values.find(v => v.language.toUpperCase() === wanted)?.value;
-        if (value === undefined || value.trim() === '') { continue; }
+        const value = entry.values.find(
+            (v) => v.language.toUpperCase() === wanted,
+        )?.value;
+        if (value === undefined || value.trim() === "") {
+            continue;
+        }
 
         seeded.push({ key: entry.key, value });
     }
@@ -56,12 +61,15 @@ export function creditsBaselineSeed(
  * list to content that is already there, which is the alignment problem seeding exists to avoid.
  */
 export function creditsFileSeed(
-    rows: readonly LocRow[], sourceLanguage: string,
+    rows: readonly LocRow[],
+    sourceLanguage: string,
 ): CreditsSeedRow[] {
     const wanted = sourceLanguage.toUpperCase();
 
-    return rows.map(row => ({
+    return rows.map((row) => ({
         key: row.key,
-        value: row.values.find(v => v.language.toUpperCase() === wanted)?.value ?? '',
+        value:
+            row.values.find((v) => v.language.toUpperCase() === wanted)
+                ?.value ?? "",
     }));
 }

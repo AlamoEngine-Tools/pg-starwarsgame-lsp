@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// <remarks>
 ///     <para>
 ///         The shape, from the engine's load-time validation
-///        :
+///         :
 ///         <c>
 ///             if (style != 3) { Message_Popup("The only currently supported
 ///             Activation_Style is Galactic_Automatic."); style = 3; }

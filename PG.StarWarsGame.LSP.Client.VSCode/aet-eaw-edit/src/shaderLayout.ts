@@ -3,8 +3,8 @@
 
 // Recognising a folder of shader sources. Kept free of `vscode` so it can be unit tested.
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Where the `.fx` files sit relative to the folder the user pointed at.
@@ -13,19 +13,23 @@ import * as path from 'path';
  * as they extract its contents - so accepting only one layout would reject half of correct answers
  * with a message saying the folder is wrong.
  */
-export const SHADER_SUBDIRECTORIES = ['', 'Shaders'];
+export const SHADER_SUBDIRECTORIES = ["", "Shaders"];
 
 /** Whether a folder actually holds shader sources, rather than merely existing. */
 export function hasShaderSources(directory: string | undefined): boolean {
-    if (directory === undefined || directory.trim() === '') {
+    if (directory === undefined || directory.trim() === "") {
         return false;
     }
 
     for (const sub of SHADER_SUBDIRECTORIES) {
-        const candidate = sub === '' ? directory : path.join(directory, sub);
+        const candidate = sub === "" ? directory : path.join(directory, sub);
 
         try {
-            if (fs.readdirSync(candidate).some(name => name.toLowerCase().endsWith('.fx'))) {
+            if (
+                fs
+                    .readdirSync(candidate)
+                    .some((name) => name.toLowerCase().endsWith(".fx"))
+            ) {
                 return true;
             }
         } catch {

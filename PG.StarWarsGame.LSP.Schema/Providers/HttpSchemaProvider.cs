@@ -20,6 +20,7 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 /// </summary>
 public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSchemaProvider
 {
+    private static readonly JsonSerializerOptions ManifestJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly string _baseUrl;
     private readonly SchemaHttpCache _cache;
     private readonly Dictionary<string, string> _etags = new();
@@ -53,14 +54,14 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
     /// <inheritdoc />
     public Task ReadyAsync => _readyTcs.Task;
 
-    /// <inheritdoc />
-    public SchemaVersionCheck? LastVersionCheck { get; private set; }
-
     /// <summary>
     ///     Whether the last load was served from the local cache (true) or rebuilt from the network
     ///     (false). Null until a load got as far as either.
     /// </summary>
     public bool? LastLoadFromCache { get; private set; }
+
+    /// <inheritdoc />
+    public SchemaVersionCheck? LastVersionCheck { get; private set; }
 
     public async Task LoadAsync(CancellationToken ct = default)
     {
@@ -124,8 +125,6 @@ public sealed class HttpSchemaProvider : SchemaIndexProviderBase, IVersionedSche
         _readyTcs.TrySetResult();
         return true;
     }
-
-    private static readonly JsonSerializerOptions ManifestJsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private static SchemaManifest? ParseManifest(string indexJson)
     {

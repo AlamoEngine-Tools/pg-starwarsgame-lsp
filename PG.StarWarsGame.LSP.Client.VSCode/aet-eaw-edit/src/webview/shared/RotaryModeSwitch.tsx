@@ -10,9 +10,9 @@
 //
 // A mode keeps its ANGLE when others are hidden, so the one you know stays where your eye expects.
 
-import * as React from 'react';
+import * as React from "react";
 
-import {type ChoiceOption} from './choice';
+import { type ChoiceOption } from "./choice";
 
 /**
  * One position on the dial.
@@ -29,7 +29,7 @@ import {type ChoiceOption} from './choice';
  * decision rather than a refactor - so it is the last hole left in the icon seam, and it is open on
  * purpose until someone picks them.
  */
-export type RotaryMode<Id extends string> = Omit<ChoiceOption<Id>, 'icon'> & {
+export type RotaryMode<Id extends string> = Omit<ChoiceOption<Id>, "icon"> & {
     /** A codicon name, without the `codicon-` prefix. See the note above. */
     icon: string;
     /** Degrees, 0 at 3 o'clock and 90 pointing down - so the arc above the centre is 180 to 360. */
@@ -57,9 +57,9 @@ export function RotaryModeSwitch<Id extends string>(props: {
     modes: readonly RotaryMode<Id>[];
     onSelect: (mode: Id) => void;
 }): React.JSX.Element {
-    const {modes} = props;
-    const active = modes.find(mode => mode.id === props.mode) ?? modes[0];
-    const order = modes.map(mode => mode.id);
+    const { modes } = props;
+    const active = modes.find((mode) => mode.id === props.mode) ?? modes[0];
+    const order = modes.map((mode) => mode.id);
 
     // Steps to the next mode that can actually be taken. Cycling blindly walked straight into a
     // disabled one, which is how a graph nothing could edit still ended up in Edit mode.
@@ -76,7 +76,7 @@ export function RotaryModeSwitch<Id extends string>(props: {
 
     return (
         <div className="rotary">
-            {modes.map(mode => {
+            {modes.map((mode) => {
                 const radians = (mode.angle * Math.PI) / 180;
                 const x = Math.cos(radians) * RADIUS;
                 const y = Math.sin(radians) * RADIUS;
@@ -84,29 +84,40 @@ export function RotaryModeSwitch<Id extends string>(props: {
                 return (
                     <button
                         key={mode.id}
-                        className={'rotary-pos' + (mode.id === props.mode ? ' active' : '')}
-                        style={{transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`}}
+                        className={
+                            "rotary-pos" +
+                            (mode.id === props.mode ? " active" : "")
+                        }
+                        style={{
+                            transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
+                        }}
                         disabled={mode.disabled ?? false}
                         // The reason outranks the label: it is the only thing worth saying about a
                         // mode that cannot be entered, and saying it HERE is what stops someone
                         // working in a mode whose edits will be refused later.
-                        title={mode.disabled
-                            ? mode.disabledReason ?? mode.label
-                            : mode.count === undefined
-                                ? mode.label
-                                : `${mode.label} (${mode.count})`}
+                        title={
+                            mode.disabled
+                                ? (mode.disabledReason ?? mode.label)
+                                : mode.count === undefined
+                                  ? mode.label
+                                  : `${mode.label} (${mode.count})`
+                        }
                         onClick={() => props.onSelect(mode.id)}
-                    ><span className={'codicon codicon-' + mode.icon}/></button>
+                    >
+                        <span className={"codicon codicon-" + mode.icon} />
+                    </button>
                 );
             })}
             <button
                 className="rotary-center"
-                title={order.length > 1
-                    ? `${active.label} - click to switch mode`
-                    : `${active.label} - the other modes are unavailable here`}
+                title={
+                    order.length > 1
+                        ? `${active.label} - click to switch mode`
+                        : `${active.label} - the other modes are unavailable here`
+                }
                 onClick={cycle}
             >
-                <span className={'codicon codicon-' + active.icon}/>
+                <span className={"codicon codicon-" + active.icon} />
             </button>
         </div>
     );

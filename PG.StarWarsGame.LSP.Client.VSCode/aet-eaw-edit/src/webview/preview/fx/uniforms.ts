@@ -7,8 +7,8 @@
 // plain record of what it already knows - matrices it computed with three's own maths, the light
 // rig, the clock - and this says which part of it each semantic wants.
 
-import type { Wind } from '../viewerSettings';
-import type { AlamoMatrix, UniformSource } from './semantics';
+import type { Wind } from "../viewerSettings";
+import type { AlamoMatrix, UniformSource } from "./semantics";
 
 /** One directional light, as the engine's uniforms describe it. */
 export interface FrameLight {
@@ -67,20 +67,20 @@ const BEND_HEIGHT_FACTOR = 0.002;
  * Written in the space the shaders work in: they add the vector to a WORLD position, and ours is
  * the Y-up one the exporter's root correction produces, so Alamo's ground plane XY is XZ here.
  */
-function windVector(of: 'bend' | 'grass', time: number, wind: Wind): number[] {
+function windVector(of: "bend" | "grass", time: number, wind: Wind): number[] {
     const heading = (wind.heading * Math.PI) / 180;
 
     // The bend SWAYS and the grass does not: the tree shader is handed an oscillation
     // (`alo-viewer Render.cpp:300` multiplies by `sin(time)`), while the grass shader reads a
     // steady vector with the wind's length in `w` and does its own thing with it.
-    const sway = of === 'bend' ? Math.sin(time) : 1;
+    const sway = of === "bend" ? Math.sin(time) : 1;
 
     // `|| 0` collapses negative zero, which a heading on an axis produces and which reads as a
     // different value to anything comparing the vector.
     const x = Math.cos(heading) * sway || 0;
     const z = -Math.sin(heading) * sway || 0;
 
-    return of === 'bend'
+    return of === "bend"
         ? [x, 0, z, BEND_HEIGHT_FACTOR]
         : [x, 0, z, wind.speed];
 }
@@ -152,8 +152,11 @@ export function sphericalHarmonics(
     lights: readonly ProbeLight[],
     ambient: readonly [number, number, number],
 ): number[] {
-    const projection = [new Array<number>(9).fill(0), new Array<number>(9).fill(0),
-        new Array<number>(9).fill(0)];
+    const projection = [
+        new Array<number>(9).fill(0),
+        new Array<number>(9).fill(0),
+        new Array<number>(9).fill(0),
+    ];
 
     for (const light of lights) {
         const [x, y, z] = light.toLight;
@@ -185,11 +188,23 @@ export function sphericalHarmonics(
         // Symmetric, every time - so the row-major matrix written here and the column-major one
         // GLSL uploads are the same sixteen numbers, and `mul(m, n4)` cannot read it the wrong way.
         probe.push(
-            SH_C1 * l[8], SH_C1 * l[4], SH_C1 * l[7], SH_C2 * l[3],
-            SH_C1 * l[4], -SH_C1 * l[8], SH_C1 * l[5], SH_C2 * l[1],
-            SH_C1 * l[7], SH_C1 * l[5], SH_C3 * l[6], SH_C2 * l[2],
-            SH_C2 * l[3], SH_C2 * l[1], SH_C2 * l[2],
-            SH_C4 * l[0] - SH_C5 * l[6] + ambient[channel]);
+            SH_C1 * l[8],
+            SH_C1 * l[4],
+            SH_C1 * l[7],
+            SH_C2 * l[3],
+            SH_C1 * l[4],
+            -SH_C1 * l[8],
+            SH_C1 * l[5],
+            SH_C2 * l[1],
+            SH_C1 * l[7],
+            SH_C1 * l[5],
+            SH_C3 * l[6],
+            SH_C2 * l[2],
+            SH_C2 * l[3],
+            SH_C2 * l[1],
+            SH_C2 * l[2],
+            SH_C4 * l[0] - SH_C5 * l[6] + ambient[channel],
+        );
     }
 
     return probe;
@@ -207,7 +222,7 @@ export function probeDiffuse(
 ): [number, number, number] {
     const n = [normal[0], normal[1], normal[2], 1];
 
-    return [0, 1, 2].map(channel => {
+    return [0, 1, 2].map((channel) => {
         let total = 0;
 
         for (let row = 0; row < 4; row++) {
@@ -249,7 +264,12 @@ export function engineLight(
         // ONE global specular for the whole rig, as the engine keeps it and as AloViewer's settings
         // dialog exposes it - but scaled by this light, so turning a light down stops it
         // highlighting at full strength.
-        specular: [specular[0] * scale, specular[1] * scale, specular[2] * scale, 0],
+        specular: [
+            specular[0] * scale,
+            specular[1] * scale,
+            specular[2] * scale,
+            0,
+        ],
     };
 }
 
@@ -268,60 +288,67 @@ export type UniformValue = number | ArrayLike<number> | undefined;
  * fog-of-war projection - deliberately return undefined rather than a made-up number. There is no
  * fog in a model viewer and no wind, and the header's own defaults are better than a guess.
  */
-export function uniformValue(source: UniformSource, frame: AlamoFrame): UniformValue {
+export function uniformValue(
+    source: UniformSource,
+    frame: AlamoFrame,
+): UniformValue {
     switch (source.kind) {
-        case 'matrix':
+        case "matrix":
             return frame.matrices[source.of];
 
-        case 'eye':
-            return source.space === 'world' ? frame.eyeWorld : frame.eyeObject;
+        case "eye":
+            return source.space === "world" ? frame.eyeWorld : frame.eyeObject;
 
-        case 'light': {
+        case "light": {
             const light = frame.lights[source.index];
             if (light === undefined) {
                 return undefined;
             }
 
             switch (source.channel) {
-                case 'vector':
-                    return source.space === 'world' ? light.vector : light.objectVector;
-                case 'diffuse':
+                case "vector":
+                    return source.space === "world"
+                        ? light.vector
+                        : light.objectVector;
+                case "diffuse":
                     return light.diffuse;
-                case 'specular':
+                case "specular":
                     return light.specular;
             }
 
             return undefined;
         }
 
-        case 'ambient':
+        case "ambient":
             return frame.ambient;
 
-        case 'lightScale':
+        case "lightScale":
             return frame.lightScale;
 
-        case 'time':
+        case "time":
             return frame.time;
 
-        case 'resolution':
+        case "resolution":
             return frame.resolution;
 
-        case 'skinMatrices':
+        case "skinMatrices":
             return frame.skinMatrices ?? undefined;
 
-        case 'sphericalHarmonics':
-            return source.set === 'fill' ? frame.sphericalHarmonicsFill : frame.sphericalHarmonics;
+        case "sphericalHarmonics":
+            return source.set === "fill"
+                ? frame.sphericalHarmonicsFill
+                : frame.sphericalHarmonics;
 
         // Everything below is engine state a model preview has none of, and whose shipped default
         // is a sensible answer - fog and fade switch themselves off, the wind sits still.
-        case 'wind':
+        case "wind":
             return windVector(source.of, frame.time, frame.wind);
 
-        case 'fog':
-        case 'distanceFade':
-        case 'shadowExtrusion':
-        case 'texture':
-        case 'projectedTexcoord':
+        case "fog":
+        case "distanceFade":
+        case "shadowExtrusion":
+        case "texture":
+        case "projectedTexcoord":
             return undefined;
     }
 

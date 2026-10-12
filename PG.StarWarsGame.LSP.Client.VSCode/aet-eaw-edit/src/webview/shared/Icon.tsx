@@ -20,28 +20,90 @@
 // the webview's content-security policy to allow. Tree-shaken, so only what this table names ships.
 
 import {
-    IconAdjustments, IconAlertTriangle, IconArrowBackUp, IconAxisX, IconBone, IconBox,
-    IconCamera, IconCheck, IconCircleX,
-    IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleOff, IconClipboardCopy,
-    IconCloudDownload, IconCube, IconDeviceFloppy, IconExternalLink, IconFileCode,
-    IconAsterisk, IconBook, IconFilterOff, IconHierarchy, IconLetterCase, IconListTree,
-    IconRegex,
-    IconEye, IconEyeClosed, IconEyeDotted, IconFlame, IconGridDots, IconHeartBroken,
+    IconAdjustments,
+    IconAlertTriangle,
+    IconArrowBackUp,
+    IconAsterisk,
+    IconAxisX,
+    IconBone,
+    IconBook,
+    IconBox,
+    IconCamera,
+    IconCheck,
+    IconChevronDown,
+    IconChevronRight,
+    IconCircleDot,
+    IconCircleOff,
+    IconCircleX,
+    IconClipboardCopy,
+    IconCloudDownload,
+    IconCoins,
+    IconCrosshair,
+    IconCube,
+    IconDeviceFloppy,
+    IconExternalLink,
+    IconEye,
+    IconEyeClosed,
+    IconEyeDotted,
+    IconFileCode,
+    IconFilterOff,
+    IconFlag,
+    IconFlame,
+    IconGridDots,
+    IconHandClick,
+    IconHeartBroken,
+    IconHierarchy,
+    IconHistory,
     IconInfoCircle,
-    IconLayoutGrid, IconMesh,
-    IconPerspective, IconPhoto, IconPlayerPause, IconPlayerPlay, IconPlayerSkipBack,
-    IconMinus, IconPencil, IconPlayerSkipForward, IconPlayerTrackNext, IconPlayerTrackPrev, IconPlus,
-    IconPlayerStop, IconPolygon, IconRadar, IconRefresh, IconRepeat,
-    IconCrosshair, IconTargetArrow, IconTool, IconHistory,
-    IconRuler, IconSearch, IconSettings, IconShadow, IconSparkles, IconStack2,
-    IconSun, IconSunHigh, IconSunLow, IconTexture, IconTrash, IconWind, IconWorld, IconX,
-    IconCircleDot, IconCoins, IconFlag, IconHandClick, IconPlanet, IconRoute, IconScript,
-    IconStairsUp, IconSwords, IconTimeline, IconUsers,
+    IconLayoutGrid,
+    IconLetterCase,
+    IconListTree,
+    IconMesh,
+    IconMinus,
+    IconPencil,
+    IconPerspective,
+    IconPhoto,
+    IconPlanet,
+    IconPlayerPause,
+    IconPlayerPlay,
+    IconPlayerSkipBack,
+    IconPlayerSkipForward,
+    IconPlayerStop,
+    IconPlayerTrackNext,
+    IconPlayerTrackPrev,
+    IconPlus,
+    IconPolygon,
     type IconProps,
-} from '@tabler/icons-react';
-import {type ComponentType} from 'react';
+    IconRadar,
+    IconRefresh,
+    IconRegex,
+    IconRepeat,
+    IconRoute,
+    IconRuler,
+    IconScript,
+    IconSearch,
+    IconSettings,
+    IconShadow,
+    IconSparkles,
+    IconStack2,
+    IconStairsUp,
+    IconSun,
+    IconSunHigh,
+    IconSunLow,
+    IconSwords,
+    IconTargetArrow,
+    IconTexture,
+    IconTimeline,
+    IconTool,
+    IconTrash,
+    IconUsers,
+    IconWind,
+    IconWorld,
+    IconX,
+} from "@tabler/icons-react";
+import { type ComponentType } from "react";
 
-import {codiconFor} from './iconSource';
+import { codiconFor } from "./iconSource";
 
 /**
  * What the preview can draw, by meaning.
@@ -228,7 +290,7 @@ export interface IconProps_ {
     size?: number;
 }
 
-export function Icon({name, size = 16}: IconProps_): React.JSX.Element {
+export function Icon({ name, size = 16 }: IconProps_): React.JSX.Element {
     // An EDITOR action keeps the editor's own glyph - see `iconSource`. Only the domain icons are
     // Tabler's, because those are the ones codicons has not got.
     const codicon = codiconFor(name);
@@ -237,7 +299,7 @@ export function Icon({name, size = 16}: IconProps_): React.JSX.Element {
         return (
             <span
                 className={`codicon codicon-${codicon}`}
-                style={{fontSize: size}}
+                style={{ fontSize: size }}
                 aria-hidden="true"
             />
         );
@@ -248,5 +310,7 @@ export function Icon({name, size = 16}: IconProps_): React.JSX.Element {
     // `currentColor` and aria-hidden are the two things that make an icon behave: it takes the
     // colour of whatever it sits in - including a disabled or a warning state - and it is invisible
     // to a screen reader, which reads the control's own label instead.
-    return <Glyph size={size} stroke={2} color="currentColor" aria-hidden="true"/>;
+    return (
+        <Glyph size={size} stroke={2} color="currentColor" aria-hidden="true" />
+    );
 }

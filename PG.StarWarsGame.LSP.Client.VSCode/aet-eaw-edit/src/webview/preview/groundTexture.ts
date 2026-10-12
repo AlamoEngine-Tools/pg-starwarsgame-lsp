@@ -47,7 +47,9 @@ const OCTAVES: readonly { period: number; weight: number }[] = [
  */
 function lattice(x: number, y: number, period: number): number {
     // Wrapped, which is what makes the tile seamless: the cell one past the edge IS the first cell.
-    const wrapped = ((x % period) + period) % period + (((y % period) + period) % period) * period;
+    const wrapped =
+        (((x % period) + period) % period) +
+        (((y % period) + period) % period) * period;
     const hashed = Math.sin(wrapped * 12.9898 + period * 78.233) * 43758.5453;
 
     return hashed - Math.floor(hashed);
@@ -66,9 +68,12 @@ function octave(u: number, v: number, period: number): number {
     const fx = ease(x - cellX);
     const fy = ease(y - cellY);
 
-    const top = lattice(cellX, cellY, period) * (1 - fx) + lattice(cellX + 1, cellY, period) * fx;
-    const bottom = lattice(cellX, cellY + 1, period) * (1 - fx)
-        + lattice(cellX + 1, cellY + 1, period) * fx;
+    const top =
+        lattice(cellX, cellY, period) * (1 - fx) +
+        lattice(cellX + 1, cellY, period) * fx;
+    const bottom =
+        lattice(cellX, cellY + 1, period) * (1 - fx) +
+        lattice(cellX + 1, cellY + 1, period) * fx;
 
     return top * (1 - fy) + bottom * fy;
 }
@@ -80,7 +85,9 @@ function octave(u: number, v: number, period: number): number {
  * evenly it catches the light.
  */
 export function concreteNoise(): Uint8ClampedArray {
-    const pixels = new Uint8ClampedArray(GROUND_TEXTURE_SIZE * GROUND_TEXTURE_SIZE * 4);
+    const pixels = new Uint8ClampedArray(
+        GROUND_TEXTURE_SIZE * GROUND_TEXTURE_SIZE * 4,
+    );
 
     for (let y = 0; y < GROUND_TEXTURE_SIZE; y++) {
         for (let x = 0; x < GROUND_TEXTURE_SIZE; x++) {
@@ -96,7 +103,8 @@ export function concreteNoise(): Uint8ClampedArray {
             }
 
             const value = Math.round(
-                BAND_CENTRE + (sum / total - 0.5) * 2 * BAND_HALF_WIDTH);
+                BAND_CENTRE + (sum / total - 0.5) * 2 * BAND_HALF_WIDTH,
+            );
             const at = (y * GROUND_TEXTURE_SIZE + x) * 4;
 
             pixels[at] = value;

@@ -28,7 +28,7 @@
 // and every pixel the sprites did not cover asked for a hard pull to one side. The clear is opaque
 // now, exactly as `D3DCOLOR_XRGB(129,128,255)` is.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
 /**
  * How far the frame can be pulled, as a fraction of the screen.
@@ -58,7 +58,11 @@ const DISTORTION_AMOUNT = 0.05;
 const NEUTRAL_CHANNEL = 128 / 255;
 
 /** Zero distortion, as a colour to clear with. */
-const NEUTRAL_HEAT = new THREE.Color(NEUTRAL_CHANNEL, NEUTRAL_CHANNEL, NEUTRAL_CHANNEL);
+const NEUTRAL_HEAT = new THREE.Color(
+    NEUTRAL_CHANNEL,
+    NEUTRAL_CHANNEL,
+    NEUTRAL_CHANNEL,
+);
 
 const COMPOSITE_VERTEX_SHADER = `
 varying vec2 vUv;
@@ -150,7 +154,9 @@ export class HeatPass {
         });
 
         this.quad = new THREE.Scene();
-        this.quad.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.composite));
+        this.quad.add(
+            new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.composite),
+        );
     }
 
     /**
@@ -165,7 +171,10 @@ export class HeatPass {
      * `debug` draws the distortion field itself rather than the bent picture.
      */
     render(
-        renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, debug = false,
+        renderer: THREE.WebGLRenderer,
+        scene: THREE.Scene,
+        camera: THREE.Camera,
+        debug = false,
     ): void {
         this.resize(renderer);
 
@@ -208,6 +217,18 @@ export class HeatPass {
         renderer.render(this.quad, this.quadCamera);
     }
 
+    dispose(): void {
+        this.frame?.dispose();
+        this.heat?.dispose();
+        this.composite.dispose();
+
+        for (const child of this.quad.children) {
+            if (child instanceof THREE.Mesh) {
+                child.geometry.dispose();
+            }
+        }
+    }
+
     /** Matches the buffers to the canvas, building them the first time round. */
     private resize(renderer: THREE.WebGLRenderer): void {
         renderer.getDrawingBufferSize(this.size);
@@ -222,28 +243,21 @@ export class HeatPass {
 
             // The distortion field is DATA - a normal - so it stays linear, and it has no depth
             // buffer because sprites drawn into it never test against one.
-            this.heat = new THREE.WebGLRenderTarget(width, height, { depthBuffer: false });
+            this.heat = new THREE.WebGLRenderTarget(width, height, {
+                depthBuffer: false,
+            });
             return;
         }
 
-        if (this.frame.image.width !== width || this.frame.image.height !== height) {
+        if (
+            this.frame.image.width !== width ||
+            this.frame.image.height !== height
+        ) {
             // A framebuffer texture cannot be resized in place - the copy would land in a buffer of
             // the wrong shape - so it is rebuilt.
             this.frame.dispose();
             this.frame = new THREE.FramebufferTexture(width, height);
             this.heat.setSize(width, height);
-        }
-    }
-
-    dispose(): void {
-        this.frame?.dispose();
-        this.heat?.dispose();
-        this.composite.dispose();
-
-        for (const child of this.quad.children) {
-            if (child instanceof THREE.Mesh) {
-                child.geometry.dispose();
-            }
         }
     }
 }

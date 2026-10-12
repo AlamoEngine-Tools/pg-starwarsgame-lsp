@@ -132,7 +132,8 @@ public sealed class XmlStructureRepairTest
     [Fact]
     public void FixAll_RepairsEveryRepairableFinding_UntilOnlyUnrepairableOnesRemain()
     {
-        const string text = "<?xml version=\"1.0\">\n<Root>\n\t<A>1</B>\n\t<C Name='x'>2</C>``\n\t<D>Tom & Jerry</D>\n</Root>";
+        const string text =
+            "<?xml version=\"1.0\">\n<Root>\n\t<A>1</B>\n\t<C Name='x'>2</C>``\n\t<D>Tom & Jerry</D>\n</Root>";
 
         var result = XmlStructureRepairs.FixAll(text, Validator, _ => true);
 

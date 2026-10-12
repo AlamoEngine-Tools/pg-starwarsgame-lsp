@@ -152,10 +152,22 @@ export interface ColourToken {
  */
 export const colourTokens: readonly ColourToken[] = [
     // Text.
-    { name: '--colour-ink', from: '--vscode-foreground', fallback: '#cccccc' },
-    { name: '--colour-muted', from: '--vscode-descriptionForeground', fallback: '#999999' },
-    { name: '--colour-faint', from: '--vscode-disabledForeground', fallback: '#888888' },
-    { name: '--colour-editor-ink', from: '--vscode-editor-foreground', fallback: '#cccccc' },
+    { name: "--colour-ink", from: "--vscode-foreground", fallback: "#cccccc" },
+    {
+        name: "--colour-muted",
+        from: "--vscode-descriptionForeground",
+        fallback: "#999999",
+    },
+    {
+        name: "--colour-faint",
+        from: "--vscode-disabledForeground",
+        fallback: "#888888",
+    },
+    {
+        name: "--colour-editor-ink",
+        from: "--vscode-editor-foreground",
+        fallback: "#cccccc",
+    },
 
     /*
      * A dock section heading. Deliberately its own role rather than the panels naming textLink
@@ -171,50 +183,158 @@ export const colourTokens: readonly ColourToken[] = [
      * to it: the stylesheet now says what the colour is for, and swapping it later is one line here
      * rather than a hunt through six files.
      */
-    { name: '--colour-heading', from: '--vscode-textLink-foreground', fallback: '#4daafc' },
-    { name: '--colour-heading-hover', from: '--vscode-textLink-activeForeground', fallback: '#6fb3ff' },
+    {
+        name: "--colour-heading",
+        from: "--vscode-textLink-foreground",
+        fallback: "#4daafc",
+    },
+    {
+        name: "--colour-heading-hover",
+        from: "--vscode-textLink-activeForeground",
+        fallback: "#6fb3ff",
+    },
 
     // Grounds.
-    { name: '--colour-editor-ground', from: '--vscode-editor-background', fallback: '#1e1e1e' },
-    { name: '--colour-panel', from: '--vscode-editorWidget-background', fallback: '#252526' },
-    { name: '--colour-sidebar', from: '--vscode-sideBar-background', fallback: '#252526' },
-    { name: '--colour-input', from: '--vscode-input-background', fallback: '#3c3c3c' },
-    { name: '--colour-input-ink', from: '--vscode-input-foreground', fallback: '#cccccc' },
+    {
+        name: "--colour-editor-ground",
+        from: "--vscode-editor-background",
+        fallback: "#1e1e1e",
+    },
+    {
+        name: "--colour-panel",
+        from: "--vscode-editorWidget-background",
+        fallback: "#252526",
+    },
+    {
+        name: "--colour-sidebar",
+        from: "--vscode-sideBar-background",
+        fallback: "#252526",
+    },
+    {
+        name: "--colour-input",
+        from: "--vscode-input-background",
+        fallback: "#3c3c3c",
+    },
+    {
+        name: "--colour-input-ink",
+        from: "--vscode-input-foreground",
+        fallback: "#cccccc",
+    },
 
     // Edges.
-    { name: '--colour-line', from: '--vscode-panel-border', fallback: '#454545' },
-    { name: '--colour-line-strong', from: '--vscode-widget-border', fallback: '#454545' },
-    { name: '--colour-input-line', from: '--vscode-input-border', fallback: '#3c3c3c' },
-    { name: '--colour-focus', from: '--vscode-focusBorder', fallback: '#007fd4' },
+    {
+        name: "--colour-line",
+        from: "--vscode-panel-border",
+        fallback: "#454545",
+    },
+    {
+        name: "--colour-line-strong",
+        from: "--vscode-widget-border",
+        fallback: "#454545",
+    },
+    {
+        name: "--colour-input-line",
+        from: "--vscode-input-border",
+        fallback: "#3c3c3c",
+    },
+    {
+        name: "--colour-focus",
+        from: "--vscode-focusBorder",
+        fallback: "#007fd4",
+    },
 
     // Actions.
-    { name: '--colour-action', from: '--vscode-button-background', fallback: '#0e639c' },
-    { name: '--colour-action-ink', from: '--vscode-button-foreground', fallback: '#ffffff' },
-    { name: '--colour-action-2', from: '--vscode-button-secondaryBackground', fallback: '#3a3d41' },
-    { name: '--colour-action-2-ink', from: '--vscode-button-secondaryForeground', fallback: '#cccccc' },
-    { name: '--colour-hover', from: '--vscode-list-hoverBackground', fallback: '#2a2d2e' },
-    { name: '--colour-selected', from: '--vscode-list-activeSelectionBackground', fallback: '#04395e' },
-    { name: '--colour-toolbar-hover', from: '--vscode-toolbar-hoverBackground', fallback: '#5a5d5e' },
+    {
+        name: "--colour-action",
+        from: "--vscode-button-background",
+        fallback: "#0e639c",
+    },
+    {
+        name: "--colour-action-ink",
+        from: "--vscode-button-foreground",
+        fallback: "#ffffff",
+    },
+    {
+        name: "--colour-action-2",
+        from: "--vscode-button-secondaryBackground",
+        fallback: "#3a3d41",
+    },
+    {
+        name: "--colour-action-2-ink",
+        from: "--vscode-button-secondaryForeground",
+        fallback: "#cccccc",
+    },
+    {
+        name: "--colour-hover",
+        from: "--vscode-list-hoverBackground",
+        fallback: "#2a2d2e",
+    },
+    {
+        name: "--colour-selected",
+        from: "--vscode-list-activeSelectionBackground",
+        fallback: "#04395e",
+    },
+    {
+        name: "--colour-toolbar-hover",
+        from: "--vscode-toolbar-hoverBackground",
+        fallback: "#5a5d5e",
+    },
 
     // Severity. Separate from the data hues on purpose: these carry a meaning, and a chart series
     // that happens to be red does not.
-    { name: '--colour-critical', from: '--vscode-errorForeground', fallback: '#f14c4c' },
-    { name: '--colour-warning', from: '--vscode-editorWarning-foreground', fallback: '#cca700' },
+    {
+        name: "--colour-critical",
+        from: "--vscode-errorForeground",
+        fallback: "#f14c4c",
+    },
+    {
+        name: "--colour-warning",
+        from: "--vscode-editorWarning-foreground",
+        fallback: "#cca700",
+    },
 
     // Data. The theme's own chart hues, which is what a lane or a branch is choosing between.
-    { name: '--colour-data-blue', from: '--vscode-charts-blue', fallback: '#3794ff' },
-    { name: '--colour-data-green', from: '--vscode-charts-green', fallback: '#89d185' },
-    { name: '--colour-data-orange', from: '--vscode-charts-orange', fallback: '#d18616' },
-    { name: '--colour-data-purple', from: '--vscode-charts-purple', fallback: '#b180d7' },
-    { name: '--colour-data-red', from: '--vscode-charts-red', fallback: '#f14c4c' },
-    { name: '--colour-data-yellow', from: '--vscode-charts-yellow', fallback: '#cca700' },
-    { name: '--colour-data-neutral', from: '--vscode-charts-foreground', fallback: '#e7e7e7' },
+    {
+        name: "--colour-data-blue",
+        from: "--vscode-charts-blue",
+        fallback: "#3794ff",
+    },
+    {
+        name: "--colour-data-green",
+        from: "--vscode-charts-green",
+        fallback: "#89d185",
+    },
+    {
+        name: "--colour-data-orange",
+        from: "--vscode-charts-orange",
+        fallback: "#d18616",
+    },
+    {
+        name: "--colour-data-purple",
+        from: "--vscode-charts-purple",
+        fallback: "#b180d7",
+    },
+    {
+        name: "--colour-data-red",
+        from: "--vscode-charts-red",
+        fallback: "#f14c4c",
+    },
+    {
+        name: "--colour-data-yellow",
+        from: "--vscode-charts-yellow",
+        fallback: "#cca700",
+    },
+    {
+        name: "--colour-data-neutral",
+        from: "--vscode-charts-foreground",
+        fallback: "#e7e7e7",
+    },
 ];
 
 /** The colour block, generated from the list above so the two can never disagree. */
 export const colourCss = `\n${colourTokens
-    .map(token => `    ${token.name}: var(${token.from}, ${token.fallback});`)
-    .join('\n')}\n`;
+    .map((token) => `    ${token.name}: var(${token.from}, ${token.fallback});`)
+    .join("\n")}\n`;
 
 /** The whole layer, for a panel that wants one interpolation rather than three. */
 export const tokensCss = `${scaleCss}${colourCss}${fittedCss}`;

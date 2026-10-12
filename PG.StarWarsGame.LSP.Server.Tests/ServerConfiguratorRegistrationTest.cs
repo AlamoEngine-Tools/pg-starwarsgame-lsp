@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Reflection;
 using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
@@ -9,8 +10,8 @@ using PG.StarWarsGame.Files.MEG.Services;
 using PG.StarWarsGame.Files.MTD.Services;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Icons;
-using PG.StarWarsGame.LSP.Server.Status;
 using PG.StarWarsGame.LSP.Server.Preview;
+using PG.StarWarsGame.LSP.Server.Status;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Symbols;
 
@@ -182,7 +183,7 @@ public sealed class ServerConfiguratorRegistrationTest
     private static object? RecorderOf(object loader)
     {
         return loader.GetType()
-            .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
             .Single(f => f.FieldType == typeof(ServerStatusRecorder))
             .GetValue(loader);
     }

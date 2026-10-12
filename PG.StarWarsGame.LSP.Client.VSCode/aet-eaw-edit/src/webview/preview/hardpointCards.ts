@@ -11,9 +11,12 @@
 // What is left over is the weapons without hardpoints - a fighter's guns are on the unit - and
 // those keep a list of their own, because putting them under Hardpoints would be a lie.
 
-import { type PreviewHardpoint, type PreviewTurret } from '../../protocol/modelPreview';
-import { healthColour } from './reticles';
-import { type WeaponRow, type WeaponScene, weaponRows } from './weaponRows';
+import {
+    type PreviewHardpoint,
+    type PreviewTurret,
+} from "../../protocol/modelPreview";
+import { healthColour } from "./reticles";
+import { type WeaponRow, weaponRows, type WeaponScene } from "./weaponRows";
 
 /** One hardpoint, with everything the card shows. */
 export interface HardpointCard {
@@ -59,7 +62,10 @@ export interface HardpointCard {
 
 /** Whether a turret declares a traverse worth swinging through. */
 function hasTraverse(turret: PreviewTurret | null | undefined): boolean {
-    return (turret?.rotateExtentDegrees ?? 0) > 0 || (turret?.elevateExtentDegrees ?? 0) > 0;
+    return (
+        (turret?.rotateExtentDegrees ?? 0) > 0 ||
+        (turret?.elevateExtentDegrees ?? 0) > 0
+    );
 }
 
 /**
@@ -69,11 +75,15 @@ function hasTraverse(turret: PreviewTurret | null | undefined): boolean {
  * card reads that state rather than keeping a second copy that can disagree with it.
  */
 export function hardpointCards(
-    scene: WeaponScene, destroyed: ReadonlySet<string>,
+    scene: WeaponScene,
+    destroyed: ReadonlySet<string>,
 ): HardpointCard[] {
     const rows = weaponRows(scene, destroyed);
     const byHardpoint = new Map(
-        rows.filter(row => row.hardpointId !== null).map(row => [row.hardpointId!, row] as const));
+        rows
+            .filter((row) => row.hardpointId !== null)
+            .map((row) => [row.hardpointId!, row] as const),
+    );
 
     return scene.hardpoints.map((hardpoint: PreviewHardpoint) => {
         const weapon = byHardpoint.get(hardpoint.id) ?? null;
@@ -82,8 +92,8 @@ export function hardpointCards(
         // the weapon and has no hardpoints at all, so reading only the hardpoint would call a
         // swinging turret fixed.
         const turret = hasTraverse(hardpoint.turret)
-            ? hardpoint.turret ?? null
-            : weapon?.turret ?? null;
+            ? (hardpoint.turret ?? null)
+            : (weapon?.turret ?? null);
 
         return {
             id: hardpoint.id,
@@ -109,7 +119,7 @@ export function hardpointCards(
  * case - it is every fighter in the game.
  */
 export function unitWeapons(rows: readonly WeaponRow[]): WeaponRow[] {
-    return rows.filter(row => row.hardpointId === null);
+    return rows.filter((row) => row.hardpointId === null);
 }
 
 /**
@@ -124,7 +134,7 @@ export function hardpointFacts(card: HardpointCard): string[] {
     const facts: string[] = [];
 
     if (!card.isDestroyable) {
-        facts.push('indestructible');
+        facts.push("indestructible");
     }
 
     if (card.attachBone !== null) {
@@ -198,12 +208,17 @@ export interface HealthBar {
  * Destroyed is GREY, not red. Red means "nearly dead and still fighting"; a hardpoint that is gone
  * is not on the ramp at all, and colouring it like the worst live state says otherwise.
  */
-export function healthBar(card: HardpointCard, live: number | null): HealthBar | null {
+export function healthBar(
+    card: HardpointCard,
+    live: number | null,
+): HealthBar | null {
     if (card.health === null || card.health <= 0) {
         return null;
     }
 
-    const left = card.destroyed ? 0 : Math.min(card.health, Math.max(0, live ?? card.health));
+    const left = card.destroyed
+        ? 0
+        : Math.min(card.health, Math.max(0, live ?? card.health));
     const fraction = left / card.health;
 
     return {
@@ -215,7 +230,7 @@ export function healthBar(card: HardpointCard, live: number | null): HealthBar |
 }
 
 /** What a hardpoint that is no longer there looks like. Grey, and it comes from the theme. */
-const DESTROYED_COLOUR = 'var(--vscode-disabledForeground, #5a5a5a)';
+const DESTROYED_COLOUR = "var(--vscode-disabledForeground, #5a5a5a)";
 
 /**
  * Which fire-bone slot a bone sits in, by position.
@@ -244,17 +259,22 @@ export function muzzleLabel(index: number): string {
  */
 export function weaponFacts(weapon: WeaponRow): [string, string][] {
     const rows: [string, string | null][] = [
-        ['Reach', weapon.reach],
-        ['Cone', weapon.cone],
-        ['Cadence', weapon.cadence],
-        ['Damage', weapon.damage],
+        ["Reach", weapon.reach],
+        ["Cone", weapon.cone],
+        ["Cadence", weapon.cadence],
+        ["Damage", weapon.damage],
         // Under Damage rather than beside Cone: it is about where a shot LANDS, which is the same
         // question as how much it does, and not about where the weapon may point.
-        ['Spread', weapon.inaccuracy],
-        ['Projectile', weapon.projectileId],
-        ['Fires when', weapon.fireModes.length > 0 ? weapon.fireModes.join(', ') : null],
+        ["Spread", weapon.inaccuracy],
+        ["Projectile", weapon.projectileId],
+        [
+            "Fires when",
+            weapon.fireModes.length > 0 ? weapon.fireModes.join(", ") : null,
+        ],
     ];
 
-    return rows.filter((row): row is [string, string] =>
-        row[1] !== null && row[1] !== undefined && row[1] !== '');
+    return rows.filter(
+        (row): row is [string, string] =>
+            row[1] !== null && row[1] !== undefined && row[1] !== "",
+    );
 }

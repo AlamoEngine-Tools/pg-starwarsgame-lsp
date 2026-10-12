@@ -31,9 +31,9 @@ public sealed record GameIndex(
     // does NOT copy them: a `with` mutation produces a copy that must recompute against its own
     // (possibly changed) dictionaries. -1 marks LeafLayerRank as not-yet-computed (ranks are >= 0).
     private ImmutableDictionary<string, ImmutableArray<GroupMembership>>? _allGroupMemberships;
+    private ImmutableHashSet<string>? _indexedTypeNames;
     private int _leafLayerRank = -1;
     private ImmutableDictionary<string, ImmutableArray<GameSymbol>>? _ownerScopedByBareName;
-    private ImmutableHashSet<string>? _indexedTypeNames;
 
     // Replaces the compiler-synthesised copy constructor used by `with` expressions. Every
     // property must be copied here - add new properties to this list when extending the record.
@@ -99,37 +99,6 @@ public sealed record GameIndex(
     /// <summary>The shipped game objects by name hash, built once when the baseline is applied.</summary>
     public ImmutableDictionary<uint, ImmutableArray<GameSymbol>> BaselineNameHashes { get; init; } =
         ImmutableDictionary<uint, ImmutableArray<GameSymbol>>.Empty;
-
-    /// <summary>
-    ///     Whether a symbol is in the engine's name-hashed object table. Only game objects are:
-    ///     factions, SFX events, hardpoints and the rest are kept by managers of their own.
-    /// </summary>
-    public static bool IsNameHashedObject(GameSymbol symbol)
-    {
-        return symbol.Kind == GameSymbolKind.XmlObject &&
-               string.Equals(symbol.TypeName, "GameObjectType", StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    ///     The game objects - workspace and shipped - whose DIFFERENT names share
-    ///     <paramref name="hash" /> with <paramref name="symbol" />, one per name. The same name in
-    ///     another case or layer is one name to the engine, so it is never in the answer.
-    /// </summary>
-    public IReadOnlyList<GameSymbol> SharingNameHash(GameSymbol symbol, uint hash)
-    {
-        var byName = new Dictionary<string, GameSymbol>(StringComparer.OrdinalIgnoreCase) { [symbol.Id] = symbol };
-        var others = new List<GameSymbol>();
-        foreach (var table in (ImmutableDictionary<uint, ImmutableArray<GameSymbol>>[])
-                 [WorkspaceNameHashes, BaselineNameHashes])
-        {
-            if (!table.TryGetValue(hash, out var named)) continue;
-            foreach (var other in named)
-                if (byName.TryAdd(other.Id, other))
-                    others.Add(other);
-        }
-
-        return others;
-    }
 
     /// <summary>
     ///     Merged (baseline ∪ workspace) localisation key set. Used by
@@ -219,6 +188,37 @@ public sealed record GameIndex(
     ///     mutation recomputes against its own dictionaries instead of inheriting a stale set.
     /// </remarks>
     public IReadOnlySet<string> IndexedTypeNames => _indexedTypeNames ??= ComputeIndexedTypeNames();
+
+    /// <summary>
+    ///     Whether a symbol is in the engine's name-hashed object table. Only game objects are:
+    ///     factions, SFX events, hardpoints and the rest are kept by managers of their own.
+    /// </summary>
+    public static bool IsNameHashedObject(GameSymbol symbol)
+    {
+        return symbol.Kind == GameSymbolKind.XmlObject &&
+               string.Equals(symbol.TypeName, "GameObjectType", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     The game objects - workspace and shipped - whose DIFFERENT names share
+    ///     <paramref name="hash" /> with <paramref name="symbol" />, one per name. The same name in
+    ///     another case or layer is one name to the engine, so it is never in the answer.
+    /// </summary>
+    public IReadOnlyList<GameSymbol> SharingNameHash(GameSymbol symbol, uint hash)
+    {
+        var byName = new Dictionary<string, GameSymbol>(StringComparer.OrdinalIgnoreCase) { [symbol.Id] = symbol };
+        var others = new List<GameSymbol>();
+        foreach (var table in (ImmutableDictionary<uint, ImmutableArray<GameSymbol>>[])
+                 [WorkspaceNameHashes, BaselineNameHashes])
+        {
+            if (!table.TryGetValue(hash, out var named)) continue;
+            foreach (var other in named)
+                if (byName.TryAdd(other.Id, other))
+                    others.Add(other);
+        }
+
+        return others;
+    }
 
     private ImmutableHashSet<string> ComputeIndexedTypeNames()
     {

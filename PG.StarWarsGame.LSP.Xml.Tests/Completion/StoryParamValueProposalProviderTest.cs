@@ -10,6 +10,10 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Completion;
 
 public sealed class StoryParamValueProposalProviderTest
 {
+    private static readonly ObjectKindDefinition PlanetKind = new()
+    {
+        Kind = "Planet", Behaviors = ["PLANET"]
+    };
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static EnumDefinition MakeEnum(string name, params string[] values)
@@ -81,11 +85,6 @@ public sealed class StoryParamValueProposalProviderTest
                 new GameSymbol(s.id, GameSymbolKind.XmlObject, s.typeName, new UnknownOrigin("test"), null))));
         return GameIndex.Empty with { Baseline = BaselineIndex.Empty with { Symbols = dict } };
     }
-
-    private static readonly ObjectKindDefinition PlanetKind = new()
-    {
-        Kind = "Planet", Behaviors = ["PLANET"]
-    };
 
     private static ParamDefinition KindParam(ObjectKindDefinition kind,
         XmlValueType valueType = XmlValueType.NameReference)

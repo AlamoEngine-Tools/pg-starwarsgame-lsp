@@ -7,12 +7,16 @@
 // carry their meaning in semantics; GLSL ES has `main()`, interface variables of basic types only,
 // a declared fragment output, and `gl_Position`. This bridges the two.
 
-import {translateHlslBody} from './hlsl';
-import {bindField} from './attributes';
+import { translateHlslBody } from "./hlsl";
+import { bindField } from "./attributes";
 import {
-    fillEmptyFunctions, fixBooleanConditions, fixReturnWidths, fixVectorTruncation, zeroFor,
+    fillEmptyFunctions,
+    fixBooleanConditions,
+    fixReturnWidths,
+    fixVectorTruncation,
+    zeroFor,
     zeroStructCasts,
-} from './truncation';
+} from "./truncation";
 
 /** A struct declared in the source, and the fields it carries. */
 export interface HlslStruct {
@@ -31,15 +35,18 @@ export interface GlslProgram {
 export function findStructs(source: string): HlslStruct[] {
     const structs: HlslStruct[] = [];
 
-    for (const match of source.matchAll(/\bstruct\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{([^}]*)\}\s*;/g)) {
-        const fields: HlslStruct['fields'] = [];
+    for (const match of source.matchAll(
+        /\bstruct\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{([^}]*)\}\s*;/g,
+    )) {
+        const fields: HlslStruct["fields"] = [];
 
         for (const field of match[2].matchAll(
-            /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*([A-Za-z_][A-Za-z0-9_]*))?\s*;/g)) {
-            fields.push({type: field[1], name: field[2], semantic: field[3]});
+            /\b([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*([A-Za-z_][A-Za-z0-9_]*))?\s*;/g,
+        )) {
+            fields.push({ type: field[1], name: field[2], semantic: field[3] });
         }
 
-        structs.push({name: match[1], fields});
+        structs.push({ name: match[1], fields });
     }
 
     return structs;
@@ -72,29 +79,41 @@ export interface ShaderHandle {
  * The arguments matter too: the same function is compiled twice with different constants, which is
  * how one shader serves both the fog-of-war case and the plain one.
  */
-export function resolveShaderHandle(source: string, name: string): ShaderHandle {
+export function resolveShaderHandle(
+    source: string,
+    name: string,
+): ShaderHandle {
     // Case-insensitive: FX keywords are, and the sources are not consistent - one file of the
     // forty-one writes `PixelShader` where the rest write `pixelshader`.
     const pattern = new RegExp(
-        `\\b(?:pixelshader|vertexshader)\\s+${name}\\s*=\\s*compile\\s+`
-        + '[A-Za-z_0-9]+\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([^)]*)\\)', 'i');
+        `\\b(?:pixelshader|vertexshader)\\s+${name}\\s*=\\s*compile\\s+` +
+            "[A-Za-z_0-9]+\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([^)]*)\\)",
+        "i",
+    );
 
     const match = pattern.exec(source);
     if (match === null) {
         // Not a handle: some effects name the function directly.
-        return {entry: name, args: []};
+        return { entry: name, args: [] };
     }
 
     return {
         entry: match[1],
-        args: match[2].split(',').map(arg => arg.trim()).filter(arg => arg !== ''),
+        args: match[2]
+            .split(",")
+            .map((arg) => arg.trim())
+            .filter((arg) => arg !== ""),
     };
 }
 
-export function findEntry(source: string, entryName: string): EntrySignature | null {
+export function findEntry(
+    source: string,
+    entryName: string,
+): EntrySignature | null {
     const pattern = new RegExp(
-        `\\b([A-Za-z_][A-Za-z0-9_]*)\\s+${entryName}\\s*\\(([^)]*)\\)`
-        + '\\s*(?::\\s*([A-Za-z_][A-Za-z0-9_]*))?\\s*\\{');
+        `\\b([A-Za-z_][A-Za-z0-9_]*)\\s+${entryName}\\s*\\(([^)]*)\\)` +
+            "\\s*(?::\\s*([A-Za-z_][A-Za-z0-9_]*))?\\s*\\{",
+    );
 
     const match = pattern.exec(source);
     if (match === null) {
@@ -102,8 +121,11 @@ export function findEntry(source: string, entryName: string): EntrySignature | n
     }
 
     // The first parameter is the struct; any others are `uniform` constants the compile call fixes.
-    const first = match[2].split(',')[0]?.trim() ?? '';
-    const parts = first.replace(/\buniform\b/, '').trim().split(/\s+/);
+    const first = match[2].split(",")[0]?.trim() ?? "";
+    const parts = first
+        .replace(/\buniform\b/, "")
+        .trim()
+        .split(/\s+/);
 
     if (parts.length < 2) {
         return null;
@@ -128,11 +150,16 @@ export function stripFxScaffolding(source: string): string {
     let out = source;
 
     // `technique name < ... > { ... }` - brace-matched, because passes nest inside.
-    out = removeBlocks(out, /\btechnique\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:<[^>]*>)?\s*/g);
+    out = removeBlocks(
+        out,
+        /\btechnique\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:<[^>]*>)?\s*/g,
+    );
 
     // Handle declarations; the entry function itself stays.
     out = out.replace(
-        /\b(?:pixelshader|vertexshader)\s+[A-Za-z_0-9]+\s*=\s*compile\b[^;]*;/gi, '');
+        /\b(?:pixelshader|vertexshader)\s+[A-Za-z_0-9]+\s*=\s*compile\b[^;]*;/gi,
+        "",
+    );
 
     // Only `#include`. Everything else the sources use - eight `#define`s and a handful of `#if`
     // blocks - is the same preprocessor GLSL ES has, so it is kept and left to do its job; removing
@@ -142,38 +169,42 @@ export function stripFxScaffolding(source: string): string {
     //
     // An `#include` should be gone by now. One still standing means the header did not resolve, and
     // leaving it in turns that into a plain compile error instead of a silently missing header.
-    out = out.replace(/^[ \t]*#include[^\n]*$/gm, '');
+    out = out.replace(/^[ \t]*#include[^\n]*$/gm, "");
 
     // State blocks, in both shapes the sources use: the one `SB_START`/`SB_END` expands to inside a
     // pass, and a named top-level declaration. Both hold render state, which chunk 17 reads from the
     // manifest - by here it is scaffolding.
     out = out.replace(
         /\b(?:StateBlock|stateblock\s+[A-Za-z_][A-Za-z0-9_]*)\s*=\s*stateblock_state\s*\{[^}]*\}\s*;?/g,
-        '');
+        "",
+    );
 
     // String annotations, at top level and inside declarations. Word-anchored, so an identifier
     // that merely ends in "string" is left alone.
-    out = out.replace(/\bstring\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*"[^"]*"\s*;/g, '');
+    out = out.replace(
+        /\bstring\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*"[^"]*"\s*;/g,
+        "",
+    );
 
     // Any remaining `< ... >` annotation block attached to a declaration.
-    out = out.replace(/<[^<>{}]*>\s*;/g, ';');
+    out = out.replace(/<[^<>{}]*>\s*;/g, ";");
 
     // Semantics on a function signature: `) : COLOR {` becomes `) {`.
-    out = out.replace(/\)\s*:\s*[A-Za-z_][A-Za-z0-9_]*\s*(\{)/g, ') $1');
+    out = out.replace(/\)\s*:\s*[A-Za-z_][A-Za-z0-9_]*\s*(\{)/g, ") $1");
 
     // Semantics on struct fields.
-    out = out.replace(/\s*:\s*[A-Za-z_][A-Za-z0-9_]*\s*;/g, ';');
+    out = out.replace(/\s*:\s*[A-Za-z_][A-Za-z0-9_]*\s*;/g, ";");
 
     // Semantics on function PARAMETERS, which end at a comma or the closing paren rather than a
     // semicolon: `vs_main(vec4 Pos : POSITION, vec2 Tex : TEXCOORD0)`.
-    out = out.replace(/\s*:\s*[A-Za-z_][A-Za-z0-9_]*\s*([,)])/g, '$1');
+    out = out.replace(/\s*:\s*[A-Za-z_][A-Za-z0-9_]*\s*([,)])/g, "$1");
 
     // `uniform` on a PARAMETER. In HLSL that marks a compile-time constant, which the technique
     // supplies in its `compile` call - `alpha_ps_main( 1 )`. Those arguments are already carried
     // through to the call site by `resolveShaderHandle`, so the parameter itself stays and only the
     // qualifier goes; GLSL rejects it in a signature. Nothing else here says `uniform`: the globals
     // do not get theirs until `declareUniforms`, which runs after this.
-    out = out.replace(/([(,]\s*)uniform\s+/g, '$1');
+    out = out.replace(/([(,]\s*)uniform\s+/g, "$1");
 
     return out;
 }
@@ -195,23 +226,24 @@ export function neutralisePacking(source: string): string {
     return source.replace(
         /(vec[234])\s+(Unpack_UV|Unpack_Normal)\s*\(\s*vec[234]\s+([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*\{[^}]*\}/g,
         (_, type: string, name: string, parameter: string) =>
-            `${type} ${name}(${type} ${parameter}) { return ${parameter}; }`);
+            `${type} ${name}(${type} ${parameter}) { return ${parameter}; }`,
+    );
 }
 
 /** Removes each match together with the brace block that follows it. */
 function removeBlocks(text: string, header: RegExp): string {
-    let out = '';
+    let out = "";
     let cursor = 0;
 
     header.lastIndex = 0;
-    for (; ;) {
+    for (;;) {
         header.lastIndex = cursor;
         const match = header.exec(text);
         if (match === null) {
             return out + text.slice(cursor);
         }
 
-        const open = text.indexOf('{', match.index + match[0].length - 1);
+        const open = text.indexOf("{", match.index + match[0].length - 1);
         if (open === -1) {
             return out + text.slice(cursor);
         }
@@ -219,9 +251,9 @@ function removeBlocks(text: string, header: RegExp): string {
         let depth = 0;
         let close = -1;
         for (let i = open; i < text.length; i++) {
-            if (text[i] === '{') {
+            if (text[i] === "{") {
                 depth++;
-            } else if (text[i] === '}') {
+            } else if (text[i] === "}") {
                 depth--;
                 if (depth === 0) {
                     close = i;
@@ -254,7 +286,8 @@ export function declareUniforms(source: string): string {
     out = out.replace(
         /\bsampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*sampler_state\s*\{[^}]*\}\s*;/g,
         (_, kind: string | undefined, name: string) =>
-            `uniform ${kind === 'CUBE' ? 'samplerCube' : 'sampler2D'} ${name};`);
+            `uniform ${kind === "CUBE" ? "samplerCube" : "sampler2D"} ${name};`,
+    );
 
     // `texture Name;`, `texture Name < ... >;` and `texture Name : SEMANTIC;` - a texture OBJECT,
     // which GLSL has no counterpart for. The sampler that reads it is what becomes a uniform. The
@@ -263,7 +296,8 @@ export function declareUniforms(source: string): string {
     // one is a plain syntax error.
     out = out.replace(
         /\btexture\s+[A-Za-z_][A-Za-z0-9_]*\s*(?::\s*[A-Za-z_][A-Za-z0-9_]*\s*)?(?:<[^>]*>\s*)?;/g,
-        '');
+        "",
+    );
 
     return declareSemanticUniforms(out);
 }
@@ -287,15 +321,16 @@ function declareSemanticUniforms(source: string): string {
     // keeps locals out - `if (a < b ...)` inside a function body matched the annotation alternative
     // and turned a local into a uniform, which GLSL rejects as "only allowed at global scope".
     const declaration = new RegExp(
-        '^()((?:float|vec|mat|int|bool|ivec|bvec)[0-9x]*)[ \\t]+'
-        + '([A-Za-z_][A-Za-z0-9_]*)(\\s*\\[[^\\]]*\\])?\\s*'
-        + '(?::\\s*[A-Za-z_][A-Za-z0-9_]*|<[^>]*>)',
-        'gm');
+        "^()((?:float|vec|mat|int|bool|ivec|bvec)[0-9x]*)[ \\t]+" +
+            "([A-Za-z_][A-Za-z0-9_]*)(\\s*\\[[^\\]]*\\])?\\s*" +
+            "(?::\\s*[A-Za-z_][A-Za-z0-9_]*|<[^>]*>)",
+        "gm",
+    );
 
-    let out = '';
+    let out = "";
     let cursor = 0;
 
-    for (; ;) {
+    for (;;) {
         declaration.lastIndex = cursor;
         const match = declaration.exec(source);
         if (match === null) {
@@ -304,7 +339,7 @@ function declareSemanticUniforms(source: string): string {
 
         // Everything up to the terminating semicolon belongs to this declaration, initialiser
         // included - which is why this cannot be a single replace.
-        const semicolon = source.indexOf(';', match.index + match[0].length);
+        const semicolon = source.indexOf(";", match.index + match[0].length);
         if (semicolon === -1) {
             return out + source.slice(cursor);
         }
@@ -312,13 +347,13 @@ function declareSemanticUniforms(source: string): string {
         const [, indent, type, name, subscript] = match;
 
         out += source.slice(cursor, match.index);
-        out += `${indent}uniform ${type} ${name}${subscript ?? ''};`;
+        out += `${indent}uniform ${type} ${name}${subscript ?? ""};`;
         cursor = semicolon + 1;
     }
 }
 
 /** The name of the fragment output. Prefixed so it cannot collide with anything in a shader. */
-const FRAGMENT_OUTPUT = 'aet_fragColour';
+const FRAGMENT_OUTPUT = "aet_fragColour";
 
 /**
  * The uniform carrying the pass's `AlphaRef`, as a 0..1 threshold.
@@ -326,7 +361,7 @@ const FRAGMENT_OUTPUT = 'aet_fragColour';
  * Named here rather than spelled out at each use because the material sets it by this name and the
  * shader reads it by this name, and a mismatch is a silent no-op: the uniform simply never binds.
  */
-export const ALPHA_TEST_UNIFORM = 'aet_alphaTest';
+export const ALPHA_TEST_UNIFORM = "aet_alphaTest";
 
 /** A threshold no fragment can fall to or below, which is how "no alpha test" is expressed. */
 export const ALPHA_TEST_OFF = -1;
@@ -341,7 +376,7 @@ export const ALPHA_TEST_OFF = -1;
  * GL reports no error, and the screen is simply empty. World coordinates reach thousands of units
  * on a capital ship, so the fragment side takes highp too rather than lose world-space lighting.
  */
-const PRECISION = 'precision highp float;\nprecision highp int;';
+const PRECISION = "precision highp float;\nprecision highp int;";
 
 /** A struct field carried across the stage boundary, with its type already in GLSL spelling. */
 interface StageField {
@@ -372,10 +407,21 @@ interface TranslationUnit {
  * where that is shown to compute the same thing - and it is the only one the shipped effects use.
  * The rest have no such padding, so a shader using one keeps its archetype.
  */
-const UNSUPPORTED_TYPES = ['float3x4', 'float4x2', 'float2x4', 'float3x2', 'float2x3'];
+const UNSUPPORTED_TYPES = [
+    "float3x4",
+    "float4x2",
+    "float2x4",
+    "float3x2",
+    "float2x3",
+];
 
-function translateUnit(hlsl: string, handleName: string): TranslationUnit | GlslProgram {
-    const unsupported = UNSUPPORTED_TYPES.find(type => new RegExp(`\\b${type}\\b`).test(hlsl));
+function translateUnit(
+    hlsl: string,
+    handleName: string,
+): TranslationUnit | GlslProgram {
+    const unsupported = UNSUPPORTED_TYPES.find((type) =>
+        new RegExp(`\\b${type}\\b`).test(hlsl),
+    );
     if (unsupported !== undefined) {
         return {
             source: null,
@@ -387,15 +433,21 @@ function translateUnit(hlsl: string, handleName: string): TranslationUnit | Glsl
 
     const entry = findEntry(hlsl, handle.entry);
     if (entry === null) {
-        return {source: null, refusal: `No entry point named '${handle.entry}'.`};
+        return {
+            source: null,
+            refusal: `No entry point named '${handle.entry}'.`,
+        };
     }
 
-    const struct = findStructs(hlsl).find(s => s.name === entry.parameterType);
+    const struct = findStructs(hlsl).find(
+        (s) => s.name === entry.parameterType,
+    );
     if (struct === undefined) {
         return {
             source: null,
-            refusal: `The entry point takes '${entry.parameterType}', which is not a struct `
-                + 'declared here.',
+            refusal:
+                `The entry point takes '${entry.parameterType}', which is not a struct ` +
+                "declared here.",
         };
     }
 
@@ -406,8 +458,14 @@ function translateUnit(hlsl: string, handleName: string): TranslationUnit | Glsl
         // `: SEMANTIC` annotation, and the strip is what removes those. The other way round every
         // one of them stayed a plain global - zero-initialised, so every shader multiplied its
         // position by a zero matrix and drew nothing, while compiling and linking perfectly.
-        translateHlslBody, declareUniforms, stripFxScaffolding, neutralisePacking,
-        zeroStructCasts, fixVectorTruncation, fixReturnWidths, fixBooleanConditions,
+        translateHlslBody,
+        declareUniforms,
+        stripFxScaffolding,
+        neutralisePacking,
+        zeroStructCasts,
+        fixVectorTruncation,
+        fixReturnWidths,
+        fixBooleanConditions,
         fillEmptyFunctions,
     ];
 
@@ -415,7 +473,7 @@ function translateUnit(hlsl: string, handleName: string): TranslationUnit | Glsl
         handle,
         entry,
         struct,
-        fields: struct.fields.map(field => ({
+        fields: struct.fields.map((field) => ({
             name: field.name,
             semantic: field.semantic,
             glslType: translateHlslBody(field.type).trim(),
@@ -425,12 +483,12 @@ function translateUnit(hlsl: string, handleName: string): TranslationUnit | Glsl
 }
 
 function isRefusal(unit: TranslationUnit | GlslProgram): unit is GlslProgram {
-    return 'refusal' in unit;
+    return "refusal" in unit;
 }
 
 /** The field that drives `gl_Position` - and travels in it rather than as a varying. */
 function isPosition(field: StageField): boolean {
-    return field.semantic?.toUpperCase() === 'POSITION';
+    return field.semantic?.toUpperCase() === "POSITION";
 }
 
 /**
@@ -443,61 +501,68 @@ function isPosition(field: StageField): boolean {
  * The input struct is flattened into one `in` per field, because an interface variable must be a
  * basic type or a block - `in VS_OUTPUT` will not compile however natural it looks.
  */
-export function buildFragmentShader(hlsl: string, handleName: string): GlslProgram {
+export function buildFragmentShader(
+    hlsl: string,
+    handleName: string,
+): GlslProgram {
     const unit = translateUnit(hlsl, handleName);
     if (isRefusal(unit)) {
         return unit;
     }
 
-    const {handle, entry, struct, fields, body} = unit;
+    const { handle, entry, struct, fields, body } = unit;
 
     // Everything except the POSITION field, which the vertex stage delivers through `gl_Position`
     // rather than as a varying. Measured across the corpus: all thirty pixel entries take a struct
     // carrying one and not one of them reads it, which is what D3D9 requires - ps_2_0 cannot read
     // POSITION at all. Declaring it here would leave the linker looking for a varying that the
     // vertex shader has no business writing.
-    const carried = fields.filter(field => !isPosition(field));
+    const carried = fields.filter((field) => !isPosition(field));
 
     const inputs = carried
-        .map(field => `in ${field.glslType} v_${field.name};`)
-        .join('\n');
+        .map((field) => `in ${field.glslType} v_${field.name};`)
+        .join("\n");
 
     const assignments = carried
-        .map(field => `    ${entry.parameterName}.${field.name} = v_${field.name};`)
-        .join('\n');
+        .map(
+            (field) =>
+                `    ${entry.parameterName}.${field.name} = v_${field.name};`,
+        )
+        .join("\n");
 
     const source = [
         // The version directive must be the very first line, ahead of even a comment.
-        '#version 300 es',
+        "#version 300 es",
         PRECISION,
-        '',
+        "",
         inputs,
         `out vec4 ${FRAGMENT_OUTPUT};`,
-        '',
+        "",
         // The alpha test, which is render STATE rather than anything the pixel shader says - but a
         // RawShaderMaterial gets none of three's built-in chunks, so `material.alphaTest` is inert
         // here and the discard has to live in the shader. Fed by `applyStoredShaderState`, and left
         // at a threshold nothing can fall below when the effect declares no test: an additive glow
         // is meant to draw at zero alpha, and discarding on it would put the effect out.
         `uniform float ${ALPHA_TEST_UNIFORM};`,
-        '',
+        "",
         body,
-        '',
-        'void main()',
-        '{',
+        "",
+        "void main()",
+        "{",
         `    ${struct.name} ${entry.parameterName};`,
         assignments,
-        `    ${FRAGMENT_OUTPUT} = ${handle.entry}(`
-        + [entry.parameterName, ...handle.args].join(', ') + ');',
-        '',
+        `    ${FRAGMENT_OUTPUT} = ${handle.entry}(` +
+            [entry.parameterName, ...handle.args].join(", ") +
+            ");",
+        "",
         // `AlphaFunc = Greater` in every alpha-tested effect the game ships, so the fragment
         // survives only above the reference.
         `    if (${FRAGMENT_OUTPUT}.a <= ${ALPHA_TEST_UNIFORM}) { discard; }`,
-        '}',
-        '',
-    ].join('\n');
+        "}",
+        "",
+    ].join("\n");
 
-    return {source, refusal: null};
+    return { source, refusal: null };
 }
 
 /**
@@ -511,24 +576,30 @@ export function buildFragmentShader(hlsl: string, handleName: string): GlslProgr
  * output: the clip-space position travels in the built-in, and re-declaring it as `v_Pos` would
  * leave the fragment shader reading an interpolated clip position that nothing writes usefully.
  */
-export function buildVertexShader(hlsl: string, handleName: string): GlslProgram {
+export function buildVertexShader(
+    hlsl: string,
+    handleName: string,
+): GlslProgram {
     const unit = translateUnit(hlsl, handleName);
     if (isRefusal(unit)) {
         return unit;
     }
 
-    const {handle, entry, struct, fields, body} = unit;
+    const { handle, entry, struct, fields, body } = unit;
 
-    const outputStruct = findStructs(hlsl).find(s => s.name === entry.returnType);
+    const outputStruct = findStructs(hlsl).find(
+        (s) => s.name === entry.returnType,
+    );
     if (outputStruct === undefined) {
         return {
             source: null,
-            refusal: `The entry point returns '${entry.returnType}', which is not a struct `
-                + 'declared here.',
+            refusal:
+                `The entry point returns '${entry.returnType}', which is not a struct ` +
+                "declared here.",
         };
     }
 
-    const outputs: StageField[] = outputStruct.fields.map(field => ({
+    const outputs: StageField[] = outputStruct.fields.map((field) => ({
         name: field.name,
         semantic: field.semantic,
         glslType: translateHlslBody(field.type).trim(),
@@ -538,12 +609,13 @@ export function buildVertexShader(hlsl: string, handleName: string): GlslProgram
     if (position === undefined) {
         return {
             source: null,
-            refusal: `'${entry.returnType}' declares no POSITION field, so there is nothing to `
-                + 'drive gl_Position with.',
+            refusal:
+                `'${entry.returnType}' declares no POSITION field, so there is nothing to ` +
+                "drive gl_Position with.",
         };
     }
 
-    const carried = outputs.filter(field => !isPosition(field));
+    const carried = outputs.filter((field) => !isPosition(field));
 
     // The input struct is filled from the attributes three actually binds, under the names it gives
     // them. Declaring `a_Pos` instead would bind to nothing and draw an empty screen.
@@ -562,32 +634,40 @@ export function buildVertexShader(hlsl: string, handleName: string): GlslProgram
         for (const read of bound.reads) {
             attributes.set(read.name, read.glslType);
         }
-        fills.push(`    ${entry.parameterName}.${field.name} = ${bound.expression};`);
+        fills.push(
+            `    ${entry.parameterName}.${field.name} = ${bound.expression};`,
+        );
     }
 
     const source = [
-        '#version 300 es',
+        "#version 300 es",
         PRECISION,
-        '',
-        [...attributes].map(([name, type]) => `in ${type} ${name};`).join('\n'),
-        carried.map(field => `out ${field.glslType} v_${field.name};`).join('\n'),
-        '',
+        "",
+        [...attributes].map(([name, type]) => `in ${type} ${name};`).join("\n"),
+        carried
+            .map((field) => `out ${field.glslType} v_${field.name};`)
+            .join("\n"),
+        "",
         body,
-        '',
-        'void main()',
-        '{',
+        "",
+        "void main()",
+        "{",
         // Zero-initialised, so a field no attribute feeds is a defined zero rather than garbage.
-        `    ${struct.name} ${entry.parameterName} = ${struct.name}(`
-        + fields.map(field => zeroFor(field.glslType)).join(', ') + ');',
-        fills.join('\n'),
-        '',
-        `    ${entry.returnType} Out = ${handle.entry}(`
-        + [entry.parameterName, ...handle.args].join(', ') + ');',
-        carried.map(field => `    v_${field.name} = Out.${field.name};`).join('\n'),
+        `    ${struct.name} ${entry.parameterName} = ${struct.name}(` +
+            fields.map((field) => zeroFor(field.glslType)).join(", ") +
+            ");",
+        fills.join("\n"),
+        "",
+        `    ${entry.returnType} Out = ${handle.entry}(` +
+            [entry.parameterName, ...handle.args].join(", ") +
+            ");",
+        carried
+            .map((field) => `    v_${field.name} = Out.${field.name};`)
+            .join("\n"),
         `    gl_Position = Out.${position.name};`,
-        '}',
-        '',
-    ].join('\n');
+        "}",
+        "",
+    ].join("\n");
 
-    return {source, refusal: null};
+    return { source, refusal: null };
 }

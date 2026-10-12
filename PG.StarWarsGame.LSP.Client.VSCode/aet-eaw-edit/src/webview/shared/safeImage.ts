@@ -16,10 +16,11 @@
  * js/client-side-unvalidated-url-redirection at every call site because it could not tell what
  * the guard admitted.
  */
-const DATA_IMAGE = /^data:image\/(?:png|jpeg|jpg|gif|webp|bmp);base64,[A-Za-z0-9+/]*={0,2}$/i;
+const DATA_IMAGE =
+    /^data:image\/(?:png|jpeg|jpg|gif|webp|bmp);base64,[A-Za-z0-9+/]*={0,2}$/i;
 
 /** The literal prefix every allowed value carries - see the `startsWith` guard below. */
-const DATA_IMAGE_PREFIX = 'data:image/';
+const DATA_IMAGE_PREFIX = "data:image/";
 
 /**
  * The value to hand an `<img src>`, or `undefined` when it is not a data-image URI this webview
@@ -38,7 +39,9 @@ const DATA_IMAGE_PREFIX = 'data:image/';
  * Returning `undefined` rather than a placeholder is deliberate: `<img src={undefined}>` renders
  * nothing and makes no request, and the callers already draw an empty-slot state.
  */
-export function safeImageSource(value: string | null | undefined): string | undefined {
+export function safeImageSource(
+    value: string | null | undefined,
+): string | undefined {
     if (!value) {
         return undefined;
     }

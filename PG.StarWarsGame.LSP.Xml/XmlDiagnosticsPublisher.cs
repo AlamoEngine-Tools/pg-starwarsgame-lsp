@@ -11,9 +11,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
@@ -32,6 +32,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     ICacheStatisticsSource,
     IXmlDiagnosticsCollector
 {
+    /// <summary>
+    ///     How long one document may take to diagnose before it is worth naming in the log. Well
+    ///     above any healthy document (the median is a couple of milliseconds) so the line only
+    ///     appears for the handful that actually dominate a sweep.
+    /// </summary>
+    private const long SlowDocumentMs = 1000;
+
     // The engine hardcodes these 20 damage types at fixed positions relative to the end of
     // GameConstants.xml's <Damage_Types> list. If they aren't present as the exact tail, in this
     // exact order, the game crashes at runtime.
@@ -54,20 +61,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
 
-    /// <summary>
-    ///     How long one document may take to diagnose before it is worth naming in the log. Well
-    ///     above any healthy document (the median is a couple of milliseconds) so the line only
-    ///     appears for the handful that actually dominate a sweep.
-    /// </summary>
-    private const long SlowDocumentMs = 1000;
-
     private readonly ConcurrentDictionary<string, Dictionary<(int Line, int Char), string>> _fixCache = new();
-
-    /// <summary>Documents with a fix-token map; never pruned, so a workspace sweep fills it for every file.</summary>
-    public CacheStatistics Snapshot()
-    {
-        return new CacheStatistics("xml-fixes", _fixCache.Count);
-    }
 
     private readonly IXmlDiagnosticsHandlerRegistry _handlerRegistry;
     private readonly IXmlHardpointFactProducer? _hardpointProducer;
@@ -223,6 +217,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     // Feature-flag gate: a null provider (test convenience ctors) means always enabled.
     protected override bool DiagnosticsEnabled =>
         _configProvider?.Current.Features.Xml.Diagnostics ?? true;
+
+    /// <summary>Documents with a fix-token map; never pruned, so a workspace sweep fills it for every file.</summary>
+    public CacheStatistics Snapshot()
+    {
+        return new CacheStatistics("xml-fixes", _fixCache.Count);
+    }
 
     /// <summary>
     ///     The full pipeline for one document, publish-free (<see cref="IXmlDiagnosticsCollector" />) —

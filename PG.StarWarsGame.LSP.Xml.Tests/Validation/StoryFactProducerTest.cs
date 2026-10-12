@@ -10,6 +10,23 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 
 public sealed class StoryFactProducerTest
 {
+    // ── Anchors: a fact marks the element that caused it, never column 0 of a line ────
+    //
+    // The squiggle has to sit on the thing to fix: a type problem on the type's value, a param
+    // problem on the param's value, a MISSING param on the whole type element that demands it,
+    // a dialog problem on the dialog's value and a chapter problem on the chapter's.
+
+    private const string Anchored =
+        "<StoryParser>\n" +
+        "<Event Name=\"E\">\n" +
+        "    <Event_Type>MY_EVENT</Event_Type>\n" +
+        "    <Event_Param1>  42 </Event_Param1>\n" +
+        "    <Reward_Type>MY_REWARD</Reward_Type>\n" +
+        "    <Story_Dialog>Dialog_One</Story_Dialog>\n" +
+        "    <Story_Chapter>2</Story_Chapter>\n" +
+        "</Event>\n" +
+        "</StoryParser>";
+
     private static string Xml(string inner)
     {
         return $"<StoryParser><Event>{inner}</Event></StoryParser>";
@@ -196,23 +213,6 @@ public sealed class StoryFactProducerTest
         Assert.NotNull(f.Def);
         Assert.False(f.Def!.Optional);
     }
-
-    // ── Anchors: a fact marks the element that caused it, never column 0 of a line ────
-    //
-    // The squiggle has to sit on the thing to fix: a type problem on the type's value, a param
-    // problem on the param's value, a MISSING param on the whole type element that demands it,
-    // a dialog problem on the dialog's value and a chapter problem on the chapter's.
-
-    private const string Anchored =
-        "<StoryParser>\n" +
-        "<Event Name=\"E\">\n" +
-        "    <Event_Type>MY_EVENT</Event_Type>\n" +
-        "    <Event_Param1>  42 </Event_Param1>\n" +
-        "    <Reward_Type>MY_REWARD</Reward_Type>\n" +
-        "    <Story_Dialog>Dialog_One</Story_Dialog>\n" +
-        "    <Story_Chapter>2</Story_Chapter>\n" +
-        "</Event>\n" +
-        "</StoryParser>";
 
     private static StoryFactProducer AnchoredProducer()
     {

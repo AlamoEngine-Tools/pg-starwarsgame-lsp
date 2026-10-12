@@ -7,7 +7,7 @@
 // `creditstext_english.dat` is nothing but them. Making them things you can pick up and place says
 // that far better than a menu item and a dropdown do.
 
-import { BLANK_SENTINEL_VALUE, CREDITS_DIRECTIVES } from './creditsCrawlModel';
+import { BLANK_SENTINEL_VALUE, CREDITS_DIRECTIVES } from "./creditsCrawlModel";
 
 export interface CreditsStep {
     id: string;
@@ -34,8 +34,8 @@ export interface CreditsStep {
  * calling the same thing by different names.
  */
 const DIRECTIVE_LABELS: Record<string, string> = {
-    HEADER: 'Label',
-    CENTER: 'Name',
+    HEADER: "Label",
+    CENTER: "Name",
 };
 
 /** The plain-language name for a directive, or null if it is not one the engine defines. */
@@ -51,36 +51,36 @@ export function directiveOptionText(key: string): string {
 
 export const CREDITS_STEPS: CreditsStep[] = [
     {
-        id: 'header',
+        id: "header",
         label: DIRECTIVE_LABELS[CREDITS_DIRECTIVES[1]],
-        description: 'A role or section heading, set small above the name',
+        description: "A role or section heading, set small above the name",
         key: CREDITS_DIRECTIVES[1],
-        value: '',
+        value: "",
         token: CREDITS_DIRECTIVES[1],
-        codicon: 'symbol-key',
+        codicon: "symbol-key",
     },
     {
-        id: 'center',
+        id: "center",
         label: DIRECTIVE_LABELS[CREDITS_DIRECTIVES[0]],
-        description: 'The larger line beneath a label',
+        description: "The larger line beneath a label",
         key: CREDITS_DIRECTIVES[0],
-        value: '',
+        value: "",
         token: CREDITS_DIRECTIVES[0],
-        codicon: 'symbol-text',
+        codicon: "symbol-text",
     },
     {
-        id: 'blank',
-        label: 'Blank line',
-        description: 'The gap between one block and the next',
+        id: "blank",
+        label: "Blank line",
+        description: "The gap between one block and the next",
         key: CREDITS_DIRECTIVES[0],
         value: BLANK_SENTINEL_VALUE,
         token: BLANK_SENTINEL_VALUE,
-        codicon: 'dash',
+        codicon: "dash",
     },
 ];
 
 export function stepById(id: string): CreditsStep | null {
-    return CREDITS_STEPS.find(step => step.id === id) ?? null;
+    return CREDITS_STEPS.find((step) => step.id === id) ?? null;
 }
 
 /** Where a row dragged to `pointerY` would land, and the boundary to draw the indicator on. */
@@ -91,7 +91,11 @@ export interface DropTarget {
     y: number;
 }
 
-export interface DropRow { index: number; top: number; bottom: number; }
+export interface DropRow {
+    index: number;
+    top: number;
+    bottom: number;
+}
 
 /**
  * Resolves a pointer position to an insertion point.
@@ -101,15 +105,23 @@ export interface DropRow { index: number; top: number; bottom: number; }
  * screen positions would drop the new row somewhere else entirely.
  */
 export function dropTargetAt(
-    pointerY: number, rows: DropRow[], totalRows: number,
+    pointerY: number,
+    rows: DropRow[],
+    totalRows: number,
 ): DropTarget {
-    if (rows.length === 0) { return { index: totalRows, y: 0 }; }
+    if (rows.length === 0) {
+        return { index: totalRows, y: 0 };
+    }
 
     const first = rows[0];
-    if (pointerY < first.top) { return { index: first.index, y: first.top }; }
+    if (pointerY < first.top) {
+        return { index: first.index, y: first.top };
+    }
 
     for (const row of rows) {
-        if (pointerY > row.bottom) { continue; }
+        if (pointerY > row.bottom) {
+            continue;
+        }
         // The half the pointer is in decides which side of the row it goes.
         return pointerY < (row.top + row.bottom) / 2
             ? { index: row.index, y: row.top }

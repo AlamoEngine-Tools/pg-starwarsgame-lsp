@@ -16,7 +16,10 @@
 // This file used to sum the hardpoints and call that the hull, on the reasoning that most mods
 // author it that way. The sum is real - it is the hardpoint pool - but it was never the hull.
 
-import type { PreviewHardpoint, PreviewTargetDefence } from '../../protocol/modelPreview';
+import type {
+    PreviewHardpoint,
+    PreviewTargetDefence,
+} from "../../protocol/modelPreview";
 
 /** Health left per hardpoint, keyed by hardpoint id. Null where the hardpoint declares none. */
 export type HardpointHealth = Readonly<Record<string, number | null>>;
@@ -52,8 +55,11 @@ export function hardpointPool(
     let max = 0;
 
     for (const hardpoint of hardpoints) {
-        if (!hardpoint.isDestroyable
-            || hardpoint.health === null || hardpoint.health === undefined) {
+        if (
+            !hardpoint.isDestroyable ||
+            hardpoint.health === null ||
+            hardpoint.health === undefined
+        ) {
             continue;
         }
 
@@ -69,7 +75,10 @@ export function hardpointPool(
 
         // Clamped to the hardpoint's own declared health at BOTH ends, so a repair that overshoots or a
         // stale entry cannot report a ship in better condition than it was built in.
-        current += Math.min(Math.max(hardpointHealth[hardpoint.id] ?? 0, 0), hardpoint.health);
+        current += Math.min(
+            Math.max(hardpointHealth[hardpoint.id] ?? 0, 0),
+            hardpoint.health,
+        );
     }
 
     return { current, max };
@@ -93,9 +102,10 @@ export function hullPool(
     const max = defence?.tacticalHealth ?? 0;
 
     return {
-        current: hullNow === undefined || hullNow === null
-            ? max
-            : Math.min(Math.max(hullNow, 0), max),
+        current:
+            hullNow === undefined || hullNow === null
+                ? max
+                : Math.min(Math.max(hullNow, 0), max),
         max,
     };
 }
@@ -125,14 +135,19 @@ export function unitDestroyed(
     hull?: HullPool | null,
     diesWithHardpoints = true,
 ): boolean {
-    const destructible = hardpoints.filter(h => h.isDestroyable);
+    const destructible = hardpoints.filter((h) => h.isDestroyable);
 
-    if (diesWithHardpoints && destructible.length > 0
-        && destructible.every(h => destroyed.has(h.id))) {
+    if (
+        diesWithHardpoints &&
+        destructible.length > 0 &&
+        destructible.every((h) => destroyed.has(h.id))
+    ) {
         return true;
     }
 
-    return hull !== undefined && hull !== null && hull.max > 0 && hull.current <= 0;
+    return (
+        hull !== undefined && hull !== null && hull.max > 0 && hull.current <= 0
+    );
 }
 
 /**
@@ -157,9 +172,10 @@ export function hullAfterHardpointDeath(
         return hull;
     }
 
-    const destructible = hardpoints.filter(h => h.isDestroyable);
+    const destructible = hardpoints.filter((h) => h.isDestroyable);
 
-    return destructible.length > 0 && destructible.every(h => destroyed.has(h.id))
+    return destructible.length > 0 &&
+        destructible.every((h) => destroyed.has(h.id))
         ? { ...hull, current: 0 }
         : hull;
 }
@@ -170,7 +186,7 @@ export function hullAfterHardpointDeath(
  * 23 of them ship across both trees and every one is `Is_Destroyable` YES. The files are not
  * consistent about case, here as everywhere else.
  */
-const SHIELD_GENERATOR = 'hard_point_shield_generator';
+const SHIELD_GENERATOR = "hard_point_shield_generator";
 
 /**
  * Whether the shield is down because every generator projecting it has been shot off.
@@ -192,16 +208,17 @@ export function shieldGeneratorsDown(
     destroyed: ReadonlySet<string>,
 ): boolean {
     const generators = hardpoints.filter(
-        h => (h.type ?? '').toLowerCase() === SHIELD_GENERATOR);
+        (h) => (h.type ?? "").toLowerCase() === SHIELD_GENERATOR,
+    );
 
     // One that cannot be shot off never stops projecting, so it is not enough for the destroyable
     // ones to be gone. Every shipped generator IS destroyable; this is about a mod that marks one
     // otherwise, and the answer is that its shield simply cannot be brought down this way.
-    if (generators.length === 0 || generators.some(h => !h.isDestroyable)) {
+    if (generators.length === 0 || generators.some((h) => !h.isDestroyable)) {
         return false;
     }
 
-    return generators.every(h => destroyed.has(h.id));
+    return generators.every((h) => destroyed.has(h.id));
 }
 
 /**
@@ -210,6 +227,8 @@ export function shieldGeneratorsDown(
  * False as soon as it has a destructible hardpoint - the engine offers the hardpoints and nothing else, so
  * a "Hull" choice in the attacker panel would be aiming at something no weapon can reach.
  */
-export function unitTargetable(hardpoints: readonly PreviewHardpoint[]): boolean {
-    return !hardpoints.some(h => h.isDestroyable);
+export function unitTargetable(
+    hardpoints: readonly PreviewHardpoint[],
+): boolean {
+    return !hardpoints.some((h) => h.isDestroyable);
 }

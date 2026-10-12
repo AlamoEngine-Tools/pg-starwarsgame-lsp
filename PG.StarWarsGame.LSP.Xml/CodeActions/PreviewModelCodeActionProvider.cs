@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using HtmlAgilityPack;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -62,7 +63,7 @@ internal sealed class PreviewModelCodeActionProvider : IXmlCursorCodeActionProvi
             return [];
 
         // A container element has children, not a value.
-        if (node.ChildNodes.Any(c => c.NodeType == HtmlAgilityPack.HtmlNodeType.Element))
+        if (node.ChildNodes.Any(c => c.NodeType == HtmlNodeType.Element))
             return [];
 
         var tag = _schema.GetTag(node.Name);
@@ -96,7 +97,7 @@ internal sealed class PreviewModelCodeActionProvider : IXmlCursorCodeActionProvi
         ];
     }
 
-    private static string? ModelItemUnderCursor(XmlTagDefinition tag, HtmlAgilityPack.HtmlNode node, string text,
+    private static string? ModelItemUnderCursor(XmlTagDefinition tag, HtmlNode node, string text,
         Position position, GameIndex index)
     {
         var lineIndex = new LineOffsetIndex(text);

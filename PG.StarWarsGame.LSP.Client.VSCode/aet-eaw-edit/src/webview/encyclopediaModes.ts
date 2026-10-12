@@ -8,11 +8,11 @@
 // and a checkbox labelled "Multiplayer body" says nothing about there being a single-player one to
 // compare it against. Split out of the panel so the options can be tested without a DOM.
 
-import {type ChoiceOption} from './shared/choice';
-import type {EncyclopediaFactionFrame} from '../protocol/encyclopedia';
+import { type ChoiceOption } from "./shared/choice";
+import type { EncyclopediaFactionFrame } from "../protocol/encyclopedia";
 
 /** Which body text the card is asked for. */
-export type BodyMode = 'sp' | 'mp';
+export type BodyMode = "sp" | "mp";
 
 /**
  * One option per faction frame the card declares.
@@ -25,24 +25,27 @@ export function factionModes(
     frames: readonly EncyclopediaFactionFrame[],
 ): ChoiceOption<string>[] {
     if (frames.length === 0) {
-        return [{
-            id: '0',
-            label: 'None',
-            disabled: true,
-            disabledReason: 'This card declares no faction frame, so there is none to draw.',
-        }];
+        return [
+            {
+                id: "0",
+                label: "None",
+                disabled: true,
+                disabledReason:
+                    "This card declares no faction frame, so there is none to draw.",
+            },
+        ];
     }
 
     const lone = frames.length === 1;
-    return frames.map(frame => ({
+    return frames.map((frame) => ({
         id: String(frame.slot),
         label: frame.slotName ?? `Slot ${frame.slot}`,
         // The texture name is what an author searches their art folder for.
         title: `${frame.slotName ?? `Slot ${frame.slot}`} - ${frame.textureName}`,
         disabled: lone,
         disabledReason: lone
-            ? `Only one faction frame is declared (${frame.textureName}), so there is nothing to `
-            + 'switch to.'
+            ? `Only one faction frame is declared (${frame.textureName}), so there is nothing to ` +
+              "switch to."
             : undefined,
     }));
 }
@@ -63,10 +66,14 @@ export function factionSlotOf(id: string): number {
  * facts; the second one is the notice beside the card, not a dead control.
  */
 export const BODY_MODES: readonly ChoiceOption<BodyMode>[] = [
-    {id: 'sp', label: 'Singleplayer', title: 'The Encyclopedia_Text body'},
-    {id: 'mp', label: 'Multiplayer', title: 'The MP_Encyclopedia_Text body, where one is defined'},
+    { id: "sp", label: "Singleplayer", title: "The Encyclopedia_Text body" },
+    {
+        id: "mp",
+        label: "Multiplayer",
+        title: "The MP_Encyclopedia_Text body, where one is defined",
+    },
 ];
 
 export function bodyModeOf(multiplayer: boolean): BodyMode {
-    return multiplayer ? 'mp' : 'sp';
+    return multiplayer ? "mp" : "sp";
 }

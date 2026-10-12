@@ -17,7 +17,7 @@
 // a bone node NEVER carries geometry, so a mesh has no children to lose and no identity to borrow,
 // and every rule downstream gets to be about one thing.
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
 /**
  * Splits a node that is both a bone and a mesh into a bone node with a mesh child.
@@ -29,7 +29,10 @@ import * as THREE from 'three';
  *
  * Returns the bone node that now stands in for the original.
  */
-export function splitGeometryFromBone(mesh: THREE.Mesh, meshName?: string): THREE.Object3D {
+export function splitGeometryFromBone(
+    mesh: THREE.Mesh,
+    meshName?: string,
+): THREE.Object3D {
     const parent = mesh.parent;
 
     const bone = new THREE.Object3D();
@@ -76,7 +79,7 @@ export function splitGeometryFromBone(mesh: THREE.Mesh, meshName?: string): THRE
 
     // The mesh's OWN name, not the bone's. Leaving it as `<bone>#<index>` would leave a second node
     // answering to a bone name, which is the confusion being removed.
-    if (meshName !== undefined && meshName !== '') {
+    if (meshName !== undefined && meshName !== "") {
         mesh.name = meshName;
     }
 
@@ -97,7 +100,9 @@ export function splitGeometryFromBone(mesh: THREE.Mesh, meshName?: string): THRE
  * order is fixed for a given file, which is what makes the last part stable rather than arbitrary.
  */
 export function stampTreeKeys(
-    root: THREE.Object3D, bonesByIndex: ReadonlyMap<number, THREE.Object3D>, partId: string,
+    root: THREE.Object3D,
+    bonesByIndex: ReadonlyMap<number, THREE.Object3D>,
+    partId: string,
 ): void {
     const boneOf = new Map<THREE.Object3D, number>();
     for (const [index, node] of bonesByIndex) {
@@ -130,7 +135,7 @@ export function stampTreeKeys(
 
     const seen = new Map<number, number>();
 
-    root.traverse(node => {
+    root.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) {
             return;
         }
@@ -146,7 +151,7 @@ export function stampTreeKeys(
 export function treeKeyOf(mesh: THREE.Object3D): string {
     const key = mesh.userData.aetTreeKey;
 
-    return typeof key === 'string' ? key : '';
+    return typeof key === "string" ? key : "";
 }
 
 /**
@@ -166,7 +171,7 @@ export function outermostRoots(
 ): THREE.Object3D[] {
     const all = new Set(roots);
 
-    return roots.filter(root => {
+    return roots.filter((root) => {
         for (let at = root.parent; at !== null; at = at.parent) {
             if (all.has(at)) {
                 return false;
@@ -189,10 +194,20 @@ function isRootCorrection(node: THREE.Object3D): boolean {
     const m = node.matrix.elements;
     const near = (a: number, b: number) => Math.abs(a - b) < 1e-5;
 
-    return near(m[0], 1) && near(m[1], 0) && near(m[2], 0)
-        && near(m[4], 0) && near(m[5], 0) && near(Math.abs(m[6]), 1)
-        && near(m[8], 0) && near(Math.abs(m[9]), 1) && near(m[10], 0)
-        && near(m[12], 0) && near(m[13], 0) && near(m[14], 0);
+    return (
+        near(m[0], 1) &&
+        near(m[1], 0) &&
+        near(m[2], 0) &&
+        near(m[4], 0) &&
+        near(m[5], 0) &&
+        near(Math.abs(m[6]), 1) &&
+        near(m[8], 0) &&
+        near(Math.abs(m[9]), 1) &&
+        near(m[10], 0) &&
+        near(m[12], 0) &&
+        near(m[13], 0) &&
+        near(m[14], 0)
+    );
 }
 
 /**
@@ -217,6 +232,10 @@ export function cancelRootCorrection(root: THREE.Object3D): void {
     }
 
     carrier.matrix.identity();
-    carrier.matrix.decompose(carrier.position, carrier.quaternion, carrier.scale);
+    carrier.matrix.decompose(
+        carrier.position,
+        carrier.quaternion,
+        carrier.scale,
+    );
     carrier.updateMatrixWorld(true);
 }

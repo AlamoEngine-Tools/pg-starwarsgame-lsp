@@ -17,7 +17,8 @@ const STEPS = 100;
 
 /** The slider's half-range and its increment, both rounded to numbers worth reading. */
 export function groundRange(radius: number): { limit: number; step: number } {
-    const limit = Number.isFinite(radius) && radius > 0 ? niceCeil(radius) : FALLBACK;
+    const limit =
+        Number.isFinite(radius) && radius > 0 ? niceCeil(radius) : FALLBACK;
 
     return { limit, step: niceCeil(limit / STEPS) };
 }

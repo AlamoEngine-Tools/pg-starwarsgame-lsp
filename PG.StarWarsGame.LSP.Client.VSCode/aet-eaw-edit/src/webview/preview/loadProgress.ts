@@ -31,7 +31,7 @@ export interface LoadTally {
     timedOut: boolean;
 }
 
-export type LoadStage = 'scene' | 'geometry' | 'materials' | 'ready';
+export type LoadStage = "scene" | "geometry" | "materials" | "ready";
 
 export interface LoadState {
     stage: LoadStage;
@@ -51,7 +51,10 @@ export interface LoadState {
  */
 export function loadState(tally: LoadTally): LoadState {
     const ready: LoadState = {
-        stage: 'ready', covered: false, label: 'Ready', detail: null,
+        stage: "ready",
+        covered: false,
+        label: "Ready",
+        detail: null,
     };
 
     if (tally.timedOut) {
@@ -59,7 +62,12 @@ export function loadState(tally: LoadTally): LoadState {
     }
 
     if (tally.expectedParts === null) {
-        return { stage: 'scene', covered: true, label: 'Reading the scene', detail: null };
+        return {
+            stage: "scene",
+            covered: true,
+            label: "Reading the scene",
+            detail: null,
+        };
     }
 
     // A scene that resolved no parts sends no GLB request, so no part will ever arrive. Waiting on
@@ -71,18 +79,18 @@ export function loadState(tally: LoadTally): LoadState {
 
     if (tally.arrivedParts < tally.expectedParts) {
         return {
-            stage: 'geometry',
+            stage: "geometry",
             covered: true,
-            label: 'Loading geometry',
+            label: "Loading geometry",
             detail: `${tally.arrivedParts} of ${tally.expectedParts}`,
         };
     }
 
     if (tally.settledAssets < tally.requestedAssets) {
         return {
-            stage: 'materials',
+            stage: "materials",
             covered: true,
-            label: 'Loading textures',
+            label: "Loading textures",
             detail: `${tally.settledAssets} of ${tally.requestedAssets}`,
         };
     }
@@ -125,7 +133,7 @@ export class AssetLedger {
     request(name: string): boolean {
         const key = name.toLowerCase();
 
-        if (key === '' || this.asked.has(key)) {
+        if (key === "" || this.asked.has(key)) {
             return false;
         }
 

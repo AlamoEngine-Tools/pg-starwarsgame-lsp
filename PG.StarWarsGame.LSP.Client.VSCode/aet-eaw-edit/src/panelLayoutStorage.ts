@@ -1,9 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import { panelLayoutFrom, type PanelLayout } from './webview/shared/panelLayout';
+import {
+    type PanelLayout,
+    panelLayoutFrom,
+} from "./webview/shared/panelLayout";
 
 /**
  * How wide the reader likes each editor's dock, and how tall its drawer.
@@ -19,7 +22,7 @@ import { panelLayoutFrom, type PanelLayout } from './webview/shared/panelLayout'
  * Held in a module rather than threaded through the panel constructors, matching the two storage
  * modules beside it: panels are created from several call sites and none of them otherwise cares.
  */
-const KEY = 'aet-eaw-edit.panelLayout';
+const KEY = "aet-eaw-edit.panelLayout";
 
 let store: vscode.Memento | undefined;
 
@@ -45,8 +48,12 @@ export function readPanelLayout(): PanelLayout {
  * default is a small annoyance, and an unhandled rejection from a storage write would be a worse one.
  */
 export function savePanelSize(key: string, value: number): void {
-    if (store === undefined) { return; }
+    if (store === undefined) {
+        return;
+    }
 
     const next = panelLayoutFrom({ ...readPanelLayout(), [key]: value });
-    void Promise.resolve(store.update(KEY, next)).then(undefined, () => { /* not worth reporting */ });
+    void Promise.resolve(store.update(KEY, next)).then(undefined, () => {
+        /* not worth reporting */
+    });
 }

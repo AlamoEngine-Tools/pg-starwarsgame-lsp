@@ -11,10 +11,10 @@
 //
 // Kept free of three.js so the whole shape - nesting, filtering, selection - is testable.
 
-import { type VisibilityLink } from './visibility';
+import { type VisibilityLink } from "./visibility";
 
 /** What a row stands for. The filter chips are exactly these. */
-export type TreeKind = 'bone' | 'mesh' | 'particle';
+export type TreeKind = "bone" | "mesh" | "particle";
 
 /** One thing in the model, before nesting. */
 export interface TreeItem {
@@ -80,7 +80,7 @@ export function boneRowId(index: number): string {
 
 /** The skeleton index in a bone row's id, or null for a row that is not a bone. */
 export function boneIndexOfRow(id: string): number | null {
-    const tail = id.startsWith('bone:') ? id.slice('bone:'.length) : '';
+    const tail = id.startsWith("bone:") ? id.slice("bone:".length) : "";
 
     return /^\d+$/.test(tail) ? Number.parseInt(tail, 10) : null;
 }
@@ -123,9 +123,14 @@ export type MeshPlacement = { merge: number } | { childOf: number };
  * mesh happened to be loaded first.
  */
 export function meshPlacement(
-    ownerBone: number, roots: ReadonlySet<number>, names: { bone: string; mesh: string },
+    ownerBone: number,
+    roots: ReadonlySet<number>,
+    names: { bone: string; mesh: string },
 ): MeshPlacement {
-    if (!roots.has(ownerBone) && names.bone.toLowerCase() === names.mesh.toLowerCase()) {
+    if (
+        !roots.has(ownerBone) &&
+        names.bone.toLowerCase() === names.mesh.toLowerCase()
+    ) {
         return { merge: ownerBone };
     }
 
@@ -149,9 +154,14 @@ export function meshPlacement(
  * because there the bone really is geometry in its own right.
  */
 export function effectPlacement(
-    ownerBone: number, roots: ReadonlySet<number>, names: { bone: string; effect: string },
+    ownerBone: number,
+    roots: ReadonlySet<number>,
+    names: { bone: string; effect: string },
 ): MeshPlacement {
-    return meshPlacement(ownerBone, roots, { bone: names.bone, mesh: names.effect });
+    return meshPlacement(ownerBone, roots, {
+        bone: names.bone,
+        mesh: names.effect,
+    });
 }
 
 /**
@@ -172,7 +182,8 @@ export function buildTree(items: readonly TreeItem[]): TreeNode[] {
 
     for (const item of items) {
         const node = nodes.get(item.id)!;
-        const parent = item.parentId === null ? undefined : nodes.get(item.parentId);
+        const parent =
+            item.parentId === null ? undefined : nodes.get(item.parentId);
 
         if (parent === undefined || parent === node) {
             roots.push(node);
@@ -214,7 +225,7 @@ export function defaultCollapsed(roots: readonly TreeNode[]): Set<string> {
     const collapsed = new Set<string>();
 
     const carries = (node: TreeNode): boolean =>
-        node.kind !== 'bone' || node.children.some(carries);
+        node.kind !== "bone" || node.children.some(carries);
 
     const walk = (node: TreeNode, depth: number): void => {
         // Never the root itself, which would hide the model behind one twisty.
@@ -261,17 +272,21 @@ export interface TreeFilter {
  * match's children are the CONTENTS of what was found - true of the search half, and never true of
  * the kind half.
  */
-export function filterTree(roots: readonly TreeNode[], filter: TreeFilter): TreeNode[] {
+export function filterTree(
+    roots: readonly TreeNode[],
+    filter: TreeFilter,
+): TreeNode[] {
     const needle = filter.text.trim().toLowerCase();
 
     // `wanted` false inside a text hit: its contents are what was searched for, so they do not each
     // have to carry the word themselves. The KIND is asked either way.
     const keep = (node: TreeNode, wanted: boolean): TreeNode | null => {
         const kindOk = filter.kinds.has(node.kind);
-        const matches = kindOk && (!wanted || node.name.toLowerCase().includes(needle));
+        const matches =
+            kindOk && (!wanted || node.name.toLowerCase().includes(needle));
 
         const children = node.children
-            .map(child => keep(child, wanted && !matches))
+            .map((child) => keep(child, wanted && !matches))
             .filter((child): child is TreeNode => child !== null);
 
         if (!matches && children.length === 0) {
@@ -286,7 +301,7 @@ export function filterTree(roots: readonly TreeNode[], filter: TreeFilter): Tree
     };
 
     return roots
-        .map(node => keep(node, needle !== ''))
+        .map((node) => keep(node, needle !== ""))
         .filter((node): node is TreeNode => node !== null);
 }
 
@@ -309,7 +324,8 @@ export interface TreeRow {
  * eighteen bones, which is a filter that looks broken.
  */
 export function visibleTreeRows(
-    roots: readonly TreeNode[], collapsed: ReadonlySet<string>,
+    roots: readonly TreeNode[],
+    collapsed: ReadonlySet<string>,
 ): TreeRow[] {
     const rows: TreeRow[] = [];
 
@@ -338,7 +354,10 @@ export function visibleTreeRows(
  * not have: they replaced the selection outright, so a weapon with two fire points could never
  * have both of them boxed at once.
  */
-export function toggleSelected(selected: ReadonlySet<string>, id: string): Set<string> {
+export function toggleSelected(
+    selected: ReadonlySet<string>,
+    id: string,
+): Set<string> {
     const next = new Set(selected);
 
     if (!next.delete(id)) {
@@ -363,15 +382,18 @@ export function selectionAfterClick(
     modifiers: { ctrl: boolean; shift: boolean },
 ): { selected: Set<string>; anchor: string } {
     if (modifiers.shift && anchor !== null) {
-        const from = rows.findIndex(row => row.node.id === anchor);
-        const to = rows.findIndex(row => row.node.id === clicked);
+        const from = rows.findIndex((row) => row.node.id === anchor);
+        const to = rows.findIndex((row) => row.node.id === clicked);
 
         if (from !== -1 && to !== -1) {
             const run = rows.slice(Math.min(from, to), Math.max(from, to) + 1);
 
             // Extends rather than replaces, so ctrl-picking a few then shift-extending works.
             return {
-                selected: new Set([...selected, ...run.map(row => row.node.id)]),
+                selected: new Set([
+                    ...selected,
+                    ...run.map((row) => row.node.id),
+                ]),
                 anchor,
             };
         }
@@ -401,7 +423,10 @@ export function selectionAfterClick(
  * ticking one outside it moves only that row, rather than silently acting on things elsewhere in a
  * long tree that the reader may have forgotten were selected.
  */
-export function toggleTargets(selected: ReadonlySet<string>, clicked: string): string[] {
+export function toggleTargets(
+    selected: ReadonlySet<string>,
+    clicked: string,
+): string[] {
     return selected.has(clicked) ? [...selected] : [clicked];
 }
 
@@ -413,7 +438,8 @@ export function toggleTargets(selected: ReadonlySet<string>, clicked: string): s
  * geometry attached to a bone is what the reader wants gone.
  */
 export function withDescendants(
-    roots: readonly TreeNode[], ids: readonly string[],
+    roots: readonly TreeNode[],
+    ids: readonly string[],
 ): string[] {
     const wanted = new Set(ids);
     const out = new Set<string>();

@@ -33,6 +33,13 @@ public sealed class TupleSlotHandlerTest
     private static readonly TupleSlotDefinition Model = new()
         { Label = "Model", ReferenceKind = ReferenceKind.ModelFile };
 
+    // ── other asset items: the rules a whole tag of that kind gets ────────────
+
+    private static readonly TupleSlotDefinition Icon = new()
+        { Label = "Icon", ReferenceKind = ReferenceKind.TextureFile };
+
+    private static readonly TupleSlotDefinition Map = new() { Label = "Map", ReferenceKind = ReferenceKind.MapFile };
+
     private static XmlTupleSlotFact Fact(TupleSlotDefinition slot, string value)
     {
         return new XmlTupleSlotFact("file:///units.xml", 4, 8, value.Length, Tag, slot, value);
@@ -100,13 +107,6 @@ public sealed class TupleSlotHandlerTest
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
         Assert.Equal(DiagnosticIds.TupleSlotModelFileFormat, d.Id);
     }
-
-    // ── other asset items: the rules a whole tag of that kind gets ────────────
-
-    private static readonly TupleSlotDefinition Icon = new()
-        { Label = "Icon", ReferenceKind = ReferenceKind.TextureFile };
-
-    private static readonly TupleSlotDefinition Map = new() { Label = "Map", ReferenceKind = ReferenceKind.MapFile };
 
     [Fact]
     public void Texture_IsSatisfiedByTheOtherFormat_AsAWholeTextureTagIs()

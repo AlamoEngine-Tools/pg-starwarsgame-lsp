@@ -13,9 +13,9 @@ public sealed class ScriptSourceMapTest
 {
     private const string ModRoot = @"D:\Mods\MyMod\Data\Scripts";
     private const string GameRoot = @"D:\Games\FoC\Data\Scripts";
+    private readonly IScriptSourceMapFactory _factory;
 
     private readonly MockFileSystem _fs = new();
-    private readonly IScriptSourceMapFactory _factory;
 
     public ScriptSourceMapTest()
     {

@@ -1,9 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import { viewerSettingsFrom, type ViewerSettings } from './webview/preview/viewerSettings';
+import {
+    type ViewerSettings,
+    viewerSettingsFrom,
+} from "./webview/preview/viewerSettings";
 
 /**
  * How the reader likes the preview's ROOM: the grid, the floor, the lights, the background.
@@ -17,7 +20,7 @@ import { viewerSettingsFrom, type ViewerSettings } from './webview/preview/viewe
  * `dialogGeometryStorage`: the preview is opened from several call sites and none of them otherwise
  * cares about storage.
  */
-const KEY = 'aet-eaw-edit.previewViewerSettings';
+const KEY = "aet-eaw-edit.previewViewerSettings";
 
 let store: vscode.Memento | undefined;
 
@@ -48,6 +51,10 @@ export function saveViewerSettings(settings: unknown): void {
         return;
     }
 
-    void Promise.resolve(store.update(KEY, viewerSettingsFrom(settings)))
-        .then(undefined, () => { /* a preference is not worth reporting a failure over */ });
+    void Promise.resolve(store.update(KEY, viewerSettingsFrom(settings))).then(
+        undefined,
+        () => {
+            /* a preference is not worth reporting a failure over */
+        },
+    );
 }

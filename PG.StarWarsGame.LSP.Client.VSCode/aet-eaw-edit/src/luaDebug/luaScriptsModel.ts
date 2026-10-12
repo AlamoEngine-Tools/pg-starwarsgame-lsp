@@ -6,13 +6,13 @@
 // TreeItems and talks to the debug session.
 
 /** The custom requests and event the adapter serves for this view; names shared with the C# side. */
-export const LUA_SCRIPTS_REQUEST = 'eawLua/scripts';
-export const LUA_REFRESH_REQUEST = 'eawLua/refresh';
-export const LUA_SELECT_SCRIPT_REQUEST = 'eawLua/selectScript';
-export const LUA_BREAK_THREAD_REQUEST = 'eawLua/breakThread';
-export const LUA_SCRIPTS_CHANGED_EVENT = 'eawLua/scriptsChanged';
+export const LUA_SCRIPTS_REQUEST = "eawLua/scripts";
+export const LUA_REFRESH_REQUEST = "eawLua/refresh";
+export const LUA_SELECT_SCRIPT_REQUEST = "eawLua/selectScript";
+export const LUA_BREAK_THREAD_REQUEST = "eawLua/breakThread";
+export const LUA_SCRIPTS_CHANGED_EVENT = "eawLua/scriptsChanged";
 
-export type LuaRunState = 'running' | 'breakArmed' | 'suspended';
+export type LuaRunState = "running" | "breakArmed" | "suspended";
 
 export interface LuaThreadRow {
     threadIndex: number;
@@ -39,49 +39,63 @@ export interface LuaScriptsResult {
 }
 
 export interface LuaScriptsChangedEvent {
-    reason: 'scriptAdded' | 'scriptRemoved' | 'suspended' | 'stateChanged';
+    reason: "scriptAdded" | "scriptRemoved" | "suspended" | "stateChanged";
     scriptId: number | null;
 }
 
 /** A script row of the tree, presentation decided. */
 export interface ScriptNode {
-    kind: 'script';
+    kind: "script";
     scriptId: number;
     label: string;
     description: string;
     tooltip: string;
     path: string | null;
     icon: string;
-    contextValue: 'aetLuaScript';
+    contextValue: "aetLuaScript";
     threads: LuaThreadRow[] | null;
 }
 
 /** A thread row under a script; index -1 is the script's main state, which every script has. */
 export interface ThreadNode {
-    kind: 'thread';
+    kind: "thread";
     scriptId: number;
     threadIndex: number;
     label: string;
     description: string | undefined;
     icon: string;
-    contextValue: 'aetLuaThread';
+    contextValue: "aetLuaThread";
 }
 
 export function scriptRows(result: LuaScriptsResult): ScriptNode[] {
-    return result.scripts.map(script => {
-        const state = script.isSuspended ? 'stopped' : script.isContext ? 'context' : script.attached ? 'attached' : null;
-        const location = script.path === null
-            ? `${script.gamePath}\nThis file is not under any source root, so breakpoints cannot be mapped to it`
-            : script.path;
+    return result.scripts.map((script) => {
+        const state = script.isSuspended
+            ? "stopped"
+            : script.isContext
+              ? "context"
+              : script.attached
+                ? "attached"
+                : null;
+        const location =
+            script.path === null
+                ? `${script.gamePath}\nThis file is not under any source root, so breakpoints cannot be mapped to it`
+                : script.path;
         return {
-            kind: 'script',
+            kind: "script",
             scriptId: script.scriptId,
             label: script.name,
-            description: state === null ? `#${script.scriptId}` : `#${script.scriptId} - ${state}`,
+            description:
+                state === null
+                    ? `#${script.scriptId}`
+                    : `#${script.scriptId} - ${state}`,
             tooltip: `${script.name} [${script.scriptId}]\n${location}`,
             path: script.path,
-            icon: script.isSuspended ? 'debug-pause' : script.attached || script.isContext ? 'debug-breakpoint-log' : 'file-code',
-            contextValue: 'aetLuaScript',
+            icon: script.isSuspended
+                ? "debug-pause"
+                : script.attached || script.isContext
+                  ? "debug-breakpoint-log"
+                  : "file-code",
+            contextValue: "aetLuaScript",
             threads: script.threads,
         };
     });
@@ -96,23 +110,26 @@ export function threadRows(script: ScriptNode): ThreadNode[] | undefined {
         return undefined;
     }
     const main: ThreadNode = {
-        kind: 'thread',
+        kind: "thread",
         scriptId: script.scriptId,
         threadIndex: -1,
-        label: 'main state',
+        label: "main state",
         description: undefined,
-        icon: 'symbol-event',
-        contextValue: 'aetLuaThread',
+        icon: "symbol-event",
+        contextValue: "aetLuaThread",
     };
-    return [main, ...script.threads.map<ThreadNode>(thread => ({
-        kind: 'thread',
-        scriptId: script.scriptId,
-        threadIndex: thread.threadIndex,
-        label: thread.name,
-        description: `#${thread.threadIndex}`,
-        icon: 'symbol-event',
-        contextValue: 'aetLuaThread',
-    }))];
+    return [
+        main,
+        ...script.threads.map<ThreadNode>((thread) => ({
+            kind: "thread",
+            scriptId: script.scriptId,
+            threadIndex: thread.threadIndex,
+            label: thread.name,
+            description: `#${thread.threadIndex}`,
+            icon: "symbol-event",
+            contextValue: "aetLuaThread",
+        })),
+    ];
 }
 
 /**
@@ -120,23 +137,36 @@ export function threadRows(script: ScriptNode): ThreadNode[] | undefined {
  * The engine asserts on a break while a script is stopped or while one is already armed, so
  * the adapter refuses both and the view says why before the click.
  */
-export function breakAvailability(runState: LuaRunState): { allowed: true } | { allowed: false; reason: string } {
+export function breakAvailability(
+    runState: LuaRunState,
+): { allowed: true } | { allowed: false; reason: string } {
     switch (runState) {
-        case 'running':
-            return {allowed: true};
-        case 'breakArmed':
-            return {allowed: false, reason: 'A break is already armed and waiting for the next Lua line'};
-        case 'suspended':
-            return {allowed: false, reason: 'A script is stopped; continue or step first'};
+        case "running":
+            return { allowed: true };
+        case "breakArmed":
+            return {
+                allowed: false,
+                reason: "A break is already armed and waiting for the next Lua line",
+            };
+        case "suspended":
+            return {
+                allowed: false,
+                reason: "A script is stopped; continue or step first",
+            };
     }
 }
 
 /** The one-line state for the view's description: how many instances, and what the game is doing. */
 export function sessionSummary(result: LuaScriptsResult): string {
-    const count = result.scripts.length === 1 ? '1 script' : `${result.scripts.length} scripts`;
-    if (result.runState === 'suspended') {
-        const stopped = result.scripts.find(s => s.isSuspended);
-        return stopped ? `${count} - stopped in ${stopped.name} [${stopped.scriptId}]` : `${count} - stopped`;
+    const count =
+        result.scripts.length === 1
+            ? "1 script"
+            : `${result.scripts.length} scripts`;
+    if (result.runState === "suspended") {
+        const stopped = result.scripts.find((s) => s.isSuspended);
+        return stopped
+            ? `${count} - stopped in ${stopped.name} [${stopped.scriptId}]`
+            : `${count} - stopped`;
     }
-    return `${count} - ${result.runState === 'breakArmed' ? 'break armed' : 'running'}`;
+    return `${count} - ${result.runState === "breakArmed" ? "break armed" : "running"}`;
 }

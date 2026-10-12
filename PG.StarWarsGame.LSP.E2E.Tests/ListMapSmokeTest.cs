@@ -36,7 +36,8 @@ public sealed class ListMapSmokeTest(E2eModServerFixture fixture) : IClassFixtur
         });
 
         var diagnostics = (await received).Diagnostics.ToList();
-        var presence = diagnostics.Where(d => d.Message.Contains("<Presence_Induced_Animations>", StringComparison.Ordinal)).ToList();
+        var presence = diagnostics
+            .Where(d => d.Message.Contains("<Presence_Induced_Animations>", StringComparison.Ordinal)).ToList();
 
         var dropped = Assert.Single(presence);
         Assert.Equal(DiagnosticSeverity.Error, dropped.Severity);

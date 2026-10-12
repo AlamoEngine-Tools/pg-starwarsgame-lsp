@@ -28,25 +28,33 @@
 
 /** The families, in the order they are shown. */
 const FAMILIES = [
-    'idle', 'move', 'attack', 'hit', 'death', 'travel', 'state', 'cinematic', 'other',
+    "idle",
+    "move",
+    "attack",
+    "hit",
+    "death",
+    "travel",
+    "state",
+    "cinematic",
+    "other",
 ] as const;
 
-export type AnimationFamily = typeof FAMILIES[number];
+export type AnimationFamily = (typeof FAMILIES)[number];
 
 export const FAMILY_LABELS: Record<AnimationFamily, string> = {
-    idle: 'Idle',
-    move: 'Movement',
-    attack: 'Attack',
-    hit: 'Taking a hit',
-    death: 'Death',
-    travel: 'Landing and takeoff',
-    state: 'State changes',
-    cinematic: 'Cinematic',
-    other: 'Other',
+    idle: "Idle",
+    move: "Movement",
+    attack: "Attack",
+    hit: "Taking a hit",
+    death: "Death",
+    travel: "Landing and takeoff",
+    state: "State changes",
+    cinematic: "Cinematic",
+    other: "Other",
 };
 
 /** How an action is being held. */
-export type AnimationStance = 'normal' | 'crouched' | 'deployed';
+export type AnimationStance = "normal" | "crouched" | "deployed";
 
 /**
  * The stance prefixes, and what to call them.
@@ -54,9 +62,13 @@ export type AnimationStance = 'normal' | 'crouched' | 'deployed';
  * `crouch` is the SPREAD_OUT ability - the reader's own explanation - so the label says the thing a
  * modder would search their XML for rather than the word the exporter happened to use.
  */
-const STANCES: readonly { prefix: string; stance: AnimationStance; label: string }[] = [
-    { prefix: 'crouch', stance: 'crouched', label: 'spread out' },
-    { prefix: 'deployed_', stance: 'deployed', label: 'deployed' },
+const STANCES: readonly {
+    prefix: string;
+    stance: AnimationStance;
+    label: string;
+}[] = [
+    { prefix: "crouch", stance: "crouched", label: "spread out" },
+    { prefix: "deployed_", stance: "deployed", label: "deployed" },
 ];
 
 /**
@@ -69,25 +81,73 @@ const STANCES: readonly { prefix: string; stance: AnimationStance; label: string
  */
 const RULES: [AnimationFamily, readonly string[]][] = [
     // Before movement: `flylandidle` is a hover, not a flight, and `attackidle` is not an attack.
-    ['idle', ['idle', 'attention', 'hold', 'disabled', 'cooldown']],
+    ["idle", ["idle", "attention", "hold", "disabled", "cooldown"]],
     // Before attack and before death: a flinch is a reaction, whatever caused it.
-    ['hit', ['flinch', 'dodge']],
-    ['death', ['die', 'death', 'crushed', 'destruct']],
+    ["hit", ["flinch", "dodge"]],
+    ["death", ["die", "death", "crushed", "destruct"]],
     // Before movement, so `running_charge` stays an attack where the name says so. It does NOT
     // catch `force_run`, which carries no attack word and files under movement - the loop rule
     // excludes that one as an ability instead. See `isAbility`.
-    ['attack', [
-        'attack', 'blaster', 'bombtoss', 'choke', 'release', 'pound', 'demolition', 'charge',
-    ]],
+    [
+        "attack",
+        [
+            "attack",
+            "blaster",
+            "bombtoss",
+            "choke",
+            "release",
+            "pound",
+            "demolition",
+            "charge",
+        ],
+    ],
     // Before movement: a rope slide and a landing are arrivals, not locomotion.
-    ['travel', ['land', 'takeoff', 'rope', 'drop', 'lift', 'jump']],
+    ["travel", ["land", "takeoff", "rope", "drop", "lift", "jump"]],
     // TURNING lives here. It was a family of its own, which put a unit's locomotion in two places -
     // the reader's words: "turnl and turnr are technically movement animations".
-    ['move', ['move', 'run', 'walk', 'fly', 'turnl', 'turnr', 'turn_', 'rotat', 'spin']],
+    [
+        "move",
+        [
+            "move",
+            "run",
+            "walk",
+            "fly",
+            "turnl",
+            "turnr",
+            "turn_",
+            "rotat",
+            "spin",
+        ],
+    ],
     // No bare 'on' or 'off' here. 'on' is a substring of half the language - it swallowed
     // `transition` - and 'power' and 'shield' already carry every on/off action the corpus ships.
-    ['state', ['build', 'deploy', 'power', 'shield', 'open', 'close', 'repair', 'hack', 'heal']],
-    ['cinematic', ['cinematic', 'talk', 'celebrate', 'dance', 'alarm', 'warning', 'trans', 'hc_']],
+    [
+        "state",
+        [
+            "build",
+            "deploy",
+            "power",
+            "shield",
+            "open",
+            "close",
+            "repair",
+            "hack",
+            "heal",
+        ],
+    ],
+    [
+        "cinematic",
+        [
+            "cinematic",
+            "talk",
+            "celebrate",
+            "dance",
+            "alarm",
+            "warning",
+            "trans",
+            "hc_",
+        ],
+    ],
 ];
 
 /**
@@ -99,14 +159,16 @@ const RULES: [AnimationFamily, readonly string[]][] = [
  * shipped `transiotion` too, and that is not a typo anyone can fix now.
  */
 function isTransition(action: string): boolean {
-    return /_(begin|end|half|quarter)$/.test(action)
-        || /^move(start|_end)/.test(action)
-        || action.includes('trans');
+    return (
+        /_(begin|end|half|quarter)$/.test(action) ||
+        /^move(start|_end)/.test(action) ||
+        action.includes("trans")
+    );
 }
 
 /** Actions the author has named a loop outright, whatever family they land in. */
 function saysLoop(action: string): boolean {
-    return action.endsWith('_loop');
+    return action.endsWith("_loop");
 }
 
 /**
@@ -120,7 +182,7 @@ function saysLoop(action: string): boolean {
  * rather than a prefix test.
  */
 function isAbility(action: string): boolean {
-    return action.includes('force_');
+    return action.includes("force_");
 }
 
 /**
@@ -129,7 +191,7 @@ function isAbility(action: string): boolean {
  * The reader's rule, in their words: an idle, or something that "belongs to a group that is meant
  * to loop (run, walk, ...), but never transitions and special ability related animations".
  */
-const LOOPING: readonly AnimationFamily[] = ['idle', 'move'];
+const LOOPING: readonly AnimationFamily[] = ["idle", "move"];
 
 /** Everything one filename says. */
 export interface ClipName {
@@ -147,7 +209,7 @@ export interface ClipName {
 
 /** Reads one clip's filename. */
 export function readClip(model: string, file: string): ClipName {
-    const stem = file.replace(/\.[^.]*$/, '');
+    const stem = file.replace(/\.[^.]*$/, "");
     const prefix = `${model.toLowerCase()}_`;
 
     // A clip whose name the model does not prefix keeps its whole stem. 50 of the shipped
@@ -161,10 +223,13 @@ export function readClip(model: string, file: string): ClipName {
     const withStance = (numbered?.[1] ?? tail).toLowerCase();
     const take = numbered === null ? null : Number.parseInt(numbered[2], 10);
 
-    const matched = STANCES.find(entry => withStance.startsWith(entry.prefix));
-    const action = matched === undefined
-        ? withStance
-        : withStance.slice(matched.prefix.length);
+    const matched = STANCES.find((entry) =>
+        withStance.startsWith(entry.prefix),
+    );
+    const action =
+        matched === undefined
+            ? withStance
+            : withStance.slice(matched.prefix.length);
 
     const family = familyOf(action);
 
@@ -172,7 +237,7 @@ export function readClip(model: string, file: string): ClipName {
         name: file,
         action,
         take,
-        stance: matched?.stance ?? 'normal',
+        stance: matched?.stance ?? "normal",
         family,
         loops: loopsBy(action, family),
     };
@@ -202,12 +267,12 @@ export function familyOf(action: string): AnimationFamily {
     const lower = action.toLowerCase();
 
     for (const [family, keywords] of RULES) {
-        if (keywords.some(keyword => lower.includes(keyword))) {
+        if (keywords.some((keyword) => lower.includes(keyword))) {
             return family;
         }
     }
 
-    return 'other';
+    return "other";
 }
 
 /** One recording of an action. */
@@ -266,20 +331,26 @@ interface ClipNamingScene {
  * the client. 672 of them load now, across 12 of the 29 shipped override pairs, so the naming has
  * to follow them.
  */
-export function clipNamingModel(scene: ClipNamingScene | null | undefined): string {
+export function clipNamingModel(
+    scene: ClipNamingScene | null | undefined,
+): string {
     const parts = scene?.parts ?? [];
-    const hull = parts.find(part => part.origin === 'Hull') ?? parts[0];
-    const named = scene?.animationSource ?? hull?.modelRef ?? '';
+    const hull = parts.find((part) => part.origin === "Hull") ?? parts[0];
+    const named = scene?.animationSource ?? hull?.modelRef ?? "";
 
-    return named.replace(/\.[^.]*$/, '');
+    return named.replace(/\.[^.]*$/, "");
 }
 
-export function groupAnimations(model: string, files: readonly string[]): AnimationGroup[] {
+export function groupAnimations(
+    model: string,
+    files: readonly string[],
+): AnimationGroup[] {
     const byFamily = new Map<AnimationFamily, Map<string, AnimationAction>>();
 
     for (const file of files) {
         const read = readClip(model, file);
-        const actions = byFamily.get(read.family) ?? new Map<string, AnimationAction>();
+        const actions =
+            byFamily.get(read.family) ?? new Map<string, AnimationAction>();
         const id = `${read.stance}:${read.action}`;
         const existing = actions.get(id);
 
@@ -305,14 +376,13 @@ export function groupAnimations(model: string, files: readonly string[]): Animat
         byFamily.set(read.family, actions);
     }
 
-    return FAMILIES
-        .filter(family => byFamily.has(family))
-        .map(family => ({
-            family,
-            label: FAMILY_LABELS[family],
-            actions: [...(byFamily.get(family) ?? new Map()).values()]
-                .map(action => ({ ...action, takes: [...action.takes].sort(byTake) })),
-        }));
+    return FAMILIES.filter((family) => byFamily.has(family)).map((family) => ({
+        family,
+        label: FAMILY_LABELS[family],
+        actions: [...(byFamily.get(family) ?? new Map()).values()].map(
+            (action) => ({ ...action, takes: [...action.takes].sort(byTake) }),
+        ),
+    }));
 }
 
 /** Lowest take first, and a take with no number sorts to the front - there is only ever one. */
@@ -322,7 +392,7 @@ function byTake(a: AnimationTake, b: AnimationTake): number {
 
 /** `3` reads as `03`, so a column of take chips lines up. */
 function pad(take: number): string {
-    return take.toString().padStart(2, '0');
+    return take.toString().padStart(2, "0");
 }
 
 /**
@@ -333,23 +403,23 @@ function pad(take: number): string {
  * would be a translation, and it would rot.
  */
 const ACTION_LABELS: Record<string, string> = {
-    turnl: 'Turn left',
-    turnr: 'Turn right',
-    turn_left: 'Turn left',
-    turn_right: 'Turn right',
+    turnl: "Turn left",
+    turnr: "Turn right",
+    turn_left: "Turn left",
+    turn_right: "Turn right",
 };
 
 /** What an action row is called, with its stance said out loud when it has one. */
 function labelFor(read: ClipName): string {
     const base = ACTION_LABELS[read.action] ?? prettify(read.action);
-    const stance = STANCES.find(entry => entry.stance === read.stance);
+    const stance = STANCES.find((entry) => entry.stance === read.stance);
 
     return stance === undefined ? base : `${base} (${stance.label})`;
 }
 
 /** `turnr_quarter` reads as `Turnr quarter`. Enough to scan; not a translation. */
 function prettify(action: string): string {
-    const spaced = action.replace(/_/g, ' ').trim();
+    const spaced = action.replace(/_/g, " ").trim();
 
     return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
@@ -362,16 +432,19 @@ function prettify(action: string): string {
  * change on its own and a readout that did not mention it would look like a bug.
  */
 export function playheadLabel(
-    action: AnimationAction | null, clip: string, rouletting: boolean,
+    action: AnimationAction | null,
+    clip: string,
+    rouletting: boolean,
 ): string {
     if (action === null) {
-        return clip.replace(/\.[^.]*$/, '');
+        return clip.replace(/\.[^.]*$/, "");
     }
 
-    const take = action.takes.find(entry => entry.name === clip);
-    const shown = action.takes.length > 1 && take !== undefined
-        ? `${action.label} ${take.label}`
-        : action.label;
+    const take = action.takes.find((entry) => entry.name === clip);
+    const shown =
+        action.takes.length > 1 && take !== undefined
+            ? `${action.label} ${take.label}`
+            : action.label;
 
     return rouletting ? `${shown} - random` : shown;
 }

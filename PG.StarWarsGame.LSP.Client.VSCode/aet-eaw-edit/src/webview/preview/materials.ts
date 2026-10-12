@@ -13,7 +13,7 @@
 // is permanent and every unknown shader lands on it.
 
 /** How a sub-mesh composites against what is already drawn. */
-export type BlendMode = 'opaque' | 'alpha' | 'additive';
+export type BlendMode = "opaque" | "alpha" | "additive";
 
 /** Which texture slot a shader parameter feeds. */
 export interface TextureBindings {
@@ -37,10 +37,10 @@ export interface TextureBindings {
  * Its `_ALAMO_RENDER_PHASE = "Transparent"` annotation is about draw ORDER, not about blending.
  */
 const ALPHA_TESTED: ReadonlyMap<string, number> = new Map([
-    ['tree.fx', 0x80 / 255],
-    ['grass.fx', 0x08 / 255],
+    ["tree.fx", 0x80 / 255],
+    ["grass.fx", 0x08 / 255],
     // Used by no shipped model, but it declares one and costs nothing to honour.
-    ['blobstencilmasked.fx', 0x80 / 255],
+    ["blobstencilmasked.fx", 0x80 / 255],
 ]);
 
 /** What to draw, and why. */
@@ -100,6 +100,7 @@ export interface MaterialExtras {
     alamoLod?: number;
     alamoHidden?: boolean;
     alamoCollidable?: boolean;
+
     [key: string]: unknown;
 }
 
@@ -111,11 +112,11 @@ export interface MaterialExtras {
  * `shadow-Collision` is read as the shadow volume its shader says it is.
  */
 const NON_VISUAL: readonly [string, string][] = [
-    ['shadowvolume', 'shadow-volume'],
-    ['collision', 'collision'],
-    ['lightvisualize', 'non-visual'],
-    ['occludedunit', 'non-visual'],
-    ['heat', 'non-visual'],
+    ["shadowvolume", "shadow-volume"],
+    ["collision", "collision"],
+    ["lightvisualize", "non-visual"],
+    ["occludedunit", "non-visual"],
+    ["heat", "non-visual"],
 ];
 
 /**
@@ -133,9 +134,9 @@ const COLLISION_NAME = /collision|(^|[_-])coll([_-]|\d|$)/i;
 
 /** Parameter names, lowercased, that feed each texture slot. */
 const TEXTURE_SLOTS: Record<keyof TextureBindings, string[]> = {
-    base: ['basetexture', 'diffusetexture', 'colortexture'],
-    normal: ['normaltexture', 'bumptexture'],
-    gloss: ['glosstexture', 'speculartexture'],
+    base: ["basetexture", "diffusetexture", "colortexture"],
+    normal: ["normaltexture", "bumptexture"],
+    gloss: ["glosstexture", "speculartexture"],
 };
 
 /**
@@ -144,7 +145,7 @@ const TEXTURE_SLOTS: Record<keyof TextureBindings, string[]> = {
  * From the engine: a mesh whose name starts with `FC_` takes the team colour whatever its shader is,
  * which is how a unit's faction stripe is authored on an otherwise ordinary material.
  */
-const FACTION_COLOUR_PREFIX = 'fc_';
+const FACTION_COLOUR_PREFIX = "fc_";
 
 /**
  * Whether a texture parameter names an actual FILE, rather than the format's empty placeholder.
@@ -164,7 +165,7 @@ const FACTION_COLOUR_PREFIX = 'fc_';
 function namesATexture(value: string): boolean {
     const written = value.trim();
 
-    return written.length > 0 && written.toLowerCase() !== 'none';
+    return written.length > 0 && written.toLowerCase() !== "none";
 }
 
 /**
@@ -172,11 +173,14 @@ function namesATexture(value: string): boolean {
  *
  * An EMPTY slot answers undefined - see `namesATexture` for the two ways the format spells empty.
  */
-export function textureParam(extras: MaterialExtras, name: string): string | undefined {
+export function textureParam(
+    extras: MaterialExtras,
+    name: string,
+): string | undefined {
     const wanted = `param:${name}`.toLowerCase();
 
     for (const [key, value] of Object.entries(extras)) {
-        if (key.toLowerCase() !== wanted || typeof value !== 'string') {
+        if (key.toLowerCase() !== wanted || typeof value !== "string") {
             continue;
         }
 
@@ -208,7 +212,7 @@ export function numericParams(extras: MaterialExtras): Map<string, number[]> {
     const params = new Map<string, number[]>();
 
     for (const [key, value] of Object.entries(extras)) {
-        if (!key.toLowerCase().startsWith('param:')) {
+        if (!key.toLowerCase().startsWith("param:")) {
             continue;
         }
 
@@ -218,15 +222,20 @@ export function numericParams(extras: MaterialExtras): Map<string, number[]> {
         // The string form is kept for a mod's own exporter, or a hand-edited glb.
         const parts: unknown[] = Array.isArray(value)
             ? value
-            : typeof value === 'number'
-                ? [value]
-                : typeof value === 'string' ? value.split(',').map(part => part.trim()) : [];
+            : typeof value === "number"
+              ? [value]
+              : typeof value === "string"
+                ? value.split(",").map((part) => part.trim())
+                : [];
 
-        if (parts.length === 0 || parts.some(part => part === '' || !Number.isFinite(Number(part)))) {
+        if (
+            parts.length === 0 ||
+            parts.some((part) => part === "" || !Number.isFinite(Number(part)))
+        ) {
             continue;
         }
 
-        params.set(key.slice('param:'.length), parts.map(Number));
+        params.set(key.slice("param:".length), parts.map(Number));
     }
 
     return params;
@@ -245,7 +254,7 @@ export function debugColour(
     extras: MaterialExtras,
 ): { r: number; g: number; b: number; a: number } | null {
     const params = numericParams(extras);
-    const value = params.get('Color') ?? params.get('DebugColor');
+    const value = params.get("Color") ?? params.get("DebugColor");
 
     if (value === undefined || value.length < 3) {
         return null;
@@ -258,7 +267,10 @@ export function debugColour(
 function bindTextures(extras: MaterialExtras): TextureBindings {
     const bindings: TextureBindings = {};
 
-    for (const [slot, names] of Object.entries(TEXTURE_SLOTS) as [keyof TextureBindings, string[]][]) {
+    for (const [slot, names] of Object.entries(TEXTURE_SLOTS) as [
+        keyof TextureBindings,
+        string[],
+    ][]) {
         for (const name of names) {
             const value = textureParam(extras, name);
             if (value !== undefined) {
@@ -278,13 +290,14 @@ function bindTextures(extras: MaterialExtras): TextureBindings {
  * has - including the ones a mod wrote that we have never seen.
  */
 export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
-    const shader = (extras.alamoShader ?? '').toLowerCase();
-    const mesh = (extras.alamoMesh ?? '').toLowerCase();
+    const shader = (extras.alamoShader ?? "").toLowerCase();
+    const mesh = (extras.alamoMesh ?? "").toLowerCase();
     const textures = bindTextures(extras);
 
     // The team colour reaches a sub-mesh two ways: a *Colorize shader, or an FC_-prefixed mesh on
     // any shader at all. Both are in the shipped data, so checking only one misses half the cases.
-    const colorize = shader.includes('colorize') || mesh.startsWith(FACTION_COLOUR_PREFIX);
+    const colorize =
+        shader.includes("colorize") || mesh.startsWith(FACTION_COLOUR_PREFIX);
 
     // The three effects that discard fragments rather than blending them. Looked up by NAME because
     // the shader itself is usually not reachable - see `MaterialSpec.alphaTest`.
@@ -297,37 +310,63 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
     // and requiring it is what keeps the rule off visible geometry whose name merely contains the
     // letters. A hidden mesh not named like collision - `B_Base`, `blink lights`, `Scale` - stays
     // ordinary geometry that happens to be switched off.
-    const namedCollision = extras.alamoHidden === true && COLLISION_NAME.test(extras.alamoMesh ?? '');
+    const namedCollision =
+        extras.alamoHidden === true &&
+        COLLISION_NAME.test(extras.alamoMesh ?? "");
 
     if (marked !== undefined || namedCollision) {
         return {
-            hidden: true, blend: 'opaque', depthWrite: false, textures, colorize: false,
-            lit: false, alphaTest, archetype: marked?.[1] ?? 'collision',
+            hidden: true,
+            blend: "opaque",
+            depthWrite: false,
+            textures,
+            colorize: false,
+            lit: false,
+            alphaTest,
+            archetype: marked?.[1] ?? "collision",
         };
     }
 
-    if (shader.includes('additive')) {
+    if (shader.includes("additive")) {
         // Additive glows are drawn on top of the hull and must not occlude anything behind them.
         return {
-            hidden: false, blend: 'additive', depthWrite: false, textures, colorize,
-            lit: false, alphaTest, archetype: 'additive',
+            hidden: false,
+            blend: "additive",
+            depthWrite: false,
+            textures,
+            colorize,
+            lit: false,
+            alphaTest,
+            archetype: "additive",
         };
     }
 
-    if (shader.includes('shield')) {
+    if (shader.includes("shield")) {
         return {
-            hidden: false, blend: 'additive', depthWrite: false, textures, colorize,
-            lit: false, alphaTest, archetype: 'shield',
+            hidden: false,
+            blend: "additive",
+            depthWrite: false,
+            textures,
+            colorize,
+            lit: false,
+            alphaTest,
+            archetype: "shield",
         };
     }
 
-    if (shader.includes('alpha')) {
+    if (shader.includes("alpha")) {
         // No depth write, the same as the additive family and for the same reason: every shipped
         // alpha effect declares `ZWriteEnable = FALSE`, and writing depth from a blended mesh leaves
         // the outline of its cut-out standing in front of whatever is drawn next.
         return {
-            hidden: false, blend: 'alpha', depthWrite: false, textures, colorize,
-            lit: true, alphaTest, archetype: 'alpha',
+            hidden: false,
+            blend: "alpha",
+            depthWrite: false,
+            textures,
+            colorize,
+            lit: true,
+            alphaTest,
+            archetype: "alpha",
         };
     }
 
@@ -336,13 +375,13 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
     // already carry.
     return {
         hidden: false,
-        blend: 'opaque',
+        blend: "opaque",
         depthWrite: true,
         textures,
         colorize,
         lit: true,
         alphaTest,
-        archetype: shader.length > 0 ? 'opaque' : 'unknown',
+        archetype: shader.length > 0 ? "opaque" : "unknown",
     };
 }
 
@@ -353,7 +392,11 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
  * when its level matches. Untagged geometry is the hull itself, so getting this backwards hides
  * the model and shows only its damage states.
  */
-export function isVisibleAt(extras: MaterialExtras, alt: number, lod: number): boolean {
+export function isVisibleAt(
+    extras: MaterialExtras,
+    alt: number,
+    lod: number,
+): boolean {
     return extras.alamoHidden !== true && isVisibleAtLevel(extras, alt, lod);
 }
 
@@ -371,7 +414,7 @@ export function isVisibleAt(extras: MaterialExtras, alt: number, lod: number): b
  * {@link shieldMeshOffShader}.
  */
 export function isShieldMesh(extras: MaterialExtras): boolean {
-    return /^shield(_|$)/i.test((extras.alamoMesh ?? '').trim());
+    return /^shield(_|$)/i.test((extras.alamoMesh ?? "").trim());
 }
 
 /**
@@ -390,7 +433,7 @@ export function isShieldMesh(extras: MaterialExtras): boolean {
  * catch those would strip five heroes the first time anything went near the stealth rules.
  */
 export function isStealthMesh(extras: MaterialExtras): boolean {
-    return /^stealth(_|$)/i.test((extras.alamoMesh ?? '').trim());
+    return /^stealth(_|$)/i.test((extras.alamoMesh ?? "").trim());
 }
 
 /**
@@ -401,8 +444,10 @@ export function isStealthMesh(extras: MaterialExtras): boolean {
  * that is worth saying once rather than leaving the author to wonder.
  */
 export function shieldMeshOffShader(extras: MaterialExtras): boolean {
-    return isShieldMesh(extras)
-        && !(extras.alamoShader ?? '').toLowerCase().includes('shield');
+    return (
+        isShieldMesh(extras) &&
+        !(extras.alamoShader ?? "").toLowerCase().includes("shield")
+    );
 }
 
 /**
@@ -413,7 +458,11 @@ export function shieldMeshOffShader(extras: MaterialExtras): boolean {
  * gate a mesh TWICE, so an ability that talked the model into drawing its shield was still vetoed
  * by the level link reading the same flag, and overriding one did nothing at all.
  */
-export function isVisibleAtLevel(extras: MaterialExtras, alt: number, lod: number): boolean {
+export function isVisibleAtLevel(
+    extras: MaterialExtras,
+    alt: number,
+    lod: number,
+): boolean {
     if (extras.alamoAlt !== undefined && extras.alamoAlt !== alt) {
         return false;
     }
@@ -433,7 +482,9 @@ export function isVisibleAtLevel(extras: MaterialExtras, alt: number, lod: numbe
  * plausible and wrong. The extra fetches cost nothing on the archetype path, which simply ignores
  * the textures it has no slot for.
  */
-export function collectTextureNames(materials: Iterable<MaterialExtras>): string[] {
+export function collectTextureNames(
+    materials: Iterable<MaterialExtras>,
+): string[] {
     const names = new Set<string>();
 
     for (const extras of materials) {
@@ -446,8 +497,12 @@ export function collectTextureNames(materials: Iterable<MaterialExtras>): string
         const numeric = numericParams(extras);
 
         for (const [key, value] of Object.entries(extras)) {
-            if (key.toLowerCase().startsWith('param:') && typeof value === 'string'
-                && namesATexture(value) && !numeric.has(key.slice('param:'.length))) {
+            if (
+                key.toLowerCase().startsWith("param:") &&
+                typeof value === "string" &&
+                namesATexture(value) &&
+                !numeric.has(key.slice("param:".length))
+            ) {
                 names.add(value);
             }
         }
@@ -468,13 +523,15 @@ export function collectTextureNames(materials: Iterable<MaterialExtras>): string
  * of shipped models that author no volume keep casting from the hull, because otherwise they would
  * cast nothing at all.
  */
-export function castsShadowMap(
-    subject: { hasVolumes: boolean; hidden: boolean; blend: BlendMode },
-): boolean {
+export function castsShadowMap(subject: {
+    hasVolumes: boolean;
+    hidden: boolean;
+    blend: BlendMode;
+}): boolean {
     if (subject.hasVolumes || subject.hidden) {
         return false;
     }
 
     // A glow has no silhouette worth casting, and an alpha card would cast its whole quad.
-    return subject.blend === 'opaque';
+    return subject.blend === "opaque";
 }

@@ -12,12 +12,18 @@
 // a label can end up with no name under it, and a spacer marked only in the source language
 // disappears, so the German crawl runs on where the English one breathes.
 
-import { LocRow } from './locRow';
+import { LocRow } from "./locRow";
 
-export interface LanguageCopyValue { index: number; key: string; value: string }
+export interface LanguageCopyValue {
+    index: number;
+    key: string;
+    value: string;
+}
 
 function valueOf(row: LocRow, language: string): string | undefined {
-    return row.values.find(v => v.language.toUpperCase() === language.toUpperCase())?.value;
+    return row.values.find(
+        (v) => v.language.toUpperCase() === language.toUpperCase(),
+    )?.value;
 }
 
 /**
@@ -28,19 +34,27 @@ function valueOf(row: LocRow, language: string): string | undefined {
  * target language does not carry is a gap it loses on export.
  */
 export function languageCopyValues(
-    from: string, to: string, rows: LocRow[]
+    from: string,
+    to: string,
+    rows: LocRow[],
 ): LanguageCopyValue[] {
-    if (from.toUpperCase() === to.toUpperCase()) { return []; }
+    if (from.toUpperCase() === to.toUpperCase()) {
+        return [];
+    }
 
     const copied: LanguageCopyValue[] = [];
     for (const row of rows) {
         const source = valueOf(row, from);
-        if (source === undefined || source.trim() === '') { continue; }
+        if (source === undefined || source.trim() === "") {
+            continue;
+        }
 
         // Undefined and blank are both "not filled in": a row may have no cell for the language at
         // all, which is how the XML format represents an absent translation.
         const target = valueOf(row, to);
-        if (target !== undefined && target.trim() !== '') { continue; }
+        if (target !== undefined && target.trim() !== "") {
+            continue;
+        }
 
         copied.push({ index: row.index, key: row.key, value: source });
     }

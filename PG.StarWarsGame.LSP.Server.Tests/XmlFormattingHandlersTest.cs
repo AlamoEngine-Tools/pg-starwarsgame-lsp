@@ -93,7 +93,7 @@ public sealed class XmlFormattingHandlersTest
     [Fact]
     public async Task FlagOff_FormatsNothing()
     {
-        var edits = await Handlers(Text, flag: false).Full.Handle(
+        var edits = await Handlers(Text, false).Full.Handle(
             new DocumentFormattingParams { TextDocument = Doc, Options = Tabs }, CancellationToken.None);
 
         Assert.Empty(All(edits));

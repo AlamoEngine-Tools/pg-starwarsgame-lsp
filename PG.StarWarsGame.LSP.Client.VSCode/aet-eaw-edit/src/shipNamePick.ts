@@ -12,10 +12,18 @@
  * The engine picks at random and remembers which names it has spent so a fleet never repeats one.
  * A preview has no campaign to remember for, so this only ever picks.
  */
-export function pickShipName(names: readonly string[], random: () => number = Math.random): string | null {
-    if (names.length === 0) { return null; }
+export function pickShipName(
+    names: readonly string[],
+    random: () => number = Math.random,
+): string | null {
+    if (names.length === 0) {
+        return null;
+    }
     // Guard the index rather than trusting the generator: a random() at exactly 1 would run off
     // the end, and callers may pass a seeded generator in tests.
-    const index = Math.min(names.length - 1, Math.max(0, Math.floor(random() * names.length)));
+    const index = Math.min(
+        names.length - 1,
+        Math.max(0, Math.floor(random() * names.length)),
+    );
     return names[index];
 }

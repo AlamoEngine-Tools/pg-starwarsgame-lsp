@@ -10,7 +10,7 @@
 //
 // Kept free of three.js so the rules can be read against the XML they come from.
 
-import type { PreviewParticle } from '../../protocol/modelPreview';
+import type { PreviewParticle } from "../../protocol/modelPreview";
 
 /**
  * One passive subject's effects, re-homed onto the part that was actually loaded.
@@ -20,9 +20,14 @@ import type { PreviewParticle } from '../../protocol/modelPreview';
  * MODEL's - two hardpoints shedding the same prop would collide on every one of them.
  */
 export function passiveEffects(
-    particles: readonly PreviewParticle[], partId: string,
+    particles: readonly PreviewParticle[],
+    partId: string,
 ): PreviewParticle[] {
-    return particles.map((particle, at) => ({ ...particle, partId, id: `${partId}#${at}` }));
+    return particles.map((particle, at) => ({
+        ...particle,
+        partId,
+        id: `${partId}#${at}`,
+    }));
 }
 
 /**

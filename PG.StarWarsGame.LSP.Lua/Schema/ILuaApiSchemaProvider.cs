@@ -50,6 +50,13 @@ public interface ILuaApiSchemaProvider
     ///     or an empty list if none. Lookup is case-insensitive.
     /// </summary>
     IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName);
+
+    /// <summary>
+    ///     A hash of the stub text this provider was built from. The stubs decide which string
+    ///     arguments a script's index records as references, so a cached index is only valid under
+    ///     the stubs it was built with; empty when no stubs are loaded.
+    /// </summary>
+    string Fingerprint { get; }
 }
 
 /// <summary>

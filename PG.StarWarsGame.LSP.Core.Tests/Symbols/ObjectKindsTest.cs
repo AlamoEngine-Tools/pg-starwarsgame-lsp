@@ -91,7 +91,7 @@ public sealed class ObjectKindsTest
     [Fact]
     public void Match_FlagSet_IsYes()
     {
-        var index = IndexOf(Object("Vader", ["DUMMY_STARSHIP"], flags: ["Is_Named_Hero"]));
+        var index = IndexOf(Object("Vader", ["DUMMY_STARSHIP"], ["Is_Named_Hero"]));
 
         Assert.Equal(KindMatch.Yes, ObjectKinds.Match(index, index.Resolve("Vader")!,
             Kind("HeroUnit", flags: ["Is_Named_Hero", "Is_Generic_Hero"])));
@@ -101,7 +101,7 @@ public sealed class ObjectKindsTest
     [Fact]
     public void Match_InspectedAndNoFlagSet_IsNo()
     {
-        var index = IndexOf(Object("Crate", ["LAND_OBSTACLE"], flags: []));
+        var index = IndexOf(Object("Crate", ["LAND_OBSTACLE"], []));
 
         Assert.Equal(KindMatch.No,
             ObjectKinds.Match(index, index.Resolve("Crate")!, Kind("HeroUnit", flags: ["Is_Named_Hero"])));
@@ -123,7 +123,7 @@ public sealed class ObjectKindsTest
     [Fact]
     public void Match_MembershipPredicate_IsUnknown()
     {
-        var index = IndexOf(Object("Rebel_Pilot", ["IDLE"], flags: []));
+        var index = IndexOf(Object("Rebel_Pilot", ["IDLE"], []));
 
         Assert.Equal(KindMatch.Unknown, ObjectKinds.Match(index, index.Resolve("Rebel_Pilot")!,
             Kind("SquadronUnit", memberOf: ["Squadron_Units"])));
@@ -136,8 +136,8 @@ public sealed class ObjectKindsTest
     public void Match_AllGroupsMustHold()
     {
         var index = IndexOf(
-            Object("Vader_Team", ["DUMMY_GROUND_COMPANY"], flags: ["Is_Named_Hero"]),
-            Object("Plain_Team", ["DUMMY_GROUND_COMPANY"], flags: []));
+            Object("Vader_Team", ["DUMMY_GROUND_COMPANY"], ["Is_Named_Hero"]),
+            Object("Plain_Team", ["DUMMY_GROUND_COMPANY"], []));
         var heroCompany = Kind("HeroCompany", ["DUMMY_GROUND_COMPANY"], ["Is_Named_Hero"]);
 
         Assert.Equal(KindMatch.Yes, ObjectKinds.Match(index, index.Resolve("Vader_Team")!, heroCompany));

@@ -44,7 +44,7 @@ public sealed class UnregisteredXmlFileHandlerTest
     [Fact]
     public void ItNamesTheFileAndSaysTheGameNeverReadsIt()
     {
-        var result = Assert.Single(Sut.Handle(Fact("Orphan.xml"), Ctx));
+        var result = Assert.Single(Sut.Handle(Fact(), Ctx));
 
         Assert.Contains("Orphan.xml", result.Message, StringComparison.Ordinal);
         Assert.Contains("never reads it", result.Message, StringComparison.OrdinalIgnoreCase);

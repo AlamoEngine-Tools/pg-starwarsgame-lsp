@@ -907,6 +907,9 @@ public sealed class StoryProtocolHandlersTest
         private static readonly StoryCampaignModel Model = BuildModel();
         public IReadOnlyList<string> Invalidated { get; init; } = [];
 
+        public StoryCampaignChain Chain { get; init; } =
+            new("GC", [new StoryFactionManifest("Rebel", "M.xml")]);
+
         public IReadOnlyList<string> GetCampaignNames()
         {
             return ["GC"];
@@ -927,9 +930,6 @@ public sealed class StoryProtocolHandlersTest
         {
             return Model.Threads.Any(t => t.DocumentUri == canonicalUri) ? [Model] : [];
         }
-
-        public StoryCampaignChain Chain { get; init; } =
-            new("GC", [new StoryFactionManifest("Rebel", "M.xml")]);
 
         public StoryChainScanResult GetChainResult()
         {
