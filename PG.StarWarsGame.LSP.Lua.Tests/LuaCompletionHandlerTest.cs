@@ -43,7 +43,6 @@ public sealed class LuaCompletionHandlerTest
             TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             schema,
-            new LuaAnnotationRepository(),
             NullLogger<LuaCompletionHandler>.Instance,
             config ?? new FakeLspConfigurationProvider(),
             analyzer);
@@ -52,13 +51,22 @@ public sealed class LuaCompletionHandlerTest
     // ── the analyzer's items, merged (#154) ─────────────────────────────────
 
     private static readonly string[] EngineStub =
-        ["--- Finds a player.\n---@param name string\nfunction Find_Player(name) end"];
+        ["---@param objectName string\n---@aetref XmlObject:Unit\nfunction Find_First_Object(objectName) end"];
 
-    private static LuaCompletionHandler WithAnalyzer(string text, ScriptedLuaAnalyzer analyzer)
+    // Find_First_Object("UNIT") - character 21 is inside "UNIT"
+    private const string ObjectArgument = "Find_First_Object(\"UNIT\")";
+
+    private static LuaCompletionHandler WithAnalyzer(string text, ScriptedLuaAnalyzer? analyzer)
     {
+        var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
+            new FileOrigin("file:///units.xml", 0, null), null);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(LuaUri, text, 1);
-        return BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider(EngineStub), host, analyzer: analyzer);
+        return BuildHandler(index, new LuaApiSchemaProvider(EngineStub), host, analyzer: analyzer);
     }
 
     private static CompletionList TheirList(params CompletionItem[] items)
@@ -70,15 +78,28 @@ public sealed class LuaCompletionHandlerTest
     public async Task BothAnswer_TheUnion_OursWinningALabelBothOffer()
     {
         var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/completion", TheirList(
-            new CompletionItem { Label = "Find_Player", Detail = "theirs" },
+            new CompletionItem { Label = "UNIT_A", Detail = "theirs" },
             new CompletionItem { Label = "local_thing", Detail = "theirs" }));
 
-        var result = await WithAnalyzer("Fin", analyzer).Handle(CompletionAt(0, 3), CancellationToken.None);
+        var result = await WithAnalyzer(ObjectArgument, analyzer).Handle(CompletionAt(0, 21), CancellationToken.None);
 
         var labels = result.Items.Select(i => i.Label).ToList();
         Assert.Contains("local_thing", labels);
-        var findPlayer = Assert.Single(result.Items, i => i.Label == "Find_Player");
-        Assert.NotEqual("theirs", findPlayer.Detail);
+        var unit = Assert.Single(result.Items, i => i.Label == "UNIT_A");
+        Assert.NotEqual("theirs", unit.Detail);
+    }
+
+    // Identifiers, members and keywords are the analyzer's alone (#155): ours name XML objects,
+    // localisation keys and modules inside a string argument, and nothing else.
+    [Theory]
+    [InlineData("Fin", 3)]
+    [InlineData("table.ins", 9)]
+    [InlineData("if", 2)]
+    public async Task OutsideAStringArgument_NothingOfOurs(string text, int character)
+    {
+        var result = await WithAnalyzer(text, null).Handle(CompletionAt(0, character), CancellationToken.None);
+
+        Assert.Empty(result.Items);
     }
 
     [Fact]
@@ -87,8 +108,8 @@ public sealed class LuaCompletionHandlerTest
         var analyzer = new ScriptedLuaAnalyzer()
             .Answer("textDocument/completion", TheirList(new CompletionItem { Label = "local_thing", Data = 42 }))
             .Answer("completionItem/resolve", new CompletionItem { Label = "local_thing", Detail = "resolved" });
-        var handler = WithAnalyzer("loc", analyzer);
-        var item = (await handler.Handle(CompletionAt(0, 3), CancellationToken.None)).Items
+        var handler = WithAnalyzer(ObjectArgument, analyzer);
+        var item = (await handler.Handle(CompletionAt(0, 21), CancellationToken.None)).Items
             .Single(i => i.Label == "local_thing");
 
         var resolved = await handler.Handle(item, CancellationToken.None);
@@ -103,9 +124,9 @@ public sealed class LuaCompletionHandlerTest
     public async Task OurItem_IsNotSentToTheAnalyzerToResolve()
     {
         var analyzer = new ScriptedLuaAnalyzer();
-        var handler = WithAnalyzer("Fin", analyzer);
-        var item = (await handler.Handle(CompletionAt(0, 3), CancellationToken.None)).Items
-            .Single(i => i.Label == "Find_Player");
+        var handler = WithAnalyzer(ObjectArgument, analyzer);
+        var item = (await handler.Handle(CompletionAt(0, 21), CancellationToken.None)).Items
+            .Single(i => i.Label == "UNIT_A");
 
         var resolved = await handler.Handle(item, CancellationToken.None);
 
@@ -116,10 +137,10 @@ public sealed class LuaCompletionHandlerTest
     [Fact]
     public async Task TheAnalyzerSilent_OursAlone()
     {
-        var result = await WithAnalyzer("Fin", new ScriptedLuaAnalyzer())
-            .Handle(CompletionAt(0, 3), CancellationToken.None);
+        var result = await WithAnalyzer(ObjectArgument, new ScriptedLuaAnalyzer())
+            .Handle(CompletionAt(0, 21), CancellationToken.None);
 
-        Assert.Contains(result.Items, i => i.Label == "Find_Player");
+        Assert.Contains(result.Items, i => i.Label == "UNIT_A");
     }
 
     // ── feature flag ──────────────────────────────────────────────────────────
@@ -131,7 +152,7 @@ public sealed class LuaCompletionHandlerTest
         var schema = new LuaApiSchemaProvider([
             """
             ---@param objectName string
-            ---@xmlref XmlObject:Unit
+            ---@aetref XmlObject:Unit
             function Find_First_Object(objectName) end
             """
         ]);
@@ -181,7 +202,7 @@ public sealed class LuaCompletionHandlerTest
         var schema = new LuaApiSchemaProvider([
             """
             ---@param objectName string
-            ---@xmlref XmlObject:Unit
+            ---@aetref XmlObject:Unit
             function Find_First_Object(objectName) end
             """
         ]);
@@ -238,7 +259,7 @@ public sealed class LuaCompletionHandlerTest
         var schema = new LuaApiSchemaProvider([
             """
             ---@param objectName string
-            ---@xmlref XmlObject:Unit
+            ---@aetref XmlObject:Unit
             function Find_First_Object(objectName) end
             """
         ]);
@@ -273,7 +294,7 @@ public sealed class LuaCompletionHandlerTest
         var schema = new LuaApiSchemaProvider([
             """
             ---@param objectName string
-            ---@xmlref XmlObject
+            ---@aetref XmlObject
             function Find_First_Object(objectName) end
             """
         ]);
@@ -324,97 +345,6 @@ public sealed class LuaCompletionHandlerTest
 
         Assert.Contains(result.Items, i =>
             string.Equals(i.Label, "pgstatemachine", StringComparison.OrdinalIgnoreCase));
-    }
-
-    // ── identifier completions ────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_IdentifierContext_ReturnsTheBuiltinsTheStubsDeclare()
-    {
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "tab", 1); // partial "table" at start of line
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var schema = new LuaApiSchemaProvider(["---@class tablelib\ntable = {}\n"]);
-        var handler = BuildHandler(index, schema, host);
-        var result = await handler.Handle(CompletionAt(0, 3), CancellationToken.None);
-
-        Assert.Contains(result.Items, i => i.Label == "table" && i.Kind == CompletionItemKind.Keyword);
-        Assert.DoesNotContain(result.Items, i => i.Label == "math");
-    }
-
-    [Fact]
-    public async Task Handle_IdentifierContext_ReturnsEngineApiFunctions()
-    {
-        var schema = new LuaApiSchemaProvider([
-            "function Find_Player(playerIndex) end"
-        ]);
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "Find", 1);
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var handler = BuildHandler(index, schema, host);
-        var result = await handler.Handle(CompletionAt(0, 4), CancellationToken.None);
-
-        Assert.Contains(result.Items, i => i.Label == "Find_Player" && i.Kind == CompletionItemKind.Function);
-    }
-
-    [Fact]
-    public async Task Handle_IdentifierContext_OwnGlobal_IsIncluded()
-    {
-        var sym = new GameSymbol("MyGlobal", GameSymbolKind.LuaGlobal, null,
-            new FileOrigin(LuaUri, 0, null), null);
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "My", 1);
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [sym], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("MyGlobal", [sym]),
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(CompletionAt(0, 2), CancellationToken.None);
-
-        Assert.Contains(result.Items, i => i.Label == "MyGlobal");
-    }
-
-    // ── snippet completions ───────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_AtStatementStart_SnippetsIncluded()
-    {
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "if", 1); // "if" typed at start of line
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(CompletionAt(0, 2), CancellationToken.None);
-
-        Assert.Contains(result.Items, i => i.Label == "if" && i.Kind == CompletionItemKind.Snippet);
-    }
-
-    [Fact]
-    public async Task Handle_NotAtStatementStart_NoSnippets()
-    {
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "local x = if", 1); // "if" after assignment
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(CompletionAt(0, 12), CancellationToken.None);
-
-        Assert.DoesNotContain(result.Items, i => i.Kind == CompletionItemKind.Snippet);
     }
 
     // ── require ordering ─────────────────────────────────────────────────────
@@ -489,7 +419,7 @@ public sealed class LuaCompletionHandlerTest
         var schema = new LuaApiSchemaProvider([
             """
             ---@param objectName string
-            ---@xmlref XmlObject:Unit
+            ---@aetref XmlObject:Unit
             function Find_First_Object(objectName) end
             """
         ]);
@@ -506,7 +436,6 @@ public sealed class LuaCompletionHandlerTest
             TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
             schema,
-            new LuaAnnotationRepository(),
             NullLogger<LuaCompletionHandler>.Instance,
             new FakeLspConfigurationProvider());
 

@@ -7,7 +7,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
-using PG.StarWarsGame.LSP.Lua.Completion;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis;
@@ -199,44 +198,5 @@ public sealed class CrossModTierClassificationTest
         // No override warning - the dep-mod's standalone file is not in the shared URI set
         Assert.DoesNotContain(diagnostics, d =>
             d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("Shared_Impl"));
-    }
-
-    // ── Completion scope with cross-mod requires ──────────────────────────────
-
-    [Fact]
-    public void CompletionScope_RequiredDepModGlobal_AppearsAsRequiredGlobal()
-    {
-        // Root script requires the base lib; its global must appear in completion scope.
-        var baseDoc = MakeDocWithSymbol(BaseLibUri, "Base_Util", 1);
-        var rootDoc = new DocumentIndex(
-            RootScriptUri, 1, [], [],
-            ImmutableArray.Create("baseutils"),
-            LayerRank: 2);
-        var docs = MakeDocs((BaseLibUri, baseDoc), (RootScriptUri, rootDoc));
-        var index = BuildIndex(docs);
-
-        var entries = LuaLocalScopeCollector.CollectAt(
-            "require(\"baseutils\")", 0, 0,
-            RootScriptUri, index, s_emptySchema, s_fileHelper);
-
-        Assert.Contains(entries, e =>
-            e.Name == "Base_Util" && e.Kind == ScopeEntryKind.RequiredGlobal);
-    }
-
-    [Fact]
-    public void CompletionScope_UnrequiredDepModStandaloneGlobal_AbsentFromScope()
-    {
-        // Root script never requires the dep-mod standalone file;
-        // its globals must not appear in completion.
-        var baseDoc = MakeDocWithSymbol(BaseStandaloneUri, "Base_Plan", 1);
-        var rootDoc = MakeDoc(RootScriptUri, 2);
-        var docs = MakeDocs((BaseStandaloneUri, baseDoc), (RootScriptUri, rootDoc));
-        var index = BuildIndex(docs);
-
-        var entries = LuaLocalScopeCollector.CollectAt(
-            "", 0, 0,
-            RootScriptUri, index, s_emptySchema, s_fileHelper);
-
-        Assert.DoesNotContain(entries, e => e.Name == "Base_Plan");
     }
 }

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -43,7 +44,8 @@ public sealed class LuaDocumentSymbolHandler(ILuaAnalyzer analyzer) : DocumentSy
         CancellationToken ct)
     {
         return LuaAnalyzerPassThrough.IsLua(request.TextDocument)
-            ? analyzer.RequestAsync<SymbolInformationOrDocumentSymbolContainer>("textDocument/documentSymbol", request, ct)
+            ? analyzer.RequestAsync<SymbolInformationOrDocumentSymbolContainer>("textDocument/documentSymbol", request,
+                ct)
             : Task.FromResult<SymbolInformationOrDocumentSymbolContainer?>(null);
     }
 
@@ -89,6 +91,64 @@ public sealed class LuaFoldingRangeHandler(ILuaAnalyzer analyzer) : FoldingRange
         FoldingRangeCapability capability, ClientCapabilities clientCapabilities)
     {
         return new FoldingRangeRegistrationOptions { DocumentSelector = LuaAnalyzerPassThrough.Selector };
+    }
+}
+
+public sealed class LuaInlayHintHandler(ILuaAnalyzer analyzer) : InlayHintsHandlerBase
+{
+    public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
+    {
+        return LuaAnalyzerPassThrough.IsLua(request.TextDocument)
+            ? analyzer.RequestAsync<InlayHintContainer>("textDocument/inlayHint", request, ct)
+            : Task.FromResult<InlayHintContainer?>(null);
+    }
+
+    // The analyzer resolves no hint (measured, 0.25.1); registered without resolve, so never asked.
+    public override Task<InlayHint> Handle(InlayHint request, CancellationToken ct)
+    {
+        return Task.FromResult(request);
+    }
+
+    protected override InlayHintRegistrationOptions CreateRegistrationOptions(
+        InlayHintClientCapabilities capability, ClientCapabilities clientCapabilities)
+    {
+        return new InlayHintRegistrationOptions
+            { DocumentSelector = LuaAnalyzerPassThrough.Selector, ResolveProvider = false };
+    }
+}
+
+/// <summary>The analyzer's lenses: sent without a command, which its resolve fills (measured, 0.25.1).</summary>
+public sealed class LuaCodeLensHandler(ILuaAnalyzer analyzer) : CodeLensHandlerBase
+{
+    public override Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken ct)
+    {
+        return LuaAnalyzerPassThrough.IsLua(request.TextDocument)
+            ? analyzer.RequestAsync<CodeLensContainer>("textDocument/codeLens", request, ct)
+            : Task.FromResult<CodeLensContainer?>(null);
+    }
+
+    // The router's own key rides in the lens data, and with it present the analyzer resolves
+    // nothing (measured, 0.25.1), so the analyzer is sent its data alone.
+    private const string RoutingKey = "$$__handler_id__$$";
+
+    public override async Task<CodeLens> Handle(CodeLens request, CancellationToken ct)
+    {
+        var data = request.Data is JObject withKey ? (JObject)withKey.DeepClone() : null;
+        data?.Remove(RoutingKey);
+        var resolved = await analyzer.RequestAsync<CodeLens>("codeLens/resolve", request with { Data = data }, ct);
+        if (resolved?.Command is not { Name: "editor.action.showReferences" or "emmy.showReferences" } command)
+            return resolved ?? request;
+
+        // The editor's command takes typed arguments the protocol cannot carry, and the analyzer's
+        // extension is not installed; ours takes them as sent - document, position, locations.
+        return resolved with { Command = command with { Name = "aet-eaw-edit.lsp.showReferences" } };
+    }
+
+    protected override CodeLensRegistrationOptions CreateRegistrationOptions(
+        CodeLensCapability capability, ClientCapabilities clientCapabilities)
+    {
+        return new CodeLensRegistrationOptions
+            { DocumentSelector = LuaAnalyzerPassThrough.Selector, ResolveProvider = true };
     }
 }
 
@@ -147,7 +207,8 @@ public sealed class LuaSemanticTokensHandler(ILuaAnalyzer analyzer)
     // Tokens are (deltaLine, deltaStart, length, type, modifiers), each relative to the one before.
     // Kept: those starting on a line inside the range; re-encoded relative to each other, the first
     // relative to the start of the document as the protocol has it.
-    private static ImmutableArray<int> Slice(ImmutableArray<int> data, OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range)
+    private static ImmutableArray<int> Slice(ImmutableArray<int> data,
+        OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range)
     {
         var result = ImmutableArray.CreateBuilder<int>();
         int line = 0, column = 0, lastLine = 0, lastColumn = 0;

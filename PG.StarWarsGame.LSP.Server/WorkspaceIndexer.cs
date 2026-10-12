@@ -14,7 +14,6 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Story.Discovery;
@@ -35,7 +34,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private static readonly ImmutableArray<string> StoryPlotManifestTypes = ["StoryPlotManifest"];
     private static readonly ImmutableArray<string> StoryParserTypes = ["StoryParser"];
 
-    private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly IModelBoneCatalogCache _boneCache;
     private readonly IProjectIndexCache _cache;
     private readonly ILspConfigurationProvider _configProvider;
@@ -52,7 +50,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     public WorkspaceIndexer(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext, IProjectIndexCache cache,
-        ILuaAnnotationRepository annotationRepository,
         IStoryChainProblemStore storyChainProblems,
         ILspConfigurationProvider configProvider,
         IMegEntryReader megEntries,
@@ -67,7 +64,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _schema = schema;
         _eaWXmlContext = eaWXmlContext;
         _cache = cache;
-        _annotationRepository = annotationRepository;
         _storyChainProblems = storyChainProblems;
         _configProvider = configProvider;
         _megEntries = megEntries;
@@ -146,18 +142,9 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     public async Task<int> IndexDocumentsAsync(WorkspaceConfiguration config, CancellationToken ct,
         Action<int, int>? progress = null)
     {
-        var count = config.Layers.Count > 0
+        return config.Layers.Count > 0
             ? await IndexByLayerAsync(config, ct, progress)
             : await IndexFlatAsync(config, ct, progress);
-        _annotationRepository.RebuildIndex();
-        // Logged like every other catalog here, and worth its line: these come from PARSING, so a
-        // document served from a cached index contributes none unless its parser state was
-        // replayed. A warm start reporting far fewer files than a cold one is that replay failing.
-        var annotated = _annotationRepository.All;
-        _logger.LogInformation(
-            "Lua annotations: {Files} file(s) contributing {Annotations} annotation(s)",
-            annotated.Count, annotated.Values.Sum(a => a.Length));
-        return count;
     }
 
     /// <summary>

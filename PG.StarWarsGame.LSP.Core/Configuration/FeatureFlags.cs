@@ -58,8 +58,6 @@ public record LuaFeatureFlags
     public bool Diagnostics { get; init; } = true;
     public bool GoToDefinition { get; init; } = true;
     public bool Rename { get; init; } = true;
-    public bool CodeLens { get; init; } = true;
-    public bool InlayHints { get; init; } = true;
     public bool CodeActions { get; init; } = true;
 
     /// <summary>

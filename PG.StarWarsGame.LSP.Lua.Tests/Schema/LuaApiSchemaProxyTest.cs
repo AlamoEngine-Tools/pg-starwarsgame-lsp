@@ -10,7 +10,7 @@ public sealed class LuaApiSchemaProxyTest
 {
     private const string MinimalSchema = """
                                          ---@param typeName string
-                                         ---@xmlref XmlObject
+                                         ---@aetref XmlObject
                                          --- Finds the first object.
                                          function Find_First_Object(typeName) end
                                          """;

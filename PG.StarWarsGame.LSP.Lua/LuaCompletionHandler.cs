@@ -10,7 +10,6 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
-using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Completion;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
@@ -20,7 +19,6 @@ namespace PG.StarWarsGame.LSP.Lua;
 public sealed class LuaCompletionHandler : CompletionHandlerBase
 {
     private readonly ILuaAnalyzer? _analyzer;
-    private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -33,7 +31,6 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
-        ILuaAnnotationRepository annotationRepository,
         ILogger<LuaCompletionHandler> logger,
         ILspConfigurationProvider config,
         // Optional: with the analyzer running, its items join ours.
@@ -43,7 +40,6 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         _parseCache = parseCache;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
-        _annotationRepository = annotationRepository;
         _logger = logger;
         _config = config;
         _analyzer = analyzer;
@@ -73,12 +69,9 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         if (parsed is null)
             return Task.FromResult(new CompletionList());
 
-        var line = request.Position.Line;
-        var character = request.Position.Character;
-        var index = _indexService.Current;
-
-        var ctx = LuaCompletionContextClassifier.Classify(parsed.Text, line, character);
-        return Task.FromResult(BuildCompletions(ctx, uri, parsed, line, character, index));
+        var ctx = LuaCompletionContextClassifier.Classify(parsed.Text, request.Position.Line,
+            request.Position.Character);
+        return Task.FromResult(BuildCompletions(ctx, uri, _indexService.Current));
     }
 
     public override async Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
@@ -101,18 +94,15 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         };
     }
 
-    private CompletionList BuildCompletions(
-        LuaCompletionContext? ctx,
-        string uri, ParsedLuaDocument parsed, int line, int character,
-        GameIndex index)
+    private CompletionList BuildCompletions(StringArgContext? ctx, string uri, GameIndex index)
     {
         switch (ctx)
         {
-            case StringArgContext { FunctionName: var fn, ParamIndex: var param }
+            case { FunctionName: var fn }
                 when string.Equals(fn, "require", StringComparison.OrdinalIgnoreCase):
                 return new CompletionList(BuildRequireCompletions(uri, index));
 
-            case StringArgContext { FunctionName: var fn, ParamIndex: var param }:
+            case { FunctionName: var fn, ParamIndex: var param }:
             {
                 var xmlRefs = _schemaProvider.GetXmlRefs(fn);
                 if (xmlRefs.Count == 0) return new CompletionList();
@@ -139,24 +129,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
                 };
             }
 
-            case IdentifierContext { AtStatementStart: var atStart }:
-            {
-                var scope = LuaLocalScopeCollector.CollectAt(
-                    parsed.Tree, parsed.Text, line, character, uri, index, _schemaProvider, _fileHelper);
-                var items = LuaIdentifierCompletionProvider.Provide(scope).ToList();
-                if (atStart)
-                    items.AddRange(LuaSnippetCompletionProvider.Snippets);
-                return new CompletionList(items);
-            }
-
-            case MemberAccessContext memberCtx:
-            {
-                var scope = LuaLocalScopeCollector.CollectAt(
-                    parsed.Tree, parsed.Text, line, character, uri, index, _schemaProvider, _fileHelper);
-                return new CompletionList(LuaMemberCompletionProvider.Provide(
-                    memberCtx, scope, _schemaProvider, _annotationRepository.Current));
-            }
-
+            // Identifiers, members and keywords are the analyzer's (#155).
             default:
                 return new CompletionList();
         }

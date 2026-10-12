@@ -1,13 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
-using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -17,16 +14,10 @@ using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Parsing;
 
-public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatisticsSource
+public sealed class LuaGameDocumentParser : IGameDocumentParser
 {
-    private readonly ILuaAnnotationRepository _annotationRepository;
-
-    // documentUri -> the annotation contribution of its most recent parse, ready to persist.
-    // Concurrent because the workspace scan parses in parallel.
-    private readonly ConcurrentDictionary<string, byte[]> _lastState = new(DocumentUris.Comparer);
     private readonly ILspConfigurationProvider? _configProvider;
     private readonly IFileHelper _fileHelper;
-    private readonly ILogger<LuaGameDocumentParser> _logger;
     private readonly ILuaParseCache? _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
@@ -37,15 +28,11 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
     public LuaGameDocumentParser(
         ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper,
-        ILogger<LuaGameDocumentParser> logger,
-        ILuaAnnotationRepository annotationRepository,
         ILuaParseCache? parseCache = null,
         ILspConfigurationProvider? configProvider = null)
     {
         _schemaProvider = schemaProvider;
         _fileHelper = fileHelper;
-        _logger = logger;
-        _annotationRepository = annotationRepository;
         _parseCache = parseCache;
         _configProvider = configProvider;
     }
@@ -63,7 +50,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
         var tree = parsed.Tree;
         var root = tree.GetRoot(ct);
 
-        var (symbols, annotations, functionAnnotations) = CollectSymbols(root, canonicalUri);
+        var symbols = CollectSymbols(root, canonicalUri);
         var references = CollectReferences(root, canonicalUri);
         var requireArgs = CollectRequireArgs(root);
 
@@ -79,13 +66,6 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
         if (_configProvider?.Current.Features.Story.Symbols ?? true)
             LuaStorySymbolCollector.Collect(root, canonicalUri, symbols, references);
 
-        _annotationRepository.Update(canonicalUri, [.. annotations]);
-        _annotationRepository.UpdateFunctionAnnotations(canonicalUri, functionAnnotations);
-        // Kept so a snapshot written after this scan can carry what the repository was told. The
-        // repository stores the annotations but not the function PAIRING, and re-deriving that
-        // would mean parsing again - which is exactly what the snapshot exists to avoid.
-        _lastState[canonicalUri] = LuaAnnotationStateCodec.Serialize([.. annotations], functionAnnotations);
-
         return ValueTask.FromResult(new DocumentIndex(
             canonicalUri, version,
             [.. symbols],
@@ -93,106 +73,28 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
             requireArgs));
     }
 
-    /// <inheritdoc />
-    /// <summary>One serialized annotation state per file ever parsed; exact bytes.</summary>
-    public CacheStatistics Snapshot()
-    {
-        long bytes = 0;
-        foreach (var state in _lastState.Values)
-            bytes += state.Length;
-        return new CacheStatistics("lua-parser-state", _lastState.Count, bytes);
-    }
-
-    public byte[]? CaptureParserState(string documentUri)
-    {
-        return _lastState.GetValueOrDefault(_fileHelper.NormalizeUri(documentUri));
-    }
-
-    /// <inheritdoc />
-    /// <remarks>
-    ///     Replays exactly what <see cref="ParseAsync" /> told the repository. Without this, a Lua
-    ///     document served from a cached index contributes NO annotations for the whole session -
-    ///     and on a layered mod most indexed files are Lua, so nearly every annotation in the
-    ///     workspace went missing on a warm start.
-    /// </remarks>
-    public void RestoreParserState(string documentUri, byte[] state)
-    {
-        var restored = LuaAnnotationStateCodec.Deserialize(state);
-        if (restored is not { } value)
-        {
-            // Bytes from another build, or truncated. The session loses this file's annotations,
-            // which is what would have happened anyway; failing the scan would be far worse.
-            _logger.LogDebug("Unreadable cached Lua annotations for '{Uri}'; skipping", documentUri);
-            return;
-        }
-
-        var canonicalUri = _fileHelper.NormalizeUri(documentUri);
-        _annotationRepository.Update(canonicalUri, value.Annotations);
-        _annotationRepository.UpdateFunctionAnnotations(canonicalUri, value.Functions);
-        _lastState[canonicalUri] = state;
-    }
-
-    private (List<GameSymbol> Symbols, List<EmmyLuaAnnotations> Annotations,
-        List<(string Name, EmmyLuaAnnotations Ann)> FunctionAnnotations) CollectSymbols(
-            SyntaxNode root, string documentUri)
+    private static List<GameSymbol> CollectSymbols(SyntaxNode root, string documentUri)
     {
         var symbols = new List<GameSymbol>();
-        var annotations = new List<EmmyLuaAnnotations>();
-        var functionAnnotations = new List<(string Name, EmmyLuaAnnotations Ann)>();
 
-        foreach (var node in root.DescendantNodes())
-            if (node is FunctionDeclarationStatementSyntax funcDecl)
-            {
-                if (funcDecl.Name is SimpleFunctionNameSyntax simpleName)
-                {
-                    // Simple global function: Foo() - becomes a workspace symbol and a named annotation.
-                    var id = simpleName.Name.Text;
-                    if (string.IsNullOrEmpty(id))
-                        continue;
+        // A global function is a workspace symbol, its doc comment's prose the description. What the
+        // rest of the comment declares is the analyzer's to read (#155).
+        foreach (var funcDecl in root.DescendantNodes().OfType<FunctionDeclarationStatementSyntax>())
+        {
+            if (funcDecl.Name is not SimpleFunctionNameSyntax simpleName) continue;
+            var id = simpleName.Name.Text;
+            if (string.IsNullOrEmpty(id)) continue;
 
-                    var ann = ExtractAnnotations(funcDecl);
-                    annotations.Add(ann);
-                    functionAnnotations.Add((id, ann));
-
-                    var position = simpleName.Name.GetLocation().GetLineSpan().StartLinePosition;
-                    symbols.Add(new GameSymbol(
-                        id,
-                        GameSymbolKind.LuaGlobal,
-                        null,
-                        new FileOrigin(documentUri, position.Line, position.Character),
-                        ann.Description));
-                }
-                else if (funcDecl.Name is MemberFunctionNameSyntax memberName)
-                {
-                    // Obj.Foo() - not a global symbol; index annotation by simple name for hover.
-                    var id = memberName.Name.Text;
-                    if (!string.IsNullOrEmpty(id))
-                        functionAnnotations.Add((id, ExtractAnnotations(funcDecl)));
-                }
-                else if (funcDecl.Name is MethodFunctionNameSyntax methodName)
-                {
-                    // Obj:Foo() - not a global symbol; index annotation by simple name for hover.
-                    var id = methodName.Name.Text;
-                    if (!string.IsNullOrEmpty(id))
-                        functionAnnotations.Add((id, ExtractAnnotations(funcDecl)));
-                }
-            }
-            else if (node is LocalFunctionDeclarationStatementSyntax localFunc)
-            {
-                // local function Foo() - not a global symbol; index annotation by name for hover.
-                var id = localFunc.Name.Name;
-                if (!string.IsNullOrEmpty(id))
-                    functionAnnotations.Add((id, ExtractAnnotations(localFunc)));
-            }
-            else if (node is StatementSyntax stmt)
-            {
-                // Scan non-function statements for @class / @alias / @enum doc blocks.
-                // These drive the workspace type index and appear in .d.lua declaration files
-                // and in regular .lua files that define user-facing types.
-                var ann = ExtractAnnotations(stmt);
-                if (ann.ClassDef is not null || ann.AliasDef is not null || ann.EnumDef is not null)
-                    annotations.Add(ann);
-            }
+            var lines = LuaDocCommentScanner.CollectLeadingDocLines(funcDecl);
+            var description = lines.Count == 0 ? null : EmmyLuaAnnotationParser.Parse(lines).Description;
+            var position = simpleName.Name.GetLocation().GetLineSpan().StartLinePosition;
+            symbols.Add(new GameSymbol(
+                id,
+                GameSymbolKind.LuaGlobal,
+                null,
+                new FileOrigin(documentUri, position.Line, position.Character),
+                description));
+        }
 
         // A plan's task forces are globals the engine creates from the TaskForce table, each a
         // TaskForce wrapper, so each name is a symbol defined at the string that declares it.
@@ -207,18 +109,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser, ICacheStatistic
                 null));
         }
 
-        return (symbols, annotations, functionAnnotations);
-    }
-
-    private static EmmyLuaAnnotations ExtractAnnotations(SyntaxNode node)
-    {
-        var lines = CollectDocCommentLines(node);
-        return lines.Count == 0 ? EmmyLuaAnnotations.Empty : EmmyLuaAnnotationParser.Parse(lines);
-    }
-
-    private static IReadOnlyList<string> CollectDocCommentLines(SyntaxNode node)
-    {
-        return LuaDocCommentScanner.CollectLeadingDocLines(node);
+        return symbols;
     }
 
     private List<GameReference> CollectReferences(SyntaxNode root, string documentUri)

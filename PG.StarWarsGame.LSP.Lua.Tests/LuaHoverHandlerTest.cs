@@ -34,7 +34,6 @@ public sealed class LuaHoverHandlerTest
         GameIndex index,
         ILuaApiSchemaProvider schema,
         FakeWorkspaceHost? host = null,
-        ILuaAnnotationRepository? repo = null,
         ILuaAnalyzer? analyzer = null)
     {
         var svc = new FakeIndexService { Current = index };
@@ -43,7 +42,6 @@ public sealed class LuaHoverHandlerTest
             TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             schema,
-            repo ?? new LuaAnnotationRepository(),
             NullLogger<LuaHoverHandler>.Instance,
             analyzer);
     }
@@ -131,10 +129,9 @@ public sealed class LuaHoverHandlerTest
     {
         var text = await HoverWith("local abc = 1", 7,
             new ScriptedLuaAnalyzer().Answer("textDocument/hover",
-                Theirs("function Find_Player(name)\n\n@*aetref* XmlObject:Faction\n\n@*xmlref* XmlObject")));
+                Theirs("function Find_Player(name)\n\n@*aetref* XmlObject:Faction")));
 
         Assert.DoesNotContain("aetref", text);
-        Assert.DoesNotContain("xmlref", text);
         Assert.Contains("function Find_Player(name)", text);
     }
 
@@ -163,10 +160,30 @@ public sealed class LuaHoverHandlerTest
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
         var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
 
-        Assert.NotNull(result);
-        var content = GetMarkdown(result!);
-        Assert.DoesNotContain("XmlObject", content);
-        Assert.Contains("RunMission", content);
+        // A workspace function's card is the analyzer's (#155).
+        Assert.Null(result);
+    }
+
+    // The analyzer reads the same doc comments and types the workspace's own code (#155).
+    [Theory]
+    [InlineData("---@class PGUnit\nPGUnit = {}\nlocal u = PGUnit", 2, 12)]
+    [InlineData("---@alias Command string\nlocal c = Command", 1, 12)]
+    [InlineData("---Runs it.\nfunction RunMission() end\nRunMission()", 2, 4)]
+    public async Task TheWorkspacesOwnTypesAndFunctions_NothingOfOurs(string text, int line, int character)
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, text, 1);
+        var sym = new GameSymbol("RunMission", GameSymbolKind.LuaGlobal, null, new FileOrigin(LuaUri, 1, 9),
+            "Runs it.");
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [sym], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunMission", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var result = await BuildHandler(index, new LuaApiSchemaProvider([]), host)
+            .Handle(HoverAt(line, character), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     [Fact]
@@ -301,55 +318,6 @@ public sealed class LuaHoverHandlerTest
         Assert.Contains("not found", content, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── LuaGlobal identifier hover ────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_CursorOnWorkspaceLuaGlobal_ReturnsHover()
-    {
-        var sym = new GameSymbol("RunMission", GameSymbolKind.LuaGlobal, null,
-            new FileOrigin(LibUri, 0, null), null);
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty
-                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunMission", [sym]),
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "RunMission()", 1);
-
-        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        // cursor on "RunMission" at col 5
-        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
-
-        Assert.NotNull(result);
-        var content = GetMarkdown(result!);
-        Assert.Contains("RunMission", content);
-    }
-
-    [Fact]
-    public async Task Handle_CursorOnWorkspaceLuaGlobal_WithDescription_ReturnsHoverWithDescription()
-    {
-        const string desc = "Runs the named mission script.";
-        var sym = new GameSymbol("RunMission", GameSymbolKind.LuaGlobal, null,
-            new FileOrigin(LibUri, 0, null), desc);
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty
-                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunMission", [sym]),
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "RunMission()", 1);
-
-        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
-        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
-
-        Assert.NotNull(result);
-        var content = GetMarkdown(result!);
-        Assert.Contains("RunMission", content);
-        Assert.Contains(desc, content);
-    }
-
     [Fact]
     public async Task Handle_CursorOnEngineGlobal_ReturnsHoverWithDescription()
     {
@@ -357,7 +325,7 @@ public sealed class LuaHoverHandlerTest
             """
             --- Finds the first game object with the specified type.
             ---@param objectName string
-            ---@xmlref XmlObject
+            ---@aetref XmlObject
             function Find_First_Object(objectName) end
             """
         ]);
@@ -378,82 +346,13 @@ public sealed class LuaHoverHandlerTest
     // ── richer hover content ──────────────────────────────────────────────────
 
     [Fact]
-    public async Task Handle_CursorOnWorkspaceLuaGlobal_FullAnnotation_ShowsParamsAndReturns()
-    {
-        var sym = new GameSymbol("RunMission", GameSymbolKind.LuaGlobal, null,
-            new FileOrigin(LibUri, 0, null), "Runs the mission.");
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty
-                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunMission", [sym]),
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var repo = new LuaAnnotationRepository();
-        repo.UpdateFunctionAnnotations(LibUri, [
-            ("RunMission", EmmyLuaAnnotations.Empty with
-            {
-                Description = "Runs the mission.",
-                Params =
-                [new LuaParamAnnotation("missionName", false, new LuaTypeRef("string"), "The mission to run.")],
-                Returns = [new LuaReturnAnnotation(new LuaTypeRef("boolean"), null, null)]
-            })
-        ]);
-
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "RunMission()", 1);
-
-        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host, repo);
-        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
-
-        Assert.NotNull(result);
-        var content = GetMarkdown(result!);
-        Assert.Contains("RunMission", content);
-        Assert.Contains("Runs the mission.", content);
-        Assert.Contains("missionName", content);
-        Assert.Contains("string", content);
-        Assert.Contains("boolean", content);
-    }
-
-    [Fact]
-    public async Task Handle_CursorOnWorkspaceLuaGlobal_DeprecatedAnnotation_ShowsDeprecatedMarker()
-    {
-        var sym = new GameSymbol("OldFunc", GameSymbolKind.LuaGlobal, null,
-            new FileOrigin(LibUri, 0, null), null);
-        var index = new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty
-                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("OldFunc", [sym]),
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var repo = new LuaAnnotationRepository();
-        repo.UpdateFunctionAnnotations(LibUri, [
-            ("OldFunc", EmmyLuaAnnotations.Empty with
-            {
-                IsDeprecated = true,
-                Description = "Use NewFunc instead."
-            })
-        ]);
-
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "OldFunc()", 1);
-
-        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host, repo);
-        var result = await handler.Handle(HoverAt(0, 4), CancellationToken.None);
-
-        Assert.NotNull(result);
-        var content = GetMarkdown(result!);
-        Assert.Contains("Deprecated", content, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Use NewFunc instead.", content);
-    }
-
-    [Fact]
     public async Task Handle_CursorOnEngineGlobal_WithParams_ShowsParamNamesInHover()
     {
         var schema = new LuaApiSchemaProvider([
             """
             --- Finds the first object by type name.
             ---@param typeName string The XML object type name.
-            ---@xmlref XmlObject
+            ---@aetref XmlObject
             ---@return GameObject
             function Find_First_Object(typeName) end
             """
@@ -506,7 +405,6 @@ public sealed class LuaHoverHandlerTest
             TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
             new LuaApiSchemaProvider([]),
-            new LuaAnnotationRepository(),
             NullLogger<LuaHoverHandler>.Instance);
 
         // Cursor inside "SomeModule" - require hover should produce a result from disk content
@@ -519,101 +417,6 @@ public sealed class LuaHoverHandlerTest
             CancellationToken.None);
 
         Assert.NotNull(result);
-    }
-
-    // ── type hover ───────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_CursorOnWorkspaceClass_ReturnsClassHover()
-    {
-        var repo = new LuaAnnotationRepository();
-        var cls = new LuaClassDefinition("PGUnit", false,
-            ImmutableArray<string>.Empty,
-            [new LuaFieldDefinition("id", false, new LuaTypeRef("integer"), null)],
-            "A game unit.");
-        repo.Update(LibUri, [EmmyLuaAnnotations.Empty with { ClassDef = cls }]);
-        repo.RebuildIndex();
-
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "local u = PGUnit", 1);
-
-        var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]), host, repo);
-        var result = await handler.Handle(HoverAt(0, 12), CancellationToken.None);
-
-        Assert.NotNull(result);
-        var content = GetMarkdown(result!);
-        Assert.Contains("class", content, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("PGUnit", content);
-    }
-
-    [Fact]
-    public async Task Handle_CursorOnWorkspaceClass_WithFields_ShowsFieldsInHover()
-    {
-        var repo = new LuaAnnotationRepository();
-        var cls = new LuaClassDefinition("PGUnit", false,
-            ImmutableArray<string>.Empty,
-            [
-                new LuaFieldDefinition("id", false, new LuaTypeRef("integer"), null),
-                new LuaFieldDefinition("name", false, new LuaTypeRef("string"), null)
-            ],
-            null);
-        repo.Update(LibUri, [EmmyLuaAnnotations.Empty with { ClassDef = cls }]);
-        repo.RebuildIndex();
-
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "local u = PGUnit", 1);
-
-        var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]), host, repo);
-        var result = await handler.Handle(HoverAt(0, 12), CancellationToken.None);
-
-        var content = GetMarkdown(result!);
-        Assert.Contains("id", content);
-        Assert.Contains("integer", content);
-        Assert.Contains("name", content);
-        Assert.Contains("string", content);
-    }
-
-    [Fact]
-    public async Task Handle_CursorOnEngineApiClass_ReturnsClassHover()
-    {
-        var schema = new LuaApiSchemaProvider([
-            """
-            ---@class PGGameObject
-            ---@field name string
-            PGGameObject = {}
-            """
-        ]);
-
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "local o = PGGameObject", 1);
-
-        var handler = BuildHandler(GameIndex.Empty, schema, host);
-        var result = await handler.Handle(HoverAt(0, 12), CancellationToken.None);
-
-        Assert.NotNull(result);
-        var content = GetMarkdown(result!);
-        Assert.Contains("class", content, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("PGGameObject", content);
-    }
-
-    [Fact]
-    public async Task Handle_CursorOnWorkspaceAlias_ReturnsAliasHover()
-    {
-        var repo = new LuaAnnotationRepository();
-        var alias = new LuaAliasDefinition("GameCommandType",
-            [new LuaTypeRef("string")]);
-        repo.Update(LibUri, [EmmyLuaAnnotations.Empty with { AliasDef = alias }]);
-        repo.RebuildIndex();
-
-        var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "local c = GameCommandType", 1);
-
-        var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]), host, repo);
-        var result = await handler.Handle(HoverAt(0, 12), CancellationToken.None);
-
-        Assert.NotNull(result);
-        var content = GetMarkdown(result!);
-        Assert.Contains("GameCommandType", content);
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────

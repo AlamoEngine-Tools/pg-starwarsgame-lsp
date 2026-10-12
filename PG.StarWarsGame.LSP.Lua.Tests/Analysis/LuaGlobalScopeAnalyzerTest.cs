@@ -25,7 +25,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
     private static readonly ILuaApiSchemaProvider SchemaWithFindFirst =
         new LuaApiSchemaProvider([
-            "---@param typeName string\n---@xmlref XmlObject\nfunction Find_First_Object(typeName) end\n"
+            "---@param typeName string\n---@aetref XmlObject\nfunction Find_First_Object(typeName) end\n"
         ]);
 
     // Builds a GameIndex containing a "lib" document that exports the given global name.

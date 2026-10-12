@@ -36,16 +36,6 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         return Inner.GetReturnTypeName(functionName);
     }
 
-    public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName)
-    {
-        return Inner.GetMembersOf(typeName);
-    }
-
-    public LuaClassDefinition? GetClassDefinition(string typeName)
-    {
-        return Inner.GetClassDefinition(typeName);
-    }
-
     public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName)
     {
         return Inner.GetFunctionParams(functionName);
@@ -70,16 +60,6 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         }
 
         public string? GetReturnTypeName(string functionName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName)
-        {
-            return [];
-        }
-
-        public LuaClassDefinition? GetClassDefinition(string typeName)
         {
             return null;
         }

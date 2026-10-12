@@ -124,7 +124,6 @@ public static class ServerConfigurator
             .WithHandler<LuaCompletionHandler>()
             .WithHandler<LuaCodeActionHandler>()
             .WithHandler<LuaDefinitionHandler>()
-            .WithHandler<LuaCodeLensHandler>()
             .WithHandler<XmlTextDocumentSyncHandler>()
             .WithHandler<GameHoverHandler>()
             .WithHandler<XmlCompletionHandler>()
@@ -141,8 +140,9 @@ public static class ServerConfigurator
             .WithHandler<XmlDocumentHighlightHandler>()
             .WithHandler<XmlOnTypeFormattingHandler>()
             .WithHandler<XmlInlayHintHandler>()
+            // The Lua analyzer's, passed through (#154, #155); each answers with nothing while it is not running.
             .WithHandler<LuaInlayHintHandler>()
-            // The Lua analyzer's, passed through (#154); each answers with nothing while it is not running.
+            .WithHandler<LuaCodeLensHandler>()
             .WithHandler<LuaReferencesHandler>()
             .WithHandler<LuaDocumentSymbolHandler>()
             .WithHandler<LuaSignatureHelpHandler>()

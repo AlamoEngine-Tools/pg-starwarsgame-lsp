@@ -139,10 +139,14 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
     protected override CodeLensRegistrationOptions CreateRegistrationOptions(
         CodeLensCapability capability, ClientCapabilities clientCapabilities)
     {
+        // Every XML lens arrives with its command, so none is ever resolved. Declared anyway: a
+        // static client gets ONE code-lens capability for both languages, and which handler's
+        // options it carries is not fixed (measured: the E2E suite saw both). The Lua analyzer's
+        // lenses need resolve (#155).
         return new CodeLensRegistrationOptions
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("xml"),
-            ResolveProvider = false
+            ResolveProvider = true
         };
     }
 }

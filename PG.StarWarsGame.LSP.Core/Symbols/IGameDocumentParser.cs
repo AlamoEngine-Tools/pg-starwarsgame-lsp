@@ -22,10 +22,10 @@ public interface IGameDocumentParser
     /// <remarks>
     ///     A document served from a persisted index snapshot is never parsed, so a parser whose
     ///     work includes a WRITE somewhere else silently loses that write for the whole session.
-    ///     That is not hypothetical: the Lua parser fills the annotation repository that
-    ///     completion, hover and inlay hints read workspace-wide, and on a layered mod most
-    ///     indexed files are Lua - so a warm start dropped nearly every annotation in the
-    ///     workspace, visible only as functions quietly losing their documented parameters.
+    ///     That was not hypothetical: until #155 the Lua parser filled an annotation repository
+    ///     read workspace-wide, and on a layered mod most indexed files are Lua - so a warm start
+    ///     dropped nearly every annotation in the workspace, visible only as functions quietly
+    ///     losing their documented parameters. No parser carries such state now.
     ///     <para>
     ///         The bytes are opaque to the caller. Their layout is the parser's own business, but
     ///         it is CACHED, so a change to it must invalidate:

@@ -15,7 +15,7 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis;
 ///     <c>StoryEvent</c> — the PGStateMachine dispatches <c>Story_Event_Trigger(name)</c> into
 ///     this table), and <c>Story_Event("X")</c> string arguments define the
 ///     <c>StoryNotification</c> ids that XML <c>STORY_AI_NOTIFICATION</c> events listen for.
-///     Flag reads (<c>Check_Story_Flag</c>) ride the ordinary <c>---@xmlref</c> reference path.
+///     Flag reads (<c>Check_Story_Flag</c>) ride the ordinary <c>---@aetref</c> reference path.
 /// </summary>
 internal static class LuaStorySymbolCollector
 {
@@ -23,7 +23,7 @@ internal static class LuaStorySymbolCollector
         List<GameSymbol> symbols, List<GameReference> references)
     {
         // The same notification id is commonly fired from several places in one script; the
-        // first occurrence is the definition, the xmlref-driven references cover the rest.
+        // first occurrence is the definition, the aetref-driven references cover the rest.
         var seenNotifications = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var node in root.DescendantNodes())
