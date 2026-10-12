@@ -20,7 +20,7 @@ public enum GameAssetTier
     /// <summary>A loose file under the configured base game (Empire at War) directory.</summary>
     BaseGameLoose,
 
-    /// <summary>An entry inside one of the configured directories' MEG archives.</summary>
+    /// <summary>An entry inside one of the MEG archives the game loads.</summary>
     Archive
 }
 
@@ -70,7 +70,7 @@ public sealed record GameAssetTiers(
 }
 
 /// <summary>
-///     Reads MEG archives from the configured game directories.
+///     Reads the MEG archives the game loads, from the projects and the configured game directories.
 /// </summary>
 /// <remarks>
 ///     A seam rather than a direct dependency so the resolver's precedence rules can be tested without
@@ -116,10 +116,10 @@ public interface IGameAssetResolver
 /// <remarks>
 ///     <para>
 ///         Precedence, highest first: the workspace's own asset roots (its layers in rank order), the
-///         configured expansion directory, the configured base game directory, then their archives.
-///         That mirrors the engine - a mod shadows the expansion, which shadows the base game, and a
-///         loose file shadows the archives - and getting it wrong would make a modder's own
-///         replacement asset silently invisible in the preview.
+///         folder the game runs from, every archive the game loads, then - when the game runs from
+///         the expansion - the base game folder. That is the game's measured lookup: mod folders, the
+///         game folder, the archives, and the fallback folder last of all. Getting it wrong would make
+///         a modder's own replacement asset silently invisible in the preview.
 ///     </para>
 ///     <para>
 ///         <strong>No install detection.</strong> The game directories come from configuration and
@@ -180,18 +180,26 @@ public sealed class GameAssetResolver(
                 return new GameAssetLocation(gameRelativePath, hit, GameAssetTier.Workspace);
         }
 
-        foreach (var (root, tier) in GameDirectories())
-        foreach (var candidate in candidates)
-        {
-            // One root at a time so the tier reported is the directory that actually supplied it.
-            var hit = fileHelper.FindInWorkspace([root], candidate);
-            if (hit is not null)
-                return new GameAssetLocation(gameRelativePath, hit, tier);
-        }
+        var (game, fallback) = GameDirectories();
+        if (game is { } gameDirectory && FindLoose(gameDirectory, candidates) is { } inGame)
+            return new GameAssetLocation(gameRelativePath, inGame, gameDirectory.Tier);
 
         foreach (var candidate in candidates)
             if (archives.TryRead(candidate) is not null)
                 return new GameAssetLocation(gameRelativePath, candidate, GameAssetTier.Archive);
+
+        // The base game folder as the expansion's fallback: consulted only once the archives missed.
+        if (fallback is { } fallbackDirectory && FindLoose(fallbackDirectory, candidates) is { } inFallback)
+            return new GameAssetLocation(gameRelativePath, inFallback, fallbackDirectory.Tier);
+
+        return null;
+    }
+
+    private string? FindLoose((string Root, GameAssetTier Tier) directory, List<string> candidates)
+    {
+        foreach (var candidate in candidates)
+            if (fileHelper.FindInWorkspace([directory.Root], candidate) is { } hit)
+                return hit;
 
         return null;
     }
@@ -297,20 +305,23 @@ public sealed class GameAssetResolver(
     }
 
     /// <summary>
-    ///     The configured game directories, expansion first - the order the engine layers them in.
+    ///     The folder the game runs from, and its fallback folder.
     /// </summary>
-    private List<(string Root, GameAssetTier Tier)> GameDirectories()
+    /// <remarks>
+    ///     With an expansion configured the game runs from it and the base game folder is its
+    ///     fallback - searched after the archives, not before them. With only the base game
+    ///     configured, the base game is what runs and there is no fallback.
+    /// </remarks>
+    private ((string Root, GameAssetTier Tier)? Game, (string Root, GameAssetTier Tier)? Fallback) GameDirectories()
     {
-        var directories = new List<(string, GameAssetTier)>(2);
-
         var expansion = config.Current.ExpansionPath;
-        if (!string.IsNullOrWhiteSpace(expansion))
-            directories.Add((expansion, GameAssetTier.ExpansionLoose));
-
         var baseGame = config.Current.GamePath;
-        if (!string.IsNullOrWhiteSpace(baseGame))
-            directories.Add((baseGame, GameAssetTier.BaseGameLoose));
+        (string, GameAssetTier)? baseDirectory = string.IsNullOrWhiteSpace(baseGame)
+            ? null
+            : (baseGame, GameAssetTier.BaseGameLoose);
 
-        return directories;
+        return string.IsNullOrWhiteSpace(expansion)
+            ? (baseDirectory, null)
+            : ((expansion, GameAssetTier.ExpansionLoose), baseDirectory);
     }
 }

@@ -11,15 +11,15 @@ using PG.StarWarsGame.LSP.Server.Assets;
 namespace PG.StarWarsGame.LSP.Server.Tests.Assets;
 
 /// <summary>
-///     Resolving a game-relative asset path through the workspace, then the configured game
-///     directories, then their archives.
+///     Resolving a game-relative asset path through the workspace, then the folder the game runs
+///     from, then the archives, then the base game folder when it is the expansion's fallback.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The precedence mirrors how the engine layers its virtual filesystem: a mod shadows the
-///         expansion, which shadows the base game, and within any one of those a loose file shadows the
-///         archives. Get the order wrong and a modder's own replacement asset silently does not appear
-///         in the preview, which is the single most confusing failure this feature could have.
+///         The precedence mirrors the game's measured lookup: a mod shadows the game folder, which
+///         shadows every archive, and the expansion's fallback folder - the base game - comes last.
+///         Get the order wrong and a modder's own replacement asset silently does not appear in the
+///         preview, which is the single most confusing failure this feature could have.
 ///     </para>
 ///     <para>
 ///         There is deliberately <strong>no install detection</strong>. The game directories come only
@@ -340,6 +340,40 @@ public sealed class GameAssetResolverTest
         var fs = FileSystemWith(@"C:\games\eaw\Data\Art\Models\Ev_stardestroyer.alo");
         var archives = new StubArchives(("data/art/models/ev_stardestroyer.alo", [7, 7, 7]));
         var resolver = Build(fs, null, BaseGame, archives: archives);
+
+        Assert.Equal(GameAssetTier.BaseGameLoose, resolver.Locate(ModelPath)!.Tier);
+    }
+
+    /// <summary>
+    ///     Measured (#221): the expansion runs with the base game folder as its fallback, and a
+    ///     fallback folder is consulted only after the mod folders, the game folder and every archive
+    ///     have missed. So a base-game loose file loses to an archive once an expansion is configured.
+    /// </summary>
+    [Fact]
+    public void Locate_WithAnExpansion_PrefersAnArchiveOverTheBaseGamesLooseFile()
+    {
+        var fs = FileSystemWith(@"C:\games\eaw\Data\Art\Models\Ev_stardestroyer.alo");
+        var archives = new StubArchives(("data/art/models/ev_stardestroyer.alo", [7, 7, 7]));
+        var resolver = Build(fs, null, BaseGame, Expansion, archives);
+
+        Assert.Equal(GameAssetTier.Archive, resolver.Locate(ModelPath)!.Tier);
+    }
+
+    [Fact]
+    public void Locate_WithAnExpansion_PrefersTheExpansionsLooseFileOverAnArchive()
+    {
+        var fs = FileSystemWith(@"C:\games\foc\Data\Art\Models\Ev_stardestroyer.alo");
+        var archives = new StubArchives(("data/art/models/ev_stardestroyer.alo", [7, 7, 7]));
+        var resolver = Build(fs, null, BaseGame, Expansion, archives);
+
+        Assert.Equal(GameAssetTier.ExpansionLoose, resolver.Locate(ModelPath)!.Tier);
+    }
+
+    [Fact]
+    public void Locate_WithAnExpansion_StillFallsBackToTheBaseGamesLooseFile()
+    {
+        var fs = FileSystemWith(@"C:\games\eaw\Data\Art\Models\Ev_stardestroyer.alo");
+        var resolver = Build(fs, null, BaseGame, Expansion);
 
         Assert.Equal(GameAssetTier.BaseGameLoose, resolver.Locate(ModelPath)!.Tier);
     }
