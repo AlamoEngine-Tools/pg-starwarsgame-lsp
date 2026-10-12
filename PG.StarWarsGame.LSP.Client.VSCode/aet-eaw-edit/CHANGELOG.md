@@ -69,6 +69,12 @@
   - A reused script whose state holds no `Flush_G`: every global carries over. Vanilla: none
   - A reused script whose release never calls `GetEvent.Reset()`: task force events left in the queue reach the
     next instance. Vanilla: none - the library's `Common_Base_Definitions` does
+- **Lua 5.1 syntax the game does not load** - the length operator `#`, the modulo operator `%`, `...` as a value
+  and long strings with `=` levels are reported as errors; the game runs Lua 5.0, while this server's parser and
+  the Lua analyzer accept 5.1 ([#157](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/157))
+  - A long comment with `=` levels over several lines too: Lua 5.0 reads `--[=[` as a line comment, the rest as
+    code
+  - Vanilla: none; 13 mods: two, in one test file
 
 ### Fixes
 
@@ -85,6 +91,7 @@
   `LuaAnalyzer10` (one per analyzer rule kept)
 - **New, state machine** - `Engine8` to `Engine13` (`aetswg-011-0008` to `aetswg-011-0013`)
 - **New, reused script state** - `Engine14` to `Engine17` (`aetswg-011-0014` to `aetswg-011-0017`)
+- **New, Lua 5.1 syntax** - `Syntax3011` (`aetswg-012-3011`)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 
 ### Breaking changes

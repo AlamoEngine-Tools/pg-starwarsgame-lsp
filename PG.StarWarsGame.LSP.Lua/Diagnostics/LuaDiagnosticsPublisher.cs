@@ -134,6 +134,9 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
             CollectSyntaxErrors(parsed.Tree, diagnostics);
         }
 
+        // What 5.1 added: both parsers read 5.1 and accept it, the game's 5.0 does not (#157).
+        diagnostics.AddRange(LuaVersionSyntaxAnalyzer.Analyze(parsed.Tree));
+
         CollectReferenceErrors(uri, index, diagnostics);
         diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, parsed.Tree, index.Documents, _fileHelper));
         diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, parsed.Tree, index, _schemaProvider, _fileHelper));

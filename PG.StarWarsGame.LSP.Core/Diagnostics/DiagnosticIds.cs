@@ -777,6 +777,15 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId LuaSyntaxError = new(DiagnosticGroup.Syntax, 3010);
 
+    /// <summary>
+    ///     Syntax Lua 5.1 added that the game's Lua 5.0 does not parse: the length operator <c>#</c>,
+    ///     the modulo operator <c>%</c>, <c>...</c> as an expression, long strings with <c>=</c> levels -
+    ///     the game does not load the script - and long comments with <c>=</c> levels over several
+    ///     lines, which Lua 5.0 reads as a line comment followed by code. This server's parser and the
+    ///     analyzer read 5.1 and accept all of it.
+    /// </summary>
+    public static readonly DiagnosticId LuaSyntaxNotInLua50 = new(DiagnosticGroup.Syntax, 3011);
+
     // ── XML strictness ──
     // The game reads the file. Either standard XML tools reject it, or the game reads less or
     // something else than the document shows. Warnings, so silencing the group keeps every lost

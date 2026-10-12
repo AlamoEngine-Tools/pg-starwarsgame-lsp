@@ -239,6 +239,9 @@ Scripts under the declared `scripts` directories are indexed and checked.
   its next instance; `Engine14` to `Engine17`: a host global read at definition time, a global read before it is set
   at run time and not reset by `Definitions` (a reset on `OnUpdate` counts), a reused state without `Flush_G`, a
   release that never empties the event queue
+- **Lua 5.0, as the game runs it** - `#`, `%`, `...` as a value and long strings with `=` levels are Lua 5.1 and
+  reported as errors (`Syntax3011`): the game does not load a script that uses them. A long comment with `=` levels
+  over several lines is reported too: Lua 5.0 reads `--[=[` as a line comment and the rest as code
 
 ### Lua analyzer
 

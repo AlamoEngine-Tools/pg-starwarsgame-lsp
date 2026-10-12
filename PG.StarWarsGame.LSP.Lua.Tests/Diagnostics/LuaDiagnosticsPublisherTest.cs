@@ -142,6 +142,18 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Equal([DiagnosticIds.LuaSyntaxError.ToString()], codes);
     }
 
+    // The analyzer reads 5.1 and accepts what the game's 5.0 refuses: ours, whether it runs or not (#157).
+    [Fact]
+    public void WithTheAnalyzerRunning_Lua51OnlySyntaxIsStillReported()
+    {
+        var (published, host, _, index) = BuildWithAnalyzer();
+        host.Set(LuaUri, "local n = #units");
+
+        index.Fire(GameIndex.Empty);
+
+        Assert.Contains(DiagnosticIds.LuaSyntaxNotInLua50.ToString(), Codes(published.Last()));
+    }
+
     [Fact]
     public void WithoutTheAnalyzer_OurOwnParserStillReportsSyntaxErrors()
     {
