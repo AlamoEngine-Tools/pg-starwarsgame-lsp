@@ -660,7 +660,7 @@
             "type": "string",
             "default": "",
             "format": "uri-reference",
-            "markdownDescription": "Path to the local EaW XML schema directory (`schema/eaw/`).\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `local`.",
+            "markdownDescription": "Path to the schema repository's `eaw` folder, the one holding `_index.json` (`schema/eaw/`, not the repository root). The Lua stubs are read from the `lua` folder beside it.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `local`.",
             "scope": "machine-overridable"
           },
           "aet-eaw-edit.localisation.format": {

@@ -688,7 +688,7 @@ offline or pinned use.
 | Setting                             | Default   | Description                                    |
 |-------------------------------------|-----------|------------------------------------------------|
 | `aet-eaw-edit.lsp.schema.source`    | `http`    | `http` (GitHub) or `local`                     |
-| `aet-eaw-edit.lsp.schema.localPath` | _(empty)_ | Local `schema/eaw/` directory (source `local`) |
+| `aet-eaw-edit.lsp.schema.localPath` | _(empty)_ | The schema repository's `eaw` folder, holding `_index.json`; not its root (source `local`) |
 | `aet-eaw-edit.lsp.schema.url`       | _(empty)_ | Custom schema index URL (source `http`)        |
 
 ### Baseline

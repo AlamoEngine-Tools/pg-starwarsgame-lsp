@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -221,6 +222,33 @@ public sealed class SchemaBootstrapperTest
 
     // The disk loader is exercised directly: the local XML provider around it needs a file-system
     // watcher the mock file system does not have, and the stubs do not depend on it.
+    // Measured: the setting pointed at the schema repository's root instead of its eaw folder; the
+    // server loaded 0 tags and no Lua stubs, said so only in its log, and every feature stayed dead.
+    [Fact]
+    public async Task LoadAsync_LocalFolderWithoutSchema_TellsTheUser()
+    {
+        // A real folder: the local provider watches it, which the mock file system cannot.
+        var repoRoot = Path.Combine(Path.GetTempPath(), "aet-schema-root-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(repoRoot, "eaw"));
+        try
+        {
+            var notifier = new RecordingUserNotifier();
+            var bootstrapper = Build(new FakeHttpClientFactory(StubServer(new Dictionary<string, string>())),
+                notifier, out _, out _, fileSystem: new FileSystem(),
+                source: new SchemaSourceConfig { Type = SchemaSourceType.Local, LocalPath = repoRoot });
+
+            await bootstrapper.LoadAsync(CancellationToken.None);
+
+            var message = Assert.Single(notifier.Errors);
+            Assert.Contains(repoRoot, message);
+            Assert.Contains("aet-eaw-edit.lsp.schema.localPath", message);
+        }
+        finally
+        {
+            Directory.Delete(repoRoot, true);
+        }
+    }
+
     [Fact]
     public void LoadLuaSchemaFromDisk_ReadsEveryStubFileTheManifestLists()
     {
@@ -280,9 +308,9 @@ public sealed class SchemaBootstrapperTest
         IHttpClientFactory factory, IUserNotifier notifier, out SchemaProviderProxy proxy,
         out LuaApiSchemaProxy luaProxy,
         string url = "https://example.com/eaw/", ServerStatusRecorder? recorder = null,
-        MockFileSystem? fileSystem = null, SchemaSourceConfig? source = null)
+        IFileSystem? fileSystem = null, SchemaSourceConfig? source = null)
     {
-        var fs = fileSystem ?? new MockFileSystem();
+        IFileSystem fs = fileSystem ?? new MockFileSystem();
         var fileHelper = new FileHelper(fs);
         var config = new FakeConfigProvider(new LspConfiguration
         {

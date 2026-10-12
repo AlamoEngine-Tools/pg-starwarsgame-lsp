@@ -93,6 +93,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         if (isLocal)
         {
             realProvider = new LocalFileSchemaProvider(src.LocalPath!, _fileSystem, _localLogger);
+            ReportEmptyLocalSchema(realProvider, src.LocalPath!);
         }
         else
         {
@@ -153,6 +154,21 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
 
         _logger.LogError("Schema version check failed: {Message}", check.Message);
         _notifier.ShowError(check.Message);
+    }
+
+    /// <summary>
+    ///     Surfaces a local schema folder that holds no schema. Nothing works without one, and the
+    ///     usual cause is a path one level off (measured: the schema repository's root instead of its
+    ///     eaw folder), which the log alone leaves unexplained.
+    /// </summary>
+    private void ReportEmptyLocalSchema(ISchemaProvider provider, string localPath)
+    {
+        if (provider.AllTags.Count > 0) return;
+
+        var message = $"No schema in {localPath}. Point \"aet-eaw-edit.lsp.schema.localPath\" at the schema's eaw "
+                      + "folder, the one holding _index.json";
+        _logger.LogError("{Message}", message);
+        _notifier.ShowError(message);
     }
 
     private async Task LoadEaWSchemaAsync(HttpSchemaProvider provider, CancellationToken ct)
