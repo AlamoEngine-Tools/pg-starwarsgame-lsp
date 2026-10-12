@@ -392,6 +392,73 @@ public sealed class LuaHoverHandlerTest
         Assert.Contains("PGStateMachine", text);
     }
 
+    // ── the state machine (#252) ─────────────────────────────────────────────
+
+    private const string MachineLibraryUri = "file:///data/scripts/library/pgstatemachine.lua";
+
+    private const string MachineLibrary = "function Define_State(s, f) end\n" +
+                                          "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
+                                          "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end\n";
+
+    private const string MachineScript = "require(\"PGStateMachine\")\n" + // 0
+                                         "function Definitions()\n" + // 1
+                                         "  Define_State(\"State_Init\", State_Init)\n" + // 2
+                                         "end\n" + // 3
+                                         "function State_Init(message)\n" + // 4
+                                         "  if message == OnEnter then Set_Next_State(\"State_Init\") end\n" + // 5
+                                         "end\n";
+
+    private static async Task<string?> HoverInMachine(int line, int character, bool withLibrary = true)
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, MachineScript, 1);
+        host.AddOrUpdate(MachineLibraryUri, withLibrary ? MachineLibrary : "function Define_State(s, f) end", 1);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [], ["PGStateMachine"]))
+                .Add(MachineLibraryUri, new DocumentIndex(MachineLibraryUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+        var result = await BuildHandler(index, new LuaApiSchemaProvider([]), host)
+            .Handle(HoverAt(line, character), CancellationToken.None);
+        return result is null ? null : GetMarkdown(result);
+    }
+
+    [Fact]
+    public async Task AStateHandler_SaysItsStateAndWhenItIsCalled()
+    {
+        var text = await HoverInMachine(4, 12);
+
+        Assert.Contains("State_Init", text);
+        Assert.Contains("initial state", text);
+        Assert.Contains("OnUpdate", text);
+    }
+
+    [Fact]
+    public async Task TheMessage_SaysWhichValuesItTakes()
+    {
+        var text = await HoverInMachine(5, 6);
+
+        Assert.Contains("OnEnter", text);
+        Assert.Contains("OnExit", text);
+    }
+
+    [Fact]
+    public async Task AStateName_NamesItsHandler()
+    {
+        var text = await HoverInMachine(5, 48);
+
+        Assert.Contains("`State_Init`", text);
+        Assert.Contains("handler", text);
+    }
+
+    // A mod's own state machine library: nothing is claimed about it.
+    [Fact]
+    public async Task WithoutTheLibrarysContract_NoStateMachineCard()
+    {
+        Assert.Null(await HoverInMachine(4, 12, withLibrary: false));
+    }
+
     // ── richer hover content ──────────────────────────────────────────────────
 
     [Fact]

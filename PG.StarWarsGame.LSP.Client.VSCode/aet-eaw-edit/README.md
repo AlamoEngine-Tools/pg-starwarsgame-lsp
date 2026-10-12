@@ -223,6 +223,18 @@ Scripts under the declared `scripts` directories are indexed and checked.
   - String arguments that name a game object, a faction, a sound or music event, a text key or a movie complete
     and resolve against the workspace; ability types, animations and reward types complete from the schema enums
   - A plan script's task forces are globals; a force without its `<Name>_Thread` function is reported (`Engine7`)
+  - A script's own definition of an engine function takes the engine's parameter and return types
+  - Entry points - the functions the game or a vanilla library calls by name - are documented on hover; one the game
+    calls is not renamed
+- **One Lua state per script** - the game runs every script with the libraries it requires in a state of its own:
+  references, code lenses and go to definition stay within it; a rename of a global reaches every script sharing a
+  library that defines or calls it
+- **The game's state machine** - for scripts whose state machine and story libraries keep the game's contract
+  - Hover on state handlers, their message and state names; the message typed `OnEnter`, `OnUpdate` or `OnExit`
+  - State names: go to the handler, completion in `Set_Next_State`, rename
+  - Diagnostics `Engine8` to `Engine13`: a transition to an unregistered state, a non-function registered, a story
+    event naming an undefined function, a state registered twice, a handler not taking one parameter, a message
+    compared with anything else
 
 ### Lua analyzer
 

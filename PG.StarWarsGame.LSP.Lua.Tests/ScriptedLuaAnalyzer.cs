@@ -17,22 +17,30 @@ internal sealed class ScriptedLuaAnalyzer : ILuaAnalyzer
 
     public bool IsRunning { get; set; } = true;
 
-    public event Action<PublishDiagnosticsParams>? DiagnosticsPublished
-    {
-        add { }
-        remove { }
-    }
+    /// <summary>The text each document was last sent with, by URI.</summary>
+    public Dictionary<string, string> Texts { get; } = new(StringComparer.Ordinal);
+
+    public event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
 
     public void DidOpen(string uri, string text, int version)
     {
+        Texts[uri] = text;
     }
 
     public void DidChange(string uri, string text, int version)
     {
+        Texts[uri] = text;
     }
 
     public void DidClose(string uri)
     {
+        Texts.Remove(uri);
+    }
+
+    /// <summary>Publishes diagnostics as the analyzer would.</summary>
+    public void Publish(PublishDiagnosticsParams diagnostics)
+    {
+        DiagnosticsPublished?.Invoke(diagnostics);
     }
 
     public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class

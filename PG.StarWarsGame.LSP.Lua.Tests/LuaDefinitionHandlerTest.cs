@@ -117,6 +117,31 @@ public sealed class LuaDefinitionHandlerTest
         Assert.Equal(mine, Assert.Single(result!).LocationLink!.TargetUri.ToString());
     }
 
+    // A state name in Set_Next_State goes to the handler registered under it (#252).
+    [Fact]
+    public async Task AStateName_GoesToItsHandler()
+    {
+        const string library = "file:///data/scripts/library/pgstatemachine.lua";
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "require(\"PGStateMachine\")\nDefine_State(\"Attack\", State_Attack)\n" +
+                                 "Set_Next_State(\"Attack\")\nfunction State_Attack(message) end", 1);
+        host.AddOrUpdate(library, "function Define_State(s, f) end\n" +
+                                  "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
+                                  "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end",
+            1);
+        var index = MakeIndex(documents:
+        [
+            (LuaUri, new DocumentIndex(LuaUri, 1, [], [], ["PGStateMachine"])),
+            (library, new DocumentIndex(library, 1, [], []))
+        ]);
+
+        var result = await BuildHandler(index, host).Handle(RequestAt(2, 18), CancellationToken.None);
+
+        var link = Assert.Single(result!).LocationLink!;
+        Assert.Equal((3, 9), (link.TargetSelectionRange.Start.Line, link.TargetSelectionRange.Start.Character));
+        Assert.Equal(16, link.OriginSelectionRange!.Start.Character);
+    }
+
     [Fact]
     public async Task OursFound_TheAnalyzerIsNotAsked()
     {

@@ -79,9 +79,49 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         if (requireHover is not null)
             return Task.FromResult<Hover?>(requireHover);
 
-        // Phase 3: an engine function, from the stubs. The workspace's own functions and types are
+        // Phase 3: the state machine library's states, handlers and message (#252).
+        var stateHover = TryBuildStateMachineHover(root, uri, line, character, index);
+        if (stateHover is not null)
+            return Task.FromResult<Hover?>(stateHover);
+
+        // Phase 4: an engine function, from the stubs. The workspace's own functions and types are
         // the analyzer's (#155).
         return Task.FromResult(TryBuildEngineFunctionHover(root, line, character, _schemaProvider));
+    }
+
+    private Hover? TryBuildStateMachineHover(SyntaxNode root, string uri, int line, int character, GameIndex index)
+    {
+        var machine = LuaStateMachine.Read(root);
+        if (machine.IsEmpty || machine.At(line, character) is not { } hit) return null;
+        var contract = LuaStateMachineContract.For(uri, index.Documents, _parseCache, _fileHelper);
+        if (!contract.StateMachine) return null;
+        if (hit.Registration?.Source == LuaStateSource.STORY_MODE_EVENTS && !contract.StoryMode) return null;
+
+        var span = hit.Location.GetLineSpan();
+        var range = new LspRange(
+            new Position(span.StartLinePosition.Line, span.StartLinePosition.Character),
+            new Position(span.EndLinePosition.Line, span.EndLinePosition.Character));
+        var initial = contract.StoryMode
+            ? LuaStateMachine.StoryInitState
+            : machine.Registrations.FirstOrDefault(r => r.Source == LuaStateSource.DEFINE_STATE)?.Name;
+        var role = hit.State == initial ? "initial state" : "state";
+
+        return hit.Kind switch
+        {
+            LuaStateHitKind.MESSAGE => BuildHover(
+                $"**message** - state `{hit.State}`\n`OnEnter` (1) once on entering the state, `OnUpdate` (2) every service tick while it stays, `OnExit` (3) once on leaving it",
+                range),
+            LuaStateHitKind.HANDLER => BuildHover(
+                $"**state handler** - {role} `{hit.State}`\nCalled with `OnEnter` once, `OnUpdate` every service tick until the state changes, then `OnExit` once",
+                range),
+            _ => BuildHover(hit.Registration is { } registration
+                    ? $"**{role}** `{hit.State}` - handler `{(registration.Value as IdentifierNameSyntax)?.Name ?? "inline function"}`" +
+                      (registration.Source == LuaStateSource.STORY_MODE_EVENTS
+                          ? "\nA story event: entered when the event fires and the machine is not already changing state"
+                          : "")
+                    : $"**state** `{hit.State}` - not registered in this script",
+                range)
+        };
     }
 
     private static Hover? TryBuildXmlRefHover(GameIndex index, string uri, int line, int character)

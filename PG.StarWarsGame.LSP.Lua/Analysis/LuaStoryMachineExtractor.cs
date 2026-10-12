@@ -27,7 +27,7 @@ public static class LuaStoryMachineExtractor
     public static LuaStoryMachine? Extract(string text, string documentUri)
     {
         var root = ParsedLuaDocument.Parse(text, documentUri).Tree.GetRoot();
-        var entries = StoryModeEntries(root);
+        var entries = LuaStateMachine.StoryModeEntries(root).ToList();
         if (entries.Count == 0) return null;
 
         var functions = root.DescendantNodes().OfType<FunctionDeclarationStatementSyntax>()
@@ -51,49 +51,6 @@ public static class LuaStoryMachineExtractor
 
         var scriptName = Path.GetFileNameWithoutExtension(documentUri);
         return new LuaStoryMachine(documentUri, scriptName, states);
-    }
-
-    // ── StoryModeEvents ──────────────────────────────────────────────────────
-
-    private static List<(string State, string? FunctionName, AnonymousFunctionExpressionSyntax? Inline)>
-        StoryModeEntries(SyntaxNode root)
-    {
-        var entries = new List<(string, string?, AnonymousFunctionExpressionSyntax?)>();
-        foreach (var node in root.DescendantNodes())
-            switch (node)
-            {
-                case AssignmentStatementSyntax assignment:
-                    for (var i = 0; i < assignment.Variables.Count && i < assignment.EqualsValues.Values.Count; i++)
-                        if (assignment.Variables[i] is IdentifierNameSyntax { Name: "StoryModeEvents" } &&
-                            assignment.EqualsValues.Values[i] is TableConstructorExpressionSyntax table)
-                            AddEntries(table, entries);
-                    break;
-                case IdentifierKeyedTableFieldSyntax { Value: TableConstructorExpressionSyntax nested } field
-                    when field.Identifier.Text == "StoryModeEvents":
-                    AddEntries(nested, entries);
-                    break;
-            }
-
-        return entries;
-    }
-
-    private static void AddEntries(TableConstructorExpressionSyntax table,
-        List<(string, string?, AnonymousFunctionExpressionSyntax?)> entries)
-    {
-        foreach (var field in table.Fields.OfType<IdentifierKeyedTableFieldSyntax>())
-        {
-            var name = field.Identifier.Text;
-            if (string.IsNullOrEmpty(name)) continue;
-            switch (field.Value)
-            {
-                case IdentifierNameSyntax reference:
-                    entries.Add((name, reference.Name, null));
-                    break;
-                case AnonymousFunctionExpressionSyntax inline:
-                    entries.Add((name, null, inline));
-                    break;
-            }
-        }
     }
 
     // ── Phases ───────────────────────────────────────────────────────────────

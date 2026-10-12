@@ -55,6 +55,32 @@ public sealed class LuaCompletionHandlerTest
             analyzer);
     }
 
+    // Set_Next_State takes a registered state's name (#252).
+    [Fact]
+    public async Task SetNextState_OffersTheRegisteredStates()
+    {
+        const string library = "file:///data/scripts/library/pgstatemachine.lua";
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri,
+            "require(\"PGStateMachine\")\nDefine_State(\"Init\", A)\nDefine_State(\"Attack\", B)\n" +
+            "Set_Next_State(\"\")\nfunction A(message) end\nfunction B(message) end", 1);
+        host.AddOrUpdate(library, "function Define_State(s, f) end\n" +
+                                  "function Set_Next_State(s) if StateMachine[s] ~= nil then end end\n" +
+                                  "function Process_States() _curproc(OnEnter) _curproc(OnUpdate) _curproc(OnExit) end",
+            1);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [], ["PGStateMachine"]))
+                .Add(library, new DocumentIndex(library, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var list = await BuildHandler(index, new LuaApiSchemaProvider([]), host)
+            .Handle(CompletionAt(3, 16), CancellationToken.None);
+
+        Assert.Equal(["Attack", "Init"], list.Items.Select(i => i.Label).Order());
+    }
+
     private static LuaCompletionHandler WithAnalyzer(string text, ScriptedLuaAnalyzer? analyzer)
     {
         var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",

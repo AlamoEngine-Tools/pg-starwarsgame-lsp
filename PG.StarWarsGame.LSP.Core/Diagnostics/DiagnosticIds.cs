@@ -659,6 +659,47 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId LuaPlanThreadFunctionMissing = new(DiagnosticGroup.Engine, 7);
 
+    // The game's state machine library (Library/PGStateMachine.lua, and PGStoryMode.lua on top of
+    // it) keeps a fixed contract; these hold a script to it, and only where the script's state
+    // loads a library that has that contract.
+
+    /// <summary>
+    ///     <c>Set_Next_State</c> names a state the script never registers. The library ignores a
+    ///     transition to an unregistered state without a message, so the machine stays where it is.
+    /// </summary>
+    public static readonly DiagnosticId LuaStateTransitionUnregistered = new(DiagnosticGroup.Engine, 8);
+
+    /// <summary>
+    ///     <c>Define_State</c> registers a value that is not a function. The library logs
+    ///     <c>Invalid State</c> when the machine reaches it and stops the machine.
+    /// </summary>
+    public static readonly DiagnosticId LuaStateHandlerNotFunction = new(DiagnosticGroup.Engine, 9);
+
+    /// <summary>
+    ///     A <c>StoryModeEvents</c> entry names a function that is not defined, or a value that is not
+    ///     a function. A nil entry is not in the table at all, so the event is never registered and does
+    ///     nothing; any other value is skipped with an <c>Invalid function object</c> message box.
+    /// </summary>
+    public static readonly DiagnosticId LuaStoryEventHandlerMissing = new(DiagnosticGroup.Engine, 10);
+
+    /// <summary>
+    ///     A state name is registered a second time. The later function replaces the earlier one and
+    ///     keeps the earlier one's place in the order <c>Advance_State</c> follows.
+    /// </summary>
+    public static readonly DiagnosticId LuaStateRegisteredTwice = new(DiagnosticGroup.Engine, 11);
+
+    /// <summary>
+    ///     A state handler does not take exactly one parameter. The library calls it with one: the
+    ///     message, <c>OnEnter</c> once, <c>OnUpdate</c> every service tick, <c>OnExit</c> once.
+    /// </summary>
+    public static readonly DiagnosticId LuaStateHandlerParameters = new(DiagnosticGroup.Engine, 12);
+
+    /// <summary>
+    ///     A state handler compares its message with something other than <c>OnEnter</c>,
+    ///     <c>OnUpdate</c> or <c>OnExit</c>, the only values the library passes.
+    /// </summary>
+    public static readonly DiagnosticId LuaStateMessageComparison = new(DiagnosticGroup.Engine, 13);
+
     // ── Syntax ──
     // Lua's parse errors come from Loretta already numbered and are mapped across by
     // LorettaDiagnosticIds, which owns 1-2999 of this group. Anything declared here must start at
