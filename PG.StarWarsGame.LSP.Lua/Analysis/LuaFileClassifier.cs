@@ -15,6 +15,21 @@ internal static class LuaFileClassifier
         return uri.Contains(LibrarySegment, StringComparison.OrdinalIgnoreCase);
     }
 
+    // The directories whose scripts a host attaches per instance and releases again - objects, the
+    // free store, plans, interventions, scoring, story - so their state can be pooled and reused.
+    // Evaluators and the libraries are loaded once and never handed to another instance.
+    private static readonly string[] s_instanceDirectories =
+    [
+        "/data/scripts/gameobject/", "/data/scripts/freestore/", "/data/scripts/ai/", "/data/scripts/interventions/",
+        "/data/scripts/miscellaneous/", "/data/scripts/story/"
+    ];
+
+    public static bool IsInstanceScriptUri(string uri)
+    {
+        var normalized = Uri.UnescapeDataString(uri).Replace('\\', '/');
+        return s_instanceDirectories.Any(d => normalized.Contains(d, StringComparison.OrdinalIgnoreCase));
+    }
+
     public static IReadOnlySet<string> GetSharedUris(
         IReadOnlyDictionary<string, DocumentIndex> documents,
         IFileHelper fileHelper)

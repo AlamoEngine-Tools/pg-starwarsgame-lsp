@@ -141,6 +141,9 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         diagnostics.AddRange(LuaPlanAnalyzer.Analyze(uri, parsed.Tree));
         diagnostics.AddRange(LuaStateMachineAnalyzer.Analyze(uri, parsed.Tree,
             LuaStateMachineContract.For(_fileHelper.NormalizeUri(uri), index.Documents, _parseCache, _fileHelper)));
+        diagnostics.AddRange(LuaPooledStateAnalyzer.Analyze(uri, parsed.Tree,
+            LuaPooledState.For(_fileHelper.NormalizeUri(uri), parsed.Tree.GetRoot(), index.Documents, _parseCache,
+                _fileHelper)));
 
         // Applied once, on the way out, so every analyzer above is covered without any of them
         // having to know about scopes - and using the parse already in hand.

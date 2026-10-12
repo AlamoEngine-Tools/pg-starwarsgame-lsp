@@ -38,22 +38,16 @@ public sealed record LuaStateMachineContract(
     public static LuaStateMachineContract For(string scriptUri, IReadOnlyDictionary<string, DocumentIndex> documents,
         ILuaParseCache parseCache, IFileHelper fileHelper)
     {
-        if (!documents.TryGetValue(scriptUri, out var script) || script.RequireArgs.IsDefaultOrEmpty) return None;
-        var direct = script.RequireArgs
-            .Select(arg => LuaRequireResolver.Resolve(arg, documents, fileHelper, scriptUri))
-            .OfType<string>()
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var closure = LuaTransitiveRequireResolver.GetTransitiveDependencies(direct, documents, fileHelper);
+        var closure = LuaScriptClosure.RequiredBy(scriptUri, documents, fileHelper);
+        if (closure.Count == 0) return None;
 
         bool Holds(string fileName, Func<SyntaxNode, bool> contract)
         {
-            return closure.Any(uri =>
-                string.Equals(Path.GetFileName(fileHelper.FileUriToPath(uri)), fileName,
-                    StringComparison.OrdinalIgnoreCase) &&
-                parseCache.GetOrParse(uri) is { } parsed && contract(parsed.Tree.GetRoot()));
+            return LuaScriptClosure.Named(closure, fileName, fileHelper)
+                .Any(uri => parseCache.GetOrParse(uri) is { } parsed && contract(parsed.Tree.GetRoot()));
         }
 
-        var elsewhere = closure.Where(uri => !string.Equals(uri, scriptUri, StringComparison.OrdinalIgnoreCase))
+        var elsewhere = closure
             .Select(uri => documents.GetValueOrDefault(uri))
             .OfType<DocumentIndex>()
             .SelectMany(d => d.Symbols)

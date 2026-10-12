@@ -700,6 +700,39 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId LuaStateMessageComparison = new(DiagnosticGroup.Engine, 13);
 
+    // The game reuses a script's Lua state for the script's next instance unless the script sets
+    // ScriptPoolCount = 0 (the story library does). On release the library's Flush_G deletes every
+    // global table and every reference to a game object, keeps numbers, strings, booleans and
+    // functions, and Base_Definitions runs again; on reuse the script starts at main.
+
+    /// <summary>
+    ///     A host global (<c>Object</c>, <c>PlayerObject</c>, <c>Target</c>, <c>AITarget</c>,
+    ///     <c>Budget</c>, <c>FreeStore</c>) is read while <c>Definitions</c> or <c>Base_Definitions</c>
+    ///     runs. The game sets those only after Base_Definitions returns, so the value read is nil.
+    /// </summary>
+    public static readonly DiagnosticId LuaHostGlobalInDefinitions = new(DiagnosticGroup.Engine, 14);
+
+    /// <summary>
+    ///     A pooled script sets a number, string, boolean or function global at run time that
+    ///     <c>Definitions</c> does not set again. The next instance of the script starts with the value
+    ///     the previous one left.
+    /// </summary>
+    public static readonly DiagnosticId LuaGlobalBleedsBetweenInstances = new(DiagnosticGroup.Engine, 15);
+
+    /// <summary>
+    ///     A pooled script's state holds no <c>Flush_G</c>: the game calls it by name on release and
+    ///     skips it silently when it is missing, so every global, tables included, carries over.
+    /// </summary>
+    public static readonly DiagnosticId LuaPooledScriptWithoutFlushG = new(DiagnosticGroup.Engine, 16);
+
+    /// <summary>
+    ///     A pooled script's state never calls <c>GetEvent.Reset()</c> on release. The game keeps a
+    ///     reused script's event queue - task force events not yet handled - and only the script can
+    ///     empty it; the game's library does so in <c>Common_Base_Definitions</c>, which its
+    ///     <c>Base_Definitions</c> calls.
+    /// </summary>
+    public static readonly DiagnosticId LuaPooledScriptEventsNotReset = new(DiagnosticGroup.Engine, 17);
+
     // ── Syntax ──
     // Lua's parse errors come from Loretta already numbered and are mapped across by
     // LorettaDiagnosticIds, which owns 1-2999 of this group. Anything declared here must start at

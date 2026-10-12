@@ -58,6 +58,17 @@
     anything else
   - Vanilla: 8 EaW story events name a function defined nowhere and never fire; one handler takes no parameter
   - Silent where a mod ships its own state machine library that changes the contract
+- **A script's state reused between instances** - the game hands a script's Lua state to the script's next instance
+  unless `ScriptPoolCount = 0`; four diagnostics
+  ([#250](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/250))
+  - A host global (`Object`, `PlayerObject`, `Target`, ...) read at definition time: nil there, set only after
+    `Base_Definitions` returns. Vanilla: 4 plans per game, whose difficulty check always takes the Easy branch
+  - A global set at run time, read before it is set and not reset by `Definitions`: the next instance reads the
+    value left behind. Vanilla: 9 EaW, 19 FoC; a reset where the state machine calls the handler with `OnUpdate`
+    counts as one
+  - A reused script whose state holds no `Flush_G`: every global carries over. Vanilla: none
+  - A reused script whose release never calls `GetEvent.Reset()`: task force events left in the queue reach the
+    next instance. Vanilla: none - the library's `Common_Base_Definitions` does
 
 ### Fixes
 
@@ -73,6 +84,7 @@
 - **New, Lua analyzer** - `Syntax3010` (a Lua syntax error, while the analyzer runs), `LuaAnalyzer1` to
   `LuaAnalyzer10` (one per analyzer rule kept)
 - **New, state machine** - `Engine8` to `Engine13` (`aetswg-011-0008` to `aetswg-011-0013`)
+- **New, reused script state** - `Engine14` to `Engine17` (`aetswg-011-0014` to `aetswg-011-0017`)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 
 ### Breaking changes
