@@ -105,6 +105,9 @@
   - Model preview with the expansion configured: the base game's loose files rank below every archive, as in the game
 - **A particle system saved by the Particle Editor** - opens in the model preview; the editor's own link-group chunk
   was refused as malformed ([#163](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/163), the reader half)
+  - A chunk or property the game does not read is skipped as the game skips it, and listed in the preview's problems
+  - Emitter blocks read in any order, as the game reads them; a chunk that is not an emitter inside the emitter list
+    is still refused, as the game refuses it
 
 ### Diagnostic IDs
 

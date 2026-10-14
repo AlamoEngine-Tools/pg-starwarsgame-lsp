@@ -101,6 +101,7 @@ public static class AloParticleReader
 
         var emitters = new List<AlamoEmitter>();
         var leaveParticles = true;
+        var notices = new List<string>();
 
         for (var i = 2; i < children.Count; i++)
         {
@@ -108,13 +109,15 @@ public static class AloParticleReader
             switch (chunk.Type)
             {
                 case ChunkEmitters:
+                    // The one strict level in the game: its list reader stops at anything that
+                    // is not an emitter and reports the load as failed.
                     foreach (var emitter in Children(bytes, chunk.BodyStart, chunk.BodyEnd))
                     {
                         if (emitter.Type != ChunkEmitter)
                             throw Malformed(
                                 $"the emitter list holds unexpected chunk 0x{emitter.Type:X}");
 
-                        emitters.Add(ReadEmitter(bytes, emitter, emitters.Count));
+                        emitters.Add(ReadEmitter(bytes, emitter, emitters.Count, notices));
                     }
 
                     break;
@@ -127,57 +130,87 @@ public static class AloParticleReader
                     break;
 
                 default:
-                    throw Malformed($"unexpected chunk 0x{chunk.Type:X} in the particle system");
+                    // Measured: the game's system reader tests for its ids and ignores the rest.
+                    notices.Add(
+                        $"Particle system - chunk 0x{chunk.Type:X} not read by the game, skipped");
+                    break;
             }
         }
 
-        return new AlamoParticleContent(name, leaveParticles, emitters);
+        return new AlamoParticleContent(name, leaveParticles, emitters) { Notices = notices };
     }
 
     // ── emitters ──────────────────────────────────────────────────────────────
 
-    private static AlamoEmitter ReadEmitter(byte[] bytes, AloChunk chunk, int index)
+    /// <summary>
+    ///     Reads one emitter.
+    /// </summary>
+    /// <remarks>
+    ///     Dispatches on the chunk id as the game does, in whatever order the chunks come, and
+    ///     skips an id it does not know with a notice - the game's reader has no default branch.
+    ///     The five blocks every file carries are still required: a file without one is broken,
+    ///     not a file with a setting to skip.
+    /// </remarks>
+    private static AlamoEmitter ReadEmitter(
+        byte[] bytes, AloChunk chunk, int index, List<string> notices)
     {
-        var children = Children(bytes, chunk.BodyStart, chunk.BodyEnd);
         var where = $"emitter {index}";
 
-        var properties = ReadProperties(
-            bytes, Expect(children, 0, ChunkProperties, $"the properties of {where}"), where);
-        var colorTexture = ReadString(
-            bytes, Expect(children, 1, ChunkColorTexture, $"the colour texture of {where}"));
-        var name = ReadString(
-            bytes, Expect(children, 2, ChunkEmitterName, $"the name of {where}"));
-        var volumes = ReadVolumes(
-            bytes, Expect(children, 3, ChunkVolumes, $"the spawn volumes of {where}"), where);
-        var tracks = ReadTracks(
-            bytes, Expect(children, 4, ChunkTracks, $"the tracks of {where}"), where);
+        AloChunk? propertiesChunk = null;
+        AloChunk? colorTextureChunk = null;
+        AloChunk? nameChunk = null;
+        AloChunk? volumesChunk = null;
+        AloChunk? tracksChunk = null;
 
         var spawnOnDeath = -1;
         var spawnDuringLife = -1;
         string? normalTexture = null;
         var linkGroup = 0u;
 
-        for (var i = 5; i < children.Count; i++)
-        {
-            var extra = children[i];
-            switch (extra.Type)
+        foreach (var child in Children(bytes, chunk.BodyStart, chunk.BodyEnd))
+            switch (child.Type)
             {
+                case ChunkProperties:
+                    propertiesChunk = child;
+                    break;
+                case ChunkColorTexture:
+                    colorTextureChunk = child;
+                    break;
+                case ChunkEmitterName:
+                    nameChunk = child;
+                    break;
+                case ChunkVolumes:
+                    volumesChunk = child;
+                    break;
+                case ChunkTracks:
+                    tracksChunk = child;
+                    break;
                 case ChunkSpawn:
-                    (spawnOnDeath, spawnDuringLife) = ReadSpawnLinks(bytes, extra, where);
+                    (spawnOnDeath, spawnDuringLife) = ReadSpawnLinks(bytes, child, where);
                     break;
                 case ChunkNormalTexture:
-                    normalTexture = ReadString(bytes, extra);
+                    normalTexture = ReadString(bytes, child);
                     break;
                 case ChunkLinkGroup:
-                    if (extra.BodyLength != 4)
+                    if (child.BodyLength != 4)
                         throw Malformed(
-                            $"the link group of {where} is {extra.BodyLength} bytes, expected 4");
-                    linkGroup = (uint)ReadInt32(bytes, extra.BodyStart);
+                            $"the link group of {where} is {child.BodyLength} bytes, expected 4");
+                    linkGroup = (uint)ReadInt32(bytes, child.BodyStart);
                     break;
                 default:
-                    throw Malformed($"{where} carries unexpected chunk 0x{extra.Type:X}");
+                    notices.Add(
+                        $"Emitter {index} - chunk 0x{child.Type:X} not read by the game, skipped");
+                    break;
             }
-        }
+
+        var properties = ReadProperties(
+            bytes, Required(propertiesChunk, $"the properties of {where}"), where, notices);
+        var colorTexture = ReadString(
+            bytes, Required(colorTextureChunk, $"the colour texture of {where}"));
+        var name = ReadString(bytes, Required(nameChunk, $"the name of {where}"));
+        var volumes = ReadVolumes(
+            bytes, Required(volumesChunk, $"the spawn volumes of {where}"), where);
+        var tracks = ReadTracks(bytes, Required(tracksChunk, $"the tracks of {where}"), where);
 
         // With random rotation on, the engine reinterprets the rotation track's first key as an
         // average and the stored variance as a fraction of it. Without this an emitter set to rotate
@@ -376,7 +409,8 @@ public static class AloParticleReader
     ///     skipped: mini-chunks carry their own length, so a stray one would be survivable, but it
     ///     would also mean the file holds a setting that silently does nothing in the preview.
     /// </remarks>
-    private static AlamoEmitterProperties ReadProperties(byte[] bytes, AloChunk chunk, string where)
+    private static AlamoEmitterProperties ReadProperties(
+        byte[] bytes, AloChunk chunk, string where, List<string> notices)
     {
         var p = new AlamoEmitterProperties();
 
@@ -441,11 +475,34 @@ public static class AloParticleReader
                 // they are skipped deliberately rather than refused.
                 0x06 or 0x11 or 0x15 or 0x14 or 0x2B or 0x3F or 0x44 or 0x49 => p,
 
-                _ => throw Malformed($"{where} has unknown property mini-chunk 0x{mini.Type:X}")
+                // Measured: the game's property switch has no default, so an id it does not know
+                // is opened, left unread and closed. Skipped here too, and said.
+                _ => Skipped(p, notices,
+                    $"{Capitalized(where)} - property 0x{mini.Type:X} not read by the game, skipped")
             };
         }
 
         return useLinkStrength ? p : p with { ParentLinkStrength = 0f };
+    }
+
+    /// <summary>One of the five blocks every emitter carries, or a refusal naming the missing one.</summary>
+    private static AloChunk Required(AloChunk? chunk, string what)
+    {
+        return chunk ?? throw Malformed($"{what} is missing");
+    }
+
+    /// <summary>Records a skipped property and leaves the record as it was.</summary>
+    private static AlamoEmitterProperties Skipped(
+        AlamoEmitterProperties properties, List<string> notices, string notice)
+    {
+        notices.Add(notice);
+        return properties;
+    }
+
+    /// <summary>"emitter 5" as the start of a notice: "Emitter 5".</summary>
+    private static string Capitalized(string where)
+    {
+        return where.Length == 0 ? where : char.ToUpperInvariant(where[0]) + where[1..];
     }
 
     /// <summary>Records a flag that gates another property, without changing the record.</summary>

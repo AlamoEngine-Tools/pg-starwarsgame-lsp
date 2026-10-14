@@ -233,4 +233,17 @@ public sealed record AlamoEmitter(
 public sealed record AlamoParticleContent(
     string Name,
     bool LeaveParticles,
-    IReadOnlyList<AlamoEmitter> Emitters);
+    IReadOnlyList<AlamoEmitter> Emitters)
+{
+    /// <summary>
+    ///     What the file holds that the game does not read, one line each; empty for every shipped
+    ///     file.
+    /// </summary>
+    /// <remarks>
+    ///     The game's reader opens a chunk or property it does not know, reads nothing and closes
+    ///     it, at the system level, the emitter level and inside the property block alike. This
+    ///     reader does the same and says so here, because a file that carries a setting nothing
+    ///     applies is worth a line in the preview's problems.
+    /// </remarks>
+    public IReadOnlyList<string> Notices { get; init; } = [];
+}

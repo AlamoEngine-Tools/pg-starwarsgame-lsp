@@ -197,6 +197,102 @@ public sealed class AloParticleReaderTest
         var content = AloParticleReader.Read(System("p", null, Emitter()));
 
         Assert.Equal(0u, content.Emitters[0].LinkGroup);
+        Assert.Empty(content.Notices);
+    }
+
+    // ── what the game skips ───────────────────────────────────────────────────
+
+    [Fact]
+    public void Read_SkipsAnEmitterChunkTheGameDoesNotRead_AndSaysSo()
+    {
+        // The game's emitter reader switches on the chunk id with no default: an id it does not
+        // know is opened, left unread and closed, and the emitter loads. Another tool's chunk
+        // must therefore not stop the preview - but the file holds something nothing reads, and
+        // that is said.
+        var emitter = Chunk(0x0700, true, Concat(
+            Chunk(0x0002, true, Concat()),
+            Chunk(0x0003, false, Str("p_particle_master.tga")),
+            Chunk(0x0016, false, Str("spark")),
+            Chunk(0x0029, true, Concat(
+                Volume(AlamoSpawnShape.Point),
+                Volume(AlamoSpawnShape.Point),
+                Volume(AlamoSpawnShape.Point))),
+            Chunk(0x0001, true, DefaultTracks()),
+            Chunk(0x007F, false, I32(9))));
+
+        var content = AloParticleReader.Read(System("p", null, emitter));
+
+        Assert.Equal("spark", content.Emitters[0].Name);
+        var notice = Assert.Single(content.Notices);
+        Assert.Contains("0x7F", notice);
+        Assert.Contains("not read by the game", notice);
+    }
+
+    [Fact]
+    public void Read_SkipsASystemChunkTheGameDoesNotRead_AndSaysSo()
+    {
+        // Same rule one level up: the system reader tests for its four ids and ignores the rest.
+        var alo = Chunk(0x0900, true, Concat(
+            Chunk(0x0000, false, Str("p_test")),
+            Chunk(0x0001, false, I32(0)),
+            Chunk(0x007E, false, I32(1)),
+            Chunk(0x0800, true, Concat(Emitter()))));
+
+        var content = AloParticleReader.Read(alo);
+
+        Assert.Single(content.Emitters);
+        var notice = Assert.Single(content.Notices);
+        Assert.Contains("0x7E", notice);
+    }
+
+    [Fact]
+    public void Read_ReadsTheEmitterChunksInAnyOrder()
+    {
+        // The game dispatches on the id, not the position, so a tool that writes the name first
+        // produces a file the game reads. The reader used to expect the five at fixed indices.
+        var emitter = Chunk(0x0700, true, Concat(
+            Chunk(0x0016, false, Str("reordered")),
+            Chunk(0x0001, true, DefaultTracks()),
+            Chunk(0x0003, false, Str("p_particle_master.tga")),
+            Chunk(0x0002, true, Concat(Mini(0x0F, F32(4f)))),
+            Chunk(0x0029, true, Concat(
+                Volume(AlamoSpawnShape.Point),
+                Volume(AlamoSpawnShape.Point),
+                Volume(AlamoSpawnShape.Point)))));
+
+        var content = AloParticleReader.Read(System("p", null, emitter));
+
+        Assert.Equal("reordered", content.Emitters[0].Name);
+        Assert.Equal(4f, content.Emitters[0].Properties.Lifetime);
+        Assert.Empty(content.Notices);
+    }
+
+    [Fact]
+    public void Read_RefusesAnEmitterMissingOneOfItsFiveBlocks()
+    {
+        // The five blocks are what every file carries; a missing one is a broken file, not a
+        // setting to skip.
+        var emitter = Chunk(0x0700, true, Concat(
+            Chunk(0x0002, true, Concat()),
+            Chunk(0x0003, false, Str("p_particle_master.tga")),
+            Chunk(0x0016, false, Str("spark")),
+            Chunk(0x0001, true, DefaultTracks())));
+
+        var e = Assert.Throws<AloFormatException>(() => AloParticleReader.Read(System("p", null, emitter)));
+        Assert.Contains("spawn volumes", e.Message);
+    }
+
+    [Fact]
+    public void Read_StillRefusesAForeignChunkInTheEmitterList()
+    {
+        // The one place the game is strict: its emitter-list reader stops at anything that is not
+        // an emitter and reports the load as failed.
+        var alo = Chunk(0x0900, true, Concat(
+            Chunk(0x0000, false, Str("p_test")),
+            Chunk(0x0001, false, I32(0)),
+            Chunk(0x0800, true, Concat(Emitter(), Chunk(0x007F, false, I32(1))))));
+
+        Assert.Throws<AloFormatException>(() => AloParticleReader.Read(alo));
     }
 
     [Fact]
@@ -451,12 +547,18 @@ public sealed class AloParticleReaderTest
     }
 
     [Fact]
-    public void Read_RejectsAPropertyIdItDoesNotKnow()
+    public void Read_SkipsAPropertyIdTheGameDoesNotRead_AndSaysSo()
     {
-        // Strict on purpose: a mini-chunk carries its own length so a stray one is survivable, but
-        // skipping it means the file holds a setting the preview silently ignores.
-        var alo = System("p", null, Emitter(properties: [Mini(0x7F, I32(1))]));
+        // As the game does: its property switch has no default, so an id it does not know is
+        // opened, left unread and closed. Skipped here too - but never silently, because the file
+        // then holds a setting that nothing applies.
+        var alo = System("p", null, Emitter(properties: [Mini(0x7F, I32(1)), Mini(0x0F, F32(2.5f))]));
 
-        Assert.Throws<AloFormatException>(() => AloParticleReader.Read(alo));
+        var content = AloParticleReader.Read(alo);
+
+        Assert.Equal(2.5f, content.Emitters[0].Properties.Lifetime);
+        var notice = Assert.Single(content.Notices);
+        Assert.Contains("0x7F", notice);
+        Assert.Contains("not read by the game", notice);
     }
 }

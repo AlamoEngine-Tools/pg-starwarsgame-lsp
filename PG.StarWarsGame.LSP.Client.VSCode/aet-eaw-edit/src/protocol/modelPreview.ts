@@ -1163,6 +1163,12 @@ export interface AlamoEmitter {
 export interface AlamoParticleContent {
     name: string;
     leaveParticles: boolean;
+    /**
+     * What the file holds that the game does not read, one line each - a chunk or property the
+     * game's reader opens, leaves unread and closes. Empty for every shipped file; shown as
+     * warnings, because the file carries a setting nothing applies.
+     */
+    notices?: string[] | null;
     emitters: AlamoEmitter[];
 }
 

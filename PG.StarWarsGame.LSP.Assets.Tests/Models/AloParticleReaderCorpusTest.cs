@@ -41,6 +41,10 @@ public sealed class AloParticleReaderCorpusTest
                 parsed++;
                 emitters += system.Emitters.Count;
 
+                // Nothing skipped: the chunk and property id sets are closed over the shipped data.
+                // A notice here would mean a shipped file carries something the game ignores.
+                Assert.Empty(system.Notices);
+
                 foreach (var emitter in system.Emitters)
                 {
                     // Seven tracks, always: the block's fourteen chunks are a header and a key list
