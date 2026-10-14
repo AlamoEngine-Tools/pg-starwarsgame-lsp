@@ -171,6 +171,39 @@ public sealed record AlamoEmitterProperties
     public float WeatherCubeDistance { get; init; }
     public bool RandomRotation { get; init; }
 
+    // Five properties the game's reader stores and the reference viewer skips (measured, #163).
+    // Read because what the game reads the preview has to apply; their use is the renderer's.
+    // A sixth, 0x11, is the older one-value form of RandomColors and lands there.
+
+    /// <summary>
+    ///     The emitter's priority ticket. Measured: after loading, the game sorts a system's
+    ///     emitters by it, ascending, and resolves the spawn links by it - a link names the emitter
+    ///     whose ticket equals the stored value, not a position in the file. Every shipped and
+    ///     workshop system numbers its tickets in file order.
+    /// </summary>
+    public int PriorityTicket { get; init; }
+
+    /// <summary>
+    ///     The stored visibility flag. Inert in the game: its reader overwrites it with true once
+    ///     the emitter has loaded. Kept so the file round-trips.
+    /// </summary>
+    public bool Visible { get; init; } = true;
+
+    /// <summary>
+    ///     Whether the game sorts this emitter's particles by depth. Measured: read only on the
+    ///     frozen-batch path, for the alpha, depth-sprite-alpha and opaque modes. Default true.
+    /// </summary>
+    public bool DepthSort { get; init; } = true;
+
+    /// <summary>
+    ///     For a weather emitter, the camera distance below which a particle is not drawn; it
+    ///     fades in over the next <see cref="WeatherFadeoutDistance" />. Default 50.
+    /// </summary>
+    public float WeatherCutoffDistance { get; init; } = 50f;
+
+    /// <summary>Whether the scene's wind disturbances push this emitter's particles.</summary>
+    public bool WindDisturbance { get; init; }
+
     /// <summary>
     ///     Average rotation speed, derived rather than stored.
     /// </summary>
@@ -200,6 +233,16 @@ public sealed record AlamoEmitter(
     int SpawnDuringLife,
     AlamoEmitterProperties Properties)
 {
+    /// <summary>
+    ///     The Particle Editor's link group this emitter belongs to, or <c>0</c> when unlinked.
+    /// </summary>
+    /// <remarks>
+    ///     Editor state, not engine state: the editor moves the emitters of a group together and
+    ///     writes the id as an optional chunk of its own (<c>0x0100</c>, after the spawn links and the
+    ///     normal texture). Read so that a file saved there opens, and kept so nothing is dropped.
+    /// </remarks>
+    public uint LinkGroup { get; init; }
+
     /// <summary>The track for one channel, or null when the file carried none.</summary>
     public AlamoTrack? Track(AlamoTrackChannel channel)
     {
@@ -223,4 +266,36 @@ public sealed record AlamoEmitter(
 public sealed record AlamoParticleContent(
     string Name,
     bool LeaveParticles,
-    IReadOnlyList<AlamoEmitter> Emitters);
+    IReadOnlyList<AlamoEmitter> Emitters)
+{
+    /// <summary>
+    ///     What the file holds that the game does not apply, one entry each. Empty for every
+    ///     shipped file but two, which carry a property the game has no case for.
+    /// </summary>
+    /// <remarks>
+    ///     The game's reader opens a chunk or property it does not know, reads nothing and closes
+    ///     it, at the system level, the emitter level and inside the property block alike. This
+    ///     reader does the same and says so here, because a file that carries a setting nothing
+    ///     applies is worth a line in the preview's problems. The kind says how loud.
+    /// </remarks>
+    public IReadOnlyList<AlamoParticleNotice> Notices { get; init; } = [];
+}
+
+/// <summary>How a particle file's unapplied data is classified, after what the game does with it.</summary>
+public enum AlamoParticleNoticeKind
+{
+    /// <summary>
+    ///     The game's reader has no case for it: opened, left unread, closed. Neither the game nor
+    ///     this reader knows what it is.
+    /// </summary>
+    UnreadByGame,
+
+    /// <summary>
+    ///     Known data the game deliberately does not apply: the Particle Editor's link group, or a
+    ///     property the game reads past by length.
+    /// </summary>
+    IgnoredByGame
+}
+
+/// <summary>One thing a particle file carries that the game does not apply.</summary>
+public sealed record AlamoParticleNotice(AlamoParticleNoticeKind Kind, string Message);

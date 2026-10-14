@@ -28,6 +28,8 @@ public sealed class AloParticleReaderCorpusTest
         var parsed = 0;
         var emitters = 0;
         var withSpawnLinks = 0;
+        var unreadByGame = 0;
+        var ignoredByGame = 0;
 
         foreach (var file in roots.SelectMany(r => Directory.EnumerateFiles(r, "*.alo")))
         {
@@ -40,6 +42,22 @@ public sealed class AloParticleReaderCorpusTest
                 var system = AloParticleReader.Read(bytes);
                 parsed++;
                 emitters += system.Emitters.Count;
+
+                // The chunk and property id sets are closed over the shipped data but for two
+                // ids: 0x06, which the game reads past (36 files), and 0x49, which its reader has
+                // no case for (2 files). Anything else here is something nobody has measured.
+                foreach (var notice in system.Notices)
+                    switch (notice.Kind)
+                    {
+                        case AlamoParticleNoticeKind.IgnoredByGame:
+                            Assert.Contains("0x06", notice.Message);
+                            ignoredByGame++;
+                            break;
+                        default:
+                            Assert.Contains("0x49", notice.Message);
+                            unreadByGame++;
+                            break;
+                    }
 
                 foreach (var emitter in system.Emitters)
                 {
@@ -74,6 +92,11 @@ public sealed class AloParticleReaderCorpusTest
         // Chained effects - an explosion starting its own smoke - are the reason the spawn links are
         // read. If none survive, the links are being dropped.
         Assert.True(withSpawnLinks > 0, "No emitter carried a spawn link.");
+
+        // Measured 2026-10-14: 0x06 on 62 emitters in 36 files, 0x49 on 3 emitters in 2 files.
+        // A change means a new id, or a known one reclassified.
+        Assert.Equal(62, ignoredByGame);
+        Assert.Equal(3, unreadByGame);
     }
 
     [Fact]

@@ -305,6 +305,11 @@ public static class ServerConfigurator
                 services.AddSingleton<IDiagnosticsRepublisher>(sp =>
                     sp.GetRequiredService<DialogDiagnosticsPublisher>());
 
+                // Particle files into the Problems view, on "Re-validate Workspace" only.
+                services.AddSingleton<ParticleFileDiagnosticsPublisher>();
+                services.AddSingleton<IDiagnosticsRepublisher>(sp =>
+                    sp.GetRequiredService<ParticleFileDiagnosticsPublisher>());
+
                 // The inbound event gate: buffers client notifications while the linear startup
                 // pipeline runs, then drains them in order. Replaces the old PreOpenBuffer race.
                 services.AddSingleton<IStartupGate, StartupGate>();

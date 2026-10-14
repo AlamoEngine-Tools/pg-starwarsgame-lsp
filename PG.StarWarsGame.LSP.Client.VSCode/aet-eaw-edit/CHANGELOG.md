@@ -103,6 +103,22 @@
   - A packed texture with no loose copy: no missing-file diagnostic, no missing-texture marker in the model preview
   - A project's own `Data\MegaFiles.xml` replaces the game's list; dependencies count, the leaf project first
   - Model preview with the expansion configured: the base game's loose files rank below every archive, as in the game
+- **A particle system saved by the Particle Editor** - opens in the model preview; the editor's own link-group chunk
+  was refused as malformed ([#163](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/163), the reader half)
+  - A chunk or property the game's reader has no case for is skipped as the game skips it, and listed in the
+    preview's problems as a warning; known editor data the game leaves unapplied (the link group, property 0x06) is
+    listed as information
+  - Six properties the game stores and the reference viewer skips are read: colour variation, priority ticket,
+    visibility, depth sort, weather cutoff distance, wind disturbance
+  - Emitter blocks read in any order, as the game reads them; a chunk that is not an emitter inside the emitter list
+    is still refused, as the game refuses it
+  - **Re-validate Workspace** reads every loose particle file and lists the same findings in the Problems view, a
+    file the game would fail to load as an error; never at startup or on opening a preview
+  - A particle's random alpha offset varies both ways, within the declared variation, as the game draws it; it
+    only ever added before
+  - Emitters update and draw in priority-ticket order, and a spawn link names the emitter whose ticket matches, as
+    the game resolves them after loading; every shipped file numbers its tickets in file order, so only a
+    reordered file looks different
 
 ### Diagnostic IDs
 
@@ -112,6 +128,8 @@
 - **New, state machine** - `Engine8` to `Engine13` (`aetswg-011-0008` to `aetswg-011-0013`)
 - **New, reused script state** - `Engine14` to `Engine17` (`aetswg-011-0014` to `aetswg-011-0017`)
 - **New, Lua 5.1 syntax** - `Syntax3011` (`aetswg-012-3011`)
+- **New, particle files** - `Preview22` (`aetswg-014-0022`, data the game's reader has no case for) and
+  `Preview23` (`aetswg-014-0023`, editor data the game leaves unapplied)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 
 ### Breaking changes

@@ -899,27 +899,40 @@ describe("appearanceOf", () => {
         }
     });
 
-    it("adds to ALPHA too, which is the channel a transparent sprite is read through", () => {
+    /**
+     * Measured in the game's particle initialiser (FoC x64, 2024 release): the colour channels
+     * draw their offset from `[0, variation]`, but ALPHA draws from `[-variation, +variation]` -
+     * a transparent sprite can come out fainter as well as denser. The reference viewer's
+     * `GetRandom(0, max)` on every channel was the earlier reading, and it was wrong for alpha.
+     */
+    it("varies ALPHA both ways, within the declared variation", () => {
         const e = emitter({
             tracks: [
                 track("Alpha", [
-                    [0, 0.2],
-                    [1, 0.2],
+                    [0, 0.5],
+                    [1, 0.5],
                 ]),
             ],
             properties: properties({
-                randomColors: { x: 0, y: 0, z: 0, w: 0.5 },
+                randomColors: { x: 0, y: 0, z: 0, w: 0.3 },
             }),
         });
 
-        const seen = new Set<number>();
+        const seen: number[] = [];
 
-        for (let seed = 1; seed < 20; seed++) {
-            seen.add(appearanceOf(spawnParticle(e, seededRandom(seed)), e).a);
+        for (let seed = 1; seed < 60; seed++) {
+            seen.push(appearanceOf(spawnParticle(e, seededRandom(seed)), e).a);
         }
 
-        assert.ok([...seen].every((a) => a >= 0.2 - 1e-9 && a <= 0.7 + 1e-9));
-        assert.ok(seen.size > 1, "the alpha addition is not random at all");
+        assert.ok(seen.every((a) => a >= 0.2 - 1e-9 && a <= 0.8 + 1e-9));
+        assert.ok(
+            seen.some((a) => a < 0.5 - 1e-9),
+            "alpha never went below the track: the offset is one-sided",
+        );
+        assert.ok(
+            seen.some((a) => a > 0.5 + 1e-9),
+            "alpha never went above the track",
+        );
     });
 
     /**

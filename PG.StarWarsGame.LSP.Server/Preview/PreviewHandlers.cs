@@ -503,8 +503,11 @@ public sealed class GetParticleSystemHandler(
 
         try
         {
-            return Task.FromResult(
-                new GetParticleSystemResult(AloParticleReader.Read(bytes), scale));
+            var system = AloParticleReader.Read(bytes);
+            return Task.FromResult(new GetParticleSystemResult(system, scale)
+            {
+                Problems = ParticleNoticeProblems.For(system)
+            });
         }
         catch (AloFormatException e)
         {

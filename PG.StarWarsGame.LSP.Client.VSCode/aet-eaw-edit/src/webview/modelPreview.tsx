@@ -57,6 +57,7 @@ import { type InspectorSubject } from "./preview/inspectorSubject";
 import { AssetLedger, loadState, type LoadTally } from "./preview/loadProgress";
 import { anchorFlyout } from "./preview/flyoutAnchor";
 import { handoffFor } from "./preview/handoff";
+import { particleNotices } from "./preview/particleNotices";
 import { groundRange, snapToZero } from "./preview/groundRange";
 import { InfoBadge } from "./shared/InfoBadge";
 import { Button, IconButton } from "./shared/Button";
@@ -5029,6 +5030,13 @@ function ModelPreview(): React.JSX.Element {
                         ]);
                     }
                     return;
+                }
+
+                // What the file holds that the game does not apply: skipped as the game skips it,
+                // and said once per system, whichever way the system was asked for.
+                const skipped = particleNotices(message.name, message.result);
+                if (skipped.length > 0) {
+                    setProblems((current) => [...current, ...skipped]);
                 }
 
                 // A particle file opened directly is its own subject and attaches to nothing.

@@ -42,6 +42,12 @@ public static class AloParticleReader
     private const uint ChunkSpawn = 0x0036;
     private const uint ChunkNormalTexture = 0x0045;
 
+    /// <summary>
+    ///     The Particle Editor's link group: editor state the game never reads, written as the last
+    ///     chunk of a linked emitter. Not in the shipped trees; a file saved there carries it.
+    /// </summary>
+    private const uint ChunkLinkGroup = 0x0100;
+
     private const uint ChunkVolume = 0x1100;
     private const uint ChunkVolumeData = 0x1101;
 
@@ -95,6 +101,7 @@ public static class AloParticleReader
 
         var emitters = new List<AlamoEmitter>();
         var leaveParticles = true;
+        var notices = new List<AlamoParticleNotice>();
 
         for (var i = 2; i < children.Count; i++)
         {
@@ -102,13 +109,15 @@ public static class AloParticleReader
             switch (chunk.Type)
             {
                 case ChunkEmitters:
+                    // The one strict level in the game: its list reader stops at anything that
+                    // is not an emitter and reports the load as failed.
                     foreach (var emitter in Children(bytes, chunk.BodyStart, chunk.BodyEnd))
                     {
                         if (emitter.Type != ChunkEmitter)
                             throw Malformed(
                                 $"the emitter list holds unexpected chunk 0x{emitter.Type:X}");
 
-                        emitters.Add(ReadEmitter(bytes, emitter, emitters.Count));
+                        emitters.Add(ReadEmitter(bytes, emitter, emitters.Count, notices));
                     }
 
                     break;
@@ -121,50 +130,90 @@ public static class AloParticleReader
                     break;
 
                 default:
-                    throw Malformed($"unexpected chunk 0x{chunk.Type:X} in the particle system");
+                    // Measured: the game's system reader tests for its ids and ignores the rest.
+                    notices.Add(new AlamoParticleNotice(AlamoParticleNoticeKind.UnreadByGame,
+                        $"Particle system - chunk 0x{chunk.Type:X} not read by the game, skipped"));
+                    break;
             }
         }
 
-        return new AlamoParticleContent(name, leaveParticles, emitters);
+        return new AlamoParticleContent(name, leaveParticles, emitters) { Notices = notices };
     }
 
     // ── emitters ──────────────────────────────────────────────────────────────
 
-    private static AlamoEmitter ReadEmitter(byte[] bytes, AloChunk chunk, int index)
+    /// <summary>
+    ///     Reads one emitter.
+    /// </summary>
+    /// <remarks>
+    ///     Dispatches on the chunk id as the game does, in whatever order the chunks come, and
+    ///     skips an id it does not know with a notice - the game's reader has no default branch.
+    ///     The five blocks every file carries are still required: a file without one is broken,
+    ///     not a file with a setting to skip.
+    /// </remarks>
+    private static AlamoEmitter ReadEmitter(
+        byte[] bytes, AloChunk chunk, int index, List<AlamoParticleNotice> notices)
     {
-        var children = Children(bytes, chunk.BodyStart, chunk.BodyEnd);
         var where = $"emitter {index}";
 
-        var properties = ReadProperties(
-            bytes, Expect(children, 0, ChunkProperties, $"the properties of {where}"), where);
-        var colorTexture = ReadString(
-            bytes, Expect(children, 1, ChunkColorTexture, $"the colour texture of {where}"));
-        var name = ReadString(
-            bytes, Expect(children, 2, ChunkEmitterName, $"the name of {where}"));
-        var volumes = ReadVolumes(
-            bytes, Expect(children, 3, ChunkVolumes, $"the spawn volumes of {where}"), where);
-        var tracks = ReadTracks(
-            bytes, Expect(children, 4, ChunkTracks, $"the tracks of {where}"), where);
+        AloChunk? propertiesChunk = null;
+        AloChunk? colorTextureChunk = null;
+        AloChunk? nameChunk = null;
+        AloChunk? volumesChunk = null;
+        AloChunk? tracksChunk = null;
 
         var spawnOnDeath = -1;
         var spawnDuringLife = -1;
         string? normalTexture = null;
+        var linkGroup = 0u;
 
-        for (var i = 5; i < children.Count; i++)
-        {
-            var extra = children[i];
-            switch (extra.Type)
+        foreach (var child in Children(bytes, chunk.BodyStart, chunk.BodyEnd))
+            switch (child.Type)
             {
+                case ChunkProperties:
+                    propertiesChunk = child;
+                    break;
+                case ChunkColorTexture:
+                    colorTextureChunk = child;
+                    break;
+                case ChunkEmitterName:
+                    nameChunk = child;
+                    break;
+                case ChunkVolumes:
+                    volumesChunk = child;
+                    break;
+                case ChunkTracks:
+                    tracksChunk = child;
+                    break;
                 case ChunkSpawn:
-                    (spawnOnDeath, spawnDuringLife) = ReadSpawnLinks(bytes, extra, where);
+                    (spawnOnDeath, spawnDuringLife) = ReadSpawnLinks(bytes, child, where);
                     break;
                 case ChunkNormalTexture:
-                    normalTexture = ReadString(bytes, extra);
+                    normalTexture = ReadString(bytes, child);
+                    break;
+                case ChunkLinkGroup:
+                    if (child.BodyLength != 4)
+                        throw Malformed(
+                            $"the link group of {where} is {child.BodyLength} bytes, expected 4");
+                    linkGroup = (uint)ReadInt32(bytes, child.BodyStart);
+                    // Known editor data, and the game has no case for it: said, but quietly.
+                    notices.Add(new AlamoParticleNotice(AlamoParticleNoticeKind.IgnoredByGame,
+                        $"Emitter {index} - link group {linkGroup}, Particle Editor data the game does not read"));
                     break;
                 default:
-                    throw Malformed($"{where} carries unexpected chunk 0x{extra.Type:X}");
+                    notices.Add(new AlamoParticleNotice(AlamoParticleNoticeKind.UnreadByGame,
+                        $"Emitter {index} - chunk 0x{child.Type:X} not read by the game, skipped"));
+                    break;
             }
-        }
+
+        var properties = ReadProperties(
+            bytes, Required(propertiesChunk, $"the properties of {where}"), where, notices);
+        var colorTexture = ReadString(
+            bytes, Required(colorTextureChunk, $"the colour texture of {where}"));
+        var name = ReadString(bytes, Required(nameChunk, $"the name of {where}"));
+        var volumes = ReadVolumes(
+            bytes, Required(volumesChunk, $"the spawn volumes of {where}"), where);
+        var tracks = ReadTracks(bytes, Required(tracksChunk, $"the tracks of {where}"), where);
 
         // With random rotation on, the engine reinterprets the rotation track's first key as an
         // average and the stored variance as a fraction of it. Without this an emitter set to rotate
@@ -173,7 +222,10 @@ public static class AloParticleReader
             properties = ApplyRandomRotation(properties, tracks);
 
         return new AlamoEmitter(name, colorTexture, normalTexture,
-            volumes[0], volumes[1], volumes[2], tracks, spawnOnDeath, spawnDuringLife, properties);
+            volumes[0], volumes[1], volumes[2], tracks, spawnOnDeath, spawnDuringLife, properties)
+        {
+            LinkGroup = linkGroup
+        };
     }
 
     private static AlamoEmitterProperties ApplyRandomRotation(
@@ -360,7 +412,8 @@ public static class AloParticleReader
     ///     skipped: mini-chunks carry their own length, so a stray one would be survivable, but it
     ///     would also mean the file holds a setting that silently does nothing in the preview.
     /// </remarks>
-    private static AlamoEmitterProperties ReadProperties(byte[] bytes, AloChunk chunk, string where)
+    private static AlamoEmitterProperties ReadProperties(
+        byte[] bytes, AloChunk chunk, string where, List<AlamoParticleNotice> notices)
     {
         var p = new AlamoEmitterProperties();
 
@@ -421,15 +474,56 @@ public static class AloParticleReader
                 0x47 => p with { WeatherCubeDistance = ReadSingle(bytes, at) },
                 0x48 => p with { RandomRotation = bytes[at] != 0 },
 
-                // Read by the engine's editor but not by its renderer. Present in the corpus, so
-                // they are skipped deliberately rather than refused.
-                0x06 or 0x11 or 0x15 or 0x14 or 0x2B or 0x3F or 0x44 or 0x49 => p,
+                // Stored by the game, skipped by the reference viewer (measured, #163).
+                // 0x11 is the older one-value form of 0x2C: the game writes it into the same
+                // colour variation, red, green and blue alike, alpha untouched - so whichever of
+                // the two comes later in the file wins, as it does in the game.
+                0x11 => p with
+                {
+                    RandomColors = new Vector4(
+                        ReadSingle(bytes, at), ReadSingle(bytes, at), ReadSingle(bytes, at),
+                        p.RandomColors.W)
+                },
+                0x14 => p with { PriorityTicket = ReadInt32(bytes, at) },
+                0x15 => p with { Visible = bytes[at] != 0 },
+                0x2B => p with { DepthSort = bytes[at] != 0 },
+                0x3F => p with { WeatherCutoffDistance = ReadSingle(bytes, at) },
+                0x44 => p with { WindDisturbance = bytes[at] != 0 },
 
-                _ => throw Malformed($"{where} has unknown property mini-chunk 0x{mini.Type:X}")
+                // The game reads the id and skips its four bytes: known, deliberately unapplied.
+                0x06 => Skipped(p, notices, AlamoParticleNoticeKind.IgnoredByGame,
+                    $"{Capitalized(where)} - property 0x06, which the game reads past"),
+
+                // Measured: the game's property switch has no default, so an id it does not know
+                // is opened, left unread and closed. Skipped here too, and said. 0x49 is one such
+                // id that two shipped files carry.
+                _ => Skipped(p, notices, AlamoParticleNoticeKind.UnreadByGame,
+                    $"{Capitalized(where)} - property 0x{mini.Type:X} not read by the game, skipped")
             };
         }
 
         return useLinkStrength ? p : p with { ParentLinkStrength = 0f };
+    }
+
+    /// <summary>One of the five blocks every emitter carries, or a refusal naming the missing one.</summary>
+    private static AloChunk Required(AloChunk? chunk, string what)
+    {
+        return chunk ?? throw Malformed($"{what} is missing");
+    }
+
+    /// <summary>Records a skipped property and leaves the record as it was.</summary>
+    private static AlamoEmitterProperties Skipped(
+        AlamoEmitterProperties properties, List<AlamoParticleNotice> notices,
+        AlamoParticleNoticeKind kind, string notice)
+    {
+        notices.Add(new AlamoParticleNotice(kind, notice));
+        return properties;
+    }
+
+    /// <summary>"emitter 5" as the start of a notice: "Emitter 5".</summary>
+    private static string Capitalized(string where)
+    {
+        return where.Length == 0 ? where : char.ToUpperInvariant(where[0]) + where[1..];
     }
 
     /// <summary>Records a flag that gates another property, without changing the record.</summary>

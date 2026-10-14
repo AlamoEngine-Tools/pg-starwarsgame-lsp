@@ -51,7 +51,8 @@ public sealed class PreviewEnumConverter : JsonConverter
         typeof(AlamoTrackChannel),
         typeof(AlamoParticleBlendMode),
         typeof(AlamoGroundBehavior),
-        typeof(AlamoEmitFromMesh)
+        typeof(AlamoEmitFromMesh),
+        typeof(AlamoParticleNoticeKind)
     ];
 
     /// <summary>The preview protocol is server-to-client only; nothing sends these back.</summary>

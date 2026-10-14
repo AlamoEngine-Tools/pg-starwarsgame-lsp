@@ -447,15 +447,19 @@ function colourAddition(
     const max = properties.randomColors;
     const red = random() * max.x;
 
+    // Measured in the game's particle initialiser: the colour channels draw from [0, max], the
+    // grayscale lock puts one draw on all three, and ALPHA draws from [-max, +max] either way.
+    const alpha = (random() * 2 - 1) * max.w;
+
     if (properties.colorAddGrayscale) {
-        return { r: red, g: red, b: red, a: red };
+        return { r: red, g: red, b: red, a: alpha };
     }
 
     return {
         r: red,
         g: random() * max.y,
         b: random() * max.z,
-        a: random() * max.w,
+        a: alpha,
     };
 }
 
