@@ -101,7 +101,7 @@ public static class AloParticleReader
 
         var emitters = new List<AlamoEmitter>();
         var leaveParticles = true;
-        var notices = new List<string>();
+        var notices = new List<AlamoParticleNotice>();
 
         for (var i = 2; i < children.Count; i++)
         {
@@ -131,8 +131,8 @@ public static class AloParticleReader
 
                 default:
                     // Measured: the game's system reader tests for its ids and ignores the rest.
-                    notices.Add(
-                        $"Particle system - chunk 0x{chunk.Type:X} not read by the game, skipped");
+                    notices.Add(new AlamoParticleNotice(AlamoParticleNoticeKind.UnreadByGame,
+                        $"Particle system - chunk 0x{chunk.Type:X} not read by the game, skipped"));
                     break;
             }
         }
@@ -152,7 +152,7 @@ public static class AloParticleReader
     ///     not a file with a setting to skip.
     /// </remarks>
     private static AlamoEmitter ReadEmitter(
-        byte[] bytes, AloChunk chunk, int index, List<string> notices)
+        byte[] bytes, AloChunk chunk, int index, List<AlamoParticleNotice> notices)
     {
         var where = $"emitter {index}";
 
@@ -196,10 +196,13 @@ public static class AloParticleReader
                         throw Malformed(
                             $"the link group of {where} is {child.BodyLength} bytes, expected 4");
                     linkGroup = (uint)ReadInt32(bytes, child.BodyStart);
+                    // Known editor data, and the game has no case for it: said, but quietly.
+                    notices.Add(new AlamoParticleNotice(AlamoParticleNoticeKind.IgnoredByGame,
+                        $"Emitter {index} - link group {linkGroup}, Particle Editor data the game does not read"));
                     break;
                 default:
-                    notices.Add(
-                        $"Emitter {index} - chunk 0x{child.Type:X} not read by the game, skipped");
+                    notices.Add(new AlamoParticleNotice(AlamoParticleNoticeKind.UnreadByGame,
+                        $"Emitter {index} - chunk 0x{child.Type:X} not read by the game, skipped"));
                     break;
             }
 
@@ -410,7 +413,7 @@ public static class AloParticleReader
     ///     would also mean the file holds a setting that silently does nothing in the preview.
     /// </remarks>
     private static AlamoEmitterProperties ReadProperties(
-        byte[] bytes, AloChunk chunk, string where, List<string> notices)
+        byte[] bytes, AloChunk chunk, string where, List<AlamoParticleNotice> notices)
     {
         var p = new AlamoEmitterProperties();
 
@@ -471,13 +474,23 @@ public static class AloParticleReader
                 0x47 => p with { WeatherCubeDistance = ReadSingle(bytes, at) },
                 0x48 => p with { RandomRotation = bytes[at] != 0 },
 
-                // Read by the engine's editor but not by its renderer. Present in the corpus, so
-                // they are skipped deliberately rather than refused.
-                0x06 or 0x11 or 0x15 or 0x14 or 0x2B or 0x3F or 0x44 or 0x49 => p,
+                // Stored by the game, skipped by the reference viewer (measured, #163). One float
+                // for the colour variation, which the game copies to red, green and blue.
+                0x11 => p with { ColorVariation = ReadSingle(bytes, at) },
+                0x14 => p with { PriorityTicket = ReadInt32(bytes, at) },
+                0x15 => p with { Visible = bytes[at] != 0 },
+                0x2B => p with { DepthSort = bytes[at] != 0 },
+                0x3F => p with { WeatherCutoffDistance = ReadSingle(bytes, at) },
+                0x44 => p with { WindDisturbance = bytes[at] != 0 },
+
+                // The game reads the id and skips its four bytes: known, deliberately unapplied.
+                0x06 => Skipped(p, notices, AlamoParticleNoticeKind.IgnoredByGame,
+                    $"{Capitalized(where)} - property 0x06, which the game reads past"),
 
                 // Measured: the game's property switch has no default, so an id it does not know
-                // is opened, left unread and closed. Skipped here too, and said.
-                _ => Skipped(p, notices,
+                // is opened, left unread and closed. Skipped here too, and said. 0x49 is one such
+                // id that two shipped files carry.
+                _ => Skipped(p, notices, AlamoParticleNoticeKind.UnreadByGame,
                     $"{Capitalized(where)} - property 0x{mini.Type:X} not read by the game, skipped")
             };
         }
@@ -493,9 +506,10 @@ public static class AloParticleReader
 
     /// <summary>Records a skipped property and leaves the record as it was.</summary>
     private static AlamoEmitterProperties Skipped(
-        AlamoEmitterProperties properties, List<string> notices, string notice)
+        AlamoEmitterProperties properties, List<AlamoParticleNotice> notices,
+        AlamoParticleNoticeKind kind, string notice)
     {
-        notices.Add(notice);
+        notices.Add(new AlamoParticleNotice(kind, notice));
         return properties;
     }
 

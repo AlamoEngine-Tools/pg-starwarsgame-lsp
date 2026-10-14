@@ -949,6 +949,29 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PreviewHardpointUnreachable =
         new(DiagnosticGroup.Preview, 21);
 
+    /// <summary>
+    ///     A particle file carries a chunk or property the game's reader has no case for: opened,
+    ///     left unread and closed by the game, skipped the same way here. Nothing knows what it is.
+    /// </summary>
+    /// <remarks>
+    ///     Measured in the game's reader (#163): the system level, the emitter level and the
+    ///     property block all skip an unknown id rather than fail. A warning, because the file
+    ///     holds a setting that nothing applies. Two shipped files carry one such property.
+    /// </remarks>
+    public static readonly DiagnosticId PreviewParticleUnreadByGame =
+        new(DiagnosticGroup.Preview, 22);
+
+    /// <summary>
+    ///     A particle file carries known data the game deliberately does not apply: the Particle
+    ///     Editor's link group, or a property the game reads past by length.
+    /// </summary>
+    /// <remarks>
+    ///     Information rather than a warning - it is editor state, harmless in game - but said,
+    ///     so that it is clear the file carries more than the game uses.
+    /// </remarks>
+    public static readonly DiagnosticId PreviewParticleIgnoredByGame =
+        new(DiagnosticGroup.Preview, 23);
+
     // ── Lua analyzer ──
     // What the Lua analyzer (emmylua_ls) reports that holds for any Lua, whatever the engine binds:
     // one id per analyzer rule, numbered in the order a rule was adopted, never renumbered. A rule

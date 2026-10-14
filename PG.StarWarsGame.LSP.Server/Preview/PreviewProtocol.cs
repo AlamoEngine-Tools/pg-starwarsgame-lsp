@@ -199,7 +199,14 @@ public sealed record GetParticleSystemParams : IRequest<GetParticleSystemResult>
 public sealed record GetParticleSystemResult(
     AlamoParticleContent? System,
     float ScaleFactor = 1f,
-    string? Error = null);
+    string? Error = null)
+{
+    /// <summary>
+    ///     What the file carries that the game does not apply, with ids: the system's notices as
+    ///     problems. Empty for a shipped file but two. See <see cref="ParticleNoticeProblems" />.
+    /// </summary>
+    public IReadOnlyList<PreviewProblem> Problems { get; init; } = [];
+}
 
 /// <summary>Request for one shader's source text.</summary>
 [Method("aet/getShaderSource", Direction.ClientToServer)]

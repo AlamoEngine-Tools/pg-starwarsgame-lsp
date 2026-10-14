@@ -189,6 +189,11 @@ public sealed class AloParticleReaderTest
         Assert.Equal(3u, content.Emitters[0].LinkGroup);
         Assert.Equal(1, content.Emitters[0].SpawnOnDeath);
         Assert.Equal("p_normal.tga", content.Emitters[0].NormalTexture);
+
+        // Known editor data the game never reads: said, as the quiet kind.
+        var notice = Assert.Single(content.Notices);
+        Assert.Equal(AlamoParticleNoticeKind.IgnoredByGame, notice.Kind);
+        Assert.Contains("link group 3", notice.Message);
     }
 
     [Fact]
@@ -224,8 +229,9 @@ public sealed class AloParticleReaderTest
 
         Assert.Equal("spark", content.Emitters[0].Name);
         var notice = Assert.Single(content.Notices);
-        Assert.Contains("0x7F", notice);
-        Assert.Contains("not read by the game", notice);
+        Assert.Equal(AlamoParticleNoticeKind.UnreadByGame, notice.Kind);
+        Assert.Contains("0x7F", notice.Message);
+        Assert.Contains("not read by the game", notice.Message);
     }
 
     [Fact]
@@ -242,7 +248,8 @@ public sealed class AloParticleReaderTest
 
         Assert.Single(content.Emitters);
         var notice = Assert.Single(content.Notices);
-        Assert.Contains("0x7E", notice);
+        Assert.Equal(AlamoParticleNoticeKind.UnreadByGame, notice.Kind);
+        Assert.Contains("0x7E", notice.Message);
     }
 
     [Fact]
@@ -476,6 +483,30 @@ public sealed class AloParticleReaderTest
     }
 
     [Fact]
+    public void Read_ReadsThePropertiesTheGameReadsAndTheReferenceViewerIgnores()
+    {
+        // Measured in the game's reader: six ids the reference viewer skips are stored by the
+        // game. They are read here because what the game reads the preview has to apply (#163).
+        // Colour variation is ONE float the game copies to red, green and blue.
+        var p = AloParticleReader.Read(System("p", null, Emitter(properties:
+        [
+            Mini(0x11, F32(0.25f)),
+            Mini(0x14, I32(7)),
+            Mini(0x15, [0]),
+            Mini(0x2B, [1]),
+            Mini(0x3F, F32(350f)),
+            Mini(0x44, [1])
+        ]))).Emitters[0].Properties;
+
+        Assert.Equal(0.25f, p.ColorVariation);
+        Assert.Equal(7, p.PriorityTicket);
+        Assert.False(p.Visible);
+        Assert.True(p.DepthSort);
+        Assert.Equal(350f, p.WeatherCutoffDistance);
+        Assert.True(p.WindDisturbance);
+    }
+
+    [Fact]
     public void Read_StoresTriangleCountOneHigherThanTheFile()
     {
         var p = AloParticleReader.Read(System("p", null,
@@ -558,7 +589,34 @@ public sealed class AloParticleReaderTest
 
         Assert.Equal(2.5f, content.Emitters[0].Properties.Lifetime);
         var notice = Assert.Single(content.Notices);
-        Assert.Contains("0x7F", notice);
-        Assert.Contains("not read by the game", notice);
+        Assert.Equal(AlamoParticleNoticeKind.UnreadByGame, notice.Kind);
+        Assert.Contains("0x7F", notice.Message);
+        Assert.Contains("not read by the game", notice.Message);
+    }
+
+    [Fact]
+    public void Read_NotesAPropertyTheGameReadsPast_Quietly()
+    {
+        // 0x06 is the one id the game's reader names and then skips by length: known data it
+        // deliberately leaves unapplied, so it is said, but as the quiet kind.
+        var content = AloParticleReader.Read(
+            System("p", null, Emitter(properties: [Mini(0x06, I32(1))])));
+
+        var notice = Assert.Single(content.Notices);
+        Assert.Equal(AlamoParticleNoticeKind.IgnoredByGame, notice.Kind);
+        Assert.Contains("0x06", notice.Message);
+    }
+
+    [Fact]
+    public void Read_TreatsThePropertyTwoShippedFilesCarryAsUnreadByTheGame()
+    {
+        // 0x49 has no case in the game's reader. Two shipped files carry it, which is not a reason
+        // to call it known - nothing anywhere says what it is.
+        var content = AloParticleReader.Read(
+            System("p", null, Emitter(properties: [Mini(0x49, [1])])));
+
+        var notice = Assert.Single(content.Notices);
+        Assert.Equal(AlamoParticleNoticeKind.UnreadByGame, notice.Kind);
+        Assert.Contains("0x49", notice.Message);
     }
 }

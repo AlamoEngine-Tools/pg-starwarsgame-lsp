@@ -105,7 +105,11 @@
   - Model preview with the expansion configured: the base game's loose files rank below every archive, as in the game
 - **A particle system saved by the Particle Editor** - opens in the model preview; the editor's own link-group chunk
   was refused as malformed ([#163](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/163), the reader half)
-  - A chunk or property the game does not read is skipped as the game skips it, and listed in the preview's problems
+  - A chunk or property the game's reader has no case for is skipped as the game skips it, and listed in the
+    preview's problems as a warning; known editor data the game leaves unapplied (the link group, property 0x06) is
+    listed as information
+  - Six properties the game stores and the reference viewer skips are read: colour variation, priority ticket,
+    visibility, depth sort, weather cutoff distance, wind disturbance
   - Emitter blocks read in any order, as the game reads them; a chunk that is not an emitter inside the emitter list
     is still refused, as the game refuses it
 
@@ -117,6 +121,8 @@
 - **New, state machine** - `Engine8` to `Engine13` (`aetswg-011-0008` to `aetswg-011-0013`)
 - **New, reused script state** - `Engine14` to `Engine17` (`aetswg-011-0014` to `aetswg-011-0017`)
 - **New, Lua 5.1 syntax** - `Syntax3011` (`aetswg-012-3011`)
+- **New, particle files** - `Preview22` (`aetswg-014-0022`, data the game's reader has no case for) and
+  `Preview23` (`aetswg-014-0023`, editor data the game leaves unapplied)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 
 ### Breaking changes

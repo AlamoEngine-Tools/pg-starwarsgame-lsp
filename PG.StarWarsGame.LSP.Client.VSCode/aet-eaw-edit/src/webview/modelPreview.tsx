@@ -5032,9 +5032,9 @@ function ModelPreview(): React.JSX.Element {
                     return;
                 }
 
-                // What the file holds that the game does not read: skipped as the game skips it,
+                // What the file holds that the game does not apply: skipped as the game skips it,
                 // and said once per system, whichever way the system was asked for.
-                const skipped = particleNotices(message.name, system);
+                const skipped = particleNotices(message.name, message.result);
                 if (skipped.length > 0) {
                     setProblems((current) => [...current, ...skipped]);
                 }

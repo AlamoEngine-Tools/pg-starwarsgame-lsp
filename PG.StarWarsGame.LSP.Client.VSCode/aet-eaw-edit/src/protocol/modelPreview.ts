@@ -1134,6 +1134,17 @@ export interface AlamoEmitterProperties {
     randomRotation: boolean;
     /** Derived from the rotation track when `randomRotation` is set. */
     randomRotationAverage: number;
+    /**
+     * Six properties the game stores and the reference viewer skips (measured). Read so the
+     * preview can apply what the game applies; `visible` is inert in the game, which sets it to
+     * true after loading.
+     */
+    colorVariation?: number;
+    priorityTicket?: number;
+    visible?: boolean;
+    depthSort?: boolean;
+    weatherCutoffDistance?: number;
+    windDisturbance?: boolean;
 }
 
 /**
@@ -1160,15 +1171,29 @@ export interface AlamoEmitter {
     linkGroup?: number;
 }
 
+/** How a particle file's unapplied data is classified. Mirrors the C# `AlamoParticleNoticeKind`. */
+export const ALAMO_PARTICLE_NOTICE_KIND = {
+    /** The game's reader has no case for it: skipped by the game and by the server alike. */
+    unreadByGame: "UnreadByGame",
+    /** Known data the game deliberately does not apply - the Particle Editor's link group. */
+    ignoredByGame: "IgnoredByGame",
+} as const;
+
+/** One thing a particle file carries that the game does not apply. */
+export interface AlamoParticleNotice {
+    /** See {@link ALAMO_PARTICLE_NOTICE_KIND}. */
+    kind: string;
+    message: string;
+}
+
 export interface AlamoParticleContent {
     name: string;
     leaveParticles: boolean;
     /**
-     * What the file holds that the game does not read, one line each - a chunk or property the
-     * game's reader opens, leaves unread and closes. Empty for every shipped file; shown as
-     * warnings, because the file carries a setting nothing applies.
+     * What the file holds that the game does not apply, one entry each. The server turns these
+     * into the result's `problems`, with ids; the panel reads those, not this.
      */
-    notices?: string[] | null;
+    notices?: AlamoParticleNotice[] | null;
     emitters: AlamoEmitter[];
 }
 
@@ -1203,6 +1228,12 @@ export interface GetParticleSystemResult {
      */
     scaleFactor?: number | null;
     error?: string | null;
+    /**
+     * What the file carries that the game does not apply, with ids: a warning for data the game's
+     * reader has no case for, information for known editor data it leaves unapplied. Empty for a
+     * shipped file but two.
+     */
+    problems?: PreviewProblem[] | null;
 }
 
 // ── aet/getModelTexture ──────────────────────────────────────────────────────

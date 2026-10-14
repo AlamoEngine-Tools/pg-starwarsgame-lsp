@@ -171,6 +171,30 @@ public sealed record AlamoEmitterProperties
     public float WeatherCubeDistance { get; init; }
     public bool RandomRotation { get; init; }
 
+    // Six properties the game's reader stores and the reference viewer skips (measured, #163).
+    // Read because what the game reads the preview has to apply; their use is the renderer's.
+
+    /// <summary>One variation value the game copies to red, green and blue; alpha untouched.</summary>
+    public float ColorVariation { get; init; }
+
+    /// <summary>The emitter's draw priority ticket, as stored.</summary>
+    public int PriorityTicket { get; init; }
+
+    /// <summary>
+    ///     The stored visibility flag. Inert in the game: its reader overwrites it with true once
+    ///     the emitter has loaded. Kept so the file round-trips.
+    /// </summary>
+    public bool Visible { get; init; } = true;
+
+    /// <summary>Whether the game sorts this emitter's particles by depth before drawing.</summary>
+    public bool DepthSort { get; init; }
+
+    /// <summary>The distance beyond which a weather emitter's particles are cut off.</summary>
+    public float WeatherCutoffDistance { get; init; }
+
+    /// <summary>Whether wind disturbs this emitter's particles.</summary>
+    public bool WindDisturbance { get; init; }
+
     /// <summary>
     ///     Average rotation speed, derived rather than stored.
     /// </summary>
@@ -236,14 +260,33 @@ public sealed record AlamoParticleContent(
     IReadOnlyList<AlamoEmitter> Emitters)
 {
     /// <summary>
-    ///     What the file holds that the game does not read, one line each; empty for every shipped
-    ///     file.
+    ///     What the file holds that the game does not apply, one entry each. Empty for every
+    ///     shipped file but two, which carry a property the game has no case for.
     /// </summary>
     /// <remarks>
     ///     The game's reader opens a chunk or property it does not know, reads nothing and closes
     ///     it, at the system level, the emitter level and inside the property block alike. This
     ///     reader does the same and says so here, because a file that carries a setting nothing
-    ///     applies is worth a line in the preview's problems.
+    ///     applies is worth a line in the preview's problems. The kind says how loud.
     /// </remarks>
-    public IReadOnlyList<string> Notices { get; init; } = [];
+    public IReadOnlyList<AlamoParticleNotice> Notices { get; init; } = [];
 }
+
+/// <summary>How a particle file's unapplied data is classified, after what the game does with it.</summary>
+public enum AlamoParticleNoticeKind
+{
+    /// <summary>
+    ///     The game's reader has no case for it: opened, left unread, closed. Neither the game nor
+    ///     this reader knows what it is.
+    /// </summary>
+    UnreadByGame,
+
+    /// <summary>
+    ///     Known data the game deliberately does not apply: the Particle Editor's link group, or a
+    ///     property the game reads past by length.
+    /// </summary>
+    IgnoredByGame
+}
+
+/// <summary>One thing a particle file carries that the game does not apply.</summary>
+public sealed record AlamoParticleNotice(AlamoParticleNoticeKind Kind, string Message);
