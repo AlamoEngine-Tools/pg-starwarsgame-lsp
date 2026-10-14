@@ -114,6 +114,8 @@
     is still refused, as the game refuses it
   - **Re-validate Workspace** reads every loose particle file and lists the same findings in the Problems view, a
     file the game would fail to load as an error; never at startup or on opening a preview
+  - A particle's random alpha offset varies both ways, within the declared variation, as the game draws it; it
+    only ever added before
 
 ### Diagnostic IDs
 
