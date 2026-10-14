@@ -10,6 +10,7 @@ import { battleLabelOf } from "./storyBattles";
 import {
     galacticOf,
     panelKey,
+    projectPanelKey,
     panelTitle,
     type StoryGraphTarget,
 } from "./storyGraphTarget";
@@ -61,6 +62,8 @@ export class StoryGraphPanel extends WebviewPanelHost {
         private readonly _target: StoryGraphTarget,
         private readonly _extensionUri: vscode.Uri,
         private readonly _lsp: LspGateway,
+        /** The project the graph belongs to; "" while the window holds one. */
+        private readonly _projectKey: string,
     ) {
         // No bodyStyle: this webview resets the page from inside its own styled-components global,
         // which is where the rest of its canvas styling lives.
@@ -78,7 +81,8 @@ export class StoryGraphPanel extends WebviewPanelHost {
     /**
      * Opens or reveals the panel for a target. `centerOn` is a node the revealed graph should
      * centre on - how a portal lands the reader on the event it stands for rather than wherever
-     * the other panel was last left.
+     * the other panel was last left. `projectKey` files the panel under its project, so two projects'
+     * campaigns of one name open two tabs, each on its own server.
      */
     static show(
         target: StoryGraphTarget,
@@ -86,8 +90,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
         lsp: LspGateway,
         centerOn?: string,
         simulate = false,
+        projectKey = "",
     ): void {
-        const key = panelKey(target);
+        const key = projectPanelKey(projectKey, target);
         const existing = StoryGraphPanel._panels.get(key);
         if (existing) {
             existing.reveal();
@@ -101,7 +106,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         }
         const panel = StoryGraphPanel._panels.track(
             key,
-            new StoryGraphPanel(target, extensionUri, lsp),
+            new StoryGraphPanel(target, extensionUri, lsp, projectKey),
         );
         panel._pendingCenter = centerOn;
         panel._pendingSimulate = simulate;
@@ -114,12 +119,16 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * The notification names CAMPAIGNS while a panel is one campaign faction, so every faction of
      * an invalidated campaign refreshes. That is wider than it needs to be and deliberately so: a
      * thread can be listed by more than one faction's manifest, so narrowing by faction here would
-     * have to repeat the server's closure walk to stay correct.
+     * have to repeat the server's closure walk to stay correct. Only the notifying project's panels
+     * are reached: another project's campaign of the same name is another campaign.
      */
-    static refreshInvalidated(campaigns: string[]): void {
+    static refreshInvalidated(campaigns: string[], projectKey = ""): void {
         const invalidated = new Set(campaigns.map((c) => c.toLowerCase()));
         for (const panel of StoryGraphPanel._panels.all) {
-            if (invalidated.has(panel._target.campaign.toLowerCase())) {
+            if (
+                panel._projectKey === projectKey &&
+                invalidated.has(panel._target.campaign.toLowerCase())
+            ) {
                 panel.post({ type: "invalidate" });
             }
         }
@@ -136,9 +145,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
      * change happened in and pushes both when a battle's resolution reaches the galaxy, so the
      * routing here is exact rather than fanned out over the faction.
      */
-    static simChanged(target: StoryGraphTarget): void {
+    static simChanged(target: StoryGraphTarget, projectKey = ""): void {
         StoryGraphPanel._panels
-            .get(panelKey(target))
+            .get(projectPanelKey(projectKey, target))
             ?.post({ type: "simChanged" });
     }
 
@@ -254,6 +263,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     this._lsp,
                     undefined,
                     msg.simulate === true,
+                    this._projectKey,
                 );
                 break;
             case "revealScope":
@@ -263,6 +273,8 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     this._extensionUri,
                     this._lsp,
                     msg.nodeId as string,
+                    false,
+                    this._projectKey,
                 );
                 break;
         }

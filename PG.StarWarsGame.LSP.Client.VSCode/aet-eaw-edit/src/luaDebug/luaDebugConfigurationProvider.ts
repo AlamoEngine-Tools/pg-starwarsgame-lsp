@@ -20,11 +20,21 @@ import {
  * settings, the script roots and the mod chain from the language server's view of the project
  * layers. A launch that cannot be assembled is refused with the reason rather than started
  * against the wrong files.
+ *
+ * With several projects open the layers are the ones of the project the launch belongs to: the
+ * one its workspace folder holds, or the active document's (#230).
  */
 export class LuaDebugConfigurationProvider
     implements vscode.DebugConfigurationProvider
 {
-    constructor(private readonly _lsp: LspGateway) {}
+    /**
+     * @param _gatewayFor The server of the project a launch in `folder` belongs to.
+     */
+    constructor(
+        private readonly _gatewayFor: (
+            folder: vscode.WorkspaceFolder | undefined,
+        ) => LspGateway,
+    ) {}
 
     provideDebugConfigurations(): vscode.ProviderResult<
         vscode.DebugConfiguration[]
@@ -45,7 +55,7 @@ export class LuaDebugConfigurationProvider
     }
 
     async resolveDebugConfiguration(
-        _folder: vscode.WorkspaceFolder | undefined,
+        folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
     ): Promise<vscode.DebugConfiguration | undefined | null> {
         if (!luaDebuggerEnabled()) {
@@ -70,15 +80,17 @@ export class LuaDebugConfigurationProvider
             false,
         );
 
-        const layers = await this._layers();
+        const layers = await this._layers(this._gatewayFor(folder));
 
         if (config.sourceRoots === undefined) {
             config.sourceRoots =
-                layers === undefined
-                    ? (vscode.workspace.workspaceFolders ?? []).map(
-                          (f) => f.uri.fsPath,
-                      )
-                    : collectSourceRoots(layers.layers);
+                layers !== undefined
+                    ? collectSourceRoots(layers.layers)
+                    : folder !== undefined
+                      ? [folder.uri.fsPath]
+                      : (vscode.workspace.workspaceFolders ?? []).map(
+                            (f) => f.uri.fsPath,
+                        );
         }
 
         if (config.request === "launch") {
@@ -119,11 +131,13 @@ export class LuaDebugConfigurationProvider
         return config;
     }
 
-    private async _layers(): Promise<LaunchLayersResult | undefined> {
-        if (!this._lsp.isRunning) {
+    private async _layers(
+        lsp: LspGateway,
+    ): Promise<LaunchLayersResult | undefined> {
+        if (!lsp.isRunning) {
             return undefined;
         }
-        const outcome = await this._lsp.request<LaunchLayersResult>(
+        const outcome = await lsp.request<LaunchLayersResult>(
             "aet/getLaunchLayers",
         );
         if (!outcome.ok) {

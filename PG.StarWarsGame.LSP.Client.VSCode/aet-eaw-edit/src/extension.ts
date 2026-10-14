@@ -51,7 +51,25 @@ import {
 import { logLine, setLogChannel } from "./log";
 import { directoriesNeedingOwnWatcher } from "./dependencyWatchers";
 import { LspGateway } from "./lsp/lspGateway";
+import { RoutedLspGateway } from "./lsp/routedLspGateway";
 import { stopClient } from "./lsp/stopClient";
+import { discoverProjects } from "./projectDiscovery";
+import {
+    type ClientSpec,
+    type ClientState,
+    clientSpecs,
+    documentSelectorFor,
+    isInside,
+    ownerKey,
+    ownsPath,
+    planChanges,
+    statusText,
+} from "./projectClientPlan";
+import { WatcherPool } from "./watcherPool";
+import {
+    type NavigatorProject,
+    ProjectGroupedTree,
+} from "./projectGroupedTree";
 import { vscodeMessageSink } from "./lsp/vscodeMessageSink";
 import {
     LUA_DEBUG_TYPE,
@@ -229,9 +247,12 @@ class EffectiveObjectContentProvider
 {
     private readonly _onDidChange = new vscode.EventEmitter<vscode.Uri>();
     readonly onDidChange = this._onDidChange.event;
+    /** The project each document was opened for, so it re-reads from that project's server. */
+    private readonly _projects = new Map<string, string>();
 
     /** Signals VS Code to re-fetch content for an already-open virtual document. */
-    refresh(uri: vscode.Uri): void {
+    refresh(uri: vscode.Uri, projectKey = ""): void {
+        this._projects.set(uri.toString(), projectKey);
         this._onDidChange.fire(uri);
     }
 
@@ -241,10 +262,11 @@ class EffectiveObjectContentProvider
 
         // The document IS the report here - it is read-only generated text, so a failure is written
         // into it as a comment rather than raised as a notification over the tab that just opened.
-        const outcome = await lsp.request<GetEffectiveObjectResult>(
-            "aet/getEffectiveObject",
-            { objectId },
-        );
+        const outcome = await gatewayFor(
+            this._projects.get(uri.toString()),
+        ).request<GetEffectiveObjectResult>("aet/getEffectiveObject", {
+            objectId,
+        });
 
         if (!outcome.ok) {
             return outcome.reason === "offline"
@@ -258,31 +280,195 @@ class EffectiveObjectContentProvider
     }
 }
 
-let lspClient: LanguageClient | undefined;
+/**
+ * One language client and the server process behind it (#229).
+ *
+ * One runs per open project; a window with a single project runs exactly one, as it always did.
+ */
+interface ProjectClient {
+    spec: ClientSpec;
+    client: LanguageClient | undefined;
+    /**
+     * The server process, while one is running.
+     *
+     * Held because the language client does not hold it for us on the factory path, and because a
+     * shutdown that times out leaves nothing else able to reach it. Cleared by the process's own
+     * `exit`, so it never names something already gone.
+     */
+    process: ChildProcess | undefined;
+    /** Requests to this project's server; offline once it failed or stopped. */
+    gateway: LspGateway;
+    state: ClientState;
+    /** This server's watchers over directories outside the workspace folders. */
+    dependencyWatchers: vscode.Disposable[];
+    /** Disposed with the client: a project's own trace channel, when it has one. */
+    owned: vscode.Disposable[];
+}
+
+/** The running clients, in discovery order. */
+const clients = new Map<string, ProjectClient>();
+
+/** The first project in discovery order. */
+function primaryClient(): ProjectClient | undefined {
+    return clients.values().next().value;
+}
+
+/** The workspaceState key of the project last picked for this window. */
+const CHOSEN_PROJECT = "aet-eaw-edit.chosenProject";
+
+/** Set on activation; the window's memory of the project last picked lives in its workspaceState. */
+let windowState: vscode.Memento | undefined;
+
+/** The project whose server owns a file, when one does (#230). */
+function ownerOf(fsPath: string): ProjectClient | undefined {
+    const key = ownerKey(
+        [...clients.values()].map((p) => p.spec),
+        fsPath,
+    );
+    return key === undefined ? undefined : clients.get(key);
+}
+
+/** The project of the document in front: a text editor's, or a custom editor's such as a model. */
+function activeEditorProject(): ProjectClient | undefined {
+    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+    const uri =
+        vscode.window.activeTextEditor?.document.uri ??
+        (input instanceof vscode.TabInputCustom ||
+        input instanceof vscode.TabInputText
+            ? input.uri
+            : undefined);
+    return uri?.scheme === "file" ? ownerOf(uri.fsPath) : undefined;
+}
 
 /**
- * The server process, while one is running.
- *
- * Held because the language client does not hold it for us on the factory path, and because a
- * shutdown that times out leaves nothing else able to reach it. Cleared by the process's own
- * `exit`, so it never names something already gone.
+ * The project a workspace folder stands for: the one owning the folder, else - for a folder holding
+ * several projects - the active document's when it is inside the folder, else the first inside it.
  */
-let serverProcess: ChildProcess | undefined;
+function folderProject(
+    folder: vscode.WorkspaceFolder,
+): ProjectClient | undefined {
+    const owner = ownerOf(folder.uri.fsPath);
+    if (owner !== undefined) {
+        return owner;
+    }
+    const inside = [...clients.values()].filter((p) =>
+        isInside(p.spec.workspaceRoot, folder.uri.fsPath),
+    );
+    const active = activeEditorProject();
+    return active !== undefined && inside.includes(active) ? active : inside[0];
+}
+
+function chosenProject(): ProjectClient | undefined {
+    const key = windowState?.get<string>(CHOSEN_PROJECT);
+    return key === undefined ? undefined : clients.get(key);
+}
+
+/**
+ * Where a request with no project of its own goes: the project of the document in front, else the
+ * one last picked in this window, else the first.
+ */
+function routedProject(): ProjectClient | undefined {
+    return activeEditorProject() ?? chosenProject() ?? primaryClient();
+}
 
 /**
  * Every request to the server goes through here.
  *
- * Resolves `lspClient` per call rather than holding it: the client is replaced on every restart,
- * so anything that captured one would keep talking to a dead process. Built once at module scope
- * because the panels and navigators are handed it at construction and outlive any single client.
+ * Resolves the client per call rather than holding it: clients are replaced on every restart and
+ * come and go with the projects, so anything that captured one would keep talking to a dead
+ * process. Built once at module scope because the panels and navigators are handed it at
+ * construction and outlive any single client.
  */
-const lsp = new LspGateway(() => lspClient, vscodeMessageSink);
+const lsp = new RoutedLspGateway(
+    () => routedProject()?.gateway,
+    vscodeMessageSink,
+);
+
+/** Gateways bound to one project each, by key. */
+const projectGateways = new Map<string, RoutedLspGateway>();
+
+/**
+ * A gateway bound to one project for as long as the window runs it, across its restarts.
+ *
+ * A panel opened for a project keeps talking to that project's server whatever document is in
+ * front later. With one project it is the window's own gateway.
+ */
+function gatewayFor(key: string | undefined): LspGateway {
+    if (!key || clients.size <= 1) {
+        return lsp;
+    }
+    let gateway = projectGateways.get(key);
+    if (gateway === undefined) {
+        gateway = new RoutedLspGateway(
+            () => clients.get(key)?.gateway,
+            vscodeMessageSink,
+        );
+        projectGateways.set(key, gateway);
+    }
+    return gateway;
+}
+
+/** Asks which project, and remembers the answer for this window. */
+async function pickProject(): Promise<ProjectClient | undefined> {
+    const picked = await vscode.window.showQuickPick(
+        [...clients.values()].map((p) => ({
+            label: p.spec.name,
+            description: p.spec.projectPath,
+            key: p.spec.key,
+        })),
+        { title: "EaWEdit project", placeHolder: "Select a project" },
+    );
+    if (picked === undefined) {
+        return undefined;
+    }
+    await windowState?.update(CHOSEN_PROJECT, picked.key);
+    return clients.get(picked.key);
+}
+
+/**
+ * The gateway of the project a command acts on: the document in front's, else the one last picked
+ * in this window, else the one picked now. Undefined when the picker was dismissed.
+ */
+async function commandGateway(): Promise<LspGateway | undefined> {
+    const key = await commandProjectKey();
+    return key === null ? undefined : gatewayFor(key);
+}
+
+/**
+ * The key of the project a command acts on, "" with one project or none, null when the picker was
+ * dismissed. Panels are filed under it, so two projects' panels of one name stay apart.
+ */
+async function commandProjectKey(): Promise<string | null> {
+    if (clients.size <= 1) {
+        return "";
+    }
+    const project =
+        activeEditorProject() ?? chosenProject() ?? (await pickProject());
+    return project === undefined ? null : project.spec.key;
+}
 
 let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
 let pgprojProposedProvider: PgprojProposedContentProvider | undefined;
-let localisationNavigatorProvider:
-    LocalisationNavigatorViewProvider | undefined;
-let storyNavigatorProvider: StoryNavigatorViewProvider | undefined;
+let localisationNavigatorProvider: ProjectGroupedTree<LocTreeItem> | undefined;
+let storyNavigatorProvider: ProjectGroupedTree<StoryTreeItem> | undefined;
+
+/**
+ * The projects the navigators show: one per running server, or the window's one tree - under the
+ * key "" - when there is a single project or none.
+ */
+function navigatorProjects(): NavigatorProject[] {
+    return clients.size <= 1
+        ? [{ key: "", name: "" }]
+        : [...clients.values()].map((p) => ({
+              key: p.spec.key,
+              name: p.spec.name,
+          }));
+}
+
+/** The key panels and navigators file a project's things under: "" while the window has one. */
+function viewKey(project: ProjectClient): string {
+    return clients.size <= 1 ? "" : project.spec.key;
+}
 let statusItem: vscode.StatusBarItem | undefined;
 
 /**
@@ -308,23 +494,40 @@ const WATCHED_GLOBS = [
  * hand because `synchronize.fileEvents` is fixed when the client is constructed, long before the
  * server has resolved which projects exist.
  */
-let dependencyWatchers: vscode.Disposable[] = [];
-
-/** A `.pgproj` may have changed the layer set, so the watched directories are rebuilt. */
-function onProjectFileTouched(uri: vscode.Uri): void {
-    if (uri.fsPath.toLowerCase().endsWith(".pgproj")) {
-        void refreshDependencyWatchers();
-    }
-}
+/**
+ * One OS watcher per directory and glob, shared by every server that asked for it: two projects
+ * referencing one dependency both need its changes.
+ */
+const dependencyWatcherPool = new WatcherPool((directory, glob, emit) => {
+    const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(vscode.Uri.file(directory), glob),
+    );
+    // 1 = Created, 2 = Changed, 3 = Deleted in the LSP FileChangeType enum.
+    const subscriptions = [
+        watcher.onDidCreate((uri) => emit({ path: uri.fsPath, type: 1 })),
+        watcher.onDidChange((uri) => emit({ path: uri.fsPath, type: 2 })),
+        watcher.onDidDelete((uri) => emit({ path: uri.fsPath, type: 3 })),
+    ];
+    return {
+        dispose: () => {
+            for (const subscription of subscriptions) {
+                subscription.dispose();
+            }
+            watcher.dispose();
+        },
+    };
+});
 
 /**
- * Asks the server where this workspace's content lives and watches whatever the open folders do
- * not already cover. Safe to call repeatedly: the previous set is disposed first.
+ * Asks one server where its project's content lives and watches whatever the open folders do not
+ * already cover. Safe to call repeatedly: the previous set is disposed first.
  */
-async function refreshDependencyWatchers(): Promise<void> {
-    const answer = await lsp.request<{ directories?: readonly string[] }>(
-        "aet/getWatchDirectories",
-    );
+async function refreshDependencyWatchers(
+    project: ProjectClient,
+): Promise<void> {
+    const answer = await project.gateway.request<{
+        directories?: readonly string[];
+    }>("aet/getWatchDirectories");
     if (!answer.ok) {
         return;
     }
@@ -337,37 +540,35 @@ async function refreshDependencyWatchers(): Promise<void> {
         folders,
     );
 
-    for (const watcher of dependencyWatchers) {
+    for (const watcher of project.dependencyWatchers) {
         watcher.dispose();
     }
-    dependencyWatchers = [];
-
-    for (const directory of outside) {
-        for (const glob of WATCHED_GLOBS) {
-            const watcher = vscode.workspace.createFileSystemWatcher(
-                new vscode.RelativePattern(vscode.Uri.file(directory), glob),
-            );
-            dependencyWatchers.push(
-                watcher,
-                // 1 = Created, 2 = Changed, 3 = Deleted in the LSP FileChangeType enum.
-                watcher.onDidCreate((uri) => forwardFileChange(uri, 1)),
-                watcher.onDidChange((uri) => forwardFileChange(uri, 2)),
-                watcher.onDidDelete((uri) => forwardFileChange(uri, 3)),
-            );
-        }
-    }
+    project.dependencyWatchers = outside.map((directory) =>
+        dependencyWatcherPool.acquire(directory, WATCHED_GLOBS, (event) =>
+            forwardFileChange(project, vscode.Uri.file(event.path), event.type),
+        ),
+    );
 
     logLine(
         outside.length === 0
-            ? "No project directories outside the workspace folders; no extra watchers needed."
-            : `Watching ${outside.length} project director(y/ies) outside the workspace: ${outside.join(", ")}`,
+            ? `${projectLabel(project)}No project directories outside the workspace folders; no extra watchers needed.`
+            : `${projectLabel(project)}Watching ${outside.length} project director(y/ies) outside the workspace: ${outside.join(", ")}`,
     );
 }
 
-function forwardFileChange(uri: vscode.Uri, type: 1 | 2 | 3): void {
-    void lsp.notify("workspace/didChangeWatchedFiles", {
+function forwardFileChange(
+    project: ProjectClient,
+    uri: vscode.Uri,
+    type: 1 | 2 | 3,
+): void {
+    void project.gateway.notify("workspace/didChangeWatchedFiles", {
         changes: [{ uri: uri.toString(), type }],
     });
+}
+
+/** A log line's prefix naming the project, when the window runs more than one. */
+function projectLabel(project: ProjectClient): string {
+    return project.spec.roots === undefined ? "" : `[${project.spec.name}] `;
 }
 
 let traceChannel: vscode.LogOutputChannel | undefined;
@@ -524,7 +725,33 @@ function validateConfiguration(extensionPath: string): boolean {
     return valid;
 }
 
-async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
+/**
+ * Starts one project's client and server, registered under its key before it is running so the
+ * status, the router and a stop all see it from the first moment.
+ */
+function startProjectClient(
+    context: vscode.ExtensionContext,
+    spec: ClientSpec,
+): ProjectClient {
+    const multi = spec.roots !== undefined;
+    const project: ProjectClient = {
+        spec,
+        client: undefined,
+        process: undefined,
+        gateway: new LspGateway(
+            () =>
+                project.state === "failed" || project.state === "stopped"
+                    ? undefined
+                    : project.client,
+            vscodeMessageSink,
+        ),
+        state: "starting",
+        dependencyWatchers: [],
+        owned: [],
+    };
+    clients.set(spec.key, project);
+    const label = projectLabel(project);
+
     const waitForDebugger = cfg("lsp.debug").get<boolean>(
         "waitForDebugger",
         false,
@@ -535,11 +762,9 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     }
     // Where the server's debug log goes. Without it the server writes beside its own binary,
     // because a spawned process inherits the EDITOR's working directory - one session's log landed
-    // inside the VS Code installation folder, and the workspace showed none at all.
-    const logRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (logRoot) {
-        extraArgs.push(`--log-dir=${logRoot}`);
-    }
+    // inside the VS Code installation folder, and the workspace showed none at all. One project
+    // logs in the first folder as before; several each log in their own directory.
+    extraArgs.push(`--log-dir=${spec.logDirectory}`);
     // How loud that log is. Only passed when it differs from the server's own default, so the
     // common case still starts with the command line it always had. Worth having as a setting
     // rather than a rebuild: the lines that say whether a document reached a sync handler are
@@ -553,7 +778,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     // The same resolution starts the Lua debug adapter (see luaDebugAdapterFactory), which is this
     // binary in a different mode; keeping it in one place is what keeps the two from drifting.
     const server = resolveServerCommand(context.extensionPath, extraArgs);
-    logLine(`Starting LSP server: ${server.description}`);
+    logLine(`${label}Starting LSP server: ${server.description}`);
     const serverExe = server.command;
     const serverArgs = [...server.args];
 
@@ -573,11 +798,11 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
             stdio: ["pipe", "pipe", "pipe"],
             env: resolveServerEnvironment(),
         });
-        serverProcess = child;
+        project.process = child;
         // Only clear if this is still the current one - a restart may already have replaced it.
         child.on("exit", () => {
-            if (serverProcess === child) {
-                serverProcess = undefined;
+            if (project.process === child) {
+                project.process = undefined;
             }
         });
         return child;
@@ -596,34 +821,36 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     // and it equally affected asset, project-file and localisation reloads.
     //
     // Keep this list in step with the server's registration options.
-    const fileEvents = WATCHED_GLOBS.map((glob) =>
-        vscode.workspace.createFileSystemWatcher(glob),
-    );
-    // A .pgproj change can add or drop a project reference, which moves the very directories the
-    // dependency watchers cover - so rebuild them whenever one changes, wherever it lives.
-    for (const watcher of fileEvents) {
-        context.subscriptions.push(
-            watcher.onDidCreate((uri) => onProjectFileTouched(uri)),
-            watcher.onDidChange((uri) => onProjectFileTouched(uri)),
-            watcher.onDidDelete((uri) => onProjectFileTouched(uri)),
-        );
-    }
+    //
+    // With several projects each server hears only the changes under its own directories, through
+    // the shared workspace watchers (see forwardWorkspaceChange): a server re-indexes any changed
+    // file it is told about, so one told about another project's files would index them as its own.
+    const fileEvents = multi
+        ? []
+        : WATCHED_GLOBS.map((glob) =>
+              vscode.workspace.createFileSystemWatcher(glob),
+          );
     // The client disposes what it is given, but only on a clean shutdown; tying them to the
     // extension's own lifetime means a failed start cannot leak OS watchers.
     context.subscriptions.push(...fileEvents);
 
+    // One project writes its protocol trace where it always did; several each get their own.
+    const trace = multi
+        ? createTraceChannel(`EaWEdit LSP Trace (${spec.name})`)
+        : traceChannel;
+    if (multi && trace) {
+        project.owned.push(trace);
+    }
+
     const clientOptions: LanguageClientOptions = {
-        synchronize: { fileEvents },
-        documentSelector: [
-            { scheme: "file", language: "xml" },
-            { scheme: "file", language: "lua" },
-            // Story-dialog scripts open as plaintext; the server gates all work on the
-            // pgproj storyDialog registry scope, so other .txt files stay untouched.
-            { scheme: "file", language: "plaintext", pattern: "**/*.txt" },
-        ],
-        traceOutputChannel: traceChannel,
+        synchronize: multi ? {} : { fileEvents },
+        // Story-dialog scripts open as plaintext; the server gates all work on the pgproj
+        // storyDialog registry scope, so other .txt files stay untouched.
+        documentSelector: documentSelectorFor(spec),
+        traceOutputChannel: trace,
         initializationOptions: {
-            workspaceRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+            workspaceRoot: spec.workspaceRoot,
+            projectPath: spec.projectPath,
             baseGamePath: gameDirectory("baseGameDirectory"),
             // The user's own copy of the base shader SOURCES; never shipped with this extension.
             shaderPath: shaderDirectory(),
@@ -692,8 +919,9 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
                     return;
                 }
 
+                // This client's own server: the code action that raised the command is its.
                 const fetched =
-                    await lsp.request<GetLocalisationProjectsResult>(
+                    await project.gateway.request<GetLocalisationProjectsResult>(
                         "aet/getLocalisationProjects",
                     );
                 if (!fetched.ok) {
@@ -746,22 +974,21 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
         },
     };
 
-    lspClient = new LanguageClient(
+    // The client's name is its output channel's: one per project when there are several.
+    const lspClient = new LanguageClient(
         CLIENT_ID,
-        CLIENT_NAME,
+        multi ? `${CLIENT_NAME} (${spec.name})` : CLIENT_NAME,
         serverOptions,
         clientOptions,
     );
+    project.client = lspClient;
 
     // Must be registered before start(): forces every language-feature capability to be advertised
     // statically, so registration is deterministic and immune to the dynamic-batch abort (and so
     // already-open documents get a didOpen). Otherwise a random subset of features may fail.
     lspClient.registerFeature(new ForceStaticCapabilitiesFeature());
 
-    if (statusItem) {
-        statusItem.text = "$(loading~spin) EaWEdit LSP: Starting...";
-        statusItem.show();
-    }
+    updateStatus();
 
     const traceLevel = cfg("lsp.debug").get<string>("traceServer", "off");
     const traceMap: Record<string, Trace> = {
@@ -776,31 +1003,37 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
         .then(async () => {
             // setTrace must be called after start() resolves: before that, activeConnection()
             // returns undefined and the trace level is stored but never applied to the transport.
-            await lspClient?.setTrace(resolvedTrace);
-            logLine("LSP server started and initialized.");
+            await lspClient.setTrace(resolvedTrace);
+            logLine(`${label}LSP server started and initialized.`);
 
             // The handshake is done and the server is answering; what remains is the workspace scan,
             // which runs in the background and can take half a minute on a large mod. Saying so is the
             // whole point of splitting these two states: the status used to read "Starting..." from
             // before start() until $/workspaceScanComplete, so a 30-second scan was indistinguishable
             // from a server that never came up - which is exactly how it was reported.
-            if (statusItem) {
-                statusItem.text =
-                    "$(loading~spin) EaWEdit LSP: Indexing workspace...";
-                statusItem.tooltip =
-                    "The server is connected. Language features become complete when the scan finishes.";
+            // A scan-complete that raced the handshake has already moved this on.
+            if (project.state === "starting") {
+                project.state = "indexing";
             }
+            updateStatus();
 
             // Anything already waiting on a server can go now. A model preview restored when the window
             // opened is resolved by VS Code long before this point, and without being told it would sit
             // blank for ever on the one request it made and lost.
-            lsp.markReady();
+            project.gateway.markReady();
 
             const serverVersion =
-                lspClient?.initializeResult?.serverInfo?.version;
-            logLine(`Server version reported: ${serverVersion ?? "(none)"}`);
+                lspClient.initializeResult?.serverInfo?.version;
+            logLine(
+                `${label}Server version reported: ${serverVersion ?? "(none)"}`,
+            );
             // The bundled server is this release's by construction; only a configured one can differ.
-            if (!server.bundled && serverVersion !== REQUIRED_SERVER_VERSION) {
+            // Every project runs the same executable, so the first project's server speaks for all.
+            if (
+                !server.bundled &&
+                serverVersion !== REQUIRED_SERVER_VERSION &&
+                project === primaryClient()
+            ) {
                 void vscode.window.showWarningMessage(
                     serverVersion
                         ? `EaWEdit: Server version ${serverVersion} does not match the expected version ${REQUIRED_SERVER_VERSION}. Clear "aet-eaw-edit.lsp.executable" to use the bundled server`
@@ -818,17 +1051,24 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
                         "traceServer",
                         "off",
                     );
-                    void lspClient?.setTrace(traceMap[level] ?? Trace.Off);
+                    if (project.client === lspClient) {
+                        void lspClient.setTrace(traceMap[level] ?? Trace.Off);
+                    }
                 }),
             );
         })
         .catch((e: unknown) => {
-            logLine(`LSP server failed to start: ${e}`);
-            lspClient = undefined;
-            lsp.markStopped();
-            if (statusItem) {
-                statusItem.text = "$(error) EaWEdit LSP: Failed to start";
+            // Stopped on purpose while starting - the project went, or the window restarts it.
+            if (
+                clients.get(spec.key) !== project ||
+                project.state === "stopped"
+            ) {
+                return;
             }
+            logLine(`${label}LSP server failed to start: ${e}`);
+            project.state = "failed";
+            project.gateway.markStopped();
+            updateStatus();
             void vscode.window
                 .showErrorMessage(
                     "EaWEdit: LSP server failed to start. Check the EaWEdit output channel for details.",
@@ -881,10 +1121,14 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
             // Stopped from HERE rather than by the server exiting: vscode-languageclient treats a
             // server that exits on its own as a crash and restarts it, straight back into this same
             // proposal. The client stopping itself is the only version that stays stopped.
+            // Only this project's server stops; the others are not asked about this file.
             logLine(
-                "Project migration declined - stopping the language server.",
+                `${label}Project migration declined - stopping the language server.`,
             );
-            void lspClient?.stop().then(() => {
+            project.state = "stopped";
+            project.gateway.markStopped();
+            updateStatus();
+            void lspClient.stop().then(() => {
                 void vscode.window.showWarningMessage(
                     declinedMessage(proposal.fileName),
                 );
@@ -894,20 +1138,18 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
     );
 
     lspClient.onNotification("$/workspaceScanComplete", () => {
-        logLine("Workspace scan complete.");
-        if (statusItem) {
-            statusItem.text = "$(check) EaWEdit LSP";
-            statusItem.tooltip = undefined;
-        }
+        logLine(`${label}Workspace scan complete.`);
+        project.state = "ready";
+        updateStatus();
         // Only now does the server know which projects the workspace resolved to, so this is the
         // first moment the dependency directories can be asked for. The notification fires on
         // startup only, which is why a .pgproj change rebuilds them separately.
-        void refreshDependencyWatchers();
+        void refreshDependencyWatchers(project);
         // Both navigators fetch now rather than when they are first opened. A tree view only asks
         // for its children on reveal, so without this the first click on either paid for a round
         // trip - and until the scan finished they had nothing to show but a "loading" line.
-        void storyNavigatorProvider?.preload();
-        void localisationNavigatorProvider?.preload();
+        void storyNavigatorProvider?.preload(viewKey(project));
+        void localisationNavigatorProvider?.preload(viewKey(project));
         // An encyclopedia card opened during the scan was answered from the baseline alone and kept
         // that answer: measured on EaWX, the popup width came back as vanilla's 262 before the scan
         // and the mod's own 340 after it. Nothing re-asked, so the card stayed vanilla all session.
@@ -916,7 +1158,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 
     lspClient.onNotification("aet/localisationIndexUpdated", () => {
         logLine("Localisation index updated - refreshing localisation views.");
-        localisationNavigatorProvider?.refresh();
+        localisationNavigatorProvider?.refresh(viewKey(project));
         // Open tabs decide for themselves whether to re-read: one with staged edits must not be
         // reloaded out from under the user. The notification fires on our own saves too.
         LocalisationEditorPanel.invalidateAll();
@@ -928,19 +1170,25 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
             logLine(
                 `Story graph changed: ${params.campaigns.join(", ")} - refreshing story views.`,
             );
-            storyNavigatorProvider?.refresh();
-            StoryGraphPanel.refreshInvalidated(params.campaigns ?? []);
+            storyNavigatorProvider?.refresh(viewKey(project));
+            StoryGraphPanel.refreshInvalidated(
+                params.campaigns ?? [],
+                viewKey(project),
+            );
         },
     );
 
     lspClient.onNotification(
         "aet/storySimChanged",
         (params: StorySimChangedParams) => {
-            StoryGraphPanel.simChanged({
-                campaign: params.campaign,
-                faction: params.faction,
-                scope: params.scope ?? undefined,
-            });
+            StoryGraphPanel.simChanged(
+                {
+                    campaign: params.campaign,
+                    faction: params.faction,
+                    scope: params.scope ?? undefined,
+                },
+                viewKey(project),
+            );
         },
     );
 
@@ -949,26 +1197,216 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
         // The server cannot say which previews an edit touches - a scene is assembled from a
         // variant chain, its hardpoints, their models and their weapons, and none of that is
         // tracked back to the files it came from.
-        ModelPreviewPanel.refreshAll();
+        ModelPreviewPanel.refreshAll(viewKey(project));
     });
+
+    return project;
 }
 
-async function stopLspClient(): Promise<void> {
+async function stopProjectClient(project: ProjectClient): Promise<void> {
     // The reference goes first, and on every path. `LanguageClient.stop()` throws when its
     // shutdown handshake loses the race with its own timer, and the old shape - stop, then clear -
     // meant a timeout skipped both the clear and the restart that three of the four callers do
     // next. The visible symptom was the language server never coming back after a feature-flag
     // change, with nothing in the log but "Stopping the server timed out".
-    const client = lspClient;
-    const child = serverProcess;
-    lspClient = undefined;
-    serverProcess = undefined;
+    const client = project.client;
+    const child = project.process;
+    project.client = undefined;
+    project.process = undefined;
+    project.state = "stopped";
+    for (const watcher of project.dependencyWatchers) {
+        watcher.dispose();
+    }
+    project.dependencyWatchers = [];
     try {
         await stopClient(client, logLine, {
             forceKill: () => killServer(child),
         });
     } finally {
-        lsp.markStopped();
+        project.gateway.markStopped();
+        for (const owned of project.owned) {
+            owned.dispose();
+        }
+        project.owned = [];
+    }
+}
+
+/** Stops every project's server; the window has none running afterwards. */
+async function stopAllClients(): Promise<void> {
+    const running = [...clients.values()];
+    clients.clear();
+    lsp.routesChanged();
+    await Promise.all(running.map((project) => stopProjectClient(project)));
+}
+
+/**
+ * The status bar: one server reads as the single server always has, several count the projects
+ * indexed and list each one in the tooltip.
+ */
+function updateStatus(): void {
+    if (!statusItem) {
+        return;
+    }
+    const running = [...clients.values()];
+    if (running.length === 0) {
+        return;
+    }
+
+    statusItem.text = statusText(
+        running.map((p) => ({ name: p.spec.name, state: p.state })),
+    );
+    if (running.length === 1) {
+        const state = running[0].state;
+        if (state === "indexing") {
+            statusItem.tooltip =
+                "The server is connected. Language features become complete when the scan finishes.";
+        } else if (state === "ready") {
+            statusItem.tooltip = undefined;
+        }
+    } else {
+        statusItem.tooltip = running
+            .map((p) => `${p.spec.name} - ${p.state}`)
+            .join("\n");
+    }
+    statusItem.show();
+}
+
+/** Serialises discovery runs: a folder change and a project file event can arrive together. */
+let reconciling: Promise<void> = Promise.resolve();
+
+/**
+ * Discovers the window's projects and brings the running servers in line: starts the projects that
+ * appeared, stops the ones that went, restarts the ones whose directories changed, and leaves every
+ * other server alone.
+ */
+function reconcileClients(context: vscode.ExtensionContext): Promise<void> {
+    reconciling = reconciling
+        .then(() => reconcileNow(context))
+        .catch((e: unknown) => logLine(`Project discovery failed: ${e}`));
+    return reconciling;
+}
+
+async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
+    const folders = (vscode.workspace.workspaceFolders ?? []).map(
+        (f) => f.uri.fsPath,
+    );
+    const found = await vscode.workspace.findFiles(
+        "**/*.pgproj",
+        "**/{node_modules,.git}/**",
+    );
+    const discovery = discoverProjects({
+        folders,
+        projectFiles: found.map((uri) => uri.fsPath),
+        read: (file) => {
+            try {
+                return fs.readFileSync(file, "utf8");
+            } catch {
+                return undefined;
+            }
+        },
+    });
+    const specs = clientSpecs(discovery, folders, onDiskSpelling);
+
+    if (specs.length > 1) {
+        logLine(
+            `Projects: ${specs.map((s) => s.name).join(", ")}` +
+                (discovery.nested.length > 0
+                    ? `; served as a dependency of the project around them: ${discovery.nested.join(", ")}`
+                    : "") +
+                (discovery.foldersWithoutProject.length > 0
+                    ? `; folders without a project: ${discovery.foldersWithoutProject.join(", ")}`
+                    : ""),
+        );
+    }
+
+    const running = new Map(
+        [...clients].map(([key, project]) => [key, project.spec.signature]),
+    );
+    const plan = planChanges(running, specs);
+    for (const key of plan.stop) {
+        const project = clients.get(key);
+        clients.delete(key);
+        if (project) {
+            await stopProjectClient(project);
+        }
+    }
+    for (const spec of plan.start) {
+        startProjectClient(context, spec);
+    }
+
+    // Discovery order is routing order, so the map follows the specs.
+    const ordered = specs
+        .map((s) => [s.key, clients.get(s.key)] as const)
+        .filter((entry): entry is [string, ProjectClient] => !!entry[1]);
+    clients.clear();
+    for (const [key, project] of ordered) {
+        clients.set(key, project);
+    }
+    lsp.routesChanged();
+    storyNavigatorProvider?.projectsChanged();
+    localisationNavigatorProvider?.projectsChanged();
+    updateStatus();
+}
+
+/** A directory as the disk spells it, so a document selector matches VS Code's spelling. */
+function onDiskSpelling(directory: string): string {
+    try {
+        return fs.realpathSync.native(directory).replace(/\\/g, "/");
+    } catch {
+        return directory;
+    }
+}
+
+/**
+ * The window's on-disk watchers, shared by every server when there are several.
+ *
+ * A project file created or deleted changes which servers run; any project file change may move the
+ * directories a server watches outside the folders. With several projects, every other change goes
+ * to the servers whose directories hold it - one server hearing another project's file would index
+ * it as its own.
+ */
+function watchWorkspace(context: vscode.ExtensionContext): void {
+    for (const glob of WATCHED_GLOBS) {
+        const watcher = vscode.workspace.createFileSystemWatcher(glob);
+        const handle = (uri: vscode.Uri, type: 1 | 2 | 3) => {
+            if (uri.fsPath.toLowerCase().endsWith(".pgproj")) {
+                onProjectFileTouched(context);
+            }
+            forwardWorkspaceChange(uri, type);
+        };
+        context.subscriptions.push(
+            watcher,
+            watcher.onDidCreate((uri) => handle(uri, 1)),
+            watcher.onDidChange((uri) => handle(uri, 2)),
+            watcher.onDidDelete((uri) => handle(uri, 3)),
+        );
+    }
+}
+
+function onProjectFileTouched(context: vscode.ExtensionContext): void {
+    // Not validated here: the configuration was checked when the servers started, and a project
+    // file saved on every keystroke must not raise the same settings errors each time.
+    if (cfg("lsp").get<boolean>("enabled") !== true) {
+        return;
+    }
+    void reconcileClients(context).then(() => {
+        // A .pgproj change can add or drop a project reference, which moves the very directories the
+        // dependency watchers cover - so rebuild them whenever one changes, wherever it lives.
+        for (const project of clients.values()) {
+            void refreshDependencyWatchers(project);
+        }
+    });
+}
+
+/** Several projects: a change goes to the servers whose directories hold it. One: its client syncs. */
+function forwardWorkspaceChange(uri: vscode.Uri, type: 1 | 2 | 3): void {
+    for (const project of clients.values()) {
+        if (
+            project.spec.watched !== undefined &&
+            ownsPath(project.spec, uri.fsPath)
+        ) {
+            forwardFileChange(project, uri, type);
+        }
     }
 }
 
@@ -1205,7 +1643,13 @@ export async function activate(
     context.subscriptions.push(
         vscode.debug.registerDebugConfigurationProvider(
             LUA_DEBUG_TYPE,
-            new LuaDebugConfigurationProvider(lsp),
+            new LuaDebugConfigurationProvider((folder) => {
+                const project =
+                    folder === undefined ? undefined : folderProject(folder);
+                return project === undefined
+                    ? lsp
+                    : gatewayFor(viewKey(project));
+            }),
         ),
         vscode.debug.registerDebugAdapterDescriptorFactory(
             LUA_DEBUG_TYPE,
@@ -1238,7 +1682,10 @@ export async function activate(
         ),
     );
 
-    localisationNavigatorProvider = new LocalisationNavigatorViewProvider(lsp);
+    localisationNavigatorProvider = new ProjectGroupedTree<LocTreeItem>(
+        navigatorProjects,
+        (key) => new LocalisationNavigatorViewProvider(gatewayFor(key)),
+    );
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider(
             LocalisationNavigatorViewProvider.viewId,
@@ -1277,6 +1724,14 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.openLocalisationEditor",
             async (arg?: LocTreeItem) => {
+                // A clicked row belongs to the project whose tree it is in.
+                const projectKey =
+                    (arg && localisationNavigatorProvider?.projectOf(arg)) ??
+                    (await commandProjectKey());
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -1393,6 +1848,11 @@ export async function activate(
                           category?: string;
                       },
             ) => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -1527,6 +1987,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.setLocalisationProjectFormat",
             async () => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -1587,6 +2052,11 @@ export async function activate(
                     );
                     return;
                 }
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -1627,7 +2097,10 @@ export async function activate(
         ),
     );
 
-    storyNavigatorProvider = new StoryNavigatorViewProvider(lsp);
+    storyNavigatorProvider = new ProjectGroupedTree<StoryTreeItem>(
+        navigatorProjects,
+        (key) => new StoryNavigatorViewProvider(gatewayFor(key)),
+    );
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider(
             StoryNavigatorViewProvider.viewId,
@@ -1645,6 +2118,14 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.openStoryGraph",
             async (arg?: StoryTreeItem) => {
+                // A clicked row belongs to the project whose tree it is in.
+                const projectKey =
+                    (arg && storyNavigatorProvider?.projectOf(arg)) ??
+                    (await commandProjectKey());
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -1699,7 +2180,14 @@ export async function activate(
                     target = picked?.target;
                 }
                 if (target) {
-                    StoryGraphPanel.show(target, context.extensionUri, lsp);
+                    StoryGraphPanel.show(
+                        target,
+                        context.extensionUri,
+                        lsp,
+                        undefined,
+                        false,
+                        projectKey,
+                    );
                 }
             },
         ),
@@ -1768,13 +2256,49 @@ export async function activate(
         `  lsp.projectPath  = ${cfg("lsp.devMode").get<string>("projectPath") ?? "(not set)"}`,
     );
 
+    windowState = context.workspaceState;
+    watchWorkspace(context);
+    // Changes the project remembered for commands; the window asks on its own only when the
+    // document in front belongs to no project and nothing was picked yet.
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "aet-eaw-edit.lsp.selectProject",
+            async () => {
+                if (clients.size <= 1) {
+                    void vscode.window.showInformationMessage(
+                        "EaWEdit: One project open",
+                    );
+                    return;
+                }
+                await pickProject();
+            },
+        ),
+    );
+    // A folder added or removed changes which projects the window holds; only the servers of the
+    // projects that came or went start or stop.
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            if (cfg("lsp").get<boolean>("enabled") === true) {
+                // A server kept running may now find a dependency inside a folder, or outside one:
+                // its own watchers over directories outside the folders are rebuilt too.
+                void reconcileClients(context).then(() => {
+                    for (const project of clients.values()) {
+                        if (project.state === "ready") {
+                            void refreshDependencyWatchers(project);
+                        }
+                    }
+                });
+            }
+        }),
+    );
+
     const restartServer = async () => {
-        await stopLspClient();
+        await stopAllClients();
         if (
             cfg("lsp").get<boolean>("enabled") === true &&
             validateConfiguration(context.extensionPath)
         ) {
-            await startLspClient(context);
+            await reconcileClients(context);
         }
     };
 
@@ -1786,20 +2310,20 @@ export async function activate(
 
             const enabled = cfg("lsp").get<boolean>("enabled") === true;
             logLine(
-                `Configuration changed. lsp.enabled=${enabled}, server running=${!!lspClient}`,
+                `Configuration changed. lsp.enabled=${enabled}, servers running=${clients.size}`,
             );
 
-            if (!enabled && lspClient) {
-                await stopLspClient();
+            if (!enabled && clients.size > 0) {
+                await stopAllClients();
             } else if (
                 enabled &&
-                !lspClient &&
+                clients.size === 0 &&
                 validateConfiguration(context.extensionPath)
             ) {
                 logLine("Starting LSP server after configuration change.");
-                await startLspClient(context);
+                await reconcileClients(context);
             } else if (
-                lspClient &&
+                clients.size > 0 &&
                 (e.affectsConfiguration("aet-eaw-edit.features") ||
                     e.affectsConfiguration("aet-eaw-edit.lsp.executable") ||
                     e.affectsConfiguration("aet-eaw-edit.lua.analyzerPath"))
@@ -1820,7 +2344,7 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.debug.forceStartup",
             async () => {
-                await stopLspClient();
+                await stopAllClients();
                 const serverMissing = serverProblem(
                     resolveServerCommand(context.extensionPath, []),
                     fs.existsSync,
@@ -1828,7 +2352,7 @@ export async function activate(
                 if (serverMissing) {
                     void vscode.window.showErrorMessage(serverMissing);
                 } else {
-                    await startLspClient(context);
+                    await reconcileClients(context);
                 }
             },
         ),
@@ -1842,7 +2366,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.revalidateWorkspace",
             async () => {
-                await lsp.executeCommand(
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.revalidateWorkspace",
                     [],
                     "could not revalidate the workspace",
@@ -1855,6 +2383,7 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.newModProject",
             async () => {
+                // Writes a new project wherever it is told to; no open project is asked about it.
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -1896,7 +2425,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.reloadProject",
             async () => {
-                await lsp.executeCommand(
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                await gatewayFor(projectKey).executeCommand(
                     "aet-eaw-edit.lsp.reloadProject",
                     [],
                     "could not reload the project",
@@ -1909,6 +2442,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.initLocalisationProject",
             async () => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -2007,6 +2545,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.importLocalisationProject",
             async () => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -2205,7 +2748,11 @@ export async function activate(
     // feature flag says: the flag gates the SERVER endpoints, and a custom editor that vanishes with
     // a setting would leave those files opening as binary with no hint why.
     context.subscriptions.push(
-        ModelPreviewEditorProvider.register(context, lsp),
+        ModelPreviewEditorProvider.register(context, (uri) => {
+            const owner = ownerOf(uri.fsPath);
+            const projectKey = owner ? viewKey(owner) : "";
+            return { lsp: gatewayFor(projectKey), projectKey };
+        }),
     );
 
     // The bug report block. Works with the server down too - "not running" is itself the most
@@ -2252,6 +2799,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.previewModel",
             async (referenceArg?: string) => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -2266,6 +2818,7 @@ export async function activate(
                     lsp,
                     { kind: "model", modelReference: name },
                     name,
+                    projectKey,
                 );
             },
         ),
@@ -2286,6 +2839,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.previewAssembledUnit",
             async (objectIdArg?: string) => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -2309,6 +2867,7 @@ export async function activate(
                     lsp,
                     { kind: "object", objectId: id },
                     id,
+                    projectKey,
                 );
             },
         ),
@@ -2318,6 +2877,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.showEncyclopedia",
             async (objectIdArg?: string) => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -2376,6 +2940,11 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.showEffectiveObject",
             async (objectIdArg?: string) => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
                 if (!lsp.requireRunning()) {
                     return;
                 }
@@ -2402,7 +2971,7 @@ export async function activate(
                     path: `/${objectId} (effective preview, read-only).xml`,
                     query: objectId,
                 });
-                effectiveObjectProvider?.refresh(uri);
+                effectiveObjectProvider?.refresh(uri, projectKey);
                 const doc = await vscode.workspace.openTextDocument(uri);
                 // Open beside the active editor so the preview sits next to the source it was generated from.
                 await vscode.window.showTextDocument(doc, {
@@ -2418,7 +2987,7 @@ export async function activate(
         validateConfiguration(context.extensionPath)
     ) {
         logLine("LSP enabled - starting server.");
-        void startLspClient(context);
+        void reconcileClients(context);
     } else if (cfg("lsp").get<boolean>("enabled") !== true) {
         logLine(
             "LSP disabled (aet-eaw-edit.lsp.enabled is false). Use the restart command or enable it in settings.",
@@ -2435,5 +3004,5 @@ export async function deactivate(): Promise<void> {
     EncyclopediaPanel.disposeAll();
     ModelPreviewPanel.disposeAll();
     ModelInspectorPanel.disposeAll();
-    await stopLspClient();
+    await stopAllClients();
 }

@@ -89,6 +89,8 @@ const ENERGY_SETTING = "aet-eaw-edit.features.preview.energyPool";
 export class ModelPreviewPanel extends WebviewPanelHost {
     static readonly viewType = "aetModelPreview";
     private static readonly panels = new PanelRegistry<ModelPreviewPanel>();
+    /** The project the preview belongs to; "" while the window holds one (#230). */
+    projectKey = "";
     /**
      * Every open preview, for the refresh push.
      *
@@ -187,20 +189,34 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         subject: PreviewSubject,
         title: string,
         panel: vscode.WebviewPanel,
+        projectKey = "",
     ): ModelPreviewPanel {
-        return new ModelPreviewPanel(extensionUri, lsp, subject, title, panel);
+        const preview = new ModelPreviewPanel(
+            extensionUri,
+            lsp,
+            subject,
+            title,
+            panel,
+        );
+        preview.projectKey = projectKey;
+        return preview;
     }
 
-    /** Opens, or reveals and retargets, the preview for one subject. */
+    /**
+     * Opens, or reveals and retargets, the preview for one subject. `projectKey` files it under its
+     * project, so two projects' objects of one name open two previews, each on its own server.
+     */
     static show(
         extensionUri: vscode.Uri,
         lsp: LspGateway,
         subject: PreviewSubject,
         title: string,
+        projectKey = "",
     ): ModelPreviewPanel {
         // One panel per subject: opening the same model twice should not give two GPU contexts, and
         // two panels for one thing is a way to run out of them.
-        const key = panelKey(subjectKey(subject));
+        const subjectPanel = panelKey(subjectKey(subject));
+        const key = projectKey ? `${projectKey}|${subjectPanel}` : subjectPanel;
         const existing = ModelPreviewPanel.panels.get(key);
 
         if (existing !== undefined) {
@@ -209,6 +225,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         }
 
         const panel = new ModelPreviewPanel(extensionUri, lsp, subject, title);
+        panel.projectKey = projectKey;
         return ModelPreviewPanel.panels.track(key, panel);
     }
 
@@ -220,11 +237,13 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * Re-reads the tree behind every open preview.
      *
      * Called on <c>aet/previewSceneChanged</c>, which the server pushes once the new index is live -
-     * so this reads the edit rather than racing it.
+     * so this reads the edit rather than racing it. Only the notifying project's previews re-read.
      */
-    static refreshAll(): void {
+    static refreshAll(projectKey = ""): void {
         for (const panel of ModelPreviewPanel.live) {
-            void panel.sendScene(true);
+            if (panel.projectKey === projectKey) {
+                void panel.sendScene(true);
+            }
         }
     }
 
