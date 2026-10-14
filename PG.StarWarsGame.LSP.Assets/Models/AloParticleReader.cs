@@ -474,9 +474,16 @@ public static class AloParticleReader
                 0x47 => p with { WeatherCubeDistance = ReadSingle(bytes, at) },
                 0x48 => p with { RandomRotation = bytes[at] != 0 },
 
-                // Stored by the game, skipped by the reference viewer (measured, #163). One float
-                // for the colour variation, which the game copies to red, green and blue.
-                0x11 => p with { ColorVariation = ReadSingle(bytes, at) },
+                // Stored by the game, skipped by the reference viewer (measured, #163).
+                // 0x11 is the older one-value form of 0x2C: the game writes it into the same
+                // colour variation, red, green and blue alike, alpha untouched - so whichever of
+                // the two comes later in the file wins, as it does in the game.
+                0x11 => p with
+                {
+                    RandomColors = new Vector4(
+                        ReadSingle(bytes, at), ReadSingle(bytes, at), ReadSingle(bytes, at),
+                        p.RandomColors.W)
+                },
                 0x14 => p with { PriorityTicket = ReadInt32(bytes, at) },
                 0x15 => p with { Visible = bytes[at] != 0 },
                 0x2B => p with { DepthSort = bytes[at] != 0 },

@@ -487,9 +487,11 @@ public sealed class AloParticleReaderTest
     {
         // Measured in the game's reader: six ids the reference viewer skips are stored by the
         // game. They are read here because what the game reads the preview has to apply (#163).
-        // Colour variation is ONE float the game copies to red, green and blue.
+        // 0x11 is the older one-value form of the random colours: one float written to red,
+        // green and blue, alpha kept - and the later of the two in the file wins.
         var p = AloParticleReader.Read(System("p", null, Emitter(properties:
         [
+            Mini(0x2C, F32(0.1f, 0.2f, 0.3f, 0.4f)),
             Mini(0x11, F32(0.25f)),
             Mini(0x14, I32(7)),
             Mini(0x15, [0]),
@@ -498,7 +500,7 @@ public sealed class AloParticleReaderTest
             Mini(0x44, [1])
         ]))).Emitters[0].Properties;
 
-        Assert.Equal(0.25f, p.ColorVariation);
+        Assert.Equal(new Vector4(0.25f, 0.25f, 0.25f, 0.4f), p.RandomColors);
         Assert.Equal(7, p.PriorityTicket);
         Assert.False(p.Visible);
         Assert.True(p.DepthSort);

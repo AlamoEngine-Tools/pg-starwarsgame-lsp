@@ -171,11 +171,9 @@ public sealed record AlamoEmitterProperties
     public float WeatherCubeDistance { get; init; }
     public bool RandomRotation { get; init; }
 
-    // Six properties the game's reader stores and the reference viewer skips (measured, #163).
+    // Five properties the game's reader stores and the reference viewer skips (measured, #163).
     // Read because what the game reads the preview has to apply; their use is the renderer's.
-
-    /// <summary>One variation value the game copies to red, green and blue; alpha untouched.</summary>
-    public float ColorVariation { get; init; }
+    // A sixth, 0x11, is the older one-value form of RandomColors and lands there.
 
     /// <summary>The emitter's draw priority ticket, as stored.</summary>
     public int PriorityTicket { get; init; }

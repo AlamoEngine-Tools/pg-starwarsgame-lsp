@@ -112,6 +112,8 @@
     visibility, depth sort, weather cutoff distance, wind disturbance
   - Emitter blocks read in any order, as the game reads them; a chunk that is not an emitter inside the emitter list
     is still refused, as the game refuses it
+  - **Re-validate Workspace** reads every loose particle file and lists the same findings in the Problems view, a
+    file the game would fail to load as an error; never at startup or on opening a preview
 
 ### Diagnostic IDs
 

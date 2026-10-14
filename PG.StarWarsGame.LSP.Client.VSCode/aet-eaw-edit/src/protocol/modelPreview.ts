@@ -1135,11 +1135,10 @@ export interface AlamoEmitterProperties {
     /** Derived from the rotation track when `randomRotation` is set. */
     randomRotationAverage: number;
     /**
-     * Six properties the game stores and the reference viewer skips (measured). Read so the
+     * Five properties the game stores and the reference viewer skips (measured). Read so the
      * preview can apply what the game applies; `visible` is inert in the game, which sets it to
-     * true after loading.
+     * true after loading. A sixth, the older one-value colour variation, lands in `randomColors`.
      */
-    colorVariation?: number;
     priorityTicket?: number;
     visible?: boolean;
     depthSort?: boolean;
