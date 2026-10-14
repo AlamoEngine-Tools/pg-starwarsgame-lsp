@@ -199,19 +199,19 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
             else _logger.LogWarning("Lua entry-point file not found at {Path}", path);
         }
 
-        var contents = new List<string>();
+        var stubs = new List<LuaStubFile>();
         foreach (var file in files)
         {
             var path = Path.Combine(luaDir, file);
             if (fs.File.Exists(path))
-                contents.Add(fs.File.ReadAllText(path));
+                stubs.Add(new LuaStubFile(file, fs.File.ReadAllText(path)));
             else
                 _logger.LogWarning("Lua stub file not found at {Path}", path);
         }
 
-        _luaProxy.Configure(new LuaApiSchemaProvider(contents, entryPoints));
+        _luaProxy.Configure(LuaApiSchemaProvider.FromFiles(stubs, entryPoints));
         if (_luaStubs is not null) _luaStubs.Directory = luaDir;
-        _logger.LogInformation("Lua schema loaded from {Dir}: {Count} of {Listed} files", luaDir, contents.Count,
+        _logger.LogInformation("Lua schema loaded from {Dir}: {Count} of {Listed} files", luaDir, stubs.Count,
             files.Count);
     }
 
@@ -238,12 +238,12 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         var entryPoints = await LoadEntryPointsFromHttpAsync(http, luaBaseUrl, entryPointsFile, ct);
 
         // Apply whatever is cached immediately so the parser has a schema while downloading.
-        var cached = new List<string>();
+        var cached = new List<LuaStubFile>();
         foreach (var file in files)
             if (_cache.TryLoadText("lua/" + file, out var existing))
-                cached.Add(existing);
+                cached.Add(new LuaStubFile(file, existing));
         if (cached.Count > 0)
-            _luaProxy.Configure(new LuaApiSchemaProvider(cached, entryPoints));
+            _luaProxy.Configure(LuaApiSchemaProvider.FromFiles(cached, entryPoints));
 
         var fresh = await Task.WhenAll(files.Select(async file =>
         {
@@ -251,7 +251,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
             {
                 var content = await http.GetStringAsync(luaBaseUrl + file, ct);
                 _cache.UpdateText("lua/" + file, content);
-                return content;
+                return new LuaStubFile(file, content);
             }
             catch (Exception ex)
             {
@@ -263,7 +263,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         var loaded = fresh.Where(c => c is not null).Select(c => c!).ToList();
         if (loaded.Count == files.Count)
         {
-            _luaProxy.Configure(new LuaApiSchemaProvider(loaded, entryPoints));
+            _luaProxy.Configure(LuaApiSchemaProvider.FromFiles(loaded, entryPoints));
             _logger.LogInformation("Lua schema loaded from {Url}: {Count} files", luaBaseUrl, loaded.Count);
         }
         else if (cached.Count > 0)
@@ -272,7 +272,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         }
         else if (loaded.Count > 0)
         {
-            _luaProxy.Configure(new LuaApiSchemaProvider(loaded, entryPoints));
+            _luaProxy.Configure(LuaApiSchemaProvider.FromFiles(loaded, entryPoints));
             _logger.LogWarning("Lua schema download incomplete; {Count} of {Listed} files loaded", loaded.Count,
                 files.Count);
         }

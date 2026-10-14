@@ -317,6 +317,37 @@ public sealed class LuaHoverHandlerTest
         Assert.Contains("not found", content, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    ///     The schema carries a stub per vanilla library. Its documentation shows on a call the way
+    ///     an engine function's does, although the name is the library's, not the engine's.
+    /// </summary>
+    [Fact]
+    public async Task Handle_CursorOnALibraryFunction_ShowsTheLibraryStubsDocumentation()
+    {
+        var schema = LuaApiSchemaProvider.FromFiles([
+            new LuaStubFile("api.d.lua", "function Find_Player(name) end\n"),
+            new LuaStubFile("pgbase.d.lua",
+                """
+                ---@meta
+                --- Pauses the execution of the calling thread for a certain amount of game time.
+                ---@param time number The time to pause the script in seconds.
+                function Sleep(time) end
+                """)
+        ]);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "Sleep(2)", 1);
+
+        var handler = BuildHandler(GameIndex.Empty, schema, host);
+        var result = await handler.Handle(HoverAt(0, 2), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = GetMarkdown(result!);
+        Assert.Contains("Sleep", content);
+        Assert.Contains("Pauses the execution", content);
+        Assert.Contains("time", content);
+    }
+
     [Fact]
     public async Task Handle_CursorOnEngineGlobal_ReturnsHoverWithDescription()
     {
