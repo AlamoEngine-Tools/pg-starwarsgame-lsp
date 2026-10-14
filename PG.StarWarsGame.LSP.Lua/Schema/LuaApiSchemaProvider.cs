@@ -21,26 +21,66 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     // (nothing an index records depends on them).
     private readonly IReadOnlyDictionary<string, LuaEntryPoint> _entryPoints;
 
+    /// <summary>
+    ///     The three stub files that describe what the ENGINE binds into every script. Everything
+    ///     else the manifest lists documents a vanilla library - names a script gets only by
+    ///     requiring that library, so they are known for hover and parameters, never declared.
+    /// </summary>
+    private static readonly HashSet<string> EngineStubFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "api.d.lua", "stdlib.d.lua", "globals.d.lua"
+    };
+
+    /// <summary>Unnamed content: the tests' shorthand, counted as the engine's.</summary>
     public LuaApiSchemaProvider(IEnumerable<string> fileContents, IEnumerable<LuaEntryPoint>? entryPoints = null)
+        : this(fileContents.Select(c => new LuaStubFile("api.d.lua", c)).ToList(), entryPoints)
+    {
+    }
+
+    /// <summary>
+    ///     The provider over the stub files as the manifest lists them, each with its name - the
+    ///     way the server loads them. A factory rather than a second constructor so that an empty
+    ///     collection expression still resolves to the unnamed-content form.
+    /// </summary>
+    public static LuaApiSchemaProvider FromFiles(
+        IEnumerable<LuaStubFile> files, IEnumerable<LuaEntryPoint>? entryPoints = null)
+    {
+        return new LuaApiSchemaProvider(files.ToList(), entryPoints);
+    }
+
+    private LuaApiSchemaProvider(List<LuaStubFile> stubs, IEnumerable<LuaEntryPoint>? entryPoints)
     {
         _entryPoints = (entryPoints ?? []).GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-        var contents = fileContents.ToList();
         var functions = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
         var memberRefs = new Dictionary<string, List<XmlRefEntry>>(StringComparer.OrdinalIgnoreCase);
         var declaredGlobals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var content in contents)
-            ParseContent(content, functions, memberRefs, declaredGlobals);
-        Fingerprint = contents.Count == 0
+        var engineFunctions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var stub in stubs)
+        {
+            // A library stub's typed globals and functions are documentation; only the engine's
+            // own files declare what every script can call.
+            var isEngine = EngineStubFiles.Contains(stub.Name);
+            var found = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
+            ParseContent(stub.Content, found, memberRefs, isEngine ? declaredGlobals : []);
+            foreach (var (name, entry) in found)
+            {
+                functions[name] = entry;
+                if (isEngine) engineFunctions.Add(name);
+            }
+        }
+
+        Fingerprint = stubs.Count == 0
             ? ""
-            : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\0', contents))));
+            : Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\0', stubs.Select(s => s.Content)))));
         _functions = functions;
         _memberRefs = memberRefs.ToDictionary(
             kvp => kvp.Key,
             kvp => (IReadOnlyList<XmlRefEntry>)kvp.Value,
             StringComparer.OrdinalIgnoreCase);
         AllFunctionNames = new HashSet<string>(functions.Keys, StringComparer.OrdinalIgnoreCase);
-        declaredGlobals.UnionWith(functions.Keys);
+        declaredGlobals.UnionWith(engineFunctions);
         DeclaredGlobalNames = declaredGlobals;
     }
 

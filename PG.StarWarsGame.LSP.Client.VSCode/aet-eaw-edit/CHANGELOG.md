@@ -90,6 +90,10 @@
 
 ### Fixes
 
+- **Vanilla library documentation** - the schema's stub per vanilla library (PGBase, PGCommands, PGEvents,
+  PGStateMachine, PGTaskForce and the rest) is read for hover and parameters, without turning a library's
+  functions into engine globals: a call without the library's `require` is still reported, and a library
+  function can still be renamed across the library and its callers
 - **`<Base>` values** - read; the HTML parser underneath treated `<Base>` as an empty element (2 vanilla files)
 - **Panel refreshes during startup** - model preview, story graph and localisation editor refresh once when the scan
   completes, not after every scan stage

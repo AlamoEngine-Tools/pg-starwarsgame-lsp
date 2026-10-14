@@ -146,6 +146,23 @@ public sealed class LuaRenameHandlerTest
         Assert.True(ClaimsAt("Find_Player(\"x\")", 0, 3, BuildIndex(), engine));
     }
 
+    /// <summary>
+    ///     A vanilla library's function is documented by a stub of its own, but the game does not
+    ///     bind it: a script defines it, and a rename across the library and its callers is the
+    ///     analyzer's to do, as before the library stubs existed.
+    /// </summary>
+    [Fact]
+    public void ALibraryName_IsNotOurs()
+    {
+        var withLibrary = LuaApiSchemaProvider.FromFiles([
+            new LuaStubFile("api.d.lua", "---@param name string\nfunction Find_Player(name) end"),
+            new LuaStubFile("pgbase.d.lua", "---@param time number\nfunction Sleep(time) end")
+        ]);
+
+        Assert.False(ClaimsAt("Sleep(1)", 0, 2, BuildIndex(), withLibrary));
+        Assert.True(ClaimsAt("Find_Player(\"x\")", 0, 3, BuildIndex(), withLibrary));
+    }
+
     // ── HandleRename: XmlObject string path ──────────────────────────────────
 
     [Fact]

@@ -190,7 +190,50 @@ public sealed class LuaApiSchemaProviderTest
         // Every file lua/_files.json lists, the way the server loads them.
         var dir = Path.Combine(AppContext.BaseDirectory, "schema", "lua");
         var files = Directory.GetFiles(dir, "*.d.lua").OrderBy(f => f, StringComparer.Ordinal);
-        return new LuaApiSchemaProvider(files.Select(File.ReadAllText));
+        return LuaApiSchemaProvider.FromFiles(
+            files.Select(f => new LuaStubFile(Path.GetFileName(f), File.ReadAllText(f))));
+    }
+
+    [Fact]
+    public void ProductionSchema_LibraryStubsDocumentWithoutDeclaringEngineGlobals()
+    {
+        // The manifest lists the three engine files and one stub per vanilla library. A library
+        // function is documented - hover, parameters - but it is NOT an engine global: the game
+        // binds it only when the script requires the library, and the scope analyzer and the
+        // rename handler must keep treating it as the library's.
+        var provider = BuildFromProductionFile();
+
+        Assert.Contains("Sleep", provider.AllFunctionNames);
+        Assert.NotEmpty(provider.GetFunctionParams("Sleep"));
+        Assert.DoesNotContain("Sleep", provider.DeclaredGlobalNames);
+        Assert.DoesNotContain("ScriptExit", provider.DeclaredGlobalNames);
+        Assert.Contains("Find_Player", provider.DeclaredGlobalNames);
+    }
+
+    [Fact]
+    public void LibraryStubFile_DocumentsItsFunctions_WithoutDeclaringThemAsEngineGlobals()
+    {
+        var provider = LuaApiSchemaProvider.FromFiles([
+            new LuaStubFile("api.d.lua", "---@param name string\nfunction Find_Player(name) end\n"),
+            new LuaStubFile("pgbase.d.lua",
+                "---@meta\n--- Pauses the thread.\n---@param time number\nfunction Sleep(time) end\n" +
+                "---@type number\nYieldCount = nil\n")
+        ]);
+
+        Assert.Contains("Sleep", provider.AllFunctionNames);
+        Assert.Single(provider.GetFunctionParams("Sleep"));
+        Assert.DoesNotContain("Sleep", provider.DeclaredGlobalNames);
+        Assert.DoesNotContain("YieldCount", provider.DeclaredGlobalNames);
+        Assert.Contains("Find_Player", provider.DeclaredGlobalNames);
+    }
+
+    [Fact]
+    public void UnnamedContent_CountsAsEngineStubs()
+    {
+        // The shorthand every other test uses: content with no file name is the engine's.
+        var provider = Build("function Find_Player(name) end\n");
+
+        Assert.Contains("Find_Player", provider.DeclaredGlobalNames);
     }
 
     [Fact]

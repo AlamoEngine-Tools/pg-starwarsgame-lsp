@@ -93,6 +93,23 @@ public sealed class LuaGlobalScopeAnalyzerTest
     }
 
     [Fact]
+    public void Analyze_NameALibraryStubDocuments_IsStillAMissingRequire()
+    {
+        // The schema carries a stub per vanilla library for the documentation. The game binds
+        // none of those names by itself - PGBase defines Sleep when a script requires it - so a
+        // call without the require is as missing as it was before the stub existed.
+        var schema = LuaApiSchemaProvider.FromFiles([
+            new LuaStubFile("api.d.lua", "function Find_Player(name) end\n"),
+            new LuaStubFile("pgbase.d.lua", "---@param time number\nfunction Sleep(time) end\n")
+        ]);
+        var index = AddCurrentDoc(IndexWithLibGlobal("Sleep", "file:///scripts/library/pgbase.lua"));
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, "Sleep(1)", index, schema, s_fileHelper);
+        var diagnostic = Assert.Single(result);
+        Assert.Contains("Sleep", diagnostic.Message);
+        Assert.Contains("not required", diagnostic.Message);
+    }
+
+    [Fact]
     public void Analyze_NameTheStubsDoNotDeclare_IsAnOrdinaryLibraryGlobal()
     {
         // Lua 5.1 names mean nothing by themselves: the engine links what the stubs declare, and
