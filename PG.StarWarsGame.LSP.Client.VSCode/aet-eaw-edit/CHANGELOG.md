@@ -116,6 +116,9 @@
     file the game would fail to load as an error; never at startup or on opening a preview
   - A particle's random alpha offset varies both ways, within the declared variation, as the game draws it; it
     only ever added before
+  - Emitters update and draw in priority-ticket order, and a spawn link names the emitter whose ticket matches, as
+    the game resolves them after loading; every shipped file numbers its tickets in file order, so only a
+    reordered file looks different
 
 ### Diagnostic IDs
 
