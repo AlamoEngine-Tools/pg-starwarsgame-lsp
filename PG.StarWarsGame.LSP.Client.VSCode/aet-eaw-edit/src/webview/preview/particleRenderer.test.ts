@@ -591,6 +591,95 @@ describe("chained emitters", () => {
         );
     });
 
+    /**
+     * Measured in the game (FoC x64, 2024 release): after loading, an emitter's spawn links are
+     * resolved by looking up the emitter whose PRIORITY TICKET equals the stored value, not the
+     * emitter at that position in the file. Every shipped system numbers its tickets 0, 1, 2 in
+     * file order, so the two readings agree there; a file the Particle Editor reordered is where
+     * they part.
+     */
+    it("resolves a spawn link by the child's priority ticket, not its position", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "debris",
+                    spawnOnDeath: 7,
+                    position: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 7 },
+                    }),
+                    properties: properties({
+                        priorityTicket: 5,
+                        particlesPerSecond: 20,
+                        lifetime: 0.05,
+                    }),
+                }),
+                emitter({
+                    name: "puff",
+                    properties: properties({
+                        priorityTicket: 7,
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+
+        instance.update(0.1);
+        instance.update(0.1);
+
+        const puffs = instance.emitterParticles(1);
+        assert.ok(
+            puffs.length > 0,
+            "the child named by ticket 7 was not spawned",
+        );
+        assert.ok(
+            puffs.every((p) => Math.abs(p.position.z - 7) < 1e-6),
+            "the child emitted on its own instead of where its parent died: " +
+                "the link was read as a position, not a ticket",
+        );
+    });
+
+    /**
+     * Measured in the game: after loading, a system's emitters are sorted by priority ticket,
+     * ascending, and that order is the update and draw order from then on. A file whose tickets
+     * are not in file order draws in ticket order, whatever the file says.
+     */
+    it("updates and draws the emitters in ascending ticket order", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "c",
+                    properties: properties({ priorityTicket: 2 }),
+                }),
+                emitter({
+                    name: "a",
+                    properties: properties({ priorityTicket: 0 }),
+                }),
+                emitter({
+                    name: "b",
+                    properties: properties({ priorityTicket: 1 }),
+                }),
+            ]),
+        );
+
+        assert.deepEqual(instance.drawOrder(), [1, 2, 0]);
+    });
+
+    it("keeps the file order where no emitter carries a ticket", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({ name: "first" }),
+                emitter({ name: "second" }),
+            ]),
+        );
+
+        assert.deepEqual(instance.drawOrder(), [0, 1]);
+    });
+
     /** `spawnOnDeath` is the other half: three emitters in the corpus, all explosion debris. */
     it("bursts a death child where its parent died", () => {
         const instance = new ParticleSystemInstance(

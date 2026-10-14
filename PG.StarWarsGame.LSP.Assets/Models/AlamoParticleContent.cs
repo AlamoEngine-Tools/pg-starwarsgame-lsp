@@ -175,7 +175,12 @@ public sealed record AlamoEmitterProperties
     // Read because what the game reads the preview has to apply; their use is the renderer's.
     // A sixth, 0x11, is the older one-value form of RandomColors and lands there.
 
-    /// <summary>The emitter's draw priority ticket, as stored.</summary>
+    /// <summary>
+    ///     The emitter's priority ticket. Measured: after loading, the game sorts a system's
+    ///     emitters by it, ascending, and resolves the spawn links by it - a link names the emitter
+    ///     whose ticket equals the stored value, not a position in the file. Every shipped and
+    ///     workshop system numbers its tickets in file order.
+    /// </summary>
     public int PriorityTicket { get; init; }
 
     /// <summary>
@@ -184,13 +189,19 @@ public sealed record AlamoEmitterProperties
     /// </summary>
     public bool Visible { get; init; } = true;
 
-    /// <summary>Whether the game sorts this emitter's particles by depth before drawing.</summary>
-    public bool DepthSort { get; init; }
+    /// <summary>
+    ///     Whether the game sorts this emitter's particles by depth. Measured: read only on the
+    ///     frozen-batch path, for the alpha, depth-sprite-alpha and opaque modes. Default true.
+    /// </summary>
+    public bool DepthSort { get; init; } = true;
 
-    /// <summary>The distance beyond which a weather emitter's particles are cut off.</summary>
-    public float WeatherCutoffDistance { get; init; }
+    /// <summary>
+    ///     For a weather emitter, the camera distance below which a particle is not drawn; it
+    ///     fades in over the next <see cref="WeatherFadeoutDistance" />. Default 50.
+    /// </summary>
+    public float WeatherCutoffDistance { get; init; } = 50f;
 
-    /// <summary>Whether wind disturbs this emitter's particles.</summary>
+    /// <summary>Whether the scene's wind disturbances push this emitter's particles.</summary>
     public bool WindDisturbance { get; init; }
 
     /// <summary>

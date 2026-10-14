@@ -455,6 +455,13 @@ public sealed class AloParticleReaderTest
         Assert.Equal(0.2f, p.Bounciness);
         Assert.Equal(500f, p.WeatherCubeSize);
         Assert.Equal(AlamoParticleBlendMode.Additive, p.BlendMode);
+
+        // Measured in the game's constants constructor (#163).
+        Assert.Equal(0, p.PriorityTicket);
+        Assert.True(p.DepthSort);
+        Assert.Equal(50f, p.WeatherCutoffDistance);
+        Assert.False(p.WindDisturbance);
+        Assert.True(p.Visible);
     }
 
     [Fact]
