@@ -103,6 +103,8 @@
   - A packed texture with no loose copy: no missing-file diagnostic, no missing-texture marker in the model preview
   - A project's own `Data\MegaFiles.xml` replaces the game's list; dependencies count, the leaf project first
   - Model preview with the expansion configured: the base game's loose files rank below every archive, as in the game
+- **A particle system saved by the Particle Editor** - opens in the model preview; the editor's own link-group chunk
+  was refused as malformed ([#163](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/163), the reader half)
 
 ### Diagnostic IDs
 

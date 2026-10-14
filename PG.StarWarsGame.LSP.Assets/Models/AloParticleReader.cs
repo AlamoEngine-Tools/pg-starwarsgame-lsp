@@ -42,6 +42,12 @@ public static class AloParticleReader
     private const uint ChunkSpawn = 0x0036;
     private const uint ChunkNormalTexture = 0x0045;
 
+    /// <summary>
+    ///     The Particle Editor's link group: editor state the game never reads, written as the last
+    ///     chunk of a linked emitter. Not in the shipped trees; a file saved there carries it.
+    /// </summary>
+    private const uint ChunkLinkGroup = 0x0100;
+
     private const uint ChunkVolume = 0x1100;
     private const uint ChunkVolumeData = 0x1101;
 
@@ -149,6 +155,7 @@ public static class AloParticleReader
         var spawnOnDeath = -1;
         var spawnDuringLife = -1;
         string? normalTexture = null;
+        var linkGroup = 0u;
 
         for (var i = 5; i < children.Count; i++)
         {
@@ -160,6 +167,12 @@ public static class AloParticleReader
                     break;
                 case ChunkNormalTexture:
                     normalTexture = ReadString(bytes, extra);
+                    break;
+                case ChunkLinkGroup:
+                    if (extra.BodyLength != 4)
+                        throw Malformed(
+                            $"the link group of {where} is {extra.BodyLength} bytes, expected 4");
+                    linkGroup = (uint)ReadInt32(bytes, extra.BodyStart);
                     break;
                 default:
                     throw Malformed($"{where} carries unexpected chunk 0x{extra.Type:X}");
@@ -173,7 +186,10 @@ public static class AloParticleReader
             properties = ApplyRandomRotation(properties, tracks);
 
         return new AlamoEmitter(name, colorTexture, normalTexture,
-            volumes[0], volumes[1], volumes[2], tracks, spawnOnDeath, spawnDuringLife, properties);
+            volumes[0], volumes[1], volumes[2], tracks, spawnOnDeath, spawnDuringLife, properties)
+        {
+            LinkGroup = linkGroup
+        };
     }
 
     private static AlamoEmitterProperties ApplyRandomRotation(

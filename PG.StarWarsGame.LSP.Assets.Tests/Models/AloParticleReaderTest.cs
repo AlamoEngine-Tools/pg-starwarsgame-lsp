@@ -85,7 +85,8 @@ public sealed class AloParticleReaderTest
         byte[]? volumes = null,
         byte[]? tracks = null,
         (int OnDeath, int DuringLife)? spawn = null,
-        string? normalTexture = null)
+        string? normalTexture = null,
+        uint linkGroup = 0)
     {
         var parts = new List<byte[]>
         {
@@ -105,6 +106,10 @@ public sealed class AloParticleReaderTest
 
         if (normalTexture is not null)
             parts.Add(Chunk(0x0045, false, Str(normalTexture)));
+
+        // The Particle Editor's own optional chunk, written last and only for a linked emitter.
+        if (linkGroup != 0)
+            parts.Add(Chunk(0x0100, false, I32((int)linkGroup)));
 
         return Chunk(0x0700, true, Concat([.. parts]));
     }
@@ -170,6 +175,28 @@ public sealed class AloParticleReaderTest
 
         Assert.Equal(2, content.Emitters[0].SpawnOnDeath);
         Assert.Equal(-1, content.Emitters[0].SpawnDuringLife);
+    }
+
+    [Fact]
+    public void Read_ReadsTheParticleEditorsLinkGroup()
+    {
+        // The Particle Editor keeps emitters that move together in a link group and writes the
+        // group id as an optional chunk of its own, after the spawn links and the normal texture.
+        // A file saved there with a group in it was refused outright (#163).
+        var content = AloParticleReader.Read(System("p", null,
+            Emitter(spawn: (1, -1), normalTexture: "p_normal.tga", linkGroup: 3)));
+
+        Assert.Equal(3u, content.Emitters[0].LinkGroup);
+        Assert.Equal(1, content.Emitters[0].SpawnOnDeath);
+        Assert.Equal("p_normal.tga", content.Emitters[0].NormalTexture);
+    }
+
+    [Fact]
+    public void Read_LeavesTheLinkGroupUnlinkedWhenTheChunkIsAbsent()
+    {
+        var content = AloParticleReader.Read(System("p", null, Emitter()));
+
+        Assert.Equal(0u, content.Emitters[0].LinkGroup);
     }
 
     [Fact]

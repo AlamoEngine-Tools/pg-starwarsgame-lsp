@@ -200,6 +200,16 @@ public sealed record AlamoEmitter(
     int SpawnDuringLife,
     AlamoEmitterProperties Properties)
 {
+    /// <summary>
+    ///     The Particle Editor's link group this emitter belongs to, or <c>0</c> when unlinked.
+    /// </summary>
+    /// <remarks>
+    ///     Editor state, not engine state: the editor moves the emitters of a group together and
+    ///     writes the id as an optional chunk of its own (<c>0x0100</c>, after the spawn links and the
+    ///     normal texture). Read so that a file saved there opens, and kept so nothing is dropped.
+    /// </remarks>
+    public uint LinkGroup { get; init; }
+
     /// <summary>The track for one channel, or null when the file carried none.</summary>
     public AlamoTrack? Track(AlamoTrackChannel channel)
     {

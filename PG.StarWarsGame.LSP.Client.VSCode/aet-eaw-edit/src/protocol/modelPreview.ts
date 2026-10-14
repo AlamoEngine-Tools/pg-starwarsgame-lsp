@@ -1153,6 +1153,11 @@ export interface AlamoEmitter {
     spawnOnDeath: number;
     spawnDuringLife: number;
     properties: AlamoEmitterProperties;
+    /**
+     * The Particle Editor's link group, 0 when unlinked. Editor state the game never reads; carried
+     * so a file saved there round-trips, drawn by nothing.
+     */
+    linkGroup?: number;
 }
 
 export interface AlamoParticleContent {
