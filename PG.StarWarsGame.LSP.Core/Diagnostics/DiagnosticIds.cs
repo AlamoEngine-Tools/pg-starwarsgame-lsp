@@ -364,6 +364,38 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId TupleSlotAssetFileExistence = new(DiagnosticGroup.Assets, 15);
 
+    /// <summary>
+    ///     A game object's <c>Lua_Script</c> names a script no script directory has, as <c>.lua</c> or
+    ///     <c>.lc</c>. The object runs without a script.
+    /// </summary>
+    public static readonly DiagnosticId LuaScriptExistence = new(DiagnosticGroup.Assets, 16);
+
+    /// <summary>
+    ///     A <c>Lua_Script</c> name with a backslash. The name is loaded from inside a Lua string
+    ///     literal, where a backslash is an escape, so the path never reaches the file system as
+    ///     written.
+    /// </summary>
+    public static readonly DiagnosticId LuaScriptBackslash = new(DiagnosticGroup.Assets, 17);
+
+    /// <summary>
+    ///     A <c>Lua_Script</c> name with a <c>..</c> segment. It resolves for a loose file on Windows
+    ///     only; an archive lookup keeps the segment and never finds the file.
+    /// </summary>
+    public static readonly DiagnosticId LuaScriptParentPath = new(DiagnosticGroup.Assets, 18);
+
+    /// <summary>
+    ///     A <c>Lua_Script</c> name ending in <c>.lua</c> or <c>.lc</c>. The game appends the
+    ///     extension itself.
+    /// </summary>
+    public static readonly DiagnosticId LuaScriptExtension = new(DiagnosticGroup.Assets, 19);
+
+    /// <summary>
+    ///     A game object's <c>Lua_Script</c> loads from a script directory other than
+    ///     <c>Data/Scripts/GameObject</c> - works, but it is not where an object script is looked for
+    ///     by anyone reading the mod, and a Library script of the same name shadows the GameObject one.
+    /// </summary>
+    public static readonly DiagnosticId LuaScriptOutsideGameObject = new(DiagnosticGroup.Assets, 20);
+
     // ── Localisation ──
     public static readonly DiagnosticId LocalisationKeyExistence = new(DiagnosticGroup.Localisation, 1);
     public static readonly DiagnosticId LocalisationKeyListExistence = new(DiagnosticGroup.Localisation, 2);

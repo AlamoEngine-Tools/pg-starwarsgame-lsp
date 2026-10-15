@@ -99,7 +99,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var handler = BuildHandler(spy, fs: fs);
         await handler.Handle(Changed(XmlUri), CancellationToken.None);
 
-        Assert.Contains(spy.Updates, u => u.Uri == "file:///c:/data/units.xml" && u.Text == freshContent);
+        Assert.Contains(spy.Updates, u => u is { Uri: "file:///c:/data/units.xml", Text: freshContent });
     }
 
     [Fact]
@@ -226,6 +226,54 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Empty(spy.Updates);
     }
 
+    /// <summary>
+    ///     A script is both a document and a catalog entry: an edit re-indexes it, and the catalog
+    ///     a <c>Lua_Script</c> resolves against is re-globbed.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ScriptChanged_ReIndexesAndReglobsTheCatalog()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\scripts\mission.lua"] = new("-- script")
+        });
+        var spy = new SpyIndexService();
+
+        var handler = BuildHandler(spy, fs: fs);
+        await handler.Handle(Changed(LuaUri), CancellationToken.None);
+
+        Assert.Single(spy.Updates);
+        Assert.Equal(1, spy.AssetApplications);
+    }
+
+    /// <summary>
+    ///     The catalog answers whether a file exists, so a deleted one has to leave it - or a
+    ///     reference to it keeps resolving.
+    /// </summary>
+    [Theory]
+    [InlineData(LuaUri)]
+    [InlineData("file:///c:/data/art/textures/foo.tga")]
+    public async Task Handle_AssetDeleted_ReglobsTheCatalog(string uri)
+    {
+        var spy = new SpyIndexService();
+
+        var handler = BuildHandler(spy, fs: new MockFileSystem());
+        await handler.Handle(Deleted(uri), CancellationToken.None);
+
+        Assert.Equal(1, spy.AssetApplications);
+    }
+
+    [Fact]
+    public async Task Handle_ScriptDeleted_RemovesItFromTheIndex()
+    {
+        var spy = new SpyIndexService();
+
+        var handler = BuildHandler(spy, fs: new MockFileSystem());
+        await handler.Handle(Deleted(LuaUri), CancellationToken.None);
+
+        Assert.Contains(spy.Removals, r => r == LuaUri);
+    }
+
     // ── watched globs ────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -274,8 +322,8 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var handler = BuildHandler(spy, fs: fs, reload: reload, schema: schema);
         await handler.Handle(Changed(xmlUri), CancellationToken.None);
 
-        Assert.Single(spy.DynamicEnumApplications);
-        Assert.Contains("ArmourG_Structure", spy.DynamicEnumApplications[0]["ArmorType"]);
+        var applied = Assert.Single(spy.DynamicEnumApplications);
+        Assert.Contains("ArmourG_Structure", applied["ArmorType"]);
         Assert.Empty(spy.Updates);
     }
 
@@ -739,14 +787,6 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         public EnumDefinition? GetEnum(string enumName)
         {
             return enums.FirstOrDefault(e => e.Name.Equals(enumName, StringComparison.OrdinalIgnoreCase));
-        }
-    }
-
-    private sealed class NullLocalisationLoader : ILocalisationLoader
-    {
-        public Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct)
-        {
-            return Task.CompletedTask;
         }
     }
 

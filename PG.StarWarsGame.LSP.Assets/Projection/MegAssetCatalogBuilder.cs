@@ -25,7 +25,9 @@ public static class MegAssetCatalogBuilder
             // `.ala` earns its place by being ENUMERABLE rather than by being resolvable: a model
             // preview has to ask which clips exist for a skeleton, and the animations sit beside
             // their model under a name prefix with nothing else to discover them by.
-            ".tga", ".dds", ".alo", ".ala", ".wav", ".mp3", ".ted");
+            // Scripts are catalogued so a game object's `Lua_Script` resolves the way the game loads
+            // it - vanilla ships them packed, so a mod's reference to one has nothing loose to find.
+            ".tga", ".dds", ".alo", ".ala", ".wav", ".mp3", ".ted", ".lua", ".lc");
 
     /// <summary>Every extension the catalog records, for reporting counts per extension.</summary>
     public static IReadOnlyCollection<string> KnownAssetExtensions => AssetExtensions;
@@ -106,12 +108,11 @@ public static class MegAssetCatalogBuilder
             pathSource[normalized] = megName;
             assetBuilder.Add(normalized);
 
-            if (ext.Equals(".alo", StringComparison.OrdinalIgnoreCase))
-            {
-                TryExtractBones(normalized, openEntry, extractBones, bonesBuilder);
-                if (extractTextures is not null)
-                    TryExtractTextures(normalized, openEntry, extractTextures, texturesBuilder);
-            }
+            if (!ext.Equals(".alo", StringComparison.OrdinalIgnoreCase)) continue;
+
+            TryExtractBones(normalized, openEntry, extractBones, bonesBuilder);
+            if (extractTextures is not null)
+                TryExtractTextures(normalized, openEntry, extractTextures, texturesBuilder);
         }
 
         // Merge loose files on top (workspace loose files may extend the MEG catalog).
@@ -119,29 +120,8 @@ public static class MegAssetCatalogBuilder
         foreach (var path in looseFiles)
             assetBuilder.Add(path);
 
-        // Extract icon names from loose .mtd files (mega-texture atlases not packed into MEGs).
         if (extractMtdIcons is not null)
-        {
-            var root = looseFileSystem.Path.GetFullPath(gameRootPath);
-            if (looseFileSystem.Directory.Exists(root))
-                foreach (var mtdFile in looseFileSystem.Directory.EnumerateFiles(
-                             root, "*.mtd", SearchOption.AllDirectories))
-                {
-                    var rel = looseFileSystem.Path.GetRelativePath(root, mtdFile);
-                    var normalizedRel = NormalizeMegPath(rel);
-                    if (!normalizedRel.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    try
-                    {
-                        using var stream = looseFileSystem.File.OpenRead(mtdFile);
-                        AddMtdIconNames(stream, extractMtdIcons, assetBuilder);
-                    }
-                    catch
-                    {
-                        /* skip corrupt/unreadable loose MTD files */
-                    }
-                }
-        }
+            AddLooseMtdIconNames(looseFileSystem, gameRootPath, extractMtdIcons, assetBuilder);
 
         return (assetBuilder.ToImmutable(),
             bonesBuilder.ToImmutableDictionary(
@@ -205,6 +185,33 @@ public static class MegAssetCatalogBuilder
         }
     }
 
+    /// <summary>Icon names from loose .mtd files (mega-texture atlases not packed into MEGs).</summary>
+    private static void AddLooseMtdIconNames(
+        IFileSystem looseFileSystem,
+        string gameRootPath,
+        Func<Stream, IEnumerable<string>> extractIcons,
+        ImmutableHashSet<string>.Builder assetBuilder)
+    {
+        var root = looseFileSystem.Path.GetFullPath(gameRootPath);
+        if (!looseFileSystem.Directory.Exists(root)) return;
+
+        foreach (var mtdFile in looseFileSystem.Directory.EnumerateFiles(root, "*.mtd", SearchOption.AllDirectories))
+        {
+            var normalizedRel = NormalizeMegPath(looseFileSystem.Path.GetRelativePath(root, mtdFile));
+            if (!normalizedRel.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
+                continue;
+            try
+            {
+                using var stream = looseFileSystem.File.OpenRead(mtdFile);
+                AddMtdIconNames(stream, extractIcons, assetBuilder);
+            }
+            catch
+            {
+                /* skip corrupt/unreadable loose MTD files */
+            }
+        }
+    }
+
     private static void AddMtdIconNames(
         Stream stream,
         Func<Stream, IEnumerable<string>> extractIcons,
@@ -235,7 +242,7 @@ public static class MegAssetCatalogBuilder
             if (stream is null) return;
             // Keyed by bare filename, like the bones: XML references models by name and the engine
             // resolves them by name across the VFS.
-            texturesBuilder[ModelBoneKey.From(normalizedPath)] = extractTextures(stream).ToImmutableArray();
+            texturesBuilder[ModelBoneKey.From(normalizedPath)] = [.. extractTextures(stream)];
         }
         catch
         {
@@ -257,7 +264,7 @@ public static class MegAssetCatalogBuilder
             if (bones.Count > 0)
                 // Keyed by bare filename: XML references models by name and the engine resolves them
                 // by name across the VFS. Later archives override earlier ones at the same filename.
-                bonesBuilder[ModelBoneKey.From(normalizedPath)] = bones.ToImmutableArray();
+                bonesBuilder[ModelBoneKey.From(normalizedPath)] = [.. bones];
         }
         catch
         {

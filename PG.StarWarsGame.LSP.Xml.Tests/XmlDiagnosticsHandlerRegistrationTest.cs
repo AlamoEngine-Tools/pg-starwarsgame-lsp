@@ -319,7 +319,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // engine reads any number of pairs from a music list, so those tags use context-name-list.
         // 155 -> 157: HardpointModeRowWithoutAbilityHandler and HardpointNeverFiresHandler (#140). A
         // hardpoint's unit-mode rows apply only for the owner's first two abilities.
-        const int expectedHandlerCount = 157;
+        // 157 -> 158: LuaScriptReferenceHandler (#133). A game object's Lua_Script is checked against
+        // the file the game's Lua search path would load.
+        const int expectedHandlerCount = 158;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

@@ -38,8 +38,11 @@ public sealed class MegAssetCatalogBuilderTest
     // beside `Ei_bobafett.alo` under the very prefix the reverse lookup already relies on.
     [InlineData(".ala", true)]
     [InlineData(".ALA", true)]
+    // Scripts. Catalogued so a game object's Lua_Script can be resolved the way the game loads it:
+    // vanilla ships its scripts packed, so a mod's reference to one has nothing loose to find.
+    [InlineData(".lua", true)]
+    [InlineData(".LC", true)]
     [InlineData(".xml", false)]
-    [InlineData(".lua", false)]
     [InlineData(".exe", false)]
     public void IsAssetExtension_ReturnsCorrectResult(string ext, bool expected)
     {
@@ -65,7 +68,7 @@ public sealed class MegAssetCatalogBuilderTest
         var megs = OneMeg("test.meg", [@"DATA\ART\TEXTURES\UNIT.TGA", @"DATA\ART\MODELS\UNIT.ALO"]);
         var fs = new MockFileSystem();
 
-        var (assets, _, _) = Build(megs, fs);
+        var (assets, _) = Build(megs, fs);
 
         Assert.Contains("data/art/textures/unit.tga", assets);
         Assert.Contains("data/art/models/unit.alo", assets);
@@ -77,7 +80,7 @@ public sealed class MegAssetCatalogBuilderTest
         var megs = OneMeg("test.meg", [@"DATA\XML\UNITS.XML", @"DATA\ART\TEXTURES\UNIT.TGA"]);
         var fs = new MockFileSystem();
 
-        var (assets, _, _) = Build(megs, fs);
+        var (assets, _) = Build(megs, fs);
 
         Assert.DoesNotContain("data/xml/units.xml", assets);
         Assert.Contains("data/art/textures/unit.tga", assets);
@@ -92,7 +95,7 @@ public sealed class MegAssetCatalogBuilderTest
             ["C:/game/data/art/textures/loose_tex.tga"] = new("")
         });
 
-        var (assets, _, _) = Build(megs, fs);
+        var (assets, _) = Build(megs, fs);
 
         Assert.Contains("data/art/textures/meg_tex.tga", assets);
         Assert.Contains("data/art/textures/loose_tex.tga", assets);
@@ -103,14 +106,14 @@ public sealed class MegAssetCatalogBuilderTest
     {
         // Collision: same path in two different MEG archives.
         // Last-seen entry wins (engine VFS semantics). The path is still in the set.
-        var megs = new[]
-        {
-            ("first.meg", new[] { @"DATA\ART\TEXTURES\SHARED.TGA" }),
-            ("second.meg", (IEnumerable<string>)new[] { @"DATA\ART\TEXTURES\SHARED.TGA" })
-        };
+        (string, IEnumerable<string>)[] megs =
+        [
+            ("first.meg", [@"DATA\ART\TEXTURES\SHARED.TGA"]),
+            ("second.meg", [@"DATA\ART\TEXTURES\SHARED.TGA"])
+        ];
         var fs = new MockFileSystem();
 
-        var (assets, _, _) = Build(megs, fs);
+        var (assets, _) = Build(megs, fs);
 
         Assert.Contains("data/art/textures/shared.tga", assets);
         Assert.Single(assets, a => a == "data/art/textures/shared.tga");
@@ -127,12 +130,7 @@ public sealed class MegAssetCatalogBuilderTest
 
         var (_, modelBones, _) = MegAssetCatalogBuilder.Build(
             megs, fs, "C:/game",
-            path =>
-            {
-                if (path == "data/art/models/unit_at_at.alo")
-                    return new MemoryStream();
-                return null;
-            },
+            path => path == "data/art/models/unit_at_at.alo" ? new MemoryStream() : null,
             _ => bones,
             null,
             NullLogger.Instance);
@@ -149,7 +147,7 @@ public sealed class MegAssetCatalogBuilderTest
         var megs = OneMeg("test.meg", [@"DATA\ART\MODELS\UNIT.ALO"]);
         var fs = new MockFileSystem();
 
-        var (_, modelBones, _) = Build(megs, fs, openEntry: _ => null);
+        var (_, modelBones) = Build(megs, fs, openEntry: _ => null);
 
         Assert.Empty(modelBones);
     }
@@ -232,7 +230,7 @@ public sealed class MegAssetCatalogBuilderTest
     public void Build_FlatSfxEntry_StoredWithSfxPrefix()
     {
         var megs = OneMeg("SFX2D_NON_LOCALIZED.MEG", ["UNIT_ATTACK.WAV"]);
-        var (assets, _, _) = Build(megs, new MockFileSystem());
+        var (assets, _) = Build(megs, new MockFileSystem());
         Assert.Contains("data/audio/sfx/unit_attack.wav", assets);
         Assert.DoesNotContain("unit_attack.wav", assets);
     }
@@ -244,7 +242,7 @@ public sealed class MegAssetCatalogBuilderTest
     public void Build_LocalisedAudio_StoredUnderItsRealName()
     {
         var megs = OneMeg("SFX2D_ENGLISH.MEG", ["UNIT_MOVE_ENG.WAV"]);
-        var (assets, _, _) = Build(megs, new MockFileSystem());
+        var (assets, _) = Build(megs, new MockFileSystem());
         Assert.Contains("data/audio/sfx/unit_move_eng.wav", assets);
         Assert.DoesNotContain("data/audio/sfx/unit_move.wav", assets);
     }
@@ -257,20 +255,23 @@ public sealed class MegAssetCatalogBuilderTest
         var mtdStream = new MemoryStream();
         var megs = OneMeg("FoC_Art.meg", [@"DATA\ART\TEXTURES\MT_COMMANDBAR.MTD"]);
 
-        Func<string, Stream?> openEntry = path =>
-            path == "data/art/textures/mt_commandbar.mtd" ? mtdStream : null;
+        var (assets, _) = Build(megs, new MockFileSystem(),
+            openEntry: OpenEntry, extractMtdIcons: ExtractIcons);
+
+        Assert.Contains("icon_a.tga", assets);
+        Assert.Contains("icon_b.tga", assets);
+        Assert.DoesNotContain("data/art/textures/mt_commandbar.mtd", assets);
+        return;
+
+        Stream? OpenEntry(string path)
+        {
+            return path == "data/art/textures/mt_commandbar.mtd" ? mtdStream : null;
+        }
 
         IEnumerable<string> ExtractIcons(Stream _)
         {
             return ["ICON_A.TGA", "ICON_B.TGA"];
         }
-
-        var (assets, _, _) = Build(megs, new MockFileSystem(),
-            openEntry: openEntry, extractMtdIcons: ExtractIcons);
-
-        Assert.Contains("icon_a.tga", assets);
-        Assert.Contains("icon_b.tga", assets);
-        Assert.DoesNotContain("data/art/textures/mt_commandbar.mtd", assets);
     }
 
     [Fact]
@@ -278,7 +279,7 @@ public sealed class MegAssetCatalogBuilderTest
     {
         var megs = OneMeg("FoC_Art.meg", [@"DATA\ART\TEXTURES\MT_COMMANDBAR.MTD"]);
 
-        var (assets, _, _) = Build(megs, new MockFileSystem());
+        var (assets, _) = Build(megs, new MockFileSystem());
 
         Assert.DoesNotContain("data/art/textures/mt_commandbar.mtd", assets);
         Assert.Empty(assets);
@@ -290,21 +291,24 @@ public sealed class MegAssetCatalogBuilderTest
         var mtdStream = new MemoryStream();
         var megs = OneMeg("FoC_Art.meg", [@"DATA\ART\TEXTURES\MT_ICONS.MTD"]);
 
-        Func<string, Stream?> openEntry = path =>
-            path == "data/art/textures/mt_icons.mtd" ? mtdStream : null;
-
-        IEnumerable<string> ExtractIcons(Stream _)
-        {
-            return ["BUTTON_ICON_ATTACK.TGA"];
-        }
-
-        var (assets, _, _) = Build(megs, new MockFileSystem(),
-            openEntry: openEntry, extractMtdIcons: ExtractIcons);
+        var (assets, _) = Build(megs, new MockFileSystem(),
+            openEntry: OpenEntry, extractMtdIcons: ExtractIcons);
 
         // Asset set is case-insensitive; verify the stored value is the normalised lowercase form.
         Assert.Contains("button_icon_attack.tga", assets);
         Assert.True(assets.TryGetValue("button_icon_attack.tga", out var stored) &&
                     stored == "button_icon_attack.tga");
+        return;
+
+        Stream? OpenEntry(string path)
+        {
+            return path == "data/art/textures/mt_icons.mtd" ? mtdStream : null;
+        }
+
+        IEnumerable<string> ExtractIcons(Stream _)
+        {
+            return ["BUTTON_ICON_ATTACK.TGA"];
+        }
     }
 
     [Fact]
@@ -315,14 +319,15 @@ public sealed class MegAssetCatalogBuilderTest
             [@"C:\game\data\art\textures\mt_commandbar.mtd"] = new([0x01, 0x02])
         });
 
+        var (assets, _) = Build([], fs, extractMtdIcons: ExtractIcons);
+
+        Assert.Contains("icon_loose.tga", assets);
+        return;
+
         IEnumerable<string> ExtractIcons(Stream _)
         {
             return ["ICON_LOOSE.TGA"];
         }
-
-        var (assets, _, _) = Build([], fs, extractMtdIcons: ExtractIcons);
-
-        Assert.Contains("icon_loose.tga", assets);
     }
 
     [Fact]
@@ -333,22 +338,22 @@ public sealed class MegAssetCatalogBuilderTest
             [@"C:\game\tools\mt_commandbar.mtd"] = new([0x01])
         });
 
+        var (assets, _) = Build([], fs, extractMtdIcons: ExtractIcons);
+
+        Assert.DoesNotContain("should_not_appear.tga", assets);
+        return;
+
         IEnumerable<string> ExtractIcons(Stream _)
         {
             return ["SHOULD_NOT_APPEAR.TGA"];
         }
-
-        var (assets, _, _) = Build([], fs, extractMtdIcons: ExtractIcons);
-
-        Assert.DoesNotContain("should_not_appear.tga", assets);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static (
         ImmutableHashSet<string> assetFiles,
-        ImmutableDictionary<string, ImmutableArray<string>> modelBones,
-        ImmutableDictionary<string, ImmutableArray<string>> modelTextures)
+        ImmutableDictionary<string, ImmutableArray<string>> modelBones)
         Build(
             IEnumerable<(string megName, IEnumerable<string> entryPaths)> megs,
             MockFileSystem fs,
@@ -358,13 +363,14 @@ public sealed class MegAssetCatalogBuilderTest
             Func<Stream, IEnumerable<string>>? extractMtdIcons = null,
             Func<Stream, IReadOnlyList<string>>? extractTextures = null)
     {
-        return MegAssetCatalogBuilder.Build(
+        var (assetFiles, modelBones, _) = MegAssetCatalogBuilder.Build(
             megs, fs, gameRoot,
             openEntry ?? (_ => null),
             extractBones ?? (_ => []),
             extractMtdIcons,
             NullLogger.Instance,
             extractTextures);
+        return (assetFiles, modelBones);
     }
 
     private static IEnumerable<(string, IEnumerable<string>)> OneMeg(string name, IEnumerable<string> entries)
