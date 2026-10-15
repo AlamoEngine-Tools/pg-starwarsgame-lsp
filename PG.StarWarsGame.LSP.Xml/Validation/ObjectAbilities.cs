@@ -48,25 +48,20 @@ public static class ObjectAbilities
     /// </summary>
     public static IReadOnlyList<string> TypesInOrder(EffectiveObject obj)
     {
-        var types = new List<string>();
-        if (!obj.Found || obj.Tags.IsDefaultOrEmpty) return types;
+        if (!obj.Found || obj.Tags.IsDefaultOrEmpty) return [];
 
-        foreach (var tag in obj.Tags)
-        {
-            if (!string.Equals(tag.TagName, AbilitiesTag, StringComparison.OrdinalIgnoreCase)) continue;
-            if (string.IsNullOrWhiteSpace(tag.Fragment)) continue;
-
-            var doc = XmlUtility.CreateHtmlDocument(tag.Fragment);
-            foreach (var ability in doc.DocumentNode.Descendants()
-                         .Where(n => n.Name.Equals(AbilityElement, StringComparison.OrdinalIgnoreCase)))
-            {
-                var type = ability.ChildNodes
-                    .FirstOrDefault(c => c.Name.Equals(TypeElement, StringComparison.OrdinalIgnoreCase));
-                var value = type?.InnerText.Trim();
-                if (!string.IsNullOrEmpty(value)) types.Add(value);
-            }
-        }
-
-        return types;
+        return
+        [
+            ..obj.Tags
+                .Where(tag => string.Equals(tag.TagName, AbilitiesTag, StringComparison.OrdinalIgnoreCase)
+                              && !string.IsNullOrWhiteSpace(tag.Fragment))
+                .SelectMany(tag => XmlUtility.CreateHtmlDocument(tag.Fragment).DocumentNode.Descendants()
+                    .Where(n => n.Name.Equals(AbilityElement, StringComparison.OrdinalIgnoreCase)))
+                .Select(ability => ability.ChildNodes
+                    .FirstOrDefault(c => c.Name.Equals(TypeElement, StringComparison.OrdinalIgnoreCase))
+                    ?.InnerText.Trim())
+                .OfType<string>()
+                .Where(value => value.Length > 0)
+        ];
     }
 }

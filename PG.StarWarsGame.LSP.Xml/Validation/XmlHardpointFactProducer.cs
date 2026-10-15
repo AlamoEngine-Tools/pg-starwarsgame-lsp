@@ -30,8 +30,8 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     ///     attaching object. Measured on the game: the rows are read for the owner's first and
     ///     second unit ability only, by that ability's type, while it is active (#140).
     /// </summary>
-    private static readonly IReadOnlyDictionary<string, string> ModeRowAbility =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> ModeRowAbility =
+        new(StringComparer.OrdinalIgnoreCase)
         {
             ["Defend_Mode_Weapon_Delay_Multiplier"] = "DEFEND",
             ["Turbo_Mode_Weapon_Delay_Multiplier"] = "TURBO",
@@ -182,17 +182,15 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     /// <summary>The hardpoint's mode rows from its own element, each anchored on its tag name.</summary>
     private static List<ModeRow> CollectModeRows(HtmlNode hardpointNode)
     {
-        var rows = new List<ModeRow>();
-        foreach (var child in hardpointNode.ChildNodes)
-        {
-            if (child.NodeType != HtmlNodeType.Element || !IsModeRow(child.Name)) continue;
-            // OriginalName: HAP lower-cases Name, and the tag is quoted back in the message.
-            rows.Add(new ModeRow(child.OriginalName ?? child.Name, child.InnerText.Trim(),
-                new Position(XmlUtility.GetLine(child), XmlUtility.GetOpeningTagStartColumn(child),
-                    child.Name.Length)));
-        }
-
-        return rows;
+        // OriginalName: HAP lower-cases Name, and the tag is quoted back in the message.
+        return
+        [
+            .. hardpointNode.ChildNodes
+                .Where(child => child.NodeType == HtmlNodeType.Element && IsModeRow(child.Name))
+                .Select(child => new ModeRow(child.OriginalName ?? child.Name, child.InnerText.Trim(),
+                    new Position(XmlUtility.GetLine(child), XmlUtility.GetOpeningTagStartColumn(child),
+                        child.Name.Length)))
+        ];
     }
 
     /// <summary>
@@ -350,6 +348,19 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
     // ── shared ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    ///     Reports the bone against each model that lacks it, and counts it against each model whose
+    ///     bones are unknown.
+    /// </summary>
+    /// <param name="bone">The bone tag, its value and where to report it.</param>
+    /// <param name="models">The models the bone must exist on; a null entry is skipped.</param>
+    /// <param name="hardpointId">The hardpoint declaring the bone.</param>
+    /// <param name="ownerId">The object whose model is checked - the hardpoint itself for its turret model.</param>
+    /// <param name="pass">The per-document state.</param>
+    /// <param name="checkedAttachedModel">
+    ///     The hardpoint's attached model when the bone was also looked for there and is missing, so
+    ///     the report names both; null otherwise.
+    /// </param>
     /// <param name="anchoredOnValue">
     ///     Whether the bone's position is the tag's own value - true from the hardpoint's file, false
     ///     from the attaching object's, where it is the hardpoint's id in the <c>HardPoints</c> list. A
@@ -616,7 +627,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             if (_chainByOwner.TryGetValue(ownerId, out var cached)) return cached;
 
             var effective = _resolver.Resolve(ownerId);
-            var chain = effective.Found && !effective.Cyclic
+            var chain = effective is { Found: true, Cyclic: false }
                 ? effective.Chain
                 : (IReadOnlyList<string>)[ownerId];
 

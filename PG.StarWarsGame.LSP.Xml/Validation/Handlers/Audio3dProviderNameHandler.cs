@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 public sealed class Audio3dProviderNameHandler : SingleValueTypeHandlerBase
 {
     /// <inheritdoc />
-    public override DiagnosticId? DefaultId => DiagnosticIds.Audio3dProviderName;
+    public override DiagnosticId? DefaultId => DiagnosticIds.Audio3DProviderName;
 
     protected override XmlValueType TargetType => XmlValueType.Audio3dProviderName;
 

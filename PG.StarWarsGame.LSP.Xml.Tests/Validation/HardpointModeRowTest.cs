@@ -223,7 +223,7 @@ public sealed class HardpointModeRowTest
     {
         var docSymbols = symbols.ToImmutableArray();
         var docIndex = new DocumentIndex(Uri, 1, docSymbols, ImmutableArray<GameReference>.Empty);
-        var defs = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
+        var defs = symbols.ToImmutableDictionary(s => s.Id, ImmutableArray.Create,
             StringComparer.OrdinalIgnoreCase);
         // Every hardpoint is referenced from this document, so the attaching-object lookup finds the
         // owners wherever the fixture declares them.

@@ -14,25 +14,28 @@ namespace PG.StarWarsGame.LSP.Xml.Tests;
 /// </summary>
 public sealed class XmlDiagnosticsHandlerRegistrationTest
 {
-    private static IReadOnlyCollection<Type> AllConcreteHandlerTypes()
+    private static List<Type> AllConcreteHandlerTypes()
     {
-        return typeof(XmlLanguageServiceExtensions).Assembly
-            .GetTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false }
-                        && typeof(IXmlDiagnosticsHandler).IsAssignableFrom(t))
-            .ToList();
+        return
+        [
+            .. typeof(XmlLanguageServiceExtensions).Assembly
+                .GetTypes()
+                .Where(t => t is { IsClass: true, IsAbstract: false }
+                            && typeof(IXmlDiagnosticsHandler).IsAssignableFrom(t))
+        ];
     }
 
-    private static IReadOnlyCollection<Type> RegisteredHandlerTypes()
+    private static List<Type> RegisteredHandlerTypes()
     {
         var services = new ServiceCollection();
         services.AddXmlLanguageServices();
-        return services
-            .Where(d => d.ServiceType == typeof(IXmlDiagnosticsHandler))
-            .Select(d => d.ImplementationType)
-            .Where(t => t is not null)
-            .Select(t => t!)
-            .ToList();
+        return
+        [
+            .. services
+                .Where(d => d.ServiceType == typeof(IXmlDiagnosticsHandler))
+                .Select(d => d.ImplementationType)
+                .OfType<Type>()
+        ];
     }
 
     [Fact]
