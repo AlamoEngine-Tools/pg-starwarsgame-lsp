@@ -52,7 +52,7 @@ public static class ObjectAbilities
 
         return
         [
-            ..obj.Tags
+            .. obj.Tags
                 .Where(tag => string.Equals(tag.TagName, AbilitiesTag, StringComparison.OrdinalIgnoreCase)
                               && !string.IsNullOrWhiteSpace(tag.Fragment))
                 .SelectMany(tag => XmlUtility.CreateHtmlDocument(tag.Fragment).DocumentNode.Descendants()
