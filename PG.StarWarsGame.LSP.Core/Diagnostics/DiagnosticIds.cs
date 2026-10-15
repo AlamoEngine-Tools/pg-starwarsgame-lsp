@@ -44,7 +44,7 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PresenceInducedAnimations = new(DiagnosticGroup.References, 15);
 
     public static readonly DiagnosticId SfxEventHudReference = new(DiagnosticGroup.References, 16);
-    public static readonly DiagnosticId SfxEventReference = new(DiagnosticGroup.References, 17);
+    public static readonly DiagnosticId SFXEventReference = new(DiagnosticGroup.References, 17);
     public static readonly DiagnosticId SpeechEventReference = new(DiagnosticGroup.References, 18);
     public static readonly DiagnosticId TypeReference = new(DiagnosticGroup.References, 19);
     public static readonly DiagnosticId TypeReferenceList = new(DiagnosticGroup.References, 20);
@@ -123,7 +123,7 @@ public static class DiagnosticIds
 
     // ── Enums ──
     public static readonly DiagnosticId AbilityModFlag = new(DiagnosticGroup.Enums, 1);
-    public static readonly DiagnosticId Audio3DProviderName = new(DiagnosticGroup.Enums, 2);
+    public static readonly DiagnosticId Audio3dProviderName = new(DiagnosticGroup.Enums, 2);
     public static readonly DiagnosticId CableRenderMode = new(DiagnosticGroup.Enums, 3);
     public static readonly DiagnosticId CommandBarProperty = new(DiagnosticGroup.Enums, 4);
     public static readonly DiagnosticId ProjectileCategory = new(DiagnosticGroup.Enums, 5);
