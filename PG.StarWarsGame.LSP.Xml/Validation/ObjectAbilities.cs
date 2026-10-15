@@ -38,7 +38,17 @@ public static class ObjectAbilities
     /// <summary>Every ability type on the object, from every ability block it effectively has.</summary>
     public static IReadOnlySet<string> TypesOf(EffectiveObject obj)
     {
-        var types = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return new HashSet<string>(TypesInOrder(obj), StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     The object's ability types in SLOT order: the order the entries have in the effective
+    ///     block, which is what the game's slot index means. Measured: a variant's own block
+    ///     replaces the base's, and every shipped object has exactly one block.
+    /// </summary>
+    public static IReadOnlyList<string> TypesInOrder(EffectiveObject obj)
+    {
+        var types = new List<string>();
         if (!obj.Found || obj.Tags.IsDefaultOrEmpty) return types;
 
         foreach (var tag in obj.Tags)

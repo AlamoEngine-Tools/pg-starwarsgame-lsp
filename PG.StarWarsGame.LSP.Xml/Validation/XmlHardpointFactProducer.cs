@@ -21,6 +21,26 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     private const string DestroyableTag = "Is_Destroyable";
     private const string CollisionMeshTag = "Collision_Mesh";
     private const string SpecialAbilityNameTag = "Special_Ability_Name";
+    private const string FireWhenInRocketAttackModeTag = "Fire_When_In_Rocket_Attack_Mode";
+    private const string FireWhenInNormalAttackModeTag = "Fire_When_In_Normal_Attack_Mode";
+    private const string RocketAttackAbility = "ROCKET_ATTACK";
+
+    /// <summary>
+    ///     The unit-mode rows a hardpoint can set, and the ability type each one needs on the
+    ///     attaching object. Measured on the game: the rows are read for the owner's first and
+    ///     second unit ability only, by that ability's type, while it is active (#140).
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> ModeRowAbility =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Defend_Mode_Weapon_Delay_Multiplier"] = "DEFEND",
+            ["Turbo_Mode_Weapon_Delay_Multiplier"] = "TURBO",
+            ["Power_To_Weapons_Mode_Weapon_Delay_Multiplier"] = "POWER_TO_WEAPONS",
+            ["Full_Salvo_Weapon_Delay_Multiplier"] = "FULL_SALVO",
+            ["Fire_When_In_Defend_Mode"] = "DEFEND",
+            ["Fire_When_In_Turbo_Mode"] = "TURBO",
+            ["Fire_When_In_Power_To_Weapons_Mode"] = "POWER_TO_WEAPONS"
+        };
 
     // Bone-tag classification and cross-file attachment/model resolution are shared with the bone-model
     // inlay hint through HardpointBoneModelResolver, so the two can never disagree on a bone's target.
@@ -30,13 +50,11 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         if (!index.Documents.TryGetValue(documentUri, out var docIndex))
             return [];
 
-        // No model was indexed at all - the game's models were never catalogued, or this workspace has
-        // none. That is a setup condition, not a defect in any particular model, and reporting it per
-        // bone reference buries the document (3806 diagnostics on vanilla Hardpoints.xml when measured).
-        // Without bone lists nothing here is decidable, so produce nothing.
-        if (index.ModelBones.IsEmpty)
-            return [];
-
+        // No model indexed at all - the game's models were never catalogued, or this workspace has
+        // none - is a setup condition, not a defect in any particular model, and reporting it per bone
+        // reference buries the document (3806 diagnostics on vanilla Hardpoints.xml when measured).
+        // The bone checks therefore run only against a catalogue (Pass.ModelsCatalogued); the ability
+        // and unit-mode checks need no model and run either way.
         var pass = new Pass(document, index, documentUri, schema, tagSource);
 
         foreach (var symbol in docIndex.Symbols)
@@ -71,8 +89,9 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
                 XmlUtility.GetOpeningTagLength(hardpointNode),
                 hardpointId, null));
 
-        var bones = CollectBoneTags(hardpointNode, pass);
-        if (bones.Count == 0) return;
+        // Bones are checked only against a catalogue; the ability and mode-row checks below need
+        // none, so a workspace without catalogued models still gets them.
+        var bones = pass.ModelsCatalogued ? CollectBoneTags(hardpointNode, pass) : [];
 
         var isTurret = IsTurret(hardpointNode);
         var turretModel = SingleValue(hardpointNode, ModelToAttachTag);
@@ -110,7 +129,9 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             n.NodeType == HtmlNodeType.Element &&
             n.Name.Equals(SpecialAbilityNameTag, StringComparison.OrdinalIgnoreCase));
         var ability = abilityNode?.InnerText.Trim();
-        if (parentBones.Count == 0 && string.IsNullOrEmpty(ability)) return;
+        var modeRows = CollectModeRows(hardpointNode);
+        CheckDeadWeapon(hardpointId, modeRows, pass);
+        if (parentBones.Count == 0 && string.IsNullOrEmpty(ability) && modeRows.Count == 0) return;
 
         foreach (var owner in pass.FindAttachingObjects(hardpointId))
         {
@@ -119,6 +140,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
                     new Position(XmlUtility.GetLine(abilityNode),
                         XmlUtility.GetOpeningTagStartColumn(abilityNode), abilityNode.Name.Length),
                     pass);
+            CheckModeRows(hardpointId, modeRows, owner.Id, pass);
 
             var models = pass.DeclaredModels(owner.Id);
             if (models.Count == 0) continue;
@@ -146,6 +168,107 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             position.Line, position.Column, position.Length,
             hardpointId, ability, ownerId,
             pass.Index.ResolveOwnerAgnostic(ability) is not null));
+    }
+
+    // ── unit-mode rows (#140) ─────────────────────────────────────────────────
+
+    private static bool IsModeRow(string tagName)
+    {
+        return ModeRowAbility.ContainsKey(tagName)
+               || tagName.Equals(FireWhenInRocketAttackModeTag, StringComparison.OrdinalIgnoreCase)
+               || tagName.Equals(FireWhenInNormalAttackModeTag, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The hardpoint's mode rows from its own element, each anchored on its tag name.</summary>
+    private static List<ModeRow> CollectModeRows(HtmlNode hardpointNode)
+    {
+        var rows = new List<ModeRow>();
+        foreach (var child in hardpointNode.ChildNodes)
+        {
+            if (child.NodeType != HtmlNodeType.Element || !IsModeRow(child.Name)) continue;
+            // OriginalName: HAP lower-cases Name, and the tag is quoted back in the message.
+            rows.Add(new ModeRow(child.OriginalName ?? child.Name, child.InnerText.Trim(),
+                new Position(XmlUtility.GetLine(child), XmlUtility.GetOpeningTagStartColumn(child),
+                    child.Name.Length)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    ///     Both rocket flags off: the hardpoint fires neither while ROCKET_ATTACK is active nor while
+    ///     it is not, whoever attaches it - so it is reported once, naming no owner.
+    /// </summary>
+    private static void CheckDeadWeapon(string hardpointId, IReadOnlyList<ModeRow> rows, Pass pass)
+    {
+        var normal = rows.FirstOrDefault(r =>
+            r.Tag.Equals(FireWhenInNormalAttackModeTag, StringComparison.OrdinalIgnoreCase));
+        var rocket = rows.FirstOrDefault(r =>
+            r.Tag.Equals(FireWhenInRocketAttackModeTag, StringComparison.OrdinalIgnoreCase));
+        if (normal is null || rocket is null
+                           || EngineBoolean.IsTrue(normal.Value) || EngineBoolean.IsTrue(rocket.Value)) return;
+
+        pass.Facts.Add(new HardpointNeverFiresFact(pass.DocumentUri, normal.Position.Line,
+            normal.Position.Column, normal.Position.Length, hardpointId, null, true));
+    }
+
+    /// <summary>
+    ///     Measured on the game: a <c>*_Mode_Weapon_Delay_Multiplier</c> or <c>Fire_When_In_*_Mode</c>
+    ///     row is read for the owner's first and second unit ability only, by that ability's type,
+    ///     while it is active - so it applies only with the matching type in slot 0 or 1. The rocket
+    ///     pair is read against ROCKET_ATTACK being active, in any slot: with the normal flag off
+    ///     the hardpoint fires only in rocket attack, so an owner without the ability never fires
+    ///     it; with both flags off nothing does.
+    /// </summary>
+    private static void CheckModeRows(string hardpointId, IReadOnlyList<ModeRow> rows, string ownerId,
+        Pass pass)
+    {
+        if (rows.Count == 0) return;
+        var abilities = pass.AbilityTypesInOrder(ownerId);
+        var hasRocketAttack = abilities.Contains(RocketAttackAbility, StringComparer.OrdinalIgnoreCase);
+
+        var normal = rows.FirstOrDefault(r =>
+            r.Tag.Equals(FireWhenInNormalAttackModeTag, StringComparison.OrdinalIgnoreCase));
+        var rocket = rows.FirstOrDefault(r =>
+            r.Tag.Equals(FireWhenInRocketAttackModeTag, StringComparison.OrdinalIgnoreCase));
+        var normalOff = normal is not null && !EngineBoolean.IsTrue(normal.Value);
+        var rocketOff = rocket is not null && !EngineBoolean.IsTrue(rocket.Value);
+
+        // Both off is owner-independent and reported once per hardpoint (CheckDeadWeapon); it is
+        // the finding, and an inert rocket flag beside it is the same defect.
+        if (!(normalOff && rocketOff) && !hasRocketAttack)
+        {
+            if (normalOff)
+            {
+                var at = normal!.Position;
+                pass.Facts.Add(new HardpointNeverFiresFact(pass.DocumentUri, at.Line, at.Column, at.Length,
+                    hardpointId, ownerId, false));
+            }
+            else if (rocket is not null)
+            {
+                pass.Facts.Add(new HardpointModeRowWithoutAbilityFact(pass.DocumentUri,
+                    rocket.Position.Line, rocket.Position.Column, rocket.Position.Length,
+                    hardpointId, rocket.Tag, RocketAttackAbility, ownerId, -1, abilities));
+            }
+        }
+
+        foreach (var row in rows)
+        {
+            if (!ModeRowAbility.TryGetValue(row.Tag, out var needed)) continue;
+            var slot = IndexOf(abilities, needed);
+            if (slot is 0 or 1) continue;
+            pass.Facts.Add(new HardpointModeRowWithoutAbilityFact(pass.DocumentUri,
+                row.Position.Line, row.Position.Column, row.Position.Length,
+                hardpointId, row.Tag, needed, ownerId, slot, abilities));
+        }
+    }
+
+    private static int IndexOf(IReadOnlyList<string> abilities, string type)
+    {
+        for (var i = 0; i < abilities.Count; i++)
+            if (abilities[i].Equals(type, StringComparison.OrdinalIgnoreCase))
+                return i;
+        return -1;
     }
 
     // ── direction 2: a file attaching hardpoints is open ──────────────────────
@@ -176,20 +299,26 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             // the model gate below: an object with no model declared still routes damage by mesh.
             CheckCollisionMeshClaim(hardpointId, hardpointTags, position, meshClaimedBy, pass);
 
-            // Everything past here compares a bone against a model, so without one there is nothing
-            // to check. Unchanged in effect from the early return this replaced.
-            if (models.Count == 0) continue;
-
-            var isTurret = IsTurretFromTags(hardpointTags);
-            var attachedModel = hardpointTags.LastOrDefault(t =>
-                t.TagName.Equals(ModelToAttachTag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
-
             // The same ability check from this side: the squiggle lands on the hardpoint token in
             // this object's HardPoints list, which is where the pairing is declared.
             var ability = hardpointTags.LastOrDefault(t =>
                 t.TagName.Equals(SpecialAbilityNameTag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
             if (!string.IsNullOrEmpty(ability))
                 CheckSpecialAbility(hardpointId, ability, ownerId, position, pass);
+
+            // The mode rows from this side too, all anchored on the hardpoint token.
+            var modeRows = hardpointTags.Where(t => IsModeRow(t.TagName))
+                .Select(t => new ModeRow(t.TagName, t.Value.Trim(), position)).ToList();
+            CheckDeadWeapon(hardpointId, modeRows, pass);
+            CheckModeRows(hardpointId, modeRows, ownerId, pass);
+
+            // Everything past here compares a bone against a model, so without one - or without a
+            // catalogue to look it up in - there is nothing to check.
+            if (models.Count == 0 || !pass.ModelsCatalogued) continue;
+
+            var isTurret = IsTurretFromTags(hardpointTags);
+            var attachedModel = hardpointTags.LastOrDefault(t =>
+                t.TagName.Equals(ModelToAttachTag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
 
             foreach (var tag in hardpointTags)
             {
@@ -392,6 +521,9 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
     private readonly record struct BoneReference(string Tag, string Value, Position Position);
 
+    /// <summary>One unit-mode row as written on a hardpoint, anchored where it is reported.</summary>
+    private sealed record ModeRow(string Tag, string Value, Position Position);
+
     /// <summary>
     ///     Per-document state for one <see cref="Produce" /> call. Exists to hold the work that is
     ///     otherwise repeated per symbol or per token: the object-node lookup, the resolved model list
@@ -422,6 +554,10 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
         public GameIndex Index { get; }
         public string DocumentUri { get; }
+
+        /// <summary>Whether any model was catalogued; without one, no bone can be checked.</summary>
+        public bool ModelsCatalogued => !Index.ModelBones.IsEmpty;
+
         public IVariantTagSource TagSource { get; }
         public List<XmlFact> Facts { get; } = [];
         public Dictionary<(string Model, string Owner), UnavailableModel> Unavailable { get; } = [];
@@ -459,6 +595,20 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
             return false;
         }
+
+        /// <summary>
+        ///     The owner's ability types in slot order, through its variant chain: a variant's own
+        ///     list replaces the base's, as the game's loader does on an overlay. Memoised, because
+        ///     one owner is asked once per hardpoint row.
+        /// </summary>
+        public IReadOnlyList<string> AbilityTypesInOrder(string ownerId)
+        {
+            if (_abilitiesByOwner.TryGetValue(ownerId, out var cached)) return cached;
+            return _abilitiesByOwner[ownerId] = ObjectAbilities.TypesInOrder(_resolver.Resolve(ownerId));
+        }
+
+        private readonly Dictionary<string, IReadOnlyList<string>> _abilitiesByOwner =
+            new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>The object's variant chain, itself first. Memoised alongside the model lookup.</summary>
         private IReadOnlyList<string> Chain(string ownerId)

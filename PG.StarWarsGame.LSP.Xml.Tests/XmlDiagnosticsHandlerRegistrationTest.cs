@@ -314,7 +314,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // and keeps the first it loads, so of two names sharing a hash one can never be found.
         // 156 -> 155: ContextNamePairHandler removed. Its "exactly one pair" rule was wrong: the
         // engine reads any number of pairs from a music list, so those tags use context-name-list.
-        const int expectedHandlerCount = 155;
+        // 155 -> 157: HardpointModeRowWithoutAbilityHandler and HardpointNeverFiresHandler (#140). A
+        // hardpoint's unit-mode rows apply only for the owner's first two abilities.
+        const int expectedHandlerCount = 157;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
