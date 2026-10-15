@@ -44,7 +44,7 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PresenceInducedAnimations = new(DiagnosticGroup.References, 15);
 
     public static readonly DiagnosticId SfxEventHudReference = new(DiagnosticGroup.References, 16);
-    public static readonly DiagnosticId SFXEventReference = new(DiagnosticGroup.References, 17);
+    public static readonly DiagnosticId SfxEventReference = new(DiagnosticGroup.References, 17);
     public static readonly DiagnosticId SpeechEventReference = new(DiagnosticGroup.References, 18);
     public static readonly DiagnosticId TypeReference = new(DiagnosticGroup.References, 19);
     public static readonly DiagnosticId TypeReferenceList = new(DiagnosticGroup.References, 20);
@@ -123,7 +123,7 @@ public static class DiagnosticIds
 
     // ── Enums ──
     public static readonly DiagnosticId AbilityModFlag = new(DiagnosticGroup.Enums, 1);
-    public static readonly DiagnosticId Audio3dProviderName = new(DiagnosticGroup.Enums, 2);
+    public static readonly DiagnosticId Audio3DProviderName = new(DiagnosticGroup.Enums, 2);
     public static readonly DiagnosticId CableRenderMode = new(DiagnosticGroup.Enums, 3);
     public static readonly DiagnosticId CommandBarProperty = new(DiagnosticGroup.Enums, 4);
     public static readonly DiagnosticId ProjectileCategory = new(DiagnosticGroup.Enums, 5);
@@ -579,6 +579,32 @@ public static class DiagnosticIds
     ///     take, so no death animation plays - and with <c>Remove_Upon_Death</c> the unit vanishes at once (#104).
     /// </summary>
     public static readonly DiagnosticId DeathAnimationClip = new(DiagnosticGroup.CrossTag, 30);
+
+    /// <summary>
+    ///     A hardpoint's unit-mode row - a <c>*_Mode_Weapon_Delay_Multiplier</c> or a
+    ///     <c>Fire_When_In_*_Mode</c> flag - on a hardpoint whose attaching object has no ability of
+    ///     the type the row needs in a slot the game consults, so the row never applies (#140).
+    /// </summary>
+    /// <remarks>
+    ///     Measured on the game: the rows are read for the owner's first and second unit ability
+    ///     only, by that ability's type, while it is active; the rocket flag against a ROCKET_ATTACK
+    ///     ability in any slot. Slots are the ability list's document order; a variant's own list
+    ///     replaces the base's. Shipped trees: 20 hardpoints carry such rows; no shipped hardpoint
+    ///     file raises this.
+    /// </remarks>
+    public static readonly DiagnosticId HardpointModeRowWithoutAbility = new(DiagnosticGroup.CrossTag, 31);
+
+    /// <summary>
+    ///     A hardpoint whose rocket-attack flags leave it no state to fire in: both flags off, or
+    ///     the normal flag off on an object with no ROCKET_ATTACK ability (#140).
+    /// </summary>
+    /// <remarks>
+    ///     Measured on the game: with <c>Fire_When_In_Normal_Attack_Mode</c> off the hardpoint fires
+    ///     only while ROCKET_ATTACK is active, and with the rocket flag off it does not fire while
+    ///     it is. An error, because the weapon exists and never fires. Both flags off is reported
+    ///     once per hardpoint, since it holds for any owner.
+    /// </remarks>
+    public static readonly DiagnosticId HardpointNeverFires = new(DiagnosticGroup.CrossTag, 32);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the

@@ -38,25 +38,30 @@ public static class ObjectAbilities
     /// <summary>Every ability type on the object, from every ability block it effectively has.</summary>
     public static IReadOnlySet<string> TypesOf(EffectiveObject obj)
     {
-        var types = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!obj.Found || obj.Tags.IsDefaultOrEmpty) return types;
+        return new HashSet<string>(TypesInOrder(obj), StringComparer.OrdinalIgnoreCase);
+    }
 
-        foreach (var tag in obj.Tags)
-        {
-            if (!string.Equals(tag.TagName, AbilitiesTag, StringComparison.OrdinalIgnoreCase)) continue;
-            if (string.IsNullOrWhiteSpace(tag.Fragment)) continue;
+    /// <summary>
+    ///     The object's ability types in SLOT order: the order the entries have in the effective
+    ///     block, which is what the game's slot index means. Measured: a variant's own block
+    ///     replaces the base's, and every shipped object has exactly one block.
+    /// </summary>
+    public static IReadOnlyList<string> TypesInOrder(EffectiveObject obj)
+    {
+        if (!obj.Found || obj.Tags.IsDefaultOrEmpty) return [];
 
-            var doc = XmlUtility.CreateHtmlDocument(tag.Fragment);
-            foreach (var ability in doc.DocumentNode.Descendants()
-                         .Where(n => n.Name.Equals(AbilityElement, StringComparison.OrdinalIgnoreCase)))
-            {
-                var type = ability.ChildNodes
-                    .FirstOrDefault(c => c.Name.Equals(TypeElement, StringComparison.OrdinalIgnoreCase));
-                var value = type?.InnerText.Trim();
-                if (!string.IsNullOrEmpty(value)) types.Add(value);
-            }
-        }
-
-        return types;
+        return
+        [
+            .. obj.Tags
+                .Where(tag => string.Equals(tag.TagName, AbilitiesTag, StringComparison.OrdinalIgnoreCase)
+                              && !string.IsNullOrWhiteSpace(tag.Fragment))
+                .SelectMany(tag => XmlUtility.CreateHtmlDocument(tag.Fragment).DocumentNode.Descendants()
+                    .Where(n => n.Name.Equals(AbilityElement, StringComparison.OrdinalIgnoreCase)))
+                .Select(ability => ability.ChildNodes
+                    .FirstOrDefault(c => c.Name.Equals(TypeElement, StringComparison.OrdinalIgnoreCase))
+                    ?.InnerText.Trim())
+                .OfType<string>()
+                .Where(value => value.Length > 0)
+        ];
     }
 }

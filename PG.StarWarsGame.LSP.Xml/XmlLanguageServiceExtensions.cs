@@ -206,6 +206,8 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointModelBonesUnavailableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageStageNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointAbilityNotOnOwnerHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointModeRowWithoutAbilityHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointNeverFiresHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, LandDamageTableMismatchHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FiresForwardHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AttackDistanceBeyondHardpointRangeHandler>();

@@ -87,6 +87,12 @@
   - Story and localisation navigators grouped by project; story graphs and model previews filed per project
   - Per project: output channel, protocol trace, log file in the project directory, Lua debug layers
   - A single project behaves as before
+- **Hardpoint mode rows against the unit's abilities** - a hardpoint's `*_Mode_Weapon_Delay_Multiplier` or
+  `Fire_When_In_*_Mode` row that never applies on a unit attaching it, and a hardpoint whose rocket-attack flags
+  leave it no state to fire in ([#140](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/140))
+  - A row applies only with the matching ability type in the unit's first or second ability slot
+  - Reported in the hardpoint file on the row, and in the unit file on the hardpoint's name
+  - Vanilla: no shipped hardpoint file raises either
 
 ### Fixes
 
@@ -134,6 +140,8 @@
 - **New, Lua 5.1 syntax** - `Syntax3011` (`aetswg-012-3011`)
 - **New, particle files** - `Preview22` (`aetswg-014-0022`, data the game's reader has no case for) and
   `Preview23` (`aetswg-014-0023`, editor data the game leaves unapplied)
+- **New, hardpoint mode rows** - `CrossTag31` (`aetswg-007-0031`, a row that never applies) and `CrossTag32`
+  (`aetswg-007-0032`, a hardpoint that never fires)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 
 ### Breaking changes
