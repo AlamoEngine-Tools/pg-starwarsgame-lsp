@@ -47,6 +47,8 @@ public sealed class WorkspaceIndexerTest
                string.Concat(entries.Select(e => $"\t<File> {e} </File>\n")) + "</Mega_Files>";
     }
 
+    // ReSharper disable once UnusedTupleComponentInReturnValue - kept the same shape as the
+    // parser-only overload, which one test reads the context from; 40 callers deconstruct both.
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) Build(
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         IProjectIndexCache? cache = null,
@@ -81,7 +83,8 @@ public sealed class WorkspaceIndexerTest
     }
 
     /// <summary>
-    ///     Its own builder rather than another optional parameter on <see cref="Build" />: that
+    ///     Its own builder rather than another optional parameter on
+    ///     <see cref="Build(MockFileSystem, IGameIndexService, IFileTypeRegistry, ISchemaProvider, IProjectIndexCache, IGameDocumentParser[])" />: that
     ///     one ends in <c>params IGameDocumentParser[]</c>, so anything inserted before it is
     ///     bound positionally by every existing caller that passes a parser.
     /// </summary>
@@ -100,11 +103,11 @@ public sealed class WorkspaceIndexerTest
         return BuildWithHost(fs, svc, registry, schema, null, null, null, null, null, parsers);
     }
 
-    private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithMegReader(
+    private static WorkspaceIndexer BuildWithMegReader(
         MockFileSystem fs, IGameIndexService svc, IMegEntryReader megReader)
     {
         return BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            null, null, null, megReader);
+            null, null, null, megReader).Indexer;
     }
 
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithHost(
@@ -138,7 +141,7 @@ public sealed class WorkspaceIndexerTest
         var metafilePath = Path.Combine(xmlDir, "gameobjectfiles.xml");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [metafilePath] = new("<Game_Object_Files><File>DATA\\XML\\HARDPOINTS.XML</File></Game_Object_Files>")
+            [metafilePath] = new(@"<Game_Object_Files><File>DATA\XML\HARDPOINTS.XML</File></Game_Object_Files>")
         });
         var registry = new FileTypeRegistry();
         var schema = new FakeSchemaProvider(
@@ -264,7 +267,7 @@ public sealed class WorkspaceIndexerTest
         var fs = new MockFileSystem();
         fs.AddDirectory(xmlDir);
         var fileTypeMap = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-            .Add("data/xml/hardpoints.xml", ImmutableArray.Create("GameObjectType"));
+            .Add("data/xml/hardpoints.xml", ["GameObjectType"]);
         var baseline = BaselineIndex.Empty with { FileTypeMap = fileTypeMap };
         var registry = new FileTypeRegistry();
         var schema = new FakeSchemaProvider(
@@ -446,8 +449,8 @@ public sealed class WorkspaceIndexerTest
         var fs = new MockFileSystem();
         fs.AddDirectory(xmlDir);
         var fileTypeMap = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-            .Add("story_plots_vanilla.xml", ImmutableArray.Create("StoryPlotManifest"))
-            .Add("story_vanilla_act.xml", ImmutableArray.Create("StoryParser"));
+            .Add("story_plots_vanilla.xml", ["StoryPlotManifest"])
+            .Add("story_vanilla_act.xml", ["StoryParser"]);
         var svc = new FakeIndexService(GameIndex.Empty with
         {
             Baseline = BaselineIndex.Empty with { FileTypeMap = fileTypeMap }
@@ -507,8 +510,8 @@ public sealed class WorkspaceIndexerTest
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(svc.Calls);
-        Assert.EndsWith("units.xml", svc.Calls[0].Uri, StringComparison.OrdinalIgnoreCase);
+        var call = Assert.Single(svc.Calls);
+        Assert.EndsWith("units.xml", call.Uri, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -546,7 +549,7 @@ public sealed class WorkspaceIndexerTest
         var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
         using var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             indexer.IndexDocumentsAsync(config, cts.Token));
@@ -637,6 +640,29 @@ public sealed class WorkspaceIndexerTest
     }
 
     /// <summary>
+    ///     A loose script is catalogued from the project's SCRIPT roots, which a .pgproj declares
+    ///     apart from its asset roots, game-relative like every other entry.
+    /// </summary>
+    [Fact]
+    public void ApplyAssetCatalog_CataloguesLooseScriptsFromTheScriptRoots()
+    {
+        var root = Root("ws");
+        var scripts = Path.Combine(root, "Data", "Scripts");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(scripts, "GameObject", "BobaFettPlan.lua")] = new("")
+        });
+        var svc = new FakeIndexService(GameIndex.Empty);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+
+        indexer.ApplyAssetCatalog(new WorkspaceConfiguration([], [scripts], [], [], null));
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/scripts/gameobject/bobafettplan.lua"),
+            "expected the script, got: " + string.Join(", ", svc.AppliedAssetFiles));
+    }
+
+    /// <summary>
     ///     A root with no <c>data</c> segment above the file still yields something usable: the
     ///     path relative to the root, as before. Nothing outside a game tree is guessed at.
     /// </summary>
@@ -679,7 +705,7 @@ public sealed class WorkspaceIndexerTest
         });
         fs.AddDirectory(art);
         var svc = new FakeIndexService(GameIndex.Empty);
-        var (indexer, _) = BuildWithMegReader(fs, svc,
+        var indexer = BuildWithMegReader(fs, svc,
             new FakeMegEntryReader((meg, [@"DATA\ART\TEXTURES\PACKED.TGA"])));
 
         indexer.ApplyAssetCatalog(AssetProject(root, art));
@@ -700,7 +726,7 @@ public sealed class WorkspaceIndexerTest
             [meg] = new("not a real archive - the reader is the seam")
         });
         var svc = new FakeIndexService(GameIndex.Empty);
-        var (indexer, _) = BuildWithMegReader(fs, svc,
+        var indexer = BuildWithMegReader(fs, svc,
             new FakeMegEntryReader((meg, [@"DATA\ART\TEXTURES\STRAY.TGA"])));
 
         indexer.ApplyAssetCatalog(AssetProject(root, Path.Combine(root, "Data", "Art")));
@@ -730,7 +756,7 @@ public sealed class WorkspaceIndexerTest
             [leafModels] = new("")
         });
         var svc = new FakeIndexService(GameIndex.Empty);
-        var (indexer, _) = BuildWithMegReader(fs, svc, new FakeMegEntryReader(
+        var indexer = BuildWithMegReader(fs, svc, new FakeMegEntryReader(
             (shared, [@"DATA\ART\TEXTURES\SHARED.TGA"]),
             (dependencyModels, [@"DATA\ART\MODELS\REPLACED.ALO"]),
             (leafModels, [@"DATA\ART\MODELS\LEAF.ALO"])));
@@ -761,7 +787,7 @@ public sealed class WorkspaceIndexerTest
             [meg] = new("not a real archive - the reader is the seam")
         });
         var svc = new FakeIndexService(GameIndex.Empty);
-        var (indexer, _) = BuildWithMegReader(fs, svc,
+        var indexer = BuildWithMegReader(fs, svc,
             new FakeMegEntryReader((meg, ["U000_SPD0101_ENG.WAV"])));
 
         indexer.ApplyAssetCatalog(AssetProject(root, Path.Combine(root, "Data", "Audio")));
@@ -827,11 +853,16 @@ public sealed class WorkspaceIndexerTest
         fs.AddDirectory(Root("dep/art"));
         fs.AddDirectory(Root("leaf/art"));
         var svc = new FakeIndexService(GameIndex.Empty);
-        var cache = new StubBoneCache();
         // Only the dependency has a snapshot; the leaf must still be extracted and then saved.
-        cache.Stored[Root("dep/dep.pgproj")] = new Dictionary<string, ModelCatalogEntry>
+        var cache = new StubBoneCache
         {
-            ["dep_model.alo"] = new(["dep_bone"], ["dep_texture.tga"])
+            Stored =
+            {
+                [Root("dep/dep.pgproj")] = new Dictionary<string, ModelCatalogEntry>
+                {
+                    ["dep_model.alo"] = new(["dep_bone"], ["dep_texture.tga"])
+                }
+            }
         };
         var indexer = BuildWithBoneCache(fs, svc, cache);
 
@@ -1013,11 +1044,11 @@ public sealed class WorkspaceIndexerTest
 
         Assert.NotNull(svc.AppliedWorkspaceEnumValueDefinitions);
         Assert.True(svc.AppliedWorkspaceEnumValueDefinitions!.TryGetValue("DamageType", out var valueMap));
-        Assert.True(valueMap!.TryGetValue("EXPLOSIVE", out var explosiveOrigin));
-        Assert.True(explosiveOrigin!.IsNavigable);
+        Assert.True(valueMap.TryGetValue("EXPLOSIVE", out var explosiveOrigin));
+        Assert.True(explosiveOrigin.IsNavigable);
         Assert.True(valueMap.TryGetValue("ENERGY", out var energyOrigin));
         // ENERGY comes after EXPLOSIVE in the same line, so its column must be greater
-        Assert.True(energyOrigin!.Column > explosiveOrigin.Column);
+        Assert.True(energyOrigin.Column > explosiveOrigin.Column);
     }
 
     [Fact]
@@ -1047,8 +1078,8 @@ public sealed class WorkspaceIndexerTest
         Assert.NotNull(svc.AppliedWorkspaceEnumValueDefinitions);
         Assert.True(svc.AppliedWorkspaceEnumValueDefinitions!
             .TryGetValue("SurfaceFXTriggerType", out var valueMap));
-        Assert.True(valueMap!.TryGetValue("GENERIC_TRACK", out var origin));
-        Assert.True(origin!.IsNavigable);
+        Assert.True(valueMap.TryGetValue("GENERIC_TRACK", out var origin));
+        Assert.True(origin.IsNavigable);
         Assert.True(origin.Line > 0); // must be inside the file, past the root element
     }
 
@@ -1127,7 +1158,7 @@ public sealed class WorkspaceIndexerTest
 
         // Build a snapshot whose hash matches the file content
         var fh = new FileHelper(fs);
-        var relPath = "data/xml/units.xml";
+        const string relPath = "data/xml/units.xml";
         var hash = ProjectFileHasher.ComputeFileHash(
             fh.FileSystem.Path.Combine(xmlDir, "units.xml"), fh.FileSystem);
         var entry = new ProjectFileEntry
@@ -1357,10 +1388,10 @@ public sealed class WorkspaceIndexerTest
         const string current = "---@param name string\n---@aetref XmlObject\nfunction Find_Object_Type(name) end";
         const string released = "---@param name string\n---@xmlref XmlObject\nfunction Find_Object_Type(name) end";
 
-        Assert.NotEqual(await SavedFingerprint(current), await SavedFingerprint(released));
+        Assert.NotEqual(await SavedFingerprintAsync(current), await SavedFingerprintAsync(released));
     }
 
-    private static async Task<string> SavedFingerprint(string luaStub)
+    private static async Task<string> SavedFingerprintAsync(string luaStub)
     {
         var root = Root("ws");
         var xmlDir = Path.Combine(root, "data", "xml");
@@ -1441,7 +1472,7 @@ public sealed class WorkspaceIndexerTest
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.True(cache.SavedPaths.Contains(pgproj));
+        Assert.Contains(pgproj, cache.SavedPaths);
         var saved = cache.Saved[pgproj];
         Assert.Equal(ProjectIndexSnapshot.CurrentSchemaVersion, saved.SchemaVersion);
         Assert.Single(saved.Files);
@@ -1478,16 +1509,6 @@ public sealed class WorkspaceIndexerTest
             Layers = [coreLayer, new ProjectLayer(1, "Rev", [revXml], [], [], [], null, revPgproj)]
         };
 
-        async Task<FakeIndexService> StartAsync(WorkspaceConfiguration config, params string[] roots)
-        {
-            var svc = new FakeIndexService();
-            var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
-                new FakeParser());
-            indexer.PreScanMetafiles(config, roots);
-            await indexer.IndexDocumentsAsync(config, CancellationToken.None);
-            return svc;
-        }
-
         await StartAsync(coreAlone, coreRoot);
         var underALeaf = await StartAsync(revOverCore, coreRoot, revRoot);
         var aloneAgain = await StartAsync(coreAlone, coreRoot);
@@ -1498,6 +1519,17 @@ public sealed class WorkspaceIndexerTest
         Assert.Empty(aloneAgain.Calls);
         // Same registry slice, same relevant roots: one context, one file for the dependency.
         Assert.Single(cache.SavedByContext.Keys, k => k.Pgproj == corePgproj);
+        return;
+
+        async Task<FakeIndexService> StartAsync(WorkspaceConfiguration config, params string[] roots)
+        {
+            var svc = new FakeIndexService();
+            var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+                new FakeParser());
+            indexer.PreScanMetafiles(config, roots);
+            await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+            return svc;
+        }
     }
 
     /// <summary>
@@ -1709,7 +1741,7 @@ public sealed class WorkspaceIndexerTest
         var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [Path.Combine(xmlDir, "units.xml")] = new("<Root/>"u8.ToArray())
+            [Path.Combine(xmlDir, "units.xml")] = new([.. "<Root/>"u8])
         });
         var svc = new FakeIndexService();
 
@@ -1759,7 +1791,7 @@ public sealed class WorkspaceIndexerTest
         var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [Path.Combine(xmlDir, "units.xml")] = new("<Root/>"u8.ToArray())
+            [Path.Combine(xmlDir, "units.xml")] = new([.. "<Root/>"u8])
         });
         var svc = new FakeIndexService();
         var cache = new FakeProjectIndexCache();
@@ -1774,7 +1806,7 @@ public sealed class WorkspaceIndexerTest
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
         Assert.True(cache.Saved.TryGetValue(pgproj, out var saved));
-        Assert.Equal([4, 2], Assert.Single(saved!.Files).Document.ParserState);
+        Assert.Equal([4, 2], Assert.Single(saved.Files).Document.ParserState);
     }
 
     [Fact]
@@ -1943,7 +1975,6 @@ public sealed class WorkspaceIndexerTest
     /// </summary>
     private sealed class FakeProjectIndexCache : IProjectIndexCache
     {
-        public readonly HashSet<string> HygienePaths = [];
         public readonly Dictionary<string, ProjectIndexSnapshot> Saved = [];
         public readonly Dictionary<(string Pgproj, string ContextKey), ProjectIndexSnapshot> SavedByContext = [];
         public readonly HashSet<string> SavedPaths = [];
@@ -1970,7 +2001,6 @@ public sealed class WorkspaceIndexerTest
 
         public void EnsureGitHygiene(string pgprojPath)
         {
-            HygienePaths.Add(pgprojPath);
         }
     }
 

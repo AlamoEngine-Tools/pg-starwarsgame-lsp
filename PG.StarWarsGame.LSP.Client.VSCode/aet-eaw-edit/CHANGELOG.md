@@ -93,6 +93,16 @@
   - A row applies only with the matching ability type in the unit's first or second ability slot
   - Reported in the hardpoint file on the row, and in the unit file on the hardpoint's name
   - Vanilla: no shipped hardpoint file raises either
+- **Lua_Script checked against the script the game loads** - a game object's `Lua_Script` resolves the way the
+  game finds it: the name as written, every script directory in the game's order, `.lua` then `.lc`, mod folder,
+  loose files and MEG archives alike ([#133](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/133))
+  - A missing script is an error: the object runs without one
+  - A backslash, a `..` segment or a `.lua`/`.lc` extension in the name is an error - each fails to load in at
+    least one setup
+  - A script loading from outside `Data/Scripts/GameObject` is a warning, naming the GameObject script it
+    shadows where there is one
+  - A forward-slash sub-path such as `Heroes/Boba_Fett` resolves, as in the game
+  - Vanilla and a large total-conversion mod: every reference resolves inside `Data/Scripts/GameObject`
 
 ### Fixes
 
@@ -142,6 +152,8 @@
   `Preview23` (`aetswg-014-0023`, editor data the game leaves unapplied)
 - **New, hardpoint mode rows** - `CrossTag31` (`aetswg-007-0031`, a row that never applies) and `CrossTag32`
   (`aetswg-007-0032`, a hardpoint that never fires)
+- **New, Lua_Script** - `Assets16` to `Assets20` (`aetswg-004-0016` to `aetswg-004-0020`: missing, backslash,
+  `..`, extension, outside GameObject)
 - **Retired** - `Structure8` (`aetswg-006-0008`) is no longer emitted; the number is never reused
 
 ### Breaking changes
