@@ -93,6 +93,15 @@
   - A row applies only with the matching ability type in the unit's first or second ability slot
   - Reported in the hardpoint file on the row, and in the unit file on the hardpoint's name
   - Vanilla: no shipped hardpoint file raises either
+- **Frozen emitters** - a particle emitter with a freeze time freezes as the game freezes it: on the first tick past
+  that time its particles are baked as they stand and never step, spawn, age or fade again
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
+  - A frozen emitter drives no trails or death children, and takes nothing more in as a child
+  - With the depth-sort flag set and the alpha, depth-sprite-alpha or opaque blend mode, the frozen batch is drawn
+    back to front from the camera, re-sorted every frame as the game sorts it; any other mode, or the flag clear,
+    keeps bake order. Live particles are never sorted, as before
+  - Vanilla: 42 emitters freeze - every asteroid, junk and planet-destruction field, the galaxy's dust and stars -
+    and two of them sort
 - **Lua_Script checked against the script the game loads** - a game object's `Lua_Script` resolves the way the
   game finds it: the name as written, every script directory in the game's order, `.lua` then `.lc`, mod folder,
   loose files and MEG archives alike ([#133](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/133))
