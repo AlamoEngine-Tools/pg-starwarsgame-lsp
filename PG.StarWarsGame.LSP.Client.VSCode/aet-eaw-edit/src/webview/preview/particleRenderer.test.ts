@@ -880,6 +880,133 @@ describe("freezing", () => {
     });
 });
 
+describe("depth-sorted frozen batch", () => {
+    /**
+     * Measured in the game (FoC x64, 2024 release): a FROZEN emitter with its depth-sort flag set
+     * and the alpha, depth-sprite-alpha or opaque blend mode submits its baked particles sorted by
+     * squared distance from the camera, descending - back to front - and re-sorts every frame
+     * against the camera as it then stands. Any other mode, or the flag clear, submits them in
+     * bake order. Live particles are never sorted.
+     */
+    function field(
+        over: Partial<AlamoEmitterProperties> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "chunks",
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 5 },
+                    }),
+                    properties: properties({
+                        blendMode: "Transparent",
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                        freezeTime: 0.5,
+                        ...over,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    /** A camera standing at `z`, looking at the origin. */
+    function viewFrom(z: number): THREE.Matrix4 {
+        const camera = new THREE.PerspectiveCamera();
+        camera.position.set(0, 0, z);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        return camera.matrixWorldInverse;
+    }
+
+    /** The z of each drawn instance, in the order the instances are drawn. */
+    function drawnZ(instance: ParticleSystemInstance): number[] {
+        const geometry = instance.emitterMesh(0)!
+            .geometry as THREE.InstancedBufferGeometry;
+        const offsets = geometry.getAttribute("iOffset").array;
+        const out: number[] = [];
+        for (let i = 0; i < geometry.instanceCount; i++) {
+            out.push(offsets[i * 3 + 2]);
+        }
+        return out;
+    }
+
+    /** Five ticks at ten a second: particles at z 2, 1.5, 1, 0.5, 0 in spawn order. */
+    function fill(
+        instance: ParticleSystemInstance,
+        view: THREE.Matrix4 | null,
+    ) {
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1, view);
+        }
+    }
+
+    const BAKE_ORDER = [2, 1.5, 1, 0.5, 0];
+
+    it("draws the frozen batch back to front from the camera", () => {
+        const instance = field();
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), [0, 0.5, 1, 1.5, 2]);
+    });
+
+    it("re-sorts every frame as the camera moves", () => {
+        const instance = field();
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        instance.update(0.1, viewFrom(-100));
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), [0, 0.5, 1, 1.5, 2]);
+    });
+
+    for (const blendMode of ["None", "DepthTransparent"] as const) {
+        it(`sorts the ${blendMode} mode too`, () => {
+            const instance = field({ blendMode });
+            fill(instance, viewFrom(100));
+            instance.update(0.1, viewFrom(100));
+            assert.deepEqual(drawnZ(instance), [0, 0.5, 1, 1.5, 2]);
+        });
+    }
+
+    it("leaves an additive batch in bake order", () => {
+        const instance = field({ blendMode: "Additive" });
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+
+    it("leaves the batch in bake order with the flag clear", () => {
+        const instance = field({ depthSort: false });
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+
+    /** An older server sends no flag; the engine's default is on. */
+    it("sorts when the server sent no flag", () => {
+        const instance = field({ depthSort: undefined });
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), [0, 0.5, 1, 1.5, 2]);
+    });
+
+    it("never sorts live particles", () => {
+        const instance = field({ freezeTime: 0 });
+        fill(instance, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+
+    it("keeps bake order with no camera to sort against", () => {
+        const instance = field();
+        fill(instance, null);
+        instance.update(0.1, null);
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+});
+
 describe("heat particles", () => {
     const system = testSystem([
         emitter({ name: "fire" }),

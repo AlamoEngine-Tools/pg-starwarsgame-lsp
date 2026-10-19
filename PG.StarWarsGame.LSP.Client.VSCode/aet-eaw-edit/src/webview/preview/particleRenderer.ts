@@ -48,6 +48,8 @@ const SPAWN_SCRATCH = new THREE.Vector3();
 const SPACE_SCRATCH = new THREE.Matrix4();
 const VIEW_SCRATCH = new THREE.Matrix4();
 const IDENTITY = new THREE.Matrix4();
+const CAMERA_SCRATCH = new THREE.Vector3();
+const CAMERA_MATRIX_SCRATCH = new THREE.Matrix4();
 
 /**
  * Longest step the simulation will take.
@@ -377,6 +379,11 @@ export interface EmitterFrame {
     velocity: THREE.Vector3;
     /** Simulation space to VIEW space, for the streak maths, which is a screen-space question. */
     toView: THREE.Matrix3;
+    /**
+     * Where the camera stands, in simulation space, or null when nothing is looking. A frozen
+     * batch is sorted by distance from it.
+     */
+    camera: THREE.Vector3 | null;
     /** Where the scene's ground plane falls in simulation space. */
     groundY: number;
     /** The wind, in simulation space. Half the corpus's emitters are thrown by it at birth. */
@@ -459,6 +466,7 @@ function stillFrame(): EmitterFrame {
         matrix: new THREE.Matrix4(),
         rotation: new THREE.Matrix3(),
         toView: new THREE.Matrix3(),
+        camera: null,
         delta: new THREE.Vector3(),
         velocity: new THREE.Vector3(),
         groundY: 0,
@@ -494,6 +502,10 @@ class EmitterRenderer {
      * steps, spawns, ages or dies, and a parent drives no more trails off them.
      */
     private frozen = false;
+
+    /** The frozen batch's draw order and the depths it was sorted on, reused every frame. */
+    private readonly drawIndex: number[] = [];
+    private readonly depths = new Float32Array(MAX_PARTICLES);
 
     /** Where `EveryVertex` has got to. Kept across ticks, because that walk is ordered. */
     private readonly cursor: EmissionCursor = { subMesh: 0, vertex: 0 };
@@ -689,6 +701,11 @@ class EmitterRenderer {
         const freezeTime = this.emitter.properties.freezeTime;
         if (this.frozen || (freezeTime > 0 && this.age + dt > freezeTime)) {
             this.frozen = true;
+            // The bake is drawn as it was written. Only a depth-sorted one is written again, and
+            // that every frame, because the camera it is sorted against moves.
+            if (frame.camera !== null && this.sortsFrozenByDepth()) {
+                this.writeBuffers(frame);
+            }
             return [];
         }
         this.age += dt;
@@ -913,9 +930,10 @@ class EmitterRenderer {
 
     private writeBuffers(frame: EmitterFrame): void {
         const tailed = this.emitter.properties.hasTail;
+        const order = this.frozen ? this.depthOrder(frame) : null;
 
         for (let i = 0; i < this.particles.length; i++) {
-            const particle = this.particles[i];
+            const particle = this.particles[order === null ? i : order[i]];
             const look = appearanceOf(particle, this.emitter);
 
             // The object's uniform scale, applied to the POSITION and the SIZE together, which is
@@ -957,6 +975,53 @@ class EmitterRenderer {
         for (const name of tailed ? [...written, "iStretch"] : written) {
             this.geometry.attributes[name].needsUpdate = true;
         }
+    }
+
+    /**
+     * Whether this emitter's FROZEN batch is drawn back to front.
+     *
+     * Measured in the game: the depth-sort flag is read on the frozen path only, and only for the
+     * alpha, depth-sprite-alpha and opaque modes - an additive batch sums the same whatever the
+     * order. The engine's default is on, which is also what an older server sends by sending
+     * nothing.
+     */
+    private sortsFrozenByDepth(): boolean {
+        const properties = this.emitter.properties;
+        if (properties.depthSort === false) {
+            return false;
+        }
+        const mode = properties.blendMode;
+        return (
+            mode === "None" ||
+            mode === "Transparent" ||
+            mode === "DepthTransparent"
+        );
+    }
+
+    /**
+     * The baked particles' indices, farthest from the camera first, or null to draw them in bake
+     * order. Squared distance, as the engine measures it, re-done against the camera as it stands.
+     */
+    private depthOrder(frame: EmitterFrame): number[] | null {
+        const camera = frame.camera;
+        if (camera === null || !this.sortsFrozenByDepth()) {
+            return null;
+        }
+        const count = this.particles.length;
+        const order = this.drawIndex;
+        order.length = count;
+        for (let i = 0; i < count; i++) {
+            // The position as drawn - the object's uniform scale is applied to it in writeBuffers,
+            // and the camera is in the unscaled simulation space.
+            const position = this.particles[i].position;
+            const dx = position.x * this.scaleFactor - camera.x;
+            const dy = position.y * this.scaleFactor - camera.y;
+            const dz = position.z * this.scaleFactor - camera.z;
+            this.depths[i] = dx * dx + dy * dy + dz * dz;
+            order[i] = i;
+        }
+        order.sort((a, b) => this.depths[b] - this.depths[a]);
+        return order;
     }
 
     /**
@@ -1543,10 +1608,18 @@ export class ParticleSystemInstance {
      * camera is standing.
      */
     private viewFrom(space: THREE.Object3D, view: THREE.Matrix4 | null): void {
-        this.frame.toView.setFromMatrix4(
-            view === null
-                ? IDENTITY
-                : VIEW_SCRATCH.multiplyMatrices(view, space.matrixWorld),
+        if (view === null) {
+            this.frame.toView.setFromMatrix4(IDENTITY);
+            this.frame.camera = null;
+            return;
+        }
+        VIEW_SCRATCH.multiplyMatrices(view, space.matrixWorld);
+        this.frame.toView.setFromMatrix4(VIEW_SCRATCH);
+        // The camera's own position, brought into the space the particles live in: the inverse
+        // of simulation-to-view takes the view origin back. A frozen batch is sorted by distance
+        // from it, so it is a question every frame, not once.
+        this.frame.camera = CAMERA_SCRATCH.setFromMatrixPosition(
+            CAMERA_MATRIX_SCRATCH.copy(VIEW_SCRATCH).invert(),
         );
     }
 }
