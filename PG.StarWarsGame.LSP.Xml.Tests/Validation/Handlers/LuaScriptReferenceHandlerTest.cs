@@ -20,10 +20,10 @@ public sealed class LuaScriptReferenceHandlerTest
 
     private static readonly XmlTagDefinition LuaScriptTag =
         XmlHandlerTestFixtures.MakeTag("Lua_Script", XmlValueType.NameReference,
-            referenceKind: ReferenceKind.WorkspaceFile) with
-        {
-            ReferenceTypeName = WorkspaceFileKey.LuaScriptType
-        };
+                referenceKind: ReferenceKind.WorkspaceFile) with
+            {
+                ReferenceTypeName = WorkspaceFileKey.LuaScriptType
+            };
 
     private static XmlTagValueFact Fact(string value, string? owner = "SpaceUnit")
     {
@@ -176,10 +176,10 @@ public sealed class LuaScriptReferenceHandlerTest
     public void Another_workspace_file_tag_is_not_checked()
     {
         var other = XmlHandlerTestFixtures.MakeTag("Active_Plot", XmlValueType.NameReference,
-            referenceKind: ReferenceKind.WorkspaceFile) with
-        {
-            ReferenceTypeName = StoryReferenceTypes.ThreadFileTypeName
-        };
+                referenceKind: ReferenceKind.WorkspaceFile) with
+            {
+                ReferenceTypeName = StoryReferenceTypes.ThreadFileTypeName
+            };
         var fact = new XmlTagValueFact("file:///test.xml", 3, 14, 6, other, "Nope", "SpaceUnit");
 
         Assert.Empty(Sut.Handle(fact, CtxWith()));
