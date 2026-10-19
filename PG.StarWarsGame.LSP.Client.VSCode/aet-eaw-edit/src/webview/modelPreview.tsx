@@ -4241,7 +4241,14 @@ function ModelPreview(): React.JSX.Element {
         for (const name of viewport.particleTextureNames()) {
             askForTexture(name);
         }
-    }, [refreshStats, effectDrawsNow]);
+        // The effects too: a system names the engine effect it is drawn with, and the geometry
+        // paths asked for shaders before any system existed. Without this a field opened on its
+        // own never asks for its effect, and the preview's own shader stays - with nothing to say
+        // so. Measured on the asteroid field, as "no difference" after two shader fixes.
+        for (const shader of viewport.shaderNames()) {
+            askForShader(shader);
+        }
+    }, [refreshStats, effectDrawsNow, askForShader]);
 
     /**
      * Switches one weapon's arc on or off.
@@ -5081,9 +5088,13 @@ function ModelPreview(): React.JSX.Element {
                         ),
                     );
 
-                    // Asked for only now, because the system is what names them.
+                    // Asked for only now, because the system is what names them - the effect it
+                    // is drawn with as much as its textures.
                     for (const name of viewport.particleTextureNames()) {
                         askForTexture(name);
+                    }
+                    for (const shader of viewport.shaderNames()) {
+                        askForShader(shader);
                     }
 
                     return;
