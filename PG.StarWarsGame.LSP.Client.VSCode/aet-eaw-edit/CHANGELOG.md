@@ -102,6 +102,10 @@
     keeps bake order. Live particles are never sorted, as before
   - Vanilla: 42 emitters freeze - every asteroid, junk and planet-destruction field, the galaxy's dust and stars -
     and two of them sort
+  - A frozen batch is depth-tested whatever the file says: the game reads the no-depth-test flag on the live path only
+- **Heat haze hidden by what is in front of it** - heat sprites are drawn over the scene's depth and the distortion
+  field copied off the canvas afterwards, the sequence the game runs; a flamethrower's haze no longer shows through
+  the hull holding it ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
 - **Lua_Script checked against the script the game loads** - a game object's `Lua_Script` resolves the way the
   game finds it: the name as written, every script directory in the game's order, `.lua` then `.lc`, mod folder,
   loose files and MEG archives alike ([#133](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/133))
