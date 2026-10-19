@@ -128,7 +128,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             if (def.MetafileType == MetafileType.FileRegistry)
                 RegisterFromMetafile(winner, def, xmlRoots);
             else // DirectContent: the file itself carries the type
-                _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(winner), def.Types.ToImmutableArray());
+                _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(winner), [.. def.Types]);
         }
 
         // Replace-all also clears stale problems when a rescan (or a disabled flag) yields none.
@@ -151,8 +151,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         Action<int, int>? progress = null)
     {
         return config.Layers.Count > 0
-            ? await IndexByLayerAsync(config, ct, progress)
-            : await IndexFlatAsync(config, ct, progress);
+            ? await IndexByLayerAsync(config, progress, ct)
+            : await IndexFlatAsync(config, progress, ct);
     }
 
     /// <summary>
@@ -178,24 +178,21 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     public void ApplyAssetCatalog(WorkspaceConfiguration config)
     {
         var baseline = _indexService.Current.Baseline.AssetFiles;
-        var workspace = new List<string>();
         var packed = 0;
 
-        foreach (var root in config.AssetRoots)
-        {
-            if (!_fileHelper.FileSystem.Directory.Exists(root)) continue;
-            foreach (var file in _fileHelper.FileSystem.Directory
-                         .EnumerateFiles(root, "*", SearchOption.AllDirectories))
-            {
-                // The catalogue's own predicate rather than a third copy of its list: the
-                // workspace's loose `.ala` files are exactly what a model preview needs enumerated,
-                // and a list that drifts from the catalogue's leaves them out silently.
-                if (!MegAssetCatalogBuilder.IsAssetExtension(
-                        _fileHelper.FileSystem.Path.GetExtension(file)))
-                    continue;
-                workspace.Add(GameRelativePath(file, root));
-            }
-        }
+        // Scripts are declared apart from the art and audio, as script roots; they are catalogued
+        // with the rest so a Lua_Script resolves against loose, packed and shipped files alike.
+        // The catalogue's own predicate rather than a third copy of its list: the workspace's
+        // loose `.ala` files are exactly what a model preview needs enumerated, and a list that
+        // drifts from the catalogue's leaves them out silently.
+        var workspace = config.AssetRoots.Concat(config.ScriptRoots)
+            .Where(_fileHelper.FileSystem.Directory.Exists)
+            .SelectMany(root => _fileHelper.FileSystem.Directory
+                .EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                .Where(file => MegAssetCatalogBuilder.IsAssetExtension(
+                    _fileHelper.FileSystem.Path.GetExtension(file)))
+                .Select(file => GameRelativePath(file, root)))
+            .ToList();
 
         var archives = _megLoadOrder.SearchOrder(MegArchiveRoots.For(config, _configProvider.Current));
         foreach (var archive in archives.Where(a => a.Source == MegArchiveSource.Mod))
@@ -212,9 +209,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             packed++;
         }
 
-        _logger.LogInformation(
-            "Asset catalog: {Workspace} workspace asset(s) ({Packed} from MEG archives) merged with {Baseline} baseline asset(s)",
-            workspace.Count, packed, baseline.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation(
+                "Asset catalog: {Workspace} workspace asset(s) ({Packed} from MEG archives) merged with {Baseline} baseline asset(s)",
+                workspace.Count, packed, baseline.Count);
 
         _indexService.ApplyAssetFiles(MergedAssetFileIndex.Merge(baseline, workspace));
     }
@@ -255,18 +253,19 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
             foreach (var (path, entry) in models)
             {
-                mergedBones[path] = entry.Bones.ToImmutableArray();
+                mergedBones[path] = [.. entry.Bones];
                 // An empty texture list is recorded on purpose: it is the answer "this model names
                 // none", and it is what keeps the validator from reopening the file to find out.
-                mergedTextures[path] = entry.Textures.ToImmutableArray();
+                mergedTextures[path] = [.. entry.Textures];
                 workspaceCount++;
             }
         }
 
-        _logger.LogInformation(
-            "Model catalog: {Workspace} workspace model(s) merged with {Baseline} baseline "
-            + "model(s); {Reused} layer(s) reused a snapshot; {Textures} model(s) with texture data",
-            workspaceCount, baselineBones.Count, reusedLayers, mergedTextures.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation(
+                "Model catalog: {Workspace} workspace model(s) merged with {Baseline} baseline "
+                + "model(s); {Reused} layer(s) reused a snapshot; {Textures} model(s) with texture data",
+                workspaceCount, baselineBones.Count, reusedLayers, mergedTextures.Count);
         LastBoneCatalog = new BoneCatalogStats(reusedLayers, layerCount);
 
         _indexService.ApplyModelBones(mergedBones.ToImmutable());
@@ -309,8 +308,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                              .EnumerateFiles(xmlRoot, "*", SearchOption.AllDirectories))
                 {
                     var name = _fileHelper.FileSystem.Path.GetFileName(file);
-                    if (wantedFileNames.Contains(name) && !diskPathByFileName.ContainsKey(name))
-                        diskPathByFileName[name] = file;
+                    if (wantedFileNames.Contains(name))
+                        diskPathByFileName.TryAdd(name, file);
                 }
             }
 
@@ -318,30 +317,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         // read once even when multiple enums share the same source file (e.g. gameconstants.xml).
         var resolvedFiles = new Dictionary<string, (string DiskPath, string Content)>(
             StringComparer.OrdinalIgnoreCase);
-
-        string? FileReader(string sourceFile)
-        {
-            var filePath = sourceFile.Contains('$') ? sourceFile[..sourceFile.IndexOf('$')] : sourceFile;
-
-            if (resolvedFiles.TryGetValue(filePath, out var cached))
-                return cached.Content;
-
-            var fileName = _fileHelper.FileSystem.Path.GetFileName(filePath.Replace('/', sep));
-            if (!diskPathByFileName.TryGetValue(fileName, out var match))
-                return null;
-
-            try
-            {
-                var content = _fileHelper.FileSystem.File.ReadAllText(match);
-                resolvedFiles[filePath] = (match, content);
-                return content;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Could not read enum file '{Path}': {Message}", match, ex.Message);
-                return null;
-            }
-        }
 
         var (workspace, _) = DynamicEnumExtractor.Extract(_schema, FileReader);
 
@@ -379,13 +354,38 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             defsBuilder[enumDef.Name] = inner.ToImmutable();
         }
 
-        var count = workspace.Values.Sum(v => v.Length);
-        _logger.LogInformation(
-            "Dynamic enum catalog: {EnumCount} enum(s) with {ValueCount} workspace value(s) applied",
-            workspace.Count, count);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation(
+                "Dynamic enum catalog: {EnumCount} enum(s) with {ValueCount} workspace value(s) applied",
+                workspace.Count, workspace.Values.Sum(v => v.Length));
 
         _indexService.ApplyWorkspaceDynamicEnumValues(workspace);
         _indexService.ApplyWorkspaceEnumValueDefinitions(defsBuilder.ToImmutable());
+        return;
+
+        string? FileReader(string sourceFile)
+        {
+            var filePath = sourceFile.Contains('$') ? sourceFile[..sourceFile.IndexOf('$')] : sourceFile;
+
+            if (resolvedFiles.TryGetValue(filePath, out var cached))
+                return cached.Content;
+
+            var fileName = _fileHelper.FileSystem.Path.GetFileName(filePath.Replace('/', sep));
+            if (!diskPathByFileName.TryGetValue(fileName, out var match))
+                return null;
+
+            try
+            {
+                var content = _fileHelper.FileSystem.File.ReadAllText(match);
+                resolvedFiles[filePath] = (match, content);
+                return content;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not read enum file '{Path}'", match);
+                return null;
+            }
+        }
     }
 
     /// <summary>
@@ -419,12 +419,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     ///     over the flattened asset roots when the workspace resolved no projects (a heuristic
     ///     scan), which cannot be cached because there is no <c>.pgproj</c> to store it beside.
     /// </summary>
-    private static IReadOnlyList<ProjectLayer> LayersForBones(WorkspaceConfiguration config)
+    private static ProjectLayer[] LayersForBones(WorkspaceConfiguration config)
     {
-        if (config.Layers.Count == 0)
-            return [new ProjectLayer(0, "(workspace)", [], [], [], config.AssetRoots, null)];
-
-        return config.Layers.OrderBy(l => l.Rank).ToArray();
+        return config.Layers.Count == 0
+            ? [new ProjectLayer(0, "(workspace)", [], [], [], config.AssetRoots, null)]
+            : [.. config.Layers.OrderBy(l => l.Rank)];
     }
 
     /// <summary>
@@ -488,8 +487,9 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     {
         if (!_configProvider.Current.Features.Story.Discovery)
         {
-            _logger.LogInformation(
-                "Story discovery is disabled (features.story.discovery); skipping '{Path}'", def.Path);
+            if (_logger.IsEnabled(LogLevel.Information))
+                _logger.LogInformation(
+                    "Story discovery is disabled (features.story.discovery); skipping '{Path}'", def.Path);
             return;
         }
 
@@ -514,7 +514,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Could not read campaign registry '{Path}': {Message}", winner, ex.Message);
+            _logger.LogWarning(ex, "Could not read campaign registry '{Path}'", winner);
             return;
         }
 
@@ -525,10 +525,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         RegisterStoryFiles(result.ThreadFiles, StoryParserTypes, xmlRoots);
         problems.AddRange(result.Problems);
 
-        _logger.LogInformation(
-            "Story chain: {Manifests} manifest(s), {Threads} thread file(s), {Lua} Lua script(s), {Problems} problem(s)",
-            result.ManifestFiles.Count, result.ThreadFiles.Count, result.LuaScripts.Count,
-            result.Problems.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation(
+                "Story chain: {Manifests} manifest(s), {Threads} thread file(s), {Lua} Lua script(s), {Problems} problem(s)",
+                result.ManifestFiles.Count, result.ThreadFiles.Count, result.LuaScripts.Count,
+                result.Problems.Count);
     }
 
     // Chain files are xml-dir-relative; like file-registry entries they are registered under
@@ -555,11 +556,20 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     // rest are shadowed. config.XmlDirectories arrives dependencies-first / root-project-last (see
     // ModProjectResolver.Resolve), hence the reversed walk; the workspace-root probe comes last as
     // a fallback for a metafile that sits outside every declared xml directory.
-    private IReadOnlyList<string> LocateInLayers(
+    private List<string> LocateInLayers(
         string defPath, IReadOnlyList<string> roots, IReadOnlyList<string> xmlRoots)
     {
         var found = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        // Metafiles live directly in the xml directory, keyed by the def's filename.
+        var fileName = _fileHelper.FileSystem.Path.GetFileName(defPath);
+        foreach (var xmlRoot in xmlRoots.AsEnumerable().Reverse())
+            TryAdd(_fileHelper.FileSystem.Path.Combine(xmlRoot, fileName));
+
+        TryAdd(_fileHelper.FindInWorkspace([.. roots], defPath));
+
+        return found;
 
         void TryAdd(string? path)
         {
@@ -567,23 +577,15 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             if (seen.Add(_fileHelper.NormalizeUri(path)))
                 found.Add(path);
         }
-
-        // Metafiles live directly in the xml directory, keyed by the def's filename.
-        var fileName = _fileHelper.FileSystem.Path.GetFileName(defPath);
-        foreach (var xmlRoot in xmlRoots.AsEnumerable().Reverse())
-            TryAdd(_fileHelper.FileSystem.Path.Combine(xmlRoot, fileName));
-
-        TryAdd(_fileHelper.FindInWorkspace(roots.ToList(), defPath));
-
-        return found;
     }
 
     // Original flat scan used when there is no pgproj dependency graph.
-    private async Task<int> IndexFlatAsync(WorkspaceConfiguration config, CancellationToken ct,
-        Action<int, int>? progress)
+    private async Task<int> IndexFlatAsync(WorkspaceConfiguration config,
+        Action<int, int>? progress, CancellationToken ct)
     {
         var files = CollectFiles(config.XmlDirectories, config.ScriptRoots);
-        _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (flat scan)", files.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (flat scan)", files.Count);
 
         var indexed = 0;
         var options = new ParallelOptions
@@ -602,13 +604,14 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         // No layers means no snapshots: everything was parsed.
         LastIndexCache = new IndexCacheStats(0, 0, 0, indexed);
-        _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
         return indexed;
     }
 
     // Per-layer scan with project index cache support.
-    private async Task<int> IndexByLayerAsync(WorkspaceConfiguration config, CancellationToken ct,
-        Action<int, int>? progress)
+    private async Task<int> IndexByLayerAsync(WorkspaceConfiguration config,
+        Action<int, int>? progress, CancellationToken ct)
     {
         // Build per-layer file lists (dependencies first - ordered by rank).
         var layerFileLists = config.Layers
@@ -617,7 +620,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             .ToList();
 
         var totalFiles = layerFileLists.Sum(l => l.Files.Count);
-        _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (layered scan)", totalFiles);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (layered scan)", totalFiles);
 
         var indexed = 0;
         var reused = 0;
@@ -652,7 +656,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             l => l.Layer,
             l => CrossLayerInputFingerprint.Compute(
                 _fileTypeRegistry,
-                l.Files.Select(_fileHelper.PathToFileUri).ToArray(),
+                [.. l.Files.Select(_fileHelper.PathToFileUri)],
                 l.Layer.XmlDirectories,
                 config.XmlDirectories));
 
@@ -677,9 +681,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 // Snapshot built under a different (or pre-fingerprint) schema - discard it.
                 if (snapshot is not null && snapshot.SchemaFingerprint != schemaFingerprint)
                 {
-                    _logger.LogInformation(
-                        "Schema changed since layer '{Layer}' was cached; discarding its snapshot",
-                        layer.Name);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                        _logger.LogInformation(
+                            "Schema changed since layer '{Layer}' was cached; discarding its snapshot",
+                            layer.Name);
                     snapshot = null;
                 }
 
@@ -693,9 +698,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 // in the file name - a re-parse, never a stale index.
                 if (snapshot is not null && snapshot.CrossLayerFingerprint != crossLayer)
                 {
-                    _logger.LogInformation(
-                        "Cross-layer inputs changed since layer '{Layer}' was cached; discarding its snapshot",
-                        layer.Name);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                        _logger.LogInformation(
+                            "Cross-layer inputs changed since layer '{Layer}' was cached; discarding its snapshot",
+                            layer.Name);
                     snapshot = null;
                 }
 
@@ -760,7 +766,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                     layerOverallHashes[pgprojPath] = overallHash;
                 }
 
-                layerResults.Add((layer, layerEntries.ToList()));
+                layerResults.Add((layer, [.. layerEntries]));
             }
         } // fires one IndexChanged with the complete final state
 
@@ -778,7 +784,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             // Nothing changed since the snapshot on disk was written - skip the re-serialization.
             if (validSnapshotHashes.TryGetValue(pgprojPath, out var priorHash) && priorHash == overallHash)
             {
-                _logger.LogDebug("Layer snapshot '{Pgproj}' unchanged; skipping save", pgprojPath);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                    _logger.LogDebug("Layer snapshot '{Pgproj}' unchanged; skipping save", pgprojPath);
                 continue;
             }
 
@@ -808,7 +815,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             _cache.EnsureGitHygiene(pgprojPath);
         }
 
-        _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
         return indexed;
     }
 
@@ -838,23 +846,25 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     // Collects files from xml directories (EaW-gated) and script roots (extension-gated).
     private List<string> CollectFiles(IEnumerable<string> xmlDirectories, IEnumerable<string> scriptRoots)
     {
-        return EnumerateFiles(xmlDirectories)
-            .Where(f =>
-            {
-                var ext = _fileHelper.FileSystem.Path.GetExtension(f);
-                if (!ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)) return false;
-                if (!_parsers.Any(p => p.CanParse(ext))) return false;
-                return _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f));
-            })
-            .Concat(EnumerateFiles(scriptRoots)
+        return
+        [
+            .. EnumerateFiles(xmlDirectories)
                 .Where(f =>
                 {
                     var ext = _fileHelper.FileSystem.Path.GetExtension(f);
-                    if (ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)) return false;
-                    return _parsers.Any(p => p.CanParse(ext));
-                }))
-            .Distinct()
-            .ToList();
+                    return ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)
+                           && _parsers.Any(p => p.CanParse(ext))
+                           && _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f));
+                })
+                .Concat(EnumerateFiles(scriptRoots)
+                    .Where(f =>
+                    {
+                        var ext = _fileHelper.FileSystem.Path.GetExtension(f);
+                        return !ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)
+                               && _parsers.Any(p => p.CanParse(ext));
+                    }))
+                .Distinct()
+        ];
     }
 
     // Separators only. The fold that used to live here belongs to the COMPARISON - see
@@ -893,7 +903,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Could not read metafile '{Path}': {Message}", metafilePath, ex.Message);
+            _logger.LogWarning(ex, "Could not read metafile '{Path}'", metafilePath);
             return;
         }
 
@@ -904,7 +914,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Could not parse metafile '{Path}': {Message}", metafilePath, ex.Message);
+            _logger.LogWarning(ex, "Could not parse metafile '{Path}'", metafilePath);
             return;
         }
 

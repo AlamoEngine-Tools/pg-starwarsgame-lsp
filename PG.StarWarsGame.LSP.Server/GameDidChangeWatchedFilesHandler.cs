@@ -125,6 +125,16 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                     continue;
                 }
 
+                // A loose asset file re-globs the asset catalog from the last-scanned roots - on a
+                // delete too, because the catalog is what says a file exists. A script is also a
+                // document, so it goes on to be indexed or removed; every other asset stops here.
+                if (path is not null && WorkspaceIndexer.IsAssetFile(path))
+                {
+                    assetsChanged = true;
+                    if (DocumentLanguages.LanguageIdOf(path) != DocumentLanguages.Lua)
+                        continue;
+                }
+
                 if (change.Type == FileChangeType.Deleted)
                 {
                     _indexService.RemoveDocument(uri);
@@ -132,13 +142,6 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 }
 
                 if (path is null) continue;
-
-                // A changed loose asset file re-globs the asset catalog from the last-scanned roots.
-                if (WorkspaceIndexer.IsAssetFile(path))
-                {
-                    assetsChanged = true;
-                    continue;
-                }
 
                 // A changed dynamic-enum source file (e.g. gameconstants.xml, surfacefxtriggertype.xml)
                 // re-scans the enum catalog so referencing tags re-validate against the new value set —
@@ -229,7 +232,8 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         catch (Exception ex)
         {
             // Unreadable here means "reload and let the loader report it properly".
-            _logger.LogDebug(ex, "Could not read {Path} to check for an own-write echo.", path);
+            if (_logger.IsEnabled(LogLevel.Debug))
+                _logger.LogDebug(ex, "Could not read {Path} to check for an own-write echo", path);
             return false;
         }
     }
@@ -246,13 +250,8 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         if (string.IsNullOrEmpty(directory)) return false;
 
         var directoryUri = _fileHelper.PathToFileUri(directory).TrimEnd('/');
-        foreach (var root in textRoots)
-            if (string.Equals(
-                    _fileHelper.PathToFileUri(root).TrimEnd('/'), directoryUri,
-                    StringComparison.Ordinal))
-                return true;
-
-        return false;
+        return textRoots.Any(root => string.Equals(
+            _fileHelper.PathToFileUri(root).TrimEnd('/'), directoryUri, StringComparison.Ordinal));
     }
 
     protected override DidChangeWatchedFilesRegistrationOptions CreateRegistrationOptions(

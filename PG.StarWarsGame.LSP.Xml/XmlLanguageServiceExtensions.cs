@@ -177,6 +177,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, ModelTextureExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IconAwaitingRepackHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ModelFileExistenceHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, LuaScriptReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioFileExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, MapFileExistenceHandler>();
 

@@ -5,6 +5,10 @@
         <IsPackable>false</IsPackable>
         <OutputType>Exe</OutputType>
         <IsTestable>true</IsTestable>
+        <!-- VSTHRD200: test methods are named as sentences the runner shows, not as API; an Async
+             suffix adds nothing there. Project level because Rider honours no narrower suppression
+             for this analyzer, as in the Xml and Lua projects. -->
+        <NoWarn>$(NoWarn);VSTHRD200</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
