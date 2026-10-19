@@ -57,6 +57,7 @@ import { type InspectorSubject } from "./preview/inspectorSubject";
 import { AssetLedger, loadState, type LoadTally } from "./preview/loadProgress";
 import { anchorFlyout } from "./preview/flyoutAnchor";
 import { handoffFor } from "./preview/handoff";
+import { shaderGapNotice } from "./preview/shaderGap";
 import { particleNotices } from "./preview/particleNotices";
 import { groundRange, snapToZero } from "./preview/groundRange";
 import { InfoBadge } from "./shared/InfoBadge";
@@ -3358,6 +3359,8 @@ function ModelPreview(): React.JSX.Element {
      * back null and the count is 0 for a reason the reader can actually act on.
      */
     const [anyShaderSource, setAnyShaderSource] = useState(false);
+    /** Whether this scene asked for any effect at all; a particle system asks for none. */
+    const [shaderRequested, setShaderRequested] = useState(false);
 
     /**
      * Effects asked for but not yet delivered, to play the moment they arrive.
@@ -3908,6 +3911,7 @@ function ModelPreview(): React.JSX.Element {
             }
 
             vscode.postMessage({ type: "requestShader", name });
+            setShaderRequested(true);
             syncTally();
         },
         [syncTally],
@@ -7101,19 +7105,22 @@ function ModelPreview(): React.JSX.Element {
 
         // The shader gap is a limitation of the preview rather than a fault in the mod, so it is
         // info. The corner button is the way OUT of it; this is the explanation of it.
-        const fromShaders =
-            translatedOn && !anyShaderSource
-                ? [
-                      {
-                          severity: "info",
-                          message:
-                              "No shader sources are reachable, so nothing can be translated. A " +
-                              "game install ships compiled .fxo; the .fx sources are a separate " +
-                              "Petroglyph download.",
-                          hardpointId: null,
-                      },
-                  ]
-                : [];
+        const fromShaders = shaderGapNotice(
+            translatedOn,
+            shaderRequested,
+            anyShaderSource,
+        )
+            ? [
+                  {
+                      severity: "info",
+                      message:
+                          "No shader sources are reachable, so nothing can be translated. A " +
+                          "game install ships compiled .fxo; the .fx sources are a separate " +
+                          "Petroglyph download.",
+                      hardpointId: null,
+                  },
+              ]
+            : [];
 
         // A shield bubble the model names but does not draw with a shield shader. The NAME is what
         // decides which mesh a shield ability reveals - the author's word - so this corrects
@@ -7146,6 +7153,7 @@ function ModelPreview(): React.JSX.Element {
         attachmentIssues,
         colourFindings,
         translatedOn,
+        shaderRequested,
         anyShaderSource,
         shieldOffShader,
     ]);

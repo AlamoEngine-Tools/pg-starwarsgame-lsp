@@ -103,6 +103,9 @@
   - Vanilla: 42 emitters freeze - every asteroid, junk and planet-destruction field, the galaxy's dust and stars -
     and two of them sort
   - A frozen batch is depth-tested whatever the file says: the game reads the no-depth-test flag on the live path only
+  - An emitter with a skip time is pre-simulated through it before its first frame, in tenths of a second as the
+    game does; every shipped field sets skip equal to freeze, so an asteroid field is a populated scene on its first
+    frame and frozen on its second, never a shower filling up
 - **Heat haze hidden by what is in front of it** - heat sprites are drawn over the scene's depth and the distortion
   field copied off the canvas afterwards, the sequence the game runs; a flamethrower's haze no longer shows through
   the hull holding it ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
@@ -119,6 +122,8 @@
 
 ### Fixes
 
+- **Shader note on particle systems** - "No shader sources are reachable" is shown only for a scene that asked for
+  an effect; a particle system asks for none and opened with a note about shaders it never needed
 - **Hardpoint without an Attachment_Bone** - both findings are errors and say what the game does, measured on the
   2024 build: the hardpoint is placed at `Fire_Bone_A`, or at the map origin with that unset too; its
   `Model_To_Attach` is never attached; a targetable one draws its reticle in the screen corner and, at the origin,
