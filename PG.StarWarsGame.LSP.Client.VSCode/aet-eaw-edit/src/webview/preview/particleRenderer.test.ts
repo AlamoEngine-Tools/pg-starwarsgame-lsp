@@ -903,6 +903,98 @@ describe("freezing", () => {
     });
 });
 
+describe("pre-simulation", () => {
+    /**
+     * Measured in the game (FoC x64, 2024 release): at an emitter's first tick, one with a skip
+     * time is stepped forward in tenths of a second until its clock is past that time, and only
+     * then does the tick's own step run. Every freezing field sets skip equal to freeze - the
+     * asteroid field is a populated scene on its first frame and frozen on its second.
+     */
+    function skipping(
+        skipTime: number,
+        freezeTime = 0,
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "field",
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 5 },
+                    }),
+                    properties: properties({
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                        skipTime,
+                        freezeTime,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    it("runs the skip time through before the first step", () => {
+        const instance = skipping(1);
+        instance.update(0.1);
+        const particles = instance.emitterParticles(0);
+        // Eleven tenths to pass one second, then the tick itself: twelve spawns at ten a second,
+        // the oldest of them a full second down the road.
+        assert.equal(particles.length, 12);
+        assert.ok(
+            particles.some((p) => p.position.z > 5),
+            "nothing had travelled the skipped second",
+        );
+    });
+
+    /**
+     * The engine's loop runs while the clock is AT OR BELOW the skip time, so a clock that lands
+     * exactly on it takes one more step. Five tenths sum to exactly one half, which is what makes
+     * this case decidable.
+     */
+    it("steps once more when the clock lands exactly on the skip time", () => {
+        const instance = skipping(0.5);
+        instance.update(0.1);
+        // Six pre-simulated steps (0.0 to 0.5 inclusive) plus the tick: seven spawns.
+        assert.equal(instance.emitterParticles(0).length, 7);
+    });
+
+    it("pre-simulates once, on the first tick only", () => {
+        const instance = skipping(1);
+        instance.update(0.1);
+        instance.update(0.1);
+        assert.equal(instance.emitterParticles(0).length, 13);
+    });
+
+    it("does nothing without a skip time", () => {
+        const instance = skipping(0);
+        instance.update(0.1);
+        assert.equal(instance.emitterParticles(0).length, 1);
+    });
+
+    /** Skip equal to freeze, the shape every shipped field has: populated, then frozen at once. */
+    it("freezes a field with skip equal to freeze on its second tick", () => {
+        const instance = skipping(1, 1);
+        instance.update(0.1);
+        const populated = instance.emitterParticles(0).length;
+        assert.equal(populated, 12);
+        instance.update(0.1);
+        const baked = JSON.stringify(
+            instance.emitterParticles(0).map((p) => [p.position.z, p.age]),
+        );
+        for (let i = 0; i < 10; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(instance.emitterParticles(0).length, populated);
+        assert.equal(
+            JSON.stringify(
+                instance.emitterParticles(0).map((p) => [p.position.z, p.age]),
+            ),
+            baked,
+        );
+    });
+});
+
 describe("depth-sorted frozen batch", () => {
     /**
      * Measured in the game (FoC x64, 2024 release): a FROZEN emitter with its depth-sort flag set

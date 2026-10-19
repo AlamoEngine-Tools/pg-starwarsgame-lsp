@@ -59,6 +59,12 @@ const CAMERA_MATRIX_SCRATCH = new THREE.Matrix4();
  */
 const MAX_STEP_SECONDS = 0.1;
 
+/**
+ * The step the game pre-simulates an emitter with, measured: at an emitter's first tick it is run
+ * forward in tenths of a second until its clock is past its skip time.
+ */
+const PRESIMULATE_STEP_SECONDS = 0.1;
+
 /** The blend state one Alamo mode needs, as three.js expresses it. */
 export interface ParticleBlend {
     blending: THREE.Blending;
@@ -711,6 +717,29 @@ class EmitterRenderer {
             }
             return [];
         }
+
+        // Measured: at its first tick an emitter with a skip time is run forward, in tenths of a
+        // second, until its clock is past that time - then the tick's own step follows. Every
+        // freezing field sets skip equal to freeze, so the game shows an asteroid field populated
+        // from its first frame and frozen on its second: a scene, never a shower filling up.
+        // Deaths during the pre-simulation go unreported; nothing is watching yet.
+        if (this.age === 0) {
+            const skip = this.emitter.properties.skipTime;
+            while (skip > 0 && this.age <= skip) {
+                this.advance(PRESIMULATE_STEP_SECONDS, frame, dependent, false);
+            }
+        }
+
+        return this.advance(dt, frame, dependent, true);
+    }
+
+    /** One step of the live simulation: age, move, kill, spawn, and write the buffers if asked. */
+    private advance(
+        dt: number,
+        frame: EmitterFrame,
+        dependent: boolean,
+        write: boolean,
+    ): AlamoVector3[] {
         this.age += dt;
 
         const follow = followFactor(this.emitter.properties);
@@ -795,7 +824,9 @@ class EmitterRenderer {
             this.particles.push(particle);
         }
 
-        this.writeBuffers(frame);
+        if (write) {
+            this.writeBuffers(frame);
+        }
 
         return deaths;
     }
