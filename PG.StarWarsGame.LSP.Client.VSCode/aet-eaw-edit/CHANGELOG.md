@@ -119,6 +119,9 @@
 
 ### Fixes
 
+- **Bone names with a dot** - the model tree, the inspector and the preview's own bone lookups read the name the
+  exporter wrote; three.js drops `.` from a node name on load and `Weap_Turbo_LS_03_170._FP01` showed as
+  `Weap_Turbo_LS_03_170_FP01` ([#265](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/265))
 - **Vanilla library documentation** - the schema's stub per vanilla library (PGBase, PGCommands, PGEvents,
   PGStateMachine, PGTaskForce and the rest) is read for hover and parameters, without turning a library's
   functions into engine globals: a call without the library's `require` is still reported, and a library
