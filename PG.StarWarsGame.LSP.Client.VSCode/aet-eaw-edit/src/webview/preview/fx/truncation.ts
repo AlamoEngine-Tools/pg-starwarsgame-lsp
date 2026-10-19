@@ -138,6 +138,18 @@ function balanceWidths(
             );
         }
 
+        // The other way round: `mul(float3, float4x4)`. HLSL drops the matrix's fourth row, and
+        // the first three components of its float4 result are the vector against the upper-left
+        // 3x3 - which is what a GLSL matrix constructor takes. The bump particle effect rotates
+        // its packed tangent this way; every use assigns into a float3, so the fourth component
+        // HLSL would have computed is never read.
+        if (leftMatrix > 0 && rightWidth > 1 && rightWidth < leftMatrix) {
+            return `mat${rightWidth}(${left}) ${split.operator} ${right}`;
+        }
+        if (rightMatrix > 0 && leftWidth > 1 && leftWidth < rightMatrix) {
+            return `${left} ${split.operator} mat${leftWidth}(${right})`;
+        }
+
         return `${left} ${split.operator} ${right}`;
     }
 

@@ -474,6 +474,34 @@ void vs_main(VS_INPUT In)
         assert.ok(/skin_rotation \* m_light0Vector\.xyz;/.test(fixed), fixed);
     });
 
+    it("narrows the matrix against a vector too narrow for it", () => {
+        // `mul(float3, float4x4)`: HLSL drops the matrix's fourth row and the first three
+        // components of its float4 result are the vector against the upper-left 3x3. The bump
+        // particle effect rotates its packed tangent this way; GLSL refuses a mat4 times a vec3.
+        const fixed = fixVectorTruncation(`
+uniform mat4 m_viewInv;
+
+void vs_main()
+{
+    vec3 packed;
+    vec3 plain = m_viewInv * packed;
+    vec3 tangent = m_viewInv * 2.0 * (packed - 0.5);
+}
+`);
+
+        assert.ok(
+            /vec3 plain = mat3\(m_viewInv\) \* packed;/.test(fixed),
+            fixed,
+        );
+        // The scaled matrix is still a matrix; the constructor wraps the whole of it.
+        assert.ok(
+            /mat3\(m_viewInv \* 2\.0\) \* \(packed - 0\.5\)/.test(fixed),
+            fixed,
+        );
+        // Not narrowed a second time, as a vec4 result into a vec3 target.
+        assert.ok(!/\.xyz/.test(fixed), fixed);
+    });
+
     it("leaves a matching scalar assignment alone", () => {
         const fixed = fixVectorTruncation(`
 void f()

@@ -117,6 +117,10 @@
     the same chunk as a bump emitter's normal map, is bound as the effect's second texture, and the pixel
     shader's depth output reaches the depth buffer, so a chunk sinks into or stands off the hull as the game
     draws it; a frozen batch drawn through an effect is depth-tested like any other frozen batch
+  - Both compile in a real WebGL2 context, which they did not at first: a `mul` of a float3 by a float4x4 now
+    narrows the matrix as HLSL does, and a shader handle bound to a block of DX8 assembly is stripped with the
+    rest of the effect scaffolding - the bump effect's tangent rotation and the depth sprites' PS1.x fallbacks
+    were each a compile error that left the preview's own shader drawing in silence
   - The shader resolver looks in the shaders' `Engine/` folder, where the particle effects live, and a header is
     asked for by its bare name whatever path the include wrote
   - An emitter with a skip time is pre-simulated through it before its first frame, in tenths of a second as the

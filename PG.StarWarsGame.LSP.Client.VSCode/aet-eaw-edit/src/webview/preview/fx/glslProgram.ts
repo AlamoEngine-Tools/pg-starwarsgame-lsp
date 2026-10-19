@@ -161,6 +161,15 @@ export function stripFxScaffolding(source: string): string {
         "",
     );
 
+    // A handle bound to a block of DX8 assembly - the depth-sprite effects carry their PS1.x
+    // fallbacks this way, beside the ps_2_0 entry. Brace-matched like a technique; the semicolon
+    // that closed the declaration is then alone on its line, and GLSL ES has no empty declaration.
+    out = removeBlocks(
+        out,
+        /\b(?:pixelshader|vertexshader)\s+[A-Za-z_0-9]+\s*=\s*asm\s*/gi,
+    );
+    out = out.replace(/^[ \t]*;[ \t]*$/gm, "");
+
     // Only `#include`. Everything else the sources use - eight `#define`s and a handful of `#if`
     // blocks - is the same preprocessor GLSL ES has, so it is kept and left to do its job; removing
     // it took `GEOMETRY_MODS_ENABLED` out from under the one shader that reads it. The two defines

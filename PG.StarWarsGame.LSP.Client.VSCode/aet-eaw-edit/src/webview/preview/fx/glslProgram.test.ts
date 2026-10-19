@@ -289,6 +289,26 @@ float4 f() { return float4(0, 0, 0, 1); }
         assert.ok(/float4 f\(\)/.test(stripped), stripped);
     });
 
+    it("removes an asm shader block, which is DX8 assembly and not shader code", () => {
+        // The depth-sprite effects carry their PS1.x fallbacks this way, beside the ps_2_0 entry.
+        const stripped = stripFxScaffolding(`
+pixelshader ps14_depth_sprite_bin = asm
+{
+	ps.1.4
+	texld r1,t0;
+	phase
+	texdepth r5
+};
+
+float4 f() { return float4(0, 0, 0, 1); }
+`);
+
+        assert.ok(!/asm|texld|ps\.1\.4/.test(stripped), stripped);
+        // Nor a stray semicolon where the block was: GLSL ES has no empty declaration.
+        assert.ok(!/^\s*;\s*$/m.test(stripped), stripped);
+        assert.ok(/float4 f\(\)/.test(stripped), stripped);
+    });
+
     it("drops the `uniform` qualifier from a parameter, keeping the parameter", () => {
         // HLSL lets a function take a compile-time constant this way; the technique supplies the
         // value in its `compile` call. GLSL has no such qualifier, but the parameter is still real.
