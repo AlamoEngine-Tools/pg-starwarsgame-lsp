@@ -919,7 +919,11 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PreviewHardpointModelNotFound =
         new(DiagnosticGroup.Preview, 8);
 
-    /// <summary>A hardpoint names no attachment bone, so it sits at the hull's origin.</summary>
+    /// <summary>
+    ///     A hardpoint names no <c>Attachment_Bone</c>. Measured: the game attaches it to nothing -
+    ///     it is placed at <c>Fire_Bone_A</c>, or at the map origin with that unset too, and its
+    ///     <c>Model_To_Attach</c> is never attached.
+    /// </summary>
     public static readonly DiagnosticId PreviewHardpointNoBone = new(DiagnosticGroup.Preview, 9);
 
     /// <summary>A hardpoint attaches to a bone the hull does not have.</summary>
@@ -960,8 +964,10 @@ public static class DiagnosticIds
         new(DiagnosticGroup.Preview, 18);
 
     /// <summary>
-    ///     A TARGETABLE hardpoint naming no <c>Attachment_Bone</c>, which the engine attaches to the
-    ///     screen root - so it can never be hit, and the unit can never be destroyed.
+    ///     A TARGETABLE hardpoint naming no <c>Attachment_Bone</c>. Measured: the targeting reticle
+    ///     is drawn in the screen corner, and the hardpoint is hit only where the game places it -
+    ///     at the map origin with no <c>Fire_Bone_A</c> either, so it is never hit and the unit is
+    ///     never destroyed.
     /// </summary>
     /// <remarks>
     ///     Its own id rather than a severity bump on

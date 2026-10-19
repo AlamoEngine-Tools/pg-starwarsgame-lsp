@@ -13,16 +13,18 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         TOLD by the user, not measured here: the engine attaches such a hardpoint to the SCREEN
-///         root rather than to the object's root. For a hardpoint nobody shoots at that is merely
-///         wrong placement, but a TARGETABLE one cannot then be hit at all - and since a unit dies
-///         only when every one of its targetable hardpoints is destroyed, one of these makes the
-///         whole unit indestructible.
+///         Measured in the game (FoC x64, 2024 release): the engine attaches such a hardpoint to
+///         nothing. Its world position falls back to <c>Fire_Bone_A</c> and, with that unset too,
+///         to the map origin; its model is never attached; the targeting reticle consults the
+///         attachment bone only and is drawn in the top-left corner of the screen. Damage reads no
+///         bone, so a TARGETABLE one is hit only where the game places it - at the origin, in
+///         practice never - and since a unit dies only when every targetable hardpoint is
+///         destroyed, one of these makes the whole unit indestructible.
 ///     </para>
 ///     <para>
-///         So the two cases are two findings. They differ in severity, in consequence and in what
-///         the author has to do about them, and reporting the pair under one id would have a reader
-///         suppress "hardpoint placement is sloppy" and silence "this unit cannot be killed".
+///         Two findings, both errors. They differ in consequence and in what the author has to do
+///         about them, and reporting the pair under one id would have a reader suppress "hardpoint
+///         placement is broken" and silence "this unit cannot be killed".
 ///     </para>
 /// </remarks>
 public sealed class PreviewHardpointAttachmentTest
@@ -50,8 +52,32 @@ public sealed class PreviewHardpointAttachmentTest
         var problem = Assert.Single(scene.Problems,
             p => p.DiagnosticId == DiagnosticIds.PreviewTargetableHardpointNoBone);
 
-        Assert.Contains("screen root", problem.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("destroy", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("map origin", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("screen corner", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("cannot be destroyed", problem.Message, StringComparison.OrdinalIgnoreCase);
+        // The old wording named a "screen root" the engine has no such thing as. Measured: the
+        // hardpoint is attached to nothing; its reticle lands in the screen corner.
+        Assert.DoesNotContain("screen root", problem.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Measured: the hardpoint's world position falls back to <c>Fire_Bone_A</c>, so with one
+    ///     set it is hit there and the unit can die. The reticle consults the attachment bone only,
+    ///     so it still lands in the screen corner - the finding stays, the consequence changes.
+    /// </summary>
+    [Fact]
+    public void TargetableHardpointWithNoAttachmentBone_ButAFireBone_IsPlacedAtTheFireBone()
+    {
+        var scene = SceneWith(true, null, "HP_Gun_Fire");
+
+        var problem = Assert.Single(scene.Problems,
+            p => p.DiagnosticId == DiagnosticIds.PreviewTargetableHardpointNoBone);
+
+        Assert.Equal("error", problem.Severity);
+        Assert.Contains("Fire_Bone_A", problem.Message, StringComparison.Ordinal);
+        Assert.Contains("screen corner", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("map origin", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("cannot be destroyed", problem.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -67,15 +93,22 @@ public sealed class PreviewHardpointAttachmentTest
             p => p.DiagnosticId == DiagnosticIds.PreviewHardpointNoBone);
     }
 
+    /// <summary>
+    ///     An error too: the hardpoint is placed at the map origin and its model is never attached,
+    ///     which breaks the unit whether or not anyone shoots at it.
+    /// </summary>
     [Fact]
-    public void UntargetableHardpointWithNoAttachmentBone_StaysAWarning()
+    public void UntargetableHardpointWithNoAttachmentBone_IsAnError()
     {
         var scene = SceneWith(false, null);
 
         var problem = Assert.Single(scene.Problems,
             p => p.DiagnosticId == DiagnosticIds.PreviewHardpointNoBone);
 
-        Assert.Equal("warning", problem.Severity);
+        Assert.Equal("error", problem.Severity);
+        Assert.Contains("map origin", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Model_To_Attach", problem.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("screen root", problem.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -106,7 +139,8 @@ public sealed class PreviewHardpointAttachmentTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static PreviewScene SceneWith(bool targetable, string? attachmentBone)
+    private static PreviewScene SceneWith(bool targetable, string? attachmentBone,
+        string? fireBoneA = null)
     {
         var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_Gun", "HardPoint")]);
 
@@ -117,10 +151,12 @@ public sealed class PreviewHardpointAttachmentTest
 
         if (attachmentBone is not null)
             hardpointTags.Add(Tag("Attachment_Bone", attachmentBone));
+        if (fireBoneA is not null)
+            hardpointTags.Add(Tag("Fire_Bone_A", fireBoneA));
 
         var tags = new FakeVariantTagSource()
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Gun"))
-            .With("HP_Gun", hardpointTags.ToArray());
+            .With("HP_Gun", [.. hardpointTags]);
 
         return Builder(index, tags, "hull.alo").BuildForObject("Ship");
     }
@@ -148,7 +184,7 @@ public sealed class PreviewHardpointAttachmentTest
         return GameIndex.Empty with
         {
             WorkspaceDefinitions = symbols.ToImmutableDictionary(
-                s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase)
+                s => s.Id, ImmutableArray.Create, StringComparer.OrdinalIgnoreCase)
         };
     }
 }

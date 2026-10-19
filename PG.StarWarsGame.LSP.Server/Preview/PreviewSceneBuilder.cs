@@ -173,6 +173,11 @@ public sealed class PreviewSceneBuilder(
                         $"'{modelReference}' is not an Alamo model or particle system: Its root chunk id is "
                         + "neither. The file may be renamed or truncated."));
                     break;
+
+                case AloFileKind.Model:
+                default:
+                    // The kind it started as.
+                    break;
             }
 
         var part = new PreviewPart("hull", modelReference, null, null, PreviewPartOrigin.Hull, null,
@@ -285,6 +290,8 @@ public sealed class PreviewSceneBuilder(
             .OrderByDescending(key => key.Length)
             .ToList();
 
+        // ReSharper disable once ForeachCanBePartlyConvertedToQueryUsingAnotherGetEnumerator - the
+        // first fitting model ends the search with a built scene; a query would bury that exit.
         foreach (var key in candidates)
         {
             if (clip is null || !clip.MatchesModel(index.ModelBones[key]))
@@ -307,6 +314,7 @@ public sealed class PreviewSceneBuilder(
     }
 
     /// <summary>A scene for a GameObject: its tactical model plus everything its XML mounts on it.</summary>
+    /// <param name="objectId">The GameObject's id, as the XML names it.</param>
     /// <param name="icons">
     ///     The project's icon catalog, for the ability rows' command-bar art. Optional and resolved
     ///     by the CALLER because building one is async and may decode a mega texture, which is not
@@ -554,6 +562,8 @@ public sealed class PreviewSceneBuilder(
 
         var abilities = new List<PreviewAbility>();
 
+        // ReSharper disable once LoopCanBeConvertedToQuery - the row is built in two steps and the
+        // second reports problems as it goes; a query would hide that.
         foreach (var ability in declared)
         {
             var row = new PreviewAbility(
@@ -812,14 +822,11 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private bool DeclaresProjectileBehavior(GameIndex index, string objectId)
     {
-        foreach (var tagName in ShieldBehaviorTags)
-        foreach (var value in RepeatedTagReader.Values(index, tagSource, objectId, tagName))
-        foreach (var token in value.Split(
-                     ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-            if (token.Equals("PROJECTILE", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-        return false;
+        return ShieldBehaviorTags
+            .SelectMany(tagName => RepeatedTagReader.Values(index, tagSource, objectId, tagName))
+            .SelectMany(value => value.Split(
+                ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Any(token => token.Equals("PROJECTILE", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Resolves a list of projectile ids, skipping repeats.</summary>
@@ -837,7 +844,7 @@ public sealed class PreviewSceneBuilder(
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var projectiles = new List<PreviewProjectile>();
 
-        foreach (var id in ids.Where(id => seen.Add(id)))
+        foreach (var id in ids.Where(seen.Add))
         {
             var effective = resolver.Resolve(id);
             if (!effective.Found)
@@ -940,7 +947,7 @@ public sealed class PreviewSceneBuilder(
                      .Select(h => h.DeathBreakoffProp)
                      .Where(id => !string.IsNullOrEmpty(id))
                      .Select(id => id!)
-                     .Where(id => seen.Add(id)))
+                     .Where(seen.Add))
         {
             var effective = resolver.Resolve(id);
             if (!effective.Found)
@@ -1037,7 +1044,7 @@ public sealed class PreviewSceneBuilder(
         // Only the hull's own hardpoints can claim its proxies; a turret's smoke is its own.
         var owning = part.Id == "hull"
             ? hardpoints
-            : hardpoints.Where(h => h.PartId == part.Id).ToList();
+            : [.. hardpoints.Where(h => h.PartId == part.Id)];
 
         return ProxiesOf(part.ModelRef, part.Id, owning, problems);
     }
@@ -1100,35 +1107,35 @@ public sealed class PreviewSceneBuilder(
     private string? ResolveAnimationOverride(
         EffectiveObject effective, string? hull, List<PreviewProblem> problems)
     {
-        var override_ = AnimationOverrideTags
+        var overrideModel = AnimationOverrideTags
             .Select(tag => Tag(effective, tag))
             .FirstOrDefault(value => value is not null);
 
-        if (override_ is null)
+        if (overrideModel is null)
             return null;
 
         if (hull is null)
-            return override_;
+            return overrideModel;
 
         var index = indexService.Current;
         var hullBones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(hull));
-        var overrideBones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(override_));
+        var overrideBones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(overrideModel));
 
         // Only compare when both are catalogued; an unknown model is already reported elsewhere.
         if (!hullBones.IsDefaultOrEmpty && !overrideBones.IsDefaultOrEmpty
                                         && !hullBones.SequenceEqual(overrideBones, StringComparer.OrdinalIgnoreCase))
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewAnimationSkeletonMismatch, "info",
-                $"'{effective.ObjectId}' takes its animations from '{override_}', whose skeleton "
+                $"'{effective.ObjectId}' takes its animations from '{overrideModel}', whose skeleton "
                 + $"differs from '{hull}' ({overrideBones.Length} bones against "
                 + $"{hullBones.Length}). The clips play, bound by bone index - where the two "
                 + "skeletons disagree, a clip drives whatever bone sits at that index."));
 
-        return override_;
+        return overrideModel;
     }
 
     // ── hardpoints ────────────────────────────────────────────────────────────
 
-    private static IEnumerable<string> HardpointIds(EffectiveObject effective)
+    private static List<string> HardpointIds(EffectiveObject effective)
     {
         return Tag(effective, HardPointsTag) is { } raw
             ? XmlUtility.SplitList(raw)
@@ -1175,24 +1182,36 @@ public sealed class PreviewSceneBuilder(
 
         var isTargetable = EngineBoolean.IsTrue(Tag(effective, "Is_Targetable"));
 
-        // A hardpoint with no attachment bone goes to the SCREEN root, not to the object's root -
-        // told by the user, not measured here. That is bad placement for a hardpoint nobody shoots
-        // at, and fatal for one they do: it cannot be hit, and a unit dies only once every
-        // targetable hardpoint is destroyed, so the whole unit becomes indestructible.
+        // Measured in the game (FoC x64, 2024 release): a hardpoint with no attachment bone is
+        // attached to NOTHING. Its world position falls back to Fire_Bone_A and, with that unset
+        // too, to the map origin; its Model_To_Attach is never attached; the targeting reticle
+        // consults the attachment bone only and is drawn in the top-left corner of the screen.
+        // Damage reads no bone, so a targetable one is hit only where the game places it - at the
+        // origin, in practice never - and a unit dies only once every targetable hardpoint is
+        // destroyed, so one of these makes the whole unit indestructible.
         //
         // Two findings rather than one, because they differ in what the author has to do about
-        // them and in what suppressing them would cost.
+        // them and in what suppressing them would cost. Both are errors: the unit is broken either
+        // way, shot at or not.
         if (string.IsNullOrEmpty(attachBone))
+        {
+            var fireBoneA = Tag(effective, "Fire_Bone_A");
+            var placed = string.IsNullOrEmpty(fireBoneA)
+                ? "The game places it at the map origin"
+                : $"The game places it at Fire_Bone_A '{fireBoneA}'";
             problems.Add(isTargetable
                 ? new PreviewProblem(DiagnosticIds.PreviewTargetableHardpointNoBone, "error",
-                    $"Hardpoint '{hardpointId}' is targetable but names no {AttachmentBoneTag}, so "
-                    + "the engine attaches it to the screen root. It can never be hit, and the unit "
-                    + "can never be destroyed.",
+                    $"Hardpoint '{hardpointId}' is targetable but names no {AttachmentBoneTag}. "
+                    + $"{placed} and draws its reticle in the screen corner."
+                    + (string.IsNullOrEmpty(fireBoneA)
+                        ? " It cannot be hit, so the unit cannot be destroyed."
+                        : string.Empty),
                     hardpointId)
-                : new PreviewProblem(DiagnosticIds.PreviewHardpointNoBone, "warning",
-                    $"Hardpoint '{hardpointId}' names no {AttachmentBoneTag}, so the engine "
-                    + "attaches it to the screen root rather than to the model.",
+                : new PreviewProblem(DiagnosticIds.PreviewHardpointNoBone, "error",
+                    $"Hardpoint '{hardpointId}' names no {AttachmentBoneTag}. "
+                    + $"{placed}; a Model_To_Attach is never attached.",
                     hardpointId));
+        }
         else if (hull is not null &&
                  !HardpointBoneModelResolver.ModelHasBone(indexService.Current, hull, attachBone))
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointBoneMissing, "warning",
@@ -1296,6 +1315,7 @@ public sealed class PreviewSceneBuilder(
         var turret = UnitTurret(effective);
         var bones = MuzzleBones(hull, turret);
 
+        // ReSharper disable once InvertIf - a guard, read as one; the weapon stays the last word.
         if (bones.Count == 0)
         {
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoMuzzleBones, "warning",
@@ -1367,6 +1387,7 @@ public sealed class PreviewSceneBuilder(
     ///         thing and must not be confused with the default.
     ///     </para>
     /// </remarks>
+    /// <param name="effective">The unit, with its variant chain resolved.</param>
     /// <param name="deployed">
     ///     The arc while deployed: <c>Deployed_Turret_Rotate_Extent_Degrees</c>, whose default is the same
     ///     360, and null for a unit that is never deployed (<see cref="CanDeploy" />).
@@ -1405,6 +1426,7 @@ public sealed class PreviewSceneBuilder(
     ///     <c>Turret_XY_Only</c> makes the cone-of-fire test skip the pitch test ENTIRELY rather
     ///     than flattening it, so the elevation is unbounded however the extent is authored.
     /// </remarks>
+    /// <param name="effective">The unit, with its variant chain resolved.</param>
     /// <param name="deployed">As for <see cref="UnitArcYawDegrees" />.</param>
     private static float? UnitArcPitchDegrees(EffectiveObject effective, bool deployed = false)
     {
@@ -1532,7 +1554,7 @@ public sealed class PreviewSceneBuilder(
     ///         conventions overlap on exactly that unit.
     ///     </para>
     /// </remarks>
-    private IReadOnlyList<string> MuzzleBones(string? hull, PreviewTurret? turret)
+    private List<string> MuzzleBones(string? hull, PreviewTurret? turret)
     {
         if (string.IsNullOrEmpty(hull) ||
             !indexService.Current.ModelBones.TryGetValue(ModelBoneKey.From(hull), out var names))
@@ -1543,13 +1565,15 @@ public sealed class PreviewSceneBuilder(
             .Select(b => b!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        return names
-            .Where(n => n.StartsWith("MuzzleA_", StringComparison.OrdinalIgnoreCase))
-            .Where(n => !n.Contains("flash", StringComparison.OrdinalIgnoreCase))
-            .Where(n => !claimed.Contains(n))
-            .OrderBy(MuzzleNumber)
-            .ThenBy(n => n, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return
+        [
+            .. names
+                .Where(n => n.StartsWith("MuzzleA_", StringComparison.OrdinalIgnoreCase))
+                .Where(n => !n.Contains("flash", StringComparison.OrdinalIgnoreCase))
+                .Where(n => !claimed.Contains(n))
+                .OrderBy(MuzzleNumber)
+                .ThenBy(n => n, StringComparer.OrdinalIgnoreCase)
+        ];
     }
 
     /// <summary>The trailing number of a muzzle bone, or <see cref="int.MaxValue" /> when it has none.</summary>
@@ -1710,7 +1734,7 @@ public sealed class PreviewSceneBuilder(
     ///     a single <c>Number</c> before, which cannot parse <c>Fighter, 30.0</c> - so the field has
     ///     never once been non-null, on any of the 1017 rows the shipped tree declares.
     /// </remarks>
-    private IReadOnlyList<PreviewInaccuracy> Inaccuracy(string objectId)
+    private List<PreviewInaccuracy> Inaccuracy(string objectId)
     {
         var rows = new List<PreviewInaccuracy>();
 
@@ -1732,11 +1756,9 @@ public sealed class PreviewSceneBuilder(
     }
 
     /// <summary>The <c>Fire_When_*</c> gates this hardpoint sets.</summary>
-    private static IReadOnlyList<string> FireModes(EffectiveObject effective)
+    private static List<string> FireModes(EffectiveObject effective)
     {
-        return FireModeTags
-            .Where(tag => EngineBoolean.IsTrue(Tag(effective, tag)))
-            .ToList();
+        return [.. FireModeTags.Where(tag => EngineBoolean.IsTrue(Tag(effective, tag)))];
     }
 
     private static int? Integer(EffectiveObject effective, string tagName)
@@ -1757,7 +1779,7 @@ public sealed class PreviewSceneBuilder(
     ///     faction's colours and compare two side by side, and shipping the whole set makes that a
     ///     local switch rather than a round trip each time.
     /// </remarks>
-    private IReadOnlyList<PreviewFaction> Factions(EffectiveObjectResolver resolver)
+    private List<PreviewFaction> Factions(EffectiveObjectResolver resolver)
     {
         var factions = new List<PreviewFaction>();
 
@@ -1774,6 +1796,8 @@ public sealed class PreviewSceneBuilder(
         var candidates = InXmlOrder(index.WorkspaceDefinitions.SelectMany(kv => kv.Value))
             .Concat(InXmlOrder(index.Baseline.Symbols.Values));
 
+        // ReSharper disable once LoopCanBeConvertedToQuery - each faction is resolved and the
+        // unresolvable skipped; a query would hide the resolve.
         foreach (var symbol in candidates
                      .Where(s => string.Equals(s.TypeName, FactionTypeName, StringComparison.OrdinalIgnoreCase))
                      .DistinctBy(s => s.Id, StringComparer.OrdinalIgnoreCase))
@@ -1821,16 +1845,18 @@ public sealed class PreviewSceneBuilder(
     ///     a value that can be looked up - it is a set that has to be tested against. Splitting it
     ///     server-side keeps the client from having to know the engine's punctuation.
     /// </remarks>
-    private static IReadOnlyList<string> CategoryTokens(string? mask)
+    private static List<string> CategoryTokens(string? mask)
     {
         if (string.IsNullOrWhiteSpace(mask))
             return [];
 
-        return mask
-            .Split(['|', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(token => token.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return
+        [
+            .. mask
+                .Split(['|', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(token => token.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+        ];
     }
 
     /// <summary>

@@ -119,6 +119,10 @@
 
 ### Fixes
 
+- **Hardpoint without an Attachment_Bone** - both findings are errors and say what the game does, measured on the
+  2024 build: the hardpoint is placed at `Fire_Bone_A`, or at the map origin with that unset too; its
+  `Model_To_Attach` is never attached; a targetable one draws its reticle in the screen corner and, at the origin,
+  is never hit, so the unit is never destroyed. The "screen root" the message named does not exist
 - **Bone names with a dot** - the model tree, the inspector and the preview's own bone lookups read the name the
   exporter wrote; three.js drops `.` from a node name on load and `Weap_Turbo_LS_03_170._FP01` showed as
   `Weap_Turbo_LS_03_170_FP01` ([#265](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/265))
