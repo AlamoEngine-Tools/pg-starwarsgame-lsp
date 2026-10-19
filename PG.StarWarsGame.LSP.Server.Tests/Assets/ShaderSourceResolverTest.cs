@@ -90,6 +90,32 @@ public sealed class ShaderSourceResolverTest
         Assert.Equal("// unpacked as shipped", Build(fs, Managed).Read("MeshBump.fx"));
     }
 
+    /// <summary>
+    ///     The particle effects (<c>PrimAlpha.fx</c>, <c>PrimParticleBumpAlpha.fx</c> and the rest)
+    ///     and their own header sit one folder down, in <c>Engine/</c>, in every tier. The request
+    ///     still names the file alone - the folder is the resolver's knowledge, not the client's.
+    /// </summary>
+    [Theory]
+    [InlineData(@"\Engine\PrimAlpha.fx")]
+    [InlineData(@"\Shaders\Engine\PrimAlpha.fx")]
+    public void Read_LooksInsideTheEngineFolderForAParticleEffect(string where)
+    {
+        var fs = FileSystemWith((Managed + where, "// a particle effect"));
+
+        Assert.Equal("// a particle effect", Build(fs, Managed).Read("PrimAlpha.fx"));
+    }
+
+    [Fact]
+    public void Read_FindsAModsOwnParticleEffectInItsEngineFolder()
+    {
+        var fs = FileSystemWith(
+            (@"C:\mod\data\art\Shaders\Engine\PrimAlpha.fx", "// the mod's own"),
+            (Managed + @"\Engine\PrimAlpha.fx", "// the base game's"));
+
+        Assert.Equal("// the mod's own",
+            Build(fs, Managed, [@"C:\mod\data\art"]).Read("PrimAlpha.fx"));
+    }
+
     [Fact]
     public void Read_FindsAnIncludeHeaderToo()
     {
