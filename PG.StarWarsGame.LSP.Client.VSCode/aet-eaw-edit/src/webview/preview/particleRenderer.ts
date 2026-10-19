@@ -701,6 +701,9 @@ class EmitterRenderer {
         const freezeTime = this.emitter.properties.freezeTime;
         if (this.frozen || (freezeTime > 0 && this.age + dt > freezeTime)) {
             this.frozen = true;
+            // Measured: the no-depth-test flag is read on the live path only. A frozen batch is
+            // always tested against the depth buffer, whatever the file asked for.
+            this.material.depthTest = true;
             // The bake is drawn as it was written. Only a depth-sorted one is written again, and
             // that every frame, because the camera it is sorted against moves.
             if (frame.camera !== null && this.sortsFrozenByDepth()) {

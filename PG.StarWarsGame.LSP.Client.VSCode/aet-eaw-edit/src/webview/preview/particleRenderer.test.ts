@@ -878,6 +878,29 @@ describe("freezing", () => {
         );
         assert.equal(instance.emitterParticles(1).length, trailed);
     });
+
+    /**
+     * Measured in the game: the no-depth-test flag is read on the live path only; the frozen
+     * path always tests against the depth buffer. No shipped emitter sets both, so this is
+     * fidelity rather than a visible fix.
+     */
+    it("depth-tests a frozen batch whatever the file says", () => {
+        const instance = freezing(0.3, {
+            properties: properties({
+                particlesPerSecond: 10,
+                lifetime: 100,
+                freezeTime: 0.3,
+                noDepthTest: true,
+            }),
+        });
+        const material = instance.emitterMesh(0)!.material as THREE.Material;
+        instance.update(0.1);
+        assert.equal(material.depthTest, false);
+        for (let i = 0; i < 4; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(material.depthTest, true);
+    });
 });
 
 describe("depth-sorted frozen batch", () => {
