@@ -486,6 +486,15 @@ class EmitterRenderer {
     /** Reused per particle by the kite maths, so a thousand sparks allocate nothing. */
     private readonly viewVelocity = new THREE.Vector3();
 
+    /** Seconds this emitter has run, the clock its freeze time is measured on. */
+    private age = 0;
+
+    /**
+     * Set once the freeze time has passed. From then on the particles are a baked batch: nothing
+     * steps, spawns, ages or dies, and a parent drives no more trails off them.
+     */
+    private frozen = false;
+
     /** Where `EveryVertex` has got to. Kept across ticks, because that walk is ordered. */
     private readonly cursor: EmissionCursor = { subMesh: 0, vertex: 0 };
 
@@ -606,6 +615,11 @@ class EmitterRenderer {
         return this.particles;
     }
 
+    /** True once the emitter's freeze time has passed and its particles are baked. */
+    get isFrozen(): boolean {
+        return this.frozen;
+    }
+
     /**
      * How fast a child emits, per parent particle.
      *
@@ -667,6 +681,18 @@ class EmitterRenderer {
         frame: EmitterFrame = stillFrame(),
         dependent = false,
     ): AlamoVector3[] {
+        // Measured in the game: on the first tick that would carry the emitter past its freeze
+        // time it bakes the particles it has - as they stand BEFORE that step - and never steps,
+        // spawns, ages or fades again. A tick landing exactly on the freeze time still steps.
+        // Every asteroid field, the junk fields and the galaxy's dust freeze this way; it is what
+        // makes them a scene rather than a shower.
+        const freezeTime = this.emitter.properties.freezeTime;
+        if (this.frozen || (freezeTime > 0 && this.age + dt > freezeTime)) {
+            this.frozen = true;
+            return [];
+        }
+        this.age += dt;
+
         const follow = followFactor(this.emitter.properties);
         const acceleration = this.accelerationIn(frame);
         const deaths: AlamoVector3[] = [];
@@ -764,8 +790,9 @@ class EmitterRenderer {
      */
     emitFrom(at: AlamoVector3, count: number, frame: EmitterFrame): void {
         // Hidden means not running here too: a trail is spawned by its parent rather than by its
-        // own clock, so the check in `update` never sees it.
-        if (!this.mesh.visible) {
+        // own clock, so the check in `update` never sees it. Frozen likewise - a baked batch takes
+        // nothing more in.
+        if (!this.mesh.visible || this.frozen) {
             return;
         }
 
@@ -1364,6 +1391,11 @@ export class ParticleSystemInstance {
         step: number,
         frame: EmitterFrame,
     ): void {
+        // A frozen parent no longer runs the modifiers that spawn its children, so its baked
+        // particles trail nothing and die never.
+        if (parent.isFrozen) {
+            return;
+        }
         const trail = this.childOf(parent.description.spawnDuringLife);
 
         if (trail !== null) {

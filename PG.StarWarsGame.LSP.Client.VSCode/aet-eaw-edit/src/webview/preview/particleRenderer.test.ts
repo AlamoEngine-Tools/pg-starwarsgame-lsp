@@ -721,6 +721,165 @@ describe("chained emitters", () => {
     });
 });
 
+describe("freezing", () => {
+    /**
+     * Measured in the game (FoC x64, 2024 release): on the first tick where the emitter's age plus
+     * the step would pass its freeze time, the emitter bakes the particles it has - as they are
+     * BEFORE that step - and never steps, spawns, ages or fades again. A tick that lands exactly
+     * on the freeze time still steps. Every asteroid field and the galaxy's dust freeze this way.
+     */
+    function freezing(
+        freezeTime: number,
+        over: Partial<AlamoEmitter> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "field",
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 5 },
+                    }),
+                    properties: properties({
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                        freezeTime,
+                    }),
+                    ...over,
+                }),
+            ]),
+        );
+    }
+
+    function snapshot(instance: ParticleSystemInstance): string {
+        return JSON.stringify(
+            instance
+                .emitterParticles(0)
+                .map((p) => [p.position.x, p.position.y, p.position.z, p.age]),
+        );
+    }
+
+    it("keeps stepping and spawning while the freeze time is not reached", () => {
+        const instance = freezing(0.5);
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1);
+        }
+        // Five steps of 0.1 s at ten a second, the last one landing exactly on the freeze time.
+        assert.equal(instance.emitterParticles(0).length, 5);
+    });
+
+    it("bakes the particles once the freeze time has passed and leaves them alone", () => {
+        const instance = freezing(0.5);
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1);
+        }
+        const baked = snapshot(instance);
+        for (let i = 0; i < 20; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(
+            snapshot(instance),
+            baked,
+            "a frozen emitter moved or aged its particles",
+        );
+    });
+
+    it("spawns nothing after the freeze", () => {
+        const instance = freezing(0.5);
+        for (let i = 0; i < 30; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(instance.emitterParticles(0).length, 5);
+    });
+
+    it("never freezes an emitter whose freeze time is zero", () => {
+        const instance = freezing(0);
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1);
+        }
+        const before = snapshot(instance);
+        for (let i = 0; i < 20; i++) {
+            instance.update(0.1);
+        }
+        assert.notEqual(snapshot(instance), before);
+        assert.ok(instance.emitterParticles(0).length > 5);
+    });
+
+    it("drives no trail off a frozen parent", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "sparks",
+                    spawnDuringLife: 1,
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                        freezeTime: 0.3,
+                    }),
+                }),
+                emitter({
+                    name: "smoke trail",
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+        for (let i = 0; i < 3; i++) {
+            instance.update(0.1);
+        }
+        const trailed = instance.emitterParticles(1).length;
+        assert.ok(trailed > 0, "the trail never spawned before the freeze");
+        for (let i = 0; i < 10; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(instance.emitterParticles(1).length, trailed);
+    });
+
+    it("takes nothing more into a frozen trail child", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "sparks",
+                    spawnDuringLife: 1,
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                    }),
+                }),
+                emitter({
+                    name: "smoke trail",
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                        freezeTime: 0.3,
+                    }),
+                }),
+            ]),
+        );
+        for (let i = 0; i < 3; i++) {
+            instance.update(0.1);
+        }
+        const trailed = instance.emitterParticles(1).length;
+        const sparks = instance.emitterParticles(0).length;
+        assert.ok(trailed > 0, "the trail never spawned before the freeze");
+        for (let i = 0; i < 10; i++) {
+            instance.update(0.1);
+        }
+        // The parent went on spawning, so the trail's standstill is the child's freeze and not
+        // the parent's.
+        assert.ok(
+            instance.emitterParticles(0).length > sparks,
+            "the parent stopped spawning, so the test proves nothing",
+        );
+        assert.equal(instance.emitterParticles(1).length, trailed);
+    });
+});
+
 describe("heat particles", () => {
     const system = testSystem([
         emitter({ name: "fire" }),
