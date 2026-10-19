@@ -103,6 +103,19 @@
   - Vanilla: 42 emitters freeze - every asteroid, junk and planet-destruction field, the galaxy's dust and stars -
     and two of them sort
   - A frozen batch is depth-tested whatever the file says: the game reads the no-depth-test flag on the live path only
+- **Particles drawn through the engine's own effects** - an emitter whose render mode names a programmable effect
+  (`PrimParticleBumpAlpha`, `PrimDecalBumpAlpha`, `PrimModulate`) is drawn through that effect, translated like a
+  mesh shader: CPU-built quads with the engine's vertex layout, the rotation tangent packed into the colour for the
+  bump effects, the normal map bound, the pass's blend, depth and alpha test applied
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
+  - Every asteroid, junk and planet-destruction field is a bump emitter: lit, normal-mapped rocks instead of flat
+    cut-outs
+  - `PrimAlpha`, `PrimAdditive`, `PrimDiffuseAlpha`, `PrimOpaque` and `PrimAlphaScanlines` ship fixed-function only
+    (their programmable technique is commented out in the sources), so they keep the preview's own shader, which is
+    that path; heat sprites keep the distortion pass; tailed emitters and depth sprites keep the preview's shader
+    for now
+  - The shader resolver looks in the shaders' `Engine/` folder, where the particle effects live, and a header is
+    asked for by its bare name whatever path the include wrote
   - An emitter with a skip time is pre-simulated through it before its first frame, in tenths of a second as the
     game does; every shipped field sets skip equal to freeze, so an asteroid field is a populated scene on its first
     frame and frozen on its second, never a shower filling up

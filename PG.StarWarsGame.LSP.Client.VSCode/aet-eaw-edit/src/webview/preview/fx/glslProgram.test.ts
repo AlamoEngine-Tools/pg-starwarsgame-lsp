@@ -92,6 +92,24 @@ describe("declareUniforms", () => {
         assert.doesNotMatch(out, /sampler_state/);
     });
 
+    /**
+     * The particle effects bind their samplers to a register instead - `sampler TextureSampler :
+     * register(s0);` - with no texture object and no state block. Left standing, the declaration
+     * is a syntax error and the sampler never becomes a uniform anyone can bind.
+     */
+    it("turns a register-bound sampler into a plain sampler uniform too", () => {
+        const out = declareUniforms(
+            "sampler TextureSampler : register(s0);\n" +
+                "sampler2D NormalSampler : register( s1 );\n" +
+                "samplerCUBE SkySampler : register(s2);\n",
+        );
+
+        assert.match(out, /uniform sampler2D TextureSampler;/);
+        assert.match(out, /uniform sampler2D NormalSampler;/);
+        assert.match(out, /uniform samplerCube SkySampler;/);
+        assert.doesNotMatch(out, /register/);
+    });
+
     it("drops the texture declaration the sampler refers to", () => {
         // GLSL has no counterpart; the sampler is what the shader reads.
         assert.doesNotMatch(declareUniforms(SHADER), /\btexture\s+BaseTexture/);

@@ -32,6 +32,11 @@ import {
     stepParticle,
     systemExtent,
 } from "./particleSim";
+import { AlamoMaterial } from "./alamoMaterial";
+import type { TranslatedEffect } from "./fx/effect";
+import type { FxMaterialState } from "./fx/renderState";
+import { applyBlend, applyDepth } from "./materialState";
+import { particleEffectName } from "./particleEffects";
 
 /**
  * Ceiling on live particles per emitter.
@@ -466,6 +471,98 @@ export function tailGeometry(
     };
 }
 
+/** The four corners of a sprite, in the index order the quad's two triangles read them. */
+const QUAD_CORNERS = [-1, -1, 1, -1, 1, 1, -1, 1];
+
+/** The sampler names the engine's particle effects read the colour sheet and the normal map through. */
+const COLOUR_SAMPLERS = ["TextureSampler", "BaseSampler"];
+const NORMAL_SAMPLERS = ["NormalSampler"];
+
+/**
+ * An emitter drawn through the engine's own effect: the translated program, the pass's render
+ * state, and a vertex stream of CPU-built quads sized for the particle ceiling.
+ */
+class EngineDraw {
+    readonly geometry = new THREE.BufferGeometry();
+    readonly material: AlamoMaterial;
+    readonly positions = new Float32Array(MAX_PARTICLES * 4 * 3);
+    readonly colours = new Float32Array(MAX_PARTICLES * 4 * 4);
+    readonly uvs = new Float32Array(MAX_PARTICLES * 4 * 2);
+
+    constructor(
+        effect: TranslatedEffect,
+        state: FxMaterialState,
+        noDepthTest: boolean,
+    ) {
+        // Position, colour, uv: the engine's own particle vertex. The bump effects declare a normal
+        // input their vertex shader never reads; it is fed zeros so the attribute is not missing.
+        this.geometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(this.positions, 3),
+        );
+        this.geometry.setAttribute(
+            "color",
+            new THREE.BufferAttribute(this.colours, 4),
+        );
+        this.geometry.setAttribute(
+            "uv",
+            new THREE.BufferAttribute(this.uvs, 2),
+        );
+        this.geometry.setAttribute(
+            "normal",
+            new THREE.BufferAttribute(
+                new Float32Array(MAX_PARTICLES * 4 * 3),
+                3,
+            ),
+        );
+        const index = new Uint32Array(MAX_PARTICLES * 6);
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            const v = i * 4;
+            index.set([v, v + 1, v + 2, v, v + 2, v + 3], i * 6);
+        }
+        this.geometry.setIndex(new THREE.BufferAttribute(index, 1));
+        this.geometry.setDrawRange(0, 0);
+
+        // No sub-mesh behind a particle, so no parameters of its own: the effect's declared
+        // defaults stand, which for the bump effect is white diffuse and no emissive.
+        this.material = new AlamoMaterial(effect, {});
+        applyDepth(this.material, state);
+        applyBlend(this.material, state.blend);
+        this.material.setAlphaTest(state.alphaTest);
+        // Measured: the particle draw passes cull NONE whatever the pass declares, and the
+        // no-depth-test flag turns the depth test off on the live path.
+        this.material.side = THREE.DoubleSide;
+        this.material.depthTest = state.depthTest && !noDepthTest;
+        this.material.needsUpdate = true;
+    }
+
+    /** Hands the colour sheet and the normal map to whichever samplers the effect declares. */
+    bindTextures(
+        colour: THREE.Texture | null,
+        normal: THREE.Texture | null,
+    ): void {
+        for (const sampler of COLOUR_SAMPLERS) {
+            this.material.uniforms[sampler] = { value: colour };
+        }
+        for (const sampler of NORMAL_SAMPLERS) {
+            this.material.uniforms[sampler] = { value: normal };
+        }
+    }
+
+    /** Marks the first `count` quads written and ready to draw. */
+    written(count: number): void {
+        this.geometry.setDrawRange(0, count * 6);
+        for (const name of ["position", "color", "uv"]) {
+            this.geometry.attributes[name].needsUpdate = true;
+        }
+    }
+
+    dispose(): void {
+        this.geometry.dispose();
+        this.material.dispose();
+    }
+}
+
 /** An emitter that neither moves nor is moved, for a system standing on its own. */
 function stillFrame(): EmitterFrame {
     return {
@@ -488,6 +585,13 @@ class EmitterRenderer {
     private readonly clock: SpawnClock;
     private readonly geometry: THREE.InstancedBufferGeometry;
     private readonly material: THREE.ShaderMaterial;
+
+    /**
+     * The engine's own effect, once translated and switched on: CPU-built quads through the
+     * effect's program, as the game draws them. Null draws with the preview's shader above.
+     */
+    private engine: EngineDraw | null = null;
+    private normalTexture: THREE.Texture | null = null;
 
     private readonly offsets = new Float32Array(MAX_PARTICLES * 3);
     private readonly colors = new Float32Array(MAX_PARTICLES * 3);
@@ -519,7 +623,7 @@ class EmitterRenderer {
     constructor(
         private readonly emitter: AlamoEmitter,
         private readonly random: Random,
-        texture: THREE.Texture | null,
+        private texture: THREE.Texture | null,
         /** The geometry this emitter is born from, when it emits from a mesh rather than a shape. */
         private readonly emissionMesh: EmissionMesh | null = null,
         /** The owning object's uniform render scale. See {@link ParticleSystemInstance}. */
@@ -666,10 +770,143 @@ class EmitterRenderer {
      * which is most of what the preview is for.
      */
     setTexture(texture: THREE.Texture): void {
+        this.texture = texture;
         this.material.uniforms.uMap.value = texture;
         this.material.uniforms.uHasMap.value = 1;
         this.material.uniforms.uMissing.value = 0;
         this.material.needsUpdate = true;
+        this.engine?.bindTextures(texture, this.normalTexture);
+    }
+
+    /** The normal map a bump emitter names, or an empty string. */
+    get normalTextureName(): string {
+        return this.emitter.normalTexture ?? "";
+    }
+
+    /** Supplies the normal map once it arrives; only the engine's bump effects read it. */
+    setNormalTexture(texture: THREE.Texture): void {
+        this.normalTexture = texture;
+        this.engine?.bindTextures(this.texture, texture);
+    }
+
+    /**
+     * The engine effect this emitter is drawn with, to be fetched like any mesh effect - or null
+     * for a heat sprite, which the distortion pass draws with the preview's own program.
+     */
+    get effectName(): string | null {
+        return this.emitter.properties.isHeatParticle
+            ? null
+            : particleEffectName(this.emitter.properties.blendMode);
+    }
+
+    /**
+     * Draws through the engine's own effect, or goes back to the preview's shader with null.
+     *
+     * Measured in the game: the particle renderer binds the effect its render mode names and
+     * submits CPU-built quads - position, a packed colour, uv - which the effect's vertex shader
+     * only projects. Three kinds keep the preview's shader for now: a heat sprite (its own pass), a
+     * tailed emitter (the streak is built in the preview's vertex shader) and a depth sprite (its
+     * effect samples the scene's depth, which the preview has no texture for yet).
+     */
+    applyEffect(
+        effect: TranslatedEffect | null,
+        state: FxMaterialState | null,
+    ): void {
+        const properties = this.emitter.properties;
+        const mode = properties.blendMode;
+        const eligible =
+            !properties.isHeatParticle &&
+            !properties.hasTail &&
+            mode !== "DepthAdditive" &&
+            mode !== "DepthTransparent" &&
+            mode !== "DepthInverse";
+
+        if (effect === null || state === null || !eligible) {
+            this.engine?.dispose();
+            this.engine = null;
+            this.mesh.geometry = this.geometry;
+            this.mesh.material = this.material;
+            return;
+        }
+
+        this.engine?.dispose();
+        this.engine = new EngineDraw(effect, state, properties.noDepthTest);
+        this.engine.bindTextures(this.texture, this.normalTexture);
+        this.mesh.geometry = this.engine.geometry;
+        this.mesh.material = this.engine.material;
+    }
+
+    /**
+     * The engine's vertex stream: four corners per particle, built the way the engine builds them.
+     *
+     * Measured: corner = position + the camera-rotated corner offset times the size, the colour
+     * packed to bytes from the tracked colour and alpha - and for the bump effect the RGB replaced
+     * by the sprite's rotation tangent in VIEW space, encoded `0.5 + 0.5 * t`, the alpha kept. The
+     * uv is the frame's cell of the sheet. The effect's vertex shader projects and nothing more.
+     */
+    private writeQuads(
+        engine: EngineDraw,
+        frame: EmitterFrame,
+        order: number[] | null,
+    ): void {
+        const properties = this.emitter.properties;
+        const bump =
+            properties.blendMode === "Bump" ||
+            properties.blendMode === "DecalBump";
+        const columns = atlasColumns(properties.textureSize);
+        const cell = 1 / columns;
+        const scale = this.scaleFactor;
+        const basis = properties.worldOriented ? GROUND_BASIS : frame.toView;
+        // Simulation space to view space is a rotation, so the view axes in simulation space are
+        // its rows - which is what the engine's camera-rotated corner table holds.
+        const e = basis.elements;
+        const rightX = e[0];
+        const rightY = e[3];
+        const rightZ = e[6];
+        const upX = e[1];
+        const upY = e[4];
+        const upZ = e[7];
+        const { positions, colours, uvs } = engine;
+
+        for (let i = 0; i < this.particles.length; i++) {
+            const particle = this.particles[order === null ? i : order[i]];
+            const look = appearanceOf(particle, this.emitter);
+            const size = look.size * scale;
+            const angle = look.rotation * 6.2831853;
+            const c = Math.cos(angle);
+            const s = Math.sin(angle);
+            const px = particle.position.x * scale;
+            const py = particle.position.y * scale;
+            const pz = particle.position.z * scale;
+            const index = look.frame % (columns * columns);
+            const originU = (index % columns) * cell;
+            const originV = Math.floor(index / columns) * cell;
+            const r = bump ? 0.5 + 0.5 * c : look.r;
+            const g = bump ? 0.5 + 0.5 * s : look.g;
+            const b = bump ? 0.5 : look.b;
+
+            for (let corner = 0; corner < 4; corner++) {
+                const cx = QUAD_CORNERS[corner * 2];
+                const cy = QUAD_CORNERS[corner * 2 + 1];
+                const spunX = cx * c - cy * s;
+                const spunY = cx * s + cy * c;
+                const vertex = i * 4 + corner;
+                positions[vertex * 3] =
+                    px + (rightX * spunX + upX * spunY) * size;
+                positions[vertex * 3 + 1] =
+                    py + (rightY * spunX + upY * spunY) * size;
+                positions[vertex * 3 + 2] =
+                    pz + (rightZ * spunX + upZ * spunY) * size;
+                colours[vertex * 4] = r;
+                colours[vertex * 4 + 1] = g;
+                colours[vertex * 4 + 2] = b;
+                colours[vertex * 4 + 3] = look.a;
+                uvs[vertex * 2] = originU + (cx * 0.5 + 0.5) * cell;
+                uvs[vertex * 2 + 1] = originV + (cy * 0.5 + 0.5) * cell;
+            }
+        }
+
+        engine.written(this.particles.length);
     }
 
     /**
@@ -879,6 +1116,8 @@ class EmitterRenderer {
     dispose(): void {
         this.geometry.dispose();
         this.material.dispose();
+        this.engine?.dispose();
+        this.engine = null;
     }
 
     /**
@@ -965,6 +1204,11 @@ class EmitterRenderer {
     private writeBuffers(frame: EmitterFrame): void {
         const tailed = this.emitter.properties.hasTail;
         const order = this.frozen ? this.depthOrder(frame) : null;
+
+        if (this.engine !== null) {
+            this.writeQuads(this.engine, frame, order);
+            return;
+        }
 
         for (let i = 0; i < this.particles.length; i++) {
             const particle = this.particles[order === null ? i : order[i]];
@@ -1280,15 +1524,47 @@ export class ParticleSystemInstance {
         return this.holds.size === 0 && this.root.visible;
     }
 
-    /** Every texture this system's emitters want, lowercased and de-duplicated. */
+    /** Every texture this system's emitters want, lowercased and de-duplicated - normal maps too. */
     textureNames(): string[] {
         return [
             ...new Set(
                 this.emitters
-                    .map((emitter) => emitter.textureName.toLowerCase())
+                    .flatMap((emitter) => [
+                        emitter.textureName.toLowerCase(),
+                        emitter.normalTextureName.toLowerCase(),
+                    ])
                     .filter((name) => name !== ""),
             ),
         ];
+    }
+
+    /** Every engine effect this system's emitters are drawn with, de-duplicated and sorted. */
+    effectNames(): string[] {
+        return [
+            ...new Set(
+                this.emitters
+                    .map((emitter) => emitter.effectName)
+                    .filter((name): name is string => name !== null),
+            ),
+        ].sort();
+    }
+
+    /**
+     * Draws each emitter through its translated engine effect where one is in hand and the
+     * translation is on; the preview's own shader otherwise. Keys are lower-cased effect names.
+     */
+    applyEffects(
+        effects: ReadonlyMap<string, TranslatedEffect>,
+        states: ReadonlyMap<string, FxMaterialState>,
+        enabled: boolean,
+    ): void {
+        for (const emitter of this.emitters) {
+            const name = emitter.effectName?.toLowerCase();
+            const effect =
+                enabled && name !== undefined ? effects.get(name) : undefined;
+            const state = name === undefined ? undefined : states.get(name);
+            emitter.applyEffect(effect ?? null, state ?? null);
+        }
     }
 
     /**
@@ -1363,6 +1639,9 @@ export class ParticleSystemInstance {
         for (const emitter of this.emitters) {
             if (emitter.textureName.toLowerCase() === wanted) {
                 emitter.setTexture(texture);
+            }
+            if (emitter.normalTextureName.toLowerCase() === wanted) {
+                emitter.setNormalTexture(texture);
             }
         }
     }

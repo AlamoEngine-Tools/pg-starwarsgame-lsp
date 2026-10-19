@@ -10,7 +10,16 @@ import type {
     AlamoEmitter,
     AlamoEmitterProperties,
 } from "../../protocol/modelPreview";
-import { emitter, properties, testSystem, volume } from "./particleFixture";
+import { AlamoMaterial } from "./alamoMaterial";
+import type { TranslatedEffect } from "./fx/effect";
+import type { FxMaterialState } from "./fx/renderState";
+import {
+    emitter,
+    properties,
+    testSystem,
+    track,
+    volume,
+} from "./particleFixture";
 import {
     blendingFor,
     HEAT_LAYER,
@@ -1119,6 +1128,339 @@ describe("depth-sorted frozen batch", () => {
         fill(instance, null);
         instance.update(0.1, null);
         assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+});
+
+describe("engine effects", () => {
+    /** The smallest thing that is still a translated effect. */
+    const EFFECT: TranslatedEffect = {
+        vertex: "#version 300 es\nvoid main() { gl_Position = vec4(0.0); }",
+        fragment:
+            "#version 300 es\nprecision highp float;\nout vec4 c;\nvoid main() { c = vec4(1.0); }",
+        semantics: new Map(),
+        defaults: new Map(),
+        samplers: new Map(),
+        types: new Map(),
+    };
+    /** `PrimParticleBumpAlpha.fx`'s DX8 pass, as `materialStateFrom` reads it. */
+    const STATE: FxMaterialState = {
+        depthTest: true,
+        depthWrite: true,
+        depthFunc: "lessEqual",
+        blend: "alpha",
+        cull: "back",
+        alphaTest: 8 / 255,
+        colourScale: 1,
+    };
+    const BUMP = "primparticlebumpalpha.fx";
+
+    function still(over: Partial<AlamoEmitterProperties> = {}): AlamoEmitter {
+        return emitter({
+            name: "rocks",
+            normalTexture: "p_asteroid_n.tga",
+            properties: properties({
+                blendMode: "Bump",
+                particlesPerSecond: 10,
+                lifetime: 100,
+                ...over,
+            }),
+        });
+    }
+
+    function withEffect(
+        instance: ParticleSystemInstance,
+        enabled = true,
+    ): ParticleSystemInstance {
+        instance.applyEffects(
+            new Map([[BUMP, EFFECT]]),
+            new Map([[BUMP, STATE]]),
+            enabled,
+        );
+        return instance;
+    }
+
+    /** A camera at +z looking at the origin: view right is +x, view up is +y. */
+    function viewFrom(z: number): THREE.Matrix4 {
+        const camera = new THREE.PerspectiveCamera();
+        camera.position.set(0, 0, z);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        return camera.matrixWorldInverse;
+    }
+
+    function attribute(
+        instance: ParticleSystemInstance,
+        name: string,
+    ): THREE.BufferAttribute {
+        return instance
+            .emitterMesh(0)!
+            .geometry.getAttribute(name) as THREE.BufferAttribute;
+    }
+
+    it("names the engine effect each of its emitters is drawn with, once", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                still(),
+                still(),
+                emitter({ properties: properties({ blendMode: "Inverse" }) }),
+            ]),
+        );
+        assert.deepEqual(instance.effectNames(), [
+            "PrimModulate.fx",
+            "PrimParticleBumpAlpha.fx",
+        ]);
+    });
+
+    it("draws an emitter through its translated effect once the effect is in hand", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        const mesh = instance.emitterMesh(0)!;
+        assert.ok(mesh.material instanceof AlamoMaterial);
+        assert.equal(attribute(instance, "position").itemSize, 3);
+        assert.equal(attribute(instance, "color").itemSize, 4);
+        assert.equal(attribute(instance, "uv").itemSize, 2);
+    });
+
+    /**
+     * Measured: the engine builds the four corners on the CPU - position plus the camera-rotated
+     * corner offset times the size - and the effect's vertex shader only projects them.
+     */
+    it("writes four corners per particle, facing the camera", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        instance.update(0.1, viewFrom(100));
+        assert.equal(instance.emitterParticles(0).length, 1);
+        const positions = attribute(instance, "position");
+        const corners = [0, 1, 2, 3]
+            .map((i) =>
+                [positions.getX(i), positions.getY(i), positions.getZ(i)]
+                    .map((v) => Math.round(v * 1000) / 1000)
+                    .join(","),
+            )
+            .sort();
+        // Half a unit either way: the scale track's default of 1, halved as the engine halves it.
+        assert.deepEqual(corners, [
+            "-0.5,-0.5,0",
+            "-0.5,0.5,0",
+            "0.5,-0.5,0",
+            "0.5,0.5,0",
+        ]);
+        assert.equal(instance.emitterMesh(0)!.geometry.drawRange.count, 6);
+    });
+
+    /**
+     * Measured: for the bump effect the engine replaces the vertex colour's RGB with the sprite's
+     * rotation tangent in view space, encoded as `0.5 + 0.5 * t`, and keeps the alpha. An
+     * unrotated sprite's tangent is view right.
+     */
+    it("packs the rotation tangent into a bump sprite's colour", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        instance.update(0.1, viewFrom(100));
+        const colour = attribute(instance, "color");
+        assert.deepEqual(
+            [colour.getX(0), colour.getY(0), colour.getZ(0), colour.getW(0)],
+            [1, 0.5, 0.5, 1],
+        );
+    });
+
+    /**
+     * The corner offsets are the VIEW axes expressed in the particles' own space - the rows of
+     * the simulation-to-view rotation, not its columns. A camera off to the side tells them apart.
+     */
+    it("faces the camera wherever it stands", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        // Off to the side AND above, so no axis lines up with another and a transposed basis
+        // lands the corners somewhere else.
+        const camera = new THREE.PerspectiveCamera();
+        camera.position.set(100, 50, 30);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        instance.update(0.1, camera.matrixWorldInverse);
+        const positions = attribute(instance, "position");
+        const right = new THREE.Vector3().setFromMatrixColumn(
+            camera.matrixWorld,
+            0,
+        );
+        const up = new THREE.Vector3().setFromMatrixColumn(
+            camera.matrixWorld,
+            1,
+        );
+        const key = (v: THREE.Vector3): string =>
+            [v.x, v.y, v.z]
+                .map((n) => Math.round(n * 1000) / 1000 + 0)
+                .join(",");
+        const expected = [
+            [-1, -1],
+            [1, -1],
+            [1, 1],
+            [-1, 1],
+        ]
+            .map(([cx, cy]) =>
+                key(
+                    right
+                        .clone()
+                        .multiplyScalar(cx * 0.5)
+                        .addScaledVector(up, cy * 0.5),
+                ),
+            )
+            .sort();
+        const corners = [0, 1, 2, 3]
+            .map((i) =>
+                key(
+                    new THREE.Vector3(
+                        positions.getX(i),
+                        positions.getY(i),
+                        positions.getZ(i),
+                    ),
+                ),
+            )
+            .sort();
+        assert.deepEqual(corners, expected);
+    });
+
+    it("packs the tangent whatever colour the track says", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([
+                    {
+                        ...still(),
+                        tracks: [
+                            track("Red", [
+                                [0, 0.2],
+                                [1, 0.2],
+                            ]),
+                            track("Green", [
+                                [0, 0.3],
+                                [1, 0.3],
+                            ]),
+                            track("Alpha", [
+                                [0, 0.7],
+                                [1, 0.7],
+                            ]),
+                        ],
+                    },
+                ]),
+            ),
+        );
+        instance.update(0.1, viewFrom(100));
+        const colour = attribute(instance, "color");
+        assert.deepEqual(
+            [
+                colour.getX(0),
+                colour.getY(0),
+                colour.getZ(0),
+                colour.getW(0),
+            ].map((v) => Math.round(v * 1000) / 1000),
+            [1, 0.5, 0.5, 0.7],
+        );
+    });
+
+    /** A quarter turn: the tangent swings from view right to view up. */
+    it("packs the tangent of a rotated sprite", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([
+                    still({
+                        randomRotation: true,
+                        randomRotationAverage: 0.25,
+                        randomRotationVariance: 0,
+                    }),
+                ]),
+            ),
+        );
+        instance.update(0.1, viewFrom(100));
+        const colour = attribute(instance, "color");
+        assert.deepEqual(
+            [colour.getX(0), colour.getY(0), colour.getZ(0)].map(
+                (v) => Math.round(v * 1000) / 1000,
+            ),
+            [0.5, 1, 0.5],
+        );
+    });
+
+    it("writes the tracked colour for any other effect", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    properties: properties({
+                        blendMode: "Inverse",
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+        instance.applyEffects(
+            new Map([["primmodulate.fx", EFFECT]]),
+            new Map([["primmodulate.fx", STATE]]),
+            true,
+        );
+        instance.update(0.1, viewFrom(100));
+        const colour = attribute(instance, "color");
+        assert.deepEqual(
+            [colour.getX(0), colour.getY(0), colour.getZ(0), colour.getW(0)],
+            [1, 1, 1, 1],
+        );
+    });
+
+    for (const [why, over, effectName] of [
+        ["a heat sprite", { isHeatParticle: true }, BUMP],
+        ["a tailed emitter", { hasTail: true }, BUMP],
+        [
+            "a depth sprite",
+            { blendMode: "DepthTransparent" },
+            "primdepthspritealpha.fx",
+        ],
+    ] as const) {
+        it(`keeps the preview's own shader for ${why}`, () => {
+            const instance = new ParticleSystemInstance(
+                "test",
+                testSystem([still(over)]),
+            );
+            instance.applyEffects(
+                new Map([[effectName, EFFECT]]),
+                new Map([[effectName, STATE]]),
+                true,
+            );
+            assert.ok(
+                !(instance.emitterMesh(0)!.material instanceof AlamoMaterial),
+            );
+        });
+    }
+
+    it("goes back to the preview's own shader when translation is switched off", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        withEffect(instance, false);
+        assert.ok(
+            !(instance.emitterMesh(0)!.material instanceof AlamoMaterial),
+        );
+        assert.equal(
+            instance.emitterMesh(0)!.geometry.getAttribute("iOffset").itemSize,
+            3,
+        );
+    });
+
+    it("asks for the normal map a bump emitter names, beside its colour texture", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([still()]),
+        );
+        assert.deepEqual(instance.textureNames(), [
+            "p_particle_master.tga",
+            "p_asteroid_n.tga",
+        ]);
     });
 });
 

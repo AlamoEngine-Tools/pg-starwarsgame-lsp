@@ -288,6 +288,14 @@ export function declareUniforms(source: string): string {
         (_, kind: string | undefined, name: string) =>
             `uniform ${kind === "CUBE" ? "samplerCube" : "sampler2D"} ${name};`,
     );
+    // `sampler Name : register(sN);` is the particle effects' form - a register and no state
+    // block. The register is the engine's business (it binds textures by stage); here the sampler
+    // is a uniform like any other, bound by name.
+    out = out.replace(
+        /\bsampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*register\s*\(\s*[a-z][0-9]+\s*\)\s*;/g,
+        (_, kind: string | undefined, name: string) =>
+            `uniform ${kind === "CUBE" ? "samplerCube" : "sampler2D"} ${name};`,
+    );
 
     // `texture Name;`, `texture Name < ... >;` and `texture Name : SEMANTIC;` - a texture OBJECT,
     // which GLSL has no counterpart for. The sampler that reads it is what becomes a uniform. The

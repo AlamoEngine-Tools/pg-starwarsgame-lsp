@@ -1855,6 +1855,7 @@ export class PreviewViewport {
     applyShaderState(shaderName: string, state: FxMaterialState): void {
         this.shaderStates.set(shaderName.toLowerCase(), state);
         this.applyStoredShaderState(shaderName.toLowerCase(), state);
+        this.applyParticleEffects();
     }
 
     /** Every distinct shader name the loaded geometry names, so each is fetched once. */
@@ -1874,7 +1875,31 @@ export class PreviewViewport {
             }
         });
 
+        // The particle systems' effects too: an emitter is drawn through the engine's own
+        // `Prim*.fx` for its render mode, fetched and translated like any mesh effect.
+        for (const entry of this.particleSystems.values()) {
+            for (const name of entry.instance.effectNames()) {
+                names.add(name);
+            }
+        }
+
         return [...names].sort();
+    }
+
+    /**
+     * Hands every particle system the translated effects in hand, or takes them away.
+     *
+     * Rerun whenever an effect or a pass state arrives and when the translation toggle moves: a
+     * system built before its effect came back has to pick it up the same as one built after.
+     */
+    private applyParticleEffects(): void {
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.applyEffects(
+                this.translated,
+                this.shaderStates,
+                this.translatedShaders,
+            );
+        }
     }
 
     /** Sets the team tint, or clears it back to the model's own colours. */
@@ -5349,6 +5374,7 @@ export class PreviewViewport {
         for (const [name, texture] of this.textures) {
             this.setTexture(name, texture);
         }
+        this.applyParticleEffects();
     }
 
     /**
@@ -6977,6 +7003,12 @@ export class PreviewViewport {
         );
         instance.attachTo(attachment);
         instance.setVisible(this.particlesVisible);
+        // Built after its effects came back, as a hardpoint's blast is: it takes what is in hand.
+        instance.applyEffects(
+            this.translated,
+            this.shaderStates,
+            this.translatedShaders,
+        );
 
         // A system built after the answers came back still has to show the marker: a hardpoint
         // blowing up spawns one long after the textures were asked for.
