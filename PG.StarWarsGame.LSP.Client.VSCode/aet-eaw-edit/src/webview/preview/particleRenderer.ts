@@ -474,9 +474,13 @@ export function tailGeometry(
 /** The four corners of a sprite, in the index order the quad's two triangles read them. */
 const QUAD_CORNERS = [-1, -1, 1, -1, 1, 1, -1, 1];
 
-/** The sampler names the engine's particle effects read the colour sheet and the normal map through. */
+/**
+ * The sampler names the engine's particle effects read the colour sheet and the second texture
+ * through. The second texture is one chunk of the file: the bump effects read it as the normal map,
+ * the depth sprites as the depth map.
+ */
 const COLOUR_SAMPLERS = ["TextureSampler", "BaseSampler"];
-const NORMAL_SAMPLERS = ["NormalSampler"];
+const SECOND_TEXTURE_SAMPLERS = ["NormalSampler", "DepthSampler"];
 
 /**
  * An emitter drawn through the engine's own effect: the translated program, the pass's render
@@ -536,16 +540,16 @@ class EngineDraw {
         this.material.needsUpdate = true;
     }
 
-    /** Hands the colour sheet and the normal map to whichever samplers the effect declares. */
+    /** Hands the colour sheet and the second texture to whichever samplers the effect declares. */
     bindTextures(
         colour: THREE.Texture | null,
-        normal: THREE.Texture | null,
+        second: THREE.Texture | null,
     ): void {
         for (const sampler of COLOUR_SAMPLERS) {
             this.material.uniforms[sampler] = { value: colour };
         }
-        for (const sampler of NORMAL_SAMPLERS) {
-            this.material.uniforms[sampler] = { value: normal };
+        for (const sampler of SECOND_TEXTURE_SAMPLERS) {
+            this.material.uniforms[sampler] = { value: second };
         }
     }
 
@@ -804,22 +808,16 @@ class EmitterRenderer {
      *
      * Measured in the game: the particle renderer binds the effect its render mode names and
      * submits CPU-built quads - position, a packed colour, uv - which the effect's vertex shader
-     * only projects. Three kinds keep the preview's shader for now: a heat sprite (its own pass), a
-     * tailed emitter (the streak is built in the preview's vertex shader) and a depth sprite (its
-     * effect samples the scene's depth, which the preview has no texture for yet).
+     * only projects. Two kinds keep the preview's shader: a heat sprite (its own pass) and a
+     * tailed emitter (the streak is built in the preview's vertex shader). A depth sprite's effect
+     * reads the emitter's own depth map through its second sampler and writes the offset depth.
      */
     applyEffect(
         effect: TranslatedEffect | null,
         state: FxMaterialState | null,
     ): void {
         const properties = this.emitter.properties;
-        const mode = properties.blendMode;
-        const eligible =
-            !properties.isHeatParticle &&
-            !properties.hasTail &&
-            mode !== "DepthAdditive" &&
-            mode !== "DepthTransparent" &&
-            mode !== "DepthInverse";
+        const eligible = !properties.isHeatParticle && !properties.hasTail;
 
         if (effect === null || state === null || !eligible) {
             this.engine?.dispose();
@@ -947,6 +945,9 @@ class EmitterRenderer {
             // Measured: the no-depth-test flag is read on the live path only. A frozen batch is
             // always tested against the depth buffer, whatever the file asked for.
             this.material.depthTest = true;
+            if (this.engine !== null) {
+                this.engine.material.depthTest = true;
+            }
             // The bake is drawn as it was written. Only a depth-sorted one is written again, and
             // that every frame, because the camera it is sorted against moves.
             if (frame.camera !== null && this.sortsFrozenByDepth()) {

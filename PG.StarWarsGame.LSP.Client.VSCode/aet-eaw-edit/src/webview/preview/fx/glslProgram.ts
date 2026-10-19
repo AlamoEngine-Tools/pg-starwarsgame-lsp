@@ -538,6 +538,47 @@ export function buildFragmentShader(
         )
         .join("\n");
 
+    const call =
+        `${handle.entry}(` +
+        [entry.parameterName, ...handle.args].join(", ") +
+        ")";
+
+    // Every pixel entry in the corpus returns the colour itself, bar the depth sprites': theirs
+    // returns a struct with a COLOR0 field and a DEPTH one, which D3D writes into the depth buffer
+    // in place of the fragment's own.
+    const outputStruct = findStructs(hlsl).find(
+        (s) => s.name === entry.returnType,
+    );
+    let results: string[];
+    if (outputStruct === undefined) {
+        results = [`    ${FRAGMENT_OUTPUT} = ${call};`];
+    } else {
+        const colour = outputStruct.fields.find((field) =>
+            /^COLOR0?$/i.test(field.semantic ?? ""),
+        );
+        if (colour === undefined) {
+            return {
+                source: null,
+                refusal:
+                    `'${entry.returnType}' declares no COLOR field, so there is nothing to ` +
+                    "drive the fragment colour with.",
+            };
+        }
+        const depth = outputStruct.fields.find(
+            (field) => field.semantic?.toUpperCase() === "DEPTH",
+        );
+        results = [
+            `    ${entry.returnType} Out = ${call};`,
+            `    ${FRAGMENT_OUTPUT} = Out.${colour.name};`,
+            // D3D's DEPTH output is z over w, which its projection puts in 0..1 - the window
+            // depth as it is. The projection the preview feeds is GL's, whose z over w runs
+            // -1..1, so the window depth is half that plus a half.
+            ...(depth === undefined
+                ? []
+                : [`    gl_FragDepth = Out.${depth.name} * 0.5 + 0.5;`]),
+        ];
+    }
+
     const source = [
         // The version directive must be the very first line, ahead of even a comment.
         "#version 300 es",
@@ -559,9 +600,7 @@ export function buildFragmentShader(
         "{",
         `    ${struct.name} ${entry.parameterName};`,
         assignments,
-        `    ${FRAGMENT_OUTPUT} = ${handle.entry}(` +
-            [entry.parameterName, ...handle.args].join(", ") +
-            ");",
+        ...results,
         "",
         // `AlphaFunc = Greater` in every alpha-tested effect the game ships, so the fragment
         // survives only above the reference.

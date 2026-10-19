@@ -192,6 +192,86 @@ describe("buildFragmentShader", () => {
     });
 });
 
+describe("buildFragmentShader with a struct output", () => {
+    /**
+     * The depth-sprite effects' pixel shader, in shape: it returns a struct carrying a COLOR0 and
+     * a DEPTH field, and the engine writes the second one into the depth buffer.
+     */
+    const DEPTH_SHADER = `
+float4x4 m_worldViewProj : WORLDVIEWPROJECTION;
+sampler BaseSampler : register(s0);
+sampler DepthSampler : register(s1);
+
+struct VS_OUTPUT
+{
+    float4 Pos : POSITION;
+    float2 Tex0 : TEXCOORD0;
+    float3 Tex1 : TEXCOORD1;
+};
+
+struct PS_OUTPUT
+{
+    float4 Color : COLOR0;
+    float Depth : DEPTH;
+};
+
+PS_OUTPUT example_depth_main(VS_OUTPUT In)
+{
+    PS_OUTPUT Out = (PS_OUTPUT)0;
+    float4 depthTexel = tex2D(DepthSampler, In.Tex0);
+    Out.Color = tex2D(BaseSampler, In.Tex0);
+    Out.Depth = dot(In.Tex1, depthTexel.rgb);
+    return Out;
+}
+`;
+    const built = buildFragmentShader(DEPTH_SHADER, "example_depth_main");
+
+    it("produces a shader", () => {
+        assert.equal(built.refusal, null);
+        assert.ok(built.source !== null);
+    });
+
+    it("keeps the struct and takes the colour from its COLOR field", () => {
+        assert.match(
+            built.source!,
+            /PS_OUTPUT Out = example_depth_main\(In\);/,
+        );
+        assert.match(built.source!, /aet_fragColour = Out\.Color;/);
+        assert.doesNotMatch(
+            built.source!,
+            /aet_fragColour = example_depth_main/,
+        );
+    });
+
+    it("writes the DEPTH field to gl_FragDepth in GL's window range", () => {
+        // D3D's DEPTH output is z over w, which its projection puts in 0..1 and so goes straight
+        // into the depth buffer. The projection the preview feeds is GL's, whose z over w runs
+        // -1..1, and a window depth is half that plus a half.
+        assert.match(
+            built.source!,
+            /gl_FragDepth = Out\.Depth \* 0\.5 \+ 0\.5;/,
+        );
+    });
+
+    it("still alpha-tests the colour", () => {
+        assert.match(
+            built.source!,
+            /if \(aet_fragColour\.a <= aet_alphaTest\)/,
+        );
+    });
+
+    it("refuses a struct output with no COLOR field", () => {
+        const colourless = buildFragmentShader(
+            DEPTH_SHADER.replace("float4 Color : COLOR0;", ""),
+            "example_depth_main",
+        );
+
+        assert.equal(colourless.source, null);
+        assert.match(colourless.refusal!, /PS_OUTPUT/);
+        assert.match(colourless.refusal!, /COLOR/);
+    });
+});
+
 describe("stripFxScaffolding", () => {
     it("removes a named state block, which is effect scaffolding and not shader code", () => {
         // Two shipped effects declare one at top level, next to the samplers.

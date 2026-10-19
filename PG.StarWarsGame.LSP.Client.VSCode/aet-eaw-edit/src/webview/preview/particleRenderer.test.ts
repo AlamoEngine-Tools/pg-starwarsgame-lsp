@@ -1413,14 +1413,57 @@ describe("engine effects", () => {
         );
     });
 
+    /**
+     * Measured: a depth sprite's second texture is the emitter's own depth map, read from the same
+     * chunk as a bump emitter's normal map, and the frozen renderer binds it to the effect's
+     * second stage. Not the scene's depth.
+     */
+    it("draws a depth sprite through its effect, its depth map bound as DepthSampler", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "chunks",
+                    normalTexture: "p_chunk_depth.tga",
+                    properties: properties({
+                        blendMode: "DepthTransparent",
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+        instance.applyEffects(
+            new Map([["primdepthspritealpha.fx", EFFECT]]),
+            new Map([["primdepthspritealpha.fx", STATE]]),
+            true,
+        );
+        const depthMap = new THREE.Texture();
+        instance.setTexture("p_chunk_depth.tga", depthMap);
+        const material = instance.emitterMesh(0)!.material;
+        assert.ok(material instanceof AlamoMaterial);
+        assert.equal(material.uniforms.DepthSampler.value, depthMap);
+    });
+
+    it("depth-tests a frozen batch drawn through its effect, whatever the file says", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([still({ freezeTime: 0.3, noDepthTest: true })]),
+            ),
+        );
+        const material = instance.emitterMesh(0)!.material as THREE.Material;
+        instance.update(0.1, viewFrom(100));
+        assert.equal(material.depthTest, false);
+        for (let i = 0; i < 4; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        assert.equal(material.depthTest, true);
+    });
+
     for (const [why, over, effectName] of [
         ["a heat sprite", { isHeatParticle: true }, BUMP],
         ["a tailed emitter", { hasTail: true }, BUMP],
-        [
-            "a depth sprite",
-            { blendMode: "DepthTransparent" },
-            "primdepthspritealpha.fx",
-        ],
     ] as const) {
         it(`keeps the preview's own shader for ${why}`, () => {
             const instance = new ParticleSystemInstance(

@@ -112,8 +112,11 @@
     cut-outs
   - `PrimAlpha`, `PrimAdditive`, `PrimDiffuseAlpha`, `PrimOpaque` and `PrimAlphaScanlines` ship fixed-function only
     (their programmable technique is commented out in the sources), so they keep the preview's own shader, which is
-    that path; heat sprites keep the distortion pass; tailed emitters and depth sprites keep the preview's shader
-    for now
+    that path; heat sprites keep the distortion pass; tailed emitters keep the preview's shader for now
+  - A depth sprite (`PrimDepthSprite*`) is drawn through its effect too: the emitter's own depth map, read from
+    the same chunk as a bump emitter's normal map, is bound as the effect's second texture, and the pixel
+    shader's depth output reaches the depth buffer, so a chunk sinks into or stands off the hull as the game
+    draws it; a frozen batch drawn through an effect is depth-tested like any other frozen batch
   - The shader resolver looks in the shaders' `Engine/` folder, where the particle effects live, and a header is
     asked for by its bare name whatever path the include wrote
   - An emitter with a skip time is pre-simulated through it before its first frame, in tenths of a second as the
