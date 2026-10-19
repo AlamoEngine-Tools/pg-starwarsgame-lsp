@@ -121,6 +121,14 @@
     narrows the matrix as HLSL does, and a shader handle bound to a block of DX8 assembly is stripped with the
     rest of the effect scaffolding - the bump effect's tangent rotation and the depth sprites' PS1.x fallbacks
     were each a compile error that left the preview's own shader drawing in silence
+  - The whole shipped set was then compiled the same way, and the translator learned what the rest of the corpus
+    writes: brace initialisers (`float4 TexU = { 0.01, 0, 0, 0 };`, flat array lists, matrices), `int4` and
+    `D3DCOLORtoUBYTE4`, a swizzled literal (`0.5.xx`), a scalar assigned to a vector (`Out.Diff = 0;`), an
+    integer compared with a float, `lerp` over mismatched widths, a `mul` of a float3 by a float4x4 kept at
+    HLSL's float4 result, a comment inside an expression, a sampler with both register and state block or with
+    neither, an annotation block after a semantic, a DX8 `asm` handle, and a `//` comment after a scaled integer.
+    60 of the 69 translatable effects compile, up from 41; the 9 left are development effects that name a
+    function, globals or a header the shipped sources do not have, and fail for an HLSL compiler the same way
   - The shader resolver looks in the shaders' `Engine/` folder, where the particle effects live, and a header is
     asked for by its bare name whatever path the include wrote
   - An emitter with a skip time is pre-simulated through it before its first frame, in tenths of a second as the

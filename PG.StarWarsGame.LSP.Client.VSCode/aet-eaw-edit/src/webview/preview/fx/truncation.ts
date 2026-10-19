@@ -86,6 +86,19 @@ function balanceWidths(
         return `(${balanceWidths(text.slice(1, -1), scope, structs, functions)})`;
     }
 
+    // Parenthesised and then swizzled - `(mul(In.position, m_world)).xyz`: the swizzle is the
+    // caller's narrowing, and what is inside still has its own widths to balance.
+    if (text.startsWith("(")) {
+        const close = matchingParen(text, 0);
+        const swizzle = /^\.[xyzwrgba]{1,4}$/.exec(text.slice(close + 1));
+        if (close !== -1 && swizzle !== null) {
+            return (
+                `(${balanceWidths(text.slice(1, close), scope, structs, functions)})` +
+                swizzle[0]
+            );
+        }
+    }
+
     // A binary expression at this level: balance each side, then match their widths.
     const split = splitBinary(text);
     if (split !== null) {
@@ -138,16 +151,20 @@ function balanceWidths(
             );
         }
 
-        // The other way round: `mul(float3, float4x4)`. HLSL drops the matrix's fourth row, and
-        // the first three components of its float4 result are the vector against the upper-left
-        // 3x3 - which is what a GLSL matrix constructor takes. The bump particle effect rotates
-        // its packed tangent this way; every use assigns into a float3, so the fourth component
-        // HLSL would have computed is never read.
+        // The other way round: `mul(float3, float4x4)`. HLSL drops the matrix's fourth row and
+        // returns a float4; a zero in the vector's added slot does the same sum. The bump
+        // particle effect rotates its packed tangent this way, the terrain renderer its normal.
         if (leftMatrix > 0 && rightWidth > 1 && rightWidth < leftMatrix) {
-            return `mat${rightWidth}(${left}) ${split.operator} ${right}`;
+            return (
+                `${left} ${split.operator} ` +
+                widenWithZeros(right, rightWidth, leftMatrix)
+            );
         }
         if (rightMatrix > 0 && leftWidth > 1 && leftWidth < rightMatrix) {
-            return `${left} ${split.operator} mat${leftWidth}(${right})`;
+            return (
+                `${widenWithZeros(left, leftWidth, rightMatrix)} ` +
+                `${split.operator} ${right}`
+            );
         }
 
         return `${left} ${split.operator} ${right}`;
@@ -163,27 +180,83 @@ function balanceWidths(
     ) {
         const parameters = functions.get(call[1])?.parameters;
 
-        const args = splitTopLevel(text.slice(call[0].length, -1))
-            .map((arg) => balanceWidths(arg, scope, structs, functions))
-            .map((arg, index) => {
-                const parameter = parameters?.[index];
+        const balanced = splitTopLevel(text.slice(call[0].length, -1)).map(
+            (arg) => balanceWidths(arg, scope, structs, functions),
+        );
 
-                return parameter === undefined
-                    ? arg
-                    : narrowExpression(
+        // A built-in that takes its vector arguments at ONE width - `lerp(float3, float4, t)` -
+        // drops the wider one's extra components in HLSL, and has no overload at all in GLSL.
+        // Scalars among the arguments are their own business and stay as they are.
+        if (parameters === undefined && SAME_WIDTH_INTRINSICS.has(call[1])) {
+            const widths = balanced.map((arg) =>
+                componentCount(inferType(arg, scope, structs, functions)),
+            );
+            const narrowest = Math.min(...widths.filter((width) => width > 1));
+            const args = balanced.map((arg, index) =>
+                widths[index] > narrowest
+                    ? narrowExpression(
                           arg,
-                          parameter,
+                          wide(narrowest),
                           scope,
                           structs,
                           functions,
-                      );
-            });
+                      )
+                    : arg,
+            );
+
+            return `${call[1]}(${args.join(", ")})`;
+        }
+
+        const args = balanced.map((arg, index) => {
+            const parameter = parameters?.[index];
+
+            return parameter === undefined
+                ? arg
+                : narrowExpression(arg, parameter, scope, structs, functions);
+        });
 
         return `${call[1]}(${args.join(", ")})`;
     }
 
     return text;
 }
+
+/**
+ * A vector brought up to a matrix's width with zeros, for `mul(float3, float4x4)`.
+ *
+ * HLSL drops the matrix's extra rows, so the product is the vector against the first three rows -
+ * and against the fourth column too, for a float4 result whose last component the caller may keep
+ * (`float4 N = mul(In.normal, m_world)` in the terrain renderer) or drop (the bump particle's
+ * tangent). A zero in the added slot multiplies the dropped row away and leaves the rest exactly
+ * as HLSL computes it; narrowing the matrix instead would lose the fourth component.
+ */
+function widenWithZeros(
+    expression: string,
+    width: number,
+    target: number,
+): string {
+    const zeros = Array.from({ length: target - width }, () => "0.0");
+    return `vec${target}(${expression}, ${zeros.join(", ")})`;
+}
+
+/**
+ * The built-ins whose vector arguments must all be one width. GLSL ES declares each of them as
+ * `genType` over and over, never mixing widths, where HLSL quietly truncates the wider argument.
+ */
+const SAME_WIDTH_INTRINSICS = new Set([
+    "mix",
+    "min",
+    "max",
+    "clamp",
+    "dot",
+    "cross",
+    "distance",
+    "reflect",
+    "refract",
+    "step",
+    "smoothstep",
+    "pow",
+]);
 
 /** The rightmost top-level binary operator, and the two sides of it. */
 function splitBinary(
@@ -348,8 +421,10 @@ export function fixVectorTruncation(source: string): string {
                     return whole;
                 }
 
+                // A block comment inside the expression - `diff_light /*+ Emissive*/` - holds
+                // a slash the operator split would otherwise take for a division.
                 const balanced = balanceWidths(
-                    rhs.trim(),
+                    rhs.replace(/\/\*[\s\S]*?\*\//g, " ").trim(),
                     scope,
                     structs,
                     functions,
@@ -369,10 +444,59 @@ export function fixVectorTruncation(source: string): string {
                     functions,
                 );
 
-                return `${indent}${declaredType ?? ""}${target} ${operator} ${fixed};`;
+                // `Out.Diff = 0;` - HLSL splats a scalar literal across the vector, GLSL ES
+                // converts nothing: the literal becomes the vector's constructor.
+                const widened =
+                    /^vec[234]$/.test(type) && /^-?\d+(?:\.\d*)?$/.test(fixed)
+                        ? `${type}(${/\./.test(fixed) ? fixed : `${fixed}.0`})`
+                        : fixed;
+
+                return `${indent}${declaredType ?? ""}${target} ${operator} ${widened};`;
             },
         );
     });
+}
+
+/**
+ * Spells an integer literal as a float where a condition compares it with one.
+ *
+ * `if (diff <= 0)` is fine in HLSL and a type error in GLSL ES, which compares like with like.
+ * Only a comparison whose other side is KNOWN to be a float is touched: `index == 0` on an int is
+ * right as it stands, and an untypeable side is left alone rather than guessed at.
+ */
+function promoteComparedLiterals(
+    condition: string,
+    scope: Scope,
+    structs: StructTable,
+    functions: FunctionTable,
+): string {
+    const operand = "[A-Za-z_][A-Za-z0-9_.]*";
+    const isFloat = (expression: string): boolean =>
+        inferType(expression, scope, structs, functions) === "float";
+
+    return condition
+        .replace(
+            new RegExp(
+                `(${operand})\\s*(<=|>=|<|>|==|!=)\\s*(-?\\d+)\\b(?!\\.)`,
+                "g",
+            ),
+            (whole, left: string, op: string, literal: string) =>
+                isFloat(left) ? `${left} ${op} ${literal}.0` : whole,
+        )
+        .replace(
+            new RegExp(
+                `(^|[(\\s&|!])(-?\\d+)\\s*(<=|>=|<|>|==|!=)\\s*(${operand})`,
+                "g",
+            ),
+            (
+                whole,
+                before: string,
+                literal: string,
+                op: string,
+                right: string,
+            ) =>
+                isFloat(right) ? `${before}${literal}.0 ${op} ${right}` : whole,
+        );
 }
 
 /**
@@ -408,7 +532,12 @@ export function fixBooleanConditions(source: string): string {
                 return out + body.slice(cursor);
             }
 
-            const condition = body.slice(open + 1, close);
+            const condition = promoteComparedLiterals(
+                body.slice(open + 1, close),
+                scope,
+                structs,
+                functions,
+            );
             const type = inferType(condition, scope, structs, functions);
 
             out += body.slice(cursor, open + 1);

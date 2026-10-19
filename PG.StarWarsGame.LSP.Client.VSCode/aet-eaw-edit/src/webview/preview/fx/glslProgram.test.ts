@@ -110,6 +110,35 @@ describe("declareUniforms", () => {
         assert.doesNotMatch(out, /register/);
     });
 
+    it("declares a sampler that carries both a register and a state block", () => {
+        // The scene passes' form, the state block spilling over several lines.
+        const out = declareUniforms(
+            "sampler DistortionSampler : register(s0) = \nsampler_state \n{ \n    Texture = (DistortionTexture); \n};\n",
+        );
+
+        assert.match(out, /uniform sampler2D DistortionSampler;/);
+        assert.doesNotMatch(out, /sampler_state|register/);
+    });
+
+    it("declares a bare sampler", () => {
+        // `StencilDarkenFinalBlur.fx` declares its four with neither register nor state.
+        const out = declareUniforms("sampler sampler0;\nsampler2D sampler1;\n");
+
+        assert.match(out, /uniform sampler2D sampler0;/);
+        assert.match(out, /uniform sampler2D sampler1;/);
+    });
+
+    it("takes a declaration's annotation block into account when it follows the semantic", () => {
+        // `TerrainRender.fx`: the semantic, then a block on its own lines, then the default. The
+        // block holds a semicolon of its own, which is not the end of the declaration.
+        const out = declareUniforms(
+            'vec4 materialDiffuse : MaterialDiffuse\n<\n    string UIType = "Surface Color";\n> = {1.0, 1.0, 1.0, 1.0};\n',
+        );
+
+        assert.match(out, /uniform vec4 materialDiffuse;/);
+        assert.doesNotMatch(out, />\s*=|UIType/);
+    });
+
     it("drops the texture declaration the sampler refers to", () => {
         // GLSL has no counterpart; the sampler is what the shader reads.
         assert.doesNotMatch(declareUniforms(SHADER), /\btexture\s+BaseTexture/);

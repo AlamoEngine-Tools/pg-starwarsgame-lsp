@@ -291,9 +291,17 @@ function removeBlocks(text: string, header: RegExp): string {
 export function declareUniforms(source: string): string {
     let out = source;
 
-    // `sampler Name = sampler_state { ... };` becomes a plain sampler uniform.
+    // `sampler Name = sampler_state { ... };` becomes a plain sampler uniform - with a register
+    // between the name and the state block in the scene passes, which bind by stage as well.
     out = out.replace(
-        /\bsampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*sampler_state\s*\{[^}]*\}\s*;/g,
+        /\bsampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*register\s*\(\s*[a-z][0-9]+\s*\))?\s*=\s*sampler_state\s*\{[^}]*\}\s*;/g,
+        (_, kind: string | undefined, name: string) =>
+            `uniform ${kind === "CUBE" ? "samplerCube" : "sampler2D"} ${name};`,
+    );
+    // `sampler Name;` - neither register nor state. Unindented, so a parameter is not mistaken
+    // for one.
+    out = out.replace(
+        /^sampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/gm,
         (_, kind: string | undefined, name: string) =>
             `uniform ${kind === "CUBE" ? "samplerCube" : "sampler2D"} ${name};`,
     );
@@ -355,8 +363,15 @@ function declareSemanticUniforms(source: string): string {
         }
 
         // Everything up to the terminating semicolon belongs to this declaration, initialiser
-        // included - which is why this cannot be a single replace.
-        const semicolon = source.indexOf(";", match.index + match[0].length);
+        // included - which is why this cannot be a single replace. An annotation block may follow
+        // the semantic - `: MaterialDiffuse\n< string UIType = "..."; >` - and the semicolons
+        // inside it are not the declaration's end.
+        let end = match.index + match[0].length;
+        const annotation = /^\s*<[^>]*>/.exec(source.slice(end));
+        if (annotation !== null) {
+            end += annotation[0].length;
+        }
+        const semicolon = source.indexOf(";", end);
         if (semicolon === -1) {
             return out + source.slice(cursor);
         }
