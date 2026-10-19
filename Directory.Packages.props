@@ -12,7 +12,7 @@
         <PackageVersion Include="HtmlAgilityPack" Version="1.13.0"/>
         <PackageVersion Include="JsonSchema.Net" Version="9.4.0"/>
         <PackageVersion Include="Loretta.CodeAnalysis.Lua" Version="0.2.13"/>
-        <PackageVersion Include="MessagePack" Version="3.1.8"/>
+        <PackageVersion Include="MessagePack" Version="3.1.12"/>
         <!-- The Lua debugger computes the PgNet datagram CRC-32 directly; held at the version
              PG.Commons uses, since both hash the same bytes for the same protocol. -->
         <PackageVersion Include="System.IO.Hashing" Version="10.0.12"/>
