@@ -146,11 +146,16 @@ async function main(): Promise<void> {
 
     const fieldTag = document.getElementById("field");
     if (fieldTag !== null) {
-        const {field, textures} = JSON.parse(fieldTag.textContent!) as {
+        const {field, textures, wind} = JSON.parse(fieldTag.textContent!) as {
             field: Parameters<PreviewViewport["addParticleSystem"]>[1];
             textures: Record<string, { format: string; data: string }>;
+            wind: { heading: number; speed: number } | null;
         };
         viewport.addParticleSystem("probe", field, {origin: "gameplay"});
+        if (wind !== null) {
+            viewport.setWind(wind.heading, wind.speed);
+            log(`wind from ${wind.heading} deg at ${wind.speed}`);
+        }
         for (const [name, {format, data}] of Object.entries(textures)) {
             if (format !== "dds") {
                 log(`texture ${name}: .${format} is not handled by the probe`);

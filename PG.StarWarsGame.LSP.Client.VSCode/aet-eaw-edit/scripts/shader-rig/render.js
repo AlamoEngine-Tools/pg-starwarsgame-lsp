@@ -3,13 +3,21 @@
 
 // Builds and runs `render-probe.ts` headless and saves its frames to `out/`.
 //
-// Usage: `node render.js [--field <system.json> --textures <dir>]`. Without a field the probe
-// draws a synthetic bump emitter. The field JSON is what `dump-particle` writes - the DTO the
-// webview receives - and the textures directory is where its .dds files are (a .tga name resolves
-// to the .dds of the same stem, as the server resolves it).
+// Usage: `node render.js [--field <system.json> --textures <dir> [--wind <heading>,<speed>]]`.
+// Without a field the probe draws a synthetic bump emitter. The field JSON is what
+// `dump-particle` writes - the DTO the webview receives - and the textures directory is where its
+// .dds files are (a .tga name resolves to the .dds of the same stem, as the server resolves it).
+// `--wind` is the viewer's wind setting, heading in degrees and speed, for a field that reads it.
 const fs = require("node:fs");
 const path = require("node:path");
-const { RIG, OUT, readShaderSources, bundle, dumpDom, unescapeHtml } = require("./paths");
+const {
+    RIG,
+    OUT,
+    readShaderSources,
+    bundle,
+    dumpDom,
+    unescapeHtml,
+} = require("./paths");
 
 const args = process.argv.slice(2);
 const option = (name) => {
@@ -32,15 +40,29 @@ if (fieldPath !== null) {
         for (const name of [e.colorTexture, e.normalTexture]) {
             if (!name || textures[name.toLowerCase()]) continue;
             const stem = name.toLowerCase().replace(/\.[^.]+$/, "");
-            const file = files.find((f) => f.toLowerCase() === `${stem}.dds`) ?? files.find((f) => f.toLowerCase() === name.toLowerCase());
+            const file =
+                files.find((f) => f.toLowerCase() === `${stem}.dds`) ??
+                files.find((f) => f.toLowerCase() === name.toLowerCase());
             if (file === undefined) {
                 console.log(`no texture file for ${name}`);
                 continue;
             }
-            textures[name.toLowerCase()] = { format: path.extname(file).slice(1).toLowerCase(), data: fs.readFileSync(path.join(dir, file)).toString("base64") };
+            textures[name.toLowerCase()] = {
+                format: path.extname(file).slice(1).toLowerCase(),
+                data: fs.readFileSync(path.join(dir, file)).toString("base64"),
+            };
         }
     }
-    fieldScript = `<script id="field" type="application/json">${JSON.stringify({ field, textures }).replace(/<\//g, "<\\/")}</script>`;
+    // `--wind <heading>,<speed>`: the viewer's wind setting, for a field that reads it.
+    const windOption = option("--wind");
+    const wind =
+        windOption === null
+            ? null
+            : (() => {
+                  const [heading, speed] = windOption.split(",").map(Number);
+                  return { heading, speed };
+              })();
+    fieldScript = `<script id="field" type="application/json">${JSON.stringify({ field, textures, wind }).replace(/<\//g, "<\\/")}</script>`;
 }
 
 const html = `<!doctype html>
@@ -59,10 +81,12 @@ console.log(unescapeHtml(report ? report[1] : "no output"));
 const gallery = /<div id="shots">([\s\S]*?)<\/div>/.exec(dom);
 const names = ["translated", "hand", "translated_again"];
 if (gallery) {
-    unescapeHtml(gallery[1]).split("\n").forEach((url, i) => {
-        if (!url.startsWith("data:image/png;base64,")) return;
-        const file = path.join(OUT, `shot_${names[i] ?? i}.png`);
-        fs.writeFileSync(file, Buffer.from(url.split(",", 2)[1], "base64"));
-        console.log(file);
-    });
+    unescapeHtml(gallery[1])
+        .split("\n")
+        .forEach((url, i) => {
+            if (!url.startsWith("data:image/png;base64,")) return;
+            const file = path.join(OUT, `shot_${names[i] ?? i}.png`);
+            fs.writeFileSync(file, Buffer.from(url.split(",", 2)[1], "base64"));
+            console.log(file);
+        });
 }
