@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using System.IO.Compression;
 using System.Net;
+using System.Text.Json;
 using MessagePack;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,6 +13,7 @@ using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Schema.Versioning;
 using PG.StarWarsGame.LSP.Server.Status;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
@@ -357,8 +359,43 @@ public sealed class BaselineLoaderTest
         ILogger<BaselineLoader>? logger = null, ServerStatusRecorder? recorder = null)
     {
         var client = new HttpClient(handler);
-        return new BaselineLoader(client, new FileHelper(fs), logger ?? NullLogger<BaselineLoader>.Instance,
-            recorder);
+        // The same fake answers the release listing; an explicit URL never asks for one.
+        var locations = new BaselineLocationResolver(
+            new SchemaReleaseResolver(client, NullLogger<SchemaReleaseResolver>.Instance),
+            NullLogger<BaselineLocationResolver>.Instance);
+        return new BaselineLoader(client, locations, new FileHelper(fs),
+            logger ?? NullLogger<BaselineLoader>.Instance, recorder);
+    }
+
+    // ── the official source is the newest release ────────────────────────────
+
+    [Fact]
+    public async Task Http_EmptyUrl_LoadsTheFileAtTheNewestReleasesTag()
+    {
+        var dto = SerializedBaseline.CurrentSchemaVersion;
+        var tagUrl = $"https://raw.githubusercontent.com/AlamoEngine-Tools/eaw-baseline/refs/tags/v{dto}.1.0/" +
+                     "foc/aet-pg-swg-lsp-foc-baseline.aet";
+        var releases = JsonSerializer.Serialize(new[]
+        {
+            new { tag_name = $"v{dto}.1.0", draft = false, prerelease = false }
+        });
+        var handler = new FakeHttpHandler(request =>
+        {
+            var url = request.RequestUri!.ToString();
+            if (url.Contains("/releases"))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(releases) };
+            return url == tagUrl
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                    { Content = new ByteArrayContent(Serialize(MakeBaseline())) }
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        var recorder = new ServerStatusRecorder();
+        var loader = Build(new MockFileSystem(), handler, recorder: recorder);
+
+        var baseline = await loader.LoadAsync(new BaselineSourceConfig(), CancellationToken.None);
+
+        Assert.True(baseline.Symbols.ContainsKey("UNIT_A"));
+        Assert.Equal(StatusAssetSource.Network, recorder.BaselineSource);
     }
 
     // ── a baseline that predates behaviours ──────────────────────────────────

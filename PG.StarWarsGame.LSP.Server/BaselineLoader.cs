@@ -14,14 +14,16 @@ public sealed class BaselineLoader
 {
     private readonly IFileHelper _fileHelper;
     private readonly HttpClient _httpClient;
+    private readonly BaselineLocationResolver _locations;
     private readonly ICrossProcessLock _lock;
     private readonly ILogger<BaselineLoader> _logger;
     private readonly ServerStatusRecorder? _status;
 
-    public BaselineLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<BaselineLoader> logger,
-        ServerStatusRecorder? status = null, ICrossProcessLock? processLock = null)
+    public BaselineLoader(HttpClient httpClient, BaselineLocationResolver locations, IFileHelper fileHelper,
+        ILogger<BaselineLoader> logger, ServerStatusRecorder? status = null, ICrossProcessLock? processLock = null)
     {
         _httpClient = httpClient;
+        _locations = locations;
         _fileHelper = fileHelper;
         _logger = logger;
         _status = status;
@@ -37,7 +39,7 @@ public sealed class BaselineLoader
         var (baseline, source) = await (config.Type switch
         {
             BaselineSourceType.Local => LoadLocalAsync(config.LocalPath, ct),
-            BaselineSourceType.Http => LoadHttpAsync(config.Url, ct),
+            BaselineSourceType.Http => LoadHttpAsync(config, ct),
             _ => Task.FromResult((BaselineIndex.Empty, StatusAssetSource.Empty))
         });
 
@@ -85,8 +87,17 @@ public sealed class BaselineLoader
         return (BaselineIndex.Empty, StatusAssetSource.Empty);
     }
 
-    private async Task<(BaselineIndex, StatusAssetSource)> LoadHttpAsync(string url, CancellationToken ct)
+    private async Task<(BaselineIndex, StatusAssetSource)> LoadHttpAsync(BaselineSourceConfig config,
+        CancellationToken ct)
     {
+        // The newest release this server reads, unless the configuration names a URL outright.
+        // Resolved before the cache lookup rather than inside the try: a cancelled start is not
+        // a download failure to fall back from.
+        var location = await _locations.ResolveAsync(config, ct);
+        var url = location.Url;
+        if (location.Tag is { } tag)
+            _logger.LogInformation("Baseline release {Tag} of {Repository} resolved", tag, config.Repository);
+
         var cacheFile = _fileHelper.FileSystem.Path.Combine(CacheDir, _fileHelper.FileSystem.Path.GetFileName(url));
 
         try

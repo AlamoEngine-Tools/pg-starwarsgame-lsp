@@ -636,7 +636,7 @@
             "type": "string",
             "default": "",
             "format": "uri-reference",
-            "markdownDescription": "Custom HTTP URL for the baseline `.aet` file. Leave empty to use the default source.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `http`."
+            "markdownDescription": "Custom HTTP URL for the baseline `.aet` file. Leave empty to read the newest baseline release this server supports.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `http`."
           },
           "aet-eaw-edit.lsp.schema.source": {
             "order": 800,

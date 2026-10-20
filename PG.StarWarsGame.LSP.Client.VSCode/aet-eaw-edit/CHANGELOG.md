@@ -4,6 +4,15 @@
 
 ### Features
 
+- **Baseline read from a release** - the server reads the newest release of the baseline repository whose
+  baseline it can load, the way it reads the schema since 0.4.1; a merge to that repository's `main` no longer
+  reaches installed clients. Before the first release exists the default branch is read as before, and the copy
+  cached by an earlier start stands in when neither is reachable
+  ([#267](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/267))
+  - The icon pack is read from beside the same release
+  - A release of the server is gated on a baseline release of the version it reads, beside the schema gate
+  - The baseline builder writes the DTO version into the manifest, which the baseline release checks its tag
+    against
 - **XML structure judged by the game's reader** - a file the game drops is an error, XML the game reads but standard
   tools reject is a warning ([#199](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/199))
   - Comments inside values read as the game reads them: cut out, the text around them joined
@@ -227,6 +236,9 @@
 
 ### Breaking changes
 
+- **Default baseline source** - the default is the newest baseline release, not the repository's `main`.
+  `aet-eaw-edit.lsp.source.baseline.url` keeps working as a custom source
+  ([#267](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/267))
 - **`aetswg-006-0008` suppressions** - silence nothing; structural findings carry the per-category IDs above
 - **`.aetswg/suppressions.json`** - document version 2, migrated once on load; the migration adds `aetswg-015-0006`
 - **Windows x64 only** - the extension is published for `win32-x64` alone; the separate server archive is gone

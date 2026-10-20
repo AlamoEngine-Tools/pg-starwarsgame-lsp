@@ -562,7 +562,11 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
         // version 2: symbols carry their behaviour tokens (2026-09-21). The payload itself stays
         // backward compatible - the key is additive - so this marks which artefact answers kind
         // questions, for a human or a future version check, rather than gating the load.
-        $$"""{ "version": 2, "hash": "{{Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant()}}" }""");
+        // schemaVersion: the DTO version a server has to read to load this file. A release of the
+        // baseline repository is tagged v<schemaVersion>.<version>.<patch>, the patch counting
+        // rebuilds at one manifest version; its workflow checks the tag against these two numbers,
+        // and the server resolves the newest tag inside its DTO major.
+        $$"""{ "version": 2, "schemaVersion": {{SerializedBaseline.CurrentSchemaVersion}}, "hash": "{{Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant()}}" }""");
     Console.WriteLine($"Manifest: {manifestFile}");
 
     // ── Icon sidecar ──────────────────────────────────────────────────────────

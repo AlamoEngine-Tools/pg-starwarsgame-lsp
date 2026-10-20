@@ -13,7 +13,8 @@ namespace PG.StarWarsGame.LSP.Schema.Versioning;
 public sealed record SchemaRelease(string Tag, SemVersion Version);
 
 /// <summary>
-///     Finds the newest published schema release this server can read.
+///     Finds the newest published release of a repository inside a version range - the schema's,
+///     and the baseline's through <c>BaselineLocationResolver</c>, which tags by the DTO version.
 ///     <para>
 ///         The schema repository publishes by tagging <c>v&lt;schemaVersion&gt;</c> and creating a
 ///         GitHub release. Drafts, releases flagged as prereleases, tags with a prerelease suffix
@@ -65,7 +66,7 @@ public sealed class SchemaReleaseResolver
             using var response = await _http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Schema releases of {Repository} not listed - HTTP {Status}",
+                _logger.LogWarning("Releases of {Repository} not listed - HTTP {Status}",
                     repository, (int)response.StatusCode);
                 return null;
             }
@@ -79,15 +80,15 @@ public sealed class SchemaReleaseResolver
         catch (Exception e) when (e is HttpRequestException or JsonException or OperationCanceledException)
         {
             // OperationCanceledException without a cancelled token is HttpClient's timeout.
-            _logger.LogWarning(e, "Schema releases of {Repository} not listed", repository);
+            _logger.LogWarning(e, "Releases of {Repository} not listed", repository);
             return null;
         }
 
         var chosen = Choose(releases ?? [], SemVersionRange.ParseNpm(supportedRange));
         if (chosen is null)
-            _logger.LogWarning("No schema release of {Repository} matches {Range}", repository, supportedRange);
+            _logger.LogWarning("No release of {Repository} matches {Range}", repository, supportedRange);
         else
-            _logger.LogInformation("Schema release {Tag} of {Repository} resolved", chosen.Tag, repository);
+            _logger.LogInformation("Release {Tag} of {Repository} resolved", chosen.Tag, repository);
         return chosen;
     }
 
