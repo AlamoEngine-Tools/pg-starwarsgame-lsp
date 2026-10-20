@@ -10,6 +10,8 @@
 
 import * as vscode from "vscode";
 
+import { routeChildren } from "./projectTreeRouting";
+
 /** What a navigator needs of one project. */
 export interface NavigatorProject {
     key: string;
@@ -95,27 +97,39 @@ export class ProjectGroupedTree<
         if (element instanceof ProjectGroupItem) {
             return element;
         }
+        // Compared with undefined, never tested for truth: a window with one project files its tree
+        // under "", and that is a real owner.
         const key = this._owners.get(element);
-        return key ? this._tree(key).getTreeItem(element) : element;
+        return key === undefined
+            ? element
+            : this._tree(key).getTreeItem(element);
     }
 
     async getChildren(
         element?: TItem | ProjectGroupItem,
     ): Promise<(TItem | ProjectGroupItem)[]> {
         const projects = this._projects();
-        if (element === undefined) {
-            if (projects.length > 1) {
+        const route = routeChildren(
+            projects.map((p) => p.key),
+            element === undefined || element instanceof ProjectGroupItem
+                ? undefined
+                : this._owners.get(element),
+            element === undefined,
+            element instanceof ProjectGroupItem
+                ? element.project.key
+                : undefined,
+        );
+        switch (route.kind) {
+            case "projects":
                 return projects.map((p) => new ProjectGroupItem(p));
-            }
-            return projects.length === 1
-                ? this._childrenIn(projects[0].key)
-                : [];
+            case "tree":
+                return this._childrenIn(
+                    route.key,
+                    route.fromRoot ? undefined : (element as TItem),
+                );
+            case "none":
+                return [];
         }
-        if (element instanceof ProjectGroupItem) {
-            return this._childrenIn(element.project.key);
-        }
-        const key = this._owners.get(element);
-        return key ? this._childrenIn(key, element) : [];
     }
 
     private async _childrenIn(key: string, element?: TItem): Promise<TItem[]> {
