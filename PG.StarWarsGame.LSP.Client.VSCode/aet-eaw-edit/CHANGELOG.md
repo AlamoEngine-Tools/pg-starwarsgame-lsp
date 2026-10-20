@@ -209,6 +209,10 @@
 
 ### Fixes
 
+- **Project-wide suppression re-analysed the workspace** - adding one from a quick fix revalidated every
+  document in every language. It now filters the diagnostics already shown and sends only the documents
+  that lose one; nothing is analysed again
+
 - **Command not found from a quick fix** - "Suppress across the project" and "Create localisation key"
   failed with `command 'aet-eaw-edit.lsp...' not found`. The server announces its commands in one batch,
   the batch collided with commands the extension registers itself and was dropped whole; the extension now

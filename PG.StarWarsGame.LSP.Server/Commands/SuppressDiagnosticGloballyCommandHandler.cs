@@ -50,10 +50,12 @@ public sealed class SuppressDiagnosticGloballyCommandHandler : ExecuteCommandHan
         // Published diagnostics do not know the store changed, so nothing would disappear until the
         // next edit to each file. Every language is refreshed, not just the one the quick fix came
         // from: the store is project-wide, so the same id may be on screen in all three.
+        // Refiltered, not re-analysed: a suppression changes what is shown, never what is found,
+        // and re-analysing for it revalidated the whole workspace on every quick fix.
         foreach (var republisher in _republishers)
             try
             {
-                await republisher.RepublishAllAsync(ct);
+                await republisher.ApplyGlobalSuppressionsAsync(ct);
             }
             catch (Exception ex)
             {

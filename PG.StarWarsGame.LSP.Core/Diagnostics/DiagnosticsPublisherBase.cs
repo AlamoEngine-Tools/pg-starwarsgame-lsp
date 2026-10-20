@@ -34,6 +34,12 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     private readonly ILogger _logger;
     private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly object _publishLock = new();
+
+    // What was last sent per document, before the origin stamp. A project-wide suppression added
+    // later can only remove diagnostics, so filtering this again is exactly what analysing again
+    // would publish - at none of the cost. Guarded by its own lock: a publisher may send outside
+    // the publish lock (a document closed, a dialog scope changed).
+    private readonly Dictionary<string, PublishDiagnosticsParams> _sent = new(StringComparer.Ordinal);
     private readonly IGameWorkspaceHost _workspaceHost;
     private HashSet<string> _lastPublishedUris = [];
 
@@ -83,6 +89,42 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
         {
             _lastRunIndex = null;
             RunPublish(_indexService.Current);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///     Applies the project-wide suppressions to what is already published, after one was added.
+    ///     <para>
+    ///         Nothing is analysed again: a suppression decides which findings are shown, never what
+    ///         is found. Each document's last published set is filtered once more and sent only where
+    ///         that removed something; a document the new suppression does not touch is left alone.
+    ///     </para>
+    /// </summary>
+    public virtual Task ApplyGlobalSuppressionsAsync(CancellationToken ct)
+    {
+        if (!DiagnosticsEnabled) return Task.CompletedTask;
+
+        List<PublishDiagnosticsParams> sent;
+        lock (_sent)
+        {
+            sent = [.. _sent.Values];
+        }
+
+        foreach (var previous in sent)
+        {
+            ct.ThrowIfCancellationRequested();
+            var before = previous.Diagnostics.ToList();
+            var after = FilterSuppressed(before, []);
+            if (after.Count == before.Count) continue;
+
+            Publish(new PublishDiagnosticsParams
+            {
+                Uri = previous.Uri,
+                Version = previous.Version,
+                Diagnostics = new Container<Diagnostic>(after)
+            });
         }
 
         return Task.CompletedTask;
@@ -138,6 +180,15 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 
     protected void Publish(PublishDiagnosticsParams p)
     {
+        var key = p.Uri.ToString();
+        lock (_sent)
+        {
+            if (p.Diagnostics.Any())
+                _sent[key] = p;
+            else
+                _sent.Remove(key);
+        }
+
         _publish(WithOrigin(p));
     }
 
@@ -233,7 +284,7 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
     protected void ClearAllPublished()
     {
         foreach (var uri in _lastPublishedUris)
-            _publish(EmptyParams(uri));
+            Publish(EmptyParams(uri));
         _lastPublishedUris = [];
     }
 
@@ -318,13 +369,13 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
             {
                 _logger.LogError(ex, "Unhandled exception publishing diagnostics for {Uri}; sending empty diagnostics",
                     doc.Uri);
-                _publish(EmptyParams(doc.Uri));
+                Publish(EmptyParams(doc.Uri));
             }
         }
 
         foreach (var uri in _lastPublishedUris)
             if (!openUris.Contains(uri))
-                _publish(EmptyParams(uri));
+                Publish(EmptyParams(uri));
 
         _lastPublishedUris = openUris;
         _lastRunIndex = index;

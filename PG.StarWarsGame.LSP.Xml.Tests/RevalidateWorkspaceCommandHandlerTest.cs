@@ -57,5 +57,10 @@ public sealed class RevalidateWorkspaceCommandHandlerTest
             Called = true;
             return Throw ? Task.FromException(new InvalidOperationException("boom")) : Task.CompletedTask;
         }
+
+        public Task ApplyGlobalSuppressionsAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
     }
 }
