@@ -17,6 +17,9 @@ import {
     stepParticle,
     systemExtent,
     volumeExtent,
+    cubePhase,
+    weatherFade,
+    wrapIntoCube,
 } from "./particleSim";
 import { emitter, properties, track, volume } from "./particleFixture";
 import type { AlamoEmitterProperties } from "../../protocol/modelPreview";
@@ -1182,5 +1185,100 @@ describe("systemExtent", () => {
 
     it("falls back to something visible when there are no emitters", () => {
         assert.ok(systemExtent([]) > 0);
+    });
+});
+
+/**
+ * Measured in the game, for weather emitters only: a particle is invisible closer than the cutoff
+ * distance to the fade centre, fully drawn from the cutoff plus the fade-out distance, and faded
+ * linearly in between. Every shipped weather system sets the cutoff to zero; rain and ash set the
+ * fade-out to zero as well, and the game's branch order makes that "fully drawn from the cutoff"
+ * rather than a division by zero.
+ */
+describe("weatherFade", () => {
+    it("hides a particle closer than the cutoff", () => {
+        assert.equal(weatherFade(49, 50, 100), 0);
+    });
+
+    it("fades in linearly over the fade-out distance past the cutoff", () => {
+        assert.equal(weatherFade(50, 50, 100), 0);
+        assert.equal(weatherFade(100, 50, 100), 0.5);
+        assert.equal(weatherFade(150, 50, 100), 1);
+    });
+
+    it("draws fully beyond the cutoff plus the fade-out", () => {
+        assert.equal(weatherFade(1000, 50, 100), 1);
+    });
+
+    it("draws fully from the cutoff when the fade-out is zero, as rain and ash declare", () => {
+        assert.equal(weatherFade(0, 0, 0), 1);
+        assert.equal(weatherFade(10, 0, 0), 1);
+    });
+});
+
+/**
+ * Measured in the game: a weather particle lives in a periodic space around the emitter's origin
+ * with the declared cube size as its period, each axis wrapped on its own - the vertical one too -
+ * by a step of one edge, not a modulo. The cube size is the full edge; the half-extent is derived.
+ */
+describe("wrapIntoCube", () => {
+    const half = 50;
+
+    it("leaves a position inside the cube alone", () => {
+        assert.deepEqual(wrapIntoCube({ x: 10, y: -49, z: 0 }, half), {
+            x: 10,
+            y: -49,
+            z: 0,
+        });
+    });
+
+    it("brings a position past a face back in through the opposite face, per axis", () => {
+        assert.deepEqual(wrapIntoCube({ x: 60, y: 0, z: 0 }, half), {
+            x: -40,
+            y: 0,
+            z: 0,
+        });
+        assert.deepEqual(wrapIntoCube({ x: 0, y: -70, z: 0 }, half), {
+            x: 0,
+            y: 30,
+            z: 0,
+        });
+        assert.deepEqual(wrapIntoCube({ x: 0, y: 0, z: 55 }, half), {
+            x: 0,
+            y: 0,
+            z: -45,
+        });
+    });
+
+    it("steps by one edge and no more, as the game does", () => {
+        // A particle a full edge and a half past the face is stepped back one edge, not folded
+        // into the cube: the game's one correction for a large overshoot takes the integer
+        // quotient off the overshoot, which is not a modulo.
+        const wrapped = wrapIntoCube({ x: 50 + 150, y: 0, z: 0 }, half);
+        assert.equal(wrapped.x, -50 + (150 - Math.trunc(150 / 100)));
+    });
+});
+
+/**
+ * Measured in the game: the rendered copy of each particle is the one inside the cube around the
+ * fade centre, which the game finds by taking the centre's position within its own period cell
+ * off every particle before wrapping. The lattice stays fixed in the world; the camera moves
+ * through it.
+ */
+describe("cubePhase", () => {
+    it("is the centre's offset within its period cell, per axis", () => {
+        assert.deepEqual(cubePhase({ x: 120, y: -30, z: 250 }, 50), {
+            x: 20,
+            y: -30,
+            z: 50,
+        });
+    });
+
+    it("is zero on a cell boundary and for the origin", () => {
+        assert.deepEqual(cubePhase({ x: 200, y: 0, z: -100 }, 50), {
+            x: 0,
+            y: 0,
+            z: 0,
+        });
     });
 });

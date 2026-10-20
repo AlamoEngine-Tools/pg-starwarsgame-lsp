@@ -658,6 +658,87 @@ export function appearanceOf(
     };
 }
 
+/**
+ * How much of a weather particle is drawn, by its distance from the fade centre.
+ *
+ * Measured in the game, for weather emitters only: zero closer than the cutoff distance, one from
+ * the cutoff plus the fade-out distance on, linear in between. The game multiplies the colour by
+ * it for an additive emitter and the alpha otherwise. Tested in that branch order: every shipped
+ * weather system declares a cutoff of zero, and rain and ash a fade-out of zero as well, which the
+ * order makes "fully drawn from the cutoff" rather than a division by zero.
+ */
+export function weatherFade(
+    distance: number,
+    cutoff: number,
+    fadeout: number,
+): number {
+    if (distance < cutoff) {
+        return 0;
+    }
+
+    if (distance >= cutoff + fadeout) {
+        return 1;
+    }
+
+    return (distance - cutoff) / fadeout;
+}
+
+/**
+ * Brings a weather particle back into its cube, one axis at a time.
+ *
+ * Measured in the game: a weather particle lives in a periodic space around the emitter's origin
+ * whose period is the declared cube size - the full edge; `half` is the derived half-extent. A
+ * coordinate past a face is stepped back by one edge, the vertical axis like the others. The game's
+ * one provision for an overshoot of a whole edge or more takes the integer quotient off the
+ * overshoot rather than the quotient times the edge, which is not a modulo; reproduced as read,
+ * since a particle that jumps a full edge in one step is what it was written for.
+ */
+export function wrapIntoCube(position: Vec3, half: number): Vec3 {
+    return {
+        x: wrapAxis(position.x, half),
+        y: wrapAxis(position.y, half),
+        z: wrapAxis(position.z, half),
+    };
+}
+
+/** One axis of {@link wrapIntoCube}, for a caller that wraps thousands in place without allocating. */
+export function wrapAxis(value: number, half: number): number {
+    const edge = half * 2;
+
+    if (value < -half) {
+        let overshoot = -half - value;
+        if (overshoot >= edge) {
+            overshoot -= Math.trunc(overshoot / edge);
+        }
+        return half - overshoot;
+    }
+
+    if (value > half) {
+        let overshoot = value - half;
+        if (overshoot >= edge) {
+            overshoot -= Math.trunc(overshoot / edge);
+        }
+        return -half + overshoot;
+    }
+
+    return value;
+}
+
+/**
+ * Where the cube's centre sits within its own period cell, per axis.
+ *
+ * Measured in the game: the rendered copy of each particle is the one inside the cube around the
+ * centre, found by taking this phase off the particle before wrapping. The lattice of copies stays
+ * fixed in the world and the camera moves through it; the particles never drag along.
+ */
+export function cubePhase(centre: Vec3, half: number): Vec3 {
+    const edge = half * 2;
+    const phase = (value: number): number =>
+        value - Math.trunc(value / edge) * edge;
+
+    return { x: phase(centre.x), y: phase(centre.y), z: phase(centre.z) };
+}
+
 /** How far a particle has turned by `t`, in turns. Zero for the emitters that do not spin. */
 function spin(particle: Particle, emitter: AlamoEmitter, t: number): number {
     const track = trackFor(emitter, "RotationSpeed");

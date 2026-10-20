@@ -1946,3 +1946,153 @@ describe("the owning object Scale_Factor", () => {
         assert.deepEqual(drawn(undefined), drawn(1));
     });
 });
+
+/**
+ * Measured in the game. A weather emitter is a field around the camera, not a stream from a point:
+ * every particle it will ever have is born at once, uniformly inside a cube of the declared edge
+ * around the emitter's origin, with a random age; none ever dies - an age past the lifetime wraps
+ * round - and none is born later. Each step the position is wrapped back into the cube, axis by
+ * axis. What is DRAWN is the copy of each particle inside the cube around the point the declared
+ * camera offset in front of the camera, found by taking that point's phase within its period cell
+ * off the particle before wrapping: the lattice stays fixed in the world, the camera moves through
+ * it. The count is the file's per-second value taken outright, lifetime playing no part.
+ */
+describe("weather emitters", () => {
+    const HALF = 50;
+
+    function weather(
+        over: Partial<AlamoEmitterProperties> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "rain",
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: -5, z: 0 },
+                    }),
+                    properties: properties({
+                        isWeatherParticle: true,
+                        weatherCubeSize: HALF * 2,
+                        weatherCubeDistance: 30,
+                        weatherFadeoutDistance: 0,
+                        weatherCutoffDistance: 0,
+                        particlesPerSecond: 10,
+                        lifetime: 1,
+                        blendMode: "Additive",
+                        ...over,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    /** A camera on +z looking at the origin, so the point in front of it is towards -z. */
+    function viewFrom(z: number): THREE.Matrix4 {
+        const camera = new THREE.PerspectiveCamera();
+        camera.position.set(0, 0, z);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        return camera.matrixWorldInverse;
+    }
+
+    function inside(value: number, centre: number): boolean {
+        return value >= centre - HALF - 1e-6 && value <= centre + HALF + 1e-6;
+    }
+
+    it("is born complete, inside its cube, and never grows", () => {
+        const instance = weather();
+        instance.update(0.1, viewFrom(100));
+        const born = instance.emitterParticles(0);
+        assert.equal(born.length, 10);
+        for (const particle of born) {
+            assert.ok(
+                inside(particle.position.x, 0),
+                `x ${particle.position.x}`,
+            );
+            assert.ok(
+                inside(particle.position.y, 0),
+                `y ${particle.position.y}`,
+            );
+            assert.ok(
+                inside(particle.position.z, 0),
+                `z ${particle.position.z}`,
+            );
+        }
+
+        for (let i = 0; i < 10; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        assert.equal(instance.emitterParticles(0).length, 10);
+    });
+
+    it("keeps every particle past its lifetime, the age wrapping round", () => {
+        const instance = weather();
+        for (let i = 0; i < 30; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        const live = instance.emitterParticles(0);
+        assert.equal(live.length, 10);
+        assert.ok(live.every((p) => p.age < p.lifetime));
+    });
+
+    it("wraps a particle that leaves a face back in through the opposite one", () => {
+        const instance = weather();
+        instance.update(0.1, viewFrom(100));
+        // Falling at five a second for three seconds crosses the hundred-unit cube more than once.
+        for (let i = 0; i < 30; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        for (const particle of instance.emitterParticles(0)) {
+            assert.ok(
+                inside(particle.position.y, 0),
+                `y ${particle.position.y}`,
+            );
+        }
+    });
+
+    it("draws the field in the cube around the point in front of the camera", () => {
+        const instance = weather();
+        // Camera at z 100 looking at the origin; thirty units in front of it is z 70.
+        instance.update(0.1, viewFrom(100));
+        const offsets = instance
+            .emitterMesh(0)!
+            .geometry.getAttribute("iOffset").array;
+        for (let i = 0; i < 10; i++) {
+            assert.ok(inside(offsets[i * 3], 0), `x ${offsets[i * 3]}`);
+            assert.ok(inside(offsets[i * 3 + 1], 0), `y ${offsets[i * 3 + 1]}`);
+            assert.ok(
+                inside(offsets[i * 3 + 2], 70),
+                `z ${offsets[i * 3 + 2]}`,
+            );
+        }
+    });
+
+    /**
+     * Measured: the fade distance is the length of twice the centre point minus the particle's
+     * local position - as the game computes it, not as the numbers were presumably meant. With the
+     * centre at z 70 that distance runs from 90 to 190 here, so a cutoff of 100 with a fade-out of
+     * 200 hides the nearest and draws none fully; for an additive emitter it is the colour that
+     * carries the fade.
+     */
+    it("fades an additive weather particle's colour by the game's distance", () => {
+        const instance = weather({
+            weatherCutoffDistance: 100,
+            weatherFadeoutDistance: 200,
+        });
+        instance.update(0.1, viewFrom(100));
+        const colours = instance
+            .emitterMesh(0)!
+            .geometry.getAttribute("iColor").array;
+        const reds = Array.from({ length: 10 }, (_, i) => colours[i * 3]);
+        assert.ok(
+            reds.every((r) => r < 0.5),
+            `reds ${reds.join(", ")}`,
+        );
+        assert.ok(
+            reds.some((r) => r > 0),
+            "every particle fully hidden",
+        );
+    });
+});

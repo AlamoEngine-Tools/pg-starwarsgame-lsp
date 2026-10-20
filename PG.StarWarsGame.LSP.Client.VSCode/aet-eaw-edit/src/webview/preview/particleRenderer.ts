@@ -24,6 +24,7 @@ import {
     accelerationIn,
     appearanceOf,
     atlasColumns,
+    cubePhase,
     type Particle,
     type Random,
     seededRandom,
@@ -31,6 +32,8 @@ import {
     spawnParticle,
     stepParticle,
     systemExtent,
+    weatherFade,
+    wrapAxis,
 } from "./particleSim";
 import { AlamoMaterial } from "./alamoMaterial";
 import type { TranslatedEffect } from "./fx/effect";
@@ -41,10 +44,12 @@ import { particleEffectName } from "./particleEffects";
 /**
  * Ceiling on live particles per emitter.
  *
- * A weather emitter authored for a whole battlefield will happily ask for tens of thousands, which is
- * a frozen tab rather than a preview. Oldest are retired first so the effect keeps running.
+ * Measured in the game: an emitter's particle count - rate times lifetime, or the rate outright for
+ * a weather field - is clamped to 5003 before its buffers are sized. The same ceiling here, so a
+ * field authored for a whole battlefield draws as many drops as the game draws and no more. Oldest
+ * are retired first on an ordinary emitter so the effect keeps running.
  */
-const MAX_PARTICLES = 2000;
+const MAX_PARTICLES = 5003;
 
 /** Reused so the per-frame ground lookup allocates nothing. */
 const GROUND_SCRATCH = new THREE.Vector3();
@@ -55,6 +60,9 @@ const VIEW_SCRATCH = new THREE.Matrix4();
 const IDENTITY = new THREE.Matrix4();
 const CAMERA_SCRATCH = new THREE.Vector3();
 const CAMERA_MATRIX_SCRATCH = new THREE.Matrix4();
+const WEATHER_FORWARD_SCRATCH = new THREE.Vector3();
+/** Where a weather cube sits when nothing is looking. */
+const ORIGIN: AlamoVector3 = { x: 0, y: 0, z: 0 };
 
 /**
  * Longest step the simulation will take.
@@ -641,6 +649,25 @@ class EmitterRenderer {
     /** Where `EveryVertex` has got to. Kept across ticks, because that walk is ordered. */
     private readonly cursor: EmissionCursor = { subMesh: 0, vertex: 0 };
 
+    /**
+     * Half the declared cube edge for a weather emitter, zero for every other kind.
+     *
+     * Measured in the game: a weather field lives in a periodic space around the emitter's origin
+     * with the cube edge as its period, every particle born at once and none ever dying; what is
+     * drawn is the copy inside the cube around the point the camera offset in front of the camera.
+     */
+    private readonly weatherHalf: number;
+
+    /** Whether the field has had its one and only burst. */
+    private weatherBorn = false;
+
+    /** The cube's centre and its phase within the period cell, computed once per write. */
+    private readonly weatherCentre = { x: 0, y: 0, z: 0 };
+    private weatherPhase = { x: 0, y: 0, z: 0 };
+
+    /** The rendered copy of the particle being written, reused so a field allocates nothing. */
+    private readonly weatherDrawn = { x: 0, y: 0, z: 0 };
+
     constructor(
         private readonly emitter: AlamoEmitter,
         private readonly random: Random,
@@ -651,6 +678,10 @@ class EmitterRenderer {
         private readonly scaleFactor = 1,
     ) {
         this.clock = new SpawnClock(emitter);
+        // The file carries the full edge; the game halves it on the emitter's reset.
+        this.weatherHalf = emitter.properties.isWeatherParticle
+            ? Math.max(0, emitter.properties.weatherCubeSize) * 0.5
+            : 0;
 
         this.geometry = new THREE.InstancedBufferGeometry();
         this.geometry.setAttribute(
@@ -904,6 +935,8 @@ class EmitterRenderer {
         const columns = atlasColumns(properties.textureSize);
         const cell = 1 / columns;
         const scale = this.scaleFactor;
+        const weather = this.weatherHalf > 0;
+        const fadeOnColour = properties.blendMode === "Additive";
         const basis = properties.worldOriented ? GROUND_BASIS : frame.toView;
         // Copied, not kept: the frame is one object the system rewrites every tick.
         this.bakedBasis = (this.bakedBasis ?? new THREE.Matrix3()).copy(basis);
@@ -925,15 +958,22 @@ class EmitterRenderer {
             const angle = look.rotation * 6.2831853;
             const c = Math.cos(angle);
             const s = Math.sin(angle);
-            const px = particle.position.x * scale;
-            const py = particle.position.y * scale;
-            const pz = particle.position.z * scale;
+            // A weather particle is drawn as its copy in the cube around the camera, faded by the
+            // game's distance on the colour of an additive emitter and the alpha otherwise.
+            const fade = weather ? this.weatherDrawOf(particle) : 1;
+            const drawn = weather ? this.weatherDrawn : particle.position;
+            const colourFade = fadeOnColour ? fade : 1;
+            const alphaFade = fadeOnColour ? 1 : fade;
+            const px = drawn.x * scale;
+            const py = drawn.y * scale;
+            const pz = drawn.z * scale;
             const index = look.frame % (columns * columns);
             const originU = (index % columns) * cell;
             const originV = Math.floor(index / columns) * cell;
-            const r = bump ? 0.5 + 0.5 * c : look.r;
-            const g = bump ? 0.5 + 0.5 * s : look.g;
-            const b = bump ? 0.5 : look.b;
+            const r = bump ? 0.5 + 0.5 * c : look.r * colourFade;
+            const g = bump ? 0.5 + 0.5 * s : look.g * colourFade;
+            const b = bump ? 0.5 : look.b * colourFade;
+            const a = look.a * alphaFade;
 
             for (let corner = 0; corner < 4; corner++) {
                 const cx = QUAD_CORNERS[corner * 2];
@@ -950,7 +990,7 @@ class EmitterRenderer {
                 colours[vertex * 4] = r;
                 colours[vertex * 4 + 1] = g;
                 colours[vertex * 4 + 2] = b;
-                colours[vertex * 4 + 3] = look.a;
+                colours[vertex * 4 + 3] = a;
                 uvs[vertex * 2] = originU + (cx * 0.5 + 0.5) * cell;
                 uvs[vertex * 2 + 1] = originV + (cy * 0.5 + 0.5) * cell;
             }
@@ -986,6 +1026,11 @@ class EmitterRenderer {
         frame: EmitterFrame = stillFrame(),
         dependent = false,
     ): AlamoVector3[] {
+        // A weather field runs the game's other update: one burst, no deaths, a wrap each step.
+        if (this.weatherHalf > 0) {
+            return this.advanceWeather(dt, frame);
+        }
+
         // Measured in the game: on the first tick that would carry the emitter past its freeze
         // time it bakes the particles it has - as they stand BEFORE that step - and never steps,
         // spawns, ages or fades again. A tick landing exactly on the freeze time still steps.
@@ -1262,8 +1307,133 @@ class EmitterRenderer {
         };
     }
 
+    /**
+     * One step of a weather field.
+     *
+     * Measured in the game, which runs a weather emitter through an update of its own: every
+     * particle is born at once - the file's per-second value is the count outright, lifetime
+     * playing no part - uniformly inside the cube, with a random age; no gravity, no inward pull,
+     * no ground and no later spawn; an age past the lifetime wraps round, so nothing ever dies;
+     * and after the position moves it is wrapped back into the cube, axis by axis. Positions are
+     * emitter-local throughout - the emitter's own transform is never applied, the field is placed
+     * at draw time around the camera instead.
+     */
+    private advanceWeather(dt: number, frame: EmitterFrame): AlamoVector3[] {
+        this.age += dt;
+        const half = this.weatherHalf;
+
+        if (!this.weatherBorn && this.mesh.visible) {
+            const count = Math.min(
+                MAX_PARTICLES,
+                Math.max(
+                    0,
+                    Math.ceil(this.emitter.properties.particlesPerSecond),
+                ),
+            );
+            for (let i = 0; i < count; i++) {
+                const particle = spawnParticle(
+                    this.emitter,
+                    this.random,
+                    frame.wind,
+                );
+                particle.position = {
+                    x: (this.random() * 2 - 1) * half,
+                    y: (this.random() * 2 - 1) * half,
+                    z: (this.random() * 2 - 1) * half,
+                };
+                particle.age = this.random() * particle.lifetime;
+                this.particles.push(particle);
+            }
+            this.weatherBorn = true;
+        }
+
+        for (const particle of this.particles) {
+            particle.age += dt;
+            if (particle.lifetime > 0 && particle.age > particle.lifetime) {
+                particle.age %= particle.lifetime;
+            }
+
+            particle.position.x = wrapAxis(
+                particle.position.x + particle.velocity.x * dt,
+                half,
+            );
+            particle.position.y = wrapAxis(
+                particle.position.y + particle.velocity.y * dt,
+                half,
+            );
+            particle.position.z = wrapAxis(
+                particle.position.z + particle.velocity.z * dt,
+                half,
+            );
+        }
+
+        this.writeBuffers(frame);
+        return [];
+    }
+
+    /**
+     * Fixes the cube's centre for this write: the declared offset in front of the camera, in
+     * simulation space, and its phase within the period cell.
+     *
+     * Row three of simulation-to-view is the view's z axis in simulation space, and the view looks
+     * down its negative z, so the point in front of the camera lies the other way along it.
+     */
+    private placeWeatherCube(frame: EmitterFrame): void {
+        const e = frame.toView.elements;
+        const forward = WEATHER_FORWARD_SCRATCH.set(
+            -e[2],
+            -e[5],
+            -e[8],
+        ).normalize();
+        const camera = frame.camera ?? ORIGIN;
+        const offset = this.emitter.properties.weatherCubeDistance;
+
+        this.weatherCentre.x = camera.x + forward.x * offset;
+        this.weatherCentre.y = camera.y + forward.y * offset;
+        this.weatherCentre.z = camera.z + forward.z * offset;
+        this.weatherPhase = cubePhase(this.weatherCentre, this.weatherHalf);
+    }
+
+    /**
+     * The copy of a weather particle that is drawn, in simulation space, and how much of it.
+     *
+     * Measured: the rendered position is the particle less the centre's phase, wrapped into the
+     * cube, placed around the centre. The fade distance is the length of twice the centre minus
+     * that local position - as the game computes it, which leaves the fade inert for any centre
+     * farther from the origin than the cutoff plus the fade-out plus the half edge. Reproduced as
+     * read; the numbers the file declares mean here what they mean in the game.
+     */
+    private weatherDrawOf(particle: Particle): number {
+        const half = this.weatherHalf;
+        const centre = this.weatherCentre;
+        const phase = this.weatherPhase;
+        const localX = wrapAxis(particle.position.x - phase.x, half);
+        const localY = wrapAxis(particle.position.y - phase.y, half);
+        const localZ = wrapAxis(particle.position.z - phase.z, half);
+
+        this.weatherDrawn.x = centre.x + localX;
+        this.weatherDrawn.y = centre.y + localY;
+        this.weatherDrawn.z = centre.z + localZ;
+
+        const dx = 2 * centre.x - localX;
+        const dy = 2 * centre.y - localY;
+        const dz = 2 * centre.z - localZ;
+        const properties = this.emitter.properties;
+        return weatherFade(
+            Math.sqrt(dx * dx + dy * dy + dz * dz),
+            properties.weatherCutoffDistance ?? 50,
+            properties.weatherFadeoutDistance,
+        );
+    }
+
     private writeBuffers(frame: EmitterFrame): void {
         const tailed = this.emitter.properties.hasTail;
+        // Measured: the weather fade multiplies the colour of an additive emitter and the alpha of
+        // every other kind.
+        const fadeOnColour = this.emitter.properties.blendMode === "Additive";
+        if (this.weatherHalf > 0) {
+            this.placeWeatherCube(frame);
+        }
         const order = this.frozen ? this.depthOrder(frame) : null;
 
         if (this.engine !== null) {
@@ -1275,19 +1445,27 @@ class EmitterRenderer {
             const particle = this.particles[order === null ? i : order[i]];
             const look = appearanceOf(particle, this.emitter);
 
+            // A weather particle is drawn as its copy in the cube around the camera, faded by the
+            // game's distance; every other kind is drawn where it is, whole.
+            const weather = this.weatherHalf > 0;
+            const fade = weather ? this.weatherDrawOf(particle) : 1;
+            const drawn = weather ? this.weatherDrawn : particle.position;
+            const colourFade = fadeOnColour ? fade : 1;
+            const alphaFade = fadeOnColour ? 1 : fade;
+
             // The object's uniform scale, applied to the POSITION and the SIZE together, which is
             // what a scale on the world matrix does. It has to be here rather than on the system's
             // node because the billboard path adds the half-extent in VIEW space, after the model
             // matrix - a node scale would move every particle without resizing any of it.
-            this.offsets[i * 3] = particle.position.x * this.scaleFactor;
-            this.offsets[i * 3 + 1] = particle.position.y * this.scaleFactor;
-            this.offsets[i * 3 + 2] = particle.position.z * this.scaleFactor;
+            this.offsets[i * 3] = drawn.x * this.scaleFactor;
+            this.offsets[i * 3 + 1] = drawn.y * this.scaleFactor;
+            this.offsets[i * 3 + 2] = drawn.z * this.scaleFactor;
 
-            this.colors[i * 3] = look.r;
-            this.colors[i * 3 + 1] = look.g;
-            this.colors[i * 3 + 2] = look.b;
+            this.colors[i * 3] = look.r * colourFade;
+            this.colors[i * 3 + 1] = look.g * colourFade;
+            this.colors[i * 3 + 2] = look.b * colourFade;
 
-            this.alphas[i] = look.a;
+            this.alphas[i] = look.a * alphaFade;
             this.sizes[i] = look.size * this.scaleFactor;
             this.rotations[i] = look.rotation;
             this.frames[i] = look.frame;
