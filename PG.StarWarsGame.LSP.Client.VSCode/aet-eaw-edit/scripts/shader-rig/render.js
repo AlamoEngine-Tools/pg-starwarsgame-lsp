@@ -7,7 +7,8 @@
 // Without a field the probe draws a synthetic bump emitter. The field JSON is what
 // `dump-particle` writes - the DTO the webview receives - and the textures directory is where its
 // .dds files are (a .tga name resolves to the .dds of the same stem, as the server resolves it).
-// `--wind` is the viewer's wind setting, heading in degrees and speed, for a field that reads it.
+// `--wind` is the viewer's wind setting, heading in degrees and speed, for a field that reads it;
+// `--intensity <0..1>` the weather intensity a phase sets.
 const fs = require("node:fs");
 const path = require("node:path");
 const {
@@ -62,7 +63,9 @@ if (fieldPath !== null) {
                   const [heading, speed] = windOption.split(",").map(Number);
                   return { heading, speed };
               })();
-    fieldScript = `<script id="field" type="application/json">${JSON.stringify({ field, textures, wind }).replace(/<\//g, "<\\/")}</script>`;
+    const intensityOption = option("--intensity");
+    const intensity = intensityOption === null ? null : Number(intensityOption);
+    fieldScript = `<script id="field" type="application/json">${JSON.stringify({ field, textures, wind, intensity }).replace(/<\//g, "<\\/")}</script>`;
 }
 
 const html = `<!doctype html>
