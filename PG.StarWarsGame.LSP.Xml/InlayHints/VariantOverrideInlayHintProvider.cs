@@ -4,6 +4,7 @@
 using System.Runtime.CompilerServices;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -65,7 +66,7 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
         if (tag is null)
             return [];
 
-        var text = Label(tag, effective);
+        var text = Label(tag, effective, ctx.Messages);
         if (text is null)
             return [];
 
@@ -89,12 +90,14 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
     ///     Mirrors the phrasing of the summary hint on the <c>Variant_Of_Existing_Type</c> line
     ///     ("inherits 12 · overrides 3 · adds 1"): a verb plus what it acted on.
     /// </summary>
-    private static string? Label(EffectiveTag tag, EffectiveObject effective)
+    private static string? Label(EffectiveTag tag, EffectiveObject effective, IMessageCatalog messages)
     {
         switch (tag.Provenance)
         {
             case VariantProvenance.Overridden:
-                return tag.BaseValue is null ? "overrides base" : $"overrides {Truncate(tag.BaseValue)}";
+                return tag.BaseValue is null
+                    ? messages.Format("VariantOverrideInlayHint_OverridesBase")
+                    : messages.Format("VariantOverrideInlayHint_Overrides", Truncate(tag.BaseValue));
 
             case VariantProvenance.Merged:
                 // A repeatable additive tag contributes one entry per element, so the useful figure
@@ -103,8 +106,10 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
                     t.TagName.Equals(tag.TagName, StringComparison.OrdinalIgnoreCase)
                     && t.Provenance == VariantProvenance.Inherited);
                 if (inherited > 0)
-                    return $"adds to {inherited} inherited";
-                return tag.BaseValue is null ? "adds to base" : $"merges with {Truncate(tag.BaseValue)}";
+                    return messages.Format("VariantOverrideInlayHint_AddsInherited", inherited);
+                return tag.BaseValue is null
+                    ? messages.Format("VariantOverrideInlayHint_AddsBase")
+                    : messages.Format("VariantOverrideInlayHint_Merges", Truncate(tag.BaseValue));
 
             default:
                 return null;

@@ -36,7 +36,7 @@ public sealed class CaseSensitiveTagHandler : XmlDiagnosticsHandler<CaseSensitiv
         [
             new XmlDiagnosticResult(severity,
                 ctx.Messages.Format("CaseSensitiveTag_HasToBeSpelledExactly", fact.Authored, fact.Expected,
-                    fact.Consequence),
+                    ctx.Messages.Format(fact.ConsequenceKey)),
                 SuggestedFix: fact.Expected,
                 FixTitle: ctx.Messages.Format("FixTitle_SpellIt", fact.Expected))
         ];

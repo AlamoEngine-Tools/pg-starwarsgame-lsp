@@ -51,6 +51,9 @@
   <data name="AssetFileExistence_AlsoChecked" xml:space="preserve">
     <value> Also checked {0} (the game treats these formats interchangeably).</value>
   </data>
+  <data name="AssetKind_Asset" xml:space="preserve">
+    <value>Asset</value>
+  </data>
   <data name="AssetKind_Audio" xml:space="preserve">
     <value>Audio</value>
   </data>
@@ -135,6 +138,12 @@
   <data name="CaseSensitiveTag_HasToBeSpelledExactly" xml:space="preserve">
     <value>&lt;{0}&gt; has to be spelled exactly &lt;{1}&gt;. Unlike the rest of the game's tags this one is matched letter by letter, so {2}.</value>
   </data>
+  <data name="CaseSensitiveTags_ActivePlot" xml:space="preserve">
+    <value>the plot loads as suspended and never starts</value>
+  </data>
+  <data name="CaseSensitiveTags_SuspendedPlot" xml:space="preserve">
+    <value>the tag is not recognised, and a plot it does not recognise is suspended anyway - so the outcome is the intended one</value>
+  </data>
   <data name="CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs" xml:space="preserve">
     <value>'{0}' could not be resolved as an SFX event for &lt;{1}&gt;.</value>
   </data>
@@ -152,6 +161,12 @@
   </data>
   <data name="ControlPointCurve_Expectation" xml:space="preserve">
     <value>needs at least two control points</value>
+  </data>
+  <data name="CreateLocKeyAction_CreateLocalisationKey" xml:space="preserve">
+    <value>Create localisation key '{0}'</value>
+  </data>
+  <data name="CreateLocKeyAction_CreateLocalisationKey2" xml:space="preserve">
+    <value>Create localisation key</value>
   </data>
   <data name="CreditHaltNeedsDurationRule_Repair" xml:space="preserve">
     <value>forces it to 10.0 seconds</value>
@@ -204,6 +219,12 @@
   <data name="DamageToArmorMod_IsNotAValidDamage" xml:space="preserve">
     <value>'{0}' is not a valid damage-to-armor modifier for &lt;{1}&gt;. Expected: DamageType, ArmorType, Float.</value>
   </data>
+  <data name="DamageTypes_OutOfOrder" xml:space="preserve">
+    <value>'{0}' must be '{1}' - the last {2} entries of &lt;Damage_Types&gt; must exactly match the engine's hardcoded order or the game will crash.</value>
+  </data>
+  <data name="DamageTypes_TooShort" xml:space="preserve">
+    <value>&lt;Damage_Types&gt; must end with the engine's {1} hardcoded damage types, in order, or the game will crash. It holds {0}.</value>
+  </data>
   <data name="DeathAnimationClip_NoAnimation" xml:space="preserve">
     <value>'{0}' has no {1} animation</value>
   </data>
@@ -237,6 +258,54 @@
   <data name="DeprecatedTag_IsDeprecatedAndShouldNot" xml:space="preserve">
     <value>&lt;{0}&gt; is deprecated and should not be used.</value>
   </data>
+  <data name="DiagnosticGroup_Assets" xml:space="preserve">
+    <value>Asset files</value>
+  </data>
+  <data name="DiagnosticGroup_CrossTag" xml:space="preserve">
+    <value>Cross-tag rules</value>
+  </data>
+  <data name="DiagnosticGroup_Engine" xml:space="preserve">
+    <value>Engine constraints</value>
+  </data>
+  <data name="DiagnosticGroup_Enums" xml:space="preserve">
+    <value>Enum values</value>
+  </data>
+  <data name="DiagnosticGroup_Localisation" xml:space="preserve">
+    <value>Localisation</value>
+  </data>
+  <data name="DiagnosticGroup_LuaAnalyzer" xml:space="preserve">
+    <value>Lua analyzer</value>
+  </data>
+  <data name="DiagnosticGroup_Preview" xml:space="preserve">
+    <value>Model preview</value>
+  </data>
+  <data name="DiagnosticGroup_References" xml:space="preserve">
+    <value>References</value>
+  </data>
+  <data name="DiagnosticGroup_Story" xml:space="preserve">
+    <value>Story and campaigns</value>
+  </data>
+  <data name="DiagnosticGroup_Structure" xml:space="preserve">
+    <value>Document structure</value>
+  </data>
+  <data name="DiagnosticGroup_Suppression" xml:space="preserve">
+    <value>Suppression comments</value>
+  </data>
+  <data name="DiagnosticGroup_Symbols" xml:space="preserve">
+    <value>Symbols and layers</value>
+  </data>
+  <data name="DiagnosticGroup_Syntax" xml:space="preserve">
+    <value>Syntax</value>
+  </data>
+  <data name="DiagnosticGroup_Values" xml:space="preserve">
+    <value>Value format</value>
+  </data>
+  <data name="DiagnosticGroup_Variants" xml:space="preserve">
+    <value>Variant inheritance</value>
+  </data>
+  <data name="DiagnosticGroup_XmlStrictness" xml:space="preserve">
+    <value>XML strictness</value>
+  </data>
   <data name="DialogArgReference_UnknownLocalisationKey" xml:space="preserve">
     <value>'{0}' is not a known localisation key.</value>
   </data>
@@ -251,6 +320,9 @@
   </data>
   <data name="DialogArgValue_NotSwitch" xml:space="preserve">
     <value>'{0}' is not valid for '{1}': Use 1 (on) or 0 (off).</value>
+  </data>
+  <data name="DialogCodeAction_ChapterTarget" xml:space="preserve">
+    <value>chapter</value>
   </data>
   <data name="DialogCommandArity_TakesNone" xml:space="preserve">
     <value>'{0}' takes no arguments, got {1}.</value>
@@ -282,6 +354,36 @@
   <data name="DynamicEnumValue_IsNotAValidEnum2" xml:space="preserve">
     <value>'{0}' is not a valid enum identifier for &lt;{1}&gt;.</value>
   </data>
+  <data name="EffectiveObject_AddedByVariant" xml:space="preserve">
+    <value>added by variant</value>
+  </data>
+  <data name="EffectiveObject_Chain" xml:space="preserve">
+    <value>variant chain: {0}</value>
+  </data>
+  <data name="EffectiveObject_Cyclic" xml:space="preserve">
+    <value>WARNING: cyclic inheritance detected at {0}</value>
+  </data>
+  <data name="EffectiveObject_Header" xml:space="preserve">
+    <value>Effective object: {0}</value>
+  </data>
+  <data name="EffectiveObject_HeaderTyped" xml:space="preserve">
+    <value>Effective object: {0} ({1})</value>
+  </data>
+  <data name="EffectiveObject_InheritedFrom" xml:space="preserve">
+    <value>inherited from {0}</value>
+  </data>
+  <data name="EffectiveObject_MergedWithBase" xml:space="preserve">
+    <value>merged with base</value>
+  </data>
+  <data name="EffectiveObject_MergedWithBaseContributes" xml:space="preserve">
+    <value>merged with base - base contributes {0}</value>
+  </data>
+  <data name="EffectiveObject_OverridesBase" xml:space="preserve">
+    <value>overrides base</value>
+  </data>
+  <data name="EffectiveObject_OverridesBaseWas" xml:space="preserve">
+    <value>overrides base - was {0}</value>
+  </data>
   <data name="EitherOrRequirement_AndAreBothSoThis" xml:space="preserve">
     <value>&lt;{0}&gt; and &lt;{1}&gt; are both {2}, so this {3} {4} - {5}</value>
   </data>
@@ -293,6 +395,9 @@
   </data>
   <data name="EitherOrRequirement_SetOneToYes" xml:space="preserve">
     <value>set one of them to Yes</value>
+  </data>
+  <data name="EncyclopediaCodeLens_PreviewEncyclopedia" xml:space="preserve">
+    <value>preview encyclopedia</value>
   </data>
   <data name="EngineTextLimit_HasRoomForMoreCharacters" xml:space="preserve">
     <value>{0} has room for {1} more characters. Going over stops the game from starting.</value>
@@ -326,6 +431,9 @@
   </data>
   <data name="FiresForward_FiresForwardSkipsTheFiring2" xml:space="preserve">
     <value>Fires_Forward skips the firing-arc check, so {0} no longer limit where '{1}' fires.</value>
+  </data>
+  <data name="FixSuggestionAction_Replace" xml:space="preserve">
+    <value>Replace with '{0}'</value>
   </data>
   <data name="FixTitle_ApplyTheEngineSOwn" xml:space="preserve">
     <value>Apply the engine's own value: {0}</value>
@@ -390,6 +498,12 @@
   <data name="HardPointTypeToTextureMap_IsNotAValidHard" xml:space="preserve">
     <value>'{0}' is not a valid hard point texture map for &lt;{1}&gt;. Expected: HardPointType, TextureName.</value>
   </data>
+  <data name="HardcodedSet_Deprecated" xml:space="preserve">
+    <value>'{0}' is deprecated.</value>
+  </data>
+  <data name="HardcodedSet_Unknown" xml:space="preserve">
+    <value>'{0}' is not a known {1}. Check the schema for valid names.</value>
+  </data>
   <data name="HardpointAbilityNotOnOwner_DefinedElsewhere" xml:space="preserve">
     <value>'{0}' is defined, but on a different object - it has to be declared on '{1}' (or something it inherits from) to take effect here.</value>
   </data>
@@ -446,6 +560,42 @@
   </data>
   <data name="HardpointUnhittable_SharesItsCollisionMeshWith" xml:space="preserve">
     <value>'{0}' shares its &lt;Collision_Mesh&gt; with '{1}', which claims it first - damage routes to the first match, so this hardpoint can never be hit</value>
+  </data>
+  <data name="HoverUtility_DefinedInADependency" xml:space="preserve">
+    <value>Defined in a dependency project</value>
+  </data>
+  <data name="HoverUtility_DefinedInDependency" xml:space="preserve">
+    <value>Defined in dependency **{0}**</value>
+  </data>
+  <data name="HoverUtility_Deprecated" xml:space="preserve">
+    <value>Deprecated</value>
+  </data>
+  <data name="HoverUtility_KindFile" xml:space="preserve">
+    <value>*{0} file*</value>
+  </data>
+  <data name="HoverUtility_NoDescription" xml:space="preserve">
+    <value>_No description available. Help the community by [contributing one via a PR](https://github.com/AlamoEngine-Tools/eaw-schema)._</value>
+  </data>
+  <data name="HoverUtility_Note" xml:space="preserve">
+    <value>Note</value>
+  </data>
+  <data name="HoverUtility_NoteDoesNotWork" xml:space="preserve">
+    <value>Does not work</value>
+  </data>
+  <data name="HoverUtility_NoteSince" xml:space="preserve">
+    <value>Since</value>
+  </data>
+  <data name="HoverUtility_NoteUntested" xml:space="preserve">
+    <value>Untested</value>
+  </data>
+  <data name="HoverUtility_PackedInBaseGame" xml:space="preserve">
+    <value>Packed in the base game - `{0}`</value>
+  </data>
+  <data name="HoverUtility_PackedPath" xml:space="preserve">
+    <value>Packed - `{0}`</value>
+  </data>
+  <data name="HoverUtility_Since" xml:space="preserve">
+    <value>Since {0}</value>
   </data>
   <data name="HullFiringArc_HasNoTurretBehaviourSo" xml:space="preserve">
     <value>'{0}' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: {1}.</value>
@@ -528,8 +678,26 @@
   <data name="LocalisationKeyHandlerBase_LocalisationKeyWasNotFound" xml:space="preserve">
     <value>Localisation key '{0}' was not found in the loaded translation databases.</value>
   </data>
+  <data name="LocalisationKeyInlayHint_Missing" xml:space="preserve">
+    <value>{0}: MISSING</value>
+  </data>
   <data name="LocalisationToTextureMap_IsNotAValidLocalisation" xml:space="preserve">
     <value>'{0}' is not a valid localisation texture map for &lt;{1}&gt;. Expected: LocalisationKey, TextureName.</value>
+  </data>
+  <data name="LuaCodeAction_FunctionTarget" xml:space="preserve">
+    <value>function</value>
+  </data>
+  <data name="LuaCodeAction_MoveLocalInsideFunction" xml:space="preserve">
+    <value>Move local inside function</value>
+  </data>
+  <data name="LuaCodeAction_RemoveDuplicateRequire" xml:space="preserve">
+    <value>Remove duplicate require</value>
+  </data>
+  <data name="LuaCodeAction_RemoveRedundantRequire" xml:space="preserve">
+    <value>Remove redundant require</value>
+  </data>
+  <data name="LuaCodeAction_SuppressUpvalueOk" xml:space="preserve">
+    <value>Suppress with ---@upvalue-ok</value>
   </data>
   <data name="LuaGlobalScope_CyclicRequire" xml:space="preserve">
     <value>require("{0}") creates a cyclic dependency.</value>
@@ -548,6 +716,64 @@
   </data>
   <data name="LuaGlobalScope_UnusedRequire" xml:space="preserve">
     <value>require("{0}") is unused - no exported globals are referenced.</value>
+  </data>
+  <data name="LuaHover_CalledByGame" xml:space="preserve">
+    <value>Called by the game</value>
+  </data>
+  <data name="LuaHover_CalledByIfDefined" xml:space="preserve">
+    <value>Called by {0}, if defined</value>
+  </data>
+  <data name="LuaHover_EntryPoint" xml:space="preserve">
+    <value>**function** `{0}` - entry point</value>
+  </data>
+  <data name="LuaHover_EntryPointCaller" xml:space="preserve">
+    <value>{0} - scripts: {1}</value>
+  </data>
+  <data name="LuaHover_Function" xml:space="preserve">
+    <value>**function** `{0}({1})`</value>
+  </data>
+  <data name="LuaHover_FunctionBare" xml:space="preserve">
+    <value>**function** `{0}`</value>
+  </data>
+  <data name="LuaHover_InitialState" xml:space="preserve">
+    <value>initial state</value>
+  </data>
+  <data name="LuaHover_InlineFunction" xml:space="preserve">
+    <value>inline function</value>
+  </data>
+  <data name="LuaHover_Message" xml:space="preserve">
+    <value>**message** - state `{0}`
+`OnEnter` (1) once on entering the state, `OnUpdate` (2) every service tick while it stays, `OnExit` (3) once on leaving it</value>
+  </data>
+  <data name="LuaHover_Parameters" xml:space="preserve">
+    <value>**Parameters:**</value>
+  </data>
+  <data name="LuaHover_Registered" xml:space="preserve">
+    <value>**{0}** `{1}` - handler `{2}`</value>
+  </data>
+  <data name="LuaHover_Require" xml:space="preserve">
+    <value>**require** `{0}`
+-&gt; `{1}`</value>
+  </data>
+  <data name="LuaHover_RequireNotFound" xml:space="preserve">
+    <value>**require** `{0}`
+*Module not found in workspace*</value>
+  </data>
+  <data name="LuaHover_Returns" xml:space="preserve">
+    <value>**Returns:** `{0}`</value>
+  </data>
+  <data name="LuaHover_State" xml:space="preserve">
+    <value>state</value>
+  </data>
+  <data name="LuaHover_StateHandler" xml:space="preserve">
+    <value>**state handler** - {0} `{1}`
+Called with `OnEnter` once, `OnUpdate` every service tick until the state changes, then `OnExit` once</value>
+  </data>
+  <data name="LuaHover_StateNotRegisteredThisScript" xml:space="preserve">
+    <value>**state** `{0}` - not registered in this script</value>
+  </data>
+  <data name="LuaHover_StoryEventState" xml:space="preserve">
+    <value>A story event: Entered when the event fires and the machine is not already changing state</value>
   </data>
   <data name="LuaImport_CannotFindModule" xml:space="preserve">
     <value>Cannot find module '{0}'. No matching '.lua' file found in workspace.</value>
@@ -639,6 +865,9 @@
   <data name="MapFileFormat_IsNotAValidMap" xml:space="preserve">
     <value>'{0}' is not a valid map filename for &lt;{1}&gt;. Expected a .ted file.</value>
   </data>
+  <data name="MegArchiveOrigin_Packed" xml:space="preserve">
+    <value>Packed in `{0}` -&gt; `{1}` - read-only, cannot be renamed or navigated to.</value>
+  </data>
   <data name="MissingRequiredTag_AndTheEngine" xml:space="preserve">
     <value>and the engine {0}</value>
   </data>
@@ -714,6 +943,12 @@
   <data name="OneEntryPerTag_OnlyIsReadIsDropped" xml:space="preserve">
     <value>Only '{0}' is read - '{1}' is dropped. Each &lt;{2}&gt; holds one entry; further entries need their own tag.</value>
   </data>
+  <data name="OverrideCodeLens_ReferencedProject" xml:space="preserve">
+    <value>a referenced project</value>
+  </data>
+  <data name="OverrideCodeLens_VOverridesFrom" xml:space="preserve">
+    <value>v Overrides '{0}' from {1}</value>
+  </data>
   <data name="PerFactionIntMap_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
   </data>
@@ -747,6 +982,15 @@
   <data name="PrerequisiteExpression_IsNotAValidPrerequisite" xml:space="preserve">
     <value>'{0}' is not a valid prerequisite expression for &lt;{1}&gt;. Expected game object names connected by '|' (OR) and ',' or spaces (AND). Example: "StructA | StructB, StructC" means (StructA OR StructB) AND StructC.</value>
   </data>
+  <data name="PreviewModelAction_NotFound" xml:space="preserve">
+    <value>Model file not found</value>
+  </data>
+  <data name="PreviewModelAction_Preview" xml:space="preserve">
+    <value>Preview model {0}</value>
+  </data>
+  <data name="PreviewUnitCodeLens_PreviewUnit" xml:space="preserve">
+    <value>preview unit</value>
+  </data>
   <data name="ProjectileCategoryList_IsNotAKnownOn" xml:space="preserve">
     <value>'{0}' is not a known {1} on &lt;{2}&gt; - the engine never matches it, so that projectile is not intercepted.</value>
   </data>
@@ -770,6 +1014,18 @@
   </data>
   <data name="ReferenceResolution_TypeMismatch" xml:space="preserve">
     <value>Type mismatch for '{0}': Expected '{1}' but found '{2}'.</value>
+  </data>
+  <data name="ReferencesCodeLens_Reference" xml:space="preserve">
+    <value>1 reference</value>
+  </data>
+  <data name="ReferencesCodeLens_References" xml:space="preserve">
+    <value>{0} references</value>
+  </data>
+  <data name="RemoveEarlierDuplicatesAction_Remove" xml:space="preserve">
+    <value>Remove the earlier duplicates of '{0}' ({1}) - the game keeps the last occurrence</value>
+  </data>
+  <data name="RemoveRedundantOverrideAction_RemoveRedundantOverride" xml:space="preserve">
+    <value>Remove redundant override '{0}'</value>
   </data>
   <data name="RequiredFirstEntry_MustListFirstItIs" xml:space="preserve">
     <value>&lt;{0}&gt; must list '{1}' first - it is entry 0, which the engine hands out whenever a lookup misses, so putting '{2}' there silently repoints every default that falls back to it</value>
@@ -857,6 +1113,15 @@
   </data>
   <data name="SquadronOffsetsMismatch_SquadronHasUnitSBut2" xml:space="preserve">
     <value>Squadron has {0} unit(s) but {1} Squadron_Offsets. Remove {2} excess.</value>
+  </data>
+  <data name="SquadronSyncAction_AddMissingSquadronOffsets" xml:space="preserve">
+    <value>Add {0} missing Squadron_Offsets (0, 0, 0)</value>
+  </data>
+  <data name="SquadronSyncAction_RemoveExcessSquadronOffsets" xml:space="preserve">
+    <value>Remove {0} excess Squadron_Offsets</value>
+  </data>
+  <data name="SquadronSyncAction_SyncAllSquadronOffsetsSquadron" xml:space="preserve">
+    <value>Sync all Squadron_Offsets to Squadron_Units</value>
   </data>
   <data name="StoryChain_NotAManifest" xml:space="preserve">
     <value>'{0}' is not a valid story plot manifest: Missing &lt;Story_Mode_Plots&gt; root element.</value>
@@ -1470,6 +1735,27 @@
   <data name="StoryThread_EventWithoutName" xml:space="preserve">
     <value>Event without a Name attribute - the block is not addressable and was skipped.</value>
   </data>
+  <data name="Suppression_AcrossProject" xml:space="preserve">
+    <value>Suppress {0} across the project</value>
+  </data>
+  <data name="Suppression_DiagnosticAcrossProject" xml:space="preserve">
+    <value>Suppress diagnostic across the project</value>
+  </data>
+  <data name="Suppression_ForThisLine" xml:space="preserve">
+    <value>Suppress {0} for this line</value>
+  </data>
+  <data name="Suppression_ForThisObject" xml:space="preserve">
+    <value>Suppress {0} for this {1}</value>
+  </data>
+  <data name="Suppression_InThisFile" xml:space="preserve">
+    <value>Suppress {0} in this file</value>
+  </data>
+  <data name="Suppression_OpenReport" xml:space="preserve">
+    <value>Open report for {0} in editor</value>
+  </data>
+  <data name="Suppression_ReportOnGitHub" xml:space="preserve">
+    <value>Report {0} on GitHub</value>
+  </data>
   <data name="SystemSpyDuration_DurationInSecsIsBut" xml:space="preserve">
     <value>&lt;Duration_In_Secs&gt; is {0}, but a {1} system spy needs a duration {2} - the engine overwrites it with {3}</value>
   </data>
@@ -1482,8 +1768,23 @@
   <data name="TextureFileFormat_IsNotAValidTexture" xml:space="preserve">
     <value>'{0}' is not a valid texture filename for &lt;{1}&gt;. Expected a .tga or .dds file.</value>
   </data>
+  <data name="TupleItems_CommaSeparatedPairs" xml:space="preserve">
+    <value>comma-separated pairs</value>
+  </data>
+  <data name="TupleItems_Groups" xml:space="preserve">
+    <value>`{0}` groups</value>
+  </data>
+  <data name="TupleItems_KeysFollowedByItems" xml:space="preserve">
+    <value>`{0}` keys, each followed by `{1}` items</value>
+  </data>
+  <data name="TupleItems_Pairs" xml:space="preserve">
+    <value>`{0}` pairs</value>
+  </data>
   <data name="TupleList_HoldsItemSWhichIs" xml:space="preserve">
     <value>&lt;{0}&gt; holds {1} item(s), which is not a whole number of {2}.</value>
+  </data>
+  <data name="TupleSlotHover_Enum" xml:space="preserve">
+    <value>enum</value>
   </data>
   <data name="TypeReferenceList_Noun" xml:space="preserve">
     <value>type reference list</value>
@@ -1530,6 +1831,174 @@
   <data name="UvSlotIndex_IsNotAValidUv" xml:space="preserve">
     <value>'{0}' is not a valid UV slot index for &lt;{1}&gt;. Expected an integer in [0, 3]. Did you mean {2}?</value>
   </data>
+  <data name="ValueTypeHint_EnumOneValues" xml:space="preserve">
+    <value>**Enum:** one of the values in `{0}`</value>
+  </data>
+  <data name="ValueTypeHint_EnumPredefinedEnumValue" xml:space="preserve">
+    <value>**Enum:** predefined enum value</value>
+  </data>
+  <data name="ValueTypeHint_EnumShipClassEG" xml:space="preserve">
+    <value>**Enum:** ship class - e.g. `Infantry`, `Corvette`, `Frigate`, `Capital`</value>
+  </data>
+  <data name="ValueTypeHint_EnumSpaceSeparatedEnumValues" xml:space="preserve">
+    <value>**Enum:** space-separated enum values</value>
+  </data>
+  <data name="ValueTypeHint_EnumSpaceSeparatedValuesFrom" xml:space="preserve">
+    <value>**Enum:** space-separated values from `{0}`</value>
+  </data>
+  <data name="ValueTypeHint_FormatAbilityFlagTypeTrueFalseTuples" xml:space="preserve">
+    <value>**Format:** `AbilityFlagType, True|False` tuples</value>
+  </data>
+  <data name="ValueTypeHint_FormatAbilityMultiplierTypeFloatTuples" xml:space="preserve">
+    <value>**Format:** `AbilityMultiplierType, float` tuples</value>
+  </data>
+  <data name="ValueTypeHint_FormatAbilityNameSFXEventNamePairsEmpty" xml:space="preserve">
+    <value>**Format:** `AbilityName, SFXEventName` pairs (empty name = no sound)</value>
+  </data>
+  <data name="ValueTypeHint_FormatCategoryFloatAccuracyModifier" xml:space="preserve">
+    <value>**Format:** `category, float` accuracy modifier pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatCommaSeparatedFloatPairs" xml:space="preserve">
+    <value>**Format:** comma-separated float pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatCommaSeparatedIntFloat" xml:space="preserve">
+    <value>**Format:** comma-separated `(int, float)` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatCommaSpaceSeparatedFloats" xml:space="preserve">
+    <value>**Format:** comma or space-separated floats (`1`, `1.0`, `1.0f`)</value>
+  </data>
+  <data name="ValueTypeHint_FormatCommaSpaceSeparatedIntegers" xml:space="preserve">
+    <value>**Format:** comma or space-separated integers</value>
+  </data>
+  <data name="ValueTypeHint_FormatConditionUnitTypePairs" xml:space="preserve">
+    <value>**Format:** `condition, UnitType` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatDamageTypeArmorTypeModifierGroups" xml:space="preserve">
+    <value>**Format:** `DamageType, ArmorType, modifier` groups</value>
+  </data>
+  <data name="ValueTypeHint_FormatF" xml:space="preserve">
+    <value>**Format:** `1`, `1.0`, or `1.0f`</value>
+  </data>
+  <data name="ValueTypeHint_FormatFactionNameIntegerPairs" xml:space="preserve">
+    <value>**Format:** `FactionName, integer` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatFactionNameValuePairs" xml:space="preserve">
+    <value>**Format:** `FactionName, value` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatFloatEGF" xml:space="preserve">
+    <value>**Format:** float in `[0.0, 1.0]` - e.g. `0.5`, `0.75f`</value>
+  </data>
+  <data name="ValueTypeHint_FormatHardPointTypeSFXEventNamePairsEmpty" xml:space="preserve">
+    <value>**Format:** `HardPointType, SFXEventName` pairs (empty name = no sound)</value>
+  </data>
+  <data name="ValueTypeHint_FormatHardPointTypeTexturePathPairs" xml:space="preserve">
+    <value>**Format:** `HardPointType, texturePath` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatHexStringEG" xml:space="preserve">
+    <value>**Format:** hex string, e.g. `0x0200` (= Shader Model 2.0)</value>
+  </data>
+  <data name="ValueTypeHint_FormatHexStringGPUVendor" xml:space="preserve">
+    <value>**Format:** hex string GPU vendor ID, e.g. `0x10DE` (NVIDIA)</value>
+  </data>
+  <data name="ValueTypeHint_FormatInteger" xml:space="preserve">
+    <value>**Format:** integer `0`-`100`</value>
+  </data>
+  <data name="ValueTypeHint_FormatInteger2" xml:space="preserve">
+    <value>**Format:** integer `0`-`3`</value>
+  </data>
+  <data name="ValueTypeHint_FormatIntegerUnlimited" xml:space="preserve">
+    <value>**Format:** integer; `-1` = unlimited</value>
+  </data>
+  <data name="ValueTypeHint_FormatLocaleTexturePathPairs" xml:space="preserve">
+    <value>**Format:** `locale, texturePath` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatRGBFour" xml:space="preserve">
+    <value>**Format:** `R, G, B, A` - four integers `0`-`255`</value>
+  </data>
+  <data name="ValueTypeHint_FormatTrueFalseYesNo" xml:space="preserve">
+    <value>**Format:** `True`, `False`, `Yes`, `No`, `1`, or `0`</value>
+  </data>
+  <data name="ValueTypeHint_FormatTuple" xml:space="preserve">
+    <value>**Format:** {0}</value>
+  </data>
+  <data name="ValueTypeHint_FormatUnitTypeCountPairsUnlimited" xml:space="preserve">
+    <value>**Format:** `UnitType, count` pairs; `-1` = unlimited</value>
+  </data>
+  <data name="ValueTypeHint_FormatUnitTypeProbabilityPairs" xml:space="preserve">
+    <value>**Format:** `UnitType, probability` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatUnsignedInteger" xml:space="preserve">
+    <value>**Format:** unsigned integer</value>
+  </data>
+  <data name="ValueTypeHint_FormatXYTwoComma" xml:space="preserve">
+    <value>**Format:** `X, Y` - two comma-separated floats</value>
+  </data>
+  <data name="ValueTypeHint_FormatXYZThree" xml:space="preserve">
+    <value>**Format:** `X, Y, Z` - three comma-separated floats</value>
+  </data>
+  <data name="ValueTypeHint_FormatXYZW" xml:space="preserve">
+    <value>**Format:** `X, Y, Z, W` - four comma-separated floats</value>
+  </data>
+  <data name="ValueTypeHint_ObjectTypeName" xml:space="preserve">
+    <value>**Reference:** `{0}`</value>
+  </data>
+  <data name="ValueTypeHint_ObjectTypeNames" xml:space="preserve">
+    <value>**Reference:** space-separated list of `{0}` names</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceAloDModelFilename" xml:space="preserve">
+    <value>**Reference:** `.alo` 3D model filename</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceAudioSampleFilename" xml:space="preserve">
+    <value>**Reference:** audio sample filename</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceBoneNameFromModel" xml:space="preserve">
+    <value>**Reference:** bone name from the model skeleton</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceLocalisationStringKeyTEXT" xml:space="preserve">
+    <value>**Reference:** localisation string key (`TEXT_xxx` format)</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameMusicEvent" xml:space="preserve">
+    <value>**Reference:** name of a `MusicEvent`</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameSFXEvent" xml:space="preserve">
+    <value>**Reference:** name of an `SFXEvent`</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameSFXEventHUDFeedback" xml:space="preserve">
+    <value>**Reference:** name of an `SFXEvent` (HUD feedback)</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameSingleGameObject" xml:space="preserve">
+    <value>**Reference:** name of a single game object type</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameSpeechEvent" xml:space="preserve">
+    <value>**Reference:** name of a `SpeechEvent`</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedBoneNames" xml:space="preserve">
+    <value>**Reference:** space-separated bone names from the model skeleton</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedGameObject" xml:space="preserve">
+    <value>**Reference:** space-separated game object type names</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedListAlo" xml:space="preserve">
+    <value>**Reference:** space-separated list of `.alo` model filenames</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedListAudio" xml:space="preserve">
+    <value>**Reference:** space-separated list of audio sample filenames</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedListTga" xml:space="preserve">
+    <value>**Reference:** space-separated list of `.tga` / `.dds` texture filenames</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedLocalisationString" xml:space="preserve">
+    <value>**Reference:** space-separated localisation string keys (`TEXT_xxx`)</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceTgaDdsTextureFilename" xml:space="preserve">
+    <value>**Reference:** `.tga` or `.dds` texture filename</value>
+  </data>
+  <data name="ValueTypeHint_XmlObjectName" xml:space="preserve">
+    <value>**Reference:** XML object name</value>
+  </data>
+  <data name="ValueTypeHint_XmlObjectNames" xml:space="preserve">
+    <value>**Reference:** space-separated list of XML object names</value>
+  </data>
   <data name="VariantAdditiveMerge_AndMore" xml:space="preserve">
     <value>{0} and {1} more</value>
   </data>
@@ -1545,11 +2014,47 @@
   <data name="VariantChainTooDeep_VariantChainIsDeepAbove" xml:space="preserve">
     <value>Variant chain is {0} deep, above the engine's 10 resolution passes - '{1}' may inherit nothing from '{2}' depending on the order the files load in, and the failure is silent.</value>
   </data>
+  <data name="VariantCodeLens_Variant" xml:space="preserve">
+    <value>1 variant</value>
+  </data>
+  <data name="VariantCodeLens_VariantShowEffectiveObject" xml:space="preserve">
+    <value>^ Variant of {0} - show effective object</value>
+  </data>
+  <data name="VariantCodeLens_Variants" xml:space="preserve">
+    <value>{0} variants</value>
+  </data>
   <data name="VariantCycle_VariantHasACircularInheritance" xml:space="preserve">
     <value>Variant '{0}' has a circular inheritance chain (loops at '{1}').</value>
   </data>
   <data name="VariantIgnoredOverride_TagIsIgnoredOnVariants" xml:space="preserve">
     <value>Tag '{0}' is ignored on variants; the engine will not apply it here.</value>
+  </data>
+  <data name="VariantInlayHint_Adds" xml:space="preserve">
+    <value>adds {0}</value>
+  </data>
+  <data name="VariantInlayHint_CyclicInheritance" xml:space="preserve">
+    <value>cyclic inheritance</value>
+  </data>
+  <data name="VariantInlayHint_Inherits" xml:space="preserve">
+    <value>inherits {0}</value>
+  </data>
+  <data name="VariantInlayHint_Overrides" xml:space="preserve">
+    <value>overrides {0}</value>
+  </data>
+  <data name="VariantOverrideInlayHint_AddsBase" xml:space="preserve">
+    <value>adds to base</value>
+  </data>
+  <data name="VariantOverrideInlayHint_AddsInherited" xml:space="preserve">
+    <value>adds to {0} inherited</value>
+  </data>
+  <data name="VariantOverrideInlayHint_Merges" xml:space="preserve">
+    <value>merges with {0}</value>
+  </data>
+  <data name="VariantOverrideInlayHint_Overrides" xml:space="preserve">
+    <value>overrides {0}</value>
+  </data>
+  <data name="VariantOverrideInlayHint_OverridesBase" xml:space="preserve">
+    <value>overrides base</value>
   </data>
   <data name="VariantRedundantOverride_TagHasTheSameValue" xml:space="preserve">
     <value>Tag '{0}' has the same value as the inherited base; this override is redundant.</value>
@@ -1569,11 +2074,23 @@
   <data name="VictoryConditionList_IsNotAKnownValue" xml:space="preserve">
     <value>'{0}' is not a known value for enum '{1}' on &lt;{2}&gt;.</value>
   </data>
+  <data name="XmlCodeLens_GroupMembers" xml:space="preserve">
+    <value>{0} in this group - {1}</value>
+  </data>
+  <data name="XmlCodeLens_Member" xml:space="preserve">
+    <value>member</value>
+  </data>
   <data name="XmlDuplicateTag_DuplicateTagOnlyOneOccurrence" xml:space="preserve">
     <value>Duplicate tag '{0}': only one occurrence is used per object - the game keeps the LAST one.{1}</value>
   </data>
   <data name="XmlDuplicateTag_OtherLines" xml:space="preserve">
     <value> Line numbers of the other occurrences - {0}.</value>
+  </data>
+  <data name="XmlFormatter_NotWellFormed" xml:space="preserve">
+    <value>Formatting refused: Not well-formed XML at line {0}, column {1}</value>
+  </data>
+  <data name="XmlFormatter_WouldChangeContent" xml:space="preserve">
+    <value>Formatting refused: The result would change the document's content</value>
   </data>
   <data name="XmlGameReader_AttributeHasNoGameDrops" xml:space="preserve">
     <value>Attribute {0} on &lt;{1}&gt; has no '=': The game drops the whole file</value>

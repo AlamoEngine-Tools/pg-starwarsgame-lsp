@@ -46,6 +46,7 @@ internal static class TupleShape
         if (count > 0 && count % size == 0) return null;
 
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            messages.Format("TupleList_HoldsItemSWhichIs", fact.Tag.Tag, count, TupleItems.Describe(fact.Tag)));
+            messages.Format("TupleList_HoldsItemSWhichIs", fact.Tag.Tag, count,
+                TupleItems.Describe(fact.Tag, messages)));
     }
 }

@@ -44,7 +44,7 @@ internal sealed class EncyclopediaCodeLensProvider : IXmlCodeLensProvider
             Range = new LspRange(new Position(ctx.Origin.Line, 0), new Position(ctx.Origin.Line, 0)),
             Command = new Command
             {
-                Title = "preview encyclopedia",
+                Title = ctx.Messages.Format("EncyclopediaCodeLens_PreviewEncyclopedia"),
                 Name = ShowEncyclopediaCommand,
                 Arguments = JArray.FromObject(new object[] { ctx.Symbol.Id })
             }

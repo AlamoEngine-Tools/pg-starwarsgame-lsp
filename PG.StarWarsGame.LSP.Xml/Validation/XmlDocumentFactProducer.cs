@@ -161,7 +161,7 @@ public sealed class XmlDocumentFactProducer(
             authored.Length + 1,
             authored,
             expected,
-            rule.Consequence,
+            rule.ConsequenceKey,
             rule.ChangesBehaviour));
     }
 

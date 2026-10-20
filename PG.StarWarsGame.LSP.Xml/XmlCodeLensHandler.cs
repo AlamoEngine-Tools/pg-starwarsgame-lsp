@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -60,7 +61,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
             if (symbol.Origin is not FileOrigin fo)
                 continue;
 
-            var ctx = new CodeLensSymbolContext(symbol, fo, index);
+            var ctx = new CodeLensSymbolContext(symbol, fo, index) { Messages = new ConfiguredMessageCatalog(_config) };
             foreach (var lens in _registry.Dispatch(ctx))
             {
                 _logger.LogDebug("CodeLens: {Id} at line {Line}", symbol.Id, fo.Line);
@@ -80,7 +81,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
     // One lens per group-key tag occurrence in this document: "{n} {MemberType}s in this group",
     // clickable to peek the co-members. Members are resolved workspace-wide (baseline ∪ workspace)
     // but only navigable origins are offered as peek targets.
-    private static IEnumerable<LspCodeLens> GroupMembershipLenses(
+    private IEnumerable<LspCodeLens> GroupMembershipLenses(
         string uri, DocumentIndex docIndex, GameIndex index)
     {
         if (docIndex.GroupMemberships.IsDefaultOrEmpty) yield break;
@@ -96,10 +97,9 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
                 .ToList();
             if (targets.Count == 0) continue;
 
-            var member = gm.Membership.MemberTypeName ?? "member";
-            var title = targets.Count == 1
-                ? $"1 {member} in this group"
-                : $"{targets.Count} {member}s in this group";
+            var messages = new ConfiguredMessageCatalog(_config);
+            var member = gm.Membership.MemberTypeName ?? messages.Format("XmlCodeLens_Member");
+            var title = messages.Format("XmlCodeLens_GroupMembers", member, targets.Count);
 
             var locations = targets.Select(fo => new
             {

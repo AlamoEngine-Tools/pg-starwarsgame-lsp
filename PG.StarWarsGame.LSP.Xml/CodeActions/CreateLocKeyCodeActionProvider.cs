@@ -31,13 +31,13 @@ internal sealed class CreateLocKeyCodeActionProvider : IXmlCodeActionProvider
         [
             new CommandOrCodeAction(new CodeAction
             {
-                Title = $"Create localisation key '{locKey}'",
+                Title = ctx.Messages.Format("CreateLocKeyAction_CreateLocalisationKey", locKey),
                 Kind = CodeActionKind.QuickFix,
                 Diagnostics = new Container<Diagnostic>(ctx.Diagnostic),
                 Command = new Command
                 {
                     Name = "aet-eaw-edit.lsp.createLocalisationKey",
-                    Title = "Create localisation key",
+                    Title = ctx.Messages.Format("CreateLocKeyAction_CreateLocalisationKey2"),
                     Arguments = new JArray(locKey)
                 }
             })

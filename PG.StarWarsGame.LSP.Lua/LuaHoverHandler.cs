@@ -6,6 +6,7 @@ using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
@@ -22,6 +23,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaHoverHandler> _logger;
+    private readonly IMessageCatalog _messages;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
@@ -32,8 +34,10 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaHoverHandler> logger,
         // Optional: with the analyzer running, its card follows ours.
-        ILuaAnalyzer? analyzer = null)
+        ILuaAnalyzer? analyzer = null,
+        IMessageCatalog? messages = null)
     {
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _indexService = indexService;
         _parseCache = parseCache;
         _fileHelper = fileHelper;
@@ -104,27 +108,31 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         var initial = contract.StoryMode
             ? LuaStateMachine.StoryInitState
             : machine.Registrations.FirstOrDefault(r => r.Source == LuaStateSource.DEFINE_STATE)?.Name;
-        var role = hit.State == initial ? "initial state" : "state";
+        var role = hit.State == initial
+            ? _messages.Format("LuaHover_InitialState")
+            : _messages.Format("LuaHover_State");
 
         return hit.Kind switch
         {
             LuaStateHitKind.MESSAGE => BuildHover(
-                $"**message** - state `{hit.State}`\n`OnEnter` (1) once on entering the state, `OnUpdate` (2) every service tick while it stays, `OnExit` (3) once on leaving it",
+                _messages.Format("LuaHover_Message", hit.State),
                 range),
             LuaStateHitKind.HANDLER => BuildHover(
-                $"**state handler** - {role} `{hit.State}`\nCalled with `OnEnter` once, `OnUpdate` every service tick until the state changes, then `OnExit` once",
+                _messages.Format("LuaHover_StateHandler", role, hit.State),
                 range),
             _ => BuildHover(hit.Registration is { } registration
-                    ? $"**{role}** `{hit.State}` - handler `{(registration.Value as IdentifierNameSyntax)?.Name ?? "inline function"}`" +
+                    ? _messages.Format("LuaHover_Registered", role, hit.State,
+                          (registration.Value as IdentifierNameSyntax)?.Name ??
+                          _messages.Format("LuaHover_InlineFunction")) +
                       (registration.Source == LuaStateSource.STORY_MODE_EVENTS
-                          ? "\nA story event: entered when the event fires and the machine is not already changing state"
+                          ? "\n" + _messages.Format("LuaHover_StoryEventState")
                           : "")
-                    : $"**state** `{hit.State}` - not registered in this script",
+                    : _messages.Format("LuaHover_StateNotRegisteredThisScript", hit.State),
                 range)
         };
     }
 
-    private static Hover? TryBuildXmlRefHover(GameIndex index, string uri, int line, int character)
+    private Hover? TryBuildXmlRefHover(GameIndex index, string uri, int line, int character)
     {
         if (!index.Documents.TryGetValue(uri, out var docIndex))
             return null;
@@ -144,7 +152,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
             string markdown;
             if (sym?.Origin is MegArchiveOrigin meg)
                 markdown = $"### `{typeName}` *`\"{reference.TargetId}\"`*\n\n" +
-                           MegArchiveOriginHoverText.Describe(meg);
+                           MegArchiveOriginHoverText.Describe(meg, _messages);
             else
                 markdown = $"### `{typeName}` *`\"{reference.TargetId}\"`*";
 
@@ -162,7 +170,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         return null;
     }
 
-    private static Hover? TryBuildRequireHover(SyntaxNode root, int line, int character,
+    private Hover? TryBuildRequireHover(SyntaxNode root, int line, int character,
         IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper, string callerUri)
     {
         var found = LuaRequireCallLocator.TryFindAt(root, line, character);
@@ -180,11 +188,11 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
             var normalized = resolved.Replace('\\', '/');
             var slashIdx = normalized.LastIndexOf('/');
             var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
-            markdown = $"**require** `{requireArg}`\n-> `{filename}`";
+            markdown = _messages.Format("LuaHover_Require", requireArg, filename);
         }
         else
         {
-            markdown = $"**require** `{requireArg}`\n*Module not found in workspace*";
+            markdown = _messages.Format("LuaHover_RequireNotFound", requireArg);
         }
 
         return new Hover
@@ -201,7 +209,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
     // A name the schema knows, used or defined: an engine function from the stubs, or an entry point.
     // The name in a script's own `function X(` counts too - the analyzer shows neither the stub's
     // documentation nor its types there (measured, 0.25.1), so the card is ours (#249).
-    private static Hover? TryBuildEngineFunctionHover(
+    private Hover? TryBuildEngineFunctionHover(
         SyntaxNode root, int line, int character, ILuaApiSchemaProvider schema)
     {
         var uses = root.DescendantNodes().OfType<IdentifierNameSyntax>()
@@ -234,16 +242,17 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         return null;
     }
 
-    private static string BuildEntryPointHoverMarkdown(LuaEntryPoint entryPoint)
+    private string BuildEntryPointHoverMarkdown(LuaEntryPoint entryPoint)
     {
         var caller = entryPoint.Caller == LuaEntryPointCaller.ENGINE
-            ? "Called by the game"
-            : $"Called by {string.Join(", ", entryPoint.Libraries.Select(l => $"`{l}`"))}, if defined";
-        return $"**function** `{entryPoint.Name}` - entry point\n{entryPoint.Description}\n\n" +
-               $"{caller} - scripts: {string.Join(", ", entryPoint.Kinds)}";
+            ? _messages.Format("LuaHover_CalledByGame")
+            : _messages.Format("LuaHover_CalledByIfDefined",
+                string.Join(", ", entryPoint.Libraries.Select(l => $"`{l}`")));
+        return _messages.Format("LuaHover_EntryPoint", entryPoint.Name) + $"\n{entryPoint.Description}\n\n" +
+               _messages.Format("LuaHover_EntryPointCaller", caller, string.Join(", ", entryPoint.Kinds));
     }
 
-    private static string BuildFunctionHoverMarkdown(string name, string? description,
+    private string BuildFunctionHoverMarkdown(string name, string? description,
         IReadOnlyList<LuaParamAnnotation> parameters, string? returnType)
     {
         var sb = new StringBuilder();
@@ -252,11 +261,11 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         if (parameters.Count > 0)
         {
             var paramList = string.Join(", ", parameters.Select(p => p.IsOptional ? p.Name + "?" : p.Name));
-            sb.Append($"**function** `{name}({paramList})`");
+            sb.Append(_messages.Format("LuaHover_Function", name, paramList));
         }
         else
         {
-            sb.Append($"**function** `{name}`");
+            sb.Append(_messages.Format("LuaHover_FunctionBare", name));
         }
 
         if (description is not null)
@@ -269,7 +278,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         {
             sb.AppendLine();
             sb.AppendLine();
-            sb.Append("**Parameters:**");
+            sb.Append(_messages.Format("LuaHover_Parameters"));
             foreach (var p in parameters)
             {
                 sb.AppendLine();
@@ -285,7 +294,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         {
             sb.AppendLine();
             sb.AppendLine();
-            sb.Append($"**Returns:** `{returnType}`");
+            sb.Append(_messages.Format("LuaHover_Returns", returnType));
         }
 
         return sb.ToString().TrimEnd();

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
@@ -22,6 +23,9 @@ public sealed class InlayHintContext : XmlDocumentHandlerContextBase
         LineEndCharacter = lineEndCharacter;
         LineIndex = lineIndex;
     }
+
+    /// <summary>The server's texts in the configured locale; English when nothing set it.</summary>
+    public IMessageCatalog Messages { get; init; } = ResxMessageCatalog.Server("en");
 
     public HtmlNode Node { get; }
     public XmlTagDefinition TagDef { get; }

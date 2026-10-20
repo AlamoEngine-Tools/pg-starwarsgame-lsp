@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -12,27 +13,30 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 /// </summary>
 public static class EffectiveObjectXmlRenderer
 {
-    public static string Render(EffectiveObject obj)
+    public static string Render(EffectiveObject obj, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var element = obj.TypeName ?? "GameObject";
         var sb = new StringBuilder();
 
-        sb.Append("<!-- Effective object: ").Append(obj.ObjectId);
-        if (obj.TypeName is not null)
-            sb.Append(" (").Append(obj.TypeName).Append(')');
-        sb.AppendLine(" -->");
+        sb.Append("<!-- ")
+            .Append(obj.TypeName is null
+                ? messages.Format("EffectiveObject_Header", obj.ObjectId)
+                : messages.Format("EffectiveObject_HeaderTyped", obj.ObjectId, obj.TypeName))
+            .AppendLine(" -->");
 
         if (obj.Chain.Length > 1)
-            sb.Append("<!-- variant chain: ").Append(string.Join(" -> ", obj.Chain)).AppendLine(" -->");
+            sb.Append("<!-- ").Append(messages.Format("EffectiveObject_Chain", string.Join(" -> ", obj.Chain)))
+                .AppendLine(" -->");
 
         if (obj.Cyclic)
-            sb.Append("<!-- WARNING: cyclic inheritance detected at ").Append(obj.CycleObjectId).AppendLine(" -->");
+            sb.Append("<!-- ").Append(messages.Format("EffectiveObject_Cyclic", obj.CycleObjectId)).AppendLine(" -->");
 
         sb.Append('<').Append(element).Append(" Name=\"").Append(obj.ObjectId).AppendLine("\">");
 
         foreach (var tag in obj.Tags)
         {
-            var note = ProvenanceNote(tag);
+            var note = ProvenanceNote(tag, messages);
             if (note is not null)
                 sb.Append("    <!-- ").Append(note).AppendLine(" -->");
             foreach (var line in tag.Fragment.Split('\n'))
@@ -43,18 +47,18 @@ public static class EffectiveObjectXmlRenderer
         return sb.ToString();
     }
 
-    private static string? ProvenanceNote(EffectiveTag tag)
+    private static string? ProvenanceNote(EffectiveTag tag, IMessageCatalog messages)
     {
         return tag.Provenance switch
         {
-            VariantProvenance.Inherited => $"inherited from {tag.OriginObjectId}",
+            VariantProvenance.Inherited => messages.Format("EffectiveObject_InheritedFrom", tag.OriginObjectId),
             VariantProvenance.Overridden => tag.BaseValue is null
-                ? "overrides base"
-                : $"overrides base - was {Describe(tag.BaseValue)}",
+                ? messages.Format("EffectiveObject_OverridesBase")
+                : messages.Format("EffectiveObject_OverridesBaseWas", Describe(tag.BaseValue)),
             VariantProvenance.Merged => tag.BaseValue is null
-                ? "merged with base"
-                : $"merged with base - base contributes {Describe(tag.BaseValue)}",
-            VariantProvenance.Added => "added by variant",
+                ? messages.Format("EffectiveObject_MergedWithBase")
+                : messages.Format("EffectiveObject_MergedWithBaseContributes", Describe(tag.BaseValue)),
+            VariantProvenance.Added => messages.Format("EffectiveObject_AddedByVariant"),
             _ => null
         };
     }

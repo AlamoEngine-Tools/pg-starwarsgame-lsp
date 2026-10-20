@@ -33,6 +33,8 @@
   - The story texts come from the catalogue: graph, chain and dialog diagnostics, the simulator's log,
     the story editor's commands and refusals. A dialog command's argument count reads as one sentence
     for any count, and the read-only layer message no longer addresses the reader
+  - Hovers, value-format hints, quick fixes, suppression actions, code lenses, inlay hints, the
+    effective-object view and the formatter's refusals come from the catalogue, XML and Lua alike
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none

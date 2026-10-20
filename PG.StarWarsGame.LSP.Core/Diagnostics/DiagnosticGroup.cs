@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
 /// <summary>
@@ -103,26 +105,27 @@ public enum DiagnosticGroup
 /// <summary>Display names for <see cref="DiagnosticGroup" />, shown in suppression UI and hovers.</summary>
 public static class DiagnosticGroups
 {
-    public static string NameOf(DiagnosticGroup group)
+    public static string NameOf(DiagnosticGroup group, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         return group switch
         {
-            DiagnosticGroup.References => "References",
-            DiagnosticGroup.Enums => "Enum values",
-            DiagnosticGroup.Values => "Value format",
-            DiagnosticGroup.Assets => "Asset files",
-            DiagnosticGroup.Localisation => "Localisation",
-            DiagnosticGroup.Structure => "Document structure",
-            DiagnosticGroup.CrossTag => "Cross-tag rules",
-            DiagnosticGroup.Variants => "Variant inheritance",
-            DiagnosticGroup.Story => "Story and campaigns",
-            DiagnosticGroup.Symbols => "Symbols and layers",
-            DiagnosticGroup.Engine => "Engine constraints",
-            DiagnosticGroup.Syntax => "Syntax",
-            DiagnosticGroup.Suppression => "Suppression comments",
-            DiagnosticGroup.Preview => "Model preview",
-            DiagnosticGroup.XmlStrictness => "XML strictness",
-            DiagnosticGroup.LuaAnalyzer => "Lua analyzer",
+            DiagnosticGroup.References => messages.Format("DiagnosticGroup_References"),
+            DiagnosticGroup.Enums => messages.Format("DiagnosticGroup_Enums"),
+            DiagnosticGroup.Values => messages.Format("DiagnosticGroup_Values"),
+            DiagnosticGroup.Assets => messages.Format("DiagnosticGroup_Assets"),
+            DiagnosticGroup.Localisation => messages.Format("DiagnosticGroup_Localisation"),
+            DiagnosticGroup.Structure => messages.Format("DiagnosticGroup_Structure"),
+            DiagnosticGroup.CrossTag => messages.Format("DiagnosticGroup_CrossTag"),
+            DiagnosticGroup.Variants => messages.Format("DiagnosticGroup_Variants"),
+            DiagnosticGroup.Story => messages.Format("DiagnosticGroup_Story"),
+            DiagnosticGroup.Symbols => messages.Format("DiagnosticGroup_Symbols"),
+            DiagnosticGroup.Engine => messages.Format("DiagnosticGroup_Engine"),
+            DiagnosticGroup.Syntax => messages.Format("DiagnosticGroup_Syntax"),
+            DiagnosticGroup.Suppression => messages.Format("DiagnosticGroup_Suppression"),
+            DiagnosticGroup.Preview => messages.Format("DiagnosticGroup_Preview"),
+            DiagnosticGroup.XmlStrictness => messages.Format("DiagnosticGroup_XmlStrictness"),
+            DiagnosticGroup.LuaAnalyzer => messages.Format("DiagnosticGroup_LuaAnalyzer"),
             _ => group.ToString()
         };
     }

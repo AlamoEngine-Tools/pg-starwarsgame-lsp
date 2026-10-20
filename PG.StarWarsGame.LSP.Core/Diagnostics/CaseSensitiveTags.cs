@@ -32,12 +32,11 @@ public static class CaseSensitiveTags
     private static readonly Dictionary<string, Rule> Rules = new(StringComparer.OrdinalIgnoreCase)
     {
         // Anything that is not byte-exactly this yields is_active = false.
-        ["Active_Plot"] = new Rule("the plot loads as suspended and never starts", true),
+        ["Active_Plot"] = new Rule("CaseSensitiveTags_ActivePlot", true),
 
         // Also unrecognised, but an unrecognised plot is suspended anyway - so this one is correct
         // for the wrong reason, and only the debug build would ever mention it.
-        ["Suspended_Plot"] = new Rule("the tag is not recognised, and a plot it does not recognise is "
-                                      + "suspended anyway - so this happens to do what you wanted", false)
+        ["Suspended_Plot"] = new Rule("CaseSensitiveTags_SuspendedPlot", false)
     };
 
     /// <summary>
@@ -74,7 +73,7 @@ public static class CaseSensitiveTags
     /// <summary>
     ///     What the engine does with a mis-spelled tag, and whether that differs from the intent.
     /// </summary>
-    /// <param name="Consequence">Stated as the engine's behaviour, not as advice.</param>
+    /// <param name="ConsequenceKey">The catalogue key of the engine's behaviour, stated as behaviour, not as advice.</param>
     /// <param name="ChangesBehaviour">False where the wrong spelling reaches the right outcome anyway.</param>
-    public sealed record Rule(string Consequence, bool ChangesBehaviour);
+    public sealed record Rule(string ConsequenceKey, bool ChangesBehaviour);
 }

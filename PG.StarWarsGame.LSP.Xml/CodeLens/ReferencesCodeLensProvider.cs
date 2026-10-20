@@ -13,7 +13,9 @@ internal sealed class ReferencesCodeLensProvider : IXmlCodeLensProvider
     public LspCodeLens? Handle(CodeLensSymbolContext ctx)
     {
         var count = ctx.Index.WorkspaceReferences.TryGetValue(ctx.Symbol.Id, out var refs) ? refs.Length : 0;
-        var title = count == 1 ? "1 reference" : $"{count} references";
+        var title = count == 1
+            ? ctx.Messages.Format("ReferencesCodeLens_Reference")
+            : ctx.Messages.Format("ReferencesCodeLens_References", count);
         var range = new LspRange(new Position(ctx.Origin.Line, 0), new Position(ctx.Origin.Line, 0));
 
         Command command;

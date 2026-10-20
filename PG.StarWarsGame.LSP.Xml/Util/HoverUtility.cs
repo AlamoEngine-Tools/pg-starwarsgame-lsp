@@ -5,6 +5,7 @@ using System.Text;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -13,9 +14,6 @@ namespace PG.StarWarsGame.LSP.Xml.Util;
 
 internal static class HoverUtility
 {
-    private const string NoneMessage =
-        "_No description available. Help the community by [contributing one via a PR](https://github.com/AlamoEngine-Tools/eaw-schema)._";
-
     /// <summary>The kinds a tag hover puts in its status line, and so need not repeat below it.</summary>
     private static readonly HashSet<SchemaNoteKind> SummarisedOnTheStatusLine =
         [SchemaNoteKind.Since, SchemaNoteKind.Deprecated];
@@ -29,18 +27,19 @@ internal static class HoverUtility
             descriptions.TryGetValue("en", out text))
             return text;
 
-        return NoneMessage;
+        return ResxMessageCatalog.Server(locale).Format("HoverUtility_NoDescription");
     }
 
     public static Hover BuildTypeHover(GameObjectTypeDefinition type, HtmlNode node, string locale)
     {
+        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
         sb.Append($"### `{type.TypeName}::{node.Name}`");
         var id = XmlUtility.GetXmlObjectId(type, node);
         if (!string.IsNullOrWhiteSpace(id)) sb.Append($" *\"{id}\"*");
         sb.AppendLine();
         sb.Append(Resolve(type.Description, locale));
-        AppendNotes(sb, type.Notes, locale);
+        AppendNotes(sb, type.Notes, locale, messages);
         return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
@@ -60,6 +59,7 @@ internal static class HoverUtility
     public static Hover BuildTagHover(GameObjectTypeDefinition? type, XmlTagDefinition tag, HtmlNode node,
         string locale)
     {
+        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
 
         if (type is null)
@@ -83,15 +83,15 @@ internal static class HoverUtility
         if (since is not null || tag.Notes.Has(SchemaNoteKind.Deprecated))
         {
             var parts = new List<string>();
-            if (since is not null) parts.Add($"Since {since}");
-            if (tag.Notes.Has(SchemaNoteKind.Deprecated)) parts.Add("Deprecated");
+            if (since is not null) parts.Add(messages.Format("HoverUtility_Since", since));
+            if (tag.Notes.Has(SchemaNoteKind.Deprecated)) parts.Add(messages.Format("HoverUtility_Deprecated"));
             sb.AppendLine($"**{string.Join(" - ", parts)}**");
         }
 
         sb.AppendLine();
         sb.Append(Resolve(tag.Description, locale));
 
-        var hint = ValueTypeHint.Build(tag);
+        var hint = ValueTypeHint.Build(tag, messages);
         if (hint is not null)
         {
             sb.AppendLine();
@@ -100,7 +100,7 @@ internal static class HoverUtility
         }
 
         // Since and Deprecated are already on the status line above the description.
-        AppendNotes(sb, tag.Notes, locale, SummarisedOnTheStatusLine);
+        AppendNotes(sb, tag.Notes, locale, messages, SummarisedOnTheStatusLine);
 
         return new Hover
         {
@@ -117,17 +117,18 @@ internal static class HoverUtility
         GameObjectTypeDefinition type, string symbolId, GameReference reference, string locale,
         SymbolOrigin? origin = null, string? dependencyLayerName = null)
     {
+        var messages = ResxMessageCatalog.Server(locale);
         var sb = new StringBuilder();
         sb.Append($"### `{type.TypeName}`");
         sb.AppendLine($" *`\"{symbolId}\"`*");
         sb.Append(Resolve(type.Description, locale));
-        AppendNotes(sb, type.Notes, locale);
+        AppendNotes(sb, type.Notes, locale, messages);
         if (origin is MegArchiveOrigin meg)
-            AppendPackedOrigin(sb, meg);
+            AppendPackedOrigin(sb, meg, messages);
         else if (origin is FileOrigin { IsNavigable: false } shipped)
-            AppendShippedOrigin(sb, shipped);
+            AppendShippedOrigin(sb, shipped, messages);
         else if (dependencyLayerName is not null)
-            AppendDependencyOrigin(sb, dependencyLayerName);
+            AppendDependencyOrigin(sb, dependencyLayerName, messages);
         return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
@@ -140,8 +141,10 @@ internal static class HoverUtility
     }
 
     public static Hover? BuildAssetReferenceHover(
-        XmlTagDefinition tag, string rawValue, IAssetFileIndex assetFiles, int line, int col, int length)
+        XmlTagDefinition tag, string rawValue, IAssetFileIndex assetFiles, int line, int col, int length,
+        string locale = "en")
     {
+        var messages = ResxMessageCatalog.Server(locale);
         var value = rawValue.Replace('\\', '/').Trim();
         if (string.IsNullOrEmpty(value)) return null;
 
@@ -165,30 +168,32 @@ internal static class HoverUtility
 
         var kindLabel = tag.ReferenceKind switch
         {
-            ReferenceKind.TextureFile => "Texture",
-            ReferenceKind.ModelFile => "Model",
-            ReferenceKind.AudioFile => "Audio",
-            ReferenceKind.MapFile => "Map",
-            _ => "Asset"
+            ReferenceKind.TextureFile => messages.Format("AssetKind_Texture"),
+            ReferenceKind.ModelFile => messages.Format("AssetKind_Model"),
+            ReferenceKind.AudioFile => messages.Format("AssetKind_Audio"),
+            ReferenceKind.MapFile => messages.Format("AssetKind_Map"),
+            _ => messages.Format("AssetKind_Asset")
         };
 
         var sb = new StringBuilder();
         sb.AppendLine($"### `{value}`");
-        sb.AppendLine($"*{kindLabel} file*");
+        sb.AppendLine(messages.Format("HoverUtility_KindFile", kindLabel));
 
         if (matches.Count == 1)
         {
             var fullPath = matches[0];
             sb.AppendLine();
             sb.Append(assetFiles.IsPackedAsset(fullPath)
-                ? $"Packed - `{fullPath}`"
+                ? messages.Format("HoverUtility_PackedPath", fullPath)
                 : $"`{fullPath}`");
         }
         else
         {
             sb.AppendLine();
             foreach (var path in matches)
-                sb.AppendLine(assetFiles.IsPackedAsset(path) ? $"- Packed - `{path}`" : $"- `{path}`");
+                sb.AppendLine(assetFiles.IsPackedAsset(path)
+                    ? "- " + messages.Format("HoverUtility_PackedPath", path)
+                    : $"- `{path}`");
         }
 
         return new Hover
@@ -212,36 +217,36 @@ internal static class HoverUtility
             .ToList();
     }
 
-    private static void AppendPackedOrigin(StringBuilder sb, MegArchiveOrigin meg)
+    private static void AppendPackedOrigin(StringBuilder sb, MegArchiveOrigin meg, IMessageCatalog messages)
     {
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.Append(MegArchiveOriginHoverText.Describe(meg));
+        sb.Append(MegArchiveOriginHoverText.Describe(meg, messages));
     }
 
     // A baseline symbol projected from shipped game data carries a game-relative path (not a file://
     // URI). The exact .meg is not retained, so flag it as packaged base-game data, mirroring how
     // packed binary assets are badged.
-    private static void AppendShippedOrigin(StringBuilder sb, FileOrigin shipped)
+    private static void AppendShippedOrigin(StringBuilder sb, FileOrigin shipped, IMessageCatalog messages)
     {
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.Append($"Packed in the base game - `{shipped.Uri.Replace('\\', '/')}`");
+        sb.Append(messages.Format("HoverUtility_PackedInBaseGame", shipped.Uri.Replace('\\', '/')));
     }
 
     // A navigable workspace definition that lives in a DEPENDENCY project's layer (rank below the
     // leaf). Without the note it is indistinguishable from a leaf-project definition, and users
     // read the non-editable experience as "broken". Empty name = the layer has no display name.
-    private static void AppendDependencyOrigin(StringBuilder sb, string layerName)
+    private static void AppendDependencyOrigin(StringBuilder sb, string layerName, IMessageCatalog messages)
     {
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
         sb.Append(layerName.Length > 0
-            ? $"Defined in dependency **{layerName}**"
-            : "Defined in a dependency project");
+            ? messages.Format("HoverUtility_DefinedInDependency", layerName)
+            : messages.Format("HoverUtility_DefinedInADependency"));
     }
 
     // Every note the element carries, in rank order, each labelled by its kind - the reader needs to
@@ -255,7 +260,7 @@ internal static class HoverUtility
     ///     "Deprecated" tells the reader nothing twice.
     /// </param>
     private static void AppendNotes(StringBuilder sb, IReadOnlyList<SchemaNote> notes, string locale,
-        IReadOnlySet<SchemaNoteKind>? summarised = null)
+        IMessageCatalog messages, IReadOnlySet<SchemaNoteKind>? summarised = null)
     {
         // Ranked here rather than trusted to arrive ranked: the parser ranks what it reads, but a
         // definition built in code has not been through it, and "worst first" is the promise.
@@ -266,7 +271,7 @@ internal static class HoverUtility
             if (string.IsNullOrWhiteSpace(text) && summarised?.Contains(note.Kind) == true)
                 continue;
 
-            var label = $"> **{NoteLabel(note.Kind)}:**";
+            var label = $"> **{NoteLabel(note.Kind, messages)}:**";
 
             // The kind alone is worth saying. Most notes carry nothing else: the schema 2.0.0 sweep
             // turned every `deprecated: true` into a Deprecated note with no words, and dropping
@@ -288,16 +293,16 @@ internal static class HoverUtility
         foreach (var line in lines) sb.AppendLine(line);
     }
 
-    private static string NoteLabel(SchemaNoteKind kind)
+    private static string NoteLabel(SchemaNoteKind kind, IMessageCatalog messages)
     {
-        return kind switch
+        return messages.Format(kind switch
         {
-            SchemaNoteKind.BuggedInEngine => "Does not work",
-            SchemaNoteKind.Deprecated => "Deprecated",
-            SchemaNoteKind.Untested => "Untested",
-            SchemaNoteKind.Since => "Since",
-            _ => "Note"
-        };
+            SchemaNoteKind.BuggedInEngine => "HoverUtility_NoteDoesNotWork",
+            SchemaNoteKind.Deprecated => "HoverUtility_Deprecated",
+            SchemaNoteKind.Untested => "HoverUtility_NoteUntested",
+            SchemaNoteKind.Since => "HoverUtility_NoteSince",
+            _ => "HoverUtility_Note"
+        });
     }
 
     private static Range MakeRange(int line, int colStart, int length)

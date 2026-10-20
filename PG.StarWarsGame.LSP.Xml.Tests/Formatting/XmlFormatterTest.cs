@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Formatting;
 using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
@@ -95,7 +96,7 @@ public sealed class XmlFormatterTest
 
         Assert.Empty(result.Edits);
         Assert.NotNull(result.Refusal);
-        Assert.Contains("line 3", result.Refusal);
+        Assert.Contains("line 3", ResxMessageCatalog.Server("en").Format(result.Refusal!));
     }
 
     [Fact]

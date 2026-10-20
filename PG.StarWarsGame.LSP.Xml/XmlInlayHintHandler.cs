@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -77,7 +78,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
                 continue;
 
             var ctx = new InlayHintContext(uri, index, _schema, hapDoc, node, tagDef, line,
-                LineEndCharacter(parsed, line), parsed.LineIndex);
+                LineEndCharacter(parsed, line), parsed.LineIndex) { Messages = new ConfiguredMessageCatalog(_config) };
             foreach (var hint in _registry.Dispatch(ctx))
             {
                 _logger.LogDebug("InlayHint at line {Line}", line);

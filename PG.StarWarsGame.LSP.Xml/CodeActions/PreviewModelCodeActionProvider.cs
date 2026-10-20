@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -85,14 +86,17 @@ internal sealed class PreviewModelCodeActionProvider : IXmlCursorCodeActionProvi
         [
             new CommandOrCodeAction(new CodeAction
             {
-                Title = $"Preview model {model}",
+                Title = new ConfiguredMessageCatalog(_config).Format("PreviewModelAction_Preview", model),
                 Command = new Command
                 {
-                    Title = $"Preview model {model}",
+                    Title = new ConfiguredMessageCatalog(_config).Format("PreviewModelAction_Preview", model),
                     Name = PreviewModelCommand,
                     Arguments = new JArray(model)
                 },
-                Disabled = found ? null : new CodeActionDisabled { Reason = "Model file not found" }
+                Disabled = found
+                    ? null
+                    : new CodeActionDisabled
+                        { Reason = new ConfiguredMessageCatalog(_config).Format("PreviewModelAction_NotFound") }
             })
         ];
     }

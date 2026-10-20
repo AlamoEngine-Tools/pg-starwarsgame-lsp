@@ -36,7 +36,9 @@ internal sealed class OverrideCodeLensProvider : IXmlCodeLensProvider
         var layerName = ctx.Index.Documents.TryGetValue(shadowedOrigin.Uri, out var shadowedDoc)
             ? shadowedDoc.LayerName
             : null;
-        var from = string.IsNullOrEmpty(layerName) ? "a referenced project" : layerName;
+        var from = string.IsNullOrEmpty(layerName)
+            ? ctx.Messages.Format("OverrideCodeLens_ReferencedProject")
+            : layerName;
 
         var range = new LspRange(new Position(ctx.Origin.Line, 0), new Position(ctx.Origin.Line, 0));
         var location = new
@@ -54,7 +56,7 @@ internal sealed class OverrideCodeLensProvider : IXmlCodeLensProvider
             Range = range,
             Command = new Command
             {
-                Title = $"v Overrides '{ctx.Symbol.Id}' from {from}",
+                Title = ctx.Messages.Format("OverrideCodeLens_VOverridesFrom", ctx.Symbol.Id, from),
                 Name = "aet-eaw-edit.lsp.showReferences",
                 Arguments = JArray.FromObject(new object[]
                 {

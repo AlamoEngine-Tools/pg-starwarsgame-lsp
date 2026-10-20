@@ -41,7 +41,7 @@ internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
                 Range = range,
                 Command = new Command
                 {
-                    Title = $"^ Variant of {ctx.Symbol.VariantBaseId} - show effective object",
+                    Title = ctx.Messages.Format("VariantCodeLens_VariantShowEffectiveObject", ctx.Symbol.VariantBaseId),
                     Name = ShowEffectiveCommand,
                     Arguments = JArray.FromObject(new object[] { ctx.Symbol.Id })
                 }
@@ -52,8 +52,8 @@ internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
         if (variants.Count == 0) return null;
 
         var title = variants.Count == 1
-            ? "1 variant"
-            : $"{variants.Count.ToString(CultureInfo.InvariantCulture)} variants";
+            ? ctx.Messages.Format("VariantCodeLens_Variant")
+            : ctx.Messages.Format("VariantCodeLens_Variants", variants.Count.ToString(CultureInfo.InvariantCulture));
 
         // Open the references peek showing just the child variant objects (their definition sites).
         var locations = variants.Select(o => new

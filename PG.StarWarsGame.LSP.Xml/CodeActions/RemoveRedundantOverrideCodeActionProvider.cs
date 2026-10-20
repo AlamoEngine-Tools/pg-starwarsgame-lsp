@@ -50,7 +50,7 @@ internal sealed class RemoveRedundantOverrideCodeActionProvider : IXmlCodeAction
         [
             new CommandOrCodeAction(new CodeAction
             {
-                Title = $"Remove redundant override '{tagName}'",
+                Title = ctx.Messages.Format("RemoveRedundantOverrideAction_RemoveRedundantOverride", tagName),
                 Kind = CodeActionKind.QuickFix,
                 IsPreferred = true,
                 Diagnostics = new Container<Diagnostic>(ctx.Diagnostic),

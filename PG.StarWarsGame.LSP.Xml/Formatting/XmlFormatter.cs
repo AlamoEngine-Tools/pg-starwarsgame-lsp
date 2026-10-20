@@ -3,15 +3,16 @@
 
 using System.Text;
 using HtmlAgilityPack;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Formatting;
 
 /// <summary>The edits that format a document, or why it was not formatted.</summary>
-public sealed record XmlFormatResult(IReadOnlyList<XmlTextEdit> Edits, string? Refusal)
+public sealed record XmlFormatResult(IReadOnlyList<XmlTextEdit> Edits, CatalogueText? Refusal)
 {
-    public static XmlFormatResult Refused(string reason)
+    public static XmlFormatResult Refused(CatalogueText reason)
     {
         return new XmlFormatResult([], reason);
     }
@@ -44,7 +45,7 @@ public static class XmlFormatter
         var text = doc.Text;
         if (XmlStructuralValidator.StrictReadError(text) is { } error)
             return XmlFormatResult.Refused(
-                $"Formatting refused: Not well-formed XML at line {error.LineNumber}, column {error.LinePosition}");
+                new CatalogueText("XmlFormatter_NotWellFormed", error.LineNumber, error.LinePosition));
 
         var edits = new List<XmlTextEdit>();
         var tokens = Tokens(doc.Spans);
@@ -74,7 +75,7 @@ public static class XmlFormatter
         var formatted = XmlStructureRepairs.Apply(text, edits);
         return Signature(doc.Html) == Signature(XmlUtility.CreateHtmlDocument(formatted))
             ? new XmlFormatResult(edits, null)
-            : XmlFormatResult.Refused("Formatting refused: The result would change the document's content");
+            : XmlFormatResult.Refused(new CatalogueText("XmlFormatter_WouldChangeContent"));
     }
 
     // Tags and comments in document order. The declaration, CDATA and anything else are not

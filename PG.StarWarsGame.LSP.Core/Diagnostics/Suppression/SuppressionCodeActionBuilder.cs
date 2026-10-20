@@ -4,6 +4,7 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
@@ -64,33 +65,37 @@ public static class SuppressionCodeActionBuilder
         DiagnosticId id,
         SuppressionCommentFormat format,
         string[] lines,
-        IReadOnlyList<SuppressionInsertionPoint> points)
+        IReadOnlyList<SuppressionInsertionPoint> points,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var actions = points
             .Where(p => p.Scope != SuppressionScope.Global)
-            .Select(p => Insert(documentUri, diagnostic, id, format, lines, p))
+            .Select(p => Insert(documentUri, diagnostic, id, format, lines, p, messages))
             .ToList();
 
         // Project-wide suppression writes .aetswg/suppressions.json rather than the open document,
         // so it goes back to the server instead of being a text edit the client applies.
         actions.Add(new CommandOrCodeAction(new CodeAction
         {
-            Title = $"Suppress {id} across the project",
+            Title = messages.Format("Suppression_AcrossProject", id),
             Kind = CodeActionKind.QuickFix,
             Diagnostics = new Container<Diagnostic>(diagnostic),
             Command = new Command
             {
                 Name = SuppressionCommands.SuppressGlobally,
-                Title = "Suppress diagnostic across the project",
+                Title = messages.Format("Suppression_DiagnosticAcrossProject"),
                 Arguments = new JArray(id.ToString())
             }
         }));
 
         // Reporting comes last: it is the rarer act, and it changes nothing in the project.
         var report = ReportPayload(documentUri, diagnostic, id, lines);
-        actions.Add(ReportAction($"Report {id} on GitHub", DiagnosticReportCommands.ReportOnGitHub, diagnostic,
+        actions.Add(ReportAction(messages.Format("Suppression_ReportOnGitHub", id),
+            DiagnosticReportCommands.ReportOnGitHub, diagnostic,
             report));
-        actions.Add(ReportAction($"Open report for {id} in editor", DiagnosticReportCommands.OpenInEditor, diagnostic,
+        actions.Add(ReportAction(messages.Format("Suppression_OpenReport", id), DiagnosticReportCommands.OpenInEditor,
+            diagnostic,
             report));
 
         return actions;
@@ -160,14 +165,15 @@ public static class SuppressionCodeActionBuilder
         DiagnosticId id,
         SuppressionCommentFormat format,
         string[] lines,
-        SuppressionInsertionPoint point)
+        SuppressionInsertionPoint point,
+        IMessageCatalog messages)
     {
         var directive = $"aetswg:suppress{ScopeSuffix(point.Scope)} {id}";
         var text = $"{IndentOf(lines, point.Line)}{format.Wrap(directive)}\n";
 
         return new CommandOrCodeAction(new CodeAction
         {
-            Title = TitleFor(point, id),
+            Title = TitleFor(point, id, messages),
             Kind = CodeActionKind.QuickFix,
             Diagnostics = new Container<Diagnostic>(diagnostic),
             Edit = new WorkspaceEdit
@@ -198,13 +204,13 @@ public static class SuppressionCodeActionBuilder
         };
     }
 
-    private static string TitleFor(SuppressionInsertionPoint point, DiagnosticId id)
+    private static string TitleFor(SuppressionInsertionPoint point, DiagnosticId id, IMessageCatalog messages)
     {
         return point.Scope switch
         {
-            SuppressionScope.File => $"Suppress {id} in this file",
-            SuppressionScope.Object => $"Suppress {id} for this {point.TargetLabel}",
-            _ => $"Suppress {id} for this line"
+            SuppressionScope.File => messages.Format("Suppression_InThisFile", id),
+            SuppressionScope.Object => messages.Format("Suppression_ForThisObject", id, point.TargetLabel),
+            _ => messages.Format("Suppression_ForThisLine", id)
         };
     }
 
