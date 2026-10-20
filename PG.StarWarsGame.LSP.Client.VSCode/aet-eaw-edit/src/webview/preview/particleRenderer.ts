@@ -621,6 +621,18 @@ class EmitterRenderer {
      * it, even for a frozen bake that would otherwise never be written again.
      */
     private rewrite = false;
+    /**
+     * The view basis the effect buffer's corners were last built against, or null before any
+     * were.
+     *
+     * Measured in the game: the corner table is rotated into camera space once per camera change,
+     * and a frozen particle's corners are built from it at every draw. The bake is the particle
+     * STATE, never the vertex stream - a frozen sprite faces the camera wherever it moves. The
+     * effect buffer holds world positions with the basis already applied, so it is written again
+     * whenever the basis moves, at the engine's own cadence: once per camera change, nothing while
+     * the camera rests. The preview's own buffer needs none of this: it billboards in the shader.
+     */
+    private bakedBasis: THREE.Matrix3 | null = null;
 
     /** The frozen batch's draw order and the depths it was sorted on, reused every frame. */
     private readonly drawIndex: number[] = [];
@@ -844,6 +856,35 @@ class EmitterRenderer {
     }
 
     /**
+     * Whether the effect buffer's corners face a camera that is no longer there.
+     *
+     * Asked of the effect buffer only - the preview's own billboards in the shader - and never of
+     * a world-oriented emitter, whose corners lie in the ground plane whatever the camera does.
+     * Compared exactly: a resting camera gives the same basis to the bit, so nothing is written
+     * while it rests.
+     */
+    private basisMoved(frame: EmitterFrame): boolean {
+        if (this.engine === null || this.emitter.properties.worldOriented) {
+            return false;
+        }
+
+        const baked = this.bakedBasis;
+        if (baked === null) {
+            return true;
+        }
+
+        const a = baked.elements;
+        const b = frame.toView.elements;
+        for (let i = 0; i < 9; i++) {
+            if (a[i] !== b[i]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * The engine's vertex stream: four corners per particle, built the way the engine builds them.
      *
      * Measured: corner = position + the camera-rotated corner offset times the size, the colour
@@ -864,6 +905,8 @@ class EmitterRenderer {
         const cell = 1 / columns;
         const scale = this.scaleFactor;
         const basis = properties.worldOriented ? GROUND_BASIS : frame.toView;
+        // Copied, not kept: the frame is one object the system rewrites every tick.
+        this.bakedBasis = (this.bakedBasis ?? new THREE.Matrix3()).copy(basis);
         // Simulation space to view space is a rotation, so the view axes in simulation space are
         // its rows - which is what the engine's camera-rotated corner table holds.
         const e = basis.elements;
@@ -957,13 +1000,14 @@ class EmitterRenderer {
             if (this.engine !== null) {
                 this.engine.material.depthTest = true;
             }
-            // The bake is drawn as it was written. Only a depth-sorted one is written again, and
-            // that every frame, because the camera it is sorted against moves - or once, into a
-            // buffer that a material switch has just left empty. Measured on the asteroid field:
-            // its effect arrives after the freeze, and a bump field is never sorted, so the fresh
-            // effect buffer held nothing and the field vanished.
+            // The bake is drawn as it was written. It is written again when the camera it faces
+            // has moved, when it is depth-sorted and so follows the camera every frame - or once,
+            // into a buffer that a material switch has just left empty. Measured on the asteroid
+            // field: its effect arrives after the freeze, and a bump field is never sorted, so the
+            // fresh effect buffer held nothing and the field vanished.
             if (
                 this.rewrite ||
+                this.basisMoved(frame) ||
                 (frame.camera !== null && this.sortsFrozenByDepth())
             ) {
                 this.writeBuffers(frame);

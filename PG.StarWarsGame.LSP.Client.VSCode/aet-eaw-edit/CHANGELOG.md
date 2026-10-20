@@ -160,6 +160,10 @@
   for as a particle system rather than as geometry; the cover counted geometry alone and stayed over the field
   for the full idle deadline, hiding the first eight seconds of any effect opened this way
   ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
+- **Frozen field facing the camera** - a frozen particle batch drawn through its engine effect is built again
+  whenever the camera turns, as the game rebuilds its corners against the camera at every draw; the asteroid
+  field's rocks faced wherever the camera stood when the field froze and showed their edges from anywhere else
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
 - **Hardpoint without an Attachment_Bone** - both findings are errors and say what the game does, measured on the
   2024 build: the hardpoint is placed at `Fire_Bone_A`, or at the map origin with that unset too; its
   `Model_To_Attach` is never attached; a targetable one draws its reticle in the screen corner and, at the origin,

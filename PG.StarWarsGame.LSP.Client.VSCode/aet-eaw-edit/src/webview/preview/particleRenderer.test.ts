@@ -1492,6 +1492,46 @@ describe("engine effects", () => {
         );
     });
 
+    /**
+     * Measured in the game: the corner table is rotated into camera space once per camera change,
+     * and a frozen particle's corners are built from it at every draw. The bake is the particle
+     * STATE, never the vertex stream, so a frozen sprite faces the camera wherever it moves. The
+     * effect buffer wrote the view basis into its positions at the freeze and was not written
+     * again, so the asteroid field's rocks faced wherever the camera stood when it froze.
+     */
+    it("turns a frozen bake drawn through its effect to face a camera that has moved", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([still({ freezeTime: 0.3 })]),
+            ),
+        );
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        assert.ok(instance.emitterParticles(0).length > 0);
+
+        // The camera moves to +x, looking at the origin: a sprite facing it spans y and z and
+        // keeps one x across its four corners.
+        const side = new THREE.PerspectiveCamera();
+        side.position.set(100, 0, 0);
+        side.lookAt(0, 0, 0);
+        side.updateMatrixWorld(true);
+        instance.update(0.1, side.matrixWorldInverse);
+
+        const positions = attribute(instance, "position").array;
+        const xs = [0, 1, 2, 3].map((corner) => positions[corner * 3]);
+        const zs = [0, 1, 2, 3].map((corner) => positions[corner * 3 + 2]);
+        assert.ok(
+            xs.every((x) => Math.abs(x - xs[0]) < 1e-6),
+            `corners spread in x: ${xs.join(", ")}`,
+        );
+        assert.ok(
+            zs.some((z) => Math.abs(z - zs[0]) > 1e-6),
+            `corners flat in z: ${zs.join(", ")}`,
+        );
+    });
+
     it("depth-tests a frozen batch drawn through its effect, whatever the file says", () => {
         const instance = withEffect(
             new ParticleSystemInstance(
