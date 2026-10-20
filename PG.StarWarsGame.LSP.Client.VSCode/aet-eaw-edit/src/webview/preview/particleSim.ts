@@ -20,6 +20,9 @@ import type {
 /** Named for what it is: a value in [0, 1). */
 export type Random = () => number;
 
+/** Measured: the scene wind enters an ordinary emitter's velocity at half strength per second. */
+const ORDINARY_WIND_FACTOR = 0.5;
+
 /**
  * A small deterministic generator.
  *
@@ -364,11 +367,7 @@ export class SpawnClock {
 }
 
 /** Creates one particle at birth, drawing everything random about it now. */
-export function spawnParticle(
-    emitter: AlamoEmitter,
-    random: Random,
-    wind: Vec3 = { x: 0, y: 0, z: 0 },
-): Particle {
+export function spawnParticle(emitter: AlamoEmitter, random: Random): Particle {
     const properties = emitter.properties;
 
     const position = sampleVolume(emitter.position, random);
@@ -395,10 +394,6 @@ export function spawnParticle(
     const direction =
         properties.randomRotationDirection && random() < 0.5 ? -1 : 1;
 
-    // Downwind, once, at birth: `if (affectedByWind) initialSpeed += GetWind()`. 484 of the
-    // corpus's 1019 emitters set the flag, so half the drifting smoke in the game depends on it.
-    const blown = properties.affectedByWind ? wind : { x: 0, y: 0, z: 0 };
-
     // The direction the particle was born in, which is what the inward terms pull along.
     const spread = Math.hypot(position.x, position.y, position.z);
     const inward =
@@ -415,10 +410,12 @@ export function spawnParticle(
         // `initialSpeed -= normpos * inwardSpeed`, with the reader having already negated the
         // stored value - so adding it here throws the particle outward exactly as the file asks.
         // Half the corpus sets this, and it was doing nothing at all.
+        // No wind here. Measured in the game: the birth path reads no wind at all; the wind is a
+        // per-frame acceleration applied in `stepParticle`.
         velocity: {
-            x: speed.x + inward.x * properties.inwardSpeed + blown.x,
-            y: speed.y + inward.y * properties.inwardSpeed + blown.y,
-            z: speed.z + inward.z * properties.inwardSpeed + blown.z,
+            x: speed.x + inward.x * properties.inwardSpeed,
+            y: speed.y + inward.y * properties.inwardSpeed,
+            z: speed.z + inward.z * properties.inwardSpeed,
         },
         inward,
         age: 0,
@@ -497,6 +494,7 @@ export function stepParticle(
     dt: number,
     groundY = 0,
     acceleration: Vec3 = accelerationIn(emitter.properties),
+    wind: Vec3 = { x: 0, y: 0, z: 0 },
 ): boolean {
     const properties = emitter.properties;
 
@@ -508,6 +506,16 @@ export function stepParticle(
     particle.velocity.x += acceleration.x * dt;
     particle.velocity.y += acceleration.y * dt;
     particle.velocity.z += acceleration.z * dt;
+
+    // Measured in the game: an emitter that declares itself affected by wind has half the scene's
+    // wind added to its velocity every frame, times the step - an acceleration that accumulates,
+    // and nothing at birth. A weather field takes the wind differently, in its own step.
+    if (properties.affectedByWind) {
+        const gust = dt * ORDINARY_WIND_FACTOR;
+        particle.velocity.x += wind.x * gust;
+        particle.velocity.y += wind.y * gust;
+        particle.velocity.z += wind.z * gust;
+    }
 
     // Pulls along the direction the particle was BORN in - `normpos`, fixed at spawn. Stored
     // positive and negated by the reader, so adding it here moves the way the file asks.

@@ -710,24 +710,39 @@ describe("inward motion", () => {
 
 describe("wind", () => {
     /**
-     * `if (affectedByWind) particle.m_initialSpeed += m_engine.GetWind()` - the editor adds it once,
-     * at birth. 484 of the corpus's 1019 emitters set the flag and it was doing nothing, so half
-     * the smoke in the game hung in dead air.
+     * Measured in the game: an ordinary emitter that declares itself affected by wind has half the
+     * scene's wind added to its velocity every frame, times the step - an acceleration that
+     * accumulates - and nothing at birth. The birth kick the preview used to apply came from the
+     * editor's emulation, not from the engine, whose birth path reads no wind at all.
      */
-    it("throws a wind-affected particle downwind at birth", () => {
+    it("adds nothing at birth, whatever the flag says", () => {
+        const blown = spawnParticle(
+            emitter({ properties: properties({ affectedByWind: true }) }),
+            seededRandom(1),
+        );
+        const still = spawnParticle(emitter(), seededRandom(1));
+
+        assert.deepEqual(blown.velocity, still.velocity);
+    });
+
+    it("accelerates a wind-affected particle by half the wind, step after step", () => {
         const e = emitter({ properties: properties({ affectedByWind: true }) });
+        const p = spawnParticle(e, seededRandom(1));
+        const wind = { x: 4, y: 0, z: -2 };
 
-        const p = spawnParticle(e, seededRandom(1), { x: 3, y: 0, z: -4 });
+        // Quarter-second steps: two halves would reach the one-second lifetime and end it.
+        stepParticle(p, e, 0.25, 0, { x: 0, y: 0, z: 0 }, wind);
+        assert.deepEqual(p.velocity, { x: 0.5, y: 0, z: -0.25 });
 
-        assert.deepEqual(p.velocity, { x: 3, y: 0, z: -4 });
+        stepParticle(p, e, 0.25, 0, { x: 0, y: 0, z: 0 }, wind);
+        assert.deepEqual(p.velocity, { x: 1, y: 0, z: -0.5 });
     });
 
     it("leaves an emitter that ignores the wind alone", () => {
-        const p = spawnParticle(emitter(), seededRandom(1), {
-            x: 3,
-            y: 0,
-            z: -4,
-        });
+        const e = emitter();
+        const p = spawnParticle(e, seededRandom(1));
+
+        stepParticle(p, e, 0.5, 0, { x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: -2 });
 
         assert.deepEqual(p.velocity, { x: 0, y: 0, z: 0 });
     });

@@ -407,7 +407,10 @@ export interface EmitterFrame {
     camera: THREE.Vector3 | null;
     /** Where the scene's ground plane falls in simulation space. */
     groundY: number;
-    /** The wind, in simulation space. Half the corpus's emitters are thrown by it at birth. */
+    /**
+     * The wind, in simulation space: the viewer's wind setting. An emitter that declares itself
+     * affected by it accelerates by half of it every frame; a weather field drifts at five times it.
+     */
     wind: AlamoVector3;
 }
 
@@ -1101,6 +1104,7 @@ class EmitterRenderer {
                     dt,
                     frame.groundY,
                     acceleration,
+                    frame.wind,
                 )
             ) {
                 deaths.push(particle.position);
@@ -1141,11 +1145,7 @@ class EmitterRenderer {
                 this.particles.shift();
             }
 
-            const particle = spawnParticle(
-                this.emitter,
-                this.random,
-                frame.wind,
-            );
+            const particle = spawnParticle(this.emitter, this.random);
 
             // Born ON the mesh rather than inside the emitter's shape volume. The shape still
             // decides the VELOCITY; only the position moves.
@@ -1197,11 +1197,7 @@ class EmitterRenderer {
                 this.particles.shift();
             }
 
-            const particle = spawnParticle(
-                this.emitter,
-                this.random,
-                frame.wind,
-            );
+            const particle = spawnParticle(this.emitter, this.random);
             this.place(particle, frame);
 
             // The shape volume still decides the SPREAD; the parent decides where that spread is

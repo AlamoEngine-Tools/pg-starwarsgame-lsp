@@ -163,6 +163,10 @@
 
 ### Fixes
 
+- **Wind on ordinary emitters** - an emitter that declares itself affected by wind accelerates by half the
+  viewer's wind every frame, as the game applies it; it used to be thrown by the whole wind once at birth, a
+  rule taken from an editor's emulation rather than the engine
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
 - **Preview and localisation texts** - tooltips and notes name the state and stop: no corpus counts, no second
   person, no full stop on a one-clause tooltip, straight apostrophes
 - **Weather emitters play as the game plays them** - rain, snow, sleet and ash are a field around the camera:
