@@ -73,8 +73,7 @@ public sealed class HullFiringArcHandler : XmlDiagnosticsHandler<HullFiringArcFa
         if (restricting.Count == 0) return [];
 
         var message =
-            $"'{fact.ObjectId}' has no TURRET behaviour, so these limit where its hull can shoot, measured from " +
-            $"its facing: {string.Join(", ", restricting)}.";
+            ctx.Messages.Format("HullFiringArc_HasNoTurretBehaviourSo", fact.ObjectId, string.Join(", ", restricting));
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, message, Id: DiagnosticIds.HullFiringArc)];
     }

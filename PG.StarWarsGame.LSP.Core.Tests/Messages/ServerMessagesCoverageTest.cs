@@ -13,8 +13,12 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Messages;
 /// </summary>
 public sealed partial class ServerMessagesCoverageTest
 {
-    [GeneratedRegex(@"Messages\.Format\(\s*""([A-Za-z0-9_]+)""")]
+    [GeneratedRegex(@"[Mm]essages\.Format\(\s*""([A-Za-z0-9_]+)""")]
     private static partial Regex KeyUse();
+
+    /// <summary>A key a handler names through a property - <c>ExpectationKey =&gt; "..."</c>.</summary>
+    [GeneratedRegex(@"Key\s*=>\s*""([A-Za-z0-9_]+)""")]
+    private static partial Regex KeyProperty();
 
     private static string RepositoryRoot()
     {
@@ -37,7 +41,11 @@ public sealed partial class ServerMessagesCoverageTest
             .SelectMany(d => Directory.EnumerateFiles(d, "*.cs", SearchOption.AllDirectories))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
                         && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-            .SelectMany(f => KeyUse().Matches(File.ReadAllText(f)).Select(m => m.Groups[1].Value))
+            .SelectMany(f =>
+            {
+                var source = File.ReadAllText(f);
+                return KeyUse().Matches(source).Concat(KeyProperty().Matches(source)).Select(m => m.Groups[1].Value);
+            })
             .ToHashSet();
     }
 

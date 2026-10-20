@@ -51,15 +51,16 @@ public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<Hardp
         // (Get_Name, vtable slot 0x18) - a name on no model never comes back.
         //
         // "Does not exist" is kept on purpose: the hardpoint E2E smoke test keys on it.
-        var message = $"<{fact.TagName}> names '{fact.BoneName}', which does not exist as a mesh or a bone "
-                      + $"on {owner}{also}. Aimed fire and land projectiles still reach it; untargeted "
-                      + "space fire never does.";
+        var message = ctx.Messages.Format("HardpointBoneNotOnModel_NamesWhichDoesNotExist", fact.TagName, fact.BoneName,
+            owner, also);
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, message,
                 SuggestedFix: fact.SuggestedName,
-                FixTitle: fact.SuggestedName is null ? null : $"Use the model's mesh '{fact.SuggestedName}'")
+                FixTitle: fact.SuggestedName is null
+                    ? null
+                    : ctx.Messages.Format("FixTitle_UseTheModelSMesh", fact.SuggestedName))
         ];
     }
 }

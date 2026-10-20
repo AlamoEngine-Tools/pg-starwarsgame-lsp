@@ -24,6 +24,6 @@ public sealed class ForceDeploymentListHandler : SingleValueTypeHandlerBase
                     ctx.Messages.Format("ForceDeploymentList_IsNotAValidForce", trimmed, fact.Tag.Tag))
             ];
 
-        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 3) is { } extra ? [extra] : [];
+        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 3, ctx.Messages) is { } extra ? [extra] : [];
     }
 }

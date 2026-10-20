@@ -85,16 +85,17 @@ public sealed class AttackDistanceBeyondHardpointRangeHandler : XmlDiagnosticsHa
         if (longestId is null || attackDistance <= longest) return [];
 
         var message =
-            $"'{fact.ObjectId}' closes only to Targeting_Max_Attack_Distance {Format(attackDistance)}, but its " +
-            $"longest-reaching hardpoint weapon '{longestId}' fires to {Format(longest)}, so it can stop where " +
-            "no hardpoint fires.";
+            ctx.Messages.Format("AttackDistanceBeyondHardpointRange_ClosesOnlyToTargetingMax", fact.ObjectId,
+                Format(attackDistance), longestId, Format(longest));
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, message,
                 SuggestedFix: fact.AnchoredOnAttackDistance ? longestText : null,
                 Id: DiagnosticIds.AttackDistanceBeyondHardpointRange,
-                FixTitle: fact.AnchoredOnAttackDistance ? $"Set to the longest hardpoint range ({longestText})" : null)
+                FixTitle: fact.AnchoredOnAttackDistance
+                    ? ctx.Messages.Format("FixTitle_SetToTheLongestHardpoint", longestText)
+                    : null)
         ];
     }
 

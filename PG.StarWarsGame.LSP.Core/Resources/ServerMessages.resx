@@ -27,8 +27,23 @@
   <data name="AllowedValues_HereOnlySupportsTheEngine" xml:space="preserve">
     <value>&lt;{0}&gt; here only supports {1} - the engine overwrites anything else.</value>
   </data>
+  <data name="AngleDegreesFullTurn_Expectation" xml:space="preserve">
+    <value>must be between 0 and 360 degrees</value>
+  </data>
+  <data name="AngleDegreesHalfTurn_Expectation" xml:space="preserve">
+    <value>must be between 0 and 180 degrees</value>
+  </data>
   <data name="AssetFileExistenceHandlerBase_FileWasNotFoundIn" xml:space="preserve">
     <value>{0} file '{1}' was not found in the game data or workspace asset files.{2}</value>
+  </data>
+  <data name="AtLeastNegativeOne_Expectation" xml:space="preserve">
+    <value>cannot be less than -1.0</value>
+  </data>
+  <data name="AtLeastOneSecond_Expectation" xml:space="preserve">
+    <value>should have at least one second of time</value>
+  </data>
+  <data name="AttackDistanceBeyondHardpointRange_ClosesOnlyToTargetingMax" xml:space="preserve">
+    <value>'{0}' closes only to Targeting_Max_Attack_Distance {1}, but its longest-reaching hardpoint weapon '{2}' fires to {3}, so it can stop where no hardpoint fires.</value>
   </data>
   <data name="Audio3dProviderName_IsNotAValidD" xml:space="preserve">
     <value>'' is not a valid 3D audio provider name for &lt;{0}&gt;.</value>
@@ -42,6 +57,12 @@
   <data name="AutomaticDespawn_CausesDespawnIsOnUnder" xml:space="preserve">
     <value>&lt;Causes_Despawn&gt; is on under Activation_Style: {0} - the engine turns it off for every automatic style</value>
   </data>
+  <data name="BelowOne_Expectation" xml:space="preserve">
+    <value>must be less than 1.0</value>
+  </data>
+  <data name="BonusPercentage_Expectation" xml:space="preserve">
+    <value>must be greater than -1.0, since -1.0 would cancel the stat outright</value>
+  </data>
   <data name="BooleanGatedRequirement_IsOnSoMustBe" xml:space="preserve">
     <value>&lt;{0}&gt; is on, so &lt;{1}&gt; must be {2} - the engine otherwise {3}.</value>
   </data>
@@ -51,8 +72,35 @@
   <data name="CableRenderMode_IsNotAValidCable" xml:space="preserve">
     <value>'' is not a valid cable render mode for &lt;{0}&gt;.</value>
   </data>
+  <data name="CampaignStoryAttachment_AlsoAtLine" xml:space="preserve">
+    <value> Also at line {0}.</value>
+  </data>
+  <data name="CampaignStoryAttachment_AlsoAtLines" xml:space="preserve">
+    <value> Also at lines {0}.</value>
+  </data>
+  <data name="CampaignStoryAttachment_CampaignAttachesPlotsThroughBoth" xml:space="preserve">
+    <value>Campaign{0} attaches plots through both the faction-specific &lt;Faction_Story_Name&gt; tags and the generic &lt;{1}&gt; tuple list. Both are read by the engine; only the generic form can attach a non-major faction.</value>
+  </data>
+  <data name="CampaignStoryAttachment_InCampaign" xml:space="preserve">
+    <value> in campaign '{0}'</value>
+  </data>
+  <data name="CampaignStoryAttachment_TakesASinglePlotManifest" xml:space="preserve">
+    <value>&lt;{0}&gt; takes a single plot manifest file, not a 'Faction, PlotFile' tuple - the tag already names the faction. Use &lt;{1}&gt;{2}&lt;/{3}&gt; for the generic form, or drop the leading token.</value>
+  </data>
+  <data name="CampaignStoryAttachment_TheFactionIsAttachedTo" xml:space="preserve">
+    <value>The {0} faction is attached to '{1}' more than once{2}. Only one attachment is needed.{3}</value>
+  </data>
+  <data name="CampaignStoryAttachment_TheFactionIsAttachedTo2" xml:space="preserve">
+    <value>The {0} faction is attached to {1} different plot manifests{2}: {3}. Keep one.{4}</value>
+  </data>
   <data name="CaseSensitiveTag_HasToBeSpelledExactly" xml:space="preserve">
     <value>&lt;{0}&gt; has to be spelled exactly &lt;{1}&gt;. Unlike the rest of the game's tags this one is matched letter by letter, so {2}.</value>
+  </data>
+  <data name="CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs" xml:space="preserve">
+    <value>'{0}' could not be resolved as an SFX event for &lt;{1}&gt;.</value>
+  </data>
+  <data name="CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs2" xml:space="preserve">
+    <value>'{0}' could not be resolved as a game object for &lt;{1}&gt;.</value>
   </data>
   <data name="CommandBarProperty_IsNotAValidCommand" xml:space="preserve">
     <value>'' is not a valid command bar property for &lt;{0}&gt;.</value>
@@ -96,6 +144,9 @@
   <data name="DeprecatedEventType_IsDeprecated" xml:space="preserve">
     <value>'{0}' is deprecated.</value>
   </data>
+  <data name="DeprecatedTag_IsDeprecatedAndShouldNot" xml:space="preserve">
+    <value>&lt;{0}&gt; is deprecated and should not be used.</value>
+  </data>
   <data name="DisallowedOrOperator_DoesNotSupportOrEvery" xml:space="preserve">
     <value>&lt;{0}&gt; does not support '|' (OR) - every listed value is required (AND only). This engine only supports OR-expressions on tags explicitly documented for it (e.g. Required_Special_Structures).</value>
   </data>
@@ -126,8 +177,35 @@
   <data name="EngineTextLimit_IsCharactersTooLongFor" xml:space="preserve">
     <value>{0} is {1} characters too long for the engine, and the game will not start. Remove at least {2} characters, or shorten the names inside it.</value>
   </data>
+  <data name="FireConeDegrees_AboveMaximumConsequence" xml:space="preserve">
+    <value>The engine halves the cone and compares it against a deviation of at most 180 degrees, so anything past a full turn has no further effect</value>
+  </data>
+  <data name="FireConeDegrees_BelowMinimumConsequence" xml:space="preserve">
+    <value>A hardpoint with this cone cannot point at anything</value>
+  </data>
+  <data name="FireConeDegrees_Expectation" xml:space="preserve">
+    <value>must be greater than 0 and at most 360 degrees</value>
+  </data>
   <data name="FiresForward_FiresForwardDoesNothingOn" xml:space="preserve">
     <value>Fires_Forward does nothing on '{0}': only the {1} behaviour reads it, and this object has none.</value>
+  </data>
+  <data name="FiresForward_FiresForwardSkipsTheFiring" xml:space="preserve">
+    <value>Fires_Forward skips the firing-arc check, so {0} still swing the turret but no longer limit where '{1}' fires.</value>
+  </data>
+  <data name="FiresForward_FiresForwardSkipsTheFiring2" xml:space="preserve">
+    <value>Fires_Forward skips the firing-arc check, so {0} no longer limit where '{1}' fires.</value>
+  </data>
+  <data name="FixTitle_ApplyTheEngineSOwn" xml:space="preserve">
+    <value>Apply the engine's own value: {0}</value>
+  </data>
+  <data name="FixTitle_SetToTheLongestHardpoint" xml:space="preserve">
+    <value>Set to the longest hardpoint range ({0})</value>
+  </data>
+  <data name="FixTitle_SpellIt" xml:space="preserve">
+    <value>Spell it &lt;{0}&gt;</value>
+  </data>
+  <data name="FixTitle_UseTheModelSMesh" xml:space="preserve">
+    <value>Use the model's mesh '{0}'</value>
   </data>
   <data name="FloatList_IsNotAValidFloat" xml:space="preserve">
     <value>'' is not a valid float list for &lt;{0}&gt;.</value>
@@ -165,6 +243,9 @@
   <data name="ForceDeploymentList_IsNotAValidForce" xml:space="preserve">
     <value>'{0}' is not a valid force deployment entry for &lt;{1}&gt;. Expected: FactionName, PlanetName, UnitTypeName.</value>
   </data>
+  <data name="FractionBelowOne_Expectation" xml:space="preserve">
+    <value>must be at least 0.0 and less than 1.0</value>
+  </data>
   <data name="GrenadeProjectile_NamesWhoseIsThisAbility" xml:space="preserve">
     <value>&lt;{0}&gt; names '{1}', whose &lt;{2}&gt; is {3} - this ability only accepts a {4} projectile and refuses anything else</value>
   </data>
@@ -183,6 +264,9 @@
   <data name="HardpointBoneNotOnModel_NamesBoneWhichDoesNot" xml:space="preserve">
     <value>&lt;{0}&gt; names bone '{1}', which does not exist on {2}{3}.</value>
   </data>
+  <data name="HardpointBoneNotOnModel_NamesWhichDoesNotExist" xml:space="preserve">
+    <value>&lt;{0}&gt; names '{1}', which does not exist as a mesh or a bone on {2}{3}. Aimed fire and land projectiles still reach it; untargeted space fire never does.</value>
+  </data>
   <data name="HardpointMissingAttachmentBone_HardpointIsIsDestroyableBut" xml:space="preserve">
     <value>Hardpoint '{0}' is Is_Destroyable but has no &lt;Attachment_Bone&gt;. The engine cannot attach it to the parent model, so it is indestructible and can never be shot off.</value>
   </data>
@@ -191,6 +275,21 @@
   </data>
   <data name="HardpointModelBonesUnavailable_NoBoneDataCouldBe" xml:space="preserve">
     <value>No bone data could be read for model '{0}' (declared by '{1}'), so this bone reference was not verified. The model may be missing, unreadable, or an unsupported .alo version.</value>
+  </data>
+  <data name="HardpointNeverFires_HardpointNeverFiresFireWhen" xml:space="preserve">
+    <value>Hardpoint '{0}' never fires. Fire_When_In_Rocket_Attack_Mode and Fire_When_In_Normal_Attack_Mode are both off, so no attack mode lets it fire.</value>
+  </data>
+  <data name="HardpointNeverFires_HardpointNeverFiresOnFire" xml:space="preserve">
+    <value>Hardpoint '{0}' never fires on '{1}'. Fire_When_In_Normal_Attack_Mode is off, so it fires only while a ROCKET_ATTACK ability is active - and '{2}' has none.</value>
+  </data>
+  <data name="HardpointUnhittable_IsDestroyableButNamesNo" xml:space="preserve">
+    <value>'{0}' is destroyable but names no &lt;Collision_Mesh&gt; - damage reaches a hardpoint through its collision mesh, so nothing can ever hit this one</value>
+  </data>
+  <data name="HardpointUnhittable_SharesItsCollisionMeshWith" xml:space="preserve">
+    <value>'{0}' shares its &lt;Collision_Mesh&gt; with '{1}', which claims it first - damage routes to the first match, so this hardpoint can never be hit</value>
+  </data>
+  <data name="HullFiringArc_HasNoTurretBehaviourSo" xml:space="preserve">
+    <value>'{0}' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: {1}.</value>
   </data>
   <data name="IconAwaitingRepack_IconExistsAsASource" xml:space="preserve">
     <value>Icon '{0}' exists as a source image but is missing from this project's mega texture, so the game will not display it. Rebuild the .mtd to include it.</value>
@@ -213,6 +312,9 @@
   <data name="IntFloatTupleList_IsNotAValidFloat" xml:space="preserve">
     <value>'{0}' is not a valid float for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
   </data>
+  <data name="IntFloatTupleList_IsNotAValidInt" xml:space="preserve">
+    <value>'{0}' is not a valid int-float tuple list for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
+  </data>
   <data name="IntFloatTupleList_IsNotAValidInteger" xml:space="preserve">
     <value>'{0}' is not a valid integer for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
   </data>
@@ -231,11 +333,32 @@
   <data name="IntValue_IsOutOfRangeFor" xml:space="preserve">
     <value>'{0}' is out of range for &lt;{1}&gt;. Expected a valid integer.</value>
   </data>
+  <data name="LandDamageTableMismatch_CountsDiffer" xml:space="preserve">
+    <value>Entry counts differ: &lt;Land_Damage_Thresholds&gt; has {0}, &lt;Land_Damage_Alternates&gt; has {1}. The columns pair by position, so the last {2} of &lt;{3}&gt; pair with nothing.</value>
+  </data>
   <data name="ListLengthHandlerBase_ButHasTheEngineRejects" xml:space="preserve">
     <value>&lt;{0}&gt; {1}, but has {2}. The engine rejects this value on load</value>
   </data>
   <data name="ListMap_AVariantReadsOnlyIts" xml:space="preserve">
     <value>A variant reads only its last &lt;{0}&gt;, on line {1}. Each one replaces the list.</value>
+  </data>
+  <data name="ListMap_AlreadyStartsAGroupOf" xml:space="preserve">
+    <value>'{0}' already starts a group of &lt;{1}&gt; on line {2}. The engine keeps the groups apart and does not merge them.</value>
+  </data>
+  <data name="ListMap_HasToStartWithIs" xml:space="preserve">
+    <value>&lt;{0}&gt; has to start with {1} {2}: '{3}' is none. The engine drops the whole value.</value>
+  </data>
+  <data name="ListMap_IsANotTheEngine" xml:space="preserve">
+    <value>'{0}' is a {1}, not {2} {3}. The engine accepts any object in &lt;{4}&gt;, and loads it all the same.</value>
+  </data>
+  <data name="ListMap_IsAsWellAsAn" xml:space="preserve">
+    <value>'{0}' is {1} {2} as well as an object, so the engine starts a new group with it instead of adding it to '{3}'.</value>
+  </data>
+  <data name="ListMap_IsNotTheEngineAccepts" xml:space="preserve">
+    <value>'{0}' is not {1} {2}. The engine accepts any object in &lt;{3}&gt;, and loads it all the same.</value>
+  </data>
+  <data name="ListMap_StartsWithWhichIsNo" xml:space="preserve">
+    <value>&lt;{0}&gt; starts with '{1}', which is no {2}, so its items join the key '{3}' of the previous &lt;{4}&gt;.</value>
   </data>
   <data name="LocalisationKeyHandlerBase_LocalisationKeyWasNotFound" xml:space="preserve">
     <value>Localisation key '{0}' was not found in the loaded translation databases.</value>
@@ -251,6 +374,12 @@
   </data>
   <data name="LuaScriptReference_LuaScriptContainsABackslash" xml:space="preserve">
     <value>Lua script '{0}' contains a backslash. The game reads the name inside a Lua string, where a backslash is an escape, so the script never loads. '/' separates directories.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptLoadsFromOutside" xml:space="preserve">
+    <value>Lua script '{0}' loads from '{1}', outside {2}.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptLoadsFromWhich" xml:space="preserve">
+    <value>Lua script '{0}' loads from '{1}', which shadows '{2}': the game searches that directory first.</value>
   </data>
   <data name="LuaScriptReference_LuaScriptWasNotFound" xml:space="preserve">
     <value>Lua script '{0}' was not found: no '{1}.lua' or '{2}.lc' in any script directory. The object runs without a script.</value>
@@ -288,8 +417,14 @@
   <data name="NamedEnumValueHandlerBase_IsNotAValidValue" xml:space="preserve">
     <value>'' is not a valid value for &lt;{0}&gt;.</value>
   </data>
+  <data name="NegativeFraction_Expectation" xml:space="preserve">
+    <value>must be between -1.0 and 0.0</value>
+  </data>
   <data name="NonEmptyReferenceHandlerBase_IsNotAValidFor" xml:space="preserve">
     <value>'' is not a valid {0} for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NonNegativeValue_Expectation" xml:space="preserve">
+    <value>cannot be less than zero</value>
   </data>
   <data name="NormalizedFloat_IsNotAValidNumber" xml:space="preserve">
     <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
@@ -302,6 +437,12 @@
   </data>
   <data name="NumericRangeHandlerBase_" xml:space="preserve">
     <value>&lt;{0}&gt; {1}. {2}</value>
+  </data>
+  <data name="NumericRangeHandlerBase_Consequence" xml:space="preserve">
+    <value>The engine rejects this value on load</value>
+  </data>
+  <data name="OneEntryPerTag_OnlyIsReadIsDropped" xml:space="preserve">
+    <value>Only '{0}' is read - '{1}' is dropped. Each &lt;{2}&gt; holds one entry; further entries need their own tag.</value>
   </data>
   <data name="PerFactionIntMap_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
@@ -327,6 +468,9 @@
   <data name="PositionLabel_IsNotAValidPosition" xml:space="preserve">
     <value>'' is not a valid position label for &lt;{0}&gt;.</value>
   </data>
+  <data name="PositiveValue_Expectation" xml:space="preserve">
+    <value>must be greater than zero</value>
+  </data>
   <data name="PrerequisiteExpression_ExpectsAPrerequisiteExpressionValue" xml:space="preserve">
     <value>&lt;{0}&gt; expects a prerequisite expression; value must not be empty.</value>
   </data>
@@ -336,8 +480,35 @@
   <data name="ProjectileCategoryList_IsNotAKnownOn" xml:space="preserve">
     <value>'{0}' is not a known {1} on &lt;{2}&gt; - the engine never matches it, so that projectile is not intercepted.</value>
   </data>
+  <data name="ReferenceResolution_BehaviourSeparator" xml:space="preserve">
+    <value> or </value>
+  </data>
+  <data name="ReferenceResolution_CannotResolve" xml:space="preserve">
+    <value>Cannot resolve reference '{0}': No object with this name exists in the workspace.</value>
+  </data>
+  <data name="ReferenceResolution_CannotVerify" xml:space="preserve">
+    <value>Cannot verify reference '{0}': Checking {1} references is not supported yet.</value>
+  </data>
+  <data name="ReferenceResolution_KindMismatch" xml:space="preserve">
+    <value>Type mismatch for '{0}': Expected a {1}{2}.</value>
+  </data>
+  <data name="ReferenceResolution_NoBehaviour" xml:space="preserve">
+    <value>, but it has no {0} behaviour</value>
+  </data>
+  <data name="ReferenceResolution_TypeMismatch" xml:space="preserve">
+    <value>Type mismatch for '{0}': Expected '{1}' but found '{2}'.</value>
+  </data>
   <data name="RequiredFirstEntry_MustListFirstItIs" xml:space="preserve">
     <value>&lt;{0}&gt; must list '{1}' first - it is entry 0, which the engine hands out whenever a lookup misses, so putting '{2}' there silently repoints every default that falls back to it</value>
+  </data>
+  <data name="RespawnTimeList_EntriesMustBeOrGreater" xml:space="preserve">
+    <value>&lt;{0}&gt; entries must be 0 or greater. The engine discards the whole respawn table, min and max together</value>
+  </data>
+  <data name="RespawnTimeList_NeedsOneEntryPerTech" xml:space="preserve">
+    <value>&lt;{0}&gt; needs one entry per tech level - {1} values, but has {2}. The engine discards the whole respawn table, min and max together</value>
+  </data>
+  <data name="RespawnTimeList_UsesZeroAsARespawn" xml:space="preserve">
+    <value>&lt;{0}&gt; uses zero as a respawn time, which is only allowed when every entry is zero - that is how the respawn feature is switched off. The engine discards the whole respawn table, min and max together</value>
   </data>
   <data name="RgbaValue_ContainsFloatComponentsButExpects" xml:space="preserve">
     <value>'{0}' contains float components but &lt;{1}&gt; expects integers. Did you mean '{2}'?</value>
@@ -375,6 +546,12 @@
   <data name="SpecialWeaponIndex_HasOutsideToSoThe" xml:space="preserve">
     <value>'{0}' has {1} {2}, outside 0 to {3}, so the game never registers it as a special weapon.</value>
   </data>
+  <data name="SquadronOffsetsMismatch_SquadronHasUnitSBut" xml:space="preserve">
+    <value>Squadron has {0} unit(s) but only {1} Squadron_Offsets. Add {2} more.</value>
+  </data>
+  <data name="SquadronOffsetsMismatch_SquadronHasUnitSBut2" xml:space="preserve">
+    <value>Squadron has {0} unit(s) but {1} Squadron_Offsets. Remove {2} excess.</value>
+  </data>
   <data name="StoryDialogReference_ChapterIsNotDefinedIn" xml:space="preserve">
     <value>Chapter {0} is not defined in story dialog '{1}' ({2}).</value>
   </data>
@@ -393,6 +570,21 @@
   <data name="StoryParamUnknownSlot_IsNotUsedBy" xml:space="preserve">
     <value>'{0}' is not used by {1}.</value>
   </data>
+  <data name="StoryParamValue_IsNotAValidBoolean" xml:space="preserve">
+    <value>'{0}' is not a valid boolean value. Use 0, 1, true, or false.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidD" xml:space="preserve">
+    <value>'{0}' is not a valid 3D vector. Expected three space- or comma-separated numbers.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidInteger" xml:space="preserve">
+    <value>'{0}' is not a valid integer.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidNumber2" xml:space="preserve">
+    <value>'{0}' is not a valid number in vector '{1}'.</value>
+  </data>
   <data name="SystemSpyDuration_DurationInSecsIsBut" xml:space="preserve">
     <value>&lt;Duration_In_Secs&gt; is {0}, but a {1} system spy needs a duration {2} - the engine overwrites it with {3}</value>
   </data>
@@ -401,6 +593,9 @@
   </data>
   <data name="TextureFileFormat_IsNotAValidTexture" xml:space="preserve">
     <value>'{0}' is not a valid texture filename for &lt;{1}&gt;. Expected a .tga or .dds file.</value>
+  </data>
+  <data name="TupleList_HoldsItemSWhichIs" xml:space="preserve">
+    <value>&lt;{0}&gt; holds {1} item(s), which is not a whole number of {2}.</value>
   </data>
   <data name="Uint_IsNotAValidNon" xml:space="preserve">
     <value>'{0}' is not a valid non-negative integer for &lt;{1}&gt;. Did you mean {2}?</value>
@@ -411,11 +606,20 @@
   <data name="UnitSpawnProbabilityTable_IsNotAValidSpawn" xml:space="preserve">
     <value>'{0}' is not a valid spawn probability for &lt;{1}&gt;. Expected a float in [0.0, 1.0].</value>
   </data>
+  <data name="UnitSpawnProbabilityTable_IsNotAValidSpawn2" xml:space="preserve">
+    <value>'{0}' is not a valid spawn probability table for &lt;{1}&gt;. Expected pairs of UnitTypeName, Float [0.0, 1.0].</value>
+  </data>
   <data name="UnitSpawnTable_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
   </data>
   <data name="UnitSpawnTable_IsNotAValidUnit" xml:space="preserve">
     <value>'{0}' is not a valid unit spawn entry for &lt;{1}&gt;. Expected: UnitTypeName, Integer &gt;= -1.</value>
+  </data>
+  <data name="UnknownTag_IsNotAKnownTag" xml:space="preserve">
+    <value>&lt;{0}&gt; is not a known {1} tag. The engine discards it.</value>
+  </data>
+  <data name="UnknownTag_IsNotAKnownTag2" xml:space="preserve">
+    <value>&lt;{0}&gt; is not a known {1} tag. Did you mean &lt;{2}&gt;?</value>
   </data>
   <data name="UnnamedObject_HasNoItCannotBe" xml:space="preserve">
     <value>&lt;{0}&gt; has no {1} - it cannot be referenced or overridden, and is ignored as a {2}.</value>

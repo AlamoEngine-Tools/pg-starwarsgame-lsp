@@ -28,7 +28,7 @@ public sealed class OwnerIncomeShareHandler : XmlDiagnosticsHandler<OwnerIncomeS
                 ctx.Messages.Format("IncomeSplitHandlers_OwnerIncomePercentageIsBut",
                     fact.Value.ToString("G", CultureInfo.InvariantCulture), fact.Clamped),
                 SuggestedFix: fact.Clamped,
-                FixTitle: $"Apply the engine's own value: {fact.Clamped}")
+                FixTitle: ctx.Messages.Format("FixTitle_ApplyTheEngineSOwn", fact.Clamped))
         ];
     }
 }

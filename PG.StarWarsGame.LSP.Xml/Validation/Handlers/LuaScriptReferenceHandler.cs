@@ -83,8 +83,9 @@ public sealed class LuaScriptReferenceHandler : XmlDiagnosticsHandler<XmlTagValu
 
         var shadowed = candidates.FirstOrDefault(LuaScriptLookup.IsInGameObjectDirectory);
         var message = shadowed is null
-            ? $"Lua script '{name}' loads from '{loaded}', outside {LuaScriptLookup.GameObjectDirectory.TrimEnd('/')}."
-            : $"Lua script '{name}' loads from '{loaded}', which shadows '{shadowed}': the game searches that directory first.";
+            ? ctx.Messages.Format("LuaScriptReference_LuaScriptLoadsFromOutside", name, loaded,
+                LuaScriptLookup.GameObjectDirectory.TrimEnd('/'))
+            : ctx.Messages.Format("LuaScriptReference_LuaScriptLoadsFromWhich", name, loaded, shadowed);
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, message,

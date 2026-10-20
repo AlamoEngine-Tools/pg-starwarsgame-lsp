@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -20,14 +21,14 @@ internal static class OneEntryPerTag
     ///     A warning when <paramref name="parts" /> holds more non-empty tokens than the engine reads,
     ///     or null when it does not.
     /// </summary>
-    public static XmlDiagnosticResult? ExtraTokens(string tag, IReadOnlyList<string> parts, int read)
+    public static XmlDiagnosticResult? ExtraTokens(string tag, IReadOnlyList<string> parts, int read,
+        IMessageCatalog messages)
     {
         var dropped = parts.Skip(read).Where(p => p.Length > 0).ToList();
         if (dropped.Count == 0) return null;
 
         var kept = string.Join(", ", parts.Take(read));
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-            $"Only '{kept}' is read - '{string.Join(", ", dropped)}' is dropped. Each <{tag}> holds one "
-            + "entry; further entries need their own tag.");
+            messages.Format("OneEntryPerTag_OnlyIsReadIsDropped", kept, string.Join(", ", dropped), tag));
     }
 }

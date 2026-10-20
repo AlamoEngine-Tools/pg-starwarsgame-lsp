@@ -19,11 +19,9 @@ public sealed class HardpointNeverFiresHandler : XmlDiagnosticsHandler<Hardpoint
     {
         // Both flags off holds for any owner, so that finding names none.
         var message = fact.OwnerId is null
-            ? $"Hardpoint '{fact.HardpointId}' never fires. Fire_When_In_Rocket_Attack_Mode and " +
-              "Fire_When_In_Normal_Attack_Mode are both off, so no attack mode lets it fire."
-            : $"Hardpoint '{fact.HardpointId}' never fires on '{fact.OwnerId}'. " +
-              "Fire_When_In_Normal_Attack_Mode is off, so it fires only while a ROCKET_ATTACK ability is " +
-              $"active - and '{fact.OwnerId}' has none.";
+            ? ctx.Messages.Format("HardpointNeverFires_HardpointNeverFiresFireWhen", fact.HardpointId)
+            : ctx.Messages.Format("HardpointNeverFires_HardpointNeverFiresOnFire", fact.HardpointId, fact.OwnerId,
+                fact.OwnerId);
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, message)];
     }

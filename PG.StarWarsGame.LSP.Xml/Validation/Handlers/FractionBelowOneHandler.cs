@@ -26,5 +26,5 @@ public sealed class FractionBelowOneHandler : NumericRangeHandlerBase
 
     protected override bool MaximumInclusive => false;
 
-    protected override string Expectation => "must be at least 0.0 and less than 1.0";
+    protected override string ExpectationKey => "FractionBelowOne_Expectation";
 }

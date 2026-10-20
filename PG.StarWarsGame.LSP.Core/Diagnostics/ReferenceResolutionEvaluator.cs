@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -35,8 +36,11 @@ public static class ReferenceResolutionEvaluator
     public static (XmlDiagnosticSeverity Severity, string Message, DiagnosticId Id)? Evaluate(
         string targetId, string? expectedTypeName, GameSymbol? resolved,
         IReadOnlySet<string>? indexedTypeNames = null,
-        ObjectKindDefinition? expectedKind = null, GameIndex? index = null)
+        ObjectKindDefinition? expectedKind = null, GameIndex? index = null, IMessageCatalog? messages = null)
     {
+        // The caller's catalogue, in the configured locale; English for a caller without one.
+        messages ??= ResxMessageCatalog.Server("en");
+
         // Scoped ability IDs are stored as "OWNER$name"; show only the bare name to the user.
         var displayId = StripOwnerPrefix(targetId);
 
@@ -50,11 +54,11 @@ public static class ReferenceResolutionEvaluator
                 // The gap is the tool's (the AI tree, for one, is a later milestone), so the notice
                 // names it as an unsupported check rather than as something missing from the data.
                 return (XmlDiagnosticSeverity.Information,
-                    $"Cannot verify reference '{displayId}': Checking {expectedTypeName} references is not supported yet.",
+                    messages.Format("ReferenceResolution_CannotVerify", displayId, expectedTypeName),
                     DiagnosticIds.ReferenceTypeNotIndexed);
 
             return (XmlDiagnosticSeverity.Error,
-                $"Cannot resolve reference '{displayId}': No object with this name exists in the workspace.",
+                messages.Format("ReferenceResolution_CannotResolve", displayId),
                 DiagnosticIds.UnresolvedReference);
         }
 
@@ -68,10 +72,11 @@ public static class ReferenceResolutionEvaluator
                 return null;
 
             var because = expectedKind.Behaviors.Count > 0
-                ? $", but it has no {string.Join(" or ", expectedKind.Behaviors)} behaviour"
+                ? messages.Format("ReferenceResolution_NoBehaviour",
+                    string.Join(messages.Format("ReferenceResolution_BehaviourSeparator"), expectedKind.Behaviors))
                 : string.Empty;
             return (XmlDiagnosticSeverity.Error,
-                $"Type mismatch for '{displayId}': Expected a {expectedKind.Kind}{because}.",
+                messages.Format("ReferenceResolution_KindMismatch", displayId, expectedKind.Kind, because),
                 DiagnosticIds.TypeMismatch);
         }
 
@@ -92,7 +97,7 @@ public static class ReferenceResolutionEvaluator
             return null;
 
         return (XmlDiagnosticSeverity.Error,
-            $"Type mismatch for '{displayId}': Expected '{expectedTypeName}' but found '{resolved.TypeName}'.",
+            messages.Format("ReferenceResolution_TypeMismatch", displayId, expectedTypeName, resolved.TypeName),
             DiagnosticIds.UnresolvedReference);
     }
 

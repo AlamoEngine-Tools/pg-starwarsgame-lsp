@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -20,75 +21,76 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
     {
         return fact.Problem switch
         {
-            CampaignStoryAttachmentProblem.TupleInFactionSpecificTag => [TupleInFactionSpecificTag(fact)],
-            CampaignStoryAttachmentProblem.RedundantAttachment => [RedundantAttachment(fact)],
-            CampaignStoryAttachmentProblem.ConflictingAttachment => [ConflictingAttachment(fact)],
-            CampaignStoryAttachmentProblem.MixedAuthoringForms => [MixedAuthoringForms(fact)],
+            CampaignStoryAttachmentProblem.TupleInFactionSpecificTag => [TupleInFactionSpecificTag(fact, ctx.Messages)],
+            CampaignStoryAttachmentProblem.RedundantAttachment => [RedundantAttachment(fact, ctx.Messages)],
+            CampaignStoryAttachmentProblem.ConflictingAttachment => [ConflictingAttachment(fact, ctx.Messages)],
+            CampaignStoryAttachmentProblem.MixedAuthoringForms => [MixedAuthoringForms(fact, ctx.Messages)],
             _ => []
         };
     }
 
     // Warning, not Error: the engine merges every occurrence into one (faction, plot) list, so
     // attaching the same manifest twice loads it once and works - it is just dead authoring.
-    private static XmlDiagnosticResult RedundantAttachment(CampaignStoryAttachmentFact fact)
+    private static XmlDiagnosticResult RedundantAttachment(CampaignStoryAttachmentFact fact, IMessageCatalog messages)
     {
         return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Warning,
-            $"The {fact.Faction} faction is attached to '{fact.Value}' more than once{InCampaign(fact)}. " +
-            $"Only one attachment is needed.{AlsoAt(fact.OtherLines)}",
+            messages.Format("CampaignStoryAttachment_TheFactionIsAttachedTo", fact.Faction, fact.Value,
+                InCampaign(fact, messages), AlsoAt(fact.OtherLines, messages)),
             Id: DiagnosticIds.CampaignStoryRedundantAttachment);
     }
 
     // Error: the engine merges both attachments, so which manifest the faction actually runs is
     // not something the author can read off the file - and only one of them can be intended.
-    private static XmlDiagnosticResult ConflictingAttachment(CampaignStoryAttachmentFact fact)
+    private static XmlDiagnosticResult ConflictingAttachment(CampaignStoryAttachmentFact fact, IMessageCatalog messages)
     {
         return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Error,
-            $"The {fact.Faction} faction is attached to {fact.PlotFiles.Count} different plot manifests" +
-            $"{InCampaign(fact)}: {string.Join(", ", fact.PlotFiles.Select(f => $"'{f}'"))}. " +
-            $"Keep one.{AlsoAt(fact.OtherLines)}", Id: DiagnosticIds.CampaignStoryConflictingAttachment);
+            messages.Format("CampaignStoryAttachment_TheFactionIsAttachedTo2", fact.Faction, fact.PlotFiles.Count,
+                InCampaign(fact, messages), string.Join(", ", fact.PlotFiles.Select(f => $"'{f}'")),
+                AlsoAt(fact.OtherLines, messages)), Id: DiagnosticIds.CampaignStoryConflictingAttachment);
     }
 
     // Information: legal and sometimes unavoidable - only the generic tag can attach a non-major
     // faction - so this states the split rather than asking for a change.
-    private static XmlDiagnosticResult MixedAuthoringForms(CampaignStoryAttachmentFact fact)
+    private static XmlDiagnosticResult MixedAuthoringForms(CampaignStoryAttachmentFact fact, IMessageCatalog messages)
     {
         return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Information,
-            $"Campaign{Named(fact)} attaches plots through both the faction-specific " +
-            $"<Faction_Story_Name> tags and the generic <{StoryNameTagSyntax.GenericTag}> tuple list. " +
-            "Both are read by the engine; only the generic form can attach a non-major faction.",
+            messages.Format("CampaignStoryAttachment_CampaignAttachesPlotsThroughBoth", Named(fact, messages),
+                StoryNameTagSyntax.GenericTag),
             Id: DiagnosticIds.CampaignStoryMixedAuthoringForms);
     }
 
-    private static string InCampaign(CampaignStoryAttachmentFact fact)
+    private static string InCampaign(CampaignStoryAttachmentFact fact, IMessageCatalog messages)
     {
-        return fact.CampaignName.Length == 0 ? string.Empty : $" in campaign '{fact.CampaignName}'";
+        return fact.CampaignName.Length == 0
+            ? string.Empty
+            : messages.Format("CampaignStoryAttachment_InCampaign", fact.CampaignName);
     }
 
-    private static string Named(CampaignStoryAttachmentFact fact)
+    private static string Named(CampaignStoryAttachmentFact fact, IMessageCatalog messages)
     {
         return fact.CampaignName.Length == 0 ? string.Empty : $" '{fact.CampaignName}'";
     }
 
-    private static string AlsoAt(IReadOnlyList<int> otherLines)
+    private static string AlsoAt(IReadOnlyList<int> otherLines, IMessageCatalog messages)
     {
         return otherLines.Count switch
         {
             0 => string.Empty,
-            1 => $" Also at line {otherLines[0]}.",
-            _ => $" Also at lines {string.Join(", ", otherLines)}."
+            1 => messages.Format("CampaignStoryAttachment_AlsoAtLine", otherLines[0]),
+            _ => messages.Format("CampaignStoryAttachment_AlsoAtLines", string.Join(", ", otherLines))
         };
     }
 
-    private static XmlDiagnosticResult TupleInFactionSpecificTag(CampaignStoryAttachmentFact fact)
+    private static XmlDiagnosticResult TupleInFactionSpecificTag(CampaignStoryAttachmentFact fact,
+        IMessageCatalog messages)
     {
         return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Error,
-            $"<{fact.TagName}> takes a single plot manifest file, not a 'Faction, PlotFile' tuple - " +
-            $"the tag already names the faction. Use <{StoryNameTagSyntax.GenericTag}>{fact.Value}" +
-            $"</{StoryNameTagSyntax.GenericTag}> for the generic form, or drop the leading token.",
+            messages.Format("CampaignStoryAttachment_TakesASinglePlotManifest", fact.TagName,
+                StoryNameTagSyntax.GenericTag, fact.Value, StoryNameTagSyntax.GenericTag),
             SuggestedFix: SingleRemainingPlotFile(fact.Value), Id: DiagnosticIds.CampaignStoryTupleInFactionTag);
     }
 

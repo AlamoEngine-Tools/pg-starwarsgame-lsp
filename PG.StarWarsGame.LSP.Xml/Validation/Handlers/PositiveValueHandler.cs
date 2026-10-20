@@ -38,5 +38,5 @@ public sealed class PositiveValueHandler : NumericRangeHandlerBase
 
     protected override bool MinimumInclusive => false;
 
-    protected override string Expectation => "must be greater than zero";
+    protected override string ExpectationKey => "PositiveValue_Expectation";
 }

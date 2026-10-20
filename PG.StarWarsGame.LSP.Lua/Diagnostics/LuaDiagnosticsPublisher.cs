@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -212,7 +213,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
                 {
                     var resolved = index.Resolve(reference.TargetId);
                     var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName,
-                        resolved);
+                        resolved, messages: ResxMessageCatalog.Server(_configProvider?.Current.Locale ?? "en"));
                     if (eval is null) continue;
 
                     diagnostics.Add(new LspDiagnostic

@@ -24,6 +24,6 @@ public sealed class PerFactionPlanetHandler : CommaSeparatedPairHandlerBase
                     ctx.Messages.Format("PerFactionPlanet_IsNotAValidPer", raw, fact.Tag.Tag))
             ];
 
-        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 2) is { } extra ? [extra] : [];
+        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 2, ctx.Messages) is { } extra ? [extra] : [];
     }
 }

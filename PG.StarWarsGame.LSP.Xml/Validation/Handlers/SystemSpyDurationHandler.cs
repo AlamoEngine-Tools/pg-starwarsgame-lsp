@@ -31,7 +31,7 @@ public sealed class SystemSpyDurationHandler : XmlDiagnosticsHandler<SystemSpyDu
                     fact.Duration.ToString("G", CultureInfo.InvariantCulture), fact.Style, fact.Requirement,
                     fact.Repair),
                 SuggestedFix: fact.Repair,
-                FixTitle: $"Apply the engine's own value: {fact.Repair}")
+                FixTitle: ctx.Messages.Format("FixTitle_ApplyTheEngineSOwn", fact.Repair))
         ];
     }
 }

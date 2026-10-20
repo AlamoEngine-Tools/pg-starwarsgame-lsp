@@ -38,7 +38,7 @@ public sealed class CaseSensitiveTagHandler : XmlDiagnosticsHandler<CaseSensitiv
                 ctx.Messages.Format("CaseSensitiveTag_HasToBeSpelledExactly", fact.Authored, fact.Expected,
                     fact.Consequence),
                 SuggestedFix: fact.Expected,
-                FixTitle: $"Spell it <{fact.Expected}>")
+                FixTitle: ctx.Messages.Format("FixTitle_SpellIt", fact.Expected))
         ];
     }
 }

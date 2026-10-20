@@ -39,7 +39,7 @@ public sealed class AbilitySfxMapHandler : CommaSeparatedPairHandlerBase
                     Id: DiagnosticIds.AbilitySfxMapUnknownAbilityType), fact, 0));
         }
 
-        var sfxResult = TryValidateSfxEvent(sfxEventName, fact.Tag.Tag, ctx.Index);
+        var sfxResult = TryValidateSfxEvent(sfxEventName, fact.Tag.Tag, ctx.Index, ctx.Messages);
         if (sfxResult is not null)
             results.Add(AtPairSlot(sfxResult, fact, 1));
 

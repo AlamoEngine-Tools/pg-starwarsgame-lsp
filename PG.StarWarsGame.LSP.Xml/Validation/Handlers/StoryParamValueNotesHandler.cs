@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -44,7 +45,7 @@ public sealed class StoryParamValueNotesHandler : XmlDiagnosticsHandler<StoryPar
             var severity = SchemaNoteDiagnostics.SeverityOf(note.Kind);
             if (severity is null) continue;
 
-            var message = Message(note, value.Name, ctx.Locale);
+            var message = Message(note, value.Name, ctx.Locale, ctx.Messages);
             if (message is null) continue;
 
             results.Add(new XmlDiagnosticResult(severity.Value, message,
@@ -54,7 +55,7 @@ public sealed class StoryParamValueNotesHandler : XmlDiagnosticsHandler<StoryPar
         return results;
     }
 
-    private static string? Message(SchemaNote note, string value, string locale)
+    private static string? Message(SchemaNote note, string value, string locale, IMessageCatalog messages)
     {
         var text = SchemaNoteDiagnostics.TextOf(note, locale);
         var lead = note.Kind switch

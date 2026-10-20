@@ -28,10 +28,8 @@ public sealed class HardpointUnhittableHandler : XmlDiagnosticsHandler<Hardpoint
         HardpointUnhittableFact fact, DiagnosticsContext ctx)
     {
         var message = fact.SharedWith is { } first
-            ? $"'{fact.HardpointId}' shares its <Collision_Mesh> with '{first}', which claims it "
-              + "first - damage routes to the first match, so this hardpoint can never be hit"
-            : $"'{fact.HardpointId}' is destroyable but names no <Collision_Mesh> - damage reaches "
-              + "a hardpoint through its collision mesh, so nothing can ever hit this one";
+            ? ctx.Messages.Format("HardpointUnhittable_SharesItsCollisionMeshWith", fact.HardpointId, first)
+            : ctx.Messages.Format("HardpointUnhittable_IsDestroyableButNamesNo", fact.HardpointId);
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, message)];
     }

@@ -16,7 +16,7 @@ public sealed class UnresolvedReferenceHandler : XmlDiagnosticsHandler<XmlRefere
             return [];
 
         var eval = ReferenceResolutionEvaluator.Evaluate(fact.TargetId, fact.ExpectedTypeName, null,
-            ctx.Index.IndexedTypeNames);
+            ctx.Index.IndexedTypeNames, messages: ctx.Messages);
         return eval is { } r ? [new XmlDiagnosticResult(r.Severity, r.Message, Id: r.Id)] : [];
     }
 }

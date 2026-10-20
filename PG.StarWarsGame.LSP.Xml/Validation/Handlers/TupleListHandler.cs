@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -30,7 +31,7 @@ public sealed class TupleListHandler : CommaSeparatedPairHandlerBase
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        return TupleShape.WholeGroups(fact) is { } error ? [error] : [];
+        return TupleShape.WholeGroups(fact, ctx.Messages) is { } error ? [error] : [];
     }
 }
 
@@ -38,13 +39,13 @@ public sealed class TupleListHandler : CommaSeparatedPairHandlerBase
 internal static class TupleShape
 {
     /// <summary>An error when the value is not a whole, non-zero number of groups.</summary>
-    public static XmlDiagnosticResult? WholeGroups(XmlTagValueFact fact)
+    public static XmlDiagnosticResult? WholeGroups(XmlTagValueFact fact, IMessageCatalog messages)
     {
         var count = TupleItems.Read(fact.Tag, fact.RawValue).Count;
         var size = TupleItems.GroupSize(fact.Tag);
         if (count > 0 && count % size == 0) return null;
 
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"<{fact.Tag.Tag}> holds {count} item(s), which is not a whole number of {TupleItems.Describe(fact.Tag)}.");
+            messages.Format("TupleList_HoldsItemSWhichIs", fact.Tag.Tag, count, TupleItems.Describe(fact.Tag)));
     }
 }

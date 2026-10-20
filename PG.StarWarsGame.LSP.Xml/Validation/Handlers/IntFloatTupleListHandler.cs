@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -18,7 +19,7 @@ public sealed class IntFloatTupleListHandler : CommaSeparatedPairHandlerBase
     {
         var tokens = XmlUtility.SplitListWithOffsets(fact.RawValue);
         if (tokens.Count == 0 || tokens.Count % 2 != 0)
-            return [Error(fact, fact.RawValue.Trim())];
+            return [Error(fact, fact.RawValue.Trim(), ctx.Messages)];
 
         var results = new List<XmlDiagnosticResult>();
         for (var i = 0; i < tokens.Count; i += 2)
@@ -51,9 +52,9 @@ public sealed class IntFloatTupleListHandler : CommaSeparatedPairHandlerBase
         return results;
     }
 
-    private static XmlDiagnosticResult Error(XmlTagValueFact fact, string trimmed)
+    private static XmlDiagnosticResult Error(XmlTagValueFact fact, string trimmed, IMessageCatalog messages)
     {
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"'{trimmed}' is not a valid int-float tuple list for <{fact.Tag.Tag}>. Expected alternating integer and float pairs.");
+            messages.Format("IntFloatTupleList_IsNotAValidInt", trimmed, fact.Tag.Tag));
     }
 }

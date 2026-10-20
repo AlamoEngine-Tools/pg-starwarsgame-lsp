@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -73,12 +74,13 @@ public sealed class ListMapHandler : XmlDiagnosticsHandler<XmlListMapFact>
                 {
                     if (currentKey is not null && NamesAnObject(item.Text, keySlot, keyType, ctx.Index))
                         results.Add(At(item, XmlDiagnosticSeverity.Warning,
-                            $"'{item.Text}' is {Article(keySlot.Label)} {Describe(keySlot)} as well as an object, so the engine starts a new group with it instead of adding it to '{currentKey}'.",
+                            ctx.Messages.Format("ListMap_IsAsWellAsAn", item.Text, Article(keySlot.Label),
+                                Describe(keySlot), currentKey),
                             DiagnosticIds.ListMapItemNamesAKey));
 
                     if (keysSeen.TryGetValue(item.Text, out var firstLine))
                         results.Add(At(item, XmlDiagnosticSeverity.Warning,
-                            $"'{item.Text}' already starts a group of <{tag.Tag}> on line {firstLine + 1}. The engine keeps the groups apart and does not merge them.",
+                            ctx.Messages.Format("ListMap_AlreadyStartsAGroupOf", item.Text, tag.Tag, firstLine + 1),
                             DiagnosticIds.ListMapRepeatedKey));
                     else
                         keysSeen[item.Text] = item.Line;
@@ -91,17 +93,19 @@ public sealed class ListMapHandler : XmlDiagnosticsHandler<XmlListMapFact>
                 {
                     // The engine stops reading the value here and keeps nothing of it.
                     results.Add(At(item, XmlDiagnosticSeverity.Error,
-                        $"<{tag.Tag}> has to start with {Article(keySlot.Label)} {Describe(keySlot)}: '{item.Text}' is none. The engine drops the whole value.",
+                        ctx.Messages.Format("ListMap_HasToStartWithIs", tag.Tag, Article(keySlot.Label),
+                            Describe(keySlot), item.Text),
                         DiagnosticIds.ListMapFirstItemNotAKey));
                     break;
                 }
 
                 if (i == 0)
                     results.Add(At(item, XmlDiagnosticSeverity.Warning,
-                        $"<{tag.Tag}> starts with '{item.Text}', which is no {Describe(keySlot)}, so its items join the key '{currentKey}' of the previous <{tag.Tag}>.",
+                        ctx.Messages.Format("ListMap_StartsWithWhichIsNo", tag.Tag, item.Text, Describe(keySlot),
+                            currentKey, tag.Tag),
                         DiagnosticIds.ListMapContinuesPreviousKey));
 
-                if (ValueKindProblem(item.Text, tag, valueSlot, ctx.Index) is { } kindMessage)
+                if (ValueKindProblem(item.Text, tag, valueSlot, ctx.Index, ctx.Messages) is { } kindMessage)
                     results.Add(At(item, XmlDiagnosticSeverity.Warning, kindMessage, DiagnosticIds.ListMapValueKind));
 
                 if ((SlotItemChecks.Enum(tag, valueSlot, item.Text, ctx) ??
@@ -133,14 +137,14 @@ public sealed class ListMapHandler : XmlDiagnosticsHandler<XmlListMapFact>
     ///     Unresolved values are the reference pipeline's to report.
     /// </summary>
     private static string? ValueKindProblem(string value, XmlTagDefinition tag, TupleSlotDefinition slot,
-        GameIndex index)
+        GameIndex index, IMessageCatalog messages)
     {
         if (slot.ReferenceKind != ReferenceKind.XmlObject || index.Resolve(value) is not { } resolved)
             return null;
 
         if (slot.Kind is { } kind)
             return ObjectKinds.Match(index, resolved, kind) == KindMatch.No
-                ? $"'{value}' is not {Article(kind.Kind)} {kind.Kind}. The engine accepts any object in <{tag.Tag}>, and loads it all the same."
+                ? messages.Format("ListMap_IsNotTheEngineAccepts", value, Article(kind.Kind), kind.Kind, tag.Tag)
                 : null;
 
         var type = slot.ObjectType?.TypeName ?? slot.ReferenceTypeName;
@@ -149,7 +153,7 @@ public sealed class ListMapHandler : XmlDiagnosticsHandler<XmlListMapFact>
             return null;
 
         return
-            $"'{value}' is a {resolved.TypeName}, not {Article(type)} {type}. The engine accepts any object in <{tag.Tag}>, and loads it all the same.";
+            messages.Format("ListMap_IsANotTheEngine", value, resolved.TypeName, Article(type), type, tag.Tag);
     }
 
     private static string Describe(TupleSlotDefinition slot)
