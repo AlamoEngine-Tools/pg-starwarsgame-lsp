@@ -97,6 +97,21 @@ export function planChanges(
     return { start, stop };
 }
 
+/**
+ * The name of a client's diagnostic collection: its own per project.
+ *
+ * vscode-languageclient names the collection after the client id unless told otherwise, and every
+ * project's client shares that id. VS Code warned that the name already existed the moment a second
+ * project published (measured in the extension host log), and only one of two same-named files
+ * showed its diagnostics.
+ */
+export function diagnosticCollectionNameFor(
+    clientId: string,
+    spec: ClientSpec,
+): string {
+    return `${clientId}:${spec.key}`;
+}
+
 /** A document selector in the shape vscode-languageclient takes. */
 export interface DocumentFilter {
     scheme: string;

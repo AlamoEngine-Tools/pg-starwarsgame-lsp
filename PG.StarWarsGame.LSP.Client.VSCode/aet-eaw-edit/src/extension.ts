@@ -66,6 +66,7 @@ import {
     type ClientSpec,
     type ClientState,
     clientSpecs,
+    diagnosticCollectionNameFor,
     documentSelectorFor,
     isInside,
     ownerKey,
@@ -912,6 +913,7 @@ function startProjectClient(
         // Story-dialog scripts open as plaintext; the server gates all work on the pgproj
         // storyDialog registry scope, so other .txt files stay untouched.
         documentSelector: documentSelectorFor(spec),
+        diagnosticCollectionName: diagnosticCollectionNameFor(CLIENT_ID, spec),
         traceOutputChannel: trace,
         initializationOptions: {
             workspaceRoot: spec.workspaceRoot,
