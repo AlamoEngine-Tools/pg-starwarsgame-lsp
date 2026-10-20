@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions;
 using System.Text.Json.Nodes;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
@@ -45,8 +46,10 @@ public static class PgprojIconProposal
     /// <param name="document">The migrated project tree, modified in place when a node is added.</param>
     /// <param name="projectDirectory">The directory holding the <c>.pgproj</c>.</param>
     /// <param name="fs">Filesystem the project lives on.</param>
-    public static string? TryPropose(JsonObject document, string projectDirectory, IFileSystem fs)
+    public static string? TryPropose(JsonObject document, string projectDirectory, IFileSystem fs,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(fs);
 
@@ -68,9 +71,7 @@ public static class PgprojIconProposal
         foreach (var root in roots) array.Add(root);
         document["icons"] = new JsonObject { ["sourceRoots"] = array };
 
-        return $"This project has icon sources at {string.Join(", ", roots)} that nothing is "
-               + "configured to read, so every icon falls back to the base game. The proposed "
-               + "'icons' node points at them.";
+        return messages.Format("PgprojIconProposal_ThisProjectHasIconSources", string.Join(", ", roots));
     }
 
     private static bool HasConventionalMegaTexture(string projectDirectory, IFileSystem fs)

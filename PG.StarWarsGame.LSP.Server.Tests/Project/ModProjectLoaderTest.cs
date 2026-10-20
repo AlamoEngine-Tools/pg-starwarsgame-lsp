@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -116,7 +117,7 @@ public sealed class ModProjectLoaderTest
         Assert.Equal(ProjectPath, path);
         Assert.Equal("From The Past", (string?)migrated["name"]);
         Assert.Equal(PgprojFormat.Current.ToString(), (string?)migrated["_typeVersion"]);
-        Assert.Equal("The 'renamedName' field is called 'name' now.", Assert.Single(notices));
+        Assert.Equal(ResxMessageCatalog.Server("en").Format("StoryLayout_DroppedPositions", 1), Assert.Single(notices));
     }
 
     [Fact]
@@ -1013,7 +1014,7 @@ public sealed class ModProjectLoaderTest
         public string TypeName => PgprojFormat.TypeName;
         public TypeVersion From => TypeVersion.Of("aetswg", 0, 9);
         public TypeVersion To => PgprojFormat.Current;
-        public string? UserNotice => "The 'renamedName' field is called 'name' now.";
+        public CatalogueText? UserNotice => new("StoryLayout_DroppedPositions", 1);
 
         public JsonNode Migrate(JsonNode document)
         {

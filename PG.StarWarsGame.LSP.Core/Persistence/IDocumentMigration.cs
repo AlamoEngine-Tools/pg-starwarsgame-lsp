@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.Json.Nodes;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Core.Persistence;
 
@@ -39,7 +40,7 @@ public interface IDocumentMigration
     ///         manual step and stays silent about it is worse than one that refuses.
     ///     </para>
     /// </summary>
-    string? UserNotice { get; }
+    CatalogueText? UserNotice { get; }
 
     /// <summary>
     ///     Rewrites the document. The envelope fields are present on a versioned document and may

@@ -9,6 +9,7 @@ using OmniSharp.Extensions.DebugAdapter.Protocol.Events;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Server;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Debug.Protocol;
 using PG.StarWarsGame.LSP.Lua.Debug.Session;
@@ -82,6 +83,9 @@ public sealed partial class LuaDebugAdapter : IDisposable
         _map = maps.Create([]);
     }
 
+    /// <summary>The catalogue the adapter speaks in: the debug client's display language.</summary>
+    public IMessageCatalog Messages { get; private set; } = ResxMessageCatalog.Server("en");
+
     /// <summary>Completes once the client has disconnected or asked for termination.</summary>
     public Task Exited => _exited.Task;
 
@@ -107,6 +111,15 @@ public sealed partial class LuaDebugAdapter : IDisposable
         _process?.Dispose();
     }
 
+    /// <summary>
+    ///     Takes the locale the debug client sent with <c>initialize</c>. The adapter runs as its own
+    ///     process, outside the language server's settings, so this is the language it has.
+    /// </summary>
+    public void UseLocale(string? locale)
+    {
+        Messages = ResxMessageCatalog.Server(string.IsNullOrWhiteSpace(locale) ? "en" : locale);
+    }
+
     /// <summary>Gives the adapter the server it sends events through. Called once the server is up.</summary>
     public void Bind(IDebugAdapterServer server)
     {
@@ -128,7 +141,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
     {
         ArgumentNullException.ThrowIfNull(args);
         if (string.IsNullOrWhiteSpace(args.Program))
-            throw new LuaDebugAdapterException("The launch configuration names no game executable ('program')");
+            throw new LuaDebugAdapterException(Messages.Format("LuaDebugAdapter_LaunchConfigurationNamesNoGame"));
 
         _process = _launcher.Start(args.Program, args.Args ?? [], args.Cwd);
         _logger.LogInformation("Started {Program} as process {Id}", args.Program, _process.Id);
@@ -149,11 +162,11 @@ public sealed partial class LuaDebugAdapter : IDisposable
                 await session.DisposeAsync().ConfigureAwait(false);
                 if (_process.HasExited)
                     throw new LuaDebugAdapterException(
-                        $"The game exited with code {_process.ExitCode} before the debugger could attach", e);
+                        Messages.Format("LuaDebugAdapter_GameExitedCodeBeforeDebugger", _process.ExitCode), e);
                 if (_time.GetElapsedTime(deadline) >= timeout)
                     throw new LuaDebugAdapterException(
-                        $"The game did not answer on {args.Host}:{args.Port} within {timeout.TotalSeconds:0} s. " +
-                        "Is it a debug build with the Lua debug server started (console command luadebug)?", e);
+                        Messages.Format("LuaDebugAdapter_GameDidNotAnswerWithin", args.Host, args.Port,
+                            timeout.TotalSeconds), e);
                 await Task.Delay(TimeSpan.FromSeconds(1), _time, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -191,7 +204,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
         {
             var name = session.Scripts.TryGetValue(scriptId, out var script)
                 ? $"{FileName(script.FullPathName)} [{scriptId}]"
-                : $"script {scriptId}";
+                : Messages.Format("LuaDebugAdapter_Script", scriptId);
             thread = new Thread { Id = ThreadIdFor(scriptId), Name = name };
         }
         else
@@ -241,7 +254,8 @@ public sealed partial class LuaDebugAdapter : IDisposable
         ArgumentNullException.ThrowIfNull(args);
         var session = RequireSession();
         var frame = FrameFor(args.FrameId);
-        var scriptId = session.SuspendedScriptId ?? throw new LuaDebugAdapterException("No script is suspended");
+        var scriptId = session.SuspendedScriptId ??
+                       throw new LuaDebugAdapterException(Messages.Format("LuaDebugAdapter_NoScriptSuspended"));
 
         // Selecting the frame is what makes the game resolve names against that frame's locals.
         await session.SelectFrameAsync(frame.Level, cancellationToken).ConfigureAwait(false);
@@ -267,14 +281,15 @@ public sealed partial class LuaDebugAdapter : IDisposable
         lock (_gate)
         {
             if (!_handles.TryGetValue(args.VariablesReference, out handle!))
-                throw new LuaDebugAdapterException("That variable reference belongs to an earlier stop");
+                throw new LuaDebugAdapterException(
+                    Messages.Format("LuaDebugAdapter_VariableReferenceBelongsEarlierStop"));
         }
 
         var variables = handle switch
         {
             LocalsHandle locals => await LocalsAsync(session, locals, cancellationToken).ConfigureAwait(false),
             TableHandle table => await TableAsync(session, table, cancellationToken).ConfigureAwait(false),
-            _ => throw new LuaDebugAdapterException("Unknown variable reference")
+            _ => throw new LuaDebugAdapterException(Messages.Format("LuaDebugAdapter_UnknownVariableReference"))
         };
         return new VariablesResponse { Variables = new Container<Variable>(variables) };
     }
@@ -284,7 +299,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
         ArgumentNullException.ThrowIfNull(args);
         var session = RequireSession();
         var scriptId = session.SuspendedScriptId ?? session.ContextScriptId
-            ?? throw new LuaDebugAdapterException("Select a script or stop in one before evaluating");
+            ?? throw new LuaDebugAdapterException(Messages.Format("LuaDebugAdapter_SelectScriptStopOneBefore"));
         var expression = args.Expression?.Trim() ?? string.Empty;
 
         if (args.Context is { } context && context.Equals(EvaluateArgumentsContext.Repl))
@@ -295,13 +310,13 @@ public sealed partial class LuaDebugAdapter : IDisposable
 
         if (!IdentifierPattern().IsMatch(expression))
             throw new LuaDebugAdapterException(
-                "Only a plain variable name can be read from the game; use the debug console to run Lua");
+                Messages.Format("LuaDebugAdapter_OnlyPlainVariableNameCan"));
 
         var value = await session.DumpVariableAsync(scriptId, expression, cancellationToken).ConfigureAwait(false);
         return new EvaluateResponse
         {
             Result = value.ValueText,
-            Type = LuaTypeNames.Of(value.ValueType),
+            Type = LuaTypeNames.Of(value.ValueType, Messages),
             VariablesReference = TableReference(scriptId, expression, [], value.ValueType)
         };
     }
@@ -315,14 +330,14 @@ public sealed partial class LuaDebugAdapter : IDisposable
         var requested = args.Breakpoints?.ToList() ?? [];
         var path = args.Source?.Path;
         if (string.IsNullOrEmpty(path))
-            return Unverified(requested, "The source has no file path");
+            return Unverified(requested, Messages.Format("LuaDebugAdapter_SourceHasNoFilePath"));
 
         var uri = _fileHelper.NormalizeUri(path);
         var session = _session;
         var connected = session is not null && session.IsConnected;
         var gamePath = connected ? _map.ToGamePath(uri) : null;
         if (connected && gamePath is null)
-            return Unverified(requested, "The file is under none of the configured script roots");
+            return Unverified(requested, Messages.Format("LuaDebugAdapter_FileUnderNoneConfiguredScript"));
 
         Dictionary<int, BreakpointEntry> current;
         lock (_gate)
@@ -347,7 +362,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
                     Line = breakpoint.Line,
                     Source = args.Source,
                     Message =
-                        "The game does not evaluate breakpoint conditions, hit counts or log messages; the breakpoint was not set"
+                        Messages.Format("LuaDebugAdapter_GameDoesNotEvaluateBreakpoint")
                 });
                 continue;
             }
@@ -371,7 +386,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
                     Verified = false,
                     Line = breakpoint.Line,
                     Source = args.Source,
-                    Message = "Waiting for the game; the breakpoint is set once the debugger is attached"
+                    Message = Messages.Format("LuaDebugAdapter_WaitingGameBreakpointSetOnce")
                 });
         }
 
@@ -422,7 +437,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
             {
                 if (gamePath is null)
                 {
-                    Announce(entry, false, "The file is under none of the configured script roots");
+                    Announce(entry, false, Messages.Format("LuaDebugAdapter_FileUnderNoneConfiguredScript"));
                     continue;
                 }
 
@@ -535,7 +550,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
             : await session.RequestThreadsAsync(args.ScriptId, cancellationToken).ConfigureAwait(false);
         if (args.ThreadIndex != -1 && threads.All(t => t.ThreadIndex != args.ThreadIndex))
             throw new LuaDebugAdapterException(
-                $"Thread {args.ThreadIndex} is not a thread of script {args.ScriptId} any more; refresh its threads");
+                Messages.Format("LuaDebugAdapter_ThreadNotThreadScriptAny", args.ThreadIndex, args.ScriptId));
 
         lock (_gate)
         {
@@ -746,14 +761,14 @@ public sealed partial class LuaDebugAdapter : IDisposable
         }
     }
 
-    private static IPEndPoint EndPoint(ILuaSessionSettings settings)
+    private IPEndPoint EndPoint(ILuaSessionSettings settings)
     {
         if (!IPAddress.TryParse(settings.Host, out var address))
         {
             var resolved = Dns.GetHostAddresses(settings.Host)
                                .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)
                            ?? throw new LuaDebugAdapterException(
-                               $"Cannot resolve host '{settings.Host}' to an IPv4 address");
+                               Messages.Format("LuaDebugAdapter_CannotResolveHostIPvAddress", settings.Host));
             address = resolved;
         }
 
@@ -769,7 +784,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
 
     private ILuaDebugSession RequireSession()
     {
-        return _session ?? throw new LuaDebugAdapterException("Not attached to the game");
+        return _session ?? throw new LuaDebugAdapterException(Messages.Format("LuaDebugAdapter_NotAttachedGame"));
     }
 
     private CallstackFrame FrameFor(long frameId)
@@ -777,10 +792,10 @@ public sealed partial class LuaDebugAdapter : IDisposable
         lock (_gate)
         {
             if (frameId / FramesPerStop != _stopSequence)
-                throw new LuaDebugAdapterException("That frame belongs to an earlier stop");
+                throw new LuaDebugAdapterException(Messages.Format("LuaDebugAdapter_FrameBelongsEarlierStop"));
             var level = (int)(frameId % FramesPerStop);
             return _frames.FirstOrDefault(f => f.Level == level)
-                   ?? throw new LuaDebugAdapterException($"No frame with level {level}");
+                   ?? throw new LuaDebugAdapterException(Messages.Format("LuaDebugAdapter_NoFrameLevel", level));
         }
     }
 
@@ -840,7 +855,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
             {
                 Name = local.Name,
                 Value = value.ValueText,
-                Type = LuaTypeNames.Of(value.ValueType),
+                Type = LuaTypeNames.Of(value.ValueType, Messages),
                 EvaluateName = local.Name,
                 VariablesReference = TableReference(handle.ScriptId, local.Name, [], value.ValueType)
             });
@@ -864,7 +879,7 @@ public sealed partial class LuaDebugAdapter : IDisposable
             {
                 Name = member.KeyText,
                 Value = member.ValueText,
-                Type = LuaTypeNames.Of(member.ValueType),
+                Type = LuaTypeNames.Of(member.ValueType, Messages),
                 VariablesReference = TableReference(handle.ScriptId, handle.Name, childPath, member.ValueType)
             });
         }

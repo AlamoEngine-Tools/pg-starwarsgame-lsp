@@ -12,6 +12,7 @@ using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -90,15 +91,13 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             var clientDirectory = args?.Value<string>("directory");
             if (string.IsNullOrWhiteSpace(clientFormat) || string.IsNullOrWhiteSpace(clientDirectory))
             {
-                Fail("Cannot initialise a localisation project: this project does not declare one yet, " +
-                     "and no format and directory were given to create it with.");
+                Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_CannotInitialiseLocalisationProjectThis"));
                 return Unit.Value;
             }
 
             if (rootLayer?.ProjectPath is not { } pgprojPath)
             {
-                Fail("Cannot initialise a localisation project: no .pgproj file was found in this " +
-                     "workspace, so there is nowhere to record the new localisation settings.");
+                Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_CannotInitialiseLocalisationProjectNo"));
                 return Unit.Value;
             }
 
@@ -113,8 +112,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
                 .Configured(_langService, _config.Current.Localisation).LanguageIdentifier);
         if (fileName is null)
         {
-            Fail($"Cannot initialise a localisation project: '{format}' is not a format that can be " +
-                 "created. Use CSV, XML or NLS.");
+            Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_CannotInitialiseLocalisationProjectNot",
+                format));
             return Unit.Value;
         }
 
@@ -122,8 +121,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
         if (fs.File.Exists(targetPath))
         {
-            Fail($"Localisation project not initialised: '{targetPath}' already exists and was left " +
-                 "untouched. Delete or move it first if you want to start over.");
+            Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_LocalisationProjectNotInitialisedAlready",
+                targetPath));
             return Unit.Value;
         }
 
@@ -142,8 +141,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         var writtenPath = await _seedWriter.WriteAsync(merged, format, targetDir, ct);
         if (writtenPath is null)
         {
-            Fail($"Cannot initialise a localisation project: '{format}' is not a format that can be " +
-                 "created. Use CSV, XML or NLS.");
+            Fail(new ConfiguredMessageCatalog(_config).Format("LocInit_CannotInitialiseLocalisationProjectNot",
+                format));
             return Unit.Value;
         }
 
@@ -163,7 +162,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             await _reloadService.ReloadLocalisationAsync(ct);
         }
 
-        _notifier.ShowInfo($"Localisation project initialised: created '{writtenPath}'.");
+        _notifier.ShowInfo(new ConfiguredMessageCatalog(_config).Format("LocInit_LocalisationProjectInitialisedCreated",
+            writtenPath));
         return Unit.Value;
     }
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.Json.Nodes;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
@@ -52,7 +53,7 @@ public static class PgprojMigrations
         ///     Nothing is asked of the user beyond agreeing to the write: no setting moves, no path
         ///     changes, and every key this build does not model is carried through untouched.
         /// </summary>
-        public string? UserNotice => null;
+        public CatalogueText? UserNotice => null;
 
         public JsonNode Migrate(JsonNode document)
         {

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.Json.Nodes;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
@@ -81,11 +82,9 @@ public static class StoryLayoutDocument
         ///     not be matched is only known once the file has been walked. The store runs one
         ///     migration instance per load, so there is no state to leak between them.
         /// </summary>
-        public string? UserNotice => _dropped == 0
+        public CatalogueText? UserNotice => _dropped == 0
             ? null
-            : $"{_dropped} saved node position{(_dropped == 1 ? "" : "s")} named a story file that no "
-              + "longer matches exactly one thread, so they were dropped. Those events will be "
-              + "arranged automatically the next time their graph opens.";
+            : new CatalogueText("StoryLayout_DroppedPositions", _dropped);
 
         public JsonNode Migrate(JsonNode document)
         {

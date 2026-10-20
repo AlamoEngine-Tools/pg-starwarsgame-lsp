@@ -4,6 +4,7 @@
 using System.Net;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Lua.Debug.PgNet;
 using PG.StarWarsGame.LSP.Lua.Debug.Protocol;
 
@@ -89,11 +90,10 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
         catch (OperationCanceledException) when (deadline.IsCancellationRequested &&
                                                  !cancellationToken.IsCancellationRequested)
         {
-            Fail(new TimeoutException(
-                $"The game at {remote} did not complete the debugger handshake within {timeout.TotalSeconds:0.#} s"));
-            throw new TimeoutException(
-                $"The game at {remote} did not complete the debugger handshake within {timeout.TotalSeconds:0.#} s. " +
-                "Is a debug build running with its Lua debug server started (console command luadebug)?");
+            Fail(new LuaDebugTimeoutException(
+                new CatalogueText("LuaDebugConnection_GameAtDidNotComplete2", remote, timeout.TotalSeconds)));
+            throw new LuaDebugTimeoutException(
+                new CatalogueText("LuaDebugConnection_GameAtDidNotComplete", remote, timeout.TotalSeconds));
         }
     }
 
@@ -218,7 +218,8 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
 
                     if (message is GoodbyeMessage)
                     {
-                        Fail(new LuaDebugConnectionLostException("The game closed the debugger connection"));
+                        Fail(new LuaDebugConnectionLostException(
+                            new CatalogueText("LuaDebugConnection_GameClosedDebuggerConnection")));
                         return;
                     }
 
@@ -233,7 +234,8 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
         {
             Fail(e is LuaDebugConnectionLostException
                 ? e
-                : new LuaDebugConnectionLostException("The debugger connection failed", e));
+                : new LuaDebugConnectionLostException(new CatalogueText("LuaDebugConnection_DebuggerConnectionFailed"),
+                    e));
         }
     }
 
@@ -248,7 +250,7 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
                 if (_time.GetElapsedTime(_lastActivity) > SilenceTimeout)
                 {
                     Fail(new LuaDebugConnectionLostException(
-                        $"No packet from the game for {SilenceTimeout.TotalSeconds:0.#} s; the connection is presumed lost"));
+                        new CatalogueText("LuaDebugConnection_NoPacketFromGameS", SilenceTimeout.TotalSeconds)));
                     return;
                 }
 
@@ -270,7 +272,8 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
         }
         catch (Exception e)
         {
-            Fail(new LuaDebugConnectionLostException("The debugger connection failed", e));
+            Fail(new LuaDebugConnectionLostException(new CatalogueText("LuaDebugConnection_DebuggerConnectionFailed"),
+                e));
         }
     }
 
@@ -315,7 +318,9 @@ public sealed class LuaDebugConnection : ILuaDebugConnection
             _inbound.Writer.TryComplete(reason);
         lock (_gate)
         {
-            _drained.TrySetException(reason ?? new LuaDebugConnectionLostException("The connection was closed"));
+            _drained.TrySetException(reason ??
+                                     new LuaDebugConnectionLostException(
+                                         new CatalogueText("LuaDebugConnection_ConnectionWasClosed")));
         }
     }
 

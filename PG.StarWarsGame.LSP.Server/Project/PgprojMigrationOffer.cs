@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -26,13 +27,16 @@ public sealed class PgprojMigrationOffer(
     IFileHelper fileHelper,
     IPgprojMigrationPrompt prompt,
     IUserNotifier notifier,
-    ILogger<PgprojMigrationOffer> logger)
+    ILogger<PgprojMigrationOffer> logger,
+    IMessageCatalog? messages = null)
     : IPgprojMigrationSink, IPgprojMigrationOffer
 {
     private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 
     /// <summary>Projects already asked about, so a reload does not ask again.</summary>
     private readonly ConcurrentDictionary<string, byte> _asked = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
 
     private readonly ConcurrentQueue<Pending> _pending = new();
 
@@ -83,7 +87,8 @@ public sealed class PgprojMigrationOffer(
         fs.File.Copy(pending.Path, backup, true);
         await fs.File.WriteAllTextAsync(pending.Path, proposed, ct);
 
-        notifier.ShowInfo($"'{fileName}' updated. The previous file is at '{fs.Path.GetFileName(backup)}'.");
+        notifier.ShowInfo(_messages.Format("PgprojMigrationOffer_UpdatedPreviousFileAt", fileName,
+            fs.Path.GetFileName(backup)));
     }
 
     private sealed record Pending(string Path, JsonNode Migrated, IReadOnlyList<string> Notices);

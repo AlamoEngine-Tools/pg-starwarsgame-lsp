@@ -39,6 +39,9 @@
     catalogue; a key with several non-ASCII characters lists them without the English "and"
   - The model preview's problems and refusals come from the catalogue. A model file's own format error
     is quoted as the reader states it, inside a translated sentence
+  - Startup, project loading, localisation commands, settings-file notices and the Lua debugger's
+    refusals come from the catalogue. The debugger follows the language the debug client reports,
+    since it runs outside the language server's settings
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none

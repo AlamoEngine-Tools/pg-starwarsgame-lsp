@@ -94,7 +94,7 @@ public sealed class LuaDebugSessionTest : IAsyncLifetime
         await Task.Delay(50, TestContext.Current.CancellationToken);
         _time.Advance(TimeSpan.FromSeconds(11));
 
-        var e = await Assert.ThrowsAsync<TimeoutException>(() => connect);
+        var e = await Assert.ThrowsAsync<LuaDebugTimeoutException>(() => connect);
         Assert.Contains("luadebug", e.Message);
         Assert.False(_session.IsConnected);
     }
@@ -132,7 +132,7 @@ public sealed class LuaDebugSessionTest : IAsyncLifetime
         await _game.WaitForAsync<RequestThreadListMessage>();
         _time.Advance(TimeSpan.FromSeconds(6));
 
-        await Assert.ThrowsAsync<TimeoutException>(() => request);
+        await Assert.ThrowsAsync<LuaDebugTimeoutException>(() => request);
         Assert.True(_session.IsConnected);
     }
 

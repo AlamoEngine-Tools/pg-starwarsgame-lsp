@@ -334,7 +334,8 @@ public static class ServerConfigurator
                     sp.GetRequiredService<IFileHelper>(),
                     sp.GetRequiredService<ILogger<ModProjectLoader>>(),
                     sp.GetRequiredService<IPgprojMigrationSink>(),
-                    PgprojMigrations.All));
+                    PgprojMigrations.All,
+                    sp.GetRequiredService<IMessageCatalog>()));
                 services.AddSingleton<ProjectDependencyGraph>();
                 services.AddSingleton<ModProjectResolver>();
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();

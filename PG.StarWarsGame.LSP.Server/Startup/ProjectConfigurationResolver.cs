@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Status;
@@ -45,6 +46,10 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         _logger = logger;
     }
 
+    /// <summary>The server's texts in the configured locale, English for a setup without one.</summary>
+    private IMessageCatalog Messages =>
+        _config is null ? ResxMessageCatalog.Server("en") : new ConfiguredMessageCatalog(_config);
+
     public WorkspaceConfiguration? Resolve(IReadOnlyList<string> roots)
     {
         _logger.LogDebug("Resolving project configuration under [{Roots}]", string.Join(", ", roots));
@@ -62,8 +67,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
                 _logger.LogError("The project file named by the client does not exist: '{Path}'", named);
                 _status?.RecordProject(false, ProjectProblem.Missing);
                 _notifier.ShowError(
-                    $"The project file '{named}' does not exist. Nothing has been indexed; reopen the "
-                    + "folder once the file is back, or remove it from the workspace.");
+                    Messages.Format("ProjectConfig_ProjectFileDoesNotExist", named));
                 return null;
             }
 
@@ -82,9 +86,8 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
                     // and how many are not, rather than refusing the whole folder as before.
                     _status?.RecordOtherProjectFiles(others.Count);
                     _notifier.ShowWarning(
-                        $"Loaded '{_resolver.FileHelper.FileSystem.Path.GetFileName(pgprojPath)}'. "
-                        + $"{others.Count} other project file(s) under this workspace are not served by "
-                        + "this server; open their folders to work on them.");
+                        Messages.Format("ProjectConfig_LoadedOtherProjectFileS",
+                            _resolver.FileHelper.FileSystem.Path.GetFileName(pgprojPath), others.Count));
                 }
 
                 return LoadAndResolve(pgprojPath, roots);
@@ -105,7 +108,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
             // failing silently. ModProjectLoadException already carries a user-facing message.
             var message = ex is ModProjectLoadException
                 ? ex.Message
-                : $"Could not load mod project configuration: {ex.Message}";
+                : Messages.Format("ProjectConfig_CouldNotLoadModProject", ex.Message);
             _notifier.ShowError(message);
             return null;
         }
@@ -131,7 +134,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
                 string.Join(", ", roots));
             _notifier.ShowError(ex is ModProjectLoadException
                 ? ex.Message
-                : $"Could not load mod project configuration: {ex.Message}");
+                : Messages.Format("ProjectConfig_CouldNotLoadModProject", ex.Message));
             return null;
         }
     }
@@ -145,9 +148,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         _logger.LogWarning("No .pgproj found under [{Roots}]; nothing to index.", string.Join(", ", roots));
         _status?.RecordProject(false, ProjectProblem.Missing);
         _notifier.ShowError(
-            $"No .pgproj file was found under [{string.Join(", ", roots)}]. This folder is not a mod "
-            + "project, so nothing has been indexed and no XML or Lua support is available here. Open "
-            + "the folder that contains your .pgproj, or create one.");
+            Messages.Format("ProjectConfig_NoPgprojFileWasFound", string.Join(", ", roots)));
         return null;
     }
 }

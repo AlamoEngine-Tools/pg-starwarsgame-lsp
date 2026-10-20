@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -64,7 +65,7 @@ public sealed class GameRenameHandler : RenameHandlerBase
         if (edit is null) return null;
         // Another script's state first: its file is no part of this rename, wherever it lives.
         if (_sandbox is not null) edit = LuaAnalyzerRename.KeepWithinState(edit, _sandbox.Current, uri);
-        LuaAnalyzerRename.EnsureWithinProject(edit, _layers);
+        LuaAnalyzerRename.EnsureWithinProject(edit, _layers, new ConfiguredMessageCatalog(_config));
         return edit;
     }
 

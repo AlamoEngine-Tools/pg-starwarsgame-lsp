@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Persistence;
@@ -54,14 +55,15 @@ public sealed class StoryLayoutStore : IStoryLayoutStore
     public StoryLayoutStore(
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
-        ILogger<StoryLayoutStore> logger)
+        ILogger<StoryLayoutStore> logger,
+        IMessageCatalog? messages = null)
     {
         _keys = new ProjectDocumentKeys(reloadService, fileHelper);
         _store = new SidecarStore<StoryLayoutDocument.Payload>(
             "story-layout.json", StoryLayoutDocument.TypeName, StoryLayoutDocument.Version,
             StoryLayoutDocument.MigrationsUsing(_keys.NodeKeyForBaseName, BucketKey),
             new AetswgSidecarLocator(reloadService), fileHelper, logger,
-            () => new StoryLayoutDocument.Payload());
+            () => new StoryLayoutDocument.Payload(), messages);
     }
 
     public IReadOnlyList<StoryLayoutEntry> Get(StoryModelKey key, IReadOnlyList<StoryLayoutNode> nodes)

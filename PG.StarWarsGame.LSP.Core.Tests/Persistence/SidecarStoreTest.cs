@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 
@@ -191,11 +192,12 @@ public sealed class SidecarStoreTest
         var fs = WithFile("""{ "title": "legacy" }""");
         var store = Store(fs, "aetswg-1.0.0", SidecarPath,
             new InlineMigration("aetswg-0.0.0", "aetswg-1.0.0", document => document,
-                "Event positions now key on the project-relative path."));
+                new CatalogueText("StoryLayout_DroppedPositions", 3)));
 
         var loaded = store.Load();
 
-        Assert.Contains("project-relative path", Assert.Single(loaded.UserNotices));
+        Assert.Equal(ResxMessageCatalog.Server("en").Format("StoryLayout_DroppedPositions", 3),
+            Assert.Single(loaded.UserNotices));
     }
 
     // A gap in the chain is a bug in our registration, not a fact about the file - it must not be
@@ -350,13 +352,13 @@ public sealed class SidecarStoreTest
         string from,
         string to,
         Func<JsonNode, JsonNode> migrate,
-        string? userNotice = null)
+        CatalogueText? userNotice = null)
         : IDocumentMigration
     {
         public string TypeName => SidecarStoreTest.TypeName;
         public TypeVersion From { get; } = Parse(from);
         public TypeVersion To { get; } = Parse(to);
-        public string? UserNotice { get; } = userNotice;
+        public CatalogueText? UserNotice { get; } = userNotice;
 
         public JsonNode Migrate(JsonNode document)
         {

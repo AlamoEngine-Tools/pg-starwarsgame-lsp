@@ -4,6 +4,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Persistence;
@@ -39,6 +40,7 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
     private readonly object _gate = new();
     private readonly AetswgSidecarLocator _locator;
     private readonly ILogger<GlobalSuppressionStore> _logger;
+    private readonly IMessageCatalog _messages;
     private readonly IUserNotifier? _notifier;
     private readonly SidecarStore<SuppressionsDocument.Payload> _store;
 
@@ -52,15 +54,17 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger<GlobalSuppressionStore> logger,
-        IUserNotifier? notifier = null)
+        IUserNotifier? notifier = null,
+        IMessageCatalog? messages = null)
     {
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _notifier = notifier;
         _logger = logger;
         _locator = new AetswgSidecarLocator(reloadService);
         _store = new SidecarStore<SuppressionsDocument.Payload>(
             "suppressions.json", SuppressionsDocument.TypeName, SuppressionsDocument.Version,
             SuppressionsDocument.Migrations, _locator, fileHelper, logger,
-            SuppressionsDocument.Default);
+            SuppressionsDocument.Default, _messages);
     }
 
     public IReadOnlyList<SuppressionMatcher> GetAll()
@@ -140,16 +144,13 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
 
         foreach (var id in bad) _logger.LogWarning("Ignoring unreadable suppression id {Id}", id);
 
-        Report($"suppressions.json has {(bad.Count == 1 ? "an entry that is not" : "entries that are not")} "
-               + $"a diagnostic id: {string.Join(", ", bad)}. "
-               + $"{(bad.Count == 1 ? "It suppresses" : "They suppress")} nothing. "
-               + $"Expected aetswg-<group>-<number> or aetswg-<group>-*{WhereToLook()}");
+        Report(_messages.Format("Suppressions_UnreadableEntries", string.Join(", ", bad)) + WhereToLook());
     }
 
     private string WhereToLook()
     {
         var path = _locator.TryLocate("suppressions.json");
-        return path is null ? "." : $" See '{path}'.";
+        return path is null ? string.Empty : _messages.Format("Suppressions_See", path);
     }
 
     private void Report(string message)

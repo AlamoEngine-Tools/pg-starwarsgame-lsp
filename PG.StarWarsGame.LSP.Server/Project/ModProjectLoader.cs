@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using AET.Modinfo.Spec;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -42,6 +43,7 @@ public sealed class ModProjectLoader
 
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<ModProjectLoader> _logger;
+    private readonly IMessageCatalog _messages;
     private readonly IPgprojMigrationSink _migrationSink;
     private readonly IReadOnlyList<IDocumentMigration> _migrations;
 
@@ -49,8 +51,10 @@ public sealed class ModProjectLoader
         IFileHelper fileHelper,
         ILogger<ModProjectLoader> logger,
         IPgprojMigrationSink migrationSink,
-        IReadOnlyList<IDocumentMigration> migrations)
+        IReadOnlyList<IDocumentMigration> migrations,
+        IMessageCatalog? messages = null)
     {
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _fileHelper = fileHelper;
         _logger = logger;
         _migrationSink = migrationSink;
@@ -79,7 +83,7 @@ public sealed class ModProjectLoader
 
         if (root is not JsonObject document)
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': The file is empty or is not a JSON object.",
+                _messages.Format("ModProject_CouldNotLoadModProject14", fileName),
                 problem: ProjectProblem.Unparseable);
 
         // JSON permits a repeated property and the parser accepts one; JsonObject only objects on
@@ -87,7 +91,7 @@ public sealed class ModProjectLoader
         // pasted in twice) deserves the file and property named instead.
         if (FindDuplicateProperty(text) is { } duplicate)
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': The property '{duplicate}' appears more than once. Keep one of them.",
+                _messages.Format("ModProject_CouldNotLoadModProject13", fileName, duplicate),
                 problem: ProjectProblem.Unparseable);
 
         // Before anything is read out of it: a project from a newer extension is refused rather
@@ -95,8 +99,9 @@ public sealed class ModProjectLoader
         // over it. Absent means version one - every .pgproj written so far predates the fields.
         var declaredType = (string?)document["_type"];
         var declaredVersion = (string?)document["_typeVersion"];
-        if (PgprojFormat.Check(declaredVersion, declaredType) is { CanLoad: false } refusal)
-            throw new ModProjectLoadException($"Could not load mod project '{fileName}': {refusal.Message}",
+        if (PgprojFormat.Check(declaredVersion, declaredType, _messages) is { CanLoad: false } refusal)
+            throw new ModProjectLoadException(
+                _messages.Format("ModProject_CouldNotLoadModProject12", fileName, refusal.Message),
                 problem: ProjectProblem.UnsupportedVersion);
 
         document = BringForward(document, declaredVersion, path, fileName);
@@ -112,7 +117,7 @@ public sealed class ModProjectLoader
         }
 
         if (dto is null)
-            throw new ModProjectLoadException($"Could not load mod project '{fileName}': The file is empty.");
+            throw new ModProjectLoadException(_messages.Format("ModProject_CouldNotLoadModProject11", fileName));
 
         ThrowIfLegacyLocalisationShape(text, fileName);
 
@@ -173,7 +178,7 @@ public sealed class ModProjectLoader
     // sensible default, so IconProjectSettings.Default covers a project that says nothing. A node
     // that IS present is validated strictly: a half-configured icons block is a mistake worth
     // reporting, not something to silently paper over.
-    private static IconProjectSettings? ParseIcons(IconsDto? dto, string fileName)
+    private IconProjectSettings? ParseIcons(IconsDto? dto, string fileName)
     {
         if (dto is null) return null;
 
@@ -182,9 +187,8 @@ public sealed class ModProjectLoader
         {
             if (string.IsNullOrWhiteSpace(dto.MegaTexture))
                 throw new ModProjectLoadException(
-                    $"Could not load mod project '{fileName}': 'icons.megaTexture' must not be empty. " +
-                    "Omit it entirely to use the default " +
-                    $"'{IconProjectSettings.ConventionalMegaTexture}'.");
+                    _messages.Format("ModProject_CouldNotLoadModProject10", fileName,
+                        IconProjectSettings.ConventionalMegaTexture));
 
             // It names a PAIR - foo.mtd and foo.tga - so an extension here is ambiguous about which
             // half the author meant, and silently stripping it would hide a real misunderstanding.
@@ -192,10 +196,8 @@ public sealed class ModProjectLoader
             if (extension.Equals(".mtd", StringComparison.OrdinalIgnoreCase)
                 || extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
                 throw new ModProjectLoadException(
-                    $"Could not load mod project '{fileName}': 'icons.megaTexture' must be given " +
-                    $"without a file extension (got '{dto.MegaTexture}'). It names both the .mtd " +
-                    "directory and the .tga atlas, e.g. " +
-                    $"\"megaTexture\": \"{IconProjectSettings.ConventionalMegaTexture}\".");
+                    _messages.Format("ModProject_CouldNotLoadModProject9", fileName, dto.MegaTexture,
+                        IconProjectSettings.ConventionalMegaTexture));
 
             megaTexture = NormalizePath(dto.MegaTexture);
         }
@@ -205,8 +207,7 @@ public sealed class ModProjectLoader
         {
             if (string.IsNullOrWhiteSpace(root))
                 throw new ModProjectLoadException(
-                    $"Could not load mod project '{fileName}': 'icons.sourceRoots' must not contain " +
-                    "empty entries.");
+                    _messages.Format("ModProject_CouldNotLoadModProject8", fileName));
 
             sourceRoots.Add(NormalizePath(root));
         }
@@ -220,19 +221,17 @@ public sealed class ModProjectLoader
 
         if (string.IsNullOrWhiteSpace(dto.Type) || !ValidLocalisationTypes.Contains(dto.Type))
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': 'localisation.type' must be one of " +
-                $"CSV, DAT, XML, NLS (got '{dto.Type}').");
+                _messages.Format("ModProject_CouldNotLoadModProject7", fileName, dto.Type));
 
         if (string.IsNullOrWhiteSpace(dto.Directory))
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': 'localisation.directory' is required " +
-                "when 'localisation' is present.");
+                _messages.Format("ModProject_CouldNotLoadModProject6", fileName));
 
         return new LocalisationProjectSettings(
             dto.Type.ToUpperInvariant(), NormalizePath(dto.Directory), ParseCredits(dto.Credits, fileName));
     }
 
-    private static LocalisationCreditsSettings? ParseCredits(CreditsDto? dto, string fileName)
+    private LocalisationCreditsSettings? ParseCredits(CreditsDto? dto, string fileName)
     {
         if (dto is null) return null;
 
@@ -244,8 +243,7 @@ public sealed class ModProjectLoader
 
         if (!ValidCreditsDetections.Contains(detection))
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': 'localisation.credits.detection' must be one of " +
-                $"convention, explicit, none (got '{dto.Detection}').");
+                _messages.Format("ModProject_CouldNotLoadModProject5", fileName, dto.Detection));
 
         var files = dto.Files ?? [];
 
@@ -253,8 +251,7 @@ public sealed class ModProjectLoader
         // except that the author clearly meant to name something.
         if (detection == LocalisationCreditsSettings.Explicit && files.Count == 0)
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': 'localisation.credits.files' must name at least " +
-                "one file when 'localisation.credits.detection' is 'explicit'.");
+                _messages.Format("ModProject_CouldNotLoadModProject4", fileName));
 
         return new LocalisationCreditsSettings(detection, files);
     }
@@ -263,7 +260,7 @@ public sealed class ModProjectLoader
     // top-level "localisation" node. System.Text.Json silently ignores unknown properties, so
     // without this check an un-migrated .pgproj would load "successfully" with its localisation
     // quietly unconfigured - no error, no hint why. Hard-fail instead, per feedback_strict_validation_clear_errors.
-    private static void ThrowIfLegacyLocalisationShape(string text, string fileName)
+    private void ThrowIfLegacyLocalisationShape(string text, string fileName)
     {
         using var document = JsonDocument.Parse(text, DocumentOptions);
         var root = document.RootElement;
@@ -276,10 +273,7 @@ public sealed class ModProjectLoader
         if (!hasLegacyText && !hasLegacyType) return;
 
         throw new ModProjectLoadException(
-            $"Could not load mod project '{fileName}': 'directories.text' and 'directories.textResourceType' " +
-            "were removed in 0.2.0. Move your localisation directory into a top-level 'localisation' node " +
-            "instead, e.g. \"localisation\": { \"type\": \"CSV\", \"directory\": \"data/text\" }. " +
-            "See the extension's 'Upgrading from 0.1.x' README section for the full migration steps.");
+            _messages.Format("ModProject_CouldNotLoadModProject3", fileName));
     }
 
     private static bool TryGetPropertyCaseInsensitive(JsonElement element, string name, out JsonElement value)
@@ -367,13 +361,13 @@ public sealed class ModProjectLoader
         if (from.CompareTo(PgprojFormat.Current) >= 0) return document;
 
         var migration = DocumentMigrator.Run(
-            document, PgprojFormat.TypeName, from, PgprojFormat.Current, _migrations);
+            document, PgprojFormat.TypeName, from, PgprojFormat.Current, _migrations, _messages);
 
         // A gap in the chain is a bug in our registration, and this is the file everything else is
         // read from - reading it at a version whose shape it does not have would paper over it.
         if (migration.Document is not JsonObject migrated)
             throw new ModProjectLoadException(
-                $"Could not load mod project '{fileName}': {migration.Failure}.");
+                _messages.Format("ModProject_CouldNotLoadModProject2", fileName, migration.Failure));
 
         migrated["_type"] = PgprojFormat.TypeName;
         migrated["_typeVersion"] = PgprojFormat.Current.ToString();
@@ -386,7 +380,7 @@ public sealed class ModProjectLoader
         var notices = migration.Notices;
         var directory = _fileHelper.FileSystem.Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory)
-            && PgprojIconProposal.TryPropose(migrated, directory, _fileHelper.FileSystem) is { } icons)
+            && PgprojIconProposal.TryPropose(migrated, directory, _fileHelper.FileSystem, _messages) is { } icons)
             notices = [.. notices, icons];
 
         _migrationSink.Migrated(path, migrated, notices);
@@ -395,20 +389,20 @@ public sealed class ModProjectLoader
 
     // Translates System.Text.Json's cryptic deserialization failures into a clear, user-facing
     // message: which file, where in it, and how to fix it. Shown verbatim as an editor notification.
-    private static string BuildLoadErrorMessage(string fileName, JsonException ex)
+    private string BuildLoadErrorMessage(string fileName, JsonException ex)
     {
         var location = ex.LineNumber is { } line
-            ? $" at line {line + 1}" +
-              (ex.BytePositionInLine is { } col ? $", column {col + 1}" : string.Empty)
+            ? ex.BytePositionInLine is { } col
+                ? _messages.Format("ModProject_AtLineColumn", line + 1, col + 1)
+                : _messages.Format("ModProject_AtLine", line + 1)
             : string.Empty;
 
         var hint = ex.Path is { } jsonPath
                    && jsonPath.Contains("projectReferences", StringComparison.OrdinalIgnoreCase)
-            ? "'projectReferences' must be an array of references - either path strings or " +
-              "{ \"path\": \"...\" } objects, e.g. [ { \"path\": \"../core/core.pgproj\" } ]."
-            : "the file is not valid JSON or does not match the .pgproj schema.";
+            ? _messages.Format("ModProject_ProjectReferencesMustBeArrayReferences")
+            : _messages.Format("ModProject_FileNotValidJSONDoes");
 
-        return $"Could not load mod project '{fileName}'{location}: {hint}";
+        return _messages.Format("ModProject_CouldNotLoadModProject", fileName, location, hint);
     }
 
     private sealed class ModProjectFileDto

@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -44,25 +45,29 @@ public interface IDefinitionLocator
 ///         ungated handler exposes it to everyone else.
 ///     </para>
 /// </remarks>
-public sealed class DefinitionLocator(IGameIndexService indexService, ISchemaProvider schema)
+public sealed class DefinitionLocator(
+    IGameIndexService indexService,
+    ISchemaProvider schema,
+    IMessageCatalog? messages = null)
     : IDefinitionLocator
 {
+    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
+
     /// <inheritdoc />
     public DefinitionLocation Locate(string? value, string? referenceType)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return new DefinitionLocation(Error: "Nothing to resolve.");
+            return new DefinitionLocation(Error: _messages.Format("DefinitionLocator_NothingResolve"));
 
         var trimmed = value.Trim();
         var symbol = Resolve(indexService.Current, trimmed, referenceType);
         if (symbol is null)
             return new DefinitionLocation(
-                Error: $"'{trimmed}' does not resolve to any known definition.");
+                Error: _messages.Format("DefinitionLocator_DoesNotResolveAnyKnown", trimmed));
 
         if (symbol.Origin is not FileOrigin origin)
             return new DefinitionLocation(
-                Error: $"'{trimmed}' is defined in the base game or an archive - " +
-                       "there is no workspace file to open.");
+                Error: _messages.Format("DefinitionLocator_DefinedBaseGameArchiveThere", trimmed));
 
         return new DefinitionLocation(origin.Uri, origin.Line, origin.Column ?? 0);
     }

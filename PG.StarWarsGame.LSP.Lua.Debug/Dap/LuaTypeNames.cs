@@ -1,6 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+using IMessageCatalog = PG.StarWarsGame.LSP.Core.Messages.IMessageCatalog;
+
 namespace PG.StarWarsGame.LSP.Lua.Debug.Dap;
 
 /// <summary>The Lua type codes the game sends with a value, as the language names them.</summary>
@@ -19,7 +22,7 @@ public static class LuaTypeNames
     /// <summary>The code the game answers with when it does not have the script asked about.</summary>
     public const int UnknownScript = -1;
 
-    public static string Of(int typeCode)
+    public static string Of(int typeCode, IMessageCatalog? messages = null)
     {
         return typeCode switch
         {
@@ -32,8 +35,8 @@ public static class LuaTypeNames
             Function => "function",
             Userdata => "userdata",
             Thread => "thread",
-            UnknownScript => "unknown script",
-            _ => $"type {typeCode}"
+            UnknownScript => (messages ?? ResxMessageCatalog.Server("en")).Format("LuaTypeNames_UnknownScript"),
+            _ => (messages ?? ResxMessageCatalog.Server("en")).Format("LuaTypeNames_Type", typeCode)
         };
     }
 

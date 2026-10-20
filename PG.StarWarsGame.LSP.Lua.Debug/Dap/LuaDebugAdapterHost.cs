@@ -12,6 +12,7 @@ using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
 using OmniSharp.Extensions.DebugAdapter.Server;
 using OmniSharp.Extensions.JsonRpc;
 using PG.Commons;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Lua.Debug.Dap;
@@ -76,37 +77,41 @@ public static class LuaDebugAdapterHost
             .WithInput(input)
             .WithOutput(output)
             .WithLoggerFactory(loggerFactory)
-            .OnInitialize((server, _, _) =>
+            .OnInitialize((server, request, _) =>
             {
                 adapter.Bind(server);
+                adapter.UseLocale(request.Locale);
                 return Task.CompletedTask;
             })
-            .OnAttach(Surfacing<LuaAttachArguments, AttachResponse>(adapter.AttachAsync))
-            .OnLaunch(Surfacing<LuaLaunchArguments, LaunchResponse>(adapter.LaunchAsync))
+            .OnAttach(Surfacing<LuaAttachArguments, AttachResponse>(adapter, adapter.AttachAsync))
+            .OnLaunch(Surfacing<LuaLaunchArguments, LaunchResponse>(adapter, adapter.LaunchAsync))
             .OnConfigurationDone(
-                Surfacing<ConfigurationDoneArguments, ConfigurationDoneResponse>(adapter.ConfigurationDoneAsync))
-            .OnDisconnect(Surfacing<DisconnectArguments, DisconnectResponse>(adapter.DisconnectAsync))
-            .OnTerminate(Surfacing<TerminateArguments, TerminateResponse>(adapter.TerminateAsync))
-            .OnThreads(Surfacing<ThreadsArguments, ThreadsResponse>(adapter.ThreadsAsync))
-            .OnStackTrace(Surfacing<StackTraceArguments, StackTraceResponse>(adapter.StackTraceAsync))
-            .OnScopes(Surfacing<ScopesArguments, ScopesResponse>(adapter.ScopesAsync))
-            .OnVariables(Surfacing<VariablesArguments, VariablesResponse>(adapter.VariablesAsync))
-            .OnEvaluate(Surfacing<EvaluateArguments, EvaluateResponse>(adapter.EvaluateAsync))
-            .OnSetBreakpoints(Surfacing<SetBreakpointsArguments, SetBreakpointsResponse>(adapter.SetBreakpointsAsync))
-            .OnContinue(Surfacing<ContinueArguments, ContinueResponse>(adapter.ContinueAsync))
-            .OnNext(Surfacing<NextArguments, NextResponse>(adapter.NextAsync))
-            .OnStepIn(Surfacing<StepInArguments, StepInResponse>(adapter.StepInAsync))
-            .OnStepOut(Surfacing<StepOutArguments, StepOutResponse>(adapter.StepOutAsync))
-            .OnPause(Surfacing<PauseArguments, PauseResponse>(adapter.PauseAsync))
-            .OnLoadedSources(Surfacing<LoadedSourcesArguments, LoadedSourcesResponse>(adapter.LoadedSourcesAsync))
+                Surfacing<ConfigurationDoneArguments, ConfigurationDoneResponse>(adapter,
+                    adapter.ConfigurationDoneAsync))
+            .OnDisconnect(Surfacing<DisconnectArguments, DisconnectResponse>(adapter, adapter.DisconnectAsync))
+            .OnTerminate(Surfacing<TerminateArguments, TerminateResponse>(adapter, adapter.TerminateAsync))
+            .OnThreads(Surfacing<ThreadsArguments, ThreadsResponse>(adapter, adapter.ThreadsAsync))
+            .OnStackTrace(Surfacing<StackTraceArguments, StackTraceResponse>(adapter, adapter.StackTraceAsync))
+            .OnScopes(Surfacing<ScopesArguments, ScopesResponse>(adapter, adapter.ScopesAsync))
+            .OnVariables(Surfacing<VariablesArguments, VariablesResponse>(adapter, adapter.VariablesAsync))
+            .OnEvaluate(Surfacing<EvaluateArguments, EvaluateResponse>(adapter, adapter.EvaluateAsync))
+            .OnSetBreakpoints(
+                Surfacing<SetBreakpointsArguments, SetBreakpointsResponse>(adapter, adapter.SetBreakpointsAsync))
+            .OnContinue(Surfacing<ContinueArguments, ContinueResponse>(adapter, adapter.ContinueAsync))
+            .OnNext(Surfacing<NextArguments, NextResponse>(adapter, adapter.NextAsync))
+            .OnStepIn(Surfacing<StepInArguments, StepInResponse>(adapter, adapter.StepInAsync))
+            .OnStepOut(Surfacing<StepOutArguments, StepOutResponse>(adapter, adapter.StepOutAsync))
+            .OnPause(Surfacing<PauseArguments, PauseResponse>(adapter, adapter.PauseAsync))
+            .OnLoadedSources(
+                Surfacing<LoadedSourcesArguments, LoadedSourcesResponse>(adapter, adapter.LoadedSourcesAsync))
             // The scripts view's own requests; VS Code sends them through DebugSession.customRequest.
-            .OnRequest(LuaCustomMessages.Scripts, Surfacing(adapter.ScriptsAsync))
+            .OnRequest(LuaCustomMessages.Scripts, Surfacing(adapter, adapter.ScriptsAsync))
             .OnRequest(LuaCustomMessages.Refresh,
-                Surfacing<LuaRefreshArguments?, LuaScriptsResult>(adapter.RefreshAsync))
+                Surfacing<LuaRefreshArguments?, LuaScriptsResult>(adapter, adapter.RefreshAsync))
             .OnRequest(LuaCustomMessages.SelectScript,
-                Surfacing<LuaSelectScriptArguments, LuaScriptsResult>(adapter.SelectScriptAsync))
+                Surfacing<LuaSelectScriptArguments, LuaScriptsResult>(adapter, adapter.SelectScriptAsync))
             .OnRequest(LuaCustomMessages.BreakThread,
-                Surfacing<LuaBreakThreadArguments, LuaScriptsResult>(adapter.BreakThreadAsync));
+                Surfacing<LuaBreakThreadArguments, LuaScriptsResult>(adapter, adapter.BreakThreadAsync));
 
         CopyCapabilities(LuaDebugAdapter.Capabilities, options.Capabilities);
     }
@@ -117,7 +122,7 @@ public static class LuaDebugAdapterHost
     ///     bare internal error.
     /// </summary>
     private static Func<TArgs, CancellationToken, Task<TResult>> Surfacing<TArgs, TResult>(
-        Func<TArgs, CancellationToken, Task<TResult>> handler)
+        LuaDebugAdapter adapter, Func<TArgs, CancellationToken, Task<TResult>> handler)
     {
         return async (args, cancellationToken) =>
         {
@@ -127,13 +132,14 @@ public static class LuaDebugAdapterHost
             }
             catch (Exception e) when (e is not RpcErrorException and not OperationCanceledException)
             {
-                throw new LuaDebugAdapterException(e.Message, e);
+                throw new LuaDebugAdapterException(
+                    e is ICatalogueTextError error ? adapter.Messages.Format(error.Text) : e.Message, e);
             }
         };
     }
 
     private static Func<CancellationToken, Task<TResult>> Surfacing<TResult>(
-        Func<CancellationToken, Task<TResult>> handler)
+        LuaDebugAdapter adapter, Func<CancellationToken, Task<TResult>> handler)
     {
         return async cancellationToken =>
         {
@@ -143,7 +149,8 @@ public static class LuaDebugAdapterHost
             }
             catch (Exception e) when (e is not RpcErrorException and not OperationCanceledException)
             {
-                throw new LuaDebugAdapterException(e.Message, e);
+                throw new LuaDebugAdapterException(
+                    e is ICatalogueTextError error ? adapter.Messages.Format(error.Text) : e.Message, e);
             }
         };
     }

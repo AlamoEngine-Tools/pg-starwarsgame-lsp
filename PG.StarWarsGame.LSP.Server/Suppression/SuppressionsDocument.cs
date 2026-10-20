@@ -3,6 +3,7 @@
 
 using System.Text.Json.Nodes;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 
 namespace PG.StarWarsGame.LSP.Server.Suppression;
@@ -69,7 +70,7 @@ public static class SuppressionsDocument
         public TypeVersion To => Version;
 
         // Nothing for the user to do: the new entry is visible in the file and explains itself.
-        public string? UserNotice => null;
+        public CatalogueText? UserNotice => null;
 
         public JsonNode Migrate(JsonNode document)
         {
@@ -95,7 +96,7 @@ public static class SuppressionsDocument
         public TypeVersion To => Version;
 
         // Nothing for the user to do: the file keeps every suppression it had, at the same ids.
-        public string? UserNotice => null;
+        public CatalogueText? UserNotice => null;
 
         public JsonNode Migrate(JsonNode document)
         {

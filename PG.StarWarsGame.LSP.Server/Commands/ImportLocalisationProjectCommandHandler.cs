@@ -17,6 +17,7 @@ using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -90,8 +91,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
 
         if (request.Arguments?.FirstOrDefault() is not JObject args)
         {
-            Fail("Cannot import localisation files: the command was invoked without any settings to " +
-                 "import with. Run it from the Localisation view rather than directly.");
+            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesCommand"));
             return Unit.Value;
         }
 
@@ -103,8 +103,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         if (string.IsNullOrWhiteSpace(sourceFormat) || string.IsNullOrWhiteSpace(sourceDirectory) ||
             string.IsNullOrWhiteSpace(targetFormat))
         {
-            Fail("Cannot import localisation files: the source format, source folder and target " +
-                 "format are all required.");
+            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesSource"));
             return Unit.Value;
         }
 
@@ -112,15 +111,15 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             .OrderByDescending(l => l.Rank).FirstOrDefault();
         if (rootLayer?.ProjectPath is not { } pgprojPath)
         {
-            Fail("Cannot import localisation files: no .pgproj file was found in this workspace, so " +
-                 "there is nowhere to record the imported localisation settings.");
+            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesNo"));
             return Unit.Value;
         }
 
         var fs = _fileHelper.FileSystem;
         if (!fs.Directory.Exists(sourceDirectory))
         {
-            Fail($"Cannot import localisation files: the folder '{sourceDirectory}' does not exist.");
+            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesFolder",
+                sourceDirectory));
             return Unit.Value;
         }
 
@@ -133,8 +132,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             .ToList();
         if (sourceFiles.Count == 0)
         {
-            Fail($"Nothing to import: no {sourceExt} files were found in '{sourceDirectory}'. Check " +
-                 "that the folder and the source format match what is actually there.");
+            Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_NothingImportNoFilesWere", sourceExt,
+                sourceDirectory));
             return Unit.Value;
         }
 
@@ -149,22 +148,21 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             var relative = fs.Path.GetRelativePath(pgprojDir, sourceDirectory);
             if (fs.Path.IsPathRooted(relative))
             {
-                Fail($"Cannot import localisation files: '{sourceDirectory}' is on a different drive " +
-                     "or root from the .pgproj, so it cannot be recorded as a relative path. Copy the " +
-                     "files inside the project folder first.");
+                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesDifferent",
+                    sourceDirectory));
                 return Unit.Value;
             }
 
             relativeDirectory = relative.Replace('\\', '/').ToLowerInvariant();
-            outcome = $"Localisation project imported: registered {sourceFiles.Count} {sourceExt} " +
-                      $"file(s) in '{relativeDirectory}'. The files themselves were not changed.";
+            outcome = new ConfiguredMessageCatalog(_config).Format(
+                "LocImport_LocalisationProjectImportedRegisteredFile", sourceFiles.Count, sourceExt, relativeDirectory);
         }
         else
         {
             if (string.IsNullOrWhiteSpace(targetDirectory))
             {
-                Fail($"Cannot convert {sourceFormat} to {targetFormat}: no target folder was given for " +
-                     "the converted file.");
+                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotConvertNoTargetFolder", sourceFormat,
+                    targetFormat));
                 return Unit.Value;
             }
 
@@ -174,8 +172,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                     .Configured(_langService, _config.Current.Localisation).LanguageIdentifier);
             if (targetFileName is null)
             {
-                Fail($"Cannot import localisation files: '{targetFormat}' is not a format that can be " +
-                     "written. Use CSV, XML or NLS.");
+                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesNot",
+                    targetFormat));
                 return Unit.Value;
             }
 
@@ -183,8 +181,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             var targetPath = fs.Path.Combine(absoluteTargetDir, targetFileName);
             if (fs.File.Exists(targetPath))
             {
-                Fail($"Nothing was imported: '{targetPath}' already exists and was left untouched. " +
-                     "Delete or move it first, or choose a different target folder.");
+                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_NothingWasImportedAlreadyExists",
+                    targetPath));
                 return Unit.Value;
             }
 
@@ -200,14 +198,14 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                     skipped++;
 
             if (skipped > 0)
-                Fail($"{skipped} of {sourceFiles.Count} file(s) in '{sourceDirectory}' could not be " +
-                     "read and were left out of the import. See the EaWEdit LSP output for which.");
+                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_FileSCouldNotBe", skipped,
+                    sourceFiles.Count, sourceDirectory));
 
             var writtenPath = await _seedWriter.WriteAsync(merged, targetFormat, absoluteTargetDir, ct);
             if (writtenPath is null)
             {
-                Fail($"Cannot import localisation files: '{targetFormat}' is not a format that can be " +
-                     "written. Use CSV, XML or NLS.");
+                Fail(new ConfiguredMessageCatalog(_config).Format("LocImport_CannotImportLocalisationFilesNot",
+                    targetFormat));
                 return Unit.Value;
             }
 
@@ -216,8 +214,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                 sourceFiles.Count, sourceFormat, writtenPath);
 
             relativeDirectory = targetDirectory;
-            outcome = $"Localisation project imported: converted {sourceFiles.Count - skipped} " +
-                      $"{sourceFormat} file(s) into '{writtenPath}'.";
+            outcome = new ConfiguredMessageCatalog(_config).Format("LocImport_LocalisationProjectImportedConvertedFile",
+                sourceFiles.Count - skipped, sourceFormat, writtenPath);
         }
 
         await _fileWriter.SetLocalisationAsync(pgprojPath, targetFormat.ToUpperInvariant(), relativeDirectory, ct);

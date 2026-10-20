@@ -264,6 +264,15 @@
   <data name="DeathCloneSpec_IsNotAValidDeath" xml:space="preserve">
     <value>'{0}' is not a valid death clone spec for &lt;{1}&gt;. Expected: Condition, CloneTypeName.</value>
   </data>
+  <data name="DefinitionLocator_DefinedBaseGameArchiveThere" xml:space="preserve">
+    <value>'{0}' is defined in the base game or an archive - there is no workspace file to open.</value>
+  </data>
+  <data name="DefinitionLocator_DoesNotResolveAnyKnown" xml:space="preserve">
+    <value>'{0}' does not resolve to any known definition.</value>
+  </data>
+  <data name="DefinitionLocator_NothingResolve" xml:space="preserve">
+    <value>Nothing to resolve.</value>
+  </data>
   <data name="DemolitionBombTypeRule_Repair" xml:space="preserve">
     <value>defaults it to Demolition_Bomb</value>
   </data>
@@ -350,6 +359,15 @@
   </data>
   <data name="DisallowedOrOperator_DoesNotSupportOrEvery" xml:space="preserve">
     <value>&lt;{0}&gt; does not support '|' (OR) - every listed value is required (AND only). This engine only supports OR-expressions on tags explicitly documented for it (e.g. Required_Special_Structures).</value>
+  </data>
+  <data name="DocumentMigrator_DoesNotTerminate" xml:space="preserve">
+    <value>the migration chain does not terminate</value>
+  </data>
+  <data name="DocumentMigrator_NoMigration" xml:space="preserve">
+    <value>version {0} has no migration leading to {1}</value>
+  </data>
+  <data name="DocumentMigrator_Overshoot" xml:space="preserve">
+    <value>the chain ended at {0}, past the {1} this build writes</value>
   </data>
   <data name="DuplicateSymbol_DuplicateSymbolAlsoDefinedIn" xml:space="preserve">
     <value>Duplicate symbol '{0}': also defined in {1}.</value>
@@ -834,6 +852,57 @@
   <data name="LocGetRows_UnsupportedFormat" xml:space="preserve">
     <value>Unsupported format: {0}</value>
   </data>
+  <data name="LocImport_CannotConvertNoTargetFolder" xml:space="preserve">
+    <value>Cannot convert {0} to {1}: No target folder was given for the converted file.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesCommand" xml:space="preserve">
+    <value>Cannot import localisation files: The command was invoked without any settings to import with. Run it from the Localisation view rather than directly.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesDifferent" xml:space="preserve">
+    <value>Cannot import localisation files: '{0}' is on a different drive or root from the .pgproj, so it cannot be recorded as a relative path. Copy the files inside the project folder first.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesFolder" xml:space="preserve">
+    <value>Cannot import localisation files: The folder '{0}' does not exist.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesNo" xml:space="preserve">
+    <value>Cannot import localisation files: No .pgproj file was found in this workspace, so there is nowhere to record the imported localisation settings.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesNot" xml:space="preserve">
+    <value>Cannot import localisation files: '{0}' is not a format that can be written. Use CSV, XML or NLS.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesSource" xml:space="preserve">
+    <value>Cannot import localisation files: The source format, source folder and target format are all required.</value>
+  </data>
+  <data name="LocImport_FileSCouldNotBe" xml:space="preserve">
+    <value>Files in '{2}' that could not be read and were left out of the import - {0} of {1}. The EaWEdit LSP output names them.</value>
+  </data>
+  <data name="LocImport_LocalisationProjectImportedConvertedFile" xml:space="preserve">
+    <value>Localisation project imported into '{2}'. Converted {1} files - {0}.</value>
+  </data>
+  <data name="LocImport_LocalisationProjectImportedRegisteredFile" xml:space="preserve">
+    <value>Localisation project imported from '{2}'. Registered {1} files - {0}. The files themselves were not changed.</value>
+  </data>
+  <data name="LocImport_NothingImportNoFilesWere" xml:space="preserve">
+    <value>Nothing to import: No {0} files were found in '{1}'. Check that the folder and the source format match what is actually there.</value>
+  </data>
+  <data name="LocImport_NothingWasImportedAlreadyExists" xml:space="preserve">
+    <value>Nothing was imported: '{0}' already exists and was left untouched. Delete or move it first, or choose a different target folder.</value>
+  </data>
+  <data name="LocInit_CannotInitialiseLocalisationProjectNo" xml:space="preserve">
+    <value>Cannot initialise a localisation project: No .pgproj file was found in this workspace, so there is nowhere to record the new localisation settings.</value>
+  </data>
+  <data name="LocInit_CannotInitialiseLocalisationProjectNot" xml:space="preserve">
+    <value>Cannot initialise a localisation project: '{0}' is not a format that can be created. Use CSV, XML or NLS.</value>
+  </data>
+  <data name="LocInit_CannotInitialiseLocalisationProjectThis" xml:space="preserve">
+    <value>Cannot initialise a localisation project: This project does not declare one yet, and no format and directory were given to create it with.</value>
+  </data>
+  <data name="LocInit_LocalisationProjectInitialisedCreated" xml:space="preserve">
+    <value>Localisation project initialised: Created '{0}'.</value>
+  </data>
+  <data name="LocInit_LocalisationProjectNotInitialisedAlready" xml:space="preserve">
+    <value>Localisation project not initialised: '{0}' already exists and was left untouched. Delete or move it first to start over.</value>
+  </data>
   <data name="LocKeyInspector_AlreadyDefined" xml:space="preserve">
     <value>'{0}' is already defined on row {1}. Only one of the two would ever be read.</value>
   </data>
@@ -909,6 +978,9 @@
   <data name="LocalisationToTextureMap_IsNotAValidLocalisation" xml:space="preserve">
     <value>'{0}' is not a valid localisation texture map for &lt;{1}&gt;. Expected: LocalisationKey, TextureName.</value>
   </data>
+  <data name="LuaAnalyzerRename_RenameRefusedEditsWhichNot" xml:space="preserve">
+    <value>Rename refused: It edits {0}, which is not one of this project's scripts</value>
+  </data>
   <data name="LuaCodeAction_FunctionTarget" xml:space="preserve">
     <value>function</value>
   </data>
@@ -923,6 +995,126 @@
   </data>
   <data name="LuaCodeAction_SuppressUpvalueOk" xml:space="preserve">
     <value>Suppress with ---@upvalue-ok</value>
+  </data>
+  <data name="LuaDebugAdapter_CannotResolveHostIPvAddress" xml:space="preserve">
+    <value>Cannot resolve host '{0}' to an IPv4 address</value>
+  </data>
+  <data name="LuaDebugAdapter_FileUnderNoneConfiguredScript" xml:space="preserve">
+    <value>The file is under none of the configured script roots</value>
+  </data>
+  <data name="LuaDebugAdapter_FrameBelongsEarlierStop" xml:space="preserve">
+    <value>That frame belongs to an earlier stop</value>
+  </data>
+  <data name="LuaDebugAdapter_GameDidNotAnswerWithin" xml:space="preserve">
+    <value>The game did not answer on {0}:{1} within {2:0} s. Is it a debug build with the Lua debug server started (console command luadebug)?</value>
+  </data>
+  <data name="LuaDebugAdapter_GameDoesNotEvaluateBreakpoint" xml:space="preserve">
+    <value>The game does not evaluate breakpoint conditions, hit counts or log messages; the breakpoint was not set</value>
+  </data>
+  <data name="LuaDebugAdapter_GameExitedCodeBeforeDebugger" xml:space="preserve">
+    <value>The game exited with code {0} before the debugger could attach</value>
+  </data>
+  <data name="LuaDebugAdapter_LaunchConfigurationNamesNoGame" xml:space="preserve">
+    <value>The launch configuration names no game executable ('program')</value>
+  </data>
+  <data name="LuaDebugAdapter_NoFrameLevel" xml:space="preserve">
+    <value>No frame with level {0}</value>
+  </data>
+  <data name="LuaDebugAdapter_NoScriptSuspended" xml:space="preserve">
+    <value>No script is suspended</value>
+  </data>
+  <data name="LuaDebugAdapter_NotAttachedGame" xml:space="preserve">
+    <value>Not attached to the game</value>
+  </data>
+  <data name="LuaDebugAdapter_OnlyPlainVariableNameCan" xml:space="preserve">
+    <value>Only a plain variable name can be read from the game; use the debug console to run Lua</value>
+  </data>
+  <data name="LuaDebugAdapter_Script" xml:space="preserve">
+    <value>script {0}</value>
+  </data>
+  <data name="LuaDebugAdapter_SelectScriptStopOneBefore" xml:space="preserve">
+    <value>Select a script or stop in one before evaluating</value>
+  </data>
+  <data name="LuaDebugAdapter_SourceHasNoFilePath" xml:space="preserve">
+    <value>The source has no file path</value>
+  </data>
+  <data name="LuaDebugAdapter_ThreadNotThreadScriptAny" xml:space="preserve">
+    <value>Thread {0} is not a thread of script {1} any more; refresh its threads</value>
+  </data>
+  <data name="LuaDebugAdapter_UnknownVariableReference" xml:space="preserve">
+    <value>Unknown variable reference</value>
+  </data>
+  <data name="LuaDebugAdapter_VariableReferenceBelongsEarlierStop" xml:space="preserve">
+    <value>That variable reference belongs to an earlier stop</value>
+  </data>
+  <data name="LuaDebugAdapter_WaitingGameBreakpointSetOnce" xml:space="preserve">
+    <value>Waiting for the game; the breakpoint is set once the debugger is attached</value>
+  </data>
+  <data name="LuaDebugConnection_ConnectionWasClosed" xml:space="preserve">
+    <value>The connection was closed</value>
+  </data>
+  <data name="LuaDebugConnection_DebuggerConnectionFailed" xml:space="preserve">
+    <value>The debugger connection failed</value>
+  </data>
+  <data name="LuaDebugConnection_GameAtDidNotComplete" xml:space="preserve">
+    <value>The game at {0} did not complete the debugger handshake within {1:0.#} s. Is a debug build running with its Lua debug server started (console command luadebug)?</value>
+  </data>
+  <data name="LuaDebugConnection_GameAtDidNotComplete2" xml:space="preserve">
+    <value>The game at {0} did not complete the debugger handshake within {1:0.#} s</value>
+  </data>
+  <data name="LuaDebugConnection_GameClosedDebuggerConnection" xml:space="preserve">
+    <value>The game closed the debugger connection</value>
+  </data>
+  <data name="LuaDebugConnection_NoPacketFromGameS" xml:space="preserve">
+    <value>No packet from the game for {0:0.#} s; the connection is presumed lost</value>
+  </data>
+  <data name="LuaDebugSession_BreakAlreadyArmedWaitingNext" xml:space="preserve">
+    <value>A break is already armed and waiting for the next Lua line</value>
+  </data>
+  <data name="LuaDebugSession_CannotBreakScriptAlreadySuspended" xml:space="preserve">
+    <value>Cannot break: a script is already suspended; continue or step first</value>
+  </data>
+  <data name="LuaDebugSession_CannotBreakThreadNoScript" xml:space="preserve">
+    <value>Cannot break a thread: no script is selected</value>
+  </data>
+  <data name="LuaDebugSession_CannotBreakThreadScriptAlready" xml:space="preserve">
+    <value>Cannot break a thread: a script is already suspended; continue first</value>
+  </data>
+  <data name="LuaDebugSession_CannotContinueNoScriptSuspended" xml:space="preserve">
+    <value>Cannot continue: no script is suspended</value>
+  </data>
+  <data name="LuaDebugSession_CannotSelectFrameNoScript" xml:space="preserve">
+    <value>Cannot select a frame: no script is suspended</value>
+  </data>
+  <data name="LuaDebugSession_CannotSelectScriptWhileOne" xml:space="preserve">
+    <value>Cannot select a script while one is suspended; continue first</value>
+  </data>
+  <data name="LuaDebugSession_CannotStepNoScriptSuspended" xml:space="preserve">
+    <value>Cannot step: no script is suspended</value>
+  </data>
+  <data name="LuaDebugSession_CannotWhileDebugger" xml:space="preserve">
+    <value>Cannot {0} while the debugger is {1}</value>
+  </data>
+  <data name="LuaDebugSession_DebuggerConnectionGone" xml:space="preserve">
+    <value>The debugger connection is gone</value>
+  </data>
+  <data name="LuaDebugSession_FrameOutsideCallStackFrames" xml:space="preserve">
+    <value>Frame {0} is outside the call stack of {1} frames</value>
+  </data>
+  <data name="LuaDebugSession_GameDidNotAnswerWithin" xml:space="preserve">
+    <value>The game did not answer {0} within {1:0.#} s</value>
+  </data>
+  <data name="LuaDebugSession_ScriptNotGameSScript" xml:space="preserve">
+    <value>Script {0} is not in the game's script list; refresh it first</value>
+  </data>
+  <data name="LuaDebugSession_SourceWideBreakpointNeedsThread" xml:space="preserve">
+    <value>A source-wide breakpoint needs thread id -1 as well as script id -1</value>
+  </data>
+  <data name="LuaDebugSession_ThreadNotKnownThreadScript" xml:space="preserve">
+    <value>Thread {0} is not a known thread of script {1}; request its threads first</value>
+  </data>
+  <data name="LuaDebugTransport_GameResetDebuggerConnection" xml:space="preserve">
+    <value>The game reset the debugger connection</value>
   </data>
   <data name="LuaGlobalScope_CyclicRequire" xml:space="preserve">
     <value>require("{0}") creates a cyclic dependency.</value>
@@ -1063,6 +1255,12 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="LuaStateMachine_StoryEventUndefined" xml:space="preserve">
     <value>Story event '{0}' names '{1}', which is not defined: The entry is nil, so the event is never registered and does nothing.</value>
   </data>
+  <data name="LuaTypeNames_Type" xml:space="preserve">
+    <value>type {0}</value>
+  </data>
+  <data name="LuaTypeNames_UnknownScript" xml:space="preserve">
+    <value>unknown script</value>
+  </data>
   <data name="LuaUpvalue_Captured" xml:space="preserve">
     <value>File-level local '{0}' is captured as an upvalue by '{1}'. This persists across save/load cycles and may corrupt save games. Move the variable inside the function, or use a global.</value>
   </data>
@@ -1104,6 +1302,63 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="MissingRequiredTag_ReportsItAsUnset" xml:space="preserve">
     <value>and the engine reports it as unset on load</value>
+  </data>
+  <data name="ModProjectReload_ShippedGameBaselineCouldNot" xml:space="preserve">
+    <value>The shipped-game baseline could not be loaded, so nothing in this project can be checked against the game. Set 'aet-eaw-edit.lsp.source.baseline.type' to 'http' to download it, or to 'local' and point it at a baseline file. Nothing has been indexed.</value>
+  </data>
+  <data name="ModProject_AtLine" xml:space="preserve">
+    <value> at line {0}</value>
+  </data>
+  <data name="ModProject_AtLineColumn" xml:space="preserve">
+    <value> at line {0}, column {1}</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject" xml:space="preserve">
+    <value>Could not load mod project '{0}'{1}: {2}</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject10" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'icons.megaTexture' must not be empty. Omit it entirely to use the default '{1}'.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject11" xml:space="preserve">
+    <value>Could not load mod project '{0}': The file is empty.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject12" xml:space="preserve">
+    <value>Could not load mod project '{0}': {1}</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject13" xml:space="preserve">
+    <value>Could not load mod project '{0}': The property '{1}' appears more than once. Keep one of them.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject14" xml:space="preserve">
+    <value>Could not load mod project '{0}': The file is empty or is not a JSON object.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject2" xml:space="preserve">
+    <value>Could not load mod project '{0}': {1}.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject3" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'directories.text' and 'directories.textResourceType' were removed in 0.2.0. Move the localisation directory into a top-level 'localisation' node instead, e.g. "localisation": {{ "type": "CSV", "directory": "data/text" }}. See the extension's 'Upgrading from 0.1.x' README section for the full migration steps.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject4" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'localisation.credits.files' must name at least one file when 'localisation.credits.detection' is 'explicit'.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject5" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'localisation.credits.detection' must be one of convention, explicit, none (got '{1}').</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject6" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'localisation.directory' is required when 'localisation' is present.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject7" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'localisation.type' must be one of CSV, DAT, XML, NLS (got '{1}').</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject8" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'icons.sourceRoots' must not contain empty entries.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject9" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'icons.megaTexture' must be given without a file extension (got '{1}'). It names both the .mtd directory and the .tga atlas, e.g. "megaTexture": "{2}".</value>
+  </data>
+  <data name="ModProject_FileNotValidJSONDoes" xml:space="preserve">
+    <value>The file is not valid JSON or does not match the .pgproj schema.</value>
+  </data>
+  <data name="ModProject_ProjectReferencesMustBeArrayReferences" xml:space="preserve">
+    <value>'projectReferences' must be an array of references - either path strings or {{ "path": "..." }} objects, e.g. [ {{ "path": "../core/core.pgproj" }} ].</value>
   </data>
   <data name="ModelFileFormat_IsNotAValidModel" xml:space="preserve">
     <value>'{0}' is not a valid model filename for &lt;{1}&gt;. Expected a .alo file.</value>
@@ -1191,6 +1446,24 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="PerFactionValue_IsNotAValidPlanet" xml:space="preserve">
     <value>'{0}' is not a valid planet value for &lt;{1}&gt;. Expected: Planet, Number.</value>
+  </data>
+  <data name="PgprojFormat_ThisFileDeclaresItselfAs" xml:space="preserve">
+    <value>This file declares itself as '{0}', not a '{1}'. It cannot be opened as a mod project.</value>
+  </data>
+  <data name="PgprojFormat_ThisProjectDeclaresUnreadableFormat" xml:space="preserve">
+    <value>This project declares an unreadable format version '{0}'. It must look like '{1}'. Fix or remove '_typeVersion' to open the project.</value>
+  </data>
+  <data name="PgprojFormat_ThisProjectDeclaresVersionWhich" xml:space="preserve">
+    <value>This project declares version '{0}', which is not a version of '{1}'. It cannot be opened as a mod project.</value>
+  </data>
+  <data name="PgprojFormat_ThisProjectFormatWhichThis" xml:space="preserve">
+    <value>This project is in format {0}, which this version of aet-eaw-edit does not understand (it reads and writes {1}). Update the extension to open it - opening it anyway would risk writing over settings a newer version put there.</value>
+  </data>
+  <data name="PgprojIconProposal_ThisProjectHasIconSources" xml:space="preserve">
+    <value>This project has icon sources at {0} that nothing is configured to read, so every icon falls back to the base game. The proposed 'icons' node points at them.</value>
+  </data>
+  <data name="PgprojMigrationOffer_UpdatedPreviousFileAt" xml:space="preserve">
+    <value>'{0}' updated. The previous file is at '{1}'.</value>
   </data>
   <data name="PlanetModeExclusionList_HasNoModeIsA" xml:space="preserve">
     <value>'{0}' has no mode. &lt;{1}&gt; is a flat list of (planet, mode) pairs, so every planet must be followed by the mode it is excluded in.</value>
@@ -1357,6 +1630,18 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="PreviewUnitCodeLens_PreviewUnit" xml:space="preserve">
     <value>preview unit</value>
   </data>
+  <data name="ProjectConfig_CouldNotLoadModProject" xml:space="preserve">
+    <value>Could not load mod project configuration: {0}</value>
+  </data>
+  <data name="ProjectConfig_LoadedOtherProjectFileS" xml:space="preserve">
+    <value>Loaded '{0}'. Other project files under this workspace are not served by this server - {1}; open their folders to work on them.</value>
+  </data>
+  <data name="ProjectConfig_NoPgprojFileWasFound" xml:space="preserve">
+    <value>No .pgproj file was found under [{0}]. This folder is not a mod project, so nothing has been indexed and no XML or Lua support is available here. Open the folder that contains the .pgproj, or create one.</value>
+  </data>
+  <data name="ProjectConfig_ProjectFileDoesNotExist" xml:space="preserve">
+    <value>The project file '{0}' does not exist. Nothing has been indexed; reopen the folder once the file is back, or remove it from the workspace.</value>
+  </data>
   <data name="ProjectileCategoryList_IsNotAKnownOn" xml:space="preserve">
     <value>'{0}' is not a known {1} on &lt;{2}&gt; - the engine never matches it, so that projectile is not intercepted.</value>
   </data>
@@ -1414,8 +1699,29 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="RgbaValue_IsNotAValidRgba" xml:space="preserve">
     <value>'{0}' is not a valid RGBA color for &lt;{1}&gt;. Expected 3 or 4 integers in 0-255, separated by spaces or commas.</value>
   </data>
+  <data name="RunnableModLayout_LayerHasNoProjectFile" xml:space="preserve">
+    <value>The layer has no project file, so there is no directory to launch it from</value>
+  </data>
+  <data name="RunnableModLayout_NotUnderDataGameOnly" xml:space="preserve">
+    <value>'{0}' is not under '{1}/Data', and the game only reads a mod's Data tree</value>
+  </data>
+  <data name="RunnableModLayout_ProjectDirectoryContainsSpaceGame" xml:space="preserve">
+    <value>The project directory '{0}' contains a space; the game's command line cannot carry a path with one</value>
+  </data>
   <data name="SFXEventReference_Noun" xml:space="preserve">
     <value>SFX event reference</value>
+  </data>
+  <data name="SchemaBootstrapper_NoSchemaPointAetEaw" xml:space="preserve">
+    <value>No schema in {0}. Point "aet-eaw-edit.lsp.schema.localPath" at the schema's eaw folder, the one holding _index.json</value>
+  </data>
+  <data name="ServerStatus_AssetCatalogNoModels" xml:space="preserve">
+    <value>Asset catalog: No models</value>
+  </data>
+  <data name="ServerStatus_ProjectFiles" xml:space="preserve">
+    <value>Project files: 0</value>
+  </data>
+  <data name="ServerStatus_SchemaNotLoaded" xml:space="preserve">
+    <value>Schema: Not loaded</value>
   </data>
   <data name="SfxCount_IsNotAValidSfx" xml:space="preserve">
     <value>'{0}' is not a valid SFX count for &lt;{1}&gt;. Expected -1 or a non-negative integer. Did you mean {2}?</value>
@@ -1434,6 +1740,42 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="ShipClassType_IsNotAValidShip" xml:space="preserve">
     <value>'' is not a valid ship class type for &lt;{0}&gt;.</value>
+  </data>
+  <data name="Sidecar_CouldNotBeBroughtForward" xml:space="preserve">
+    <value>'{0}' could not be brought forward: {1}. Defaults are in use and the file was left alone.</value>
+  </data>
+  <data name="Sidecar_CouldNotBeReadWas" xml:space="preserve">
+    <value>'{0}' could not be read and was left alone. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_CouldNotWrite" xml:space="preserve">
+    <value>Could not write '{0}': {1}</value>
+  </data>
+  <data name="Sidecar_DeclaresNoSoThereNo" xml:space="preserve">
+    <value>'{0}' declares no '{1}' or '{2}', so there is no way to tell which shape it holds. It was left alone and defaults are in use.</value>
+  </data>
+  <data name="Sidecar_DeclaresUnreadableVersionDefaultsAre" xml:space="preserve">
+    <value>'{0}' declares an unreadable version '{1}'. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_DeclaresVersionWhichNotVersion" xml:space="preserve">
+    <value>'{0}' declares version '{1}', which is not a version of '{2}'. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_DoesNotMatchShapeDefaults" xml:space="preserve">
+    <value>'{0}' does not match the shape of '{1}'. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_EmptyDefaultsAreUse" xml:space="preserve">
+    <value>'{0}' is empty. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_HoldsNotDefaultsAreUse" xml:space="preserve">
+    <value>'{0}' holds '{1}', not '{2}'. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_NotJSONObjectNoMigration" xml:space="preserve">
+    <value>'{0}' is not a JSON object and no migration made it one. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_VersionWhichThisVersionAet" xml:space="preserve">
+    <value>'{0}' is version {1}, which this version of aet-eaw-edit does not understand (it writes {2}). Update the extension to open this project. The file has been left untouched.</value>
+  </data>
+  <data name="Sidecar_WasWrittenByNewerVersion" xml:space="preserve">
+    <value>'{0}' was written by a newer version of aet-eaw-edit and is left untouched. Update the extension to edit this project.</value>
   </data>
   <data name="SlotItemChecks_FileWasNotFoundIn" xml:space="preserve">
     <value>{0} file '{1}' was not found in the game data or workspace asset files.</value>
@@ -1488,6 +1830,15 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="SquadronSyncAction_SyncAllSquadronOffsetsSquadron" xml:space="preserve">
     <value>Sync all Squadron_Offsets to Squadron_Units</value>
+  </data>
+  <data name="StartupPipeline_IndexingWorkspace" xml:space="preserve">
+    <value>Indexing workspace</value>
+  </data>
+  <data name="StartupPipeline_LoadingSchemaBaseline" xml:space="preserve">
+    <value>Loading schema and baseline</value>
+  </data>
+  <data name="StartupProgress_StarWarsLSPStarting" xml:space="preserve">
+    <value>Star Wars LSP - starting</value>
   </data>
   <data name="StoryChain_NotAManifest" xml:space="preserve">
     <value>'{0}' is not a valid story plot manifest: Missing &lt;Story_Mode_Plots&gt; root element.</value>
@@ -1764,6 +2115,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="StoryHandlers_NodeWasNotFoundCampaign" xml:space="preserve">
     <value>Node '{0}' was not found in campaign '{1}'.</value>
+  </data>
+  <data name="StoryLayout_DroppedPositions" xml:space="preserve">
+    <value>Saved node positions that named a story file no longer matching exactly one thread were dropped - {0}. Those events are arranged automatically the next time their graph opens.</value>
   </data>
   <data name="StoryParamEnum_IsNotAValidValue" xml:space="preserve">
     <value>'{0}' is not a valid {1} value.</value>
@@ -2121,6 +2475,12 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   </data>
   <data name="Suppression_ReportOnGitHub" xml:space="preserve">
     <value>Report {0} on GitHub</value>
+  </data>
+  <data name="Suppressions_See" xml:space="preserve">
+    <value> See '{0}'.</value>
+  </data>
+  <data name="Suppressions_UnreadableEntries" xml:space="preserve">
+    <value>suppressions.json holds entries that are not diagnostic ids and suppress nothing - {0}. Expected aetswg-&lt;group&gt;-&lt;number&gt; or aetswg-&lt;group&gt;-*.</value>
   </data>
   <data name="SystemSpyDuration_DurationInSecsIsBut" xml:space="preserve">
     <value>&lt;Duration_In_Secs&gt; is {0}, but a {1} system spy needs a duration {2} - the engine overwrites it with {3}</value>
