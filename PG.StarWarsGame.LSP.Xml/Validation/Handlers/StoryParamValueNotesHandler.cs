@@ -60,9 +60,9 @@ public sealed class StoryParamValueNotesHandler : XmlDiagnosticsHandler<StoryPar
         var text = SchemaNoteDiagnostics.TextOf(note, locale);
         var lead = note.Kind switch
         {
-            SchemaNoteKind.BuggedInEngine => $"'{value}' is accepted but does nothing in the engine.",
-            SchemaNoteKind.Deprecated => $"'{value}' is deprecated and should not be used.",
-            SchemaNoteKind.Untested => $"'{value}' is documented but untested - it may not work in the engine.",
+            SchemaNoteKind.BuggedInEngine => messages.Format("StoryParamValueNotes_BuggedInEngine", value),
+            SchemaNoteKind.Deprecated => messages.Format("StoryParamValueNotes_Deprecated", value),
+            SchemaNoteKind.Untested => messages.Format("StoryParamValueNotes_Untested", value),
             // A remark is only ever its own words; without them it has nothing to say.
             _ => null
         };

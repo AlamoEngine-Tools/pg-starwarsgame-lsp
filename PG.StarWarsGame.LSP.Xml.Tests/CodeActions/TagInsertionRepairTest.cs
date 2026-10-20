@@ -89,7 +89,7 @@ public sealed class TagInsertionRepairTest
         var fact = Fact("<Demolition_Ability Name='D'></Demolition_Ability>");
 
         Assert.Equal("Bomb_Type", fact.TagName);
-        Assert.Null(fact.Insertion);
+        Assert.Null(fact.InsertionEdits);
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public sealed class TagInsertionRepairTest
         var facts = Produce("<Eat_Attack_Ability Name='A'><Damage_Amount>1</Damage_Amount>"
                             + "</Eat_Attack_Ability>", new EatAttackAnimationRule());
 
-        Assert.Null(Assert.Single(facts.OfType<MissingRequiredTagFact>()).Insertion);
+        Assert.Null(Assert.Single(facts.OfType<MissingRequiredTagFact>()).InsertionEdits);
     }
 
     /// <summary>The handler passes the insertion through as the engine-repair quick fix.</summary>
@@ -123,9 +123,9 @@ public sealed class TagInsertionRepairTest
 
     private static XmlDiagnosticEdit Single(string body)
     {
-        var insertion = Fact(body).Insertion;
+        var insertion = Fact(body).InsertionEdits;
         Assert.NotNull(insertion);
-        return Assert.Single(insertion!.Edits);
+        return Assert.Single(insertion!);
     }
 
     private static MissingRequiredTagFact Fact(string body)

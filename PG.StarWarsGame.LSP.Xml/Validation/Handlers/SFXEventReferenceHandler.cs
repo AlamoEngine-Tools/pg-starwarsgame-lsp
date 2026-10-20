@@ -12,5 +12,5 @@ public sealed class SFXEventReferenceHandler : NonEmptyReferenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.SfxEventReference;
 
     protected override XmlValueType TargetType => XmlValueType.SFXEventReference;
-    protected override string ReferenceNoun => "SFX event reference";
+    protected override string ReferenceNounKey => "SFXEventReference_Noun";
 }

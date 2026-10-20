@@ -58,7 +58,7 @@ public sealed class DeathAnimationClipHandler : XmlDiagnosticsHandler<DeathAnima
         if (string.IsNullOrEmpty(indexText))
         {
             if (takes > 0) return [];
-            what = $"'{model}' has no {type} animation";
+            what = ctx.Messages.Format("DeathAnimationClip_NoAnimation", model, type);
         }
         else
         {
@@ -66,15 +66,15 @@ public sealed class DeathAnimationClipHandler : XmlDiagnosticsHandler<DeathAnima
                 return [];
             if (index < takes) return [];
             what = takes == 0
-                ? $"'{model}' has no {type} animation"
-                : $"'{model}' has {takes} {type} take{(takes == 1 ? "" : "s")}, so {IndexTag} {indexText} does not exist";
+                ? ctx.Messages.Format("DeathAnimationClip_NoAnimation", model, type)
+                : ctx.Messages.Format("DeathAnimationClip_NoSuchTake", model, takes, type, IndexTag, indexText);
         }
 
         var consequence = !EngineBoolean.IsTrue(unit.ValueOf("Remove_Upon_Death"))
-            ? "plays no death animation."
+            ? ctx.Messages.Format("DeathAnimationClip_PlaysNone")
             : EngineBoolean.IsTrue(unit.ValueOf("Spin_Away_On_Death"))
-                ? "plays no death animation and, with Remove_Upon_Death, is removed the moment it dies unless it spins away."
-                : "plays no death animation and, with Remove_Upon_Death, is removed the moment it dies.";
+                ? ctx.Messages.Format("DeathAnimationClip_RemovedUnlessSpins")
+                : ctx.Messages.Format("DeathAnimationClip_Removed");
 
         return
         [

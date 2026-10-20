@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -49,11 +50,12 @@ public sealed class XmlStructureHandlerTest
     public void EachCategory_HasItsOwnIdAndSeverity(XmlStrictnessCategory category, DiagnosticId id,
         XmlDiagnosticSeverity severity)
     {
-        var fact = new XmlStructureFact("file:///test.xml", 3, 2, 5, "reason", category);
+        var fact = new XmlStructureFact("file:///test.xml", 3, 2, 5,
+            new CatalogueText("XmlGameReader_NoRootElementGameDrops"), category);
         var d = Assert.Single(Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
         Assert.Equal(id, d.Id);
         Assert.Equal(severity, d.Severity);
-        Assert.Equal("reason", d.Message);
+        Assert.Equal("No root element: The game drops the whole file", d.Message);
     }
 
     [Fact]

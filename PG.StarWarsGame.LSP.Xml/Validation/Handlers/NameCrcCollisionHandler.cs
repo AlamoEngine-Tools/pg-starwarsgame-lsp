@@ -30,7 +30,8 @@ public sealed class NameCrcCollisionHandler : XmlDiagnosticsHandler<XmlNameCrcCo
             .Select(s => s.Origin)
             .OfType<FileOrigin>()
             .Where(fo => fo.IsNavigable)
-            .Select(fo => new XmlRelatedLocation(fo.Uri, fo.Line, fo.Column, "Object with the same name hash"))
+            .Select(fo => new XmlRelatedLocation(fo.Uri, fo.Line, fo.Column,
+                ctx.Messages.Format("NameCrcCollision_SameNameHash")))
             .ToList();
 
         return

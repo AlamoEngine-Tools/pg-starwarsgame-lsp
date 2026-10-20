@@ -62,7 +62,7 @@ internal static class SlotItemChecks
             return null;
 
         return new XmlDiagnosticResult(rule.MissingSeverity,
-            ctx.Messages.Format("SlotItemChecks_FileWasNotFoundIn", rule.Noun, value),
+            ctx.Messages.Format("SlotItemChecks_FileWasNotFoundIn", ctx.Messages.Format(rule.NounKey), value),
             Id: slot.ReferenceKind == ReferenceKind.ModelFile
                 ? DiagnosticIds.TupleSlotModelFileExistence
                 : DiagnosticIds.TupleSlotAssetFileExistence);

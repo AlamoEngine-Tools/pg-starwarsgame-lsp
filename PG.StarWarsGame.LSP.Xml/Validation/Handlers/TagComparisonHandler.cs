@@ -24,12 +24,13 @@ public sealed class TagComparisonHandler : XmlDiagnosticsHandler<TagComparisonFa
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                ctx.Messages.Format("TagComparison_ButIsAgainst", fact.LeftTag, fact.Expectation, fact.RightTag,
+                ctx.Messages.Format("TagComparison_ButIsAgainst", fact.LeftTag,
+                    ctx.Messages.Format(fact.ExpectationKey), fact.RightTag,
                     Show(fact.Left), Show(fact.Right)),
                 EngineRepair: fact.SwapEdits is null
                     ? null
                     : new XmlEngineRepair(
-                        $"Apply the engine's own correction: swap <{fact.LeftTag}> and <{fact.RightTag}>",
+                        ctx.Messages.Format("TagComparison_ApplyTheEngineSCorrection", fact.LeftTag, fact.RightTag),
                         fact.SwapEdits))
         ];
     }

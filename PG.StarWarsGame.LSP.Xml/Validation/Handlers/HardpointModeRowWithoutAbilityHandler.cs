@@ -20,15 +20,14 @@ public sealed class HardpointModeRowWithoutAbilityHandler
         HardpointModeRowWithoutAbilityFact fact, DiagnosticsContext ctx)
     {
         var slots = fact.OwnerAbilities.Count == 0
-            ? "no unit ability"
-            : $"unit abilities {string.Join(", ", fact.OwnerAbilities)}";
+            ? ctx.Messages.Format("HardpointModeRowWithoutAbility_NoAbility")
+            : ctx.Messages.Format("HardpointModeRowWithoutAbility_Abilities", string.Join(", ", fact.OwnerAbilities));
 
         // Two causes, two remedies: add the ability, or move it up the list.
         var tail = fact.SlotOfType < 0
-            ? $"'{fact.OwnerId}' has {slots}; the game reads the row only while an active " +
-              $"{fact.AbilityType} ability sits in its first or second slot."
-            : $"'{fact.OwnerId}' has {fact.AbilityType} in slot {fact.SlotOfType + 1} of {slots}; " +
-              "the game reads the row for the first two slots only.";
+            ? ctx.Messages.Format("HardpointModeRowWithoutAbility_NotInSlots", fact.OwnerId, slots, fact.AbilityType)
+            : ctx.Messages.Format("HardpointModeRowWithoutAbility_SlotTooLate", fact.OwnerId, fact.AbilityType,
+                fact.SlotOfType + 1, slots);
 
         return
         [

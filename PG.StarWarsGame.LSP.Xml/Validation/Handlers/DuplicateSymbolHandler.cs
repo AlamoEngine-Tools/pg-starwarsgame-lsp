@@ -35,7 +35,7 @@ public sealed class DuplicateSymbolHandler : XmlDiagnosticsHandler<XmlSymbolFact
             .Select(s => (FileOrigin)s.Origin)
             .Where(fo => fo.IsNavigable)
             .Select(fo => new XmlRelatedLocation(fo.Uri, fo.Line, fo.Column,
-                $"Other definition of '{fact.SymbolId}'"))
+                ctx.Messages.Format("DuplicateSymbol_OtherDefinition", fact.SymbolId)))
             .ToList();
 
         return

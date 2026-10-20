@@ -3,6 +3,7 @@
 
 using System.Xml;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
@@ -77,25 +78,26 @@ public sealed class XmlStructuralValidator : IXmlStructuralValidator
         if (open < 0) return null;
         var close = text.IndexOf('>', open);
         if (close < 0 || text[close - 1] == '?') return null;
-        return new XmlRepair("End the declaration with '?>'", [new XmlTextEdit(close, 0, "?")]);
+        return new XmlRepair(new CatalogueText("XmlStructuralValidator_EndDeclaration"),
+            [new XmlTextEdit(close, 0, "?")]);
     }
 
     // XmlException carries no error code, and its message words one construct several ways (a
     // declaration ending in '" >' is "Name cannot begin with '>'", a name after '&' is "expected
     // ';'"), so the category comes from the TEXT at the error. The game read the file, so every
     // error here is one standard XML tools give and the game does not.
-    private static (XmlStrictnessCategory, string) Categorize(string message, string text, int line, int at)
+    private static (XmlStrictnessCategory, CatalogueText) Categorize(string message, string text, int line, int at)
     {
         var detail = message.Split(" Line ", 2)[0].TrimEnd('.');
         if (line == 0 && DeclarationRepair(text) is not null)
             return (XmlStrictnessCategory.MalformedDeclaration,
-                "XML declaration must end in '?>': The game reads it, standard XML tools reject the file");
+                new CatalogueText("XmlStructuralValidator_XMLDeclarationMustEndGame"));
         if (InsideEntityReference(text, at) ||
             message.Contains("undeclared entity", StringComparison.Ordinal))
             return (XmlStrictnessCategory.StrayAmpersand,
-                "'&' that starts no entity: The game reads it as a plain character, standard XML tools reject the file");
+                new CatalogueText("XmlStructuralValidator_StartsNoEntityGameReads"));
         return (XmlStrictnessCategory.StrictOnly,
-            $"Invalid XML ({detail}): The game reads the file, standard XML tools reject it");
+            new CatalogueText("XmlStructuralValidator_InvalidXMLGameReadsFile", detail));
     }
 
     // True when the error sits in an unterminated reference: an '&' at the error, or one reached

@@ -38,8 +38,8 @@ public abstract class ListLengthHandlerBase : XmlDiagnosticsHandler<XmlTagValueF
     /// <summary>Most entries the engine accepts, or <c>null</c> for an unlimited list.</summary>
     protected abstract int? MaximumEntries { get; }
 
-    /// <summary>The rule as a sentence fragment completing "&lt;Tag&gt; ...".</summary>
-    protected abstract string Expectation { get; }
+    /// <summary>The catalogue key of the rule, a sentence fragment completing "&lt;Tag&gt; ...".</summary>
+    protected abstract string ExpectationKey { get; }
 
     /// <inheritdoc />
     public abstract string ValidationId { get; }
@@ -69,7 +69,8 @@ public abstract class ListLengthHandlerBase : XmlDiagnosticsHandler<XmlTagValueF
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                ctx.Messages.Format("ListLengthHandlerBase_ButHasTheEngineRejects", fact.Tag.Tag, Expectation, entries))
+                ctx.Messages.Format("ListLengthHandlerBase_ButHasTheEngineRejects", fact.Tag.Tag,
+                    ctx.Messages.Format(ExpectationKey), entries))
         ];
     }
 }

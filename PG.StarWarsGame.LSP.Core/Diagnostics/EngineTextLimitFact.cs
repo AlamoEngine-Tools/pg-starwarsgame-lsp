@@ -20,7 +20,8 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///         <c>size() &lt; limit</c>.
 ///     </para>
 /// </remarks>
-/// <param name="Subject">What was too long, for the message - a tag name or the object's name.</param>
+/// <param name="SubjectKey">The catalogue key of how the message names what was too long.</param>
+/// <param name="Subject">What was too long - a tag name or the object's name.</param>
 /// <param name="CharactersOver">
 ///     How many characters must come off the end before the engine will take it, or 0 when it
 ///     already fits. THE number the author acts on - deliberately not the byte overage, which is a
@@ -40,6 +41,7 @@ public sealed record EngineTextLimitFact(
     int Line,
     int Column,
     int Length,
+    string SubjectKey,
     string Subject,
     int CharactersOver,
     int CharactersLeft,

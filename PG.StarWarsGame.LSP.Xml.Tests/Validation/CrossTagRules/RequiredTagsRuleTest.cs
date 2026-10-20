@@ -83,7 +83,7 @@ public sealed class RequiredTagsRuleTest
     {
         var fact = Assert.Single(Missing(Run("<Demolition_Ability Name='D'></Demolition_Ability>")));
 
-        Assert.Contains("Demolition_Bomb", fact.Repair);
+        Assert.Equal("DemolitionBombTypeRule_Repair", fact.RepairKey);
     }
 
     [Fact]

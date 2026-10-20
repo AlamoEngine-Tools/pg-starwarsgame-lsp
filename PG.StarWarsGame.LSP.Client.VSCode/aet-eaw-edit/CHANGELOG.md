@@ -24,6 +24,10 @@
     and back
   - The XML diagnostics read the configured locale; it was fixed to English, so neither the server's
     texts nor the schema's per-language notes ever reached a diagnostic in another language
+  - The XML structure findings, the cross-tag rules, every message fragment and every engine-repair
+    quick fix come from the catalogue as well. The findings keep the key until they are shown, so a
+    changed locale needs no re-parse. Fix titles take a capital after the colon, and the gated-flag
+    message no longer says "for you"
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none

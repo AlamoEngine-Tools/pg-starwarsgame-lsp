@@ -18,12 +18,13 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// </remarks>
 /// <param name="OwningType">The type that requires the tag, for the message.</param>
 /// <param name="TagName">The tag that is missing or empty.</param>
-/// <param name="Repair">
-///     What the engine silently does instead, as a sentence fragment - for example
+/// <param name="RepairKey">
+///     The catalogue key of what the engine silently does instead, a sentence fragment - for example
 ///     <c>defaults it to Demolition_Bomb</c>. Empty where the engine only complains, which is the
 ///     common case: the seven Leech_Shields tags have no substitute and the ability does not run.
 /// </param>
-/// <param name="Insertion">
+/// <param name="DefaultValue">The value the engine writes in, where it has one.</param>
+/// <param name="InsertionEdits">
 ///     The engine's default written into the file as an edit, where the engine HAS a default and the
 ///     surrounding layout could be derived. Null for the tags it only complains about, and null for
 ///     an object with no existing child to copy a layout from.
@@ -35,5 +36,6 @@ public sealed record MissingRequiredTagFact(
     int Length,
     string OwningType,
     string TagName,
-    string Repair = "",
-    XmlEngineRepair? Insertion = null) : XmlFact(DocumentUri, Line, Column, Length);
+    string RepairKey = "",
+    string? DefaultValue = null,
+    IReadOnlyList<XmlDiagnosticEdit>? InsertionEdits = null) : XmlFact(DocumentUri, Line, Column, Length);

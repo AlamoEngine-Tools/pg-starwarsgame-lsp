@@ -33,5 +33,5 @@ public sealed class ControlPointCurveHandler : ListLengthHandlerBase
 
     protected override int? MaximumEntries => null;
 
-    protected override string Expectation => "needs at least two control points";
+    protected override string ExpectationKey => "ControlPointCurve_Expectation";
 }

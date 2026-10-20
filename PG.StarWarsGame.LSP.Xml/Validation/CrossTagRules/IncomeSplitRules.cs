@@ -119,12 +119,10 @@ public sealed class SplitFavorsOwnerIgnoredRule : IncomeStreamRuleBase
                 XmlUtility.GetTagBracketColumn(favors),
                 XmlUtility.GetOpeningTagLength(favors),
                 FavorsTag, AlliesTag,
-                $"does nothing without <{AlliesTag}>",
-                "turns it off and zeroes Owner_Income_Percentage",
-                edits.Count == 0
-                    ? null
-                    : new XmlEngineRepair(
-                        "Apply the engine's own correction: turn Split_Favors_Owner off", edits))
+                "SplitFavorsOwnerIgnoredRule_Problem",
+                "SplitFavorsOwnerIgnoredRule_Consequence",
+                "SplitFavorsOwnerIgnoredRule_RepairTitle",
+                edits.Count == 0 ? null : edits)
         ];
     }
 }
@@ -168,12 +166,10 @@ public sealed class SplitFavorsOwnerVsFullAmountRule : IncomeStreamRuleBase
                 XmlUtility.GetTagBracketColumn(favors),
                 XmlUtility.GetOpeningTagLength(favors),
                 FavorsTag, FullAmountTag,
-                $"cannot be set together with <{FullAmountTag}>",
-                "turns both off",
-                edits.Count == 0
-                    ? null
-                    : new XmlEngineRepair(
-                        "Apply the engine's own correction: turn both flags off", edits))
+                "SplitFavorsOwnerVsFullAmountRule_Problem",
+                "SplitFavorsOwnerVsFullAmountRule_Consequence",
+                "SplitFavorsOwnerVsFullAmountRule_RepairTitle",
+                edits.Count == 0 ? null : edits)
         ];
     }
 }

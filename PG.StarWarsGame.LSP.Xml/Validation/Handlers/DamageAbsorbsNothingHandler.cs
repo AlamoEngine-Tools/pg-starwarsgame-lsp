@@ -26,8 +26,8 @@ public sealed class DamageAbsorbsNothingHandler : XmlDiagnosticsHandler<DamageAb
                 : null;
 
         var state = missing is null
-            ? $"Both are {Show(fact.Percentage)}"
-            : $"{Show(fact.Percentage ?? fact.Amount)} with no {missing}";
+            ? ctx.Messages.Format("DamageAbsorbsNothing_BothAre", Show(fact.Percentage))
+            : ctx.Messages.Format("DamageAbsorbsNothing_WithNo", Show(fact.Percentage ?? fact.Amount), missing);
 
         return
         [

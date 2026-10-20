@@ -22,6 +22,7 @@ using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -224,6 +225,8 @@ public static class ServerConfigurator
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();
+                // The server's own texts outside a diagnostics run, in the configured locale.
+                services.AddSingleton<IMessageCatalog, ConfiguredMessageCatalog>();
                 services.AddSingleton<IFileSystem, FileSystem>();
                 services.AddSingleton<IFileHelper, FileHelper>();
                 services.AddSingleton<SchemaHttpCache>();

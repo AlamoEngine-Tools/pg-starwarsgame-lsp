@@ -20,11 +20,14 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// </remarks>
 /// <param name="GateTag">The flag whose being on creates the requirement.</param>
 /// <param name="RequiredTag">The tag that must then be set.</param>
-/// <param name="Requirement">
-///     What the required tag must be, as a sentence fragment - "set to true", "a time greater than
-///     zero".
+/// <param name="RequirementKey">
+///     The catalogue key of what the required tag must be, a sentence fragment - "set to true", "a
+///     time greater than zero".
 /// </param>
-/// <param name="Repair">What the engine silently does instead, for the second half of the message.</param>
+/// <param name="RepairKey">
+///     The catalogue key of what the engine silently does instead, for the second half of the
+///     message.
+/// </param>
 public sealed record BooleanGatedRequirementFact(
     string DocumentUri,
     int Line,
@@ -32,5 +35,5 @@ public sealed record BooleanGatedRequirementFact(
     int Length,
     string GateTag,
     string RequiredTag,
-    string Requirement,
-    string Repair) : XmlFact(DocumentUri, Line, Column, Length);
+    string RequirementKey,
+    string RepairKey) : XmlFact(DocumentUri, Line, Column, Length);

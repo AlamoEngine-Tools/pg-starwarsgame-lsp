@@ -24,6 +24,9 @@
   <data name="AbilitySfxMap_IsNotAValidAbility" xml:space="preserve">
     <value>'{0}' is not a valid ability SFX map for &lt;{1}&gt;. Expected: AbilityName, SFXEventName.</value>
   </data>
+  <data name="AbsorbBlasterApplicableUnitsRule_Consequence" xml:space="preserve">
+    <value>cannot absorb fire from any source</value>
+  </data>
   <data name="AllowedValues_HereOnlySupportsTheEngine" xml:space="preserve">
     <value>&lt;{0}&gt; here only supports {1} - the engine overwrites anything else.</value>
   </data>
@@ -33,14 +36,41 @@
   <data name="AngleDegreesHalfTurn_Expectation" xml:space="preserve">
     <value>must be between 0 and 180 degrees</value>
   </data>
+  <data name="ApplicableUnitRule_AffectsNoUnits" xml:space="preserve">
+    <value>affects no units at all</value>
+  </data>
+  <data name="ApplicableUnitRule_Empty" xml:space="preserve">
+    <value>empty</value>
+  </data>
+  <data name="ApplicableUnitRule_ListOne" xml:space="preserve">
+    <value>list at least one unit category or type</value>
+  </data>
   <data name="AssetFileExistenceHandlerBase_FileWasNotFoundIn" xml:space="preserve">
     <value>{0} file '{1}' was not found in the game data or workspace asset files.{2}</value>
+  </data>
+  <data name="AssetFileExistence_AlsoChecked" xml:space="preserve">
+    <value> Also checked {0} (the game treats these formats interchangeably).</value>
+  </data>
+  <data name="AssetKind_Audio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="AssetKind_Map" xml:space="preserve">
+    <value>Map</value>
+  </data>
+  <data name="AssetKind_Model" xml:space="preserve">
+    <value>Model</value>
+  </data>
+  <data name="AssetKind_Texture" xml:space="preserve">
+    <value>Texture</value>
   </data>
   <data name="AtLeastNegativeOne_Expectation" xml:space="preserve">
     <value>cannot be less than -1.0</value>
   </data>
   <data name="AtLeastOneSecond_Expectation" xml:space="preserve">
     <value>should have at least one second of time</value>
+  </data>
+  <data name="AttackAbilityApplicableUnitsRule_Consequence" xml:space="preserve">
+    <value>cannot activate</value>
   </data>
   <data name="AttackDistanceBeyondHardpointRange_ClosesOnlyToTargetingMax" xml:space="preserve">
     <value>'{0}' closes only to Targeting_Max_Attack_Distance {1}, but its longest-reaching hardpoint weapon '{2}' fires to {3}, so it can stop where no hardpoint fires.</value>
@@ -54,6 +84,9 @@
   <data name="AudioParamInt_IsNotAValidAudio" xml:space="preserve">
     <value>'{0}' is not a valid audio parameter integer for &lt;{1}&gt;. Did you mean {2}?</value>
   </data>
+  <data name="AutomaticDespawn_ApplyTheEngineSCorrection" xml:space="preserve">
+    <value>Apply the engine's own correction: Turn Causes_Despawn off</value>
+  </data>
   <data name="AutomaticDespawn_CausesDespawnIsOnUnder" xml:space="preserve">
     <value>&lt;Causes_Despawn&gt; is on under Activation_Style: {0} - the engine turns it off for every automatic style</value>
   </data>
@@ -65,6 +98,12 @@
   </data>
   <data name="BooleanGatedRequirement_IsOnSoMustBe" xml:space="preserve">
     <value>&lt;{0}&gt; is on, so &lt;{1}&gt; must be {2} - the engine otherwise {3}.</value>
+  </data>
+  <data name="BooleanGatedRequirement_SetToTrue" xml:space="preserve">
+    <value>set to true</value>
+  </data>
+  <data name="BooleanGatedRequirement_TurnsItOn" xml:space="preserve">
+    <value>turns it on</value>
   </data>
   <data name="BooleanValue_IsNotAValidBoolean" xml:space="preserve">
     <value>'{0}' is not a valid Boolean for &lt;{1}&gt;. Expected: True, False, Yes or No.</value>
@@ -111,20 +150,50 @@
   <data name="ConditionalSpeechEvent_IsNotAValidConditional" xml:space="preserve">
     <value>'{0}' is not a valid conditional speech event for &lt;{1}&gt;. Expected: UnitTypeCondition, SpeechEventName.</value>
   </data>
+  <data name="ControlPointCurve_Expectation" xml:space="preserve">
+    <value>needs at least two control points</value>
+  </data>
+  <data name="CreditHaltNeedsDurationRule_Repair" xml:space="preserve">
+    <value>forces it to 10.0 seconds</value>
+  </data>
+  <data name="CreditHaltNeedsDurationRule_Requirement" xml:space="preserve">
+    <value>a time greater than zero</value>
+  </data>
   <data name="CrossLayerShadow_OverridesADefinitionFromIf" xml:space="preserve">
     <value>'{0}' overrides a definition from '{1}'. If that is intended, declare it: &lt;!-- &lt;Override Name="{2}"/&gt; --&gt;</value>
   </data>
   <data name="CrossTypeShadow_IsDefinedAsBothAnd" xml:space="preserve">
     <value>'{0}' is defined as both {1} and {2}. Typed references resolve to the matching type, but untyped lookups pick the highest-rank definition. If that is intended, declare it: &lt;!-- &lt;Override Name="{3}"/&gt; --&gt;</value>
   </data>
+  <data name="DamageAbsorbsNothing_BothAre" xml:space="preserve">
+    <value>Both are {0}</value>
+  </data>
   <data name="DamageAbsorbsNothing_ThisAbsorbsNoDamageAnd" xml:space="preserve">
     <value>This absorbs no damage. {0}, and the amount healed is (damage * Damage_Absorb_Percentage) + Damage_Absorb_Amount, so one of them must be non-zero.</value>
+  </data>
+  <data name="DamageAbsorbsNothing_WithNo" xml:space="preserve">
+    <value>{0} with no {1}</value>
   </data>
   <data name="DamageNonzero_MustBeGreaterThanFor" xml:space="preserve">
     <value>&lt;{0}&gt; must be greater than 0 for the AI to use this unit.</value>
   </data>
+  <data name="DamageRadiusWithinChaseRadiusRule_Expectation" xml:space="preserve">
+    <value>must be less than</value>
+  </data>
   <data name="DamageStageNotOnModel_LandDamageAlternatesDeclaresDamage" xml:space="preserve">
     <value>&lt;Land_Damage_Alternates&gt; declares damage {0}, but '{1}' {2}. The unit reaches that state and does not change.</value>
+  </data>
+  <data name="DamageStageNotOnModel_Stage" xml:space="preserve">
+    <value>stage {0}</value>
+  </data>
+  <data name="DamageStageNotOnModel_Stages" xml:space="preserve">
+    <value>stages {0}</value>
+  </data>
+  <data name="DamageStageNotOnModel_TagsNone" xml:space="preserve">
+    <value>tags no damage stage at all</value>
+  </data>
+  <data name="DamageStageNotOnModel_TagsOnly" xml:space="preserve">
+    <value>tags only {0}</value>
   </data>
   <data name="DamageToArmorMod_IsNotAKnownArmortype" xml:space="preserve">
     <value>'{0}' is not a known ArmorType value.</value>
@@ -135,11 +204,29 @@
   <data name="DamageToArmorMod_IsNotAValidDamage" xml:space="preserve">
     <value>'{0}' is not a valid damage-to-armor modifier for &lt;{1}&gt;. Expected: DamageType, ArmorType, Float.</value>
   </data>
+  <data name="DeathAnimationClip_NoAnimation" xml:space="preserve">
+    <value>'{0}' has no {1} animation</value>
+  </data>
+  <data name="DeathAnimationClip_NoSuchTake" xml:space="preserve">
+    <value>{2} takes on '{0}' - {1}, so {3} {4} does not exist</value>
+  </data>
+  <data name="DeathAnimationClip_PlaysNone" xml:space="preserve">
+    <value>plays no death animation.</value>
+  </data>
+  <data name="DeathAnimationClip_Removed" xml:space="preserve">
+    <value>plays no death animation and, with Remove_Upon_Death, is removed the moment it dies.</value>
+  </data>
+  <data name="DeathAnimationClip_RemovedUnlessSpins" xml:space="preserve">
+    <value>plays no death animation and, with Remove_Upon_Death, is removed the moment it dies unless it spins away.</value>
+  </data>
   <data name="DeathAnimationClip_So" xml:space="preserve">
     <value>{0}, so '{1}' {2}</value>
   </data>
   <data name="DeathCloneSpec_IsNotAValidDeath" xml:space="preserve">
     <value>'{0}' is not a valid death clone spec for &lt;{1}&gt;. Expected: Condition, CloneTypeName.</value>
+  </data>
+  <data name="DemolitionBombTypeRule_Repair" xml:space="preserve">
+    <value>defaults it to Demolition_Bomb</value>
   </data>
   <data name="DeprecatedEventType_IsDeprecated" xml:space="preserve">
     <value>'{0}' is deprecated.</value>
@@ -152,6 +239,9 @@
   </data>
   <data name="DuplicateSymbol_DuplicateSymbolAlsoDefinedIn" xml:space="preserve">
     <value>Duplicate symbol '{0}': also defined in {1}.</value>
+  </data>
+  <data name="DuplicateSymbol_OtherDefinition" xml:space="preserve">
+    <value>Other definition of '{0}'</value>
   </data>
   <data name="DynamicEnumValue_ExpectsASingleEnumIdentifier" xml:space="preserve">
     <value>&lt;{0}&gt; expects a single enum identifier; '|' is not allowed here.</value>
@@ -171,11 +261,29 @@
   <data name="EitherOrRequirement_AndAreBothSoThis" xml:space="preserve">
     <value>&lt;{0}&gt; and &lt;{1}&gt; are both {2}, so this {3} {4} - {5}</value>
   </data>
+  <data name="EitherOrRequirement_DoesNothing" xml:space="preserve">
+    <value>does nothing</value>
+  </data>
+  <data name="EitherOrRequirement_Off" xml:space="preserve">
+    <value>off</value>
+  </data>
+  <data name="EitherOrRequirement_SetOneToYes" xml:space="preserve">
+    <value>set one of them to Yes</value>
+  </data>
   <data name="EngineTextLimit_HasRoomForMoreCharacters" xml:space="preserve">
     <value>{0} has room for {1} more characters. Going over stops the game from starting.</value>
   </data>
   <data name="EngineTextLimit_IsCharactersTooLongFor" xml:space="preserve">
     <value>{0} is {1} characters too long for the engine, and the game will not start. Remove at least {2} characters, or shorten the names inside it.</value>
+  </data>
+  <data name="EngineTextLimit_ObjectName" xml:space="preserve">
+    <value>The name '{0}'</value>
+  </data>
+  <data name="EngineTextLimit_Tag" xml:space="preserve">
+    <value>&lt;{0}&gt;</value>
+  </data>
+  <data name="FactionReference_Noun" xml:space="preserve">
+    <value>faction reference</value>
   </data>
   <data name="FireConeDegrees_AboveMaximumConsequence" xml:space="preserve">
     <value>The engine halves the cone and compares it against a deviation of at most 180 degrees, so anything past a full turn has no further effect</value>
@@ -258,8 +366,14 @@
   <data name="HardPointTypeToTextureMap_IsNotAValidHard" xml:space="preserve">
     <value>'{0}' is not a valid hard point texture map for &lt;{1}&gt;. Expected: HardPointType, TextureName.</value>
   </data>
+  <data name="HardpointAbilityNotOnOwner_DefinedElsewhere" xml:space="preserve">
+    <value>'{0}' is defined, but on a different object - it has to be declared on '{1}' (or something it inherits from) to take effect here.</value>
+  </data>
   <data name="HardpointAbilityNotOnOwner_HardpointEnablesAbilityOnWhich" xml:space="preserve">
     <value>Hardpoint '{0}' enables ability '{1}' on '{2}', which does not have it. {3}</value>
+  </data>
+  <data name="HardpointAbilityNotOnOwner_NotDeclared" xml:space="preserve">
+    <value>No object declares an ability called '{0}'.</value>
   </data>
   <data name="HardpointBoneNotOnModel_NamesBoneWhichDoesNot" xml:space="preserve">
     <value>&lt;{0}&gt; names bone '{1}', which does not exist on {2}{3}.</value>
@@ -267,11 +381,32 @@
   <data name="HardpointBoneNotOnModel_NamesWhichDoesNotExist" xml:space="preserve">
     <value>&lt;{0}&gt; names '{1}', which does not exist as a mesh or a bone on {2}{3}. Aimed fire and land projectiles still reach it; untargeted space fire never does.</value>
   </data>
+  <data name="HardpointBoneNotOnModel_NorOnAttached" xml:space="preserve">
+    <value>, nor on '{0}', the hardpoint's own Model_To_Attach</value>
+  </data>
+  <data name="HardpointBoneNotOnModel_OwnModel" xml:space="preserve">
+    <value>its own model '{0}'</value>
+  </data>
+  <data name="HardpointBoneNotOnModel_OwnerModel" xml:space="preserve">
+    <value>'{0}', the model of '{1}' which attaches it</value>
+  </data>
   <data name="HardpointMissingAttachmentBone_HardpointIsIsDestroyableBut" xml:space="preserve">
     <value>Hardpoint '{0}' is Is_Destroyable but has no &lt;Attachment_Bone&gt;. The engine cannot attach it to the parent model, so it is indestructible and can never be shot off.</value>
   </data>
+  <data name="HardpointModeRowWithoutAbility_Abilities" xml:space="preserve">
+    <value>unit abilities {0}</value>
+  </data>
   <data name="HardpointModeRowWithoutAbility_HardpointSetsWhichNeverApplies" xml:space="preserve">
     <value>Hardpoint '{0}' sets '{1}', which never applies here. {2}</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_NoAbility" xml:space="preserve">
+    <value>no unit ability</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_NotInSlots" xml:space="preserve">
+    <value>'{0}' has {1}; the game reads the row only while an active {2} ability sits in its first or second slot.</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_SlotTooLate" xml:space="preserve">
+    <value>'{0}' has {1} in slot {2} of {3}; the game reads the row for the first two slots only.</value>
   </data>
   <data name="HardpointModelBonesUnavailable_NoBoneDataCouldBe" xml:space="preserve">
     <value>No bone data could be read for model '{0}' (declared by '{1}'), so this bone reference was not verified. The model may be missing, unreadable, or an unsupported .alo version.</value>
@@ -290,6 +425,12 @@
   </data>
   <data name="HullFiringArc_HasNoTurretBehaviourSo" xml:space="preserve">
     <value>'{0}' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: {1}.</value>
+  </data>
+  <data name="HullFiringArc_Pitch" xml:space="preserve">
+    <value>{0} {1} (up to {1} degrees up or down)</value>
+  </data>
+  <data name="HullFiringArc_Yaw" xml:space="preserve">
+    <value>{0} {1} (up to {1} degrees either side)</value>
   </data>
   <data name="IconAwaitingRepack_IconExistsAsASource" xml:space="preserve">
     <value>Icon '{0}' exists as a source image but is missing from this project's mega texture, so the game will not display it. Rebuild the .mtd to include it.</value>
@@ -387,8 +528,17 @@
   <data name="MapFileFormat_IsNotAValidMap" xml:space="preserve">
     <value>'{0}' is not a valid map filename for &lt;{1}&gt;. Expected a .ted file.</value>
   </data>
+  <data name="MissingRequiredTag_AndTheEngine" xml:space="preserve">
+    <value>and the engine {0}</value>
+  </data>
+  <data name="MissingRequiredTag_ApplyTheEngineSDefault" xml:space="preserve">
+    <value>Apply the engine's own default: &lt;{0}&gt;{1}&lt;/{0}&gt;</value>
+  </data>
   <data name="MissingRequiredTag_IsNotSetNeedsIt" xml:space="preserve">
     <value>&lt;{0}&gt; is not set. {1} needs it, {2}</value>
+  </data>
+  <data name="MissingRequiredTag_ReportsItAsUnset" xml:space="preserve">
+    <value>and the engine reports it as unset on load</value>
   </data>
   <data name="ModelFileFormat_IsNotAValidModel" xml:space="preserve">
     <value>'{0}' is not a valid model filename for &lt;{1}&gt;. Expected a .alo file.</value>
@@ -402,8 +552,17 @@
   <data name="MovieFrameTrigger_IsNotAValidMovie" xml:space="preserve">
     <value>'{0}' is not a valid movie frame trigger for &lt;{1}&gt;. Expected: EventKey, NonNegativeInteger.</value>
   </data>
+  <data name="MusicEventReference_Noun" xml:space="preserve">
+    <value>music event reference</value>
+  </data>
   <data name="NameCrcCollision_HasTheSameNameHash" xml:space="preserve">
     <value>'{0}' has the same name hash as {1} (0x{2:X8}). The engine finds objects by that hash, so only the one it loads first can be referenced.</value>
+  </data>
+  <data name="NameCrcCollision_SameNameHash" xml:space="preserve">
+    <value>Object with the same name hash</value>
+  </data>
+  <data name="NameReferenceList_Noun" xml:space="preserve">
+    <value>name reference list</value>
   </data>
   <data name="NameReference_IsNotAKnownValue" xml:space="preserve">
     <value>'{0}' is not a known value for '{1}' on &lt;{2}&gt;.</value>
@@ -480,6 +639,9 @@
   <data name="ProjectileCategoryList_IsNotAKnownOn" xml:space="preserve">
     <value>'{0}' is not a known {1} on &lt;{2}&gt; - the engine never matches it, so that projectile is not intercepted.</value>
   </data>
+  <data name="RedirectBlasterApplicableUnitsRule_Consequence" xml:space="preserve">
+    <value>cannot block or redirect fire</value>
+  </data>
   <data name="ReferenceResolution_BehaviourSeparator" xml:space="preserve">
     <value> or </value>
   </data>
@@ -510,14 +672,26 @@
   <data name="RespawnTimeList_UsesZeroAsARespawn" xml:space="preserve">
     <value>&lt;{0}&gt; uses zero as a respawn time, which is only allowed when every entry is zero - that is how the respawn feature is switched off. The engine discards the whole respawn table, min and max together</value>
   </data>
+  <data name="RespawnTimeOrderRule_Expectation" xml:space="preserve">
+    <value>cannot be greater than</value>
+  </data>
   <data name="RgbaValue_ContainsFloatComponentsButExpects" xml:space="preserve">
     <value>'{0}' contains float components but &lt;{1}&gt; expects integers. Did you mean '{2}'?</value>
   </data>
   <data name="RgbaValue_IsNotAValidRgba" xml:space="preserve">
     <value>'{0}' is not a valid RGBA color for &lt;{1}&gt;. Expected 3 or 4 integers in 0-255, separated by spaces or commas.</value>
   </data>
+  <data name="SFXEventReference_Noun" xml:space="preserve">
+    <value>SFX event reference</value>
+  </data>
   <data name="SfxCount_IsNotAValidSfx" xml:space="preserve">
     <value>'{0}' is not a valid SFX count for &lt;{1}&gt;. Expected -1 or a non-negative integer. Did you mean {2}?</value>
+  </data>
+  <data name="SfxEventHudReference_Noun" xml:space="preserve">
+    <value>SFX HUD event reference</value>
+  </data>
+  <data name="SfxEventType_Noun" xml:space="preserve">
+    <value>SFX event</value>
   </data>
   <data name="SfxPercentage_IsNotAValidSfx" xml:space="preserve">
     <value>'{0}' is not a valid SFX percentage for &lt;{1}&gt;. Expected [0, 100]. Did you mean {2}?</value>
@@ -546,6 +720,27 @@
   <data name="SpecialWeaponIndex_HasOutsideToSoThe" xml:space="preserve">
     <value>'{0}' has {1} {2}, outside 0 to {3}, so the game never registers it as a special weapon.</value>
   </data>
+  <data name="SpeechEventReference_Noun" xml:space="preserve">
+    <value>speech event reference</value>
+  </data>
+  <data name="SplitFavorsOwnerIgnoredRule_Consequence" xml:space="preserve">
+    <value>turns it off and zeroes Owner_Income_Percentage</value>
+  </data>
+  <data name="SplitFavorsOwnerIgnoredRule_Problem" xml:space="preserve">
+    <value>does nothing without &lt;{0}&gt;</value>
+  </data>
+  <data name="SplitFavorsOwnerIgnoredRule_RepairTitle" xml:space="preserve">
+    <value>Apply the engine's own correction: Turn Split_Favors_Owner off</value>
+  </data>
+  <data name="SplitFavorsOwnerVsFullAmountRule_Consequence" xml:space="preserve">
+    <value>turns both off</value>
+  </data>
+  <data name="SplitFavorsOwnerVsFullAmountRule_Problem" xml:space="preserve">
+    <value>cannot be set together with &lt;{0}&gt;</value>
+  </data>
+  <data name="SplitFavorsOwnerVsFullAmountRule_RepairTitle" xml:space="preserve">
+    <value>Apply the engine's own correction: Turn both flags off</value>
+  </data>
   <data name="SquadronOffsetsMismatch_SquadronHasUnitSBut" xml:space="preserve">
     <value>Squadron has {0} unit(s) but only {1} Squadron_Offsets. Add {2} more.</value>
   </data>
@@ -554,6 +749,12 @@
   </data>
   <data name="StoryDialogReference_ChapterIsNotDefinedIn" xml:space="preserve">
     <value>Chapter {0} is not defined in story dialog '{1}' ({2}).</value>
+  </data>
+  <data name="StoryDialogReference_DefinedChapters" xml:space="preserve">
+    <value>defined chapters: {0}</value>
+  </data>
+  <data name="StoryDialogReference_NoChapters" xml:space="preserve">
+    <value>the file defines no chapters</value>
   </data>
   <data name="StoryDialogReference_StoryDialogDoesNotResolve" xml:space="preserve">
     <value>Story dialog '{0}' does not resolve to a .txt script under the project's storyDialog directories.</value>
@@ -569,6 +770,15 @@
   </data>
   <data name="StoryParamUnknownSlot_IsNotUsedBy" xml:space="preserve">
     <value>'{0}' is not used by {1}.</value>
+  </data>
+  <data name="StoryParamValueNotes_BuggedInEngine" xml:space="preserve">
+    <value>'{0}' is accepted but does nothing in the engine.</value>
+  </data>
+  <data name="StoryParamValueNotes_Deprecated" xml:space="preserve">
+    <value>'{0}' is deprecated and should not be used.</value>
+  </data>
+  <data name="StoryParamValueNotes_Untested" xml:space="preserve">
+    <value>'{0}' is documented but untested - it may not work in the engine.</value>
   </data>
   <data name="StoryParamValue_IsNotAValidBoolean" xml:space="preserve">
     <value>'{0}' is not a valid boolean value. Use 0, 1, true, or false.</value>
@@ -588,6 +798,9 @@
   <data name="SystemSpyDuration_DurationInSecsIsBut" xml:space="preserve">
     <value>&lt;Duration_In_Secs&gt; is {0}, but a {1} system spy needs a duration {2} - the engine overwrites it with {3}</value>
   </data>
+  <data name="TagComparison_ApplyTheEngineSCorrection" xml:space="preserve">
+    <value>Apply the engine's own correction: Swap &lt;{0}&gt; and &lt;{1}&gt;</value>
+  </data>
   <data name="TagComparison_ButIsAgainst" xml:space="preserve">
     <value>&lt;{0}&gt; {1} &lt;{2}&gt;, but is {3} against {4}</value>
   </data>
@@ -596,6 +809,12 @@
   </data>
   <data name="TupleList_HoldsItemSWhichIs" xml:space="preserve">
     <value>&lt;{0}&gt; holds {1} item(s), which is not a whole number of {2}.</value>
+  </data>
+  <data name="TypeReferenceList_Noun" xml:space="preserve">
+    <value>type reference list</value>
+  </data>
+  <data name="TypeReference_Noun" xml:space="preserve">
+    <value>type reference</value>
   </data>
   <data name="Uint_IsNotAValidNon" xml:space="preserve">
     <value>'{0}' is not a valid non-negative integer for &lt;{1}&gt;. Did you mean {2}?</value>
@@ -630,8 +849,14 @@
   <data name="UvSlotIndex_IsNotAValidUv" xml:space="preserve">
     <value>'{0}' is not a valid UV slot index for &lt;{1}&gt;. Expected an integer in [0, 3]. Did you mean {2}?</value>
   </data>
+  <data name="VariantAdditiveMerge_AndMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
   <data name="VariantAdditiveMerge_IsAdditiveThisValueIs" xml:space="preserve">
     <value>'{0}' is additive: this value is added to the base's rather than replacing it, so the variant also keeps {1} inherited from the base. Change the base object if the inherited entries should not apply here.</value>
+  </data>
+  <data name="VariantAdditiveMerge_ItsValue" xml:space="preserve">
+    <value>its value</value>
   </data>
   <data name="VariantBaseUnresolved_VariantBaseDoesNotResolve" xml:space="preserve">
     <value>Variant base '{0}' does not resolve - the engine ignores the tag silently, so '{1}' inherits nothing.</value>
@@ -665,5 +890,125 @@
   </data>
   <data name="XmlDuplicateTag_DuplicateTagOnlyOneOccurrence" xml:space="preserve">
     <value>Duplicate tag '{0}': only one occurrence is used per object - the game keeps the LAST one.{1}</value>
+  </data>
+  <data name="XmlDuplicateTag_OtherLines" xml:space="preserve">
+    <value> Line numbers of the other occurrences - {0}.</value>
+  </data>
+  <data name="XmlGameReader_AttributeHasNoGameDrops" xml:space="preserve">
+    <value>Attribute {0} on &lt;{1}&gt; has no '=': The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_AttributeHasNoOpeningGame" xml:space="preserve">
+    <value>Attribute {0} on &lt;{1}&gt; has no opening '"': The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_AttributeUsesSingleQuotesGame" xml:space="preserve">
+    <value>Attribute {0} on &lt;{1}&gt; uses single quotes: The game requires double quotes and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_CloseAnd" xml:space="preserve">
+    <value>Close {0} and {1}</value>
+  </data>
+  <data name="XmlGameReader_CloseOne" xml:space="preserve">
+    <value>Close {0}</value>
+  </data>
+  <data name="XmlGameReader_CommentInsideValueGameCuts" xml:space="preserve">
+    <value>Comment inside a value: The game cuts it out and joins the text on both sides, but standard XML readers return two separate text nodes, so other tools may read a different value</value>
+  </data>
+  <data name="XmlGameReader_CommentNeverClosedGameDrops" xml:space="preserve">
+    <value>Comment is never closed: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_EndTagDoesNotMatch" xml:space="preserve">
+    <value>End tag &lt;/{0}&gt; does not match &lt;{1}&gt;: The game compares them byte for byte and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_EndTagHasNoGame" xml:space="preserve">
+    <value>End tag &lt;/{0}&gt; has no '&gt;': The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_EndTagOutsideAnyElement" xml:space="preserve">
+    <value>End tag outside any element: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_EndTagWhereStartTag" xml:space="preserve">
+    <value>End tag where a start tag is expected: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_FileEndsInsideAttributeGame" xml:space="preserve">
+    <value>File ends inside attribute {0} of &lt;{1}&gt;: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_FileEndsInsideMarkupGame" xml:space="preserve">
+    <value>File ends inside markup: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_FileEndsInsideStartTag" xml:space="preserve">
+    <value>File ends inside the start tag of &lt;{0}&gt;: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_FileEndsInsideXMLDeclaration" xml:space="preserve">
+    <value>File ends inside the XML declaration: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_InsertXMLDeclaration" xml:space="preserve">
+    <value>Insert the XML declaration</value>
+  </data>
+  <data name="XmlGameReader_InsideCommentGameDropsWhole" xml:space="preserve">
+    <value>'--' inside a comment: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_MoveCommentAboveElement" xml:space="preserve">
+    <value>Move the comment above the element</value>
+  </data>
+  <data name="XmlGameReader_NeverClosedGameDropsWhole" xml:space="preserve">
+    <value>&lt;{0}&gt; is never closed: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NeverClosedGamePairsEvery" xml:space="preserve">
+    <value>&lt;{0}&gt; is never closed: The game pairs every later end tag one level off and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NeverClosedGameReadsWhere" xml:space="preserve">
+    <value>&lt;{0}&gt; is never closed: The game reads &lt;/{1}&gt; where it expects &lt;/{0}&gt; and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NoRootElementGameDrops" xml:space="preserve">
+    <value>No root element: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NoXMLDeclarationGameRequires" xml:space="preserve">
+    <value>No XML declaration: The game requires '&lt;?xml ...?&gt;' before the root element and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NotFollowedByGameDrops" xml:space="preserve">
+    <value>'/' not followed by '&gt;' in &lt;{0}&gt;: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_RemoveEndTag" xml:space="preserve">
+    <value>Remove the end tag</value>
+  </data>
+  <data name="XmlGameReader_RemoveTextGameSkips" xml:space="preserve">
+    <value>Remove the text the game skips</value>
+  </data>
+  <data name="XmlGameReader_RemoveUFromEndValue" xml:space="preserve">
+    <value>Remove U+{0:X4} from the end of the value</value>
+  </data>
+  <data name="XmlGameReader_RenameEndTag" xml:space="preserve">
+    <value>Rename the end tag to &lt;/{0}&gt;</value>
+  </data>
+  <data name="XmlGameReader_RootElementWithoutChildElements" xml:space="preserve">
+    <value>Root element without child elements: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_SecondRootElementGameReads" xml:space="preserve">
+    <value>Second root element: The game reads one root per file and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_SeparateHyphens" xml:space="preserve">
+    <value>Separate the hyphens</value>
+  </data>
+  <data name="XmlGameReader_TextAfterChildElementGame" xml:space="preserve">
+    <value>Text after a child element: The game skips it; values must come before the first child</value>
+  </data>
+  <data name="XmlGameReader_UseDoubleQuotes" xml:space="preserve">
+    <value>Use double quotes</value>
+  </data>
+  <data name="XmlGameReader_ValueEndsUGameTrims" xml:space="preserve">
+    <value>Value ends in U+{0:X4}: The game trims only space, tab, CR and LF, so the character is part of the value it reads</value>
+  </data>
+  <data name="XmlStructuralValidator_EndDeclaration" xml:space="preserve">
+    <value>End the declaration with '?&gt;'</value>
+  </data>
+  <data name="XmlStructuralValidator_InvalidXMLGameReadsFile" xml:space="preserve">
+    <value>Invalid XML ({0}): The game reads the file, standard XML tools reject it</value>
+  </data>
+  <data name="XmlStructuralValidator_StartsNoEntityGameReads" xml:space="preserve">
+    <value>'&amp;' that starts no entity: The game reads it as a plain character, standard XML tools reject the file</value>
+  </data>
+  <data name="XmlStructuralValidator_XMLDeclarationMustEndGame" xml:space="preserve">
+    <value>XML declaration must end in '?&gt;': The game reads it, standard XML tools reject the file</value>
+  </data>
+  <data name="XmlStructureRepair_FixAll" xml:space="preserve">
+    <value>Fix all repairable XML structure problems in this file</value>
   </data>
 </root>

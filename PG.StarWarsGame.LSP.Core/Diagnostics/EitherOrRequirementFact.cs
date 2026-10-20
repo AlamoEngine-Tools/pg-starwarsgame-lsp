@@ -24,12 +24,15 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// <param name="OwningType">The ability type, for the message.</param>
 /// <param name="FirstTag">One half of the pair, in the order the engine names them.</param>
 /// <param name="SecondTag">The other half.</param>
-/// <param name="State">
-///     How to describe both halves being unset - "off" for a pair of flags, "empty" for a pair of
+/// <param name="StateKey">
+///     The catalogue key of how to describe both halves being unset - "off" for a pair of flags, "empty" for a pair of
 ///     lists. The tags decide what "set" means, so they decide how to say it.
 /// </param>
-/// <param name="Consequence">What the object cannot do, in the engine's own words where it gives them.</param>
-/// <param name="Remedy">What the author should do about it.</param>
+/// <param name="ConsequenceKey">
+///     The catalogue key of what the object cannot do, in the engine's own words where it gives
+///     them.
+/// </param>
+/// <param name="RemedyKey">The catalogue key of what the author should do about it.</param>
 public sealed record EitherOrRequirementFact(
     string DocumentUri,
     int Line,
@@ -38,6 +41,6 @@ public sealed record EitherOrRequirementFact(
     string OwningType,
     string FirstTag,
     string SecondTag,
-    string State = "off",
-    string Consequence = "does nothing",
-    string Remedy = "set one of them to Yes") : XmlFact(DocumentUri, Line, Column, Length);
+    string StateKey,
+    string ConsequenceKey,
+    string RemedyKey) : XmlFact(DocumentUri, Line, Column, Length);

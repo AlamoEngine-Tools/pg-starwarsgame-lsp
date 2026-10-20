@@ -6,6 +6,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
@@ -30,7 +31,8 @@ public sealed class XmlStructureRepairCodeActionProviderTest
         var host = new SingleDocumentHost(Uri, text);
         var fileHelper = new FileHelper(new MockFileSystem());
         return new XmlStructureRepairCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper,
-            new XmlStructuralValidator(), new FixedSuppressions(suppressed.Select(SuppressionMatcher.ForId).ToList()));
+            new XmlStructuralValidator(), new FixedSuppressions(suppressed.Select(SuppressionMatcher.ForId).ToList()),
+            ResxMessageCatalog.Server("en"));
     }
 
     private static XmlCodeActionContext At(DiagnosticId id, int line, int startCol, int endCol)

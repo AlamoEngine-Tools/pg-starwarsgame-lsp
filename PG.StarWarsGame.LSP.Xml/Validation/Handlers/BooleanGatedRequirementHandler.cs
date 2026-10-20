@@ -25,7 +25,7 @@ public sealed class BooleanGatedRequirementHandler : XmlDiagnosticsHandler<Boole
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                 ctx.Messages.Format("BooleanGatedRequirement_IsOnSoMustBe", fact.GateTag, fact.RequiredTag,
-                    fact.Requirement, fact.Repair))
+                    ctx.Messages.Format(fact.RequirementKey), ctx.Messages.Format(fact.RepairKey)))
         ];
     }
 }

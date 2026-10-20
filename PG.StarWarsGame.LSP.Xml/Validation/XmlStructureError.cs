@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -9,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 public sealed record XmlStructureError(
     int Line,
     int Column,
-    string Reason,
+    CatalogueText Reason,
     XmlStrictnessCategory Category = XmlStrictnessCategory.StrictOnly,
     int Length = 1,
     XmlRepair? Repair = null);
@@ -21,4 +22,4 @@ public sealed record XmlTextEdit(int Start, int Length, string NewText);
 ///     The fix for one finding: a title for the lightbulb and the edits, computed against the exact
 ///     text the finding was read from.
 /// </summary>
-public sealed record XmlRepair(string Title, IReadOnlyList<XmlTextEdit> Edits);
+public sealed record XmlRepair(CatalogueText Title, IReadOnlyList<XmlTextEdit> Edits);

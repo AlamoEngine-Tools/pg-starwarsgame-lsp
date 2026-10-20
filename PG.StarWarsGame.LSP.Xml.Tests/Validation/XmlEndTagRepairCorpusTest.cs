@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
@@ -61,7 +62,7 @@ public sealed partial class XmlEndTagRepairCorpusTest
                 offered++;
                 var repaired = XmlStructureRepairs.Apply(broken, repair);
                 if (Tree(repaired) == expected) restored++;
-                else Miss(misses, path, text, endTags[t].Index, repair.Title);
+                else Miss(misses, path, text, endTags[t].Index, ResxMessageCatalog.Server("en").Format(repair.Title));
             }
         }
 

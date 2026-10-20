@@ -43,13 +43,15 @@ public sealed record OwnerIncomeShareFact(
 /// </remarks>
 /// <param name="FlagTag">The flag the diagnostic is anchored on.</param>
 /// <param name="OtherTag">The tag it conflicts with, or the one whose absence makes it moot.</param>
-/// <param name="Problem">
-///     What is wrong with the combination, as a sentence fragment completing "&lt;FlagTag&gt; ...".
+/// <param name="ProblemKey">
+///     The catalogue key of what is wrong with the combination, a sentence fragment completing
+///     "&lt;FlagTag&gt; ..." that takes <paramref name="OtherTag" /> as its argument.
 ///     The two rules read differently - one flag is inert without its partner, the other is refused
 ///     alongside it - so the wording belongs to the rule that measured it.
 /// </param>
-/// <param name="Consequence">What the engine does about it, as a sentence fragment.</param>
-/// <param name="Repair">The engine's own correction, where every tag it clears is actually present.</param>
+/// <param name="ConsequenceKey">The catalogue key of what the engine does about it, a sentence fragment.</param>
+/// <param name="RepairTitleKey">The catalogue key of the title of the engine's own correction.</param>
+/// <param name="RepairEdits">The engine's own correction, where every tag it clears is actually present.</param>
 public sealed record IncomeSplitConflictFact(
     string DocumentUri,
     int Line,
@@ -57,6 +59,7 @@ public sealed record IncomeSplitConflictFact(
     int Length,
     string FlagTag,
     string OtherTag,
-    string Problem,
-    string Consequence,
-    XmlEngineRepair? Repair) : XmlFact(DocumentUri, Line, Column, Length);
+    string ProblemKey,
+    string ConsequenceKey,
+    string RepairTitleKey,
+    IReadOnlyList<XmlDiagnosticEdit>? RepairEdits) : XmlFact(DocumentUri, Line, Column, Length);

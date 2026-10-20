@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
@@ -20,16 +21,16 @@ namespace PG.StarWarsGame.LSP.Xml.CodeActions;
 /// </summary>
 internal sealed class XmlStructureRepairCodeActionProvider : IXmlCodeActionProvider
 {
-    public const string FixAllTitle = "Fix all repairable XML structure problems in this file";
-
     private readonly IFileHelper _fileHelper;
+    private readonly IMessageCatalog _messages;
     private readonly IXmlParseCache _parseCache;
     private readonly IGlobalSuppressionStore _suppressions;
     private readonly IXmlStructuralValidator _validator;
 
     public XmlStructureRepairCodeActionProvider(IXmlParseCache parseCache, IFileHelper fileHelper,
-        IXmlStructuralValidator validator, IGlobalSuppressionStore suppressions)
+        IXmlStructuralValidator validator, IGlobalSuppressionStore suppressions, IMessageCatalog messages)
     {
+        _messages = messages;
         _parseCache = parseCache;
         _fileHelper = fileHelper;
         _validator = validator;
@@ -56,7 +57,7 @@ internal sealed class XmlStructureRepairCodeActionProvider : IXmlCodeActionProvi
         if (finding.Repair is { } repair)
             actions.Add(new CommandOrCodeAction(new CodeAction
             {
-                Title = repair.Title,
+                Title = _messages.Format(repair.Title),
                 Kind = CodeActionKind.QuickFix,
                 IsPreferred = true,
                 Diagnostics = new Container<Diagnostic>(ctx.Diagnostic),
@@ -73,7 +74,7 @@ internal sealed class XmlStructureRepairCodeActionProvider : IXmlCodeActionProvi
         if (!string.Equals(fixedText, text, StringComparison.Ordinal))
             actions.Add(new CommandOrCodeAction(new CodeAction
             {
-                Title = FixAllTitle,
+                Title = _messages.Format("XmlStructureRepair_FixAll"),
                 Kind = CodeActionKind.QuickFix,
                 Diagnostics = new Container<Diagnostic>(ctx.Diagnostic),
                 Edit = Edit(ctx.DocumentUri,

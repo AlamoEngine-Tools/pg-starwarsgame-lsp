@@ -43,14 +43,16 @@ public sealed class EngineTextLimitHandler : XmlDiagnosticsHandler<EngineTextLim
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    ctx.Messages.Format("EngineTextLimit_IsCharactersTooLongFor", fact.Subject, over, over))
+                    ctx.Messages.Format("EngineTextLimit_IsCharactersTooLongFor",
+                        ctx.Messages.Format(fact.SubjectKey, fact.Subject), over, over))
             ];
         }
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                ctx.Messages.Format("EngineTextLimit_HasRoomForMoreCharacters", fact.Subject,
+                ctx.Messages.Format("EngineTextLimit_HasRoomForMoreCharacters",
+                    ctx.Messages.Format(fact.SubjectKey, fact.Subject),
                     Show(fact.CharactersLeft)),
                 Id: DiagnosticIds.EngineTextLimitApproaching)
         ];

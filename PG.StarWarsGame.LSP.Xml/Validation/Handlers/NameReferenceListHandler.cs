@@ -12,5 +12,5 @@ public sealed class NameReferenceListHandler : NonEmptyReferenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.NameReferenceList;
 
     protected override XmlValueType TargetType => XmlValueType.NameReferenceList;
-    protected override string ReferenceNoun => "name reference list";
+    protected override string ReferenceNounKey => "NameReferenceList_Noun";
 }

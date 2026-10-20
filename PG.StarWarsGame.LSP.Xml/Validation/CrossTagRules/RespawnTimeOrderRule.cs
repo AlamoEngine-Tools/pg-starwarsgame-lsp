@@ -24,7 +24,7 @@ public sealed class RespawnTimeOrderRule : TagComparisonRuleBase
 
     protected override string RightTag => "Max_Respawn_Time";
 
-    protected override string Expectation => "cannot be greater than";
+    protected override string ExpectationKey => "RespawnTimeOrderRule_Expectation";
 
     /// <summary>
     ///     Measured: after the message, the engine's load-time validation calls

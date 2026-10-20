@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
 /// <summary>
@@ -12,5 +14,5 @@ public sealed record XmlStructureFact(
     int Line,
     int Column,
     int Length,
-    string Reason,
+    CatalogueText Reason,
     XmlStrictnessCategory Category = XmlStrictnessCategory.StrictOnly) : XmlFact(DocumentUri, Line, Column, Length);

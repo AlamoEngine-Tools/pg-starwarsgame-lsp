@@ -128,7 +128,8 @@ public sealed class XmlDocumentFactProducer(
             XmlUtility.GetLine(node),
             XmlUtility.GetTagBracketColumn(node),
             node.Name.Length + 1,
-            $"The name '{name}'",
+            "EngineTextLimit_ObjectName",
+            name,
             EngineTextLimits.CharactersToRemove(name, EngineTextLimits.ObjectName),
             EngineTextLimits.CharactersLeft(name, EngineTextLimits.ObjectName),
             bytes,
@@ -513,7 +514,7 @@ public sealed class XmlDocumentFactProducer(
                 if (EngineTextLimits.ValueIsCopiedToBuffer(tagDef.ValueType) &&
                     valueBytes >= EngineTextLimits.TagValue * EngineTextLimits.WarnAtFraction)
                     facts.Add(new EngineTextLimitFact(documentUri, valLine, valCol, valLen,
-                        $"<{XmlUtility.GetOriginalTagName(child, text)}>",
+                        "EngineTextLimit_Tag", XmlUtility.GetOriginalTagName(child, text),
                         EngineTextLimits.CharactersToRemove(rawValue, EngineTextLimits.TagValue),
                         EngineTextLimits.CharactersLeft(rawValue, EngineTextLimits.TagValue),
                         valueBytes, EngineTextLimits.TagValue));

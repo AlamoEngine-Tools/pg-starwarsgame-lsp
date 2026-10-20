@@ -52,8 +52,11 @@ public sealed class IncomeSplitConflictHandler : XmlDiagnosticsHandler<IncomeSpl
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                ctx.Messages.Format("IncomeSplitHandlers_TheEngine", fact.FlagTag, fact.Problem, fact.Consequence),
-                EngineRepair: fact.Repair)
+                ctx.Messages.Format("IncomeSplitHandlers_TheEngine", fact.FlagTag,
+                    ctx.Messages.Format(fact.ProblemKey, fact.OtherTag), ctx.Messages.Format(fact.ConsequenceKey)),
+                EngineRepair: fact.RepairEdits is null
+                    ? null
+                    : new XmlEngineRepair(ctx.Messages.Format(fact.RepairTitleKey), fact.RepairEdits))
         ];
     }
 }

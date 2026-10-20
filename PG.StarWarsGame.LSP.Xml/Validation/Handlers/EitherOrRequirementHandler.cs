@@ -25,8 +25,9 @@ public sealed class EitherOrRequirementHandler : XmlDiagnosticsHandler<EitherOrR
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                ctx.Messages.Format("EitherOrRequirement_AndAreBothSoThis", fact.FirstTag, fact.SecondTag, fact.State,
-                    fact.OwningType, fact.Consequence, fact.Remedy))
+                ctx.Messages.Format("EitherOrRequirement_AndAreBothSoThis", fact.FirstTag, fact.SecondTag,
+                    ctx.Messages.Format(fact.StateKey), fact.OwningType, ctx.Messages.Format(fact.ConsequenceKey),
+                    ctx.Messages.Format(fact.RemedyKey)))
         ];
     }
 }

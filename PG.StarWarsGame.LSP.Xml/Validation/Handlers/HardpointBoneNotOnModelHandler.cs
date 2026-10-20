@@ -23,15 +23,15 @@ public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<Hardp
         HardpointBoneNotOnModelFact fact, DiagnosticsContext ctx)
     {
         var owner = string.Equals(fact.OwnerId, fact.HardpointId, StringComparison.OrdinalIgnoreCase)
-            ? $"its own model '{fact.ModelName}'"
-            : $"'{fact.ModelName}', the model of '{fact.OwnerId}' which attaches it";
+            ? ctx.Messages.Format("HardpointBoneNotOnModel_OwnModel", fact.ModelName)
+            : ctx.Messages.Format("HardpointBoneNotOnModel_OwnerModel", fact.ModelName, fact.OwnerId);
 
         // Collision_Mesh is valid on either model, so the check has already looked at both by the
         // time it reports. Naming only one of them reads as though the other were still worth
         // opening, which is the first thing the author would go and do.
         var also = fact.AttachedModelName is null
             ? string.Empty
-            : $", nor on '{fact.AttachedModelName}', the hardpoint's own Model_To_Attach";
+            : ctx.Messages.Format("HardpointBoneNotOnModel_NorOnAttached", fact.AttachedModelName);
 
         if (!string.Equals(fact.TagName, CollisionMeshTag, StringComparison.OrdinalIgnoreCase))
             return

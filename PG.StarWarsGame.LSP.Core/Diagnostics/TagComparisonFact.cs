@@ -14,8 +14,8 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// <param name="RightTag">The tag it is compared against.</param>
 /// <param name="Left">The left value as authored.</param>
 /// <param name="Right">The right value as authored.</param>
-/// <param name="Expectation">
-///     The relation as a sentence fragment, phrased as the engine phrases it, completing
+/// <param name="ExpectationKey">
+///     The catalogue key of the relation as a sentence fragment, phrased as the engine phrases it, completing
 ///     "&lt;LeftTag&gt; ... &lt;RightTag&gt;".
 /// </param>
 /// <param name="SwapEdits">
@@ -32,5 +32,5 @@ public sealed record TagComparisonFact(
     string RightTag,
     double Left,
     double Right,
-    string Expectation,
+    string ExpectationKey,
     IReadOnlyList<XmlDiagnosticEdit>? SwapEdits = null) : XmlFact(DocumentUri, Line, Column, Length);
