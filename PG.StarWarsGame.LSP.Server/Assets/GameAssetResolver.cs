@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -51,21 +52,20 @@ public sealed record GameAssetTiers(
     public bool CanResolveShippedAssets => HasBaseGamePath || HasExpansionPath;
 
     /// <summary>A sentence naming what is missing, for the preview to show verbatim.</summary>
-    public string Explain()
+    public string Explain(IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         if (!CanResolveShippedAssets)
-            return "Only this workspace's own files can be resolved. Set " +
-                   "aet-eaw-edit.lsp.source.baseGameDirectory (and expansionDirectory) to preview " +
-                   "models that ship with the game.";
+            return messages.Format("AssetTiers_WorkspaceOnly");
 
         var where = (HasBaseGamePath, HasExpansionPath) switch
         {
-            (true, true) => "the base game and the expansion",
-            (true, false) => "the base game",
-            _ => "the expansion"
+            (true, true) => messages.Format("AssetTiers_BaseGameAndExpansion"),
+            (true, false) => messages.Format("AssetTiers_BaseGame"),
+            _ => messages.Format("AssetTiers_Expansion")
         };
 
-        return $"Resolving from this workspace, {where}, and {ArchiveCount} archive(s).";
+        return messages.Format("AssetTiers_Resolving", where, ArchiveCount);
     }
 }
 
@@ -195,15 +195,6 @@ public sealed class GameAssetResolver(
         return null;
     }
 
-    private string? FindLoose((string Root, GameAssetTier Tier) directory, List<string> candidates)
-    {
-        foreach (var candidate in candidates)
-            if (fileHelper.FindInWorkspace([directory.Root], candidate) is { } hit)
-                return hit;
-
-        return null;
-    }
-
     public byte[]? Read(string gameRelativePath)
     {
         var location = Locate(gameRelativePath);
@@ -225,6 +216,15 @@ public sealed class GameAssetResolver(
                 gameRelativePath, location.ResolvedPath);
             return null;
         }
+    }
+
+    private string? FindLoose((string Root, GameAssetTier Tier) directory, List<string> candidates)
+    {
+        foreach (var candidate in candidates)
+            if (fileHelper.FindInWorkspace([directory.Root], candidate) is { } hit)
+                return hit;
+
+        return null;
     }
 
     /// <summary>

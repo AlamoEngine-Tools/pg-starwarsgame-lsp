@@ -66,6 +66,21 @@
   <data name="AssetKind_Texture" xml:space="preserve">
     <value>Texture</value>
   </data>
+  <data name="AssetTiers_BaseGame" xml:space="preserve">
+    <value>the base game</value>
+  </data>
+  <data name="AssetTiers_BaseGameAndExpansion" xml:space="preserve">
+    <value>the base game and the expansion</value>
+  </data>
+  <data name="AssetTiers_Expansion" xml:space="preserve">
+    <value>the expansion</value>
+  </data>
+  <data name="AssetTiers_Resolving" xml:space="preserve">
+    <value>Resolving from this workspace, {0}, and the archives ({1}).</value>
+  </data>
+  <data name="AssetTiers_WorkspaceOnly" xml:space="preserve">
+    <value>Only this workspace's own files can be resolved. Set aet-eaw-edit.lsp.source.baseGameDirectory (and expansionDirectory) to preview models that ship with the game.</value>
+  </data>
   <data name="AtLeastNegativeOne_Expectation" xml:space="preserve">
     <value>cannot be less than -1.0</value>
   </data>
@@ -1159,6 +1174,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="OverrideCodeLens_VOverridesFrom" xml:space="preserve">
     <value>v Overrides '{0}' from {1}</value>
   </data>
+  <data name="ParticleFile_MalformedParticleFile" xml:space="preserve">
+    <value>Malformed particle file: {0}</value>
+  </data>
   <data name="PerFactionIntMap_IsAFloatButExpects" xml:space="preserve">
     <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
   </data>
@@ -1192,11 +1210,149 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="PrerequisiteExpression_IsNotAValidPrerequisite" xml:space="preserve">
     <value>'{0}' is not a valid prerequisite expression for &lt;{1}&gt;. Expected game object names connected by '|' (OR) and ',' or spaces (AND). Example: "StructA | StructB, StructC" means (StructA OR StructB) AND StructC.</value>
   </data>
+  <data name="PreviewAbility_IconNotFound" xml:space="preserve">
+    <value>Ability {0} names icon '{1}', which is not in this project's mega texture or icon sources. The game will draw missing art.</value>
+  </data>
+  <data name="PreviewHandlers_CouldNotBeExported" xml:space="preserve">
+    <value>'{0}' could not be exported: {1}</value>
+  </data>
+  <data name="PreviewHandlers_CouldNotBeInspected" xml:space="preserve">
+    <value>'{0}' could not be inspected: {1}</value>
+  </data>
+  <data name="PreviewHandlers_CouldNotBeRead" xml:space="preserve">
+    <value>'{0}' could not be read: {1}</value>
+  </data>
+  <data name="PreviewHandlers_ModelPreviewTurnedOff" xml:space="preserve">
+    <value>The model preview is turned off.</value>
+  </data>
+  <data name="PreviewHandlers_ModelPreviewTurnedOffAet" xml:space="preserve">
+    <value>The model preview is turned off (aet-eaw-edit.features.tools.modelPreview).</value>
+  </data>
+  <data name="PreviewHandlers_ModelWasNotFound" xml:space="preserve">
+    <value>Model '{0}' was not found. {1}</value>
+  </data>
+  <data name="PreviewHandlers_NoModelWasNamed" xml:space="preserve">
+    <value>No model was named.</value>
+  </data>
+  <data name="PreviewHandlers_NoObjectModelAnimationWas" xml:space="preserve">
+    <value>No object, model or animation was named.</value>
+  </data>
+  <data name="PreviewHandlers_NoParticleSystemWasNamed" xml:space="preserve">
+    <value>No particle system was named.</value>
+  </data>
+  <data name="PreviewHandlers_NoProjectileWasNamed" xml:space="preserve">
+    <value>No projectile was named.</value>
+  </data>
+  <data name="PreviewHandlers_NoTextureWasNamed" xml:space="preserve">
+    <value>No texture was named.</value>
+  </data>
+  <data name="PreviewHandlers_ParticleSystemWasNotFound" xml:space="preserve">
+    <value>Particle system '{0}' was not found. {1}</value>
+  </data>
+  <data name="PreviewHandlers_ProjectileNotDefinedThisProject" xml:space="preserve">
+    <value>Projectile '{0}' is not defined in this project.</value>
+  </data>
+  <data name="PreviewHandlers_TextureResolvedButCouldNot" xml:space="preserve">
+    <value>Texture '{0}' resolved but could not be read.</value>
+  </data>
+  <data name="PreviewHandlers_TextureWasNotFound" xml:space="preserve">
+    <value>Texture '{0}' was not found. {1}</value>
+  </data>
   <data name="PreviewModelAction_NotFound" xml:space="preserve">
     <value>Model file not found</value>
   </data>
   <data name="PreviewModelAction_Preview" xml:space="preserve">
     <value>Preview model {0}</value>
+  </data>
+  <data name="PreviewScene_AnimationSkeletonDiffers" xml:space="preserve">
+    <value>'{0}' takes its animations from '{1}', whose skeleton differs from '{2}' ({3} bones against {4}). The clips play, bound by bone index - where the two skeletons disagree, a clip drives whatever bone sits at that index.</value>
+  </data>
+  <data name="PreviewScene_BreakoffPropNotDefined" xml:space="preserve">
+    <value>Breakoff prop '{0}' is not defined in this project, so the hardpoint will vanish instead of breaking off.</value>
+  </data>
+  <data name="PreviewScene_CouldNotBeReadIts" xml:space="preserve">
+    <value>'{0}' could not be read for its cameras: {1}</value>
+  </data>
+  <data name="PreviewScene_CouldNotBeReadIts2" xml:space="preserve">
+    <value>'{0}' could not be read for its particle effects: {1}</value>
+  </data>
+  <data name="PreviewScene_DamageStageUntagged" xml:space="preserve">
+    <value>'{0}' declares damage {1}, which nothing in '{2}' is tagged for. The unit reaches that state and does not change.</value>
+  </data>
+  <data name="PreviewScene_DeathCloneNotDefinedThis" xml:space="preserve">
+    <value>Death clone '{0}' is not defined in this project.</value>
+  </data>
+  <data name="PreviewScene_DeclaresNoTacticalModelSo" xml:space="preserve">
+    <value>'{0}' declares no tactical model, so there is nothing to draw.</value>
+  </data>
+  <data name="PreviewScene_HardpointAttachesModelWhichWas" xml:space="preserve">
+    <value>Hardpoint '{0}' attaches model '{1}', which was not found.</value>
+  </data>
+  <data name="PreviewScene_HardpointBoneMissing" xml:space="preserve">
+    <value>Hardpoint '{0}' attaches to bone '{1}', which model '{2}' does not have.</value>
+  </data>
+  <data name="PreviewScene_HardpointMountedButNotDefined" xml:space="preserve">
+    <value>Hardpoint '{0}' is mounted but not defined in this project.</value>
+  </data>
+  <data name="PreviewScene_HardpointNoBone" xml:space="preserve">
+    <value>Hardpoint '{0}' names no {1}. {2}; a Model_To_Attach is never attached.</value>
+  </data>
+  <data name="PreviewScene_HardpointUnreachable" xml:space="preserve">
+    <value>Hardpoint '{0}' is destroyable but names no Collision_Mesh, so no shot can reach it. The unit can never be finished through its hardpoints.</value>
+  </data>
+  <data name="PreviewScene_InheritanceCycle" xml:space="preserve">
+    <value>'{0}' inherits in a cycle through '{1}'; the assembled scene may be incomplete.</value>
+  </data>
+  <data name="PreviewScene_ModelWasNotFound" xml:space="preserve">
+    <value>Model '{0}' was not found. {1}</value>
+  </data>
+  <data name="PreviewScene_Muzzle" xml:space="preserve">
+    <value>Muzzle A</value>
+  </data>
+  <data name="PreviewScene_NoModelForAnimation" xml:space="preserve">
+    <value>No model name prefixes '{0}', so there is nothing to play it on.</value>
+  </data>
+  <data name="PreviewScene_NoMuzzleBones" xml:space="preserve">
+    <value>'{0}' has a WEAPON behaviour but its model declares no MuzzleA bones, so the engine has no muzzle to fire from.</value>
+  </data>
+  <data name="PreviewScene_NoObjectNamedIndexed" xml:space="preserve">
+    <value>No object named '{0}' is indexed.</value>
+  </data>
+  <data name="PreviewScene_NoReticle" xml:space="preserve">
+    <value>GameConstants maps no targeting reticle for hardpoint type '{0}', so the game draws nothing over those hardpoints.</value>
+  </data>
+  <data name="PreviewScene_NotAModel" xml:space="preserve">
+    <value>'{0}' is not an Alamo model or particle system: Its root chunk id is neither. The file may be renamed or truncated.</value>
+  </data>
+  <data name="PreviewScene_PlacedAtFireBone" xml:space="preserve">
+    <value>The game places it at Fire_Bone_A '{0}'</value>
+  </data>
+  <data name="PreviewScene_PlacedAtOrigin" xml:space="preserve">
+    <value>The game places it at the map origin</value>
+  </data>
+  <data name="PreviewScene_ProjectileNotDefinedThisProject" xml:space="preserve">
+    <value>Projectile '{0}' is not defined in this project.</value>
+  </data>
+  <data name="PreviewScene_SkeletonMismatch" xml:space="preserve">
+    <value>'{0}' does not match the skeleton of {1}. An animation exported against a different revision of a model cannot be played on it.</value>
+  </data>
+  <data name="PreviewScene_TargetableNoBone" xml:space="preserve">
+    <value>Hardpoint '{0}' is targetable but names no {1}. {2} and draws its reticle in the screen corner.</value>
+  </data>
+  <data name="PreviewScene_TargetableNoBoneUnkillable" xml:space="preserve">
+    <value>Hardpoint '{0}' is targetable but names no {1}. {2} and draws its reticle in the screen corner. It cannot be hit, so the unit cannot be destroyed.</value>
+  </data>
+  <data name="PreviewScene_UnboundAbilityEffect" xml:space="preserve">
+    <value>{0} names {1} by its prefix, but this object declares no such ability - the effect is unbound.</value>
+  </data>
+  <data name="PreviewSubMesh_NoSuchBone" xml:space="preserve">
+    <value>(no such bone: {0})</value>
+  </data>
+  <data name="PreviewSubMesh_NoSuchMesh" xml:space="preserve">
+    <value>Model '{0}' has {1} meshes; {2} is not one of them.</value>
+  </data>
+  <data name="PreviewSubMesh_NoSuchSubMesh" xml:space="preserve">
+    <value>Mesh '{0}' has {1} sub-meshes; {2} is not one of them.</value>
   </data>
   <data name="PreviewUnitCodeLens_PreviewUnit" xml:space="preserve">
     <value>preview unit</value>

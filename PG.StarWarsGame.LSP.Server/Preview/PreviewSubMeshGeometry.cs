@@ -3,6 +3,7 @@
 
 using System.Numerics;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -52,18 +53,18 @@ public sealed record PreviewSubMeshGeometry(
     /// </exception>
     public static PreviewSubMeshGeometry From(
         string model, AlamoModelContent content, int meshIndex, int subMeshIndex, string table,
-        int offset, int count)
+        int offset, int count, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         if (meshIndex < 0 || meshIndex >= content.Meshes.Count)
             throw new ArgumentOutOfRangeException(nameof(meshIndex),
-                $"Model '{model}' has {content.Meshes.Count} meshes; {meshIndex} is not one of them.");
+                messages.Format("PreviewSubMesh_NoSuchMesh", model, content.Meshes.Count, meshIndex));
 
         var mesh = content.Meshes[meshIndex];
 
         if (subMeshIndex < 0 || subMeshIndex >= mesh.SubMeshes.Count)
             throw new ArgumentOutOfRangeException(nameof(subMeshIndex),
-                $"Mesh '{mesh.Name}' has {mesh.SubMeshes.Count} sub-meshes; " +
-                $"{subMeshIndex} is not one of them.");
+                messages.Format("PreviewSubMesh_NoSuchSubMesh", mesh.Name, mesh.SubMeshes.Count, subMeshIndex));
 
         var sub = mesh.SubMeshes[subMeshIndex];
         var totalFaces = sub.Indices.Count / 3;
@@ -77,7 +78,7 @@ public sealed record PreviewSubMeshGeometry(
             sub.Vertices.Count, totalFaces,
             table == "vertices" ? VertexPage(sub, start, page) : [],
             table == "faces" ? FacePage(sub, start, page) : [],
-            table == "boneMapping" ? BoneMappingRows(sub, content) : []);
+            table == "boneMapping" ? BoneMappingRows(sub, content, messages) : []);
     }
 
     private static IReadOnlyList<PreviewVertexRow> VertexPage(
@@ -128,7 +129,7 @@ public sealed record PreviewSubMeshGeometry(
     ///     thing that says which bone of the model that slot actually is.
     /// </remarks>
     private static IReadOnlyList<PreviewBoneMappingRow> BoneMappingRows(
-        AlamoSubMesh sub, AlamoModelContent content)
+        AlamoSubMesh sub, AlamoModelContent content, IMessageCatalog messages)
     {
         return
         [
@@ -140,7 +141,7 @@ public sealed record PreviewSubMeshGeometry(
 
                     // Said plainly rather than thrown: a mod's own exporter can write anything here,
                     // and a slot pointing nowhere is precisely the fault worth surfacing.
-                    : $"(no such bone: {bone})"))
+                    : messages.Format("PreviewSubMesh_NoSuchBone", bone)))
         ];
     }
 

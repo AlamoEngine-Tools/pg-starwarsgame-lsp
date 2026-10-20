@@ -7,6 +7,7 @@ using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
@@ -42,20 +43,24 @@ public sealed class GetProjectileHandler(
     {
         if (!config.Current.Features.Tools.ModelPreview)
             return Task.FromResult(
-                new GetProjectileResult(null, "The model preview is turned off."));
+                new GetProjectileResult(null,
+                    new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
 
         var id = request.Name?.Trim() ?? string.Empty;
         if (id.Length == 0)
-            return Task.FromResult(new GetProjectileResult(null, "No projectile was named."));
+            return Task.FromResult(new GetProjectileResult(null,
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoProjectileWasNamed")));
 
         // The problems the builder would have raised are collected and dropped: this is a request
         // for ONE projectile and the caller wants an answer about it, not a scene's problem list.
         var problems = new List<PreviewProblem>();
         var resolver = new EffectiveObjectResolver(indexService.Current, schema, tagSource);
-        var found = PreviewSceneBuilder.ProjectilesFor(resolver, [id], problems).FirstOrDefault();
+        var found = PreviewSceneBuilder.ProjectilesFor(resolver, [id], problems, new ConfiguredMessageCatalog(config))
+            .FirstOrDefault();
 
         return Task.FromResult(found is null
-            ? new GetProjectileResult(null, $"Projectile '{id}' is not defined in this project.")
+            ? new GetProjectileResult(null,
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ProjectileNotDefinedThisProject", id))
             : new GetProjectileResult(found));
     }
 }
@@ -113,7 +118,7 @@ public sealed class GetPreviewSceneHandler(
         if (!config.Current.Features.Tools.ModelPreview)
             return new GetPreviewSceneResult(PreviewScene.NotFound(
                 request.ObjectId ?? request.ModelReference ?? string.Empty,
-                "The model preview is turned off (aet-eaw-edit.features.tools.modelPreview).",
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOffAet"),
                 assets.Tiers));
 
         if (!string.IsNullOrWhiteSpace(request.ObjectId))
@@ -133,7 +138,8 @@ public sealed class GetPreviewSceneHandler(
                 builder.BuildForModel(PreviewModelReference.Normalise(request.ModelReference)));
 
         return new GetPreviewSceneResult(PreviewScene.NotFound(
-            string.Empty, "No object, model or animation was named.", assets.Tiers));
+            string.Empty, new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoObjectModelAnimationWas"),
+            assets.Tiers));
     }
 
     /// <summary>
@@ -174,16 +180,19 @@ public sealed class GetModelGlbHandler(
     public Task<GetModelGlbResult> Handle(GetModelGlbParams request, CancellationToken cancellationToken)
     {
         if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetModelGlbResult(null, [], "The model preview is turned off."));
+            return Task.FromResult(new GetModelGlbResult(null, [],
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
 
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
-            return Task.FromResult(new GetModelGlbResult(null, [], "No model was named."));
+            return Task.FromResult(new GetModelGlbResult(null, [],
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoModelWasNamed")));
 
         var bytes = assets.Read(PreviewModelReference.ModelPath(reference));
         if (bytes is null)
             return Task.FromResult(new GetModelGlbResult(null, [],
-                $"Model '{reference}' was not found. {assets.Tiers.Explain()}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelWasNotFound", reference,
+                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
 
         try
         {
@@ -199,13 +208,14 @@ public sealed class GetModelGlbHandler(
             // The reader is strict on purpose; a refusal names the chunk that did not add up, which is
             // far more use to the author than a half-drawn model would be.
             return Task.FromResult(new GetModelGlbResult(null, [],
-                $"'{reference}' could not be read: {e.Message}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "Unexpected failure exporting {Model}", reference);
             return Task.FromResult(new GetModelGlbResult(null, [],
-                $"'{reference}' could not be exported: {e.Message}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeExported", reference,
+                    e.Message)));
         }
     }
 
@@ -299,16 +309,19 @@ public sealed class GetModelDetailHandler(
         GetModelDetailParams request, CancellationToken cancellationToken)
     {
         if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetModelDetailResult(null, "The model preview is turned off."));
+            return Task.FromResult(new GetModelDetailResult(null,
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
 
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
-            return Task.FromResult(new GetModelDetailResult(null, "No model was named."));
+            return Task.FromResult(new GetModelDetailResult(null,
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoModelWasNamed")));
 
         var bytes = assets.Read(PreviewModelReference.ModelPath(reference));
         if (bytes is null)
             return Task.FromResult(new GetModelDetailResult(null,
-                $"Model '{reference}' was not found. {assets.Tiers.Explain()}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelWasNotFound", reference,
+                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
 
         try
         {
@@ -321,13 +334,14 @@ public sealed class GetModelDetailHandler(
         catch (AloFormatException e)
         {
             return Task.FromResult(new GetModelDetailResult(null,
-                $"'{reference}' could not be read: {e.Message}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "Unexpected failure reading detail for {Model}", reference);
             return Task.FromResult(new GetModelDetailResult(null,
-                $"'{reference}' could not be inspected: {e.Message}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeInspected", reference,
+                    e.Message)));
         }
     }
 }
@@ -349,16 +363,18 @@ public sealed class GetSubMeshGeometryHandler(
     {
         if (!config.Current.Features.Tools.ModelPreview)
             return Task.FromResult(new GetSubMeshGeometryResult(null,
-                "The model preview is turned off."));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
 
         var reference = PreviewModelReference.Normalise(request.ModelReference);
         if (string.IsNullOrEmpty(reference))
-            return Task.FromResult(new GetSubMeshGeometryResult(null, "No model was named."));
+            return Task.FromResult(new GetSubMeshGeometryResult(null,
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoModelWasNamed")));
 
         var bytes = assets.Read(PreviewModelReference.ModelPath(reference));
         if (bytes is null)
             return Task.FromResult(new GetSubMeshGeometryResult(null,
-                $"Model '{reference}' was not found. {assets.Tiers.Explain()}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelWasNotFound", reference,
+                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
 
         try
         {
@@ -366,7 +382,7 @@ public sealed class GetSubMeshGeometryHandler(
 
             return Task.FromResult(new GetSubMeshGeometryResult(PreviewSubMeshGeometry.From(
                 reference, model, request.MeshIndex, request.SubMeshIndex, request.Table,
-                request.Offset, request.Count)));
+                request.Offset, request.Count, new ConfiguredMessageCatalog(config))));
         }
         catch (ArgumentOutOfRangeException e)
         {
@@ -377,13 +393,14 @@ public sealed class GetSubMeshGeometryHandler(
         catch (AloFormatException e)
         {
             return Task.FromResult(new GetSubMeshGeometryResult(null,
-                $"'{reference}' could not be read: {e.Message}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeRead", reference, e.Message)));
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "Unexpected failure reading geometry for {Model}", reference);
             return Task.FromResult(new GetSubMeshGeometryResult(null,
-                $"'{reference}' could not be inspected: {e.Message}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeInspected", reference,
+                    e.Message)));
         }
     }
 }
@@ -401,23 +418,26 @@ public sealed class GetModelTextureHandler(
         GetModelTextureParams request, CancellationToken cancellationToken)
     {
         if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetModelTextureResult(null, null, "The model preview is turned off."));
+            return Task.FromResult(new GetModelTextureResult(null, null,
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
 
         var name = request.Name?.Trim();
         if (string.IsNullOrEmpty(name))
-            return Task.FromResult(new GetModelTextureResult(null, null, "No texture was named."));
+            return Task.FromResult(new GetModelTextureResult(null, null,
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoTextureWasNamed")));
 
         // Locate before reading so the ACTUAL extension is reported: a .tga reference routinely
         // resolves to a .dds, and the client picks its decoder from what it is given.
         var location = assets.Locate(TextureDirectory + name);
         if (location is null)
             return Task.FromResult(new GetModelTextureResult(null, null,
-                $"Texture '{name}' was not found. {assets.Tiers.Explain()}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_TextureWasNotFound", name,
+                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
 
         var bytes = assets.Read(TextureDirectory + name);
         if (bytes is null)
             return Task.FromResult(new GetModelTextureResult(null, null,
-                $"Texture '{name}' resolved but could not be read."));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_TextureResolvedButCouldNot", name)));
 
         var format = Path.GetExtension(location.ResolvedPath).TrimStart('.').ToLowerInvariant();
         return Task.FromResult(new GetModelTextureResult(format, Convert.ToBase64String(bytes)));
@@ -442,7 +462,8 @@ public sealed class GetShaderSourceHandler(
     {
         if (!config.Current.Features.Tools.ModelPreview)
             return Task.FromResult(
-                new GetShaderSourceResult(null, false, "The model preview is turned off."));
+                new GetShaderSourceResult(null, false,
+                    new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
 
         return Task.FromResult(
             new GetShaderSourceResult(shaders.Read(request.Name), shaders.HasManagedShaders));
@@ -473,7 +494,8 @@ public sealed class GetParticleSystemHandler(
     {
         if (!config.Current.Features.Tools.ModelPreview)
             return Task.FromResult(
-                new GetParticleSystemResult(null, Error: "The model preview is turned off."));
+                new GetParticleSystemResult(null,
+                    Error: new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ModelPreviewTurnedOff")));
 
         // Resolved ONCE: the object carries both the asset name and the render scale, and looking it
         // up twice would resolve the whole variant chain twice for one request.
@@ -488,7 +510,8 @@ public sealed class GetParticleSystemHandler(
 
         if (string.IsNullOrEmpty(name))
             return Task.FromResult(
-                new GetParticleSystemResult(null, Error: "No particle system was named."));
+                new GetParticleSystemResult(null,
+                    Error: new ConfiguredMessageCatalog(config).Format("PreviewHandlers_NoParticleSystemWasNamed")));
 
         var scale = ScaleFactorOf(owner);
 
@@ -499,7 +522,8 @@ public sealed class GetParticleSystemHandler(
         var bytes = assets.Read(PreviewModelReference.ModelPath(name));
         if (bytes is null)
             return Task.FromResult(new GetParticleSystemResult(null, scale,
-                $"Particle system '{name}' was not found. {assets.Tiers.Explain()}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_ParticleSystemWasNotFound", name,
+                    assets.Tiers.Explain(new ConfiguredMessageCatalog(config)))));
 
         try
         {
@@ -512,7 +536,7 @@ public sealed class GetParticleSystemHandler(
         catch (AloFormatException e)
         {
             return Task.FromResult(new GetParticleSystemResult(null, scale,
-                $"'{name}' could not be read: {e.Message}"));
+                new ConfiguredMessageCatalog(config).Format("PreviewHandlers_CouldNotBeRead", name, e.Message)));
         }
     }
 

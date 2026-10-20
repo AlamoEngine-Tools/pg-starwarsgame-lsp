@@ -37,6 +37,8 @@
     effective-object view and the formatter's refusals come from the catalogue, XML and Lua alike
   - The localisation editor's refusals, key and coverage problems and conversion errors come from the
     catalogue; a key with several non-ASCII characters lists them without the English "and"
+  - The model preview's problems and refusals come from the catalogue. A model file's own format error
+    is quoted as the reader states it, inside a translated sentence
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none
