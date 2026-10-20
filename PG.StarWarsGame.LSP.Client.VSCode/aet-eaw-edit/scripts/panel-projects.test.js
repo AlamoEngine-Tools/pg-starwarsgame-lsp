@@ -1,0 +1,68 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+// Every panel belongs to exactly one project (#276).
+//
+// A panel that reached a server any other way than through its project - a gateway passed in on
+// its own, or the window's routed gateway, which follows whatever editor is in front - showed one
+// project's data and wrote through another's server once a second project ran. A panel kept as a
+// single static instance served every project from one tab, reloading through whichever had opened
+// it last. Both shapes are what this holds the panel sources against.
+
+const assert = require("node:assert/strict");
+const {describe, it} = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const src = process.env.PANEL_PROJECTS_SRC ?? path.join(__dirname, "..", "src");
+
+/** The panel classes: every class extending the shared host, with its file's text. */
+function panelClasses() {
+    return fs
+        .readdirSync(src)
+        .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+        .flatMap((name) => {
+            const text = fs.readFileSync(path.join(src, name), "utf8");
+            return [...text.matchAll(/class (\w+) extends WebviewPanelHost\b/g)].map((m) => ({
+                name: m[1],
+                file: name,
+                text,
+            }));
+        });
+}
+
+describe("panel projects", () => {
+    it("finds the panels", () => {
+        assert.ok(panelClasses().length >= 6);
+    });
+
+    it("gives no panel a gateway of its own - only its project's", () => {
+        assert.deepEqual(
+            panelClasses()
+                .filter((panel) => /\bLspGateway\b/.test(panel.text))
+                .map((panel) => panel.name),
+            [],
+        );
+    });
+
+    it("keeps every panel in a registry filed by project, never as a single instance", () => {
+        assert.deepEqual(
+            panelClasses()
+                .filter(
+                    (panel) =>
+                        !panel.text.includes(`new PanelRegistry<${panel.name}>`) ||
+                        new RegExp(`static \\w+\\s*:\\s*${panel.name}\\s*\\|\\s*undefined`).test(panel.text),
+                )
+                .map((panel) => panel.name),
+            [],
+        );
+    });
+
+    it("builds a panel's project in one place", () => {
+        const extension = fs.readFileSync(path.join(src, "extension.ts"), "utf8");
+        // The one literal of a project is panelProject()'s; a second would be a panel bound some
+        // other way, and the routed gateway handed to one is exactly the bug.
+        assert.equal([...extension.matchAll(/\bgateway: gatewayFor\(/g)].length, 1);
+        assert.doesNotMatch(extension, /\bgateway: lsp\b/);
+    });
+});

@@ -374,7 +374,8 @@ public sealed class ConvertLocalisationFormatHandlerTest
             reload,
             writer,
             NullLogger<ConvertLocalisationFormatHandler>.Instance,
-            config ?? new FakeLspConfigurationProvider());
+            config ?? new FakeLspConfigurationProvider(),
+            new ProjectLayerMap(new FileHelper(fs)));
 
         return (handler, fs, reload, writer);
     }

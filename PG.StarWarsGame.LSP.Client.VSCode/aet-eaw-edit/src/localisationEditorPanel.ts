@@ -5,7 +5,6 @@ import { basename } from "path";
 import * as vscode from "vscode";
 
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
-import { LspGateway } from "./lsp/lspGateway";
 import {
     readDialogGeometry,
     saveDialogGeometry,
@@ -24,6 +23,7 @@ import {
     WebviewMessage,
     WebviewPanelHost,
 } from "./webviewPanelHost";
+import { PanelProject } from "./panelProject";
 import {
     ApplyLocalisationBatchResult,
     CreateLocalisationLanguageFileResult,
@@ -90,7 +90,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         private readonly _label: string,
         private readonly _category: string,
         private readonly _extensionUri: vscode.Uri,
-        private readonly _lsp: LspGateway,
+        project: PanelProject,
     ) {
         // Two view types, so a menu contribution can target one kind of file. The credits editor
         // has a crawl to preview; the translation editor has nothing of the sort.
@@ -101,6 +101,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         // repeatedly. The category comes from the tree, so the choice is made before the webview
         // exists - the script cannot be swapped afterwards.
         super(_extensionUri, {
+            project,
             viewType: isCredits(_category)
                 ? "aetCreditsEditor"
                 : "aetTranslationEditor",
@@ -151,14 +152,14 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         label: string,
         category: string,
         extensionUri: vscode.Uri,
-        lsp: LspGateway,
+        project: PanelProject,
     ): void {
         LocalisationEditorPanel.showSet(
             [filePath],
             label,
             category,
             extensionUri,
-            lsp,
+            project,
         );
     }
 
@@ -176,11 +177,11 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         label: string,
         category: string,
         extensionUri: vscode.Uri,
-        lsp: LspGateway,
+        project: PanelProject,
         focusLanguage?: string,
     ): void {
         const id = panelSetKey(filePaths);
-        const existing = LocalisationEditorPanel._panels.get(id);
+        const existing = LocalisationEditorPanel._panels.get(project.key, id);
         if (existing) {
             // The set and every language in it map to one tab - deliberately, so they cannot stage
             // competing edits against the same files. Revealing alone is therefore not enough:
@@ -199,20 +200,24 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
                 label,
                 category,
                 extensionUri,
-                lsp,
+                project,
             ),
         );
     }
 
     /**
-     * Tells every open tab its file may have changed underneath it. All of them, because
-     * `aet/localisationIndexUpdated` carries no payload - it cannot say which file moved.
+     * Tells every open tab of one project its file may have changed underneath it. All of that
+     * project's, because `aet/localisationIndexUpdated` carries no payload - it cannot say which
+     * file moved - and only that project's, because another project's server said nothing about
+     * its own files.
      *
      * The tab decides what to do: one with nothing staged re-reads, one with staged edits does not,
      * since silently reloading would discard work still visible on screen.
      */
-    static invalidateAll(): void {
-        for (const panel of LocalisationEditorPanel._panels.all) {
+    static invalidateAll(projectKey: string): void {
+        for (const panel of LocalisationEditorPanel._panels.forProject(
+            projectKey,
+        )) {
             panel.post({ type: "invalidate", dirty: panel._state.isDirty });
         }
     }
@@ -273,7 +278,10 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             case "exportDat":
                 await vscode.commands.executeCommand(
                     "aet-eaw-edit.lsp.exportLocalisationToDat",
-                    { project: { filePath: this._filePath } },
+                    {
+                        project: { filePath: this._filePath },
+                        projectKey: this.project.key,
+                    },
                 );
                 break;
             default:
@@ -306,10 +314,11 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
                 this._filePath,
                 this._label,
                 this._extensionUri,
+                this.project,
                 payload,
             );
         } else {
-            CreditsPreviewPanel.update(this._filePath, payload);
+            CreditsPreviewPanel.update(this.project, this._filePath, payload);
         }
     }
 
@@ -320,11 +329,11 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
         // Not fatal: the editor is fully usable, it just cannot offer to add a language. Not cached
         // when the server is down either, so the list arrives once it comes back.
-        if (!this._lsp.isRunning) {
+        if (!this.project.gateway.isRunning) {
             return [];
         }
 
-        const result = await this._lsp.requestOr<GetLanguagesResult>(
+        const result = await this.project.gateway.requestOr<GetLanguagesResult>(
             "aet/getLanguages",
             {},
             { languages: [] },
@@ -342,10 +351,11 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         // escape here as an unhandled rejection and leave the grid stuck on "Loading...".
         const results: GetLocalisationRowsResult[] = [];
         for (const filePath of this._filePaths) {
-            const outcome = await this._lsp.request<GetLocalisationRowsResult>(
-                "aet/getLocalisationRows",
-                { projectFilePath: filePath },
-            );
+            const outcome =
+                await this.project.gateway.request<GetLocalisationRowsResult>(
+                    "aet/getLocalisationRows",
+                    { projectFilePath: filePath },
+                );
 
             if (!outcome.ok) {
                 this.post({
@@ -431,11 +441,12 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      * working editor.
      */
     private async _sendSeedSources(): Promise<void> {
-        const listed = await this._lsp.requestOr<GetLocalisationProjectsResult>(
-            "aet/getLocalisationProjects",
-            {},
-            { projects: [] },
-        );
+        const listed =
+            await this.project.gateway.requestOr<GetLocalisationProjectsResult>(
+                "aet/getLocalisationProjects",
+                {},
+                { projects: [] },
+            );
 
         const self = (listed.projects ?? []).find(
             (p) => p.filePath.toLowerCase() === this._filePath.toLowerCase(),
@@ -453,10 +464,11 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         }[] = [];
 
         for (const sibling of siblingsOf(self, listed.projects ?? [])) {
-            const read = await this._lsp.request<GetLocalisationRowsResult>(
-                "aet/getLocalisationRows",
-                { projectFilePath: sibling.filePath },
-            );
+            const read =
+                await this.project.gateway.request<GetLocalisationRowsResult>(
+                    "aet/getLocalisationRows",
+                    { projectFilePath: sibling.filePath },
+                );
             if (!read.ok || read.value.error) {
                 continue;
             }
@@ -494,6 +506,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
                 filePath: this._filePath,
                 targetFormat,
                 category: this._category,
+                projectKey: this.project.key,
             },
         );
     }
@@ -507,7 +520,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      */
     private async _addLanguageFile(language: string): Promise<void> {
         const result =
-            await this._lsp.requestOrReport<CreateLocalisationLanguageFileResult>(
+            await this.project.gateway.requestOrReport<CreateLocalisationLanguageFileResult>(
                 "aet/createLocalisationLanguageFile",
                 { projectFilePath: this._filePath, language },
                 `could not create the ${language} file`,
@@ -541,7 +554,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
                 basename(writtenPath),
                 this._category,
                 this._extensionUri,
-                this._lsp,
+                this.project,
             );
         }
     }
@@ -555,11 +568,12 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
      * would interrupt editing over a convenience.
      */
     private async _sendBaseline(): Promise<void> {
-        const result = await this._lsp.requestOr<GetBaselineEntriesResult>(
-            "aet/getBaselineEntries",
-            { projectFilePath: this._filePath },
-            { entries: [] },
-        );
+        const result =
+            await this.project.gateway.requestOr<GetBaselineEntriesResult>(
+                "aet/getBaselineEntries",
+                { projectFilePath: this._filePath },
+                { entries: [] },
+            );
         this.post({ type: "baselineRows", entries: result.entries ?? [] });
     }
 
@@ -570,7 +584,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         // too - otherwise the tag sits on the previous run's verdict, describing a document that no
         // longer exists.
         const outcome =
-            await this._lsp.request<ValidateLocalisationBatchResult>(
+            await this.project.gateway.request<ValidateLocalisationBatchResult>(
                 isCredits(this._category)
                     ? "aet/validateCreditsBatch"
                     : "aet/validateTranslationBatch",
@@ -600,7 +614,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
     private async _save(commands: Record<string, unknown>[]): Promise<void> {
         // Answered rather than abandoned: a silent return left the Save button spinning with the
         // queue neither written nor released, which looks exactly like the button doing nothing.
-        if (!this._lsp.isRunning) {
+        if (!this.project.gateway.isRunning) {
             void vscode.window.showWarningMessage(
                 vscode.l10n.t(
                     "EaWEdit LSP: Server is not running; the edits are still staged.",
@@ -661,11 +675,14 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             // rather than escaping. Before, it left the loop mid-set: the files already written
             // stayed written, and the user was told nothing at all.
             const outcome =
-                await this._lsp.request<ApplyLocalisationBatchResult>(method, {
-                    projectFilePath: member.filePath,
-                    expectedContentHash: member.contentHash,
-                    commands: batch,
-                });
+                await this.project.gateway.request<ApplyLocalisationBatchResult>(
+                    method,
+                    {
+                        projectFilePath: member.filePath,
+                        expectedContentHash: member.contentHash,
+                        commands: batch,
+                    },
+                );
 
             const result: ApplyLocalisationBatchResult = outcome.ok
                 ? outcome.value

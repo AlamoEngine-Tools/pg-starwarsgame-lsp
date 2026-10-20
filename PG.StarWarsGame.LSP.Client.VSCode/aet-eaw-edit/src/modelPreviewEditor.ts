@@ -10,7 +10,7 @@
 
 import * as vscode from "vscode";
 
-import { LspGateway } from "./lsp/lspGateway";
+import { PanelProject } from "./panelProject";
 import { ModelPreviewPanel, PreviewSubject } from "./modelPreviewPanel";
 
 /**
@@ -35,20 +35,17 @@ export class ModelPreviewEditorProvider
     static readonly viewType = "aet-eaw-edit.modelPreview";
 
     /**
-     * @param projectOf The server a file's preview talks to, and the project it is filed under: the
-     *     project that owns the file, when the window holds several (#230).
+     * @param projectOf The project a file's preview belongs to: the one that owns the file (#230,
+     *     #276).
      */
     constructor(
         private readonly extensionUri: vscode.Uri,
-        private readonly projectOf: (uri: vscode.Uri) => {
-            lsp: LspGateway;
-            projectKey: string;
-        },
+        private readonly projectOf: (uri: vscode.Uri) => PanelProject,
     ) {}
 
     static register(
         context: vscode.ExtensionContext,
-        projectOf: (uri: vscode.Uri) => { lsp: LspGateway; projectKey: string },
+        projectOf: (uri: vscode.Uri) => PanelProject,
     ): vscode.Disposable {
         return vscode.window.registerCustomEditorProvider(
             ModelPreviewEditorProvider.viewType,
@@ -71,14 +68,12 @@ export class ModelPreviewEditorProvider
         document: vscode.CustomDocument,
         panel: vscode.WebviewPanel,
     ): void {
-        const { lsp, projectKey } = this.projectOf(document.uri);
         ModelPreviewPanel.adopt(
             this.extensionUri,
-            lsp,
+            this.projectOf(document.uri),
             subjectFor(document.uri),
             basename(document.uri),
             panel,
-            projectKey,
         );
     }
 }

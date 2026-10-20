@@ -55,18 +55,6 @@ export function panelKey(target: StoryGraphTarget): string {
         : chain;
 }
 
-/**
- * The registry key for one target's panel within one project (#230). Two projects may each have a
- * campaign of one name, and those are two campaigns on two servers. "" while the window holds one
- * project, which leaves the key as it always was.
- */
-export function projectPanelKey(
-    projectKey: string,
-    target: StoryGraphTarget,
-): string {
-    return projectKey ? `${projectKey}|${panelKey(target)}` : panelKey(target);
-}
-
 /** The galactic target a scoped one belongs to - itself when it is already galactic. */
 export function galacticOf(target: StoryGraphTarget): StoryGraphTarget {
     return { campaign: target.campaign, faction: target.faction };

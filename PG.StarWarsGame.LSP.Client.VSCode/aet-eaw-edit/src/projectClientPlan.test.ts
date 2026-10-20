@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import { discoverProjects } from "./projectDiscovery";
 import {
     clientSpecs,
+    diagnosticCollectionNameFor,
     documentSelectorFor,
     ownerKey,
     ownsPath,
@@ -179,6 +180,30 @@ describe("planChanges", () => {
         // The shared dependency moved from Rev to FotR, so both servers' document selectors change.
         assert.deepEqual(plan.stop.sort(), both.map((s) => s.key).sort());
         assert.equal(plan.start.length, 2);
+    });
+});
+
+describe("diagnosticCollectionNameFor", () => {
+    it("gives every project's client a collection of its own", () => {
+        const folders = ["c:/dev/EaWX/Rev", "c:/dev/EaWX/FotR"];
+        const [rev, fotr] = clientSpecs(discover(folders, EAWX), folders);
+
+        assert.notEqual(
+            diagnosticCollectionNameFor("aet.pg.swg.lsp", rev),
+            diagnosticCollectionNameFor("aet.pg.swg.lsp", fotr),
+        );
+    });
+
+    it("never reuses the bare client id, which every client shares", () => {
+        const [spec] = clientSpecs(
+            discover(["c:/m"], { "c:/m/m.pgproj": pgproj("M") }),
+            ["c:/m"],
+        );
+
+        assert.notEqual(
+            diagnosticCollectionNameFor("aet.pg.swg.lsp", spec),
+            "aet.pg.swg.lsp",
+        );
     });
 });
 

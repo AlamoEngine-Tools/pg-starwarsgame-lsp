@@ -596,7 +596,7 @@ public static class ServerConfigurator
                         ChangeNotifications = false
                     };
 
-                var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
+                var scanRoots = ComputeScanRoots(request, config.Current);
 
                 // Log whether a .pgproj was found under the scan roots - useful startup breadcrumb only.
                 // Not authoritative: the real resolution (with a user-facing notification on failure,
@@ -669,30 +669,17 @@ public static class ServerConfigurator
     // add the configured workspaceRoot if not already covered. The extension sends
     // workspaceRoot = the game data directory, which may be a subdirectory of the VS Code
     // workspace root - so it must always be included, not used as a mere fallback.
-    private static IReadOnlyList<string> ComputeScanRoots(InitializeParams request, string? configWorkspaceRoot)
+    private static IReadOnlyList<string> ComputeScanRoots(InitializeParams request, LspConfiguration config)
     {
-        var folders = new List<string>();
-
         var workspaceFolderPaths = request.WorkspaceFolders
             ?.Select(f => f.Uri.GetFileSystemPath())
             .Where(p => !string.IsNullOrEmpty(p))
-            .ToList();
+            .ToList() ?? [];
 
-        if (workspaceFolderPaths is { Count: > 0 })
-        {
-            folders.AddRange(workspaceFolderPaths!);
-        }
-        else if (request.RootUri is not null)
-        {
-            var rootPath = request.RootUri.GetFileSystemPath();
-            if (!string.IsNullOrEmpty(rootPath))
-                folders.Add(rootPath);
-        }
-
-        if (configWorkspaceRoot is not null &&
-            !folders.Any(f => string.Equals(f, configWorkspaceRoot, StringComparison.OrdinalIgnoreCase)))
-            folders.Add(configWorkspaceRoot);
-
-        return folders;
+        return ScanRoots.Compute(
+            workspaceFolderPaths,
+            request.RootUri?.GetFileSystemPath(),
+            config.WorkspaceRoot,
+            !string.IsNullOrEmpty(config.ProjectPath));
     }
 }

@@ -40,6 +40,24 @@ public sealed class CreditsBatchHandlerTest
     }
 
     [Fact]
+    public async Task Apply_ToADependencysFile_IsRefusedAndWritesNothing()
+    {
+        var fs = Files();
+        var before = fs.File.ReadAllText(Path);
+        var (apply, _, reload) = Build(fs, layers: DependencyOwnsTheFile(new FileHelper(fs)));
+
+        var result = await apply.Handle(
+            new ApplyCreditsBatchParams(Path, HashOf(fs),
+                [new LocEditCommandDto("setCell", 1, Language: "ENGLISH", Value: "SOMEONE ELSE")]),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("read-only", result.Error);
+        Assert.Equal(before, fs.File.ReadAllText(Path));
+        Assert.Equal(0, reload.LocalisationReloads);
+    }
+
+    [Fact]
     public async Task Apply_WritesTheComposedTextAndReturnsItsHash()
     {
         var fs = Files();
@@ -222,7 +240,7 @@ public sealed class CreditsBatchHandlerTest
 
     private static (ApplyCreditsBatchHandler Apply, ValidateCreditsBatchHandler Validate,
         CountingReloadService Reload) Build(
-            MockFileSystem fs, ILspConfigurationProvider? config = null)
+            MockFileSystem fs, ILspConfigurationProvider? config = null, IProjectLayerMap? layers = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(fs);
@@ -243,9 +261,20 @@ public sealed class CreditsBatchHandlerTest
             new ApplyCreditsBatchHandler(
                 editor, reload, helper,
                 NullLogger<ApplyCreditsBatchHandler>.Instance, configuration,
-                new LocalisationWriteLedger(helper)),
+                new LocalisationWriteLedger(helper), layers ?? new ProjectLayerMap(helper)),
             new ValidateCreditsBatchHandler(editor, helper, configuration),
             reload);
+    }
+
+    /// <summary>The file under test belongs to a dependency; the project itself writes elsewhere.</summary>
+    private static ProjectLayerMap DependencyOwnsTheFile(FileHelper helper)
+    {
+        var map = new ProjectLayerMap(helper);
+        map.SetLayers([
+            new ProjectLayer(0, "Core", [], [], ["/mod/text"], [], null),
+            new ProjectLayer(1, "Rev", [], [], ["/leaf/text"], [], null)
+        ]);
+        return map;
     }
 
     private sealed class CountingReloadService : IModProjectReloadService

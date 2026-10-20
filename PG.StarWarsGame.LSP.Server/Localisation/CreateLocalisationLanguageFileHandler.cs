@@ -11,6 +11,7 @@ using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -35,6 +36,7 @@ public sealed class CreateLocalisationLanguageFileHandler
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
+    private readonly IProjectLayerMap _layers;
     private readonly ILogger<CreateLocalisationLanguageFileHandler> _logger;
     private readonly ILocalisationProjectRegistry _projectRegistry;
     private readonly IModProjectReloadService _reloadService;
@@ -51,7 +53,8 @@ public sealed class CreateLocalisationLanguageFileHandler
         ILocalisationProjectRegistry projectRegistry,
         IModProjectReloadService reloadService,
         ILogger<CreateLocalisationLanguageFileHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        IProjectLayerMap layers)
     {
         _rowReader = rowReader;
         _converter = converter;
@@ -64,6 +67,7 @@ public sealed class CreateLocalisationLanguageFileHandler
         _reloadService = reloadService;
         _logger = logger;
         _config = config;
+        _layers = layers;
     }
 
     public async Task<CreateLocalisationLanguageFileResult> Handle(
@@ -79,6 +83,12 @@ public sealed class CreateLocalisationLanguageFileHandler
         if (!fs.File.Exists(request.ProjectFilePath))
             return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_DoesNotExist",
                 request.ProjectFilePath));
+
+        // The new language file is written beside the source, so a dependency's source would put a
+        // file into the dependency's own directory (#276).
+        if (LocalisationLayerGuard.ReadOnlyObjection(
+                _layers, _fileHelper, request.ProjectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
+            return Fail(readOnly);
 
         if (!_langService.TryGetByIdentifier(request.Language ?? string.Empty, out var language)
             || language is null)

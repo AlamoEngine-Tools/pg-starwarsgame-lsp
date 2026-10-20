@@ -10,9 +10,9 @@
 
 import * as vscode from "vscode";
 
-import { LspGateway } from "./lsp/lspGateway";
 import { subMeshGeometryReply } from "./lsp/subMeshGeometry";
 import { ModelInspectorPanel } from "./modelInspectorPanel";
+import { PanelProject } from "./panelProject";
 import {
     GetModelDetailResult,
     GetModelGlbResult,
@@ -89,8 +89,6 @@ const ENERGY_SETTING = "aet-eaw-edit.features.preview.energyPool";
 export class ModelPreviewPanel extends WebviewPanelHost {
     static readonly viewType = "aetModelPreview";
     private static readonly panels = new PanelRegistry<ModelPreviewPanel>();
-    /** The project the preview belongs to; "" while the window holds one (#230). */
-    projectKey = "";
     /**
      * Every open preview, for the refresh push.
      *
@@ -133,7 +131,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     private constructor(
         // Kept, not just passed up: opening the inspector tab needs it again later.
         private readonly extensionUri: vscode.Uri,
-        private readonly lsp: LspGateway,
+        project: PanelProject,
         subject: PreviewSubject,
         title: string,
         adopt?: vscode.WebviewPanel,
@@ -141,6 +139,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         super(
             extensionUri,
             {
+                project,
                 viewType: ModelPreviewPanel.viewType,
                 title,
                 column: vscode.ViewColumn.Active,
@@ -185,48 +184,44 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      */
     static adopt(
         extensionUri: vscode.Uri,
-        lsp: LspGateway,
+        project: PanelProject,
         subject: PreviewSubject,
         title: string,
         panel: vscode.WebviewPanel,
-        projectKey = "",
     ): ModelPreviewPanel {
-        const preview = new ModelPreviewPanel(
+        return new ModelPreviewPanel(
             extensionUri,
-            lsp,
+            project,
             subject,
             title,
             panel,
         );
-        preview.projectKey = projectKey;
-        return preview;
     }
 
     /**
-     * Opens, or reveals and retargets, the preview for one subject. `projectKey` files it under its
-     * project, so two projects' objects of one name open two previews, each on its own server.
+     * Opens, or reveals and retargets, the preview for one subject, filed under its project: two
+     * projects' objects of one name open two previews, each on its own server.
      */
     static show(
         extensionUri: vscode.Uri,
-        lsp: LspGateway,
+        project: PanelProject,
         subject: PreviewSubject,
         title: string,
-        projectKey = "",
     ): ModelPreviewPanel {
         // One panel per subject: opening the same model twice should not give two GPU contexts, and
         // two panels for one thing is a way to run out of them.
-        const subjectPanel = panelKey(subjectKey(subject));
-        const key = projectKey ? `${projectKey}|${subjectPanel}` : subjectPanel;
-        const existing = ModelPreviewPanel.panels.get(key);
+        const key = panelKey(subjectKey(subject));
+        const existing = ModelPreviewPanel.panels.get(project.key, key);
 
         if (existing !== undefined) {
             existing.reveal();
             return existing;
         }
 
-        const panel = new ModelPreviewPanel(extensionUri, lsp, subject, title);
-        panel.projectKey = projectKey;
-        return ModelPreviewPanel.panels.track(key, panel);
+        return ModelPreviewPanel.panels.track(
+            key,
+            new ModelPreviewPanel(extensionUri, project, subject, title),
+        );
     }
 
     static disposeAll(): void {
@@ -239,9 +234,9 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * Called on <c>aet/previewSceneChanged</c>, which the server pushes once the new index is live -
      * so this reads the edit rather than racing it. Only the notifying project's previews re-read.
      */
-    static refreshAll(projectKey = ""): void {
+    static refreshAll(projectKey: string): void {
         for (const panel of ModelPreviewPanel.live) {
-            if (panel.projectKey === projectKey) {
+            if (panel.project.key === projectKey) {
                 void panel.sendScene(true);
             }
         }
@@ -271,7 +266,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 // server has finished starting. Asking straight away failed once, nothing asked
                 // again, and the tab stayed blank until the file was closed and reopened by hand.
                 // Waiting costs a fresh open nothing - it is already ready by then.
-                await this.lsp.whenReady();
+                await this.project.gateway.whenReady();
                 await this.sendScene();
                 return;
 
@@ -308,7 +303,9 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 return;
 
             case "requestSubMeshGeometry":
-                this.post(await subMeshGeometryReply(this.lsp, message));
+                this.post(
+                    await subMeshGeometryReply(this.project.gateway, message),
+                );
                 return;
 
             case "openInspector":
@@ -319,7 +316,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 // Retargets a tab that is open and does nothing if none is. The preview sends this
                 // whenever the row's facts change, so it must NOT be able to open one - a reader
                 // who closed the tab would have it spring back the next time they ticked a box.
-                ModelInspectorPanel.update(message.subject);
+                ModelInspectorPanel.update(this.project.key, message.subject);
                 return;
 
             case "requestTexture":
@@ -352,7 +349,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 // it to run textDocument/definition against, because the server assembled the row
                 // out of several files.
                 await revealDefinition(
-                    this.lsp,
+                    this.project.gateway,
                     String(message.value ?? ""),
                     typeof message.referenceType === "string"
                         ? message.referenceType
@@ -448,10 +445,10 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * than left for the mark to go stale on a tab that is no longer there.
      */
     private openInspector(subject: unknown): void {
-        const alreadyOpen = ModelInspectorPanel.isOpen;
+        const alreadyOpen = ModelInspectorPanel.isOpen(this.project.key);
         const inspector = ModelInspectorPanel.show(
             this.extensionUri,
-            this.lsp,
+            this.project,
             subject,
         );
 
@@ -465,10 +462,11 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     private async sendScene(refresh = false): Promise<void> {
         this.requestedTextures.clear();
 
-        const result = await this.lsp.request<GetPreviewSceneResult>(
-            "aet/getPreviewScene",
-            requestFor(this.subject),
-        );
+        const result =
+            await this.project.gateway.request<GetPreviewSceneResult>(
+                "aet/getPreviewScene",
+                requestFor(this.subject),
+            );
 
         if (!result.ok) {
             // Said out loud on an open, because the panel would otherwise sit empty with no reason
@@ -535,7 +533,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
                 ? message.animations.map((name) => String(name))
                 : null;
 
-        const result = await this.lsp.request<GetModelGlbResult>(
+        const result = await this.project.gateway.request<GetModelGlbResult>(
             "aet/getModelGlb",
             {
                 modelReference,
@@ -567,7 +565,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * matrices have no business in the load path of a preview nobody inspects.
      */
     private async sendModelDetail(modelReference: string): Promise<void> {
-        const result = await this.lsp.request<GetModelDetailResult>(
+        const result = await this.project.gateway.request<GetModelDetailResult>(
             "aet/getModelDetail",
             { modelReference },
         );
@@ -582,10 +580,11 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     }
 
     private async sendParticleSystem(name: string): Promise<void> {
-        const result = await this.lsp.request<GetParticleSystemResult>(
-            "aet/getParticleSystem",
-            { name },
-        );
+        const result =
+            await this.project.gateway.request<GetParticleSystemResult>(
+                "aet/getParticleSystem",
+                { name },
+            );
 
         this.post({
             type: "particleSystem",
@@ -603,7 +602,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
      * answer after an edit to the projectile's own XML would be worse than the round trip costs.
      */
     private async sendProjectile(name: string): Promise<void> {
-        const result = await this.lsp.request<GetProjectileResult>(
+        const result = await this.project.gateway.request<GetProjectileResult>(
             "aet/getProjectile",
             { name },
         );
@@ -618,10 +617,11 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     }
 
     private async sendShader(name: string): Promise<void> {
-        const result = await this.lsp.request<GetShaderSourceResult>(
-            "aet/getShaderSource",
-            { name },
-        );
+        const result =
+            await this.project.gateway.request<GetShaderSourceResult>(
+                "aet/getShaderSource",
+                { name },
+            );
 
         this.post({
             type: "shader",
@@ -643,10 +643,11 @@ export class ModelPreviewPanel extends WebviewPanelHost {
 
         this.requestedTextures.add(name.toLowerCase());
 
-        const result = await this.lsp.request<GetModelTextureResult>(
-            "aet/getModelTexture",
-            { name },
-        );
+        const result =
+            await this.project.gateway.request<GetModelTextureResult>(
+                "aet/getModelTexture",
+                { name },
+            );
 
         this.post({
             type: "texture",

@@ -375,6 +375,11 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         {
             ct.ThrowIfCancellationRequested();
 
+            // The index holds every language's documents; reading a Lua script as XML put "No XML
+            // declaration" on each of them.
+            if (!Path.GetExtension(uri).Equals(FileExtension, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             swPhase.Restart();
             var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
             textTicks += swPhase.ElapsedTicks;

@@ -866,6 +866,36 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Contains(published, p => p.Uri.ToString() == uri2);
     }
 
+    /// <summary>
+    ///     The index holds every language's documents. A sweep that read them all as XML put "No XML
+    ///     declaration" on every Lua script of the project.
+    /// </summary>
+    [Fact]
+    public async Task RevalidateWorkspace_SkipsDocumentsThatAreNotXml()
+    {
+        const string xml = "file:///a.xml";
+        const string lua = "file:///script.lua";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/a.xml"] = new("<Root/>"),
+            ["/script.lua"] = new("function Definitions() end")
+        });
+        var (publisher, published, indexService, _) = BuildSubscribedWithFs(fs);
+
+        indexService.Current = new GameIndex(
+            BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(xml, new DocumentIndex(xml, 1, [], []))
+                .Add(lua, new DocumentIndex(lua, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        await publisher.RevalidateWorkspaceAsync(CancellationToken.None);
+
+        Assert.Contains(published, p => p.Uri.ToString() == xml);
+        Assert.DoesNotContain(published, p => p.Uri.ToString() == lua);
+    }
+
     [Fact]
     public async Task RevalidateWorkspace_Clears_Diagnostics_For_Previously_Published_Uris_Not_In_Index()
     {

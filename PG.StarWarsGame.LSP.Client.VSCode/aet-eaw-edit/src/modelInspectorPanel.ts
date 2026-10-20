@@ -14,9 +14,13 @@
 
 import * as vscode from "vscode";
 
-import { LspGateway } from "./lsp/lspGateway";
 import { subMeshGeometryReply } from "./lsp/subMeshGeometry";
-import { WebviewMessage, WebviewPanelHost } from "./webviewPanelHost";
+import { PanelProject } from "./panelProject";
+import {
+    PanelRegistry,
+    WebviewMessage,
+    WebviewPanelHost,
+} from "./webviewPanelHost";
 
 /**
  * The page CSS the inspector needs before its bundle runs.
@@ -31,12 +35,12 @@ export class ModelInspectorPanel extends WebviewPanelHost {
     static readonly viewType = "aetModelInspector";
 
     /**
-     * The one open inspector.
+     * The open inspectors, at most one per project - filed under the empty subject.
      *
-     * A single field rather than a `PanelRegistry`: the registry keys panels by what they stand
-     * for, and this one stands for whatever is selected right now, which is not a key.
+     * Not keyed by what it inspects: it stands for whatever is selected right now, which is not a
+     * key. Per project (#276), because the rows it describes come from one project's server.
      */
-    private static current: ModelInspectorPanel | undefined;
+    private static readonly panels = new PanelRegistry<ModelInspectorPanel>();
 
     /**
      * The row to describe, held for a webview that has not said `ready` yet.
@@ -50,11 +54,9 @@ export class ModelInspectorPanel extends WebviewPanelHost {
     /** Whether the webview has come up and been given what it is describing. */
     private live = false;
 
-    private constructor(
-        extensionUri: vscode.Uri,
-        private readonly lsp: LspGateway,
-    ) {
+    private constructor(extensionUri: vscode.Uri, project: PanelProject) {
         super(extensionUri, {
+            project,
             viewType: ModelInspectorPanel.viewType,
             title: vscode.l10n.t("Model inspector"),
 
@@ -67,17 +69,11 @@ export class ModelInspectorPanel extends WebviewPanelHost {
             // A vertex table is exactly the sort of thing a reader hits Ctrl+F in.
             enableFindWidget: true,
         });
-
-        this.onDidDispose(() => {
-            if (ModelInspectorPanel.current === this) {
-                ModelInspectorPanel.current = undefined;
-            }
-        });
     }
 
-    /** Whether a tab is open to receive anything - what the preview checks before it sends. */
-    static get isOpen(): boolean {
-        return ModelInspectorPanel.current !== undefined;
+    /** Whether the project has a tab open to receive anything - what the preview checks first. */
+    static isOpen(projectKey: string): boolean {
+        return ModelInspectorPanel.panels.has(projectKey, "");
     }
 
     /**
@@ -89,28 +85,28 @@ export class ModelInspectorPanel extends WebviewPanelHost {
      */
     static show(
         extensionUri: vscode.Uri,
-        lsp: LspGateway,
+        project: PanelProject,
         subject: unknown,
     ): ModelInspectorPanel {
         const panel =
-            ModelInspectorPanel.current ??
-            (ModelInspectorPanel.current = new ModelInspectorPanel(
-                extensionUri,
-                lsp,
-            ));
+            ModelInspectorPanel.panels.get(project.key, "") ??
+            ModelInspectorPanel.panels.track(
+                "",
+                new ModelInspectorPanel(extensionUri, project),
+            );
 
         panel.setSubject(subject);
         panel.reveal(true);
         return panel;
     }
 
-    /** Retargets the inspector if one is open, and does nothing at all if none is. */
-    static update(subject: unknown): void {
-        ModelInspectorPanel.current?.setSubject(subject);
+    /** Retargets the project's inspector if one is open, and does nothing at all if none is. */
+    static update(projectKey: string, subject: unknown): void {
+        ModelInspectorPanel.panels.get(projectKey, "")?.setSubject(subject);
     }
 
     static disposeAll(): void {
-        ModelInspectorPanel.current?.dispose();
+        ModelInspectorPanel.panels.disposeAll();
     }
 
     protected async onMessage(message: WebviewMessage): Promise<void> {
@@ -121,7 +117,9 @@ export class ModelInspectorPanel extends WebviewPanelHost {
                 return;
 
             case "requestSubMeshGeometry":
-                this.post(await subMeshGeometryReply(this.lsp, message));
+                this.post(
+                    await subMeshGeometryReply(this.project.gateway, message),
+                );
                 return;
 
             default:

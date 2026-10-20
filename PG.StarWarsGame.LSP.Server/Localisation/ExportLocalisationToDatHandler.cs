@@ -16,6 +16,7 @@ using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
@@ -32,6 +33,7 @@ public sealed class ExportLocalisationToDatHandler
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
     private readonly ILocalisationLayerRegistry _layerRegistry;
+    private readonly IProjectLayerMap _layers;
     private readonly ILogger<ExportLocalisationToDatHandler> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
     private readonly ILocalisationProjectRegistry _projectRegistry;
@@ -50,7 +52,8 @@ public sealed class ExportLocalisationToDatHandler
         ILocalisationProjectRegistry projectRegistry,
         ILocalisationLayerRegistry layerRegistry,
         ILogger<ExportLocalisationToDatHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        IProjectLayerMap layers)
     {
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
@@ -65,6 +68,7 @@ public sealed class ExportLocalisationToDatHandler
         _layerRegistry = layerRegistry;
         _logger = logger;
         _config = config;
+        _layers = layers;
     }
 
     public Task<ExportLocalisationToDatResult> Handle(
@@ -81,6 +85,12 @@ public sealed class ExportLocalisationToDatHandler
         if (!fs.File.Exists(request.ProjectFilePath))
             return Task.FromResult(new ExportLocalisationToDatResult([],
                 new ConfiguredMessageCatalog(_config).Format("LocExportDat_FileNotFound", request.ProjectFilePath)));
+
+        // The DAT files are written beside the source - into the dependency's own directory when
+        // the source is its file (#276).
+        if (LocalisationLayerGuard.ReadOnlyObjection(
+                _layers, _fileHelper, request.ProjectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
+            return Task.FromResult(new ExportLocalisationToDatResult([], readOnly));
 
         var languages = _langService.OfficiallySupported();
         var isCredits = LocalisationCategoryResolver.Resolve(

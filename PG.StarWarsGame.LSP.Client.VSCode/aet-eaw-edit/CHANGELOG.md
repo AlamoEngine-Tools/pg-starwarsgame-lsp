@@ -209,6 +209,20 @@
 
 ### Fixes
 
+- **Panels in a window of several projects** - every panel belongs to one project for its whole life
+  ([#276](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/276))
+  - A panel opened while one project ran kept following the editor in front once a second project
+    started, and stopped receiving its project's refreshes; it now stays on the project it opened for
+  - The localisation editor filed its tabs by file alone, so a dependency's file opened from a second
+    project revealed the first project's tab; every project's index update re-read every tab
+  - The encyclopedia was one panel for the window, reloaded through whichever project opened it last;
+    the model inspector likewise. Both are one panel per project now
+  - The effective-object document was keyed by the object alone, so two projects asking for one object
+    shared it; the project now travels in the document, which also keeps it across a window reload
+  - Converting or exporting from the localisation editor acted on the remembered project, or asked for
+    one; it acts on the editor's own
+  - Panel titles name the project once the window runs more than one
+
 - **Project-wide suppression re-analysed the workspace** - adding one from a quick fix revalidated every
   document in every language. It now filters the diagnostics already shown and sends only the documents
   that lose one; nothing is analysed again
@@ -323,6 +337,9 @@
 
 ### Breaking changes
 
+- **Dependency localisation files are read-only** - saving, adding a language, converting and exporting
+  refuse a file of a dependency, as the story editor already did; copy the file into the project's text
+  directory to override it ([#276](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/276))
 - **Default baseline source** - the default is the newest baseline release, not the repository's `main`.
   `aet-eaw-edit.lsp.source.baseline.url` keeps working as a custom source
   ([#267](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/267))

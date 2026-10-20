@@ -48,6 +48,22 @@ public sealed class TranslationBatchHandlerTest
     // ── the write ────────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task Apply_ToADependencysFile_IsRefusedAndWritesNothing()
+    {
+        var fs = Files();
+        var (apply, _, reload) = Build(fs, layers: DependencyOwnsTheFile(new FileHelper(fs)));
+
+        var result = await apply.Handle(
+            new ApplyTranslationBatchParams(Path, HashOf(fs), [SetValue("TEXT_B", "Changed")]),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("read-only", result.Error);
+        Assert.Equal(Csv, fs.File.ReadAllText(Path));
+        Assert.Equal(0, reload.LocalisationReloads);
+    }
+
+    [Fact]
     public async Task Apply_ResolvesTheKeyAndWritesTheComposedText()
     {
         var fs = Files();
@@ -269,7 +285,7 @@ public sealed class TranslationBatchHandlerTest
 
     private static (ApplyTranslationBatchHandler Apply, ValidateTranslationBatchHandler Validate,
         CountingReloadService Reload) Build(
-            MockFileSystem fs, ILspConfigurationProvider? config = null)
+            MockFileSystem fs, ILspConfigurationProvider? config = null, IProjectLayerMap? layers = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(fs);
@@ -290,10 +306,21 @@ public sealed class TranslationBatchHandlerTest
             new ApplyTranslationBatchHandler(
                 editor, reload, helper,
                 NullLogger<ApplyTranslationBatchHandler>.Instance, configuration,
-                new LocalisationWriteLedger(helper)),
+                new LocalisationWriteLedger(helper), layers ?? new ProjectLayerMap(helper)),
             new ValidateTranslationBatchHandler(
                 editor, helper, sp.GetRequiredService<ICrc32HashingService>(), configuration),
             reload);
+    }
+
+    /// <summary>The file under test belongs to a dependency; the project itself writes elsewhere.</summary>
+    private static ProjectLayerMap DependencyOwnsTheFile(FileHelper helper)
+    {
+        var map = new ProjectLayerMap(helper);
+        map.SetLayers([
+            new ProjectLayer(0, "Core", [], [], ["/mod/text"], [], null),
+            new ProjectLayer(1, "Rev", [], [], ["/leaf/text"], [], null)
+        ]);
+        return map;
     }
 
     private sealed class CountingReloadService : IModProjectReloadService
