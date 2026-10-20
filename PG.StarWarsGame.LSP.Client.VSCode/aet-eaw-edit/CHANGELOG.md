@@ -117,6 +117,10 @@
     the same chunk as a bump emitter's normal map, is bound as the effect's second texture, and the pixel
     shader's depth output reaches the depth buffer, so a chunk sinks into or stands off the hull as the game
     draws it; a frozen batch drawn through an effect is depth-tested like any other frozen batch
+  - A frozen field whose effect arrives after the freeze - the real order of events, since a field freezes on
+    its second frame and the shader comes back from the host later - is written into the effect's fresh buffer
+    on the next tick; before, an unsorted frozen bake was never written again and the asteroid field vanished
+    the moment its effect was applied
   - Both compile in a real WebGL2 context, which they did not at first: a `mul` of a float3 by a float4x4 now
     narrows the matrix as HLSL does, and a shader handle bound to a block of DX8 assembly is stripped with the
     rest of the effect scaffolding - the bump effect's tangent rotation and the depth sprites' PS1.x fallbacks

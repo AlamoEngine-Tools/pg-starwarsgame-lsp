@@ -1445,6 +1445,53 @@ describe("engine effects", () => {
         assert.equal(material.uniforms.DepthSampler.value, depthMap);
     });
 
+    /**
+     * The real order of events: the field freezes on its second frame, the effect comes back from
+     * the host later. A bump field is not depth-sorted, so a frozen one is never written again -
+     * and a fresh effect buffer created on arrival stayed empty. Measured on P_asteroid_field00
+     * with the headless render probe: 832 particles, 37 in the frustum, nothing drawn.
+     */
+    it("writes the frozen bake into the effect's buffer when the effect arrives after the freeze", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([still({ freezeTime: 0.3 })]),
+        );
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        assert.ok(instance.emitterParticles(0).length > 0);
+
+        withEffect(instance);
+        instance.update(0.1, viewFrom(100));
+        const mesh = instance.emitterMesh(0)!;
+        assert.ok(mesh.material instanceof AlamoMaterial);
+        assert.equal(
+            mesh.geometry.drawRange.count,
+            instance.emitterParticles(0).length * 6,
+        );
+    });
+
+    it("writes the frozen bake back into the preview's own buffer when the effect is switched off", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([still({ freezeTime: 0.3 })]),
+            ),
+        );
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+
+        withEffect(instance, false);
+        instance.update(0.1, viewFrom(100));
+        const geometry = instance.emitterMesh(0)!
+            .geometry as THREE.InstancedBufferGeometry;
+        assert.equal(
+            geometry.instanceCount,
+            instance.emitterParticles(0).length,
+        );
+    });
+
     it("depth-tests a frozen batch drawn through its effect, whatever the file says", () => {
         const instance = withEffect(
             new ParticleSystemInstance(

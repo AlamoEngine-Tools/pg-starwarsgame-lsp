@@ -616,6 +616,11 @@ class EmitterRenderer {
      * steps, spawns, ages or dies, and a parent drives no more trails off them.
      */
     private frozen = false;
+    /**
+     * Set by a material switch: the buffer now drawn is empty or stale and the next tick writes
+     * it, even for a frozen bake that would otherwise never be written again.
+     */
+    private rewrite = false;
 
     /** The frozen batch's draw order and the depths it was sorted on, reused every frame. */
     private readonly drawIndex: number[] = [];
@@ -819,6 +824,10 @@ class EmitterRenderer {
         const properties = this.emitter.properties;
         const eligible = !properties.isHeatParticle && !properties.hasTail;
 
+        // Whichever buffer the switch lands on is empty or stale, and a frozen bake is not written
+        // again on its own: the next tick writes it, sorted or not.
+        this.rewrite = true;
+
         if (effect === null || state === null || !eligible) {
             this.engine?.dispose();
             this.engine = null;
@@ -949,9 +958,16 @@ class EmitterRenderer {
                 this.engine.material.depthTest = true;
             }
             // The bake is drawn as it was written. Only a depth-sorted one is written again, and
-            // that every frame, because the camera it is sorted against moves.
-            if (frame.camera !== null && this.sortsFrozenByDepth()) {
+            // that every frame, because the camera it is sorted against moves - or once, into a
+            // buffer that a material switch has just left empty. Measured on the asteroid field:
+            // its effect arrives after the freeze, and a bump field is never sorted, so the fresh
+            // effect buffer held nothing and the field vanished.
+            if (
+                this.rewrite ||
+                (frame.camera !== null && this.sortsFrozenByDepth())
+            ) {
                 this.writeBuffers(frame);
+                this.rewrite = false;
             }
             return [];
         }
