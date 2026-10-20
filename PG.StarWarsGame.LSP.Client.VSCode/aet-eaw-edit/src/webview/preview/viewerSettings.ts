@@ -99,9 +99,10 @@ export interface LightRig {
 /**
  * The weather, such as it is.
  *
- * One wind with three consumers: `Tree.fx` bends along it, `Grass.fx` reads its own vector with the
- * speed in `w`, and 484 of the corpus's 1019 emitters set `affectedByWind` and are thrown by it.
- * AloViewer's settings dialog exposes exactly these two numbers.
+ * Measured in the game: each map environment stores a wind heading and speed, which the engine
+ * turns into the vector `speed * (cos heading, sin heading)` in the ground plane with no clamp.
+ * The scene hands it to the tree bend, the grass and the particles - an emitter affected by wind
+ * accelerates by half of it every second, a weather field drifts at five times it.
  */
 export interface Wind {
     /** Degrees, the direction the wind blows TOWARDS. */
@@ -249,7 +250,9 @@ export const DEFAULT_VIEWER_SETTINGS: ViewerSettings = {
 
     // A gentle breeze across the model rather than dead calm: the foliage shaders are only
     // interesting in motion, and zero would look like the feature is missing.
-    wind: { heading: 90, speed: 1 },
+    // Measured: an environment that sets no wind gets speed 2 at heading 0. It is also the median
+    // of the 711 environments the shipped maps declare.
+    wind: { heading: 0, speed: 2 },
     skeleton: false,
     boneLabels: "none",
     fireArcs: false,
@@ -272,7 +275,8 @@ const RANGES: Record<string, { min: number; max: number }> = {
     azimuth: { min: 0, max: 360 },
     elevation: { min: -90, max: 90 },
     intensity: { min: 0, max: 8 },
-    windSpeed: { min: 0, max: 20 },
+    // The shipped maps set 1 to 10; 10 is the strongest (sandstorms, rain, Honoghr).
+    windSpeed: { min: 0, max: 10 },
 };
 
 /**

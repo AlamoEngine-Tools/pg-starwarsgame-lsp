@@ -163,7 +163,9 @@
 
 ### Fixes
 
-- **Wind direction** - the viewer's wind control is named for what it sets, the heading the wind blows from
+- **Wind controls follow the maps** - the direction control is named for what it sets, the heading the wind
+  blows towards, in whole degrees; the speed runs from 0 to 10, the range the shipped maps declare, and starts
+  at the game's default of 2 at heading 0
 - **Wind on ordinary emitters** - an emitter that declares itself affected by wind accelerates by half the
   viewer's wind every frame, as the game applies it; it used to be thrown by the whole wind once at birth, a
   rule taken from an editor's emulation rather than the engine

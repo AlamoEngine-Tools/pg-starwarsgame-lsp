@@ -8376,14 +8376,17 @@ function ModelPreview(): React.JSX.Element {
                                             label="Wind direction"
                                             value={<>{wind.heading} deg</>}
                                             info={
-                                                <>Heading the wind blows from</>
+                                                <>
+                                                    Heading the wind blows
+                                                    towards
+                                                </>
                                             }
                                         >
                                             <input
                                                 type="range"
                                                 min={0}
                                                 max={360}
-                                                step={5}
+                                                step={1}
                                                 value={wind.heading}
                                                 onChange={(e) =>
                                                     setWind((current) => ({
@@ -8410,8 +8413,8 @@ function ModelPreview(): React.JSX.Element {
                                             <input
                                                 type="range"
                                                 min={0}
-                                                max={20}
-                                                step={0.5}
+                                                max={10}
+                                                step={0.1}
                                                 value={wind.speed}
                                                 onChange={(e) =>
                                                     setWind((current) => ({
