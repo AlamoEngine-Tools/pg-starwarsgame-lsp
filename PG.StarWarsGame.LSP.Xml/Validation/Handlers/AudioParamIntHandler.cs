@@ -23,7 +23,7 @@ public sealed class AudioParamIntHandler : NumberValueHandlerBase
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{trimmed}' is not a valid audio parameter integer for <{fact.Tag.Tag}>. Did you mean {corrected}?",
+                ctx.Messages.Format("AudioParamInt_IsNotAValidAudio", trimmed, fact.Tag.Tag, corrected),
                 SuggestedFix: corrected)
         ];
     }

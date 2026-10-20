@@ -21,7 +21,7 @@ public sealed class UnitSpawnTableHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid unit spawn entry for <{fact.Tag.Tag}>. Expected: UnitTypeName, Integer >= -1.")
+                    ctx.Messages.Format("UnitSpawnTable_IsNotAValidUnit", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         // The unit (slot 0) is indexed as an object reference by XmlGameDocumentParser and its
@@ -34,7 +34,7 @@ public sealed class UnitSpawnTableHandler : CommaSeparatedPairHandlerBase
         return
         [
             AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"'{parts[1].Trim()}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {count}?",
+                    ctx.Messages.Format("UnitSpawnTable_IsAFloatButExpects", parts[1].Trim(), fact.Tag.Tag, count),
                     SuggestedFix: count.ToString(), Id: DiagnosticIds.UnitSpawnTableFloatWhereIntExpected),
                 fact, 1)
         ];

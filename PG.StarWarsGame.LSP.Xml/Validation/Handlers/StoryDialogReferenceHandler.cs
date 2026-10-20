@@ -28,8 +28,7 @@ public sealed class StoryDialogReferenceHandler(IStoryDialogScope? scope = null)
         if (resolved is null)
         {
             yield return new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"Story dialog '{fact.DialogName}' does not resolve to a .txt script under the " +
-                "project's storyDialog directories.");
+                ctx.Messages.Format("StoryDialogReference_StoryDialogDoesNotResolve", fact.DialogName));
             yield break;
         }
 
@@ -42,7 +41,7 @@ public sealed class StoryDialogReferenceHandler(IStoryDialogScope? scope = null)
             ? $"defined chapters: {string.Join(", ", chapters.Order())}"
             : "the file defines no chapters";
         yield return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"Chapter {chapter} is not defined in story dialog '{fact.DialogName}' ({defined}).",
+            ctx.Messages.Format("StoryDialogReference_ChapterIsNotDefinedIn", chapter, fact.DialogName, defined),
             fact.ChapterLine >= 0 ? fact.ChapterLine : null,
             fact.ChapterLine >= 0 ? fact.ChapterColumn : null,
             fact.ChapterLine >= 0 ? fact.ChapterLength : null,

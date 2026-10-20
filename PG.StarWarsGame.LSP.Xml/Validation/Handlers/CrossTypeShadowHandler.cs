@@ -14,9 +14,7 @@ public sealed class CrossTypeShadowHandler : XmlDiagnosticsHandler<XmlCrossTypeS
     {
         yield return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Warning,
-            $"'{fact.SymbolId}' is defined as both {fact.OwnTypeName} and " +
-            $"{fact.CollidingTypeName}. Typed references resolve to the matching type, " +
-            $"but untyped lookups pick the highest-rank definition. " +
-            $"If that is intended, declare it: <!-- <Override Name=\"{fact.SymbolId}\"/> -->");
+            ctx.Messages.Format("CrossTypeShadow_IsDefinedAsBothAnd", fact.SymbolId, fact.OwnTypeName,
+                fact.CollidingTypeName, fact.SymbolId));
     }
 }

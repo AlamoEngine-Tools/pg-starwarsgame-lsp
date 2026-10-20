@@ -71,9 +71,7 @@ public sealed class ModelTextureExistenceHandler : XmlDiagnosticsHandler<XmlTagV
                     continue;
 
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"Model '{model}' references texture '{name}', which was not found in the game "
-                    + "data or workspace asset files. The reference is inside the model, so the fix "
-                    + "is in the art rather than on this line."));
+                    ctx.Messages.Format("ModelTextureExistence_ModelReferencesTextureWhichWas", model, name)));
             }
         }
 

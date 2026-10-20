@@ -21,7 +21,7 @@ public sealed class PerFactionIntMapHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid per-faction int map for <{fact.Tag.Tag}>. Expected: FactionName, Integer.")
+                    ctx.Messages.Format("PerFactionIntMap_IsNotAValidPer", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         if (wasFloat)
@@ -29,7 +29,8 @@ public sealed class PerFactionIntMapHandler : CommaSeparatedPairHandlerBase
             return
             [
                 AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                        $"'{parts[1].Trim()}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {value}?",
+                        ctx.Messages.Format("PerFactionIntMap_IsAFloatButExpects", parts[1].Trim(), fact.Tag.Tag,
+                            value),
                         SuggestedFix: value.ToString(), Id: DiagnosticIds.PerFactionIntMapFloatWhereIntExpected),
                     fact, 1)
             ];

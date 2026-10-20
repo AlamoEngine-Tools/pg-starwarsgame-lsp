@@ -33,7 +33,7 @@ public sealed class UnitSpawnProbabilityTableHandler : CommaSeparatedPairHandler
                 probability < 0.0f || probability > 1.0f)
             {
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{prob}' is not a valid spawn probability for <{fact.Tag.Tag}>. Expected a float in [0.0, 1.0].",
+                        ctx.Messages.Format("UnitSpawnProbabilityTable_IsNotAValidSpawn", prob, fact.Tag.Tag),
                         Id: DiagnosticIds.UnitSpawnProbabilityInvalid),
                     fact, probOffset, prob.Length));
                 continue;

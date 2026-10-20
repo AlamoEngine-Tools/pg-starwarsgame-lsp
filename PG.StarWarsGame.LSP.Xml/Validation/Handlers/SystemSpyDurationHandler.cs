@@ -27,9 +27,9 @@ public sealed class SystemSpyDurationHandler : XmlDiagnosticsHandler<SystemSpyDu
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<Duration_In_Secs> is {fact.Duration.ToString("G", CultureInfo.InvariantCulture)}, "
-                + $"but a {fact.Style} system spy needs a duration {fact.Requirement} - the engine "
-                + $"overwrites it with {fact.Repair}",
+                ctx.Messages.Format("SystemSpyDuration_DurationInSecsIsBut",
+                    fact.Duration.ToString("G", CultureInfo.InvariantCulture), fact.Style, fact.Requirement,
+                    fact.Repair),
                 SuggestedFix: fact.Repair,
                 FixTitle: $"Apply the engine's own value: {fact.Repair}")
         ];

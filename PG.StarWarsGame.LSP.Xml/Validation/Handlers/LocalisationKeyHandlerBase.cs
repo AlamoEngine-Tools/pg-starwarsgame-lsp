@@ -49,7 +49,7 @@ public abstract class LocalisationKeyHandlerBase : XmlDiagnosticsHandler<XmlTagV
             return null;
 
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-            $"Localisation key '{key}' was not found in the loaded translation databases.",
+            ctx.Messages.Format("LocalisationKeyHandlerBase_LocalisationKeyWasNotFound", key),
             position?.Line,
             position?.Col,
             position is null ? null : key.Length,

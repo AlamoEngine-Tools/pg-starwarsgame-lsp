@@ -29,8 +29,8 @@ public sealed class HardpointAbilityNotOnOwnerHandler
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"Hardpoint '{fact.HardpointId}' enables ability '{fact.AbilityName}' on '{fact.OwnerId}', "
-                + $"which does not have it. {tail}")
+                ctx.Messages.Format("HardpointAbilityNotOnOwner_HardpointEnablesAbilityOnWhich", fact.HardpointId,
+                    fact.AbilityName, fact.OwnerId, tail))
         ];
     }
 }

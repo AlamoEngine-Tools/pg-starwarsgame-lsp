@@ -23,7 +23,7 @@ public abstract class NonEmptyReferenceHandlerBase : SingleValueTypeHandlerBase
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"'' is not a valid {ReferenceNoun} for <{fact.Tag.Tag}>.")
+                ctx.Messages.Format("NonEmptyReferenceHandlerBase_IsNotAValidFor", ReferenceNoun, fact.Tag.Tag))
         ];
     }
 }

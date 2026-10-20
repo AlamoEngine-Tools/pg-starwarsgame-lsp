@@ -46,8 +46,8 @@ public sealed class ProjectileCategoryListHandler : NamedEnumValueHandlerBase
                 return
                 [
                     new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{token}' is not a known {fact.Tag.Enum!.Name} on <{fact.Tag.Tag}> - " +
-                        "the engine never matches it, so that projectile is not intercepted.")
+                        ctx.Messages.Format("ProjectileCategoryList_IsNotAKnownOn", token, fact.Tag.Enum!.Name,
+                            fact.Tag.Tag))
                 ];
 
         return [];

@@ -40,7 +40,8 @@ public sealed class VictoryConditionListHandler : NamedEnumValueHandlerBase
                 return
                 [
                     new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{token}' is not a known value for enum '{fact.Tag.Enum!.Name}' on <{fact.Tag.Tag}>.")
+                        ctx.Messages.Format("VictoryConditionList_IsNotAKnownValue", token, fact.Tag.Enum!.Name,
+                            fact.Tag.Tag))
                 ];
 
         return [];

@@ -22,7 +22,7 @@ public sealed class TextureFileFormatHandler : XmlDiagnosticsHandler<XmlTagValue
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{value}' is not a valid texture filename for <{fact.Tag.Tag}>. Expected a .tga or .dds file.")
+                    ctx.Messages.Format("TextureFileFormat_IsNotAValidTexture", value, fact.Tag.Tag))
             ];
 
         return [];

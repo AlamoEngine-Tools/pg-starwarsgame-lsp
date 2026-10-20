@@ -69,8 +69,7 @@ public abstract class ListLengthHandlerBase : XmlDiagnosticsHandler<XmlTagValueF
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.Tag.Tag}> {Expectation}, but has {entries}. "
-                + "The engine rejects this value on load")
+                ctx.Messages.Format("ListLengthHandlerBase_ButHasTheEngineRejects", fact.Tag.Tag, Expectation, entries))
         ];
     }
 }

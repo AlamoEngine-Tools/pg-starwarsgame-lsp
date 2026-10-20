@@ -19,7 +19,7 @@ public sealed class CableRenderModeHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid cable render mode for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("CableRenderMode_IsNotAValidCable", fact.Tag.Tag))
             ];
 
         return [];

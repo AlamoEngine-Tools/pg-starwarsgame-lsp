@@ -53,7 +53,7 @@ public sealed class SpecialWeaponIndexHandler : XmlDiagnosticsHandler<XmlTagValu
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"'{value}' has no {IndexTag}, so the game never registers it as a special weapon.",
+                    ctx.Messages.Format("SpecialWeaponIndex_HasNoSoTheGame", value, IndexTag),
                     Id: DiagnosticIds.SpecialWeaponIndex)
             ];
 
@@ -64,8 +64,8 @@ public sealed class SpecialWeaponIndexHandler : XmlDiagnosticsHandler<XmlTagValu
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{value}' has {IndexTag} {text}, outside 0 to {MaxSpecialWeapons - 1}, so the game never " +
-                "registers it as a special weapon.",
+                ctx.Messages.Format("SpecialWeaponIndex_HasOutsideToSoThe", value, IndexTag, text,
+                    MaxSpecialWeapons - 1),
                 Id: DiagnosticIds.SpecialWeaponIndex)
         ];
     }

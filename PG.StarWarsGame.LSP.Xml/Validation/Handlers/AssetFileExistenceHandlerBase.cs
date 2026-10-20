@@ -68,7 +68,7 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
                 ? $" Also checked {string.Join(", ", alternates.Select(a => $"'{a}'"))} (the game treats these formats interchangeably)."
                 : string.Empty;
             var result = new XmlDiagnosticResult(MissingSeverity,
-                $"{AssetNoun} file '{se}' was not found in the game data or workspace asset files.{alsoChecked}");
+                ctx.Messages.Format("AssetFileExistenceHandlerBase_FileWasNotFoundIn", AssetNoun, se, alsoChecked));
 
             // Each name in a list carries its own squiggle. A single value already covers exactly
             // the span the fact does, so it is left alone.

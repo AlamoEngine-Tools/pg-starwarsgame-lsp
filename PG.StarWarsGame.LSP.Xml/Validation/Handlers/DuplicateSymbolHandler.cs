@@ -41,7 +41,7 @@ public sealed class DuplicateSymbolHandler : XmlDiagnosticsHandler<XmlSymbolFact
         return
         [
             new XmlDiagnosticResult(severity,
-                $"Duplicate symbol '{fact.SymbolId}': also defined in {othersText}.",
+                ctx.Messages.Format("DuplicateSymbol_DuplicateSymbolAlsoDefinedIn", fact.SymbolId, othersText),
                 RelatedLocations: related.Count > 0 ? related : null)
         ];
     }

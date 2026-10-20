@@ -17,6 +17,7 @@ using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -238,8 +239,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             ? null
             : new EffectiveObjectResolver(index, _schema, _variantTagSource);
 
-        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en",
-            _iconRepack?.IconsAwaitingRepack, _modelTextures, _iconNames, objects);
+        // The configured locale picks the server's own texts and the schema's notes alike. It was a
+        // fixed "en" here, so neither ever reached a diagnostic in another language.
+        var locale = _configProvider?.Current.Locale ?? "en";
+        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, locale,
+            _iconRepack?.IconsAwaitingRepack, _modelTextures, _iconNames, objects)
+        {
+            Messages = ResxMessageCatalog.Server(locale)
+        };
 
         // One parse shared by every producer - and via the parse cache, shared with the indexing
         // parse and every request handler touching the same content.

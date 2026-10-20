@@ -29,7 +29,7 @@ public sealed class MissingRequiredTagHandler : XmlDiagnosticsHandler<MissingReq
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.TagName}> is not set. {fact.OwningType} needs it, {consequence}",
+                ctx.Messages.Format("MissingRequiredTag_IsNotSetNeedsIt", fact.TagName, fact.OwningType, consequence),
                 EngineRepair: fact.Insertion)
         ];
     }

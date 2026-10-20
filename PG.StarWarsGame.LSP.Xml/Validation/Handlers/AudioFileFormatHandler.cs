@@ -24,7 +24,7 @@ public sealed class AudioFileFormatHandler : XmlDiagnosticsHandler<XmlTagValueFa
             if (!token.EndsWith(".wav", StringComparison.OrdinalIgnoreCase) &&
                 !token.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{token}' is not a valid audio filename for <{fact.Tag.Tag}>. Expected a .wav or .mp3 file."));
+                    ctx.Messages.Format("AudioFileFormat_IsNotAValidAudio", token, fact.Tag.Tag)));
 
         return results;
     }

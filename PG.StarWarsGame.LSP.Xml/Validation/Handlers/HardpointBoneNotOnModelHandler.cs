@@ -37,7 +37,8 @@ public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<Hardp
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"<{fact.TagName}> names bone '{fact.BoneName}', which does not exist on {owner}{also}.")
+                    ctx.Messages.Format("HardpointBoneNotOnModel_NamesBoneWhichDoesNot", fact.TagName, fact.BoneName,
+                        owner, also))
             ];
 
         // Collision_Mesh says what the mismatch COSTS, because the obvious reading - nothing can hit

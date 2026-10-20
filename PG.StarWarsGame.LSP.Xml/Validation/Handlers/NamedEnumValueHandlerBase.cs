@@ -35,7 +35,7 @@ public abstract class NamedEnumValueHandlerBase : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid value for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("NamedEnumValueHandlerBase_IsNotAValidValue", fact.Tag.Tag))
             ];
 
         var valid = GetValidValues(fact.Tag.Enum, ctx);
@@ -43,7 +43,7 @@ public abstract class NamedEnumValueHandlerBase : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a known value for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("NamedEnumValueHandlerBase_IsNotAKnownValue", trimmed, fact.Tag.Tag))
             ];
 
         return [];

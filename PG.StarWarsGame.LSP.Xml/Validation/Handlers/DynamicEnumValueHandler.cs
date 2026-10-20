@@ -23,7 +23,8 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid enum identifier for <{fact.Tag.Tag}>.", Id: DiagnosticIds.DynamicEnumEmptyValue)
+                    ctx.Messages.Format("DynamicEnumValue_IsNotAValidEnum", fact.Tag.Tag),
+                    Id: DiagnosticIds.DynamicEnumEmptyValue)
             ];
 
         var isFlagList = fact.Tag.SemanticType == TagSemanticType.FlagList;
@@ -32,7 +33,7 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"<{fact.Tag.Tag}> expects a single enum identifier; '|' is not allowed here.",
+                    ctx.Messages.Format("DynamicEnumValue_ExpectsASingleEnumIdentifier", fact.Tag.Tag),
                     Id: DiagnosticIds.DynamicEnumOrNotAllowed)
             ];
 
@@ -43,7 +44,7 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
                 return
                 [
                     new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{trimmed}' is not a valid enum identifier for <{fact.Tag.Tag}>.",
+                        ctx.Messages.Format("DynamicEnumValue_IsNotAValidEnum2", trimmed, fact.Tag.Tag),
                         Id: DiagnosticIds.DynamicEnumInvalidIdentifier)
                 ];
         }
@@ -65,7 +66,8 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
                         return
                         [
                             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                                $"'{seg}' is not a known value for enum '{enumDef.Name}' on <{fact.Tag.Tag}>.")
+                                ctx.Messages.Format("DynamicEnumValue_IsNotAKnownValue", seg, enumDef.Name,
+                                    fact.Tag.Tag))
                         ];
         }
 
@@ -80,7 +82,7 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
                         return
                         [
                             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                                $"'{seg}' is not a known {enumDef.Name} value.")
+                                ctx.Messages.Format("DynamicEnumValue_IsNotAKnownValue2", seg, enumDef.Name))
                         ];
         }
 

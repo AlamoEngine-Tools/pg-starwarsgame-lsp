@@ -79,7 +79,8 @@ public sealed class DeathAnimationClipHandler : XmlDiagnosticsHandler<DeathAnima
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"{what}, so '{fact.ObjectId}' {consequence}", Id: DiagnosticIds.DeathAnimationClip)
+                ctx.Messages.Format("DeathAnimationClip_So", what, fact.ObjectId, consequence),
+                Id: DiagnosticIds.DeathAnimationClip)
         ];
     }
 

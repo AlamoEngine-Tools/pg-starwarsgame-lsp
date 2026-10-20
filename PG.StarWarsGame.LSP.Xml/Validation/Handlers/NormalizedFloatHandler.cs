@@ -21,7 +21,7 @@ public sealed class NormalizedFloatHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid number for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("NormalizedFloat_IsNotAValidNumber", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         if (d is < 0.0 or > 1.0)
@@ -30,7 +30,7 @@ public sealed class NormalizedFloatHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"Value {d} is out of range [0, 1] for <{fact.Tag.Tag}>. Did you mean {clamped}?",
+                    ctx.Messages.Format("NormalizedFloat_ValueIsOutOfRange", d, fact.Tag.Tag, clamped),
                     SuggestedFix: clamped, Id: DiagnosticIds.NormalizedFloatOutOfRange)
             ];
         }

@@ -19,7 +19,7 @@ public sealed class CommandBarPropertyHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid command bar property for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("CommandBarProperty_IsNotAValidCommand", fact.Tag.Tag))
             ];
 
         return [];

@@ -43,16 +43,15 @@ public sealed class EngineTextLimitHandler : XmlDiagnosticsHandler<EngineTextLim
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"{fact.Subject} is {over} characters too long for the engine, and the game will "
-                    + $"not start. Remove at least {over} characters, or shorten the names inside it.")
+                    ctx.Messages.Format("EngineTextLimit_IsCharactersTooLongFor", fact.Subject, over, over))
             ];
         }
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"{fact.Subject} has room for {Show(fact.CharactersLeft)} more characters. Going "
-                + "over stops the game from starting.",
+                ctx.Messages.Format("EngineTextLimit_HasRoomForMoreCharacters", fact.Subject,
+                    Show(fact.CharactersLeft)),
                 Id: DiagnosticIds.EngineTextLimitApproaching)
         ];
     }

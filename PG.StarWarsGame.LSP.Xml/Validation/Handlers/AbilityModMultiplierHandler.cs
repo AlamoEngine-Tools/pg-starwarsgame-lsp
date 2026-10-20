@@ -21,7 +21,7 @@ public sealed class AbilityModMultiplierHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid ability multiplier for <{fact.Tag.Tag}>. Expected: MultiplierType, Float.")
+                    ctx.Messages.Format("AbilityModMultiplier_IsNotAValidAbility", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         return [];

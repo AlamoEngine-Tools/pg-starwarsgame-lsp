@@ -28,7 +28,7 @@ public sealed partial class PrerequisiteExpressionHandler : SingleValueTypeHandl
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"<{fact.Tag.Tag}> expects a prerequisite expression; value must not be empty.",
+                    ctx.Messages.Format("PrerequisiteExpression_ExpectsAPrerequisiteExpressionValue", fact.Tag.Tag),
                     Id: DiagnosticIds.PrerequisiteExpressionEmpty)
             ];
 
@@ -36,9 +36,7 @@ public sealed partial class PrerequisiteExpressionHandler : SingleValueTypeHandl
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid prerequisite expression for <{fact.Tag.Tag}>. " +
-                    "Expected game object names connected by '|' (OR) and ',' or spaces (AND). " +
-                    "Example: \"StructA | StructB, StructC\" means (StructA OR StructB) AND StructC.")
+                    ctx.Messages.Format("PrerequisiteExpression_IsNotAValidPrerequisite", trimmed, fact.Tag.Tag))
             ];
 
         return [];

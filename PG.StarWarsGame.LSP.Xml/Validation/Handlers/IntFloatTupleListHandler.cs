@@ -29,7 +29,7 @@ public sealed class IntFloatTupleListHandler : CommaSeparatedPairHandlerBase
             if (!LenientIntParser.TryParse(intToken, out var intValue, out var wasFloat))
             {
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{intToken}' is not a valid integer for <{fact.Tag.Tag}>. Expected alternating integer and float pairs."),
+                        ctx.Messages.Format("IntFloatTupleList_IsNotAValidInteger", intToken, fact.Tag.Tag)),
                     fact, intOffset, intToken.Length));
             }
             else if (wasFloat)
@@ -37,14 +37,14 @@ public sealed class IntFloatTupleListHandler : CommaSeparatedPairHandlerBase
                 // Consistent int-slot policy: floats are accepted (the game truncates) but warned.
                 var corrected = intValue.ToString();
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                        $"'{intToken}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {corrected}?",
+                        ctx.Messages.Format("IntFloatTupleList_IsAFloatButExpects", intToken, fact.Tag.Tag, corrected),
                         SuggestedFix: corrected, Id: DiagnosticIds.IntFloatTupleListFloatWhereIntExpected),
                     fact, intOffset, intToken.Length));
             }
 
             if (!LenientFloatParser.TryParse(floatToken, out _))
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{floatToken}' is not a valid float for <{fact.Tag.Tag}>. Expected alternating integer and float pairs."),
+                        ctx.Messages.Format("IntFloatTupleList_IsNotAValidFloat", floatToken, fact.Tag.Tag)),
                     fact, floatOffset, floatToken.Length));
         }
 

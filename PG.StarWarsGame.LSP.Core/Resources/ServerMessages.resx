@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AbilityModFlag_IsNotAValidAbility" xml:space="preserve">
+    <value>'{0}' is not a valid ability flag for &lt;{1}&gt;. Expected: FlagType, Boolean.</value>
+  </data>
+  <data name="AbilityModMultiplier_IsNotAValidAbility" xml:space="preserve">
+    <value>'{0}' is not a valid ability multiplier for &lt;{1}&gt;. Expected: MultiplierType, Float.</value>
+  </data>
+  <data name="AbilitySfxMap_IsNotAKnownAbilitytype" xml:space="preserve">
+    <value>'{0}' is not a known AbilityType value for &lt;{1}&gt;.</value>
+  </data>
+  <data name="AbilitySfxMap_IsNotAValidAbility" xml:space="preserve">
+    <value>'{0}' is not a valid ability SFX map for &lt;{1}&gt;. Expected: AbilityName, SFXEventName.</value>
+  </data>
+  <data name="AllowedValues_HereOnlySupportsTheEngine" xml:space="preserve">
+    <value>&lt;{0}&gt; here only supports {1} - the engine overwrites anything else.</value>
+  </data>
+  <data name="AssetFileExistenceHandlerBase_FileWasNotFoundIn" xml:space="preserve">
+    <value>{0} file '{1}' was not found in the game data or workspace asset files.{2}</value>
+  </data>
+  <data name="Audio3dProviderName_IsNotAValidD" xml:space="preserve">
+    <value>'' is not a valid 3D audio provider name for &lt;{0}&gt;.</value>
+  </data>
+  <data name="AudioFileFormat_IsNotAValidAudio" xml:space="preserve">
+    <value>'{0}' is not a valid audio filename for &lt;{1}&gt;. Expected a .wav or .mp3 file.</value>
+  </data>
+  <data name="AudioParamInt_IsNotAValidAudio" xml:space="preserve">
+    <value>'{0}' is not a valid audio parameter integer for &lt;{1}&gt;. Did you mean {2}?</value>
+  </data>
+  <data name="AutomaticDespawn_CausesDespawnIsOnUnder" xml:space="preserve">
+    <value>&lt;Causes_Despawn&gt; is on under Activation_Style: {0} - the engine turns it off for every automatic style</value>
+  </data>
+  <data name="BooleanGatedRequirement_IsOnSoMustBe" xml:space="preserve">
+    <value>&lt;{0}&gt; is on, so &lt;{1}&gt; must be {2} - the engine otherwise {3}.</value>
+  </data>
+  <data name="BooleanValue_IsNotAValidBoolean" xml:space="preserve">
+    <value>'{0}' is not a valid Boolean for &lt;{1}&gt;. Expected: True, False, Yes or No.</value>
+  </data>
+  <data name="CableRenderMode_IsNotAValidCable" xml:space="preserve">
+    <value>'' is not a valid cable render mode for &lt;{0}&gt;.</value>
+  </data>
+  <data name="CaseSensitiveTag_HasToBeSpelledExactly" xml:space="preserve">
+    <value>&lt;{0}&gt; has to be spelled exactly &lt;{1}&gt;. Unlike the rest of the game's tags this one is matched letter by letter, so {2}.</value>
+  </data>
+  <data name="CommandBarProperty_IsNotAValidCommand" xml:space="preserve">
+    <value>'' is not a valid command bar property for &lt;{0}&gt;.</value>
+  </data>
+  <data name="ConditionalSfxEvent_IsNotAValidConditional" xml:space="preserve">
+    <value>'{0}' is not a valid conditional SFX event for &lt;{1}&gt;. Expected: UnitType, SFXEventName.</value>
+  </data>
+  <data name="ConditionalSpeechEvent_IsNotAValidConditional" xml:space="preserve">
+    <value>'{0}' is not a valid conditional speech event for &lt;{1}&gt;. Expected: UnitTypeCondition, SpeechEventName.</value>
+  </data>
+  <data name="CrossLayerShadow_OverridesADefinitionFromIf" xml:space="preserve">
+    <value>'{0}' overrides a definition from '{1}'. If that is intended, declare it: &lt;!-- &lt;Override Name="{2}"/&gt; --&gt;</value>
+  </data>
+  <data name="CrossTypeShadow_IsDefinedAsBothAnd" xml:space="preserve">
+    <value>'{0}' is defined as both {1} and {2}. Typed references resolve to the matching type, but untyped lookups pick the highest-rank definition. If that is intended, declare it: &lt;!-- &lt;Override Name="{3}"/&gt; --&gt;</value>
+  </data>
+  <data name="DamageAbsorbsNothing_ThisAbsorbsNoDamageAnd" xml:space="preserve">
+    <value>This absorbs no damage. {0}, and the amount healed is (damage * Damage_Absorb_Percentage) + Damage_Absorb_Amount, so one of them must be non-zero.</value>
+  </data>
+  <data name="DamageNonzero_MustBeGreaterThanFor" xml:space="preserve">
+    <value>&lt;{0}&gt; must be greater than 0 for the AI to use this unit.</value>
+  </data>
+  <data name="DamageStageNotOnModel_LandDamageAlternatesDeclaresDamage" xml:space="preserve">
+    <value>&lt;Land_Damage_Alternates&gt; declares damage {0}, but '{1}' {2}. The unit reaches that state and does not change.</value>
+  </data>
+  <data name="DamageToArmorMod_IsNotAKnownArmortype" xml:space="preserve">
+    <value>'{0}' is not a known ArmorType value.</value>
+  </data>
+  <data name="DamageToArmorMod_IsNotAKnownDamagetype" xml:space="preserve">
+    <value>'{0}' is not a known DamageType value.</value>
+  </data>
+  <data name="DamageToArmorMod_IsNotAValidDamage" xml:space="preserve">
+    <value>'{0}' is not a valid damage-to-armor modifier for &lt;{1}&gt;. Expected: DamageType, ArmorType, Float.</value>
+  </data>
+  <data name="DeathAnimationClip_So" xml:space="preserve">
+    <value>{0}, so '{1}' {2}</value>
+  </data>
+  <data name="DeathCloneSpec_IsNotAValidDeath" xml:space="preserve">
+    <value>'{0}' is not a valid death clone spec for &lt;{1}&gt;. Expected: Condition, CloneTypeName.</value>
+  </data>
+  <data name="DeprecatedEventType_IsDeprecated" xml:space="preserve">
+    <value>'{0}' is deprecated.</value>
+  </data>
+  <data name="DisallowedOrOperator_DoesNotSupportOrEvery" xml:space="preserve">
+    <value>&lt;{0}&gt; does not support '|' (OR) - every listed value is required (AND only). This engine only supports OR-expressions on tags explicitly documented for it (e.g. Required_Special_Structures).</value>
+  </data>
+  <data name="DuplicateSymbol_DuplicateSymbolAlsoDefinedIn" xml:space="preserve">
+    <value>Duplicate symbol '{0}': also defined in {1}.</value>
+  </data>
+  <data name="DynamicEnumValue_ExpectsASingleEnumIdentifier" xml:space="preserve">
+    <value>&lt;{0}&gt; expects a single enum identifier; '|' is not allowed here.</value>
+  </data>
+  <data name="DynamicEnumValue_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known value for enum '{1}' on &lt;{2}&gt;.</value>
+  </data>
+  <data name="DynamicEnumValue_IsNotAKnownValue2" xml:space="preserve">
+    <value>'{0}' is not a known {1} value.</value>
+  </data>
+  <data name="DynamicEnumValue_IsNotAValidEnum" xml:space="preserve">
+    <value>'' is not a valid enum identifier for &lt;{0}&gt;.</value>
+  </data>
+  <data name="DynamicEnumValue_IsNotAValidEnum2" xml:space="preserve">
+    <value>'{0}' is not a valid enum identifier for &lt;{1}&gt;.</value>
+  </data>
+  <data name="EitherOrRequirement_AndAreBothSoThis" xml:space="preserve">
+    <value>&lt;{0}&gt; and &lt;{1}&gt; are both {2}, so this {3} {4} - {5}</value>
+  </data>
+  <data name="EngineTextLimit_HasRoomForMoreCharacters" xml:space="preserve">
+    <value>{0} has room for {1} more characters. Going over stops the game from starting.</value>
+  </data>
+  <data name="EngineTextLimit_IsCharactersTooLongFor" xml:space="preserve">
+    <value>{0} is {1} characters too long for the engine, and the game will not start. Remove at least {2} characters, or shorten the names inside it.</value>
+  </data>
+  <data name="FiresForward_FiresForwardDoesNothingOn" xml:space="preserve">
+    <value>Fires_Forward does nothing on '{0}': only the {1} behaviour reads it, and this object has none.</value>
+  </data>
+  <data name="FloatList_IsNotAValidFloat" xml:space="preserve">
+    <value>'' is not a valid float list for &lt;{0}&gt;.</value>
+  </data>
+  <data name="FloatList_IsNotAValidFloat2" xml:space="preserve">
+    <value>'{0}' is not a valid float list for &lt;{1}&gt;. Expected space-separated floats.</value>
+  </data>
+  <data name="FloatTupleList_IsNotAValidFloat" xml:space="preserve">
+    <value>'' is not a valid float tuple list for &lt;{0}&gt;.</value>
+  </data>
+  <data name="FloatTupleList_IsNotAValidFloat2" xml:space="preserve">
+    <value>'{0}' is not a valid float tuple list for &lt;{1}&gt;. Expected space/comma-separated floats.</value>
+  </data>
+  <data name="FloatValue_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid float for &lt;{1}&gt;.</value>
+  </data>
+  <data name="FloatVector2_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid Float2 for &lt;{1}&gt;. Expected 2 floats separated by spaces or commas.</value>
+  </data>
+  <data name="FloatVector3List_IsNotAValidFloat" xml:space="preserve">
+    <value>'' is not a valid Float3 list for &lt;{0}&gt;.</value>
+  </data>
+  <data name="FloatVector3List_IsNotAValidFloat2" xml:space="preserve">
+    <value>'{0}' is not a valid Float3 list for &lt;{1}&gt;. Expected a multiple of 3 floats.</value>
+  </data>
+  <data name="FloatVector3List_IsNotAValidFloat3" xml:space="preserve">
+    <value>'{0}' is not a valid Float3 list for &lt;{1}&gt;. Expected space-separated floats.</value>
+  </data>
+  <data name="FloatVector3_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid Float3 for &lt;{1}&gt;. Expected 3 floats separated by spaces or commas.</value>
+  </data>
+  <data name="FloatVector4_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid Float4 for &lt;{1}&gt;. Expected 4 floats separated by spaces or commas.</value>
+  </data>
+  <data name="ForceDeploymentList_IsNotAValidForce" xml:space="preserve">
+    <value>'{0}' is not a valid force deployment entry for &lt;{1}&gt;. Expected: FactionName, PlanetName, UnitTypeName.</value>
+  </data>
+  <data name="GrenadeProjectile_NamesWhoseIsThisAbility" xml:space="preserve">
+    <value>&lt;{0}&gt; names '{1}', whose &lt;{2}&gt; is {3} - this ability only accepts a {4} projectile and refuses anything else</value>
+  </data>
+  <data name="HardPointSfxMap_IsNotAKnownHardpointtype" xml:space="preserve">
+    <value>'{0}' is not a known HardPointType value for &lt;{1}&gt;.</value>
+  </data>
+  <data name="HardPointSfxMap_IsNotAValidHard" xml:space="preserve">
+    <value>'{0}' is not a valid hard point SFX map for &lt;{1}&gt;. Expected: HardPointType, SFXEventName.</value>
+  </data>
+  <data name="HardPointTypeToTextureMap_IsNotAValidHard" xml:space="preserve">
+    <value>'{0}' is not a valid hard point texture map for &lt;{1}&gt;. Expected: HardPointType, TextureName.</value>
+  </data>
+  <data name="HardpointAbilityNotOnOwner_HardpointEnablesAbilityOnWhich" xml:space="preserve">
+    <value>Hardpoint '{0}' enables ability '{1}' on '{2}', which does not have it. {3}</value>
+  </data>
+  <data name="HardpointBoneNotOnModel_NamesBoneWhichDoesNot" xml:space="preserve">
+    <value>&lt;{0}&gt; names bone '{1}', which does not exist on {2}{3}.</value>
+  </data>
+  <data name="HardpointMissingAttachmentBone_HardpointIsIsDestroyableBut" xml:space="preserve">
+    <value>Hardpoint '{0}' is Is_Destroyable but has no &lt;Attachment_Bone&gt;. The engine cannot attach it to the parent model, so it is indestructible and can never be shot off.</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_HardpointSetsWhichNeverApplies" xml:space="preserve">
+    <value>Hardpoint '{0}' sets '{1}', which never applies here. {2}</value>
+  </data>
+  <data name="HardpointModelBonesUnavailable_NoBoneDataCouldBe" xml:space="preserve">
+    <value>No bone data could be read for model '{0}' (declared by '{1}'), so this bone reference was not verified. The model may be missing, unreadable, or an unsupported .alo version.</value>
+  </data>
+  <data name="IconAwaitingRepack_IconExistsAsASource" xml:space="preserve">
+    <value>Icon '{0}' exists as a source image but is missing from this project's mega texture, so the game will not display it. Rebuild the .mtd to include it.</value>
+  </data>
+  <data name="InaccuracyMap_IsNotAKnownGameobjectcategorytype" xml:space="preserve">
+    <value>'{0}' is not a known GameObjectCategoryType value for &lt;{1}&gt;.</value>
+  </data>
+  <data name="InaccuracyMap_IsNotAValidInaccuracy" xml:space="preserve">
+    <value>'{0}' is not a valid inaccuracy map entry for &lt;{1}&gt;. Expected: Category, Float.</value>
+  </data>
+  <data name="IncomeSplitHandlers_OwnerIncomePercentageIsBut" xml:space="preserve">
+    <value>&lt;Owner_Income_Percentage&gt; is {0}, but a split that favours the owner needs at least 0 and less than 1 - the engine clamps it to {1}</value>
+  </data>
+  <data name="IncomeSplitHandlers_TheEngine" xml:space="preserve">
+    <value>&lt;{0}&gt; {1} - the engine {2}</value>
+  </data>
+  <data name="IntFloatTupleList_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+  </data>
+  <data name="IntFloatTupleList_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid float for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
+  </data>
+  <data name="IntFloatTupleList_IsNotAValidInteger" xml:space="preserve">
+    <value>'{0}' is not a valid integer for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
+  </data>
+  <data name="IntList_ContainsFloatValuesButExpects" xml:space="preserve">
+    <value>'{0}' contains float values but &lt;{1}&gt; expects integers. Did you mean '{2}'?</value>
+  </data>
+  <data name="IntList_IsNotAValidInteger" xml:space="preserve">
+    <value>'' is not a valid integer list for &lt;{0}&gt;.</value>
+  </data>
+  <data name="IntList_IsNotAValidInteger2" xml:space="preserve">
+    <value>'{0}' is not a valid integer list for &lt;{1}&gt;. Expected space-separated integers.</value>
+  </data>
+  <data name="IntValue_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+  </data>
+  <data name="IntValue_IsOutOfRangeFor" xml:space="preserve">
+    <value>'{0}' is out of range for &lt;{1}&gt;. Expected a valid integer.</value>
+  </data>
+  <data name="ListLengthHandlerBase_ButHasTheEngineRejects" xml:space="preserve">
+    <value>&lt;{0}&gt; {1}, but has {2}. The engine rejects this value on load</value>
+  </data>
+  <data name="ListMap_AVariantReadsOnlyIts" xml:space="preserve">
+    <value>A variant reads only its last &lt;{0}&gt;, on line {1}. Each one replaces the list.</value>
+  </data>
+  <data name="LocalisationKeyHandlerBase_LocalisationKeyWasNotFound" xml:space="preserve">
+    <value>Localisation key '{0}' was not found in the loaded translation databases.</value>
+  </data>
+  <data name="LocalisationToTextureMap_IsNotAValidLocalisation" xml:space="preserve">
+    <value>'{0}' is not a valid localisation texture map for &lt;{1}&gt;. Expected: LocalisationKey, TextureName.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptCarriesItsExtension" xml:space="preserve">
+    <value>Lua script '{0}' carries its extension. The game appends '.lua' itself and looks for '{1}.lua'.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptClimbsOutOf" xml:space="preserve">
+    <value>Lua script '{0}' climbs out of the script directory with '..'. That resolves for a loose file on Windows only, never inside a MEG archive.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptContainsABackslash" xml:space="preserve">
+    <value>Lua script '{0}' contains a backslash. The game reads the name inside a Lua string, where a backslash is an escape, so the script never loads. '/' separates directories.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptWasNotFound" xml:space="preserve">
+    <value>Lua script '{0}' was not found: no '{1}.lua' or '{2}.lc' in any script directory. The object runs without a script.</value>
+  </data>
+  <data name="MapFileFormat_IsNotAValidMap" xml:space="preserve">
+    <value>'{0}' is not a valid map filename for &lt;{1}&gt;. Expected a .ted file.</value>
+  </data>
+  <data name="MissingRequiredTag_IsNotSetNeedsIt" xml:space="preserve">
+    <value>&lt;{0}&gt; is not set. {1} needs it, {2}</value>
+  </data>
+  <data name="ModelFileFormat_IsNotAValidModel" xml:space="preserve">
+    <value>'{0}' is not a valid model filename for &lt;{1}&gt;. Expected a .alo file.</value>
+  </data>
+  <data name="ModelTextureExistence_ModelReferencesTextureWhichWas" xml:space="preserve">
+    <value>Model '{0}' references texture '{1}', which was not found in the game data or workspace asset files. The reference is inside the model, so the fix is in the art rather than on this line.</value>
+  </data>
+  <data name="MovieFrameTrigger_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+  </data>
+  <data name="MovieFrameTrigger_IsNotAValidMovie" xml:space="preserve">
+    <value>'{0}' is not a valid movie frame trigger for &lt;{1}&gt;. Expected: EventKey, NonNegativeInteger.</value>
+  </data>
+  <data name="NameCrcCollision_HasTheSameNameHash" xml:space="preserve">
+    <value>'{0}' has the same name hash as {1} (0x{2:X8}). The engine finds objects by that hash, so only the one it loads first can be referenced.</value>
+  </data>
+  <data name="NameReference_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known value for '{1}' on &lt;{2}&gt;.</value>
+  </data>
+  <data name="NameReference_IsNotAValidName" xml:space="preserve">
+    <value>'' is not a valid name reference for &lt;{0}&gt;.</value>
+  </data>
+  <data name="NamedEnumValueHandlerBase_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known value for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NamedEnumValueHandlerBase_IsNotAValidValue" xml:space="preserve">
+    <value>'' is not a valid value for &lt;{0}&gt;.</value>
+  </data>
+  <data name="NonEmptyReferenceHandlerBase_IsNotAValidFor" xml:space="preserve">
+    <value>'' is not a valid {0} for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NormalizedFloat_IsNotAValidNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NormalizedFloat_ValueIsOutOfRange" xml:space="preserve">
+    <value>Value {0} is out of range [0, 1] for &lt;{1}&gt;. Did you mean {2}?</value>
+  </data>
+  <data name="NumberValueHandlerBase_IsNotAValidNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NumericRangeHandlerBase_" xml:space="preserve">
+    <value>&lt;{0}&gt; {1}. {2}</value>
+  </data>
+  <data name="PerFactionIntMap_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+  </data>
+  <data name="PerFactionIntMap_IsNotAValidPer" xml:space="preserve">
+    <value>'{0}' is not a valid per-faction int map for &lt;{1}&gt;. Expected: FactionName, Integer.</value>
+  </data>
+  <data name="PerFactionPlanet_IsNotAValidPer" xml:space="preserve">
+    <value>'{0}' is not a valid per-faction planet for &lt;{1}&gt;. Expected: FactionName, PlanetName.</value>
+  </data>
+  <data name="PerFactionValue_IsNotAValidPer" xml:space="preserve">
+    <value>'{0}' is not a valid per-faction value for &lt;{1}&gt;. Expected: FactionName, Number.</value>
+  </data>
+  <data name="PerFactionValue_IsNotAValidPlanet" xml:space="preserve">
+    <value>'{0}' is not a valid planet value for &lt;{1}&gt;. Expected: Planet, Number.</value>
+  </data>
+  <data name="PlanetModeExclusionList_HasNoModeIsA" xml:space="preserve">
+    <value>'{0}' has no mode. &lt;{1}&gt; is a flat list of (planet, mode) pairs, so every planet must be followed by the mode it is excluded in.</value>
+  </data>
+  <data name="PlanetModeExclusionList_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known {1} value. Each entry in &lt;{2}&gt; is a planet followed by the mode it is excluded in.</value>
+  </data>
+  <data name="PositionLabel_IsNotAValidPosition" xml:space="preserve">
+    <value>'' is not a valid position label for &lt;{0}&gt;.</value>
+  </data>
+  <data name="PrerequisiteExpression_ExpectsAPrerequisiteExpressionValue" xml:space="preserve">
+    <value>&lt;{0}&gt; expects a prerequisite expression; value must not be empty.</value>
+  </data>
+  <data name="PrerequisiteExpression_IsNotAValidPrerequisite" xml:space="preserve">
+    <value>'{0}' is not a valid prerequisite expression for &lt;{1}&gt;. Expected game object names connected by '|' (OR) and ',' or spaces (AND). Example: "StructA | StructB, StructC" means (StructA OR StructB) AND StructC.</value>
+  </data>
+  <data name="ProjectileCategoryList_IsNotAKnownOn" xml:space="preserve">
+    <value>'{0}' is not a known {1} on &lt;{2}&gt; - the engine never matches it, so that projectile is not intercepted.</value>
+  </data>
+  <data name="RequiredFirstEntry_MustListFirstItIs" xml:space="preserve">
+    <value>&lt;{0}&gt; must list '{1}' first - it is entry 0, which the engine hands out whenever a lookup misses, so putting '{2}' there silently repoints every default that falls back to it</value>
+  </data>
+  <data name="RgbaValue_ContainsFloatComponentsButExpects" xml:space="preserve">
+    <value>'{0}' contains float components but &lt;{1}&gt; expects integers. Did you mean '{2}'?</value>
+  </data>
+  <data name="RgbaValue_IsNotAValidRgba" xml:space="preserve">
+    <value>'{0}' is not a valid RGBA color for &lt;{1}&gt;. Expected 3 or 4 integers in 0-255, separated by spaces or commas.</value>
+  </data>
+  <data name="SfxCount_IsNotAValidSfx" xml:space="preserve">
+    <value>'{0}' is not a valid SFX count for &lt;{1}&gt;. Expected -1 or a non-negative integer. Did you mean {2}?</value>
+  </data>
+  <data name="SfxPercentage_IsNotAValidSfx" xml:space="preserve">
+    <value>'{0}' is not a valid SFX percentage for &lt;{1}&gt;. Expected [0, 100]. Did you mean {2}?</value>
+  </data>
+  <data name="ShaderVersionHex_IsNotAValidHex" xml:space="preserve">
+    <value>'{0}' is not a valid hex literal for &lt;{1}&gt;. Expected format: 0x[0-9A-Fa-f]+.</value>
+  </data>
+  <data name="ShipClassType_IsNotAValidShip" xml:space="preserve">
+    <value>'' is not a valid ship class type for &lt;{0}&gt;.</value>
+  </data>
+  <data name="SlotItemChecks_FileWasNotFoundIn" xml:space="preserve">
+    <value>{0} file '{1}' was not found in the game data or workspace asset files.</value>
+  </data>
+  <data name="SlotItemChecks_IsNotAValidModel" xml:space="preserve">
+    <value>'{0}' is not a valid model filename for the {1} of &lt;{2}&gt;. Expected a .alo file.</value>
+  </data>
+  <data name="SlotItemChecks_IsNotAValueWhich" xml:space="preserve">
+    <value>'{0}' is not a {1} value, which the {2} of &lt;{3}&gt; has to be.</value>
+  </data>
+  <data name="SpecialWeaponBehavior_HasNeitherTheSpecialWeapon" xml:space="preserve">
+    <value>'{0}' has neither the SPECIAL_WEAPON nor the LOBBING_SUPERWEAPON behaviour, so the game never registers it as a special weapon.</value>
+  </data>
+  <data name="SpecialWeaponIndex_HasNoSoTheGame" xml:space="preserve">
+    <value>'{0}' has no {1}, so the game never registers it as a special weapon.</value>
+  </data>
+  <data name="SpecialWeaponIndex_HasOutsideToSoThe" xml:space="preserve">
+    <value>'{0}' has {1} {2}, outside 0 to {3}, so the game never registers it as a special weapon.</value>
+  </data>
+  <data name="StoryDialogReference_ChapterIsNotDefinedIn" xml:space="preserve">
+    <value>Chapter {0} is not defined in story dialog '{1}' ({2}).</value>
+  </data>
+  <data name="StoryDialogReference_StoryDialogDoesNotResolve" xml:space="preserve">
+    <value>Story dialog '{0}' does not resolve to a .txt script under the project's storyDialog directories.</value>
+  </data>
+  <data name="StoryParamEnum_IsNotAValidValue" xml:space="preserve">
+    <value>'{0}' is not a valid {1} value.</value>
+  </data>
+  <data name="StoryParamRequired_Requires" xml:space="preserve">
+    <value>{0} requires {1}.</value>
+  </data>
+  <data name="StoryParamRequired_Requires2" xml:space="preserve">
+    <value>{0} requires {1} - {2}.</value>
+  </data>
+  <data name="StoryParamUnknownSlot_IsNotUsedBy" xml:space="preserve">
+    <value>'{0}' is not used by {1}.</value>
+  </data>
+  <data name="SystemSpyDuration_DurationInSecsIsBut" xml:space="preserve">
+    <value>&lt;Duration_In_Secs&gt; is {0}, but a {1} system spy needs a duration {2} - the engine overwrites it with {3}</value>
+  </data>
+  <data name="TagComparison_ButIsAgainst" xml:space="preserve">
+    <value>&lt;{0}&gt; {1} &lt;{2}&gt;, but is {3} against {4}</value>
+  </data>
+  <data name="TextureFileFormat_IsNotAValidTexture" xml:space="preserve">
+    <value>'{0}' is not a valid texture filename for &lt;{1}&gt;. Expected a .tga or .dds file.</value>
+  </data>
+  <data name="Uint_IsNotAValidNon" xml:space="preserve">
+    <value>'{0}' is not a valid non-negative integer for &lt;{1}&gt;. Did you mean {2}?</value>
+  </data>
+  <data name="Uint_IsNotAValidNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
+  </data>
+  <data name="UnitSpawnProbabilityTable_IsNotAValidSpawn" xml:space="preserve">
+    <value>'{0}' is not a valid spawn probability for &lt;{1}&gt;. Expected a float in [0.0, 1.0].</value>
+  </data>
+  <data name="UnitSpawnTable_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+  </data>
+  <data name="UnitSpawnTable_IsNotAValidUnit" xml:space="preserve">
+    <value>'{0}' is not a valid unit spawn entry for &lt;{1}&gt;. Expected: UnitTypeName, Integer &gt;= -1.</value>
+  </data>
+  <data name="UnnamedObject_HasNoItCannotBe" xml:space="preserve">
+    <value>&lt;{0}&gt; has no {1} - it cannot be referenced or overridden, and is ignored as a {2}.</value>
+  </data>
+  <data name="UnregisteredXmlFile_NoRegistryNamesSoThe" xml:space="preserve">
+    <value>No registry names '{0}', so the game never reads it.</value>
+  </data>
+  <data name="UvSlotIndex_IsNotAValidUv" xml:space="preserve">
+    <value>'{0}' is not a valid UV slot index for &lt;{1}&gt;. Expected an integer in [0, 3]. Did you mean {2}?</value>
+  </data>
+  <data name="VariantAdditiveMerge_IsAdditiveThisValueIs" xml:space="preserve">
+    <value>'{0}' is additive: this value is added to the base's rather than replacing it, so the variant also keeps {1} inherited from the base. Change the base object if the inherited entries should not apply here.</value>
+  </data>
+  <data name="VariantBaseUnresolved_VariantBaseDoesNotResolve" xml:space="preserve">
+    <value>Variant base '{0}' does not resolve - the engine ignores the tag silently, so '{1}' inherits nothing.</value>
+  </data>
+  <data name="VariantChainTooDeep_VariantChainIsDeepAbove" xml:space="preserve">
+    <value>Variant chain is {0} deep, above the engine's 10 resolution passes - '{1}' may inherit nothing from '{2}' depending on the order the files load in, and the failure is silent.</value>
+  </data>
+  <data name="VariantCycle_VariantHasACircularInheritance" xml:space="preserve">
+    <value>Variant '{0}' has a circular inheritance chain (loops at '{1}').</value>
+  </data>
+  <data name="VariantIgnoredOverride_TagIsIgnoredOnVariants" xml:space="preserve">
+    <value>Tag '{0}' is ignored on variants; the engine will not apply it here.</value>
+  </data>
+  <data name="VariantRedundantOverride_TagHasTheSameValue" xml:space="preserve">
+    <value>Tag '{0}' has the same value as the inherited base; this override is redundant.</value>
+  </data>
+  <data name="VariantTagNotSupported_DoesNothingOnAOnly" xml:space="preserve">
+    <value>&lt;{0}&gt; does nothing on a {1} - only GameObjectType inherits. The engine logs it as an unprocessed entry and loads the object without it.</value>
+  </data>
+  <data name="VehicleThiefClone_HasNoAbilitySoA" xml:space="preserve">
+    <value>'{0}' has no {1} ability, so a thief who captures this vehicle can never get out.</value>
+  </data>
+  <data name="VehicleThiefClone_KeepsTheBehaviourWhichA" xml:space="preserve">
+    <value>'{0}' keeps the {1} behaviour, which a capture clone must not have. The thief rides in the same container garrisoned units are loaded into.</value>
+  </data>
+  <data name="VendorIdHex_IsNotAValidHex" xml:space="preserve">
+    <value>'{0}' is not a valid hex literal for &lt;{1}&gt;. Expected format: 0x[0-9A-Fa-f]+.</value>
+  </data>
+  <data name="VictoryConditionList_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known value for enum '{1}' on &lt;{2}&gt;.</value>
+  </data>
+  <data name="XmlDuplicateTag_DuplicateTagOnlyOneOccurrence" xml:space="preserve">
+    <value>Duplicate tag '{0}': only one occurrence is used per object - the game keeps the LAST one.{1}</value>
+  </data>
+</root>

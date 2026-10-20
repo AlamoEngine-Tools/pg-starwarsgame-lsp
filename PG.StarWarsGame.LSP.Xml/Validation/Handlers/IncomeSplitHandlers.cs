@@ -25,9 +25,8 @@ public sealed class OwnerIncomeShareHandler : XmlDiagnosticsHandler<OwnerIncomeS
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<Owner_Income_Percentage> is {fact.Value.ToString("G", CultureInfo.InvariantCulture)}, "
-                + "but a split that favours the owner needs at least 0 and less than 1 - the engine "
-                + $"clamps it to {fact.Clamped}",
+                ctx.Messages.Format("IncomeSplitHandlers_OwnerIncomePercentageIsBut",
+                    fact.Value.ToString("G", CultureInfo.InvariantCulture), fact.Clamped),
                 SuggestedFix: fact.Clamped,
                 FixTitle: $"Apply the engine's own value: {fact.Clamped}")
         ];
@@ -53,7 +52,7 @@ public sealed class IncomeSplitConflictHandler : XmlDiagnosticsHandler<IncomeSpl
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<{fact.FlagTag}> {fact.Problem} - the engine {fact.Consequence}",
+                ctx.Messages.Format("IncomeSplitHandlers_TheEngine", fact.FlagTag, fact.Problem, fact.Consequence),
                 EngineRepair: fact.Repair)
         ];
     }

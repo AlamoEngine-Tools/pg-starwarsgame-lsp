@@ -20,7 +20,8 @@ public sealed class HardPointTypeToTextureMapHandler : CommaSeparatedPairHandler
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid hard point texture map for <{fact.Tag.Tag}>. Expected: HardPointType, TextureName.")
+                    ctx.Messages.Format("HardPointTypeToTextureMap_IsNotAValidHard", fact.RawValue.Trim(),
+                        fact.Tag.Tag))
             ];
 
         return [];

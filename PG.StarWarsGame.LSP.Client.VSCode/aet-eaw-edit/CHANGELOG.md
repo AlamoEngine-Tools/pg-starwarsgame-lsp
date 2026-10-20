@@ -18,6 +18,12 @@
     - come from the same bundle, which the host hands every page; text interrupted by values is one
     message with placeholders. The page's language follows VS Code's display language. Curly quotes in one
     message became straight ones, and texts in second person were reworded
+  - The server's own texts come from one catalogue, `ServerMessages.resx`, in the language
+    `aet-eaw-edit.lsp.locale` names, English where no translation exists; values in a message keep the
+    form the XML holds - `0.5`, never `0,5`. A test ties every key the code asks for to the catalogue
+    and back
+  - The XML diagnostics read the configured locale; it was fixed to English, so neither the server's
+    texts nor the schema's per-language notes ever reached a diagnostic in another language
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none

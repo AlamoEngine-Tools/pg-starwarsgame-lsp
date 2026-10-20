@@ -23,7 +23,7 @@ public sealed class UvSlotIndexHandler : NumberValueHandlerBase
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{trimmed}' is not a valid UV slot index for <{fact.Tag.Tag}>. Expected an integer in [0, 3]. Did you mean {corrected}?",
+                ctx.Messages.Format("UvSlotIndex_IsNotAValidUv", trimmed, fact.Tag.Tag, corrected),
                 SuggestedFix: corrected)
         ];
     }

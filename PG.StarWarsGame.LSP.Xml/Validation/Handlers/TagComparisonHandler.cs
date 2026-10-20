@@ -24,8 +24,8 @@ public sealed class TagComparisonHandler : XmlDiagnosticsHandler<TagComparisonFa
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.LeftTag}> {fact.Expectation} <{fact.RightTag}>, "
-                + $"but is {Show(fact.Left)} against {Show(fact.Right)}",
+                ctx.Messages.Format("TagComparison_ButIsAgainst", fact.LeftTag, fact.Expectation, fact.RightTag,
+                    Show(fact.Left), Show(fact.Right)),
                 EngineRepair: fact.SwapEdits is null
                     ? null
                     : new XmlEngineRepair(

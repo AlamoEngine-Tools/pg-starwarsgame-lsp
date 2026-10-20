@@ -20,7 +20,7 @@ public sealed class StoryParamUnknownSlotHandler : XmlDiagnosticsHandler<StoryPa
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{tagName}' is not used by {fact.EventType}.")
+                ctx.Messages.Format("StoryParamUnknownSlot_IsNotUsedBy", tagName, fact.EventType))
         ];
     }
 }

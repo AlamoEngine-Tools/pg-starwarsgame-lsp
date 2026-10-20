@@ -22,7 +22,7 @@ public sealed partial class FloatVector2Handler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid Float2 for <{fact.Tag.Tag}>. Expected 2 floats separated by spaces or commas.")
+                    ctx.Messages.Format("FloatVector2_IsNotAValidFloat", trimmed, fact.Tag.Tag))
             ];
 
         return [];

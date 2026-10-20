@@ -20,7 +20,7 @@ public sealed class FloatValueHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid float for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("FloatValue_IsNotAValidFloat", trimmed, fact.Tag.Tag))
             ];
 
         return [];

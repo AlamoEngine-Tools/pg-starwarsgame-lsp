@@ -21,7 +21,7 @@ public sealed class MapFileFormatHandler : XmlDiagnosticsHandler<XmlTagValueFact
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{value}' is not a valid map filename for <{fact.Tag.Tag}>. Expected a .ted file.")
+                    ctx.Messages.Format("MapFileFormat_IsNotAValidMap", value, fact.Tag.Tag))
             ];
 
         return [];

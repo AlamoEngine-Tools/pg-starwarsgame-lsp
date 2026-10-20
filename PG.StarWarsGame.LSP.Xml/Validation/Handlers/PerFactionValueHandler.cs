@@ -25,8 +25,8 @@ public sealed class PerFactionValueHandler : CommaSeparatedPairHandlerBase
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                     planet
-                        ? $"'{raw}' is not a valid planet value for <{fact.Tag.Tag}>. Expected: Planet, Number."
-                        : $"'{raw}' is not a valid per-faction value for <{fact.Tag.Tag}>. Expected: FactionName, Number.")
+                        ? ctx.Messages.Format("PerFactionValue_IsNotAValidPlanet", raw, fact.Tag.Tag)
+                        : ctx.Messages.Format("PerFactionValue_IsNotAValidPer", raw, fact.Tag.Tag))
             ];
 
         return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 2) is { } extra ? [extra] : [];

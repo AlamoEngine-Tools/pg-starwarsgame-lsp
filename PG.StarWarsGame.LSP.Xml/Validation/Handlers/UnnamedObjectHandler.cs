@@ -25,8 +25,7 @@ public sealed class UnnamedObjectHandler : XmlDiagnosticsHandler<XmlUnnamedObjec
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<{fact.ElementName}> has no {fact.NameTag} - it cannot be referenced or " +
-                $"overridden, and is ignored as a {fact.TypeName}.")
+                ctx.Messages.Format("UnnamedObject_HasNoItCannotBe", fact.ElementName, fact.NameTag, fact.TypeName))
         ];
     }
 }

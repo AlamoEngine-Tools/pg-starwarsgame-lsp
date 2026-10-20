@@ -33,7 +33,8 @@ public sealed class HardpointModeRowWithoutAbilityHandler
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"Hardpoint '{fact.HardpointId}' sets '{fact.TagName}', which never applies here. {tail}")
+                ctx.Messages.Format("HardpointModeRowWithoutAbility_HardpointSetsWhichNeverApplies", fact.HardpointId,
+                    fact.TagName, tail))
         ];
     }
 }

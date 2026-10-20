@@ -57,8 +57,7 @@ public sealed class FiresForwardHandler : XmlDiagnosticsHandler<FiresForwardFact
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint,
-                    $"Fires_Forward does nothing on '{fact.ObjectId}': only the {WeaponBehavior} behaviour " +
-                    "reads it, and this object has none.",
+                    ctx.Messages.Format("FiresForward_FiresForwardDoesNothingOn", fact.ObjectId, WeaponBehavior),
                     Id: DiagnosticIds.FiresForwardWithoutWeapon)
             ];
 

@@ -23,7 +23,7 @@ public sealed class XmlDuplicateTagHandler : XmlDiagnosticsHandler<XmlDuplicateT
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"Duplicate tag '{fact.Tag.Tag}': only one occurrence is used per object - the game keeps the LAST one.{othersText}",
+                ctx.Messages.Format("XmlDuplicateTag_DuplicateTagOnlyOneOccurrence", fact.Tag.Tag, othersText),
                 Tags: fact.IsLastOccurrence ? null : [XmlDiagnosticTag.Unnecessary],
                 OfferRemoveEarlierDuplicates: true)
         ];

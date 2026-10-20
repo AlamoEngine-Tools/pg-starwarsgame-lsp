@@ -55,7 +55,7 @@ public sealed class ListMapHandler : XmlDiagnosticsHandler<XmlListMapFact>
             var last = fact.Occurrences[^1];
             foreach (var dead in fact.Occurrences.Take(fact.Occurrences.Count - 1))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"A variant reads only its last <{tag.Tag}>, on line {last.Line + 1}. Each one replaces the list.",
+                    ctx.Messages.Format("ListMap_AVariantReadsOnlyIts", tag.Tag, last.Line + 1),
                     dead.Line, dead.Column, dead.Length, Id: DiagnosticIds.ListMapReplacedInVariant));
             read = [last];
         }

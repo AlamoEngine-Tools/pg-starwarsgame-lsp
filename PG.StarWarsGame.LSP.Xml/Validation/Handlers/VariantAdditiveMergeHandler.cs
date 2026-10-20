@@ -29,9 +29,7 @@ public sealed class VariantAdditiveMergeHandler : XmlDiagnosticsHandler<VariantA
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Information,
-                $"'{fact.TagName}' is additive: this value is added to the base's rather than replacing it, "
-                + $"so the variant also keeps {Describe(inherited)} inherited from the base. "
-                + "Change the base object if the inherited entries should not apply here.")
+                ctx.Messages.Format("VariantAdditiveMerge_IsAdditiveThisValueIs", fact.TagName, Describe(inherited)))
         ];
     }
 

@@ -24,7 +24,7 @@ public sealed class AbilityModFlagHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid ability flag for <{fact.Tag.Tag}>. Expected: FlagType, Boolean.")
+                    ctx.Messages.Format("AbilityModFlag_IsNotAValidAbility", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         return [];

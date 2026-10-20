@@ -21,7 +21,8 @@ public sealed partial class FloatVector3ListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid Float3 list for <{fact.Tag.Tag}>.", Id: DiagnosticIds.FloatVector3ListEmpty)
+                    ctx.Messages.Format("FloatVector3List_IsNotAValidFloat", fact.Tag.Tag),
+                    Id: DiagnosticIds.FloatVector3ListEmpty)
             ];
 
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
@@ -29,14 +30,14 @@ public sealed partial class FloatVector3ListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid Float3 list for <{fact.Tag.Tag}>. Expected a multiple of 3 floats.")
+                    ctx.Messages.Format("FloatVector3List_IsNotAValidFloat2", trimmed, fact.Tag.Tag))
             ];
 
         if (parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid Float3 list for <{fact.Tag.Tag}>. Expected space-separated floats.")
+                    ctx.Messages.Format("FloatVector3List_IsNotAValidFloat3", trimmed, fact.Tag.Tag))
             ];
 
         return [];

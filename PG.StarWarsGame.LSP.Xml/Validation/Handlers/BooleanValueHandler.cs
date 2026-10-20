@@ -20,7 +20,7 @@ public sealed class BooleanValueHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid Boolean for <{fact.Tag.Tag}>. Expected: True, False, Yes or No.")
+                    ctx.Messages.Format("BooleanValue_IsNotAValidBoolean", trimmed, fact.Tag.Tag))
             ];
 
         return [];

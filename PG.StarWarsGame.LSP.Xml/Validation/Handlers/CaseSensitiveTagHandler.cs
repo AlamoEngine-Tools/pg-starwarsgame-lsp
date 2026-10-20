@@ -35,8 +35,8 @@ public sealed class CaseSensitiveTagHandler : XmlDiagnosticsHandler<CaseSensitiv
         return
         [
             new XmlDiagnosticResult(severity,
-                $"<{fact.Authored}> has to be spelled exactly <{fact.Expected}>. Unlike the rest of "
-                + $"the game's tags this one is matched letter by letter, so {fact.Consequence}.",
+                ctx.Messages.Format("CaseSensitiveTag_HasToBeSpelledExactly", fact.Authored, fact.Expected,
+                    fact.Consequence),
                 SuggestedFix: fact.Expected,
                 FixTitle: $"Spell it <{fact.Expected}>")
         ];

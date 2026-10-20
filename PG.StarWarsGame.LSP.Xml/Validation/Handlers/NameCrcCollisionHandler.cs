@@ -36,7 +36,7 @@ public sealed class NameCrcCollisionHandler : XmlDiagnosticsHandler<XmlNameCrcCo
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{fact.SymbolId}' has the same name hash as {names} (0x{fact.Hash:X8}). The engine finds objects by that hash, so only the one it loads first can be referenced.",
+                ctx.Messages.Format("NameCrcCollision_HasTheSameNameHash", fact.SymbolId, names, fact.Hash),
                 RelatedLocations: related.Count > 0 ? related : null)
         ];
     }

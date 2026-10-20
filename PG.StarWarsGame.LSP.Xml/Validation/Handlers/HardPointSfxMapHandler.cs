@@ -21,7 +21,7 @@ public sealed class HardPointSfxMapHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid hard point SFX map for <{fact.Tag.Tag}>. Expected: HardPointType, SFXEventName.")
+                    ctx.Messages.Format("HardPointSfxMap_IsNotAValidHard", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         var hardPointType = parts[0].Trim();
@@ -34,7 +34,7 @@ public sealed class HardPointSfxMapHandler : CommaSeparatedPairHandlerBase
             var known = hardPointEnum.Values.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (!known.Contains(hardPointType))
                 results.Add(AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{hardPointType}' is not a known HardPointType value for <{fact.Tag.Tag}>.",
+                    ctx.Messages.Format("HardPointSfxMap_IsNotAKnownHardpointtype", hardPointType, fact.Tag.Tag),
                     Id: DiagnosticIds.HardPointSfxMapUnknownType), fact, 0));
         }
 

@@ -32,9 +32,7 @@ public sealed class DamageAbsorbsNothingHandler : XmlDiagnosticsHandler<DamageAb
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"This absorbs no damage. {state}, and the amount healed is " +
-                "(damage * Damage_Absorb_Percentage) + Damage_Absorb_Amount, so one of them must " +
-                "be non-zero.")
+                ctx.Messages.Format("DamageAbsorbsNothing_ThisAbsorbsNoDamageAnd", state))
         ];
     }
 

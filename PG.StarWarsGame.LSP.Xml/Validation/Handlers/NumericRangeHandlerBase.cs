@@ -86,7 +86,7 @@ public abstract class NumericRangeHandlerBase : XmlDiagnosticsHandler<XmlTagValu
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.Tag.Tag}> {Expectation}. {consequence}",
+                ctx.Messages.Format("NumericRangeHandlerBase_", fact.Tag.Tag, Expectation, consequence),
                 SuggestedFix: repair,
                 FixTitle: repair is null ? null : $"Apply the engine's own value: {repair}")
         ];

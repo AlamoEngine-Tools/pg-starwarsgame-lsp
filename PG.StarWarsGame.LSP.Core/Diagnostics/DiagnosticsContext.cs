@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -33,7 +34,14 @@ public record DiagnosticsContext(
     IReadOnlySet<string>? IconsAwaitingRepack = null,
     IModelTextureIndex? ModelTextures = null,
     IIconNameIndex? IconNames = null,
-    IEffectiveObjectSource? Objects = null);
+    IEffectiveObjectSource? Objects = null)
+{
+    /// <summary>
+    ///     The server's own texts in <see cref="Locale" />. English unless the pipeline says otherwise -
+    ///     which keeps a handler test that builds its own context reading the texts it always read.
+    /// </summary>
+    public IMessageCatalog Messages { get; init; } = ResxMessageCatalog.Server("en");
+}
 
 /// <summary>
 ///     Supplies the icons a workspace has drawn but not yet repacked.

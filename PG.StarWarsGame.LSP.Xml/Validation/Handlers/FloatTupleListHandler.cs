@@ -21,7 +21,8 @@ public sealed partial class FloatTupleListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid float tuple list for <{fact.Tag.Tag}>.", Id: DiagnosticIds.FloatTupleListEmpty)
+                    ctx.Messages.Format("FloatTupleList_IsNotAValidFloat", fact.Tag.Tag),
+                    Id: DiagnosticIds.FloatTupleListEmpty)
             ];
 
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
@@ -29,7 +30,7 @@ public sealed partial class FloatTupleListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid float tuple list for <{fact.Tag.Tag}>. Expected space/comma-separated floats.")
+                    ctx.Messages.Format("FloatTupleList_IsNotAValidFloat2", trimmed, fact.Tag.Tag))
             ];
 
         return [];

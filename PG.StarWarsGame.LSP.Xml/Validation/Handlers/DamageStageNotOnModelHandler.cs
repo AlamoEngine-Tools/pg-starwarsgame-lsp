@@ -35,8 +35,8 @@ public sealed class DamageStageNotOnModelHandler
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<Land_Damage_Alternates> declares damage {which}, but '{fact.ModelName}' {has}. "
-                + "The unit reaches that state and does not change.")
+                ctx.Messages.Format("DamageStageNotOnModel_LandDamageAlternatesDeclaresDamage", which, fact.ModelName,
+                    has))
         ];
     }
 }
