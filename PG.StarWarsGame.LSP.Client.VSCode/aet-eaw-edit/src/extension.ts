@@ -2458,14 +2458,17 @@ export async function activate(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.revalidateWorkspace",
             async () => {
-                const projectKey = await commandProjectKey();
-                if (projectKey === null) {
-                    return;
-                }
-                await gatewayFor(projectKey).executeCommand(
-                    "aet-eaw-edit.lsp.revalidateWorkspace",
-                    [],
-                    "could not revalidate the workspace",
+                // The workspace is the window: every project's server revalidates its own files.
+                // Asking one project left the others' diagnostics as they were (#167).
+                const keys = clients.size > 0 ? [...clients.keys()] : [""];
+                await Promise.all(
+                    keys.map((key) =>
+                        gatewayFor(key).executeCommand(
+                            "aet-eaw-edit.lsp.revalidateWorkspace",
+                            [],
+                            "could not revalidate the workspace",
+                        ),
+                    ),
                 );
             },
         ),
