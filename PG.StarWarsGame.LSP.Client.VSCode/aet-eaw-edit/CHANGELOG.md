@@ -30,6 +30,9 @@
     message no longer says "for you"
   - The Lua analyzers' messages - Lua 5.1 syntax, requires, task forces, pooled state, state machines,
     upvalues - come from the catalogue in the configured locale
+  - The story texts come from the catalogue: graph, chain and dialog diagnostics, the simulator's log,
+    the story editor's commands and refusals. A dialog command's argument count reads as one sentence
+    for any count, and the read-only layer message no longer addresses the reader
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none

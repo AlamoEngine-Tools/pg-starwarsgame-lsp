@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -28,7 +29,7 @@ public sealed class DialogCommandArityHandler : IDialogDiagnosticsHandler
         if (got < required)
         {
             yield return new DialogDiagnostic(XmlDiagnosticSeverity.Error,
-                $"'{command.Name}' expects {expected} argument(s), got {got}.",
+                new CatalogueText("DialogCommandArity_WrongCount", command.Name, expected, got),
                 command.Line, command.Column,
                 got > 0 ? EndOf(command.Args[^1]) : command.Column + command.RawName.Length);
         }
@@ -36,8 +37,8 @@ public sealed class DialogCommandArityHandler : IDialogDiagnosticsHandler
         {
             var firstExtra = command.Args[expected];
             var message = expected == 0
-                ? $"'{command.Name}' takes no arguments, got {got}."
-                : $"'{command.Name}' expects {expected} argument(s), got {got}.";
+                ? new CatalogueText("DialogCommandArity_TakesNone", command.Name, got)
+                : new CatalogueText("DialogCommandArity_WrongCount", command.Name, expected, got);
             yield return new DialogDiagnostic(XmlDiagnosticSeverity.Error, message,
                 firstExtra.Line, firstExtra.Column, EndOf(command.Args[^1]));
         }

@@ -18,9 +18,14 @@ public sealed record CatalogueText(string Key, params object?[] Args);
 /// <summary>Formats a <see cref="CatalogueText" />.</summary>
 public static class CatalogueTextExtensions
 {
-    /// <summary>The text for <paramref name="text" /> in the catalogue's language.</summary>
+    /// <summary>
+    ///     The text for <paramref name="text" /> in the catalogue's language. An argument that is itself
+    ///     a <see cref="CatalogueText" /> is formatted first, so a fragment such as a noun travels the
+    ///     same way as the message it sits in.
+    /// </summary>
     public static string Format(this IMessageCatalog messages, CatalogueText text)
     {
-        return messages.Format(text.Key, text.Args);
+        return messages.Format(text.Key,
+            text.Args.Select(a => a is CatalogueText inner ? messages.Format(inner) : a).ToArray());
     }
 }

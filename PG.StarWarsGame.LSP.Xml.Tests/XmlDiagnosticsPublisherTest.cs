@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -155,7 +156,7 @@ public sealed class XmlDiagnosticsPublisherTest
         store.Replace([
             new StoryChainProblem("Campaigns_Test.xml", "file:///a.xml", 2, 4, 2, 24,
                 StoryChainProblemKind.UnresolvedStoryName, "Story_Plots_Gone.xml",
-                "Story plot file 'Story_Plots_Gone.xml' does not exist in any project layer or the baseline.",
+                new CatalogueText("StoryChain_PlotFileMissing", "Story_Plots_Gone.xml"),
                 XmlDiagnosticSeverity.Error)
         ]);
         var (publisher, published, _, workspaceHost) = BuildSubscribed(storyChainProblems: store);
@@ -178,7 +179,7 @@ public sealed class XmlDiagnosticsPublisherTest
         var store = new StoryChainProblemStore();
         store.Replace([
             new StoryChainProblem("Campaigns_Other.xml", "file:///other.xml", 0, 0, 0, 5,
-                StoryChainProblemKind.UnresolvedStoryName, "X", "message",
+                StoryChainProblemKind.UnresolvedStoryName, "X", new CatalogueText("StoryChain_PlotFileMissing", "X"),
                 XmlDiagnosticSeverity.Error)
         ]);
         var (publisher, published, _, workspaceHost) = BuildSubscribed(storyChainProblems: store);

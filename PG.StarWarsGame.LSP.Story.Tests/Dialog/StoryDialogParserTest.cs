@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Story.Dialog;
 
 namespace PG.StarWarsGame.LSP.Story.Tests.Dialog;
@@ -115,7 +116,8 @@ public sealed class StoryDialogParserTest
 
         var problem = Assert.Single(doc.Problems);
         Assert.Equal(0, problem.Line);
-        Assert.Contains("chapter header", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("chapter header", ResxMessageCatalog.Server("en").Format(problem.Message),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -125,7 +127,8 @@ public sealed class StoryDialogParserTest
 
         var problem = Assert.Single(doc.Problems);
         Assert.Equal(0, problem.Line);
-        Assert.Contains("[CHAPTER", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("[CHAPTER", ResxMessageCatalog.Server("en").Format(problem.Message),
+            StringComparison.OrdinalIgnoreCase);
         Assert.Empty(doc.Chapters.SelectMany(c => c.Commands));
     }
 
@@ -136,7 +139,8 @@ public sealed class StoryDialogParserTest
 
         var problem = Assert.Single(doc.Problems);
         Assert.Equal(1, problem.Line);
-        Assert.Contains("already defined", problem.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("already defined", ResxMessageCatalog.Server("en").Format(problem.Message),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

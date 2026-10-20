@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Server.Story;
 using static PG.StarWarsGame.LSP.Server.Tests.Story.StoryCommandTestFixtures;
 
@@ -32,7 +33,7 @@ public sealed class PreviewStoryGraphHandlerTest
     {
         var result = await Handler(false).Handle(Preview(), CancellationToken.None);
 
-        Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
     }
 
     /// <summary>
@@ -44,7 +45,7 @@ public sealed class PreviewStoryGraphHandlerTest
     {
         var result = await Handler(storyEditing: false).Handle(Preview(), CancellationToken.None);
 
-        Assert.Equal(StoryEditingFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditingFeature.DisabledKey), result.Error);
     }
 
     [Fact]

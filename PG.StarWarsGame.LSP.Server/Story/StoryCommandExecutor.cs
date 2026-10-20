@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -55,7 +56,8 @@ internal sealed class StoryCommandExecutor(
     ISchemaProvider schema,
     IFileHelper fileHelper,
     IModProjectReloadService reloadService,
-    ILogger logger)
+    ILogger logger,
+    IMessageCatalog messages)
 {
     /// <summary>The skeleton for a newly created plot manifest file.</summary>
     private const string ManifestFileSkeleton =
@@ -84,7 +86,7 @@ internal sealed class StoryCommandExecutor(
             "createThread" or "deleteThread" or "setThreadState" or "attachLuaScript"
                 => ManifestOp(request, texts),
             "addPlotManifest" or "removePlotManifest" => CampaignOp(request, texts),
-            _ => (null, $"Unknown story command '{request.Kind}'.")
+            _ => (null, messages.Format("StoryCommand_UnknownStoryCommand", request.Kind))
         };
     }
 
@@ -118,7 +120,7 @@ internal sealed class StoryCommandExecutor(
         ExecuteStoryCommandParams request, StoryCampaignModel model, WorkingTextSet texts)
     {
         if (string.IsNullOrEmpty(request.ThreadUri))
-            return (null, "The command needs a threadUri.");
+            return (null, messages.Format("StoryCommand_CommandNeedsThreadUri"));
 
         var uri = fileHelper.NormalizeUri(request.ThreadUri);
         if (ReadOnlyLayerObjection(uri) is { } objection)
@@ -126,7 +128,7 @@ internal sealed class StoryCommandExecutor(
 
         var text = texts.GetText(uri);
         if (text is null)
-            return (null, $"'{uri}' is not readable.");
+            return (null, messages.Format("StoryCommand_NotReadable", uri));
 
         // Parse fresh: the model's ranges may predate unflushed edits; the writer's ranges must
         // match the exact text the edits will be applied to.
@@ -137,21 +139,21 @@ internal sealed class StoryCommandExecutor(
         if (request.Kind is "createEvent" or "createTacticalAttachment")
         {
             if (string.IsNullOrWhiteSpace(request.NewName))
-                return (null, $"{request.Kind} needs a newName.");
+                return (null, messages.Format("StoryCommand_NeedsNewName", request.Kind));
             if (model.Threads.SelectMany(t => t.Events).Any(e =>
                     string.Equals(e.Name, request.NewName, StringComparison.OrdinalIgnoreCase)))
-                return (null, $"'{request.NewName}' already names an event in campaign " +
-                              $"'{request.Campaign}' - event names resolve campaign-wide.");
+                return (null, messages.Format("StoryCommand_NameTakenCampaignWide", request.NewName,
+                    request.Campaign));
             if (request.Kind == "createTacticalAttachment")
             {
                 if (string.IsNullOrEmpty(request.File))
-                    return (null, "createTacticalAttachment needs the tactical manifest file.");
+                    return (null, messages.Format("StoryCommand_CreateTacticalAttachmentNeedsTacticalManifestFile"));
                 var eventType = string.Equals(request.Value, "space", StringComparison.OrdinalIgnoreCase)
                     ? "STORY_SPACE_TACTICAL"
                     : "STORY_LAND_TACTICAL";
                 edits = StoryXmlWriter.CreateEvent(text, thread, request.NewName!, eventType, null,
                     [("Event_Param1", request.File!)]);
-                label = $"Create tactical attachment '{request.NewName}'";
+                label = messages.Format("StoryCommand_CreateTacticalAttachment", request.NewName);
             }
             else
             {
@@ -164,7 +166,7 @@ internal sealed class StoryCommandExecutor(
                         extraTags.Add(($"Reward_Param{p.Position + 1}", p.Value));
                 edits = StoryXmlWriter.CreateEvent(text, thread, request.NewName!,
                     request.EventType, request.RewardType, extraTags.Count > 0 ? extraTags : null);
-                label = $"Create story event '{request.NewName}'";
+                label = messages.Format("StoryCommand_CreateStoryEvent", request.NewName);
             }
         }
         else
@@ -177,36 +179,36 @@ internal sealed class StoryCommandExecutor(
             {
                 case "deleteEvent":
                     edits = StoryXmlWriter.DeleteEvent(text, storyEvent);
-                    label = $"Delete story event '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_DeleteStoryEvent", storyEvent.Name);
                     break;
                 case "setEventType":
                     edits = StoryXmlWriter.SetTagValue(text, storyEvent, "Event_Type", request.Value);
-                    label = $"Set event type of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_SetEventType", storyEvent.Name);
                     break;
                 case "setRewardType":
                     edits = StoryXmlWriter.SetTagValue(text, storyEvent, "Reward_Type", request.Value);
-                    label = $"Set reward type of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_SetRewardType", storyEvent.Name);
                     break;
                 case "clearEventType":
                     edits = StoryXmlWriter.ClearTypeBlock(text, storyEvent, "Event");
-                    label = $"Remove the trigger of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_RemoveTrigger", storyEvent.Name);
                     break;
                 case "clearRewardType":
                     edits = StoryXmlWriter.ClearTypeBlock(text, storyEvent, "Reward");
-                    label = $"Remove the reward of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_RemoveReward", storyEvent.Name);
                     break;
                 case "setBranch":
                     edits = StoryXmlWriter.SetTagValue(text, storyEvent, "Branch", request.Value);
-                    label = $"Set branch of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_SetBranch", storyEvent.Name);
                     break;
                 case "setDialog":
                     edits = StoryXmlWriter.SetTagValue(text, storyEvent, "Story_Dialog", request.Value);
-                    label = $"Set dialog of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_SetDialog", storyEvent.Name);
                     break;
                 case "setPerpetual":
                     edits = StoryXmlWriter.SetTagValue(text, storyEvent, "Perpetual",
                         request.Flag == true ? "Yes" : null);
-                    label = $"Set perpetual of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_SetPerpetual", storyEvent.Name);
                     break;
                 case "setParams":
                 {
@@ -216,84 +218,89 @@ internal sealed class StoryCommandExecutor(
                         "REWARD" => "Reward_Param",
                         _ => null
                     };
-                    if (prefix is null) return (null, "setParams needs paramKind 'event' or 'reward'.");
-                    if (request.Params is not { Count: > 0 }) return (null, "setParams needs params.");
+                    if (prefix is null)
+                        return (null, messages.Format("StoryCommand_SetParamsNeedsParamKindEventReward"));
+                    if (request.Params is not { Count: > 0 })
+                        return (null, messages.Format("StoryCommand_SetParamsNeedsParams"));
                     edits = StoryXmlWriter.SetParams(text, storyEvent, prefix,
                         request.Params.Select(p => (p.Position, p.Value)).ToList());
-                    label = $"Set params of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_SetParams", storyEvent.Name);
                     break;
                 }
                 case "retargetControlEdge":
                 {
                     if (request.GroupIndex is not { } slot || string.IsNullOrEmpty(request.Token))
-                        return (null, "retargetControlEdge needs groupIndex (the reward slot) and token.");
+                        return (null, messages.Format("StoryCommand_RetargetControlEdgeNeedsGroupIndexRewardSlot"));
                     edits = StoryXmlWriter.SetParams(text, storyEvent, "Reward_Param", [(slot, request.Token)]);
-                    label = $"Retarget control edge of '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_RetargetControlEdge", storyEvent.Name);
                     break;
                 }
                 case "addPrereq":
-                    if (string.IsNullOrEmpty(request.Token)) return (null, "addPrereq needs a token.");
+                    if (string.IsNullOrEmpty(request.Token))
+                        return (null, messages.Format("StoryCommand_AddPrereqNeedsToken"));
                     edits = StoryXmlWriter.AddPrereq(text, storyEvent, request.GroupIndex, request.Token!);
-                    label = $"Add prereq to '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_AddPrereq", storyEvent.Name);
                     break;
                 case "addPrereqGroup":
-                    if (request.Tokens is not { Count: > 0 }) return (null, "addPrereqGroup needs tokens.");
+                    if (request.Tokens is not { Count: > 0 })
+                        return (null, messages.Format("StoryCommand_AddPrereqGroupNeedsTokens"));
                     edits = StoryXmlWriter.AddPrereqGroup(text, storyEvent, request.Tokens);
-                    label = $"Add prereq group to '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_AddPrereqGroup", storyEvent.Name);
                     break;
                 case "addPrereqAlternatives":
                     if (request.Tokens is not { Count: > 0 })
-                        return (null, "addPrereqAlternatives needs tokens.");
+                        return (null, messages.Format("StoryCommand_AddPrereqAlternativesNeedsTokens"));
                     edits = StoryXmlWriter.AddPrereqAlternatives(text, storyEvent, request.Tokens);
-                    label = $"Add prereq alternatives to '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_AddPrereqAlternatives", storyEvent.Name);
                     break;
                 case "removePrereq":
                 {
                     if (string.IsNullOrEmpty(request.Token))
-                        return (null, "removePrereq needs a token.");
+                        return (null, messages.Format("StoryCommand_RemovePrereqNeedsToken"));
                     if (request.GroupIndex is { } group)
                     {
                         if (group < 0 || group >= storyEvent.PrereqGroups.Count)
-                            return (null, $"'{storyEvent.Name}' has no prereq group {group}.");
+                            return (null, messages.Format("StoryCommand_HasNoPrereqGroup", storyEvent.Name, group));
                         if (!storyEvent.PrereqGroups[group].Tokens.Any(t =>
                                 string.Equals(t.Text, request.Token, StringComparison.OrdinalIgnoreCase)))
                             return (null,
-                                $"Prereq group {group} of '{storyEvent.Name}' has no token '{request.Token}'.");
+                                messages.Format("StoryCommand_PrereqGroupHasNoToken", group, storyEvent.Name,
+                                    request.Token));
                     }
                     else if (!storyEvent.PrereqGroups.Any(g => g.Tokens.Any(t =>
                                  string.Equals(t.Text, request.Token, StringComparison.OrdinalIgnoreCase))))
                     {
-                        return (null, $"'{storyEvent.Name}' has no prereq '{request.Token}'.");
+                        return (null, messages.Format("StoryCommand_HasNoPrereq", storyEvent.Name, request.Token));
                     }
 
                     // Without a group index (edge-removal gesture) the token goes from every line.
                     edits = StoryXmlWriter.RemovePrereq(text, storyEvent, request.GroupIndex, request.Token!);
-                    label = $"Remove prereq from '{storyEvent.Name}'";
+                    label = messages.Format("StoryCommand_RemovePrereqFrom", storyEvent.Name);
                     break;
                 }
                 default:
-                    return (null, $"Unknown story command '{request.Kind}'.");
+                    return (null, messages.Format("StoryCommand_UnknownStoryCommand", request.Kind));
             }
         }
 
         if (edits.Count == 0)
-            return (null, "The command produced no changes.");
+            return (null, messages.Format("StoryCommand_CommandProducedNoChanges"));
 
         return (new StoryCommandEdit([new StoryFileEdit(uri, edits)], label), null);
     }
 
-    private static (StoryEvent? Event, string? Error) LocateEvent(StoryThread thread, string? eventName)
+    private (StoryEvent? Event, string? Error) LocateEvent(StoryThread thread, string? eventName)
     {
         if (string.IsNullOrEmpty(eventName))
-            return (null, "The command needs an eventName.");
+            return (null, messages.Format("StoryCommand_CommandNeedsEventName"));
         var matches = thread.Events
             .Where(e => string.Equals(e.Name, eventName, StringComparison.OrdinalIgnoreCase))
             .ToList();
         return matches.Count switch
         {
-            0 => (null, $"Event '{eventName}' was not found in the thread."),
+            0 => (null, messages.Format("StoryCommand_EventWasNotFoundThread", eventName)),
             1 => (matches[0], null),
-            _ => (null, $"'{eventName}' names {matches.Count} events in this thread - fix the duplicate first.")
+            _ => (null, messages.Format("StoryCommand_NamesEventsThisThreadFix", eventName, matches.Count))
         };
     }
 
@@ -302,13 +309,13 @@ internal sealed class StoryCommandExecutor(
     private (StoryCommandEdit?, string?) ManifestOp(ExecuteStoryCommandParams request, WorkingTextSet texts)
     {
         if (string.IsNullOrEmpty(request.File))
-            return (null, "The command needs the plot manifest file.");
+            return (null, messages.Format("StoryCommand_CommandNeedsPlotManifestFile"));
         if (string.IsNullOrEmpty(request.Value))
-            return (null, "The command needs a value (thread file or script name).");
+            return (null, messages.Format("StoryCommand_CommandNeedsValueThreadFile"));
 
         var manifest = ResolveXmlRelative(request.File!, texts);
         if (manifest is null)
-            return (null, $"Plot manifest '{request.File}' was not found in the workspace.");
+            return (null, messages.Format("StoryCommand_PlotManifestWasNotFound", request.File));
         if (ReadOnlyLayerObjection(manifest.Value.Uri) is { } objection)
             return (null, objection);
 
@@ -326,38 +333,36 @@ internal sealed class StoryCommandExecutor(
                 if (texts.GetText(threadUri) is null)
                     files.Add(new StoryFileEdit(threadUri, [], StoryManifestWriter.ThreadFileSkeleton));
 
-                label = $"Create story thread '{request.Value}'";
+                label = messages.Format("StoryCommand_CreateStoryThread", request.Value);
                 break;
             }
             case "deleteThread":
                 edits = StoryManifestWriter.RemoveEntry(text, ["Active_Plot", "Suspended_Plot"], request.Value!);
                 if (edits.Count == 0)
-                    return (null, $"'{request.Value}' is not listed in '{request.File}'. " +
-                                  "The file itself is never deleted - remove it manually if intended.");
-                label = $"Detach story thread '{request.Value}'";
+                    return (null, messages.Format("StoryCommand_NotListedNeverDeleted", request.Value, request.File));
+                label = messages.Format("StoryCommand_DetachStoryThread", request.Value);
                 break;
             case "setThreadState":
             {
                 if (request.Flag is not { } suspended)
-                    return (null, "setThreadState needs flag (true = suspended).");
+                    return (null, messages.Format("StoryCommand_SetThreadStateNeedsFlagTrueSuspended"));
                 edits = StoryManifestWriter.RetagEntry(text, ["Active_Plot", "Suspended_Plot"],
                     request.Value!, suspended ? "Suspended_Plot" : "Active_Plot");
                 if (edits.Count == 0)
-                    return (null, $"'{request.Value}' is not listed in '{request.File}', " +
-                                  "or it is already in the requested state.");
-                label = $"Set thread state of '{request.Value}'";
+                    return (null, messages.Format("StoryCommand_NotListedOrAlready", request.Value, request.File));
+                label = messages.Format("StoryCommand_SetThreadState", request.Value);
                 break;
             }
             case "attachLuaScript":
                 edits = StoryManifestWriter.AddEntry(text, "Lua_Script", request.Value!);
-                label = $"Attach Lua script '{request.Value}'";
+                label = messages.Format("StoryCommand_AttachLuaScript", request.Value);
                 break;
             default:
-                return (null, $"Unknown story command '{request.Kind}'.");
+                return (null, messages.Format("StoryCommand_UnknownStoryCommand", request.Kind));
         }
 
         if (edits.Count == 0)
-            return (null, "The command produced no changes.");
+            return (null, messages.Format("StoryCommand_CommandProducedNoChanges"));
 
         files.Add(new StoryFileEdit(uri, edits));
         return (new StoryCommandEdit(files, label), null);
@@ -368,17 +373,17 @@ internal sealed class StoryCommandExecutor(
     private (StoryCommandEdit?, string?) CampaignOp(ExecuteStoryCommandParams request, WorkingTextSet texts)
     {
         if (string.IsNullOrEmpty(request.File))
-            return (null, "The command needs the plot manifest file.");
+            return (null, messages.Format("StoryCommand_CommandNeedsPlotManifestFile"));
 
         var chain = modelService.GetChainResult();
         var campaignChain = chain.Campaigns.FirstOrDefault(c =>
             string.Equals(c.Name, request.Campaign, StringComparison.OrdinalIgnoreCase));
         if (campaignChain is null || campaignChain.SourceFile.Length == 0)
-            return (null, $"The campaign set file declaring '{request.Campaign}' could not be located.");
+            return (null, messages.Format("StoryCommand_CampaignSetFileDeclaringCould", request.Campaign));
 
         var source = ResolveXmlRelative(campaignChain.SourceFile, texts);
         if (source is null)
-            return (null, $"'{campaignChain.SourceFile}' is not readable.");
+            return (null, messages.Format("StoryCommand_NotReadable", campaignChain.SourceFile));
         if (ReadOnlyLayerObjection(source.Value.Uri) is { } objection)
             return (null, objection);
 
@@ -389,25 +394,26 @@ internal sealed class StoryCommandExecutor(
         if (request.Kind == "addPlotManifest")
         {
             if (string.IsNullOrEmpty(request.TargetFaction))
-                return (null, "addPlotManifest needs the faction.");
+                return (null, messages.Format("StoryCommand_AddPlotManifestNeedsFaction"));
             edits = StoryManifestWriter.AddCampaignStoryName(
                 text, request.Campaign, request.TargetFaction!, request.File!);
             if (edits.Count == 0)
-                return (null, $"Campaign '{request.Campaign}' was not found in '{campaignChain.SourceFile}'.");
+                return (null,
+                    messages.Format("StoryCommand_CampaignWasNotFound", request.Campaign, campaignChain.SourceFile));
 
             var manifestPath = Path.Combine(Path.GetDirectoryName(path) ?? "", request.File!);
             var manifestUri = fileHelper.NormalizeUri(manifestPath);
             if (texts.GetText(manifestUri) is null)
                 files.Add(new StoryFileEdit(manifestUri, [], ManifestFileSkeleton));
 
-            label = $"Attach plot manifest '{request.File}'";
+            label = messages.Format("StoryCommand_AttachPlotManifest", request.File);
         }
         else
         {
             edits = StoryManifestWriter.RemoveCampaignStoryName(text, request.Campaign, request.File!);
             if (edits.Count == 0)
-                return (null, $"'{request.File}' is not attached to campaign '{request.Campaign}'.");
-            label = $"Detach plot manifest '{request.File}'";
+                return (null, messages.Format("StoryCommand_NotAttachedCampaign", request.File, request.Campaign));
+            label = messages.Format("StoryCommand_DetachPlotManifest", request.File);
         }
 
         files.Add(new StoryFileEdit(uri, edits));
@@ -436,7 +442,7 @@ internal sealed class StoryCommandExecutor(
         ExecuteStoryCommandParams request, StoryCampaignModel model, WorkingTextSet texts, bool composable)
     {
         if (string.IsNullOrEmpty(request.EventName) || string.IsNullOrWhiteSpace(request.NewName))
-            return (null, "renameEvent needs eventName and newName.");
+            return (null, messages.Format("StoryCommand_RenameEventNeedsEventNameNewName"));
 
         // In a batch (composable), always take the model-only path: it re-parses the working text so
         // its positions are correct after earlier commands, and it produces per-file XML edits that
@@ -457,9 +463,11 @@ internal sealed class StoryCommandExecutor(
         var edit = XmlObjectRenameBuilder.Build(
             request.EventName!, request.NewName!, index, schema, textSource, logger);
         if (edit is null)
-            return (null, $"'{request.EventName}' cannot be renamed (not owned by the project layer).");
+            return (null, messages.Format("StoryCommand_CannotBeRenamedNotOwned", request.EventName));
 
-        return (new StoryCommandEdit([], $"Rename story event '{request.EventName}'", PrebuiltEdit: edit), null);
+        return (
+            new StoryCommandEdit([], messages.Format("StoryCommand_RenameStoryEvent", request.EventName),
+                PrebuiltEdit: edit), null);
     }
 
     /// <summary>
@@ -499,13 +507,13 @@ internal sealed class StoryCommandExecutor(
         var definitionCount = allEvents.Count(e =>
             string.Equals(e.Name, oldName, StringComparison.OrdinalIgnoreCase));
         if (definitionCount == 0)
-            return (null, $"Event '{oldName}' was not found in campaign '{request.Campaign}'.");
+            return (null, messages.Format("StoryCommand_EventWasNotFoundCampaign", oldName, request.Campaign));
         if (definitionCount > 1)
-            return (null, $"'{oldName}' names {definitionCount} events in campaign '{request.Campaign}' - " +
-                          "rename is ambiguous. Disambiguate them first.");
+            return (null, messages.Format("StoryCommand_RenameAmbiguous", oldName, definitionCount,
+                request.Campaign));
         if (!string.Equals(oldName, newName, StringComparison.OrdinalIgnoreCase)
             && allEvents.Any(e => string.Equals(e.Name, newName, StringComparison.OrdinalIgnoreCase)))
-            return (null, $"'{newName}' already names an event in campaign '{request.Campaign}'.");
+            return (null, messages.Format("StoryCommand_AlreadyNamesEventCampaign", newName, request.Campaign));
 
         var definitionThread = threads.First(t =>
             t.Thread.Events.Any(e => string.Equals(e.Name, oldName, StringComparison.OrdinalIgnoreCase)));
@@ -556,7 +564,7 @@ internal sealed class StoryCommandExecutor(
         }
 
         if (byUri.Count == 0)
-            return (null, "The rename produced no changes.");
+            return (null, messages.Format("StoryCommand_RenameProducedNoChanges"));
 
         // Uses the `changes` map (not documentChanges): the versioned-identifier form is rejected by
         // the client for thread files that aren't open/tracked (mirrors XmlObjectRenameBuilder).
@@ -567,7 +575,7 @@ internal sealed class StoryCommandExecutor(
             logger.LogDebug("Rename '{Old}'->'{New}' in {Uri}: {Edits}", oldName, newName, file.Uri,
                 string.Join(", ", file.Edits.Select(e =>
                     $"[{e.Range.StartLine},{e.Range.StartColumn}-{e.Range.EndLine},{e.Range.EndColumn}]")));
-        return (new StoryCommandEdit(files, $"Rename story event '{oldName}'", true), null);
+        return (new StoryCommandEdit(files, messages.Format("StoryCommand_RenameStoryEvent", oldName), true), null);
     }
 
     // ── Shared ───────────────────────────────────────────────────────────────
@@ -578,9 +586,8 @@ internal sealed class StoryCommandExecutor(
         if (!index.Documents.TryGetValue(uri, out var doc)) return null;
         var leaf = index.LeafLayerRank;
         if (leaf <= 0 || doc.LayerRank >= leaf) return null;
-        var layer = doc.LayerName ?? "a dependency";
-        return $"'{uri}' belongs to {layer}, which is read-only. " +
-               "Copy the file into your project's xml directory to override it, then edit the copy.";
+        var layer = doc.LayerName ?? messages.Format("StoryCommand_ADependency");
+        return messages.Format("StoryCommand_ReadOnlyLayer", uri, layer);
     }
 
     // ── Workspace-edit construction ──────────────────────────────────────────

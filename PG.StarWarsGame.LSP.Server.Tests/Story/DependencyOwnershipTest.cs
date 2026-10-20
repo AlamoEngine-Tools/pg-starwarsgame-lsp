@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Story;
 
@@ -49,7 +50,7 @@ public sealed class DependencyOwnershipTest
         var rejection = DependencyOwnership.Rejection(Layered(), CoreDir + "/data/xml/core_story.xml");
 
         Assert.NotNull(rejection);
-        Assert.Contains("EaWX Core", rejection);
+        Assert.Contains("EaWX Core", ResxMessageCatalog.Server("en").Format(rejection!));
     }
 
     /// <summary>A file URI is the shape the client actually sends.</summary>

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Story.Model;
@@ -39,7 +40,7 @@ public static class StoryThreadParser
             if (string.IsNullOrEmpty(name))
             {
                 problems.Add(new StoryParseProblem(RangeAt(document, node.StreamPosition, "<Event".Length),
-                    "Event without a Name attribute - the block is not addressable and was skipped."));
+                    new CatalogueText("StoryThread_EventWithoutName")));
                 continue;
             }
 

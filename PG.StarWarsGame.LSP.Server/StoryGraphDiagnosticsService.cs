@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Graph;
 
@@ -24,11 +25,12 @@ public sealed class StoryGraphDiagnosticsService : IStoryGraphDiagnosticsSource
     public StoryGraphDiagnosticsService(
         IStoryModelService modelService,
         ISchemaProvider schema,
-        ILspConfigurationProvider configProvider)
+        ILspConfigurationProvider configProvider,
+        IMessageCatalog messages)
     {
         _modelService = modelService;
         _configProvider = configProvider;
-        _producer = new StoryGraphDiagnosticsProducer(schema);
+        _producer = new StoryGraphDiagnosticsProducer(schema, messages);
     }
 
     public IReadOnlyList<StoryGraphDiagnostic> GetForDocument(string canonicalUri)

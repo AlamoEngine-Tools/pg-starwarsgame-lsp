@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -47,18 +48,19 @@ public sealed class ValidateStoryCommandBatchHandler(
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
-                $"Campaign '{request.Campaign}' was not found."));
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService,
-            NullLogger.Instance);
+            NullLogger.Instance, new ConfiguredMessageCatalog(config));
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, composeError) = executor.Compose(
             model, request.Commands.Select(c => c.ToParams(request.Campaign, request.Faction)).ToList(), texts);
         if (composeError is not null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
-                $"Change {(failedIndex ?? 0) + 1} of {request.Commands.Count} can't be staged: {composeError}"));
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_ChangeCanTBeStaged", (failedIndex ?? 0) + 1,
+                    request.Commands.Count, composeError)));
 
         // Validate every thread the campaign knows about (reading its staged text where present),
         // plus any new thread the batch created that already has events.

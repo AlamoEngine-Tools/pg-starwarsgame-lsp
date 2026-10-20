@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
@@ -17,7 +18,8 @@ public sealed class StoryGraphDiagnosticsServiceTest
     {
         var config = FakeLspConfigurationProvider.WithFeatures(
             new FeatureFlags { Story = new StoryFeatureFlags { GraphDiagnostics = flagOn } });
-        return new StoryGraphDiagnosticsService(new StubModelService(), new EmptySchema(), config);
+        return new StoryGraphDiagnosticsService(new StubModelService(), new EmptySchema(), config,
+            ResxMessageCatalog.Server("en"));
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
@@ -26,13 +27,12 @@ public static class DependencyOwnership
     /// <summary>
     ///     Null when <paramref name="documentUri" /> may be edited; otherwise why it may not.
     /// </summary>
-    public static string? Rejection(WorkspaceConfiguration? workspace, string? documentUri)
+    public static CatalogueText? Rejection(WorkspaceConfiguration? workspace, string? documentUri)
     {
         var owner = ReadOnlyOwner(workspace, documentUri);
         if (owner is null) return null;
 
-        return $"'{owner}' is a referenced project and is read-only here. "
-               + $"Edit this thread in '{owner}' itself.";
+        return new CatalogueText("DependencyOwnership_ReadOnly", owner);
     }
 
     /// <summary>

@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.Globalization;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -134,6 +135,7 @@ public sealed partial class StorySimulator
     private readonly IReadOnlyList<StoryNode> _eventNodes;
     private readonly Dictionary<(string Type, int Position), string> _eventParamTypes;
     private readonly Dictionary<string, List<StoryNode>> _eventsByName;
+    private readonly IMessageCatalog _messages;
     private readonly StoryCampaignModel _model;
     private readonly Dictionary<string, StoryNode> _nodesById;
     private readonly Dictionary<string, List<List<string>>> _prereqLinesById;
@@ -149,9 +151,10 @@ public sealed partial class StorySimulator
     ///     ever run there, so a session arms one scope's events and never the other's.
     /// </summary>
     public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols? symbols = null,
-        string? scope = null, StorySimOptions? options = null)
+        string? scope = null, StorySimOptions? options = null, IMessageCatalog? messages = null)
     {
         _model = model;
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _symbols = symbols;
         Options = options ?? StorySimOptions.Default;
         Scope = StoryGraphScoper.IsGalactic(scope) ? null : StoryGraphScoper.BattleKey(scope!);
@@ -207,7 +210,7 @@ public sealed partial class StorySimulator
                     else
                     {
                         _startupNotes.Add(
-                            $"Prereq '{token.Text}' of '{node.Event.Name}' is not in its thread - the engine drops it from the line.");
+                            _messages.Format("StorySim_PrereqNotItsThreadEngine", token.Text, node.Event.Name));
                     }
                 }
 
@@ -277,7 +280,9 @@ public sealed partial class StorySimulator
                 World = world ?? SeedWorld(_model.Seed),
                 Flags = flags ?? StoryRuntimeState.Initial.Flags
             },
-            Log = ImmutableList.Create(Scope is null ? "Simulation started" : $"Battle {Scope} started")
+            Log = ImmutableList.Create(Scope is null
+                    ? _messages.Format("StorySim_SimulationStarted")
+                    : _messages.Format("StorySim_BattleStarted", Scope))
                 .AddRange(_startupNotes)
         };
 
@@ -365,10 +370,10 @@ public sealed partial class StorySimulator
     {
         snapshot = RunTransitions(snapshot with { HaltedAt = null });
         if (!_nodesById.TryGetValue(nodeId, out var node))
-            return snapshot with { Log = snapshot.Log.Add($"Unknown event node '{nodeId}'.") };
+            return snapshot with { Log = snapshot.Log.Add(_messages.Format("StorySim_UnknownEventNode", nodeId)) };
         if (!IsActive(node, snapshot.Runtime))
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                $"'{node.Event!.Name}' is not armed - trigger ignored.");
+                _messages.Format("StorySim_NotArmedTriggerIgnored", node.Event!.Name));
 
         return Fire(snapshot, node, StorySimCause.Manual, null, 0);
     }
@@ -382,18 +387,22 @@ public sealed partial class StorySimulator
     {
         snapshot = snapshot with { HaltedAt = null };
         if (!_nodesById.TryGetValue(nodeId, out var node))
-            return snapshot with { Log = snapshot.Log.Add($"Unknown event node '{nodeId}'") };
+            return snapshot with { Log = snapshot.Log.Add(_messages.Format("StorySim_UnknownEventNode", nodeId)) };
         var name = node.Event!.Name;
         if (ruledOut == snapshot.Runtime.RuledOut.Contains(nodeId))
             return Note(snapshot, nodeId, null, StorySimCause.Ignored,
-                ruledOut ? $"'{name}' is already ruled out" : $"'{name}' is not ruled out");
+                ruledOut
+                    ? _messages.Format("StorySim_AlreadyRuledOut", name)
+                    : _messages.Format("StorySim_NotRuledOut", name));
         var runtime = snapshot.Runtime with
         {
             RuledOut = ruledOut ? snapshot.Runtime.RuledOut.Add(nodeId) : snapshot.Runtime.RuledOut.Remove(nodeId)
         };
         return Note(snapshot with { Runtime = runtime }, nodeId, null,
             ruledOut ? StorySimCause.RuledOut : StorySimCause.Reconsidered,
-            ruledOut ? $"'{name}' ruled out - armed, no decision" : $"'{name}' reconsidered - a decision again");
+            ruledOut
+                ? _messages.Format("StorySim_RuledOutArmedNoDecision", name)
+                : _messages.Format("StorySim_ReconsideredDecisionAgain", name));
     }
 
     public StorySimSnapshot SetFlag(StorySimSnapshot snapshot, string flag, int value)
@@ -402,7 +411,7 @@ public sealed partial class StorySimulator
         {
             HaltedAt = null,
             Runtime = snapshot.Runtime.WithFlag(flag, value),
-            Log = snapshot.Log.Add($"Flag {flag} = {value}.")
+            Log = snapshot.Log.Add(_messages.Format("StorySim_Flag", flag, value))
         };
     }
 
@@ -411,7 +420,7 @@ public sealed partial class StorySimulator
     {
         snapshot = RunTransitions(snapshot with
         {
-            HaltedAt = null, Log = snapshot.Log.Add($"Lua Story_Event(\"{notificationId}\").")
+            HaltedAt = null, Log = snapshot.Log.Add(_messages.Format("StorySim_LuaStoryEvent", notificationId))
         });
         var fired = false;
         foreach (var node in _eventNodes)
@@ -426,7 +435,10 @@ public sealed partial class StorySimulator
         }
 
         if (!fired)
-            snapshot = snapshot with { Log = snapshot.Log.Add($"No armed event listens for '{notificationId}'.") };
+            snapshot = snapshot with
+            {
+                Log = snapshot.Log.Add(_messages.Format("StorySim_NoArmedEventListens", notificationId))
+            };
         return snapshot;
     }
 
@@ -560,9 +572,9 @@ public sealed partial class StorySimulator
                 var rawTarget = storyEvent.EventParams.FirstOrDefault(p => p.Position == 1)?.RawValue;
                 var target = int.TryParse(rawTarget, out var parsed) ? parsed : 0;
                 if (!snapshot.Runtime.Flags.TryGetValue(flag, out var value))
-                    return new StorySimGate($"{flag} unset", 0);
+                    return new StorySimGate(_messages.Format("StorySim_Unset", flag), 0);
                 var progress = target <= 0 ? value == target ? 1 : 0 : Math.Clamp((double)value / target, 0, 1);
-                return new StorySimGate($"{flag} {value} of {target}", progress);
+                return new StorySimGate(_messages.Format("StorySim_FlagProgress", flag, value, target), progress);
             }
             default:
                 return null;
@@ -581,8 +593,9 @@ public sealed partial class StorySimulator
             Clock = snapshot.Clock + ClockStepSeconds,
             GameplayClock = paused ? snapshot.GameplayClock : snapshot.GameplayClock + ClockStepSeconds,
             Log = snapshot.Log.Add(paused
-                ? $"Tick {snapshot.Tick + 1} ({snapshot.Clock + ClockStepSeconds:0.##}s, gameplay paused for the battle)"
-                : $"Tick {snapshot.Tick + 1} ({snapshot.Clock + ClockStepSeconds:0.##}s)")
+                ? _messages.Format("StorySim_TickSGameplayPausedBattle", snapshot.Tick + 1,
+                    snapshot.Clock + ClockStepSeconds)
+                : _messages.Format("StorySim_TickS", snapshot.Tick + 1, snapshot.Clock + ClockStepSeconds))
         };
         snapshot = DispatchCompletions(snapshot);
         snapshot = ServiceScripts(snapshot);
@@ -596,7 +609,7 @@ public sealed partial class StorySimulator
         if (hit is null) return snapshot;
 
         snapshot = Note(snapshot, hit.NodeId, null, StorySimCause.Breakpoint,
-            $"Halted at '{EventNameOf(hit.NodeId)}'.");
+            _messages.Format("StorySim_HaltedAt", EventNameOf(hit.NodeId)));
         return snapshot with { HaltedAt = hit.NodeId };
     }
 
@@ -714,10 +727,10 @@ public sealed partial class StorySimulator
         var storyEvent = node.Event!;
         if (depth > MaxFireDepth)
             return Note(snapshot, node.Id, sourceId, StorySimCause.Ignored,
-                $"'{storyEvent.Name}' not fired - trigger chain deeper than {MaxFireDepth}.");
+                _messages.Format("StorySim_NotFiredTriggerChainDeeper", storyEvent.Name, MaxFireDepth));
         if (snapshot.Runtime.DisabledEvents.Contains(node.Id))
             return Note(snapshot, node.Id, sourceId, StorySimCause.Ignored,
-                $"'{storyEvent.Name}' is disabled - fire swallowed.");
+                _messages.Format("StorySim_DisabledFireSwallowed", storyEvent.Name));
 
         // Measured order: the plot's Lua script hears Story_Event_Trigger before the event's own
         // Triggered flag and reward.
@@ -725,7 +738,8 @@ public sealed partial class StorySimulator
 
         // The fire step always lands on Fired, even for a perpetual event whose lifecycle reads
         // Armed again the moment it re-arms: the engine sets Triggered here and clears it later.
-        snapshot = Transition(snapshot, node, sourceId, cause, $"Fired '{storyEvent.Name}' ({cause}).",
+        snapshot = Transition(snapshot, node, sourceId, cause,
+            _messages.Format("StorySim_Fired", storyEvent.Name, cause),
             r => r.WithFired(node.Id) with { RuledOut = r.RuledOut.Remove(node.Id) }, StoryEventLifecycle.Fired);
         snapshot = GiveReward(snapshot, node, depth);
 
@@ -756,7 +770,8 @@ public sealed partial class StorySimulator
         var lines = _prereqLinesById[node.Id];
         if (!lines.Any(line => line.All(runtime.FiredEvents.Contains))) return snapshot;
 
-        snapshot = Transition(snapshot, node, sourceId, StorySimCause.Prereq, $"  -> armed '{node.Event!.Name}'.",
+        snapshot = Transition(snapshot, node, sourceId, StorySimCause.Prereq,
+            "  -> " + _messages.Format("StorySim_Armed", node.Event!.Name),
             r => r.WithArmed(node.Id, snapshot.GameplayClock));
         return IsStoryTrigger(node.Event) ? Fire(snapshot, node, StorySimCause.Prereq, sourceId, depth) : snapshot;
     }
@@ -808,7 +823,7 @@ public sealed partial class StorySimulator
                     _ => 1
                 };
                 snapshot = Note(snapshot with { Runtime = snapshot.Runtime.WithFlag(flag, value) },
-                    node.Id, null, StorySimCause.Flag, $"  -> flag {flag} = {value}.");
+                    node.Id, null, StorySimCause.Flag, "  -> " + _messages.Format("StorySim_Flag2", flag, value));
             }
         }
 
@@ -816,7 +831,7 @@ public sealed partial class StorySimulator
     }
 
     // STORY_ELEMENT activates a suspended thread (param = thread name sans .xml).
-    private static StorySimSnapshot ActivateThread(StorySimSnapshot snapshot, StoryNode node)
+    private StorySimSnapshot ActivateThread(StorySimSnapshot snapshot, StoryNode node)
     {
         var element = Param(node.Event!, 0);
         if (element is null) return snapshot;
@@ -832,7 +847,7 @@ public sealed partial class StorySimulator
                     SuspendedThreads = snapshot.Runtime.SuspendedThreads.Remove(match)
                 }
             },
-            node.Id, null, StorySimCause.Thread, $"  -> activated thread '{element}'.");
+            node.Id, null, StorySimCause.Thread, "  -> " + _messages.Format("StorySim_ActivatedThread", element));
     }
 
     // Measured: Trigger_Event(name) runs Event_Triggered on the named event in EVERY subplot,
@@ -842,10 +857,10 @@ public sealed partial class StorySimulator
         var name = Param(node.Event!, 0);
         if (name is null)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                "  -> TRIGGER_EVENT ignored - missing parameter.");
+                "  -> " + _messages.Format("StorySim_TRIGGEREVENTIgnoredMissingParameter"));
         if (!_eventsByName.TryGetValue(name, out var targets))
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                $"  -> TRIGGER_EVENT: no event named '{name}'.");
+                "  -> " + _messages.Format("StorySim_TRIGGEREVENTNoEventNamed", name));
         foreach (var target in targets)
             snapshot = Fire(snapshot, target, StorySimCause.Trigger, node.Id, depth + 1);
         return snapshot;
@@ -867,12 +882,12 @@ public sealed partial class StorySimulator
             if (target is null)
             {
                 snapshot = Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                    $"  -> RESET_EVENT: no event '{name}' in this thread.");
+                    "  -> " + _messages.Format("StorySim_RESETEVENTNoEventThis", name));
                 continue;
             }
 
             snapshot = Transition(snapshot, target, node.Id, StorySimCause.Reset,
-                $"  -> reset '{target.Event!.Name}'.", r => ClearTriggered(r, target));
+                "  -> " + _messages.Format("StorySim_Reset", target.Event!.Name), r => ClearTriggered(r, target));
         }
 
         return snapshot;
@@ -887,19 +902,20 @@ public sealed partial class StorySimulator
         var branch = Param(storyEvent, 0);
         if (branch is null)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                "  -> RESET_BRANCH ignored - missing parameter.");
+                "  -> " + _messages.Format("StorySim_RESETBRANCHIgnoredMissingParameter"));
 
         var members = BranchMembers(node, branch);
         foreach (var member in members)
             snapshot = Transition(snapshot, member, node.Id, StorySimCause.Reset,
-                $"  -> reset '{member.Event!.Name}' (branch '{branch}').", r => ClearTriggered(r, member));
+                "  -> " + _messages.Format("StorySim_ResetBranch", member.Event!.Name, branch),
+                r => ClearTriggered(r, member));
         foreach (var member in members) snapshot = ParentTriggered(snapshot, member, node.Id, depth + 1);
 
         if (Param(storyEvent, 1) is not { } named) return snapshot;
         var target = SameThreadEvent(node, named);
         if (target is null)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                $"  -> RESET_BRANCH: no event '{named}' in this thread.");
+                "  -> " + _messages.Format("StorySim_RESETBRANCHNoEventThis", named));
         return Fire(snapshot, target, StorySimCause.Trigger, node.Id, depth + 1);
     }
 
@@ -912,7 +928,7 @@ public sealed partial class StorySimulator
         var flag = Param(storyEvent, 1);
         if (name is null || flag is null)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                "  -> DISABLE_STORY_EVENT ignored - missing parameter.");
+                "  -> " + _messages.Format("StorySim_DISABLESTORYEVENTIgnoredMissing"));
 
         var disable = ParseInt(flag) != 0;
         var everywhere = ParseInt(Param(storyEvent, 2)) != 0;
@@ -923,7 +939,7 @@ public sealed partial class StorySimulator
                 : [];
         if (targets.Count == 0)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                $"  -> DISABLE_STORY_EVENT: no event named '{name}'.");
+                "  -> " + _messages.Format("StorySim_DISABLESTORYEVENTNoEvent", name));
 
         foreach (var target in targets) snapshot = SetDisabled(snapshot, target, node.Id, disable);
         return snapshot;
@@ -937,7 +953,7 @@ public sealed partial class StorySimulator
         var flag = Param(storyEvent, 1);
         if (branch is null || flag is null)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                "  -> DISABLE_BRANCH ignored - missing parameter.");
+                "  -> " + _messages.Format("StorySim_DISABLEBRANCHIgnoredMissingParameter"));
 
         var disable = ParseInt(flag) != 0;
         foreach (var member in BranchMembers(node, branch)) snapshot = SetDisabled(snapshot, member, node.Id, disable);
@@ -947,9 +963,11 @@ public sealed partial class StorySimulator
     private StorySimSnapshot SetDisabled(StorySimSnapshot snapshot, StoryNode target, string sourceId, bool disable)
     {
         return disable
-            ? Transition(snapshot, target, sourceId, StorySimCause.Disable, $"  -> disabled '{target.Event!.Name}'.",
+            ? Transition(snapshot, target, sourceId, StorySimCause.Disable,
+                "  -> " + _messages.Format("StorySim_Disabled", target.Event!.Name),
                 r => r.WithDisabled(target.Id))
-            : Transition(snapshot, target, sourceId, StorySimCause.Enable, $"  -> enabled '{target.Event!.Name}'.",
+            : Transition(snapshot, target, sourceId, StorySimCause.Enable,
+                "  -> " + _messages.Format("StorySim_Enabled", target.Event!.Name),
                 r => r.WithEnabled(target.Id));
     }
 
@@ -970,8 +988,8 @@ public sealed partial class StorySimulator
             Runtime = snapshot.Runtime.WithCompletionPending(doneType + "|" + name.ToUpperInvariant() + "|" + node.Id)
         };
         return Options.AssumeMediaCompletes
-            ? Note(snapshot, node.Id, null, cause, $"  -> {doneType} '{name}' owed on the next tick.")
-            : Note(snapshot, node.Id, null, cause, $"  -> {doneType} '{name}' left to the author.");
+            ? Note(snapshot, node.Id, null, cause, "  -> " + _messages.Format("StorySim_OwedNextTick", doneType, name))
+            : Note(snapshot, node.Id, null, cause, "  -> " + _messages.Format("StorySim_LeftAuthor", doneType, name));
     }
 
     /// <summary>

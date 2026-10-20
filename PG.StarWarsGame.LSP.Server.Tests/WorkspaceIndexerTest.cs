@@ -9,6 +9,7 @@ using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -385,7 +386,7 @@ public sealed class WorkspaceIndexerTest
         var store = new StoryChainProblemStore();
         store.Replace([
             new StoryChainProblem("Campaigns_Old.xml", "file:///stale", 0, 0, 0, 1,
-                StoryChainProblemKind.UnresolvedStoryName, "X", "stale", XmlDiagnosticSeverity.Error)
+                StoryChainProblemKind.UnresolvedStoryName, "X", new CatalogueText("stale"), XmlDiagnosticSeverity.Error)
         ]);
         var config = FakeLspConfigurationProvider.WithFeatures(
             new FeatureFlags { Story = new StoryFeatureFlags { Discovery = false } });

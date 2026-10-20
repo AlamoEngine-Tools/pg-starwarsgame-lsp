@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -24,7 +25,7 @@ public sealed record DialogCommandFact(
 /// </param>
 public sealed record DialogDiagnostic(
     XmlDiagnosticSeverity Severity,
-    string Message,
+    CatalogueText Message,
     int Line,
     int Column,
     int EndColumn,

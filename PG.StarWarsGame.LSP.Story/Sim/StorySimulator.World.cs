@@ -56,14 +56,14 @@ public sealed partial class StorySimulator
         snapshot = RunTransitions(snapshot with { HaltedAt = null });
         if (change.Kind == StoryWorldChangeKind.AssumeMet)
             return change.NodeId is null
-                ? Note(snapshot, "", null, StorySimCause.Ignored, "AssumeMet needs an event.")
+                ? Note(snapshot, "", null, StorySimCause.Ignored, _messages.Format("StorySimWorld_AssumeMetNeedsEvent"))
                 : SatisfyTrigger(snapshot, change.NodeId);
 
         change = change with { Faction = change.Faction ?? _model.Faction };
         var unknown = UnknownName(change);
         if (unknown is not null)
             return Note(snapshot, "", null, StorySimCause.Ignored,
-                $"{Describe(change)} ignored - '{unknown}' is not a known name.");
+                _messages.Format("StorySimWorld_IgnoredNotKnownName", Describe(change), unknown));
 
         snapshot = WriteFacts(snapshot, change);
         return Dispatch(snapshot, change, 0);
@@ -109,37 +109,46 @@ public sealed partial class StorySimulator
         return null;
     }
 
-    private static string Describe(StoryWorldChange change)
+    private string Describe(StoryWorldChange change)
     {
         var what = change.Kind switch
         {
-            StoryWorldChangeKind.CapturePlanet => $"{change.Faction} captures {change.Planet}",
+            StoryWorldChangeKind.CapturePlanet => _messages.Format("StorySimWorld_Captures", change.Faction,
+                change.Planet),
             StoryWorldChangeKind.BuildUnit =>
-                $"{change.Faction} builds {change.Amount} x {change.UnitType} at {change.Planet ?? "?"}",
-            StoryWorldChangeKind.DestroyUnit => $"{change.Amount} x {change.UnitType} of {change.Faction} destroyed",
-            StoryWorldChangeKind.CaptureUnit => $"{change.Faction} captures {change.UnitType}",
-            StoryWorldChangeKind.DestroyAll => $"all {change.UnitType ?? "units"} of {change.Faction} destroyed",
-            StoryWorldChangeKind.SetTech => $"{change.Faction} tech level {change.Amount}",
-            StoryWorldChangeKind.AddCredits => $"{change.Faction} credits {change.Amount:+#;-#;0}",
-            StoryWorldChangeKind.BattleWon => $"{change.Faction} wins at {change.Planet ?? "?"}",
-            StoryWorldChangeKind.BattleLost => $"{change.Faction} loses at {change.Planet ?? "?"}",
-            StoryWorldChangeKind.BattleStarted => $"{change.Mode ?? "a"} battle starts at {change.Planet ?? "?"}",
-            StoryWorldChangeKind.EnterPlanet => $"{change.Faction} enters {change.Planet}",
-            StoryWorldChangeKind.Bounced => $"{change.Faction} bounced at {change.Planet}",
-            StoryWorldChangeKind.MoveUnit => $"{change.UnitType} moves to {change.Planet}",
-            StoryWorldChangeKind.ClickGui => $"GUI {change.Name} clicked",
-            StoryWorldChangeKind.SelectPlanet => $"{change.Planet} selected",
-            StoryWorldChangeKind.Corrupt => $"{change.Planet} corrupted",
-            StoryWorldChangeKind.BeginEra => $"era {change.Amount} begins",
-            StoryWorldChangeKind.PlanetDestroyed => $"{change.Planet} destroyed",
-            StoryWorldChangeKind.Generic => $"generic {change.Name}",
+                _messages.Format("StorySimWorld_BuildsXAt", change.Faction, change.Amount, change.UnitType,
+                    change.Planet ?? "?"),
+            StoryWorldChangeKind.DestroyUnit => _messages.Format("StorySimWorld_XDestroyed", change.Amount,
+                change.UnitType, change.Faction),
+            StoryWorldChangeKind.CaptureUnit => _messages.Format("StorySimWorld_Captures", change.Faction,
+                change.UnitType),
+            StoryWorldChangeKind.DestroyAll => _messages.Format("StorySimWorld_AllDestroyed",
+                change.UnitType ?? _messages.Format("StorySimWorld_Units"), change.Faction),
+            StoryWorldChangeKind.SetTech => _messages.Format("StorySimWorld_TechLevel", change.Faction, change.Amount),
+            StoryWorldChangeKind.AddCredits => _messages.Format("StorySimWorld_Credits", change.Faction, change.Amount),
+            StoryWorldChangeKind.BattleWon => _messages.Format("StorySimWorld_WinsAt", change.Faction,
+                change.Planet ?? "?"),
+            StoryWorldChangeKind.BattleLost => _messages.Format("StorySimWorld_LosesAt", change.Faction,
+                change.Planet ?? "?"),
+            StoryWorldChangeKind.BattleStarted => change.Mode is null
+                ? _messages.Format("StorySimWorld_ABattleStartsAt", change.Planet ?? "?")
+                : _messages.Format("StorySimWorld_BattleStartsAt", change.Mode, change.Planet ?? "?"),
+            StoryWorldChangeKind.EnterPlanet => _messages.Format("StorySimWorld_Enters", change.Faction, change.Planet),
+            StoryWorldChangeKind.Bounced => _messages.Format("StorySimWorld_BouncedAt", change.Faction, change.Planet),
+            StoryWorldChangeKind.MoveUnit => _messages.Format("StorySimWorld_Moves", change.UnitType, change.Planet),
+            StoryWorldChangeKind.ClickGui => _messages.Format("StorySimWorld_GUIClicked", change.Name),
+            StoryWorldChangeKind.SelectPlanet => _messages.Format("StorySimWorld_Selected", change.Planet),
+            StoryWorldChangeKind.Corrupt => _messages.Format("StorySimWorld_Corrupted", change.Planet),
+            StoryWorldChangeKind.BeginEra => _messages.Format("StorySimWorld_EraBegins", change.Amount),
+            StoryWorldChangeKind.PlanetDestroyed => _messages.Format("StorySimWorld_Destroyed", change.Planet),
+            StoryWorldChangeKind.Generic => _messages.Format("StorySimWorld_Generic", change.Name),
             _ => change.Kind
         };
-        return "World: " + what;
+        return _messages.Format("StorySimWorld_World", what);
     }
 
     /// <summary>The fact writes of a change. Nothing here reasons about the game; it records what the author said.</summary>
-    private static StorySimSnapshot WriteFacts(StorySimSnapshot snapshot, StoryWorldChange change)
+    private StorySimSnapshot WriteFacts(StorySimSnapshot snapshot, StoryWorldChange change)
     {
         var world = snapshot.Runtime.World;
         var faction = change.Faction!;
@@ -585,7 +594,8 @@ public sealed partial class StorySimulator
                 // The dialog is up until its Continue button raises Continue_Tutorial; that
                 // generic is answerable only meanwhile (StoryWorld.TutorialDialog).
                 return Fact(snapshot, node, world with { TutorialDialog = text },
-                    $"  -> tutorial dialog {text} up - Continue raises {StoryGraphBuilder.ContinueTutorialGeneric}.");
+                    "  -> " + _messages.Format("StorySimWorld_TutorialDialogUpContinueRaises", text,
+                        StoryGraphBuilder.ContinueTutorialGeneric));
             case "FORCE_CLICK_GUI" when Param(storyEvent, 0) is { } component:
             {
                 // Measured: the reward presses the named command-bar component's release handler
@@ -596,14 +606,15 @@ public sealed partial class StorySimulator
                 if (choice is not null && world.PendingBattle is { } pending && world.PendingBattleChoice is null)
                     return Fact(snapshot, node, world.WithPendingBattle(pending, choice),
                         choice == StoryBattleChoice.Fight
-                            ? $"  -> {component} pressed: the battle {pending} begins."
-                            : $"  -> {component} pressed: {pending} is auto-resolved - decide its outcome.");
+                            ? "  -> " + _messages.Format("StorySimWorld_PressedBattleBegins", component, pending)
+                            : "  -> " + _messages.Format("StorySimWorld_PressedAutoResolvedDecideIts", component,
+                                pending));
                 return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                    $"  -> FORCE_CLICK_GUI {component}: pressed in the game; no listener hears a forced click.");
+                    "  -> " + _messages.Format("StorySimWorld_FORCECLICKGUIPressedGame", component));
             }
             case "PLANET_FACTION" when Param(storyEvent, 0) is { } planet && Param(storyEvent, 1) is { } faction:
                 return Fact(snapshot, node, world.WithPlanetOwner(planet, faction),
-                    $"  -> {planet} now belongs to {faction}.");
+                    "  -> " + _messages.Format("StorySimWorld_NowBelongs", planet, faction));
             case "CHANGE_OWNER" when Param(storyEvent, 0) is { } type && Param(storyEvent, 1) is { } faction:
             {
                 var next = world;
@@ -611,19 +622,21 @@ public sealed partial class StorySimulator
                              .Where(u => u.Type.Equals(type, StringComparison.OrdinalIgnoreCase)))
                     next = next.WithUnits(fact.Type, fact.Owner, fact.Planet, -fact.Count)
                         .WithUnits(fact.Type, faction, fact.Planet, fact.Count);
-                return Fact(snapshot, node, next, $"  -> {type} now belongs to {faction}.");
+                return Fact(snapshot, node, next,
+                    "  -> " + _messages.Format("StorySimWorld_NowBelongs", type, faction));
             }
             case "SPAWN_HERO" when Param(storyEvent, 0) is { } type:
                 return Fact(snapshot, node, world.WithUnits(type, own, Param(storyEvent, 1) ?? "", 1),
-                    $"  -> {type} spawned at {Param(storyEvent, 1) ?? "?"}.");
+                    "  -> " + _messages.Format("StorySimWorld_SpawnedAt", type, Param(storyEvent, 1) ?? "?"));
             case "UNIQUE_UNIT" when Param(storyEvent, 0) is { } type:
             {
                 var count = Math.Max(1, ParseInt(Param(storyEvent, 2)));
                 return Fact(snapshot, node, world.WithUnits(type, own, Param(storyEvent, 1) ?? "", count),
-                    $"  -> {count} x {type} at {Param(storyEvent, 1) ?? "?"}.");
+                    "  -> " + _messages.Format("StorySimWorld_XAt", count, type, Param(storyEvent, 1) ?? "?"));
             }
             case "REMOVE_UNIT" or "DESTROY_OBJECT" when Param(storyEvent, 0) is { } type:
-                return Fact(snapshot, node, world.WithoutUnitType(type), $"  -> {type} removed.");
+                return Fact(snapshot, node, world.WithoutUnitType(type),
+                    "  -> " + _messages.Format("StorySimWorld_Removed", type));
             case "SET_TECH_LEVEL" when Param(storyEvent, 0) is { } faction:
             {
                 var change = new StoryWorldChange(StoryWorldChangeKind.SetTech)
@@ -633,7 +646,7 @@ public sealed partial class StorySimulator
             case "SET_MAX_TECH_LEVEL" when Param(storyEvent, 0) is { } faction:
                 return Fact(snapshot, node,
                     world with { MaxTech = world.MaxTech.SetItem(faction, ParseInt(Param(storyEvent, 1))) },
-                    $"  -> {faction} max tech {ParseInt(Param(storyEvent, 1))}.");
+                    "  -> " + _messages.Format("StorySimWorld_MaxTech", faction, ParseInt(Param(storyEvent, 1))));
             case "CREDITS":
             {
                 var change = new StoryWorldChange(StoryWorldChangeKind.AddCredits)
@@ -642,17 +655,22 @@ public sealed partial class StorySimulator
             }
             case "ADD_OBJECTIVE" when Param(storyEvent, 0) is { } objective:
                 return Fact(snapshot, node, world with { Objectives = world.Objectives.Add(objective) },
-                    $"  -> objective {objective} added.");
+                    "  -> " + _messages.Format("StorySimWorld_ObjectiveAdded", objective));
             case "OBJECTIVE_COMPLETE" or "OBJECTIVE_FAILED" or "REMOVE_OBJECTIVE"
                 when Param(storyEvent, 0) is { } objective:
                 return Fact(snapshot, node, world with { Objectives = world.Objectives.Remove(objective) },
-                    $"  -> objective {objective} {upperReward.ToLowerInvariant().Replace("objective_", "").Replace("remove_objective", "removed")}.");
+                    "  -> " + _messages.Format(upperReward switch
+                    {
+                        "OBJECTIVE_COMPLETE" => "StorySimWorld_ObjectiveComplete",
+                        "OBJECTIVE_FAILED" => "StorySimWorld_ObjectiveFailed",
+                        _ => "StorySimWorld_ObjectiveRemoved"
+                    }, objective));
             case "REMOVE_ALL_OBJECTIVES":
                 return Fact(snapshot, node, world with { Objectives = world.Objectives.Clear() },
-                    "  -> all objectives removed.");
+                    "  -> " + _messages.Format("StorySimWorld_AllObjectivesRemoved"));
             case "INVADE_PLANET" or "MOVE_FLEET" or "TRIGGER_AI" or "FORCE_RETREAT" or "SET_PLANET_SPAWN":
                 return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                    $"  -> {upperReward}: the game would act here; the simulator records no fact for it.");
+                    "  -> " + _messages.Format("StorySimWorld_GameWouldActHereSimulator", upperReward));
             default:
                 return snapshot;
         }
@@ -675,13 +693,13 @@ public sealed partial class StorySimulator
             : _model.Battles.FirstOrDefault(b => StoryGraphScoper.TacticalNodeId(b.Key) == stub)?.Key;
         if (battleKey is null)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                "  -> LINK_TACTICAL names no battle the model knows.");
+                "  -> " + _messages.Format("StorySimWorld_LINKTACTICALNamesNoBattle"));
         if (Scope is not null)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                $"  -> LINK_TACTICAL {battleKey} from inside a battle: queued for the galaxy, not modelled here.");
+                "  -> " + _messages.Format("StorySimWorld_LINKTACTICALFromInsideBattle", battleKey));
         if (world.PendingBattle is { } pending)
             return Note(snapshot, node.Id, null, StorySimCause.Ignored,
-                $"  -> LINK_TACTICAL {battleKey} while {pending} is pending: the game queues nothing.");
+                "  -> " + _messages.Format("StorySimWorld_LINKTACTICALWhilePendingGame", battleKey, pending));
         // Linked again after an outcome - the tutorial resets its branch on a loss and links the
         // same mission once more: a new attempt, with no outcome on the books.
         if (world.BattleOutcomes.ContainsKey(battleKey))
@@ -690,9 +708,9 @@ public sealed partial class StorySimulator
         var showChoice = Param(node.Event!, 12) is not { } raw || ParseInt(raw) != 0;
         return showChoice
             ? Fact(snapshot, node, world.WithPendingBattle(battleKey),
-                $"  -> battle {battleKey} pending: fight or auto-resolve.")
+                "  -> " + _messages.Format("StorySimWorld_BattlePendingFightAutoResolve", battleKey))
             : Fact(snapshot, node, world.WithPendingBattle(battleKey, StoryBattleChoice.Fight),
-                $"  -> battle {battleKey} begins.");
+                "  -> " + _messages.Format("StorySimWorld_BattleBegins", battleKey));
     }
 
     private static StorySimSnapshot Fact(StorySimSnapshot snapshot, StoryNode node, StoryWorld world, string detail)

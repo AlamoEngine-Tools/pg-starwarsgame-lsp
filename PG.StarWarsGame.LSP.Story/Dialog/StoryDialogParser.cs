@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.RegularExpressions;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Story.Dialog;
 
@@ -37,7 +38,7 @@ public static partial class StoryDialogParser
                 if (!match.Success)
                 {
                     problems.Add(new StoryDialogParseProblem(lineNo, indent, line.Length,
-                        $"Malformed chapter header '{trimmed.TrimEnd()}': expected '[CHAPTER <number>]'."));
+                        new CatalogueText("StoryDialog_MalformedChapterHeader", trimmed.TrimEnd())));
                     // Recover into an anonymous chapter so the commands below still get
                     // command-level validation without cascading "before first chapter" noise.
                     currentCommands = OpenChapter(chapters, StoryDialogChapter.AnonymousIndex, lineNo);
@@ -48,7 +49,7 @@ public static partial class StoryDialogParser
                 if (!seenIndices.Add(index))
                 {
                     problems.Add(new StoryDialogParseProblem(lineNo, indent, line.Length,
-                        $"Chapter {index} is already defined in this file."));
+                        new CatalogueText("StoryDialog_ChapterDefinedTwice", index)));
                     currentCommands = OpenChapter(chapters, StoryDialogChapter.AnonymousIndex, lineNo);
                     continue;
                 }
@@ -63,7 +64,7 @@ public static partial class StoryDialogParser
             if (currentCommands is null)
             {
                 problems.Add(new StoryDialogParseProblem(lineNo, indent, line.Length,
-                    $"'{tokens[0].Text}' appears before the first [CHAPTER <number>] header."));
+                    new CatalogueText("StoryDialog_BeforeFirstChapter", tokens[0].Text)));
                 continue;
             }
 

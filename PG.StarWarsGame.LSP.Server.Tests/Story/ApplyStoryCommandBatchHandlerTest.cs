@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Story;
@@ -57,7 +58,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
             .Handle(Batch(Cmd("setPerpetual", eventName: "Start", flag: true)), CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
     }
 
     /// <summary>
@@ -73,7 +74,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
             .Handle(Batch(Cmd("setPerpetual", eventName: "Start", flag: true)), CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal(StoryEditingFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditingFeature.DisabledKey), result.Error);
         Assert.Null(applier.Edit);
     }
 

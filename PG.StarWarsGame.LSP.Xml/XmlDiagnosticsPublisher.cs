@@ -304,7 +304,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (_storyChainProblems is not null)
             Phase("storyChain",
                 () => allDiags.AddRange(
-                    _storyChainProblems.GetForDocument(canonicalUri).Select(ToLspDiagnostic)));
+                    _storyChainProblems.GetForDocument(canonicalUri)
+                        .Select(p => ToLspDiagnostic(p, ctx.Messages))));
 
         if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
             Phase("storyGraph",
@@ -697,12 +698,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         return _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
     }
 
-    private static Diagnostic ToLspDiagnostic(StoryChainProblem problem)
+    private static Diagnostic ToLspDiagnostic(StoryChainProblem problem, IMessageCatalog messages)
     {
         return new Diagnostic
         {
             Severity = problem.Severity.ToLsp(),
-            Message = problem.Message,
+            Message = messages.Format(problem.Message),
             Range = SafeRange(problem.Line, problem.Column, problem.EndLine, problem.EndColumn),
             Source = AppProperties.LspServerId,
             Code = DiagnosticIds.StoryChain.ToString()

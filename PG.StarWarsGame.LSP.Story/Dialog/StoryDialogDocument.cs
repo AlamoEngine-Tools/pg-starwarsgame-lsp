@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Story.Dialog;
 
 /// <summary>A whitespace-delimited token with its 0-based source position.</summary>
@@ -29,7 +31,7 @@ public sealed record StoryDialogChapter(int Index, int HeaderLine, IReadOnlyList
 }
 
 /// <summary>A structural defect found while parsing (0-based positions).</summary>
-public sealed record StoryDialogParseProblem(int Line, int Column, int EndColumn, string Message);
+public sealed record StoryDialogParseProblem(int Line, int Column, int EndColumn, CatalogueText Message);
 
 /// <summary>The parsed shape of a story-dialog .txt script.</summary>
 public sealed record StoryDialogDocument(

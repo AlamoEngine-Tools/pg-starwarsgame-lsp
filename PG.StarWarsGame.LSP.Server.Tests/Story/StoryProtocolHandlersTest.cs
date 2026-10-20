@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -176,7 +177,7 @@ public sealed class StoryProtocolHandlersTest
         var result = await new GetStoryPlotsHandler(Models(), Index(), Config(false))
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
-        Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
         Assert.Empty(result.Campaigns);
     }
 
@@ -186,7 +187,7 @@ public sealed class StoryProtocolHandlersTest
         var result = await new GetStoryPlotsHandler(Models(), Index(), Config(discovery: false))
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
-        Assert.Equal(StoryEditorFeature.DiscoveryMissingMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DiscoveryMissingKey), result.Error);
     }
 
     // ── aet/getStoryGraph ────────────────────────────────────────────────────
@@ -673,7 +674,7 @@ public sealed class StoryProtocolHandlersTest
             .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "reward", "TRIGGER_EVENT", 0),
                 CancellationToken.None);
 
-        Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
     }
 
     private static Diagnostic Diag(int line, int character, DiagnosticSeverity severity, string message)
@@ -742,7 +743,7 @@ public sealed class StoryProtocolHandlersTest
 
         var result = await handler.Handle(new GetStoryDiagnosticsParams("GC", "Rebel"), CancellationToken.None);
 
-        Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
     }
 
     // ── aet/resolveStoryReference ────────────────────────────────────────────

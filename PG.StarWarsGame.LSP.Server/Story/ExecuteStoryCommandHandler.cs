@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -43,14 +44,16 @@ public sealed class ExecuteStoryCommandHandler(
         // being that the refusal arrives instead of the work, not after it.
         if (DependencyOwnership.Rejection(reloadService.LastWorkspaceConfig, request.ThreadUri)
             is { } notOurs)
-            return Task.FromResult(Error(notOurs));
+            return Task.FromResult(Error(new ConfiguredMessageCatalog(config).Format(notOurs)));
 
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
-            return Task.FromResult(Error($"Campaign '{request.Campaign}' was not found."));
+            return Task.FromResult(Error(
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         var executor = new StoryCommandExecutor(
-            modelService, indexService, textSource, schema, fileHelper, reloadService, logger);
+            modelService, indexService, textSource, schema, fileHelper, reloadService, logger,
+            new ConfiguredMessageCatalog(config));
         var (produced, error) = executor.Produce(request, model, new WorkingTextSet(textSource));
         if (error is not null)
             return Task.FromResult(Error(error));

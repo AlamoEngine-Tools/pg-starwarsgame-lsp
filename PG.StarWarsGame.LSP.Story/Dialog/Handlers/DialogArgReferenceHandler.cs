@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -25,16 +26,17 @@ public sealed class DialogArgReferenceHandler : IDialogDiagnosticsHandler
             if (param.Position >= fact.Command.Args.Count) continue;
             var arg = fact.Command.Args[param.Position];
 
-            string? message = null;
+            CatalogueText? message = null;
             if (param.ReferenceKind == ReferenceKind.LocalisationKey)
             {
                 if (!index.Localisation.ContainsKey(arg.Text))
-                    message = $"'{arg.Text}' is not a known localisation key.";
+                    message = new CatalogueText("DialogArgReference_UnknownLocalisationKey", arg.Text);
             }
             else if (param.ReferenceKind == ReferenceKind.XmlObject && param.ObjectType is not null)
             {
                 if (index.Resolve(arg.Text) is null)
-                    message = $"'{arg.Text}' is not a recognized {param.ObjectType.TypeName}.";
+                    message = new CatalogueText("DialogArgReference_UnknownObject", arg.Text,
+                        param.ObjectType.TypeName);
             }
 
             if (message is not null)

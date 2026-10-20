@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -26,11 +27,12 @@ public sealed class DialogArgValueHandler : IDialogDiagnosticsHandler
             var message = param.ValueType switch
             {
                 XmlValueType.UInt when !uint.TryParse(arg.Text, NumberStyles.None, CultureInfo.InvariantCulture, out _)
-                    => $"'{arg.Text}' is not a valid non-negative number for '{fact.Command.Name}' argument {param.Position + 1}.",
+                    => new CatalogueText("DialogArgValue_NotNonNegative", arg.Text, fact.Command.Name,
+                        param.Position + 1),
                 XmlValueType.Int when !int.TryParse(arg.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)
-                    => $"'{arg.Text}' is not a valid number for '{fact.Command.Name}' argument {param.Position + 1}.",
+                    => new CatalogueText("DialogArgValue_NotNumber", arg.Text, fact.Command.Name, param.Position + 1),
                 XmlValueType.Boolean when arg.Text is not ("1" or "0")
-                    => $"'{arg.Text}' is not valid for '{fact.Command.Name}': use 1 (on) or 0 (off).",
+                    => new CatalogueText("DialogArgValue_NotSwitch", arg.Text, fact.Command.Name),
                 _ => null
             };
 

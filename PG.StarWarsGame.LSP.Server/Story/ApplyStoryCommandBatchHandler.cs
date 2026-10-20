@@ -6,6 +6,7 @@ using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -49,18 +50,21 @@ public sealed class ApplyStoryCommandBatchHandler(
         foreach (var command in request.Commands)
             if (DependencyOwnership.Rejection(reloadService.LastWorkspaceConfig, command.ThreadUri)
                 is { } notOurs)
-                return Task.FromResult(new ApplyStoryCommandBatchResult(false, Error: notOurs));
+                return Task.FromResult(new ApplyStoryCommandBatchResult(false,
+                    Error: new ConfiguredMessageCatalog(config).Format(notOurs)));
 
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false,
-                Error: $"Campaign '{request.Campaign}' was not found."));
+                Error: new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound",
+                    request.Campaign)));
 
         if (request.Commands.Count == 0)
             return Task.FromResult(new ApplyStoryCommandBatchResult(true));
 
         var executor = new StoryCommandExecutor(
-            modelService, indexService, textSource, schema, fileHelper, reloadService, logger);
+            modelService, indexService, textSource, schema, fileHelper, reloadService, logger,
+            new ConfiguredMessageCatalog(config));
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, error) = executor.Compose(
@@ -72,7 +76,8 @@ public sealed class ApplyStoryCommandBatchHandler(
         if (changed.Count == 0)
             return Task.FromResult(new ApplyStoryCommandBatchResult(true));
 
-        var label = $"Apply {request.Commands.Count} story change(s)";
+        var label = new ConfiguredMessageCatalog(config).Format("StoryHandlers_ApplyStoryChangeS",
+            request.Commands.Count);
         logger.LogDebug("Story batch of {Count} -> applyEdit touching {Files} file(s)",
             request.Commands.Count, changed.Count);
         _ = SendAsync(BuildBatchEdit(changed), label);

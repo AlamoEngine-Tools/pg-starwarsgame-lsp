@@ -228,11 +228,35 @@
   <data name="DemolitionBombTypeRule_Repair" xml:space="preserve">
     <value>defaults it to Demolition_Bomb</value>
   </data>
+  <data name="DependencyOwnership_ReadOnly" xml:space="preserve">
+    <value>'{0}' is a referenced project and is read-only here. Edit this thread in '{0}' itself.</value>
+  </data>
   <data name="DeprecatedEventType_IsDeprecated" xml:space="preserve">
     <value>'{0}' is deprecated.</value>
   </data>
   <data name="DeprecatedTag_IsDeprecatedAndShouldNot" xml:space="preserve">
     <value>&lt;{0}&gt; is deprecated and should not be used.</value>
+  </data>
+  <data name="DialogArgReference_UnknownLocalisationKey" xml:space="preserve">
+    <value>'{0}' is not a known localisation key.</value>
+  </data>
+  <data name="DialogArgReference_UnknownObject" xml:space="preserve">
+    <value>'{0}' is not a recognized {1}.</value>
+  </data>
+  <data name="DialogArgValue_NotNonNegative" xml:space="preserve">
+    <value>'{0}' is not a valid non-negative number for '{1}' argument {2}.</value>
+  </data>
+  <data name="DialogArgValue_NotNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number for '{1}' argument {2}.</value>
+  </data>
+  <data name="DialogArgValue_NotSwitch" xml:space="preserve">
+    <value>'{0}' is not valid for '{1}': Use 1 (on) or 0 (off).</value>
+  </data>
+  <data name="DialogCommandArity_TakesNone" xml:space="preserve">
+    <value>'{0}' takes no arguments, got {1}.</value>
+  </data>
+  <data name="DialogCommandArity_WrongCount" xml:space="preserve">
+    <value>Wrong argument count for '{0}' - expected {1}, got {2}.</value>
   </data>
   <data name="DisallowedOrOperator_DoesNotSupportOrEvery" xml:space="preserve">
     <value>&lt;{0}&gt; does not support '|' (OR) - every listed value is required (AND only). This engine only supports OR-expressions on tags explicitly documented for it (e.g. Required_Special_Structures).</value>
@@ -834,6 +858,198 @@
   <data name="SquadronOffsetsMismatch_SquadronHasUnitSBut2" xml:space="preserve">
     <value>Squadron has {0} unit(s) but {1} Squadron_Offsets. Remove {2} excess.</value>
   </data>
+  <data name="StoryChain_NotAManifest" xml:space="preserve">
+    <value>'{0}' is not a valid story plot manifest: Missing &lt;Story_Mode_Plots&gt; root element.</value>
+  </data>
+  <data name="StoryChain_PlotFileMissing" xml:space="preserve">
+    <value>Story plot file '{0}' does not exist in any project layer or the baseline.</value>
+  </data>
+  <data name="StoryChain_StoryFileMissing" xml:space="preserve">
+    <value>Story file '{0}' does not exist in any project layer or the baseline.</value>
+  </data>
+  <data name="StoryCommand_ADependency" xml:space="preserve">
+    <value>a dependency</value>
+  </data>
+  <data name="StoryCommand_AddPlotManifestNeedsFaction" xml:space="preserve">
+    <value>addPlotManifest needs the faction.</value>
+  </data>
+  <data name="StoryCommand_AddPrereq" xml:space="preserve">
+    <value>Add prereq to '{0}'</value>
+  </data>
+  <data name="StoryCommand_AddPrereqAlternatives" xml:space="preserve">
+    <value>Add prereq alternatives to '{0}'</value>
+  </data>
+  <data name="StoryCommand_AddPrereqAlternativesNeedsTokens" xml:space="preserve">
+    <value>addPrereqAlternatives needs tokens.</value>
+  </data>
+  <data name="StoryCommand_AddPrereqGroup" xml:space="preserve">
+    <value>Add prereq group to '{0}'</value>
+  </data>
+  <data name="StoryCommand_AddPrereqGroupNeedsTokens" xml:space="preserve">
+    <value>addPrereqGroup needs tokens.</value>
+  </data>
+  <data name="StoryCommand_AddPrereqNeedsToken" xml:space="preserve">
+    <value>addPrereq needs a token.</value>
+  </data>
+  <data name="StoryCommand_AlreadyNamesEventCampaign" xml:space="preserve">
+    <value>'{0}' already names an event in campaign '{1}'.</value>
+  </data>
+  <data name="StoryCommand_AttachLuaScript" xml:space="preserve">
+    <value>Attach Lua script '{0}'</value>
+  </data>
+  <data name="StoryCommand_AttachPlotManifest" xml:space="preserve">
+    <value>Attach plot manifest '{0}'</value>
+  </data>
+  <data name="StoryCommand_CampaignSetFileDeclaringCould" xml:space="preserve">
+    <value>The campaign set file declaring '{0}' could not be located.</value>
+  </data>
+  <data name="StoryCommand_CampaignWasNotFound" xml:space="preserve">
+    <value>Campaign '{0}' was not found in '{1}'.</value>
+  </data>
+  <data name="StoryCommand_CannotBeRenamedNotOwned" xml:space="preserve">
+    <value>'{0}' cannot be renamed (not owned by the project layer).</value>
+  </data>
+  <data name="StoryCommand_CommandNeedsEventName" xml:space="preserve">
+    <value>The command needs an eventName.</value>
+  </data>
+  <data name="StoryCommand_CommandNeedsPlotManifestFile" xml:space="preserve">
+    <value>The command needs the plot manifest file.</value>
+  </data>
+  <data name="StoryCommand_CommandNeedsThreadUri" xml:space="preserve">
+    <value>The command needs a threadUri.</value>
+  </data>
+  <data name="StoryCommand_CommandNeedsValueThreadFile" xml:space="preserve">
+    <value>The command needs a value (thread file or script name).</value>
+  </data>
+  <data name="StoryCommand_CommandProducedNoChanges" xml:space="preserve">
+    <value>The command produced no changes.</value>
+  </data>
+  <data name="StoryCommand_CreateStoryEvent" xml:space="preserve">
+    <value>Create story event '{0}'</value>
+  </data>
+  <data name="StoryCommand_CreateStoryThread" xml:space="preserve">
+    <value>Create story thread '{0}'</value>
+  </data>
+  <data name="StoryCommand_CreateTacticalAttachment" xml:space="preserve">
+    <value>Create tactical attachment '{0}'</value>
+  </data>
+  <data name="StoryCommand_CreateTacticalAttachmentNeedsTacticalManifestFile" xml:space="preserve">
+    <value>createTacticalAttachment needs the tactical manifest file.</value>
+  </data>
+  <data name="StoryCommand_DeleteStoryEvent" xml:space="preserve">
+    <value>Delete story event '{0}'</value>
+  </data>
+  <data name="StoryCommand_DetachPlotManifest" xml:space="preserve">
+    <value>Detach plot manifest '{0}'</value>
+  </data>
+  <data name="StoryCommand_DetachStoryThread" xml:space="preserve">
+    <value>Detach story thread '{0}'</value>
+  </data>
+  <data name="StoryCommand_EventWasNotFoundCampaign" xml:space="preserve">
+    <value>Event '{0}' was not found in campaign '{1}'.</value>
+  </data>
+  <data name="StoryCommand_EventWasNotFoundThread" xml:space="preserve">
+    <value>Event '{0}' was not found in the thread.</value>
+  </data>
+  <data name="StoryCommand_HasNoPrereq" xml:space="preserve">
+    <value>'{0}' has no prereq '{1}'.</value>
+  </data>
+  <data name="StoryCommand_HasNoPrereqGroup" xml:space="preserve">
+    <value>'{0}' has no prereq group {1}.</value>
+  </data>
+  <data name="StoryCommand_NameTakenCampaignWide" xml:space="preserve">
+    <value>'{0}' already names an event in campaign '{1}' - event names resolve campaign-wide.</value>
+  </data>
+  <data name="StoryCommand_NamesEventsThisThreadFix" xml:space="preserve">
+    <value>'{0}' names {1} events in this thread - fix the duplicate first.</value>
+  </data>
+  <data name="StoryCommand_NeedsNewName" xml:space="preserve">
+    <value>{0} needs a newName.</value>
+  </data>
+  <data name="StoryCommand_NotAttachedCampaign" xml:space="preserve">
+    <value>'{0}' is not attached to campaign '{1}'.</value>
+  </data>
+  <data name="StoryCommand_NotListedNeverDeleted" xml:space="preserve">
+    <value>'{0}' is not listed in '{1}'. The file itself is never deleted - remove it manually if intended.</value>
+  </data>
+  <data name="StoryCommand_NotListedOrAlready" xml:space="preserve">
+    <value>'{0}' is not listed in '{1}', or it is already in the requested state.</value>
+  </data>
+  <data name="StoryCommand_NotReadable" xml:space="preserve">
+    <value>'{0}' is not readable.</value>
+  </data>
+  <data name="StoryCommand_PlotManifestWasNotFound" xml:space="preserve">
+    <value>Plot manifest '{0}' was not found in the workspace.</value>
+  </data>
+  <data name="StoryCommand_PrereqGroupHasNoToken" xml:space="preserve">
+    <value>Prereq group {0} of '{1}' has no token '{2}'.</value>
+  </data>
+  <data name="StoryCommand_ReadOnlyLayer" xml:space="preserve">
+    <value>'{0}' belongs to {1}, which is read-only. Copy the file into the project's xml directory to override it, then edit the copy.</value>
+  </data>
+  <data name="StoryCommand_RemovePrereqFrom" xml:space="preserve">
+    <value>Remove prereq from '{0}'</value>
+  </data>
+  <data name="StoryCommand_RemovePrereqNeedsToken" xml:space="preserve">
+    <value>removePrereq needs a token.</value>
+  </data>
+  <data name="StoryCommand_RemoveReward" xml:space="preserve">
+    <value>Remove the reward of '{0}'</value>
+  </data>
+  <data name="StoryCommand_RemoveTrigger" xml:space="preserve">
+    <value>Remove the trigger of '{0}'</value>
+  </data>
+  <data name="StoryCommand_RenameAmbiguous" xml:space="preserve">
+    <value>'{0}' names {1} events in campaign '{2}' - rename is ambiguous. Disambiguate them first.</value>
+  </data>
+  <data name="StoryCommand_RenameEventNeedsEventNameNewName" xml:space="preserve">
+    <value>renameEvent needs eventName and newName.</value>
+  </data>
+  <data name="StoryCommand_RenameProducedNoChanges" xml:space="preserve">
+    <value>The rename produced no changes.</value>
+  </data>
+  <data name="StoryCommand_RenameStoryEvent" xml:space="preserve">
+    <value>Rename story event '{0}'</value>
+  </data>
+  <data name="StoryCommand_RetargetControlEdge" xml:space="preserve">
+    <value>Retarget control edge of '{0}'</value>
+  </data>
+  <data name="StoryCommand_RetargetControlEdgeNeedsGroupIndexRewardSlot" xml:space="preserve">
+    <value>retargetControlEdge needs groupIndex (the reward slot) and token.</value>
+  </data>
+  <data name="StoryCommand_SetBranch" xml:space="preserve">
+    <value>Set branch of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetDialog" xml:space="preserve">
+    <value>Set dialog of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetEventType" xml:space="preserve">
+    <value>Set event type of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetParams" xml:space="preserve">
+    <value>Set params of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetParamsNeedsParamKindEventReward" xml:space="preserve">
+    <value>setParams needs paramKind 'event' or 'reward'.</value>
+  </data>
+  <data name="StoryCommand_SetParamsNeedsParams" xml:space="preserve">
+    <value>setParams needs params.</value>
+  </data>
+  <data name="StoryCommand_SetPerpetual" xml:space="preserve">
+    <value>Set perpetual of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetRewardType" xml:space="preserve">
+    <value>Set reward type of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetThreadState" xml:space="preserve">
+    <value>Set thread state of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetThreadStateNeedsFlagTrueSuspended" xml:space="preserve">
+    <value>setThreadState needs flag (true = suspended).</value>
+  </data>
+  <data name="StoryCommand_UnknownStoryCommand" xml:space="preserve">
+    <value>Unknown story command '{0}'.</value>
+  </data>
   <data name="StoryDialogReference_ChapterIsNotDefinedIn" xml:space="preserve">
     <value>Chapter {0} is not defined in story dialog '{1}' ({2}).</value>
   </data>
@@ -845,6 +1061,78 @@
   </data>
   <data name="StoryDialogReference_StoryDialogDoesNotResolve" xml:space="preserve">
     <value>Story dialog '{0}' does not resolve to a .txt script under the project's storyDialog directories.</value>
+  </data>
+  <data name="StoryDialog_BeforeFirstChapter" xml:space="preserve">
+    <value>'{0}' appears before the first [CHAPTER &lt;number&gt;] header.</value>
+  </data>
+  <data name="StoryDialog_ChapterDefinedTwice" xml:space="preserve">
+    <value>Chapter {0} is already defined in this file.</value>
+  </data>
+  <data name="StoryDialog_MalformedChapterHeader" xml:space="preserve">
+    <value>Malformed chapter header '{0}': Expected '[CHAPTER &lt;number&gt;]'.</value>
+  </data>
+  <data name="StoryEditingFeature_Disabled" xml:space="preserve">
+    <value>Story editing is disabled. Enable 'aet-eaw-edit.features.tools.storyEditing' in the editor settings.</value>
+  </data>
+  <data name="StoryEditorFeature_Disabled" xml:space="preserve">
+    <value>The story editor is disabled. Enable 'aet-eaw-edit.features.tools.storyEditor' in the editor settings.</value>
+  </data>
+  <data name="StoryEditorFeature_DiscoveryMissing" xml:space="preserve">
+    <value>The story editor requires story discovery. Enable 'aet-eaw-edit.features.story.discovery' in the editor settings.</value>
+  </data>
+  <data name="StoryGraph_AmbiguousTarget" xml:space="preserve">
+    <value>'{0}' names more than one event in the same plot file - the engine's pick is undefined.</value>
+  </data>
+  <data name="StoryGraph_ControlTarget" xml:space="preserve">
+    <value>{0} target</value>
+  </data>
+  <data name="StoryGraph_DuplicateEventName" xml:space="preserve">
+    <value>Event name '{0}' is defined {1} times in this file.</value>
+  </data>
+  <data name="StoryGraph_EventInOtherFile" xml:space="preserve">
+    <value>{0} '{1}' is not an event in this plot file - the engine only looks here and asserts. An event of that name is in {2}.</value>
+  </data>
+  <data name="StoryGraph_FlagNameTooLong" xml:space="preserve">
+    <value>Flag name '{0}' is {1} characters long - the engine truncates at {2}.</value>
+  </data>
+  <data name="StoryGraph_GenericNeverRaised" xml:space="preserve">
+    <value>The game never raises '{0}' as a generic trigger and no TRIGGER_EVENT pushes '{1}' - it never fires. The game raises {2}.</value>
+  </data>
+  <data name="StoryGraph_MissionLostAfterSummary" xml:space="preserve">
+    <value>'{0}' never fires: The game delivers STORY_MISSION_LOST before the battle summary closes, and '{0}' arms only after '{1}' (battle_end_closed). After a lost battle the game offers a retry instead.</value>
+  </data>
+  <data name="StoryGraph_NeverFires" xml:space="preserve">
+    <value>'{0}' can never fire: No prerequisite line is satisfiable and nothing triggers it.</value>
+  </data>
+  <data name="StoryGraph_NoMatchingEvent" xml:space="preserve">
+    <value>{0} '{1}' does not match any event in this campaign.</value>
+  </data>
+  <data name="StoryGraph_PrereqCycle" xml:space="preserve">
+    <value>'{0}' is part of a prerequisite cycle ({1}) - none of these events can arm.</value>
+  </data>
+  <data name="StoryGraph_Prerequisite" xml:space="preserve">
+    <value>Prerequisite</value>
+  </data>
+  <data name="StoryGraph_SuspendedNeverActivated" xml:space="preserve">
+    <value>This plot is suspended in campaign '{0}' and no STORY_ELEMENT reward activates it.</value>
+  </data>
+  <data name="StoryGraph_TagOrder" xml:space="preserve">
+    <value>'{0}' appears after '{1}' - the engine expects the documented event tag order.</value>
+  </data>
+  <data name="StoryHandlers_ApplyStoryChangeS" xml:space="preserve">
+    <value>Apply story changes ({0})</value>
+  </data>
+  <data name="StoryHandlers_CampaignCouldNotBeAssembled" xml:space="preserve">
+    <value>Campaign '{0}' could not be assembled from the staged changes.</value>
+  </data>
+  <data name="StoryHandlers_CampaignWasNotFound" xml:space="preserve">
+    <value>Campaign '{0}' was not found.</value>
+  </data>
+  <data name="StoryHandlers_ChangeCanTBeStaged" xml:space="preserve">
+    <value>Change {0} of {1} can't be staged: {2}</value>
+  </data>
+  <data name="StoryHandlers_NodeWasNotFoundCampaign" xml:space="preserve">
+    <value>Node '{0}' was not found in campaign '{1}'.</value>
   </data>
   <data name="StoryParamEnum_IsNotAValidValue" xml:space="preserve">
     <value>'{0}' is not a valid {1} value.</value>
@@ -881,6 +1169,306 @@
   </data>
   <data name="StoryParamValue_IsNotAValidNumber2" xml:space="preserve">
     <value>'{0}' is not a valid number in vector '{1}'.</value>
+  </data>
+  <data name="StorySimFeature_Disabled" xml:space="preserve">
+    <value>The story simulator is disabled. Enable 'aet-eaw-edit.features.tools.storySimulator' in the editor settings.</value>
+  </data>
+  <data name="StorySimLua_EmissionIn" xml:space="preserve">
+    <value>{0} in {1:0.#}s</value>
+  </data>
+  <data name="StorySimLua_Entered" xml:space="preserve">
+    <value>{0}: entered '{1}'.</value>
+  </data>
+  <data name="StorySimLua_Left" xml:space="preserve">
+    <value>{0}: left '{1}'.</value>
+  </data>
+  <data name="StorySimLua_NextState" xml:space="preserve">
+    <value>{0}: next state '{1}'.</value>
+  </data>
+  <data name="StorySimLua_Owes" xml:space="preserve">
+    <value>owes {0}.</value>
+  </data>
+  <data name="StorySimLua_SetNextState" xml:space="preserve">
+    <value>{0}: Set_Next_State '{1}'.</value>
+  </data>
+  <data name="StorySimLua_StoryEventFromNoArmed" xml:space="preserve">
+    <value>Story_Event("{0}") from '{1}' - no armed event listens.</value>
+  </data>
+  <data name="StorySimLua_TriggerDroppedTransitionPending" xml:space="preserve">
+    <value>{0}: trigger '{1}' dropped - a transition to '{2}' is pending.</value>
+  </data>
+  <data name="StorySimService_BattleAlready" xml:space="preserve">
+    <value>Battle '{0}' is already {1}</value>
+  </data>
+  <data name="StorySimService_BattleHasNoOutcomeRetry" xml:space="preserve">
+    <value>Battle '{0}' has no outcome to retry</value>
+  </data>
+  <data name="StorySimService_BattleRestartRunAgain" xml:space="preserve">
+    <value>Battle '{0}' is {1} - restart to run it again</value>
+  </data>
+  <data name="StorySimService_BattleStillRunningResolveFirst" xml:space="preserve">
+    <value>Battle '{0}' is still running - resolve it first</value>
+  </data>
+  <data name="StorySimService_GalaxyPausedBattleRunning" xml:space="preserve">
+    <value>Galaxy paused - battle '{0}' running</value>
+  </data>
+  <data name="StorySimService_GalaxyPausedBattleStarting" xml:space="preserve">
+    <value>Galaxy paused - battle '{0}' starting</value>
+  </data>
+  <data name="StorySimService_NoSimulationRunning" xml:space="preserve">
+    <value>No simulation running for {0}</value>
+  </data>
+  <data name="StorySimService_NotBattle" xml:space="preserve">
+    <value>'{0}' is not a battle of {1}.</value>
+  </data>
+  <data name="StorySimService_TickOutsideRun" xml:space="preserve">
+    <value>Tick {0} is outside the run (0 to {1}).</value>
+  </data>
+  <data name="StorySimService_WasNotFound" xml:space="preserve">
+    <value>{0} was not found.</value>
+  </data>
+  <data name="StorySimWorld_ABattleStartsAt" xml:space="preserve">
+    <value>a battle starts at {0}</value>
+  </data>
+  <data name="StorySimWorld_AllDestroyed" xml:space="preserve">
+    <value>all {0} of {1} destroyed</value>
+  </data>
+  <data name="StorySimWorld_AllObjectivesRemoved" xml:space="preserve">
+    <value>all objectives removed.</value>
+  </data>
+  <data name="StorySimWorld_AssumeMetNeedsEvent" xml:space="preserve">
+    <value>AssumeMet needs an event.</value>
+  </data>
+  <data name="StorySimWorld_BattleBegins" xml:space="preserve">
+    <value>battle {0} begins.</value>
+  </data>
+  <data name="StorySimWorld_BattlePendingFightAutoResolve" xml:space="preserve">
+    <value>battle {0} pending: fight or auto-resolve.</value>
+  </data>
+  <data name="StorySimWorld_BattleStartsAt" xml:space="preserve">
+    <value>{0} battle starts at {1}</value>
+  </data>
+  <data name="StorySimWorld_BouncedAt" xml:space="preserve">
+    <value>{0} bounced at {1}</value>
+  </data>
+  <data name="StorySimWorld_BuildsXAt" xml:space="preserve">
+    <value>{0} builds {1} x {2} at {3}</value>
+  </data>
+  <data name="StorySimWorld_Captures" xml:space="preserve">
+    <value>{0} captures {1}</value>
+  </data>
+  <data name="StorySimWorld_Corrupted" xml:space="preserve">
+    <value>{0} corrupted</value>
+  </data>
+  <data name="StorySimWorld_Credits" xml:space="preserve">
+    <value>{0} credits {1:+#;-#;0}</value>
+  </data>
+  <data name="StorySimWorld_Destroyed" xml:space="preserve">
+    <value>{0} destroyed</value>
+  </data>
+  <data name="StorySimWorld_Enters" xml:space="preserve">
+    <value>{0} enters {1}</value>
+  </data>
+  <data name="StorySimWorld_EraBegins" xml:space="preserve">
+    <value>era {0} begins</value>
+  </data>
+  <data name="StorySimWorld_FORCECLICKGUIPressedGame" xml:space="preserve">
+    <value>FORCE_CLICK_GUI {0}: pressed in the game; no listener hears a forced click.</value>
+  </data>
+  <data name="StorySimWorld_GUIClicked" xml:space="preserve">
+    <value>GUI {0} clicked</value>
+  </data>
+  <data name="StorySimWorld_GameWouldActHereSimulator" xml:space="preserve">
+    <value>{0}: the game would act here; the simulator records no fact for it.</value>
+  </data>
+  <data name="StorySimWorld_Generic" xml:space="preserve">
+    <value>generic {0}</value>
+  </data>
+  <data name="StorySimWorld_IgnoredNotKnownName" xml:space="preserve">
+    <value>{0} ignored - '{1}' is not a known name.</value>
+  </data>
+  <data name="StorySimWorld_LINKTACTICALFromInsideBattle" xml:space="preserve">
+    <value>LINK_TACTICAL {0} from inside a battle: queued for the galaxy, not modelled here.</value>
+  </data>
+  <data name="StorySimWorld_LINKTACTICALNamesNoBattle" xml:space="preserve">
+    <value>LINK_TACTICAL names no battle the model knows.</value>
+  </data>
+  <data name="StorySimWorld_LINKTACTICALWhilePendingGame" xml:space="preserve">
+    <value>LINK_TACTICAL {0} while {1} is pending: the game queues nothing.</value>
+  </data>
+  <data name="StorySimWorld_LosesAt" xml:space="preserve">
+    <value>{0} loses at {1}</value>
+  </data>
+  <data name="StorySimWorld_MaxTech" xml:space="preserve">
+    <value>{0} max tech {1}.</value>
+  </data>
+  <data name="StorySimWorld_Moves" xml:space="preserve">
+    <value>{0} moves to {1}</value>
+  </data>
+  <data name="StorySimWorld_NowBelongs" xml:space="preserve">
+    <value>{0} now belongs to {1}.</value>
+  </data>
+  <data name="StorySimWorld_ObjectiveAdded" xml:space="preserve">
+    <value>objective {0} added.</value>
+  </data>
+  <data name="StorySimWorld_ObjectiveComplete" xml:space="preserve">
+    <value>objective {0} complete.</value>
+  </data>
+  <data name="StorySimWorld_ObjectiveFailed" xml:space="preserve">
+    <value>objective {0} failed.</value>
+  </data>
+  <data name="StorySimWorld_ObjectiveRemoved" xml:space="preserve">
+    <value>objective {0} removed.</value>
+  </data>
+  <data name="StorySimWorld_PressedAutoResolvedDecideIts" xml:space="preserve">
+    <value>{0} pressed: {1} is auto-resolved - decide its outcome.</value>
+  </data>
+  <data name="StorySimWorld_PressedBattleBegins" xml:space="preserve">
+    <value>{0} pressed: the battle {1} begins.</value>
+  </data>
+  <data name="StorySimWorld_Removed" xml:space="preserve">
+    <value>{0} removed.</value>
+  </data>
+  <data name="StorySimWorld_Selected" xml:space="preserve">
+    <value>{0} selected</value>
+  </data>
+  <data name="StorySimWorld_SpawnedAt" xml:space="preserve">
+    <value>{0} spawned at {1}.</value>
+  </data>
+  <data name="StorySimWorld_TechLevel" xml:space="preserve">
+    <value>{0} tech level {1}</value>
+  </data>
+  <data name="StorySimWorld_TutorialDialogUpContinueRaises" xml:space="preserve">
+    <value>tutorial dialog {0} up - Continue raises {1}.</value>
+  </data>
+  <data name="StorySimWorld_Units" xml:space="preserve">
+    <value>units</value>
+  </data>
+  <data name="StorySimWorld_WinsAt" xml:space="preserve">
+    <value>{0} wins at {1}</value>
+  </data>
+  <data name="StorySimWorld_World" xml:space="preserve">
+    <value>World: {0}</value>
+  </data>
+  <data name="StorySimWorld_XAt" xml:space="preserve">
+    <value>{0} x {1} at {2}.</value>
+  </data>
+  <data name="StorySimWorld_XDestroyed" xml:space="preserve">
+    <value>{0} x {1} of {2} destroyed</value>
+  </data>
+  <data name="StorySim_ActivatedThread" xml:space="preserve">
+    <value>activated thread '{0}'.</value>
+  </data>
+  <data name="StorySim_AlreadyRuledOut" xml:space="preserve">
+    <value>'{0}' is already ruled out</value>
+  </data>
+  <data name="StorySim_Armed" xml:space="preserve">
+    <value>armed '{0}'.</value>
+  </data>
+  <data name="StorySim_BattleStarted" xml:space="preserve">
+    <value>Battle {0} started</value>
+  </data>
+  <data name="StorySim_DISABLEBRANCHIgnoredMissingParameter" xml:space="preserve">
+    <value>DISABLE_BRANCH ignored - missing parameter.</value>
+  </data>
+  <data name="StorySim_DISABLESTORYEVENTIgnoredMissing" xml:space="preserve">
+    <value>DISABLE_STORY_EVENT ignored - missing parameter.</value>
+  </data>
+  <data name="StorySim_DISABLESTORYEVENTNoEvent" xml:space="preserve">
+    <value>DISABLE_STORY_EVENT: no event named '{0}'.</value>
+  </data>
+  <data name="StorySim_Disabled" xml:space="preserve">
+    <value>disabled '{0}'.</value>
+  </data>
+  <data name="StorySim_DisabledFireSwallowed" xml:space="preserve">
+    <value>'{0}' is disabled - fire swallowed.</value>
+  </data>
+  <data name="StorySim_Enabled" xml:space="preserve">
+    <value>enabled '{0}'.</value>
+  </data>
+  <data name="StorySim_Fired" xml:space="preserve">
+    <value>Fired '{0}' ({1}).</value>
+  </data>
+  <data name="StorySim_Flag" xml:space="preserve">
+    <value>Flag {0} = {1}.</value>
+  </data>
+  <data name="StorySim_Flag2" xml:space="preserve">
+    <value>flag {0} = {1}.</value>
+  </data>
+  <data name="StorySim_FlagProgress" xml:space="preserve">
+    <value>{0} {1} of {2}</value>
+  </data>
+  <data name="StorySim_HaltedAt" xml:space="preserve">
+    <value>Halted at '{0}'.</value>
+  </data>
+  <data name="StorySim_LeftAuthor" xml:space="preserve">
+    <value>{0} '{1}' left to the author.</value>
+  </data>
+  <data name="StorySim_LuaStoryEvent" xml:space="preserve">
+    <value>Lua Story_Event("{0}").</value>
+  </data>
+  <data name="StorySim_NoArmedEventListens" xml:space="preserve">
+    <value>No armed event listens for '{0}'.</value>
+  </data>
+  <data name="StorySim_NotArmedTriggerIgnored" xml:space="preserve">
+    <value>'{0}' is not armed - trigger ignored.</value>
+  </data>
+  <data name="StorySim_NotFiredTriggerChainDeeper" xml:space="preserve">
+    <value>'{0}' not fired - trigger chain deeper than {1}.</value>
+  </data>
+  <data name="StorySim_NotRuledOut" xml:space="preserve">
+    <value>'{0}' is not ruled out</value>
+  </data>
+  <data name="StorySim_OwedNextTick" xml:space="preserve">
+    <value>{0} '{1}' owed on the next tick.</value>
+  </data>
+  <data name="StorySim_PrereqNotItsThreadEngine" xml:space="preserve">
+    <value>Prereq '{0}' of '{1}' is not in its thread - the engine drops it from the line.</value>
+  </data>
+  <data name="StorySim_RESETBRANCHIgnoredMissingParameter" xml:space="preserve">
+    <value>RESET_BRANCH ignored - missing parameter.</value>
+  </data>
+  <data name="StorySim_RESETBRANCHNoEventThis" xml:space="preserve">
+    <value>RESET_BRANCH: no event '{0}' in this thread.</value>
+  </data>
+  <data name="StorySim_RESETEVENTNoEventThis" xml:space="preserve">
+    <value>RESET_EVENT: no event '{0}' in this thread.</value>
+  </data>
+  <data name="StorySim_ReconsideredDecisionAgain" xml:space="preserve">
+    <value>'{0}' reconsidered - a decision again</value>
+  </data>
+  <data name="StorySim_Reset" xml:space="preserve">
+    <value>reset '{0}'.</value>
+  </data>
+  <data name="StorySim_ResetBranch" xml:space="preserve">
+    <value>reset '{0}' (branch '{1}').</value>
+  </data>
+  <data name="StorySim_RuledOutArmedNoDecision" xml:space="preserve">
+    <value>'{0}' ruled out - armed, no decision</value>
+  </data>
+  <data name="StorySim_SimulationStarted" xml:space="preserve">
+    <value>Simulation started</value>
+  </data>
+  <data name="StorySim_TRIGGEREVENTIgnoredMissingParameter" xml:space="preserve">
+    <value>TRIGGER_EVENT ignored - missing parameter.</value>
+  </data>
+  <data name="StorySim_TRIGGEREVENTNoEventNamed" xml:space="preserve">
+    <value>TRIGGER_EVENT: no event named '{0}'.</value>
+  </data>
+  <data name="StorySim_TickS" xml:space="preserve">
+    <value>Tick {0} ({1:0.##}s)</value>
+  </data>
+  <data name="StorySim_TickSGameplayPausedBattle" xml:space="preserve">
+    <value>Tick {0} ({1:0.##}s, gameplay paused for the battle)</value>
+  </data>
+  <data name="StorySim_UnknownEventNode" xml:space="preserve">
+    <value>Unknown event node '{0}'.</value>
+  </data>
+  <data name="StorySim_Unset" xml:space="preserve">
+    <value>{0} unset</value>
+  </data>
+  <data name="StoryThread_EventWithoutName" xml:space="preserve">
+    <value>Event without a Name attribute - the block is not addressable and was skipped.</value>
   </data>
   <data name="SystemSpyDuration_DurationInSecsIsBut" xml:space="preserve">
     <value>&lt;Duration_In_Secs&gt; is {0}, but a {1} system spy needs a duration {2} - the engine overwrites it with {3}</value>
@@ -921,6 +1509,9 @@
   <data name="UnitSpawnTable_IsNotAValidUnit" xml:space="preserve">
     <value>'{0}' is not a valid unit spawn entry for &lt;{1}&gt;. Expected: UnitTypeName, Integer &gt;= -1.</value>
   </data>
+  <data name="UnknownDialogCommand_Unknown" xml:space="preserve">
+    <value>Unknown story-dialog command '{0}'.</value>
+  </data>
   <data name="UnknownTag_IsNotAKnownTag" xml:space="preserve">
     <value>&lt;{0}&gt; is not a known {1} tag. The engine discards it.</value>
   </data>
@@ -932,6 +1523,9 @@
   </data>
   <data name="UnregisteredXmlFile_NoRegistryNamesSoThe" xml:space="preserve">
     <value>No registry names '{0}', so the game never reads it.</value>
+  </data>
+  <data name="UntestedDialogCommand_Untested" xml:space="preserve">
+    <value>'{0}' is documented but untested - it may not work in the engine.</value>
   </data>
   <data name="UvSlotIndex_IsNotAValidUv" xml:space="preserve">
     <value>'{0}' is not a valid UV slot index for &lt;{1}&gt;. Expected an integer in [0, 3]. Did you mean {2}?</value>

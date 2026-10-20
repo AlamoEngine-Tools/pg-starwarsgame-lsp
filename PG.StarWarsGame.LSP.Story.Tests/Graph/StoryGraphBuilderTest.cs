@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -217,7 +218,7 @@ public sealed class StoryGraphBuilderTest
         Assert.Empty(graph.Edges);
         var problem = Assert.Single(graph.Problems);
         Assert.Equal(StoryGraphProblemKind.UnresolvedControlTarget, problem.Kind);
-        Assert.Contains("story_b.xml", problem.Message);
+        Assert.Contains("story_b.xml", ResxMessageCatalog.Server("en").Format(problem.Message));
     }
 
     // Measured: the engine raises 36 generic names from 53 call sites; a listener naming none of
@@ -232,8 +233,8 @@ public sealed class StoryGraphBuilderTest
         var problem = Assert.Single(graph.Problems);
         Assert.Equal(StoryGraphProblemKind.GenericNeverRaised, problem.Kind);
         Assert.Equal("right_click", problem.Reference);
-        Assert.Contains("never fires", problem.Message);
-        Assert.Contains("click", problem.Message);
+        Assert.Contains("never fires", ResxMessageCatalog.Server("en").Format(problem.Message));
+        Assert.Contains("click", ResxMessageCatalog.Server("en").Format(problem.Message));
     }
 
     [Fact]
@@ -277,8 +278,8 @@ public sealed class StoryGraphBuilderTest
         var problem = Assert.Single(graph.Problems);
         Assert.Equal(StoryGraphProblemKind.MissionLostAfterSummary, problem.Kind);
         Assert.Equal("Failed", problem.Reference);
-        Assert.Contains("never fires", problem.Message);
-        Assert.Contains("Returned", problem.Message);
+        Assert.Contains("never fires", ResxMessageCatalog.Server("en").Format(problem.Message));
+        Assert.Contains("Returned", ResxMessageCatalog.Server("en").Format(problem.Message));
     }
 
     [Fact]
@@ -385,7 +386,7 @@ public sealed class StoryGraphBuilderTest
         Assert.Empty(graph.Edges);
         var problem = Assert.Single(graph.Problems);
         Assert.Equal(StoryGraphProblemKind.DanglingPrereq, problem.Kind);
-        Assert.Contains("story_b.xml", problem.Message);
+        Assert.Contains("story_b.xml", ResxMessageCatalog.Server("en").Format(problem.Message));
     }
 
     // Measured: a branch reward touches the members in its own subplot; the engine compares branch

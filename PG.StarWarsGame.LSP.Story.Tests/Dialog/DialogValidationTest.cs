@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Story.Dialog;
@@ -101,7 +102,7 @@ public sealed class DialogValidationTest
 
         var diag = Assert.Single(diags);
         Assert.Equal(XmlDiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("TEXTCOLOR255", diag.Message);
+        Assert.Contains("TEXTCOLOR255", ResxMessageCatalog.Server("en").Format(diag.Message));
         Assert.Equal(1, diag.Line);
         Assert.Equal(0, diag.Column);
         Assert.Equal("TEXTCOLOR255".Length, diag.EndColumn);
@@ -122,8 +123,8 @@ public sealed class DialogValidationTest
 
         var diag = Assert.Single(diags);
         Assert.Equal(XmlDiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("4 argument", diag.Message);
-        Assert.Contains("got 3", diag.Message);
+        Assert.Contains("expected 4", ResxMessageCatalog.Server("en").Format(diag.Message));
+        Assert.Contains("got 3", ResxMessageCatalog.Server("en").Format(diag.Message));
     }
 
     [Fact]
@@ -133,7 +134,7 @@ public sealed class DialogValidationTest
 
         var diag = Assert.Single(diags);
         Assert.Equal(XmlDiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("got 2", diag.Message);
+        Assert.Contains("got 2", ResxMessageCatalog.Server("en").Format(diag.Message));
         Assert.Equal("WAIT 500 ".Length, diag.Column);
         Assert.Equal("WAIT 500 extra".Length, diag.EndColumn);
     }
@@ -144,7 +145,7 @@ public sealed class DialogValidationTest
         var diags = Validate("WAIT_SPEECH now");
 
         var diag = Assert.Single(diags);
-        Assert.Contains("no arguments", diag.Message);
+        Assert.Contains("no arguments", ResxMessageCatalog.Server("en").Format(diag.Message));
     }
 
     // ── Argument types ───────────────────────────────────────────────────────
@@ -156,7 +157,7 @@ public sealed class DialogValidationTest
 
         var diag = Assert.Single(diags);
         Assert.Equal(XmlDiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("'soon'", diag.Message);
+        Assert.Contains("'soon'", ResxMessageCatalog.Server("en").Format(diag.Message));
         Assert.Equal("WAIT ".Length, diag.Column);
         Assert.Equal("WAIT soon".Length, diag.EndColumn);
     }
@@ -179,8 +180,8 @@ public sealed class DialogValidationTest
     public void PauseWithOtherValue_ProducesError()
     {
         var diag = Assert.Single(Validate("PAUSE yes"));
-        Assert.Contains("1", diag.Message);
-        Assert.Contains("0", diag.Message);
+        Assert.Contains("1", ResxMessageCatalog.Server("en").Format(diag.Message));
+        Assert.Contains("0", ResxMessageCatalog.Server("en").Format(diag.Message));
     }
 
     // ── Untested commands ────────────────────────────────────────────────────
@@ -190,7 +191,8 @@ public sealed class DialogValidationTest
     {
         var diag = Assert.Single(Validate("CLEAR_TEXT"));
         Assert.Equal(XmlDiagnosticSeverity.Warning, diag.Severity);
-        Assert.Contains("untested", diag.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("untested", ResxMessageCatalog.Server("en").Format(diag.Message),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     // ── References ───────────────────────────────────────────────────────────
@@ -202,8 +204,9 @@ public sealed class DialogValidationTest
 
         var diag = Assert.Single(diags);
         Assert.Equal(XmlDiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("TEXT_MISSING", diag.Message);
-        Assert.Contains("localisation key", diag.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("TEXT_MISSING", ResxMessageCatalog.Server("en").Format(diag.Message));
+        Assert.Contains("localisation key", ResxMessageCatalog.Server("en").Format(diag.Message),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -219,8 +222,8 @@ public sealed class DialogValidationTest
 
         var diag = Assert.Single(diags);
         Assert.Equal(XmlDiagnosticSeverity.Error, diag.Severity);
-        Assert.Contains("TAR_MISSING", diag.Message);
-        Assert.Contains("SpeechEvent", diag.Message);
+        Assert.Contains("TAR_MISSING", ResxMessageCatalog.Server("en").Format(diag.Message));
+        Assert.Contains("SpeechEvent", ResxMessageCatalog.Server("en").Format(diag.Message));
     }
 
     [Fact]
