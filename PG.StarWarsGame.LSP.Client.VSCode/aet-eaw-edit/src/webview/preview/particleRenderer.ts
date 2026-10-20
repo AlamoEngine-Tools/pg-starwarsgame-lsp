@@ -32,6 +32,7 @@ import {
     spawnParticle,
     stepParticle,
     systemExtent,
+    tailMaxSpeed,
     weatherFade,
     wrapAxis,
 } from "./particleSim";
@@ -459,24 +460,25 @@ export interface TailGeometry {
 export function tailGeometry(
     properties: AlamoEmitter["properties"],
     velocity: AlamoVector3,
-    speed: number,
+    maxSpeed: number,
 ): TailGeometry | null {
     if (!properties.hasTail) {
         return null;
     }
 
-    if (speed <= 0) {
+    // Measured in the game: the length that counts is the velocity ACROSS the view, the part
+    // that shows on screen.
+    const planar = Math.hypot(velocity.x, velocity.y);
+    if (planar <= 0) {
         return { stretch: 1, turns: 0 };
     }
 
-    // An inherited-motion emitter measures its tail against a kilometre a second, so a spark that
-    // is merely keeping up with its hull barely streaks at all.
-    const mult = properties.parentLinkStrength !== 0 ? speed / 1000 : 1;
-    const planar = Math.hypot(velocity.x, velocity.y);
-    const length = (properties.tailSize * mult * planar) / speed;
+    // Measured: the trailing corner reaches `tailSize * speed / ceiling + 1` half sizes, the
+    // ceiling raised to the speed when the particle is faster than its emitter allows for.
+    const ceiling = Math.max(maxSpeed, planar);
 
     return {
-        stretch: Math.max(1, length / Math.SQRT2),
+        stretch: (properties.tailSize * planar) / ceiling + 1,
         // The corner being pulled sits on the quad's 135 degree diagonal, so the extra eighth of a
         // turn lands it opposite the direction of travel.
         turns:
@@ -681,6 +683,9 @@ class EmitterRenderer {
      */
     private readonly weatherDrift = { x: 0, y: 0, z: 0 };
 
+    /** The speed this emitter's streaks are measured against, fixed by its file. */
+    private readonly tailCeiling: number;
+
     constructor(
         private readonly emitter: AlamoEmitter,
         private readonly random: Random,
@@ -695,6 +700,7 @@ class EmitterRenderer {
         this.weatherHalf = emitter.properties.isWeatherParticle
             ? Math.max(0, emitter.properties.weatherCubeSize) * 0.5
             : 0;
+        this.tailCeiling = tailMaxSpeed(emitter);
 
         this.geometry = new THREE.InstancedBufferGeometry();
         this.geometry.setAttribute(
@@ -1574,7 +1580,6 @@ class EmitterRenderer {
         const vx = particle.velocity.x + drift.x;
         const vy = particle.velocity.y + drift.y;
         const vz = particle.velocity.z + drift.z;
-        const speed = Math.hypot(vx, vy, vz);
 
         this.viewVelocity
             .set(vx, vy, vz)
@@ -1585,7 +1590,11 @@ class EmitterRenderer {
             );
 
         return (
-            tailGeometry(this.emitter.properties, this.viewVelocity, speed) ?? {
+            tailGeometry(
+                this.emitter.properties,
+                this.viewVelocity,
+                this.tailCeiling,
+            ) ?? {
                 stretch: 1,
                 turns: 0,
             }

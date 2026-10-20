@@ -447,42 +447,31 @@ describe("tailGeometry", () => {
         properties({ hasTail: true, tailSize: 50, ...over });
 
     /**
-     * A kite is an ordinary quad with ONE corner pulled out behind the particle, which is how the
-     * engine draws a streak (`EmitterInstance.cpp:625-640`). The pull is `tailSize` scaled by how
-     * much of the velocity lies across the view - `sqrt(len*len/2)` in the reference, which is
-     * len over root two.
+     * Measured in the game: the trailing corner is pulled out to `tailSize * speed / maxSpeed + 1`
+     * times the half size, where speed is the length of the velocity across the view and maxSpeed
+     * the emitter's ceiling, raised to the speed when the particle is faster.
      */
-    it("pulls the trailing corner out by the tail size", () => {
+    it("pulls the trailing corner out by the tail size over the emitter's ceiling", () => {
         // Straight across the view, so none of the speed is foreshortened away.
-        const kited = tailGeometry(kite(), { x: 10, y: 0, z: 0 }, 10)!;
+        const kited = tailGeometry(kite(), { x: 10, y: 0, z: 0 }, 20)!;
 
-        assert.ok(
-            Math.abs(kited.stretch - 50 / Math.SQRT2) < 1e-6,
-            `${kited.stretch}`,
-        );
+        assert.equal(kited.stretch, (50 * 10) / 20 + 1);
     });
 
     /** Flying at the camera there is nothing to streak: the quad stays a quad. */
     it("leaves a particle coming straight at the camera unstretched", () => {
         assert.equal(
-            tailGeometry(kite(), { x: 0, y: 0, z: 10 }, 10)!.stretch,
+            tailGeometry(kite(), { x: 0, y: 0, z: 10 }, 20)!.stretch,
             1,
         );
     });
 
-    /** `mult = length / 1000` when the particle inherited its emitter's motion. */
-    it("scales the tail by speed for an emitter its particles are linked to", () => {
-        const linked = kite({ parentLinkStrength: 1 });
-
-        const slow = tailGeometry(linked, { x: 10, y: 0, z: 0 }, 10)!.stretch;
-        const fast = tailGeometry(linked, { x: 400, y: 0, z: 0 }, 400)!.stretch;
-
+    /** A particle faster than the ceiling takes its own speed as the ceiling: the full tail. */
+    it("draws the full tail for a particle past the emitter's ceiling", () => {
         assert.equal(
-            slow,
-            1,
-            "a slow linked particle should have no tail worth drawing",
+            tailGeometry(kite(), { x: 30, y: 0, z: 0 }, 20)!.stretch,
+            51,
         );
-        assert.ok(Math.abs(fast - (50 * 0.4) / Math.SQRT2) < 1e-6, `${fast}`);
     });
 
     /**
@@ -497,7 +486,7 @@ describe("tailGeometry", () => {
 
     it("says nothing to do for an emitter without a tail", () => {
         assert.equal(
-            tailGeometry(properties(), { x: 10, y: 0, z: 0 }, 10),
+            tailGeometry(properties(), { x: 10, y: 0, z: 0 }, 20),
             null,
         );
     });

@@ -163,6 +163,14 @@
 
 ### Fixes
 
+- **Cube-shaped spawn and velocity volumes** - drawn at their full size: the file stores a cube's half-extent,
+  and the preview halved it again
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+- **Streak length** - a tailed particle's streak reaches the tail size times its speed across the view over
+  the emitter's ceiling, plus one, as the game draws it; the ceiling is the fastest the emitter's velocity
+  can throw a particle plus its gravity and acceleration, or a fixed 1000 for an emitter linked to its
+  parent's motion; the previous formula came from an editor's emulation
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
 - **Wind controls follow the maps** - the direction control is named for what it sets, the heading the wind
   blows towards, in whole degrees; the speed runs from 0 to 10, the range the shipped maps declare, and starts
   at the game's default of 2 at heading 0

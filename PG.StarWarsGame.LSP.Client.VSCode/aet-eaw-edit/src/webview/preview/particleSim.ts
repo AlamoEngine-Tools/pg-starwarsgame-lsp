@@ -157,7 +157,9 @@ export function sampleVolume(volume: AlamoSpawnVolume, random: Random): Vec3 {
             };
 
         case "Cube": {
-            const half = volume.sideLength / 2;
+            // Measured: the stored value is the HALF-extent; the game draws each axis between
+            // minus and plus it.
+            const half = volume.sideLength;
             return {
                 x: lerp(-half, half, random()),
                 y: lerp(-half, half, random()),
@@ -209,8 +211,8 @@ export function volumeExtent(volume: AlamoSpawnVolume): number {
             return Math.max(length(volume.min), length(volume.max));
 
         case "Cube":
-            // To the corner, not the face - half a side would leave the corners outside the frame.
-            return (volume.sideLength / 2) * Math.sqrt(3);
+            // To the corner, not the face. The stored value is the half-extent.
+            return volume.sideLength * Math.sqrt(3);
 
         case "Sphere":
             return volume.sphereRadius;
@@ -664,6 +666,62 @@ export function appearanceOf(
             (particle.rotation + spin(particle, emitter, t)),
         frame: Math.max(0, Math.floor(channel("TextureIndex", 0))),
     };
+}
+
+/**
+ * The fastest an emitter's velocity property can throw a particle.
+ *
+ * Measured in the game, per shape: the exact value's length for a point; for a box the length of
+ * the larger magnitude on each axis; for a cube the corner, the stored value being the
+ * half-extent; a sphere's radius as stored; a cylinder's slant, radius against height.
+ */
+export function velocityCeiling(volume: AlamoSpawnVolume): number {
+    switch (volume.shape) {
+        case "Box":
+            return Math.hypot(
+                Math.max(Math.abs(volume.min.x), Math.abs(volume.max.x)),
+                Math.max(Math.abs(volume.min.y), Math.abs(volume.max.y)),
+                Math.max(Math.abs(volume.min.z), Math.abs(volume.max.z)),
+            );
+
+        case "Cube":
+            return volume.sideLength * Math.sqrt(3);
+
+        case "Sphere":
+            return volume.sphereRadius;
+
+        case "Cylinder":
+            return Math.hypot(volume.cylinderRadius, volume.cylinderHeight);
+
+        default:
+            return length(volume.exactValue);
+    }
+}
+
+/** Measured: the ceiling of an emitter linked to its parent's motion, set by the engine. */
+const LINKED_TAIL_MAX_SPEED = 1000;
+
+/**
+ * The speed a streak's length is measured against.
+ *
+ * Measured in the game: 1000 for an emitter linked to its parent's motion - the server zeroes the
+ * link strength when the file does not set the link, so a non-zero strength is the flag - and
+ * otherwise the velocity ceiling plus gravity plus the acceleration's length. A weather field has
+ * gravity, acceleration and the link cleared on reset, so only its velocity counts.
+ */
+export function tailMaxSpeed(emitter: AlamoEmitter): number {
+    const properties = emitter.properties;
+    const ceiling = velocityCeiling(emitter.speed);
+
+    if (properties.isWeatherParticle) {
+        return ceiling;
+    }
+
+    if (properties.parentLinkStrength !== 0) {
+        return LINKED_TAIL_MAX_SPEED;
+    }
+
+    return ceiling + properties.gravity + length(properties.acceleration);
 }
 
 /**

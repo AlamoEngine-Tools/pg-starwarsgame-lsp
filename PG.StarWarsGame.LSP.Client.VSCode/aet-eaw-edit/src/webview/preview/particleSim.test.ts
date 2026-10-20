@@ -16,6 +16,8 @@ import {
     spawnParticle,
     stepParticle,
     systemExtent,
+    tailMaxSpeed,
+    velocityCeiling,
     volumeExtent,
     cubePhase,
     weatherFade,
@@ -140,8 +142,8 @@ describe("sampleVolume", () => {
         }
     });
 
-    it("centres a cube on the origin", () => {
-        const cube = volume({ shape: "Cube", sideLength: 4 });
+    it("centres a cube on the origin, out to its stored half-extent", () => {
+        const cube = volume({ shape: "Cube", sideLength: 2 });
         const random = seededRandom(3);
 
         for (let i = 0; i < 200; i++) {
@@ -1078,8 +1080,8 @@ describe("volumeExtent", () => {
     });
 
     it("measures a cube to its corner, not its face", () => {
-        // Half the side would put the corners outside the frame.
-        const cube = volume({ shape: "Cube", sideLength: 2 });
+        // The stored value is the half-extent; the face alone would leave the corners outside.
+        const cube = volume({ shape: "Cube", sideLength: 1 });
         assert.ok(Math.abs(volumeExtent(cube) - Math.sqrt(3)) < 1e-6);
     });
 
@@ -1200,6 +1202,116 @@ describe("systemExtent", () => {
 
     it("falls back to something visible when there are no emitters", () => {
         assert.ok(systemExtent([]) > 0);
+    });
+});
+
+/**
+ * Measured in the game: the fastest an emitter's velocity property can throw a particle, per
+ * shape, which a streak's length is measured against.
+ */
+describe("velocityCeiling", () => {
+    /**
+     * Measured in the game: a cube's stored value is its HALF-extent - the sampler draws each axis
+     * between minus and plus it. Halving it again drew every cube volume at half its size.
+     */
+    it("samples a cube out to its stored half-extent on every axis", () => {
+        const cube = volume({ shape: "Cube", sideLength: 10 });
+        const random = seededRandom(7);
+        let reach = 0;
+        for (let i = 0; i < 400; i++) {
+            const p = sampleVolume(cube, random);
+            reach = Math.max(
+                reach,
+                Math.abs(p.x),
+                Math.abs(p.y),
+                Math.abs(p.z),
+            );
+        }
+        assert.ok(reach > 9 && reach <= 10, `reach ${reach}`);
+        assert.equal(volumeExtent(cube), 10 * Math.sqrt(3));
+    });
+
+    it("is the exact value's length for a point", () => {
+        assert.equal(
+            velocityCeiling(
+                volume({ shape: "Point", exactValue: { x: 3, y: 0, z: 4 } }),
+            ),
+            5,
+        );
+    });
+
+    it("takes the larger magnitude per axis for a box", () => {
+        assert.equal(
+            velocityCeiling(
+                volume({
+                    shape: "Box",
+                    min: { x: -3, y: 0, z: 1 },
+                    max: { x: 2, y: 0, z: 4 },
+                }),
+            ),
+            5,
+        );
+    });
+
+    it("reaches the corner of a cube whose value is the half-extent", () => {
+        assert.equal(
+            velocityCeiling(volume({ shape: "Cube", sideLength: 2 })),
+            2 * Math.sqrt(3),
+        );
+    });
+
+    it("is the radius of a sphere and the slant of a cylinder", () => {
+        assert.equal(
+            velocityCeiling(volume({ shape: "Sphere", sphereRadius: 7 })),
+            7,
+        );
+        assert.equal(
+            velocityCeiling(
+                volume({
+                    shape: "Cylinder",
+                    cylinderRadius: 3,
+                    cylinderHeight: 4,
+                }),
+            ),
+            5,
+        );
+    });
+});
+
+/**
+ * Measured in the game: a streak's ceiling is 1000 for an emitter linked to its parent's motion,
+ * and otherwise the velocity ceiling plus gravity plus the acceleration's length. A weather field
+ * has gravity, acceleration and the link cleared on reset, so only its velocity counts.
+ */
+describe("tailMaxSpeed", () => {
+    const moving = (over: Partial<AlamoEmitterProperties> = {}) =>
+        emitter({
+            speed: volume({
+                shape: "Point",
+                exactValue: { x: 0, y: 0, z: 10 },
+            }),
+            properties: properties({
+                gravity: 2,
+                acceleration: { x: 3, y: 4, z: 0 },
+                ...over,
+            }),
+        });
+
+    it("adds gravity and the acceleration to the velocity ceiling", () => {
+        assert.equal(tailMaxSpeed(moving()), 10 + 2 + 5);
+    });
+
+    it("is a kilometre a second for an emitter linked to its parent", () => {
+        assert.equal(tailMaxSpeed(moving({ parentLinkStrength: 0.5 })), 1000);
+    });
+
+    it("counts only the velocity for a weather field", () => {
+        assert.equal(
+            tailMaxSpeed(
+                moving({ isWeatherParticle: true, parentLinkStrength: 1 }),
+            ),
+            10,
+        );
     });
 });
 
