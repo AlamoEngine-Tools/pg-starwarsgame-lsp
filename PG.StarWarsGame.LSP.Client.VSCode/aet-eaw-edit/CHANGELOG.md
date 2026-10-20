@@ -42,6 +42,10 @@
   - Startup, project loading, localisation commands, settings-file notices and the Lua debugger's
     refusals come from the catalogue. The debugger follows the language the debug client reports,
     since it runs outside the language server's settings
+  - Every catalogue is held to the text rules by `npm run lint`: ASCII only, no second person, a capital
+    after a colon, no full stop on a one-clause label, no counts of the game's own data. The texts that
+    broke them were reworded - "Did you mean" suggestions now name the nearest valid value - and a test
+    fails any server text written in place where a reader sees it
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none

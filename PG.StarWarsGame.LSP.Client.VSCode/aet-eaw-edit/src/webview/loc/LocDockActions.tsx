@@ -504,7 +504,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     {fromLanguage && (
                         <p className="modal-note">
                             {l10n.t(
-                                "Most of a credits list is names, and a name is usually the same in every language. Only do this where that holds: a cell left empty is dropped from that language on export, which is how one file carries lists of different lengths - a dub recorded with a smaller cast, for instance - so filling those in would credit the wrong people.",
+                                "Most of a credits list is names, and a name is usually the same in every language. Only do this where that holds: A cell left empty is dropped from that language on export, which is how one file carries lists of different lengths - a dub recorded with a smaller cast, for instance - so filling those in would credit the wrong people.",
                             )}
                         </p>
                     )}

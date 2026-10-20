@@ -63,7 +63,7 @@ export function chooseServerCommand(input: ServerChoiceInput): ServerChoice {
             bundled: false,
             devMode: true,
             requires: projectPath,
-            description: l10n.t("Dev mode: dotnet {0}", args.join(" ")),
+            description: l10n.t("Dev mode - dotnet {0}", args.join(" ")),
         };
     }
 

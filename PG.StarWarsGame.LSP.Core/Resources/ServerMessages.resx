@@ -100,7 +100,7 @@
     <value>'{0}' is not a valid audio filename for &lt;{1}&gt;. Expected a .wav or .mp3 file.</value>
   </data>
   <data name="AudioParamInt_IsNotAValidAudio" xml:space="preserve">
-    <value>'{0}' is not a valid audio parameter integer for &lt;{1}&gt;. Did you mean {2}?</value>
+    <value>'{0}' is not a valid audio parameter integer for &lt;{1}&gt;. {2} is the nearest valid value.</value>
   </data>
   <data name="AutomaticDespawn_ApplyTheEngineSCorrection" xml:space="preserve">
     <value>Apply the engine's own correction: Turn Causes_Despawn off</value>
@@ -370,7 +370,7 @@
     <value>the chain ended at {0}, past the {1} this build writes</value>
   </data>
   <data name="DuplicateSymbol_DuplicateSymbolAlsoDefinedIn" xml:space="preserve">
-    <value>Duplicate symbol '{0}': also defined in {1}.</value>
+    <value>Duplicate symbol '{0}': Also defined in {1}.</value>
   </data>
   <data name="DuplicateSymbol_OtherDefinition" xml:space="preserve">
     <value>Other definition of '{0}'</value>
@@ -397,7 +397,7 @@
     <value>variant chain: {0}</value>
   </data>
   <data name="EffectiveObject_Cyclic" xml:space="preserve">
-    <value>WARNING: cyclic inheritance detected at {0}</value>
+    <value>WARNING: Cyclic inheritance detected at {0}</value>
   </data>
   <data name="EffectiveObject_Header" xml:space="preserve">
     <value>Effective object: {0}</value>
@@ -460,7 +460,7 @@
     <value>must be greater than 0 and at most 360 degrees</value>
   </data>
   <data name="FiresForward_FiresForwardDoesNothingOn" xml:space="preserve">
-    <value>Fires_Forward does nothing on '{0}': only the {1} behaviour reads it, and this object has none.</value>
+    <value>Fires_Forward does nothing on '{0}': Only the {1} behaviour reads it, and this object has none.</value>
   </data>
   <data name="FiresForward_FiresForwardSkipsTheFiring" xml:space="preserve">
     <value>Fires_Forward skips the firing-arc check, so {0} still swing the turret but no longer limit where '{1}' fires.</value>
@@ -658,7 +658,7 @@
     <value>&lt;{0}&gt; {1} - the engine {2}</value>
   </data>
   <data name="IntFloatTupleList_IsAFloatButExpects" xml:space="preserve">
-    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>
   <data name="IntFloatTupleList_IsNotAValidFloat" xml:space="preserve">
     <value>'{0}' is not a valid float for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
@@ -670,7 +670,7 @@
     <value>'{0}' is not a valid integer for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
   </data>
   <data name="IntList_ContainsFloatValuesButExpects" xml:space="preserve">
-    <value>'{0}' contains float values but &lt;{1}&gt; expects integers. Did you mean '{2}'?</value>
+    <value>'{0}' contains float values but &lt;{1}&gt; expects integers. '{2}' is the nearest valid value.</value>
   </data>
   <data name="IntList_IsNotAValidInteger" xml:space="preserve">
     <value>'' is not a valid integer list for &lt;{0}&gt;.</value>
@@ -679,7 +679,7 @@
     <value>'{0}' is not a valid integer list for &lt;{1}&gt;. Expected space-separated integers.</value>
   </data>
   <data name="IntValue_IsAFloatButExpects" xml:space="preserve">
-    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>
   <data name="IntValue_IsOutOfRangeFor" xml:space="preserve">
     <value>'{0}' is out of range for &lt;{1}&gt;. Expected a valid integer.</value>
@@ -1072,25 +1072,25 @@
     <value>A break is already armed and waiting for the next Lua line</value>
   </data>
   <data name="LuaDebugSession_CannotBreakScriptAlreadySuspended" xml:space="preserve">
-    <value>Cannot break: a script is already suspended; continue or step first</value>
+    <value>Cannot break: A script is already suspended; continue or step first</value>
   </data>
   <data name="LuaDebugSession_CannotBreakThreadNoScript" xml:space="preserve">
-    <value>Cannot break a thread: no script is selected</value>
+    <value>Cannot break a thread: No script is selected</value>
   </data>
   <data name="LuaDebugSession_CannotBreakThreadScriptAlready" xml:space="preserve">
-    <value>Cannot break a thread: a script is already suspended; continue first</value>
+    <value>Cannot break a thread: A script is already suspended; continue first</value>
   </data>
   <data name="LuaDebugSession_CannotContinueNoScriptSuspended" xml:space="preserve">
-    <value>Cannot continue: no script is suspended</value>
+    <value>Cannot continue: No script is suspended</value>
   </data>
   <data name="LuaDebugSession_CannotSelectFrameNoScript" xml:space="preserve">
-    <value>Cannot select a frame: no script is suspended</value>
+    <value>Cannot select a frame: No script is suspended</value>
   </data>
   <data name="LuaDebugSession_CannotSelectScriptWhileOne" xml:space="preserve">
     <value>Cannot select a script while one is suspended; continue first</value>
   </data>
   <data name="LuaDebugSession_CannotStepNoScriptSuspended" xml:space="preserve">
-    <value>Cannot step: no script is suspended</value>
+    <value>Cannot step: No script is suspended</value>
   </data>
   <data name="LuaDebugSession_CannotWhileDebugger" xml:space="preserve">
     <value>Cannot {0} while the debugger is {1}</value>
@@ -1226,10 +1226,10 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>Lua script '{0}' loads from '{1}', outside {2}.</value>
   </data>
   <data name="LuaScriptReference_LuaScriptLoadsFromWhich" xml:space="preserve">
-    <value>Lua script '{0}' loads from '{1}', which shadows '{2}': the game searches that directory first.</value>
+    <value>Lua script '{0}' loads from '{1}', which shadows '{2}': The game searches that directory first.</value>
   </data>
   <data name="LuaScriptReference_LuaScriptWasNotFound" xml:space="preserve">
-    <value>Lua script '{0}' was not found: no '{1}.lua' or '{2}.lc' in any script directory. The object runs without a script.</value>
+    <value>Lua script '{0}' was not found: No '{1}.lua' or '{2}.lc' in any script directory. The object runs without a script.</value>
   </data>
   <data name="LuaStateMachine_AnonymousHandler" xml:space="preserve">
     <value>function</value>
@@ -1367,7 +1367,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>Model '{0}' references texture '{1}', which was not found in the game data or workspace asset files. The reference is inside the model, so the fix is in the art rather than on this line.</value>
   </data>
   <data name="MovieFrameTrigger_IsAFloatButExpects" xml:space="preserve">
-    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>
   <data name="MovieFrameTrigger_IsNotAValidMovie" xml:space="preserve">
     <value>'{0}' is not a valid movie frame trigger for &lt;{1}&gt;. Expected: EventKey, NonNegativeInteger.</value>
@@ -1409,7 +1409,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
   </data>
   <data name="NormalizedFloat_ValueIsOutOfRange" xml:space="preserve">
-    <value>Value {0} is out of range [0, 1] for &lt;{1}&gt;. Did you mean {2}?</value>
+    <value>Value {0} is out of range [0, 1] for &lt;{1}&gt;. {2} is the nearest valid value.</value>
   </data>
   <data name="NumberValueHandlerBase_IsNotAValidNumber" xml:space="preserve">
     <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
@@ -1433,7 +1433,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>Malformed particle file: {0}</value>
   </data>
   <data name="PerFactionIntMap_IsAFloatButExpects" xml:space="preserve">
-    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>
   <data name="PerFactionIntMap_IsNotAValidPer" xml:space="preserve">
     <value>'{0}' is not a valid per-faction int map for &lt;{1}&gt;. Expected: FactionName, Integer.</value>
@@ -1694,7 +1694,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>cannot be greater than</value>
   </data>
   <data name="RgbaValue_ContainsFloatComponentsButExpects" xml:space="preserve">
-    <value>'{0}' contains float components but &lt;{1}&gt; expects integers. Did you mean '{2}'?</value>
+    <value>'{0}' contains float components but &lt;{1}&gt; expects integers. '{2}' is the nearest valid value.</value>
   </data>
   <data name="RgbaValue_IsNotAValidRgba" xml:space="preserve">
     <value>'{0}' is not a valid RGBA color for &lt;{1}&gt;. Expected 3 or 4 integers in 0-255, separated by spaces or commas.</value>
@@ -1724,7 +1724,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>Schema: Not loaded</value>
   </data>
   <data name="SfxCount_IsNotAValidSfx" xml:space="preserve">
-    <value>'{0}' is not a valid SFX count for &lt;{1}&gt;. Expected -1 or a non-negative integer. Did you mean {2}?</value>
+    <value>'{0}' is not a valid SFX count for &lt;{1}&gt;. Expected -1 or a non-negative integer. {2} is the nearest valid value.</value>
   </data>
   <data name="SfxEventHudReference_Noun" xml:space="preserve">
     <value>SFX HUD event reference</value>
@@ -1733,7 +1733,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>SFX event</value>
   </data>
   <data name="SfxPercentage_IsNotAValidSfx" xml:space="preserve">
-    <value>'{0}' is not a valid SFX percentage for &lt;{1}&gt;. Expected [0, 100]. Did you mean {2}?</value>
+    <value>'{0}' is not a valid SFX percentage for &lt;{1}&gt;. Expected [0, 100]. {2} is the nearest valid value.</value>
   </data>
   <data name="ShaderVersionHex_IsNotAValidHex" xml:space="preserve">
     <value>'{0}' is not a valid hex literal for &lt;{1}&gt;. Expected format: 0x[0-9A-Fa-f]+.</value>
@@ -2162,13 +2162,13 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>{0} in {1:0.#}s</value>
   </data>
   <data name="StorySimLua_Entered" xml:space="preserve">
-    <value>{0}: entered '{1}'.</value>
+    <value>{0}: Entered '{1}'.</value>
   </data>
   <data name="StorySimLua_Left" xml:space="preserve">
-    <value>{0}: left '{1}'.</value>
+    <value>{0}: Left '{1}'.</value>
   </data>
   <data name="StorySimLua_NextState" xml:space="preserve">
-    <value>{0}: next state '{1}'.</value>
+    <value>{0}: Next state '{1}'.</value>
   </data>
   <data name="StorySimLua_Owes" xml:space="preserve">
     <value>owes {0}.</value>
@@ -2180,7 +2180,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>Story_Event("{0}") from '{1}' - no armed event listens.</value>
   </data>
   <data name="StorySimLua_TriggerDroppedTransitionPending" xml:space="preserve">
-    <value>{0}: trigger '{1}' dropped - a transition to '{2}' is pending.</value>
+    <value>{0}: Trigger '{1}' dropped - a transition to '{2}' is pending.</value>
   </data>
   <data name="StorySimService_BattleAlready" xml:space="preserve">
     <value>Battle '{0}' is already {1}</value>
@@ -2228,7 +2228,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>battle {0} begins.</value>
   </data>
   <data name="StorySimWorld_BattlePendingFightAutoResolve" xml:space="preserve">
-    <value>battle {0} pending: fight or auto-resolve.</value>
+    <value>battle {0} pending: Fight or auto-resolve.</value>
   </data>
   <data name="StorySimWorld_BattleStartsAt" xml:space="preserve">
     <value>{0} battle starts at {1}</value>
@@ -2258,13 +2258,13 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>era {0} begins</value>
   </data>
   <data name="StorySimWorld_FORCECLICKGUIPressedGame" xml:space="preserve">
-    <value>FORCE_CLICK_GUI {0}: pressed in the game; no listener hears a forced click.</value>
+    <value>FORCE_CLICK_GUI {0}: Pressed in the game; no listener hears a forced click.</value>
   </data>
   <data name="StorySimWorld_GUIClicked" xml:space="preserve">
     <value>GUI {0} clicked</value>
   </data>
   <data name="StorySimWorld_GameWouldActHereSimulator" xml:space="preserve">
-    <value>{0}: the game would act here; the simulator records no fact for it.</value>
+    <value>{0}: The game would act here; the simulator records no fact for it.</value>
   </data>
   <data name="StorySimWorld_Generic" xml:space="preserve">
     <value>generic {0}</value>
@@ -2273,13 +2273,13 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>{0} ignored - '{1}' is not a known name.</value>
   </data>
   <data name="StorySimWorld_LINKTACTICALFromInsideBattle" xml:space="preserve">
-    <value>LINK_TACTICAL {0} from inside a battle: queued for the galaxy, not modelled here.</value>
+    <value>LINK_TACTICAL {0} from inside a battle: Queued for the galaxy, not modelled here.</value>
   </data>
   <data name="StorySimWorld_LINKTACTICALNamesNoBattle" xml:space="preserve">
     <value>LINK_TACTICAL names no battle the model knows.</value>
   </data>
   <data name="StorySimWorld_LINKTACTICALWhilePendingGame" xml:space="preserve">
-    <value>LINK_TACTICAL {0} while {1} is pending: the game queues nothing.</value>
+    <value>LINK_TACTICAL {0} while {1} is pending: The game queues nothing.</value>
   </data>
   <data name="StorySimWorld_LosesAt" xml:space="preserve">
     <value>{0} loses at {1}</value>
@@ -2309,7 +2309,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>{0} pressed: {1} is auto-resolved - decide its outcome.</value>
   </data>
   <data name="StorySimWorld_PressedBattleBegins" xml:space="preserve">
-    <value>{0} pressed: the battle {1} begins.</value>
+    <value>{0} pressed: The battle {1} begins.</value>
   </data>
   <data name="StorySimWorld_Removed" xml:space="preserve">
     <value>{0} removed.</value>
@@ -2360,7 +2360,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>DISABLE_STORY_EVENT ignored - missing parameter.</value>
   </data>
   <data name="StorySim_DISABLESTORYEVENTNoEvent" xml:space="preserve">
-    <value>DISABLE_STORY_EVENT: no event named '{0}'.</value>
+    <value>DISABLE_STORY_EVENT: No event named '{0}'.</value>
   </data>
   <data name="StorySim_Disabled" xml:space="preserve">
     <value>disabled '{0}'.</value>
@@ -2414,10 +2414,10 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>RESET_BRANCH ignored - missing parameter.</value>
   </data>
   <data name="StorySim_RESETBRANCHNoEventThis" xml:space="preserve">
-    <value>RESET_BRANCH: no event '{0}' in this thread.</value>
+    <value>RESET_BRANCH: No event '{0}' in this thread.</value>
   </data>
   <data name="StorySim_RESETEVENTNoEventThis" xml:space="preserve">
-    <value>RESET_EVENT: no event '{0}' in this thread.</value>
+    <value>RESET_EVENT: No event '{0}' in this thread.</value>
   </data>
   <data name="StorySim_ReconsideredDecisionAgain" xml:space="preserve">
     <value>'{0}' reconsidered - a decision again</value>
@@ -2438,7 +2438,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>TRIGGER_EVENT ignored - missing parameter.</value>
   </data>
   <data name="StorySim_TRIGGEREVENTNoEventNamed" xml:space="preserve">
-    <value>TRIGGER_EVENT: no event named '{0}'.</value>
+    <value>TRIGGER_EVENT: No event named '{0}'.</value>
   </data>
   <data name="StorySim_TickS" xml:space="preserve">
     <value>Tick {0} ({1:0.##}s)</value>
@@ -2519,7 +2519,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>type reference</value>
   </data>
   <data name="Uint_IsNotAValidNon" xml:space="preserve">
-    <value>'{0}' is not a valid non-negative integer for &lt;{1}&gt;. Did you mean {2}?</value>
+    <value>'{0}' is not a valid non-negative integer for &lt;{1}&gt;. {2} is the nearest valid value.</value>
   </data>
   <data name="Uint_IsNotAValidNumber" xml:space="preserve">
     <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
@@ -2531,7 +2531,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>'{0}' is not a valid spawn probability table for &lt;{1}&gt;. Expected pairs of UnitTypeName, Float [0.0, 1.0].</value>
   </data>
   <data name="UnitSpawnTable_IsAFloatButExpects" xml:space="preserve">
-    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. Did you mean {2}?</value>
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
   </data>
   <data name="UnitSpawnTable_IsNotAValidUnit" xml:space="preserve">
     <value>'{0}' is not a valid unit spawn entry for &lt;{1}&gt;. Expected: UnitTypeName, Integer &gt;= -1.</value>
@@ -2543,7 +2543,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>&lt;{0}&gt; is not a known {1} tag. The engine discards it.</value>
   </data>
   <data name="UnknownTag_IsNotAKnownTag2" xml:space="preserve">
-    <value>&lt;{0}&gt; is not a known {1} tag. Did you mean &lt;{2}&gt;?</value>
+    <value>&lt;{0}&gt; is not a known {1} tag. &lt;{2}&gt; is the nearest known tag.</value>
   </data>
   <data name="UnnamedObject_HasNoItCannotBe" xml:space="preserve">
     <value>&lt;{0}&gt; has no {1} - it cannot be referenced or overridden, and is ignored as a {2}.</value>
@@ -2555,7 +2555,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>'{0}' is documented but untested - it may not work in the engine.</value>
   </data>
   <data name="UvSlotIndex_IsNotAValidUv" xml:space="preserve">
-    <value>'{0}' is not a valid UV slot index for &lt;{1}&gt;. Expected an integer in [0, 3]. Did you mean {2}?</value>
+    <value>'{0}' is not a valid UV slot index for &lt;{1}&gt;. Expected an integer in [0, 3]. {2} is the nearest valid value.</value>
   </data>
   <data name="ValueTypeHint_EnumOneValues" xml:space="preserve">
     <value>**Enum:** one of the values in `{0}`</value>
@@ -2729,7 +2729,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>{0} and {1} more</value>
   </data>
   <data name="VariantAdditiveMerge_IsAdditiveThisValueIs" xml:space="preserve">
-    <value>'{0}' is additive: this value is added to the base's rather than replacing it, so the variant also keeps {1} inherited from the base. Change the base object if the inherited entries should not apply here.</value>
+    <value>'{0}' is additive: This value is added to the base's rather than replacing it, so the variant also keeps {1} inherited from the base. Change the base object if the inherited entries should not apply here.</value>
   </data>
   <data name="VariantAdditiveMerge_ItsValue" xml:space="preserve">
     <value>its value</value>
@@ -2807,7 +2807,7 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
     <value>member</value>
   </data>
   <data name="XmlDuplicateTag_DuplicateTagOnlyOneOccurrence" xml:space="preserve">
-    <value>Duplicate tag '{0}': only one occurrence is used per object - the game keeps the LAST one.{1}</value>
+    <value>Duplicate tag '{0}': Only one occurrence is used per object - the game keeps the LAST one.{1}</value>
   </data>
   <data name="XmlDuplicateTag_OtherLines" xml:space="preserve">
     <value> Line numbers of the other occurrences - {0}.</value>

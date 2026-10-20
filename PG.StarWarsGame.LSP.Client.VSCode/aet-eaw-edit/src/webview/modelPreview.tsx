@@ -8038,7 +8038,7 @@ function ModelPreview(): React.JSX.Element {
                                             info={
                                                 <>
                                                     {l10n.t(
-                                                        "Zero is the middle of the track - the plane the model itself stands on. The ends are one model radius either way, so the control means the same thing on a trooper and on a Star Destroyer. The grid moves with it: it is the ruler for the ground, not for the origin.",
+                                                        "Zero is the middle of the track - the plane the model itself stands on. The ends are one model radius either way, so the control means the same thing on a trooper and on a Star Destroyer. The grid moves with it: It is the ruler for the ground, not for the origin.",
                                                     )}
                                                 </>
                                             }
@@ -8105,7 +8105,7 @@ function ModelPreview(): React.JSX.Element {
                                             info={
                                                 <>
                                                     {l10n.t(
-                                                        "The engine's own rig: a sun that casts the shadow and two fills that do not. All three reach the translated shaders.",
+                                                        "The engine's own rig: A sun that casts the shadow and two fills that do not. All three reach the translated shaders.",
                                                     )}
                                                 </>
                                             }
@@ -8148,7 +8148,7 @@ function ModelPreview(): React.JSX.Element {
                                             info={
                                                 <>
                                                     {l10n.t(
-                                                        "Turns round the model the way the stage does, from the same zero: at 0 the light stands at the Front view's camera, and it moves clockwise seen from above.",
+                                                        "Turns round the model the way the stage does, from the same zero: At 0 the light stands at the Front view's camera, and it moves clockwise seen from above.",
                                                     )}
                                                 </>
                                             }
@@ -8542,7 +8542,7 @@ function ModelPreview(): React.JSX.Element {
                                                     info={
                                                         <>
                                                             {l10n.t(
-                                                                "Default reads each sub-mesh's shader NAME and draws the archetype it names - never wrong about geometry, only about how a surface is lit. Game draws the model the way the engine does: its own effect shaders, translated, and stencil shadow volumes cast by its authored shadow mesh. Only the shaders need the .fx sources; the shadows work without them.",
+                                                                "Default reads each sub-mesh's shader NAME and draws the archetype it names - never wrong about geometry, only about how a surface is lit. Game draws the model the way the engine does: Its own effect shaders, translated, and stencil shadow volumes cast by its authored shadow mesh. Only the shaders need the .fx sources; the shadows work without them.",
                                                             )}
                                                         </>
                                                     }
@@ -8951,7 +8951,7 @@ function ModelPreview(): React.JSX.Element {
                                                               "A model opened on its own has no object, type or category to bind to. Open it through a game object to bind a preset to a whole roster.",
                                                           )
                                                         : l10n.t(
-                                                              "A bound preset is applied when the model opens, most specific rule first: this object beats its type, and its type beats a category. Moving the camera afterwards is always allowed.",
+                                                              "A bound preset is applied when the model opens, most specific rule first: This object beats its type, and its type beats a category. Moving the camera afterwards is always allowed.",
                                                           )}
                                                 </>
                                             }
@@ -10411,10 +10411,10 @@ function ModelPreview(): React.JSX.Element {
                                                             attackerPresets.length ===
                                                             0
                                                                 ? l10n.t(
-                                                                      "Name a configuration below to save it here.",
+                                                                      "Name a configuration below to save it here",
                                                                   )
                                                                 : l10n.t(
-                                                                      "Loads a saved weapon into the fields above.",
+                                                                      "Loads a saved weapon into the fields above",
                                                                   )
                                                         }
                                                     >

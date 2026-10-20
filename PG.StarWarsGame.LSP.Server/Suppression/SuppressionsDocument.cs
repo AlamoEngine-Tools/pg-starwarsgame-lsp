@@ -42,6 +42,7 @@ public static class SuppressionsDocument
         new()
         {
             Id = DiagnosticIds.XmlCommentInsideValue.ToString(),
+            // file content, not UI: written into the project's suppressions.json, the same on every machine.
             Reason = "Off by default: comments inside values are common practice; delete this entry to report them"
         }
     ];

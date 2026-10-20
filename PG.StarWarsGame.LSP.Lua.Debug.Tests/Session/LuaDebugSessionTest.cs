@@ -323,7 +323,7 @@ public sealed class LuaDebugSessionTest : IAsyncLifetime
 
         var e = await Assert.ThrowsAsync<LuaDebugStateException>(() => _session.ContinueAsync(None));
 
-        Assert.Contains("no script is suspended", e.Message);
+        Assert.Contains("No script is suspended", e.Message);
         Assert.DoesNotContain(_game.Received, m => m is ContinueMessage);
     }
 

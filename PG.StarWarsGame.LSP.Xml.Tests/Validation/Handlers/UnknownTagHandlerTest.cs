@@ -51,7 +51,7 @@ public sealed class UnknownTagHandlerTest
 
         Assert.Equal(
             "<Autoresolve_Health> is not a known GroundCompany tag. " +
-            "Did you mean <Autoresolve_Health_Percentage>?",
+            "<Autoresolve_Health_Percentage> is the nearest known tag.",
             d.Message);
     }
 

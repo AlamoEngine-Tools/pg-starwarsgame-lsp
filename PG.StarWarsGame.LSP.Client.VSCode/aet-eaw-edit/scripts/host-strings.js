@@ -94,10 +94,10 @@ function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
     );
     const found = [];
     const report = (node) => {
-        const { line } = tree.getLineAndCharacterOfPosition(
+        const {line} = tree.getLineAndCharacterOfPosition(
             node.getStart(tree),
         );
-        found.push({ line: line + 1, text: node.getText(tree) });
+        found.push({line: line + 1, text: node.getText(tree)});
     };
 
     const visit = (node) => {
@@ -178,11 +178,100 @@ function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
     return found;
 }
 
+/**
+ * Where a catalogue text is a LABEL rather than a message: an option's or an item's name, a
+ * tooltip, a button. The text rules treat a full stop there as decoration, so this is what lets
+ * them tell `Clear all filters.` from `Saved to {0}.`.
+ */
+const LABEL_PROPERTIES = new Set([
+    "title",
+    "label",
+    "tooltip",
+    "placeHolder",
+    "description",
+    "detail",
+    "text",
+]);
+
+/** Climbs past what passes a value through unchanged: brackets, `a ? b : c`, `a ?? b`. */
+function valueSite(node) {
+    let site = node;
+    for (; ;) {
+        const parent = site.parent;
+        if (
+            ts.isParenthesizedExpression(parent) ||
+            (ts.isConditionalExpression(parent) && parent.condition !== site) ||
+            (ts.isBinaryExpression(parent) &&
+                (parent.operatorToken.kind ===
+                    ts.SyntaxKind.QuestionQuestionToken ||
+                    parent.operatorToken.kind === ts.SyntaxKind.BarBarToken))
+        ) {
+            site = parent;
+            continue;
+        }
+        return site;
+    }
+}
+
+function isLabelSite(site, tree) {
+    const parent = site.parent;
+    if (ts.isPropertyAssignment(parent) && parent.initializer === site) {
+        return LABEL_PROPERTIES.has(parent.name.getText(tree));
+    }
+    if (ts.isJsxExpression(parent) && ts.isJsxAttribute(parent.parent)) {
+        return SHOWN_ATTRIBUTES.has(parent.parent.name.getText(tree));
+    }
+    if (ts.isCallExpression(parent)) {
+        const index = parent.arguments.indexOf(site);
+        const name = calleeName(parent);
+        return (
+            (SHOWN_ARGUMENTS.has(name) && index >= 1) ||
+            (name === "createWebviewPanel" && index === 1)
+        );
+    }
+    if (ts.isNewExpression(parent)) {
+        return (
+            /TreeItem$/.test(parent.expression.getText(tree)) &&
+            parent.arguments?.[0] === site
+        );
+    }
+    return false;
+}
+
+/** Every `l10n.t("...")` in one file, with whether that use is a label. */
+function catalogueCalls(file, source = fs.readFileSync(file, "utf8")) {
+    const tree = ts.createSourceFile(
+        file,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
+    const found = [];
+    const visit = (node) => {
+        if (
+            ts.isCallExpression(node) &&
+            /(^|\.)l10n\.t$/.test(node.expression.getText(tree)) &&
+            node.arguments[0] &&
+            (ts.isStringLiteral(node.arguments[0]) ||
+                ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))
+        ) {
+            found.push({
+                text: node.arguments[0].text,
+                label: isLabelSite(valueSite(node), tree),
+            });
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(tree);
+    return found;
+}
+
 /** The extension host's own sources: `src/` outside the webviews, tests excluded. */
 function hostFiles(src) {
     const files = [];
     const walk = (dir) => {
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
             const full = path.join(dir, entry.name);
             if (entry.isDirectory()) {
                 if (entry.name !== "webview") {
@@ -204,7 +293,7 @@ function hostFiles(src) {
 function webviewFiles(src) {
     const files = [];
     const walk = (dir) => {
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
             const full = path.join(dir, entry.name);
             if (entry.isDirectory()) {
                 walk(full);
@@ -220,7 +309,7 @@ function webviewFiles(src) {
     return files.sort();
 }
 
-module.exports = { rawStrings, hostFiles, webviewFiles };
+module.exports = {rawStrings, catalogueCalls, hostFiles, webviewFiles};
 
 if (require.main === module) {
     const src = path.join(__dirname, "..", "src");
@@ -242,7 +331,7 @@ if (require.main === module) {
     }
 
     // The committed bundle is what translators work from, so it has to match the code.
-    const { execFileSync } = require("node:child_process");
+    const {execFileSync} = require("node:child_process");
     const os = require("node:os");
     const fresh = fs.mkdtempSync(path.join(os.tmpdir(), "aet-l10n-"));
     execFileSync(
@@ -254,14 +343,14 @@ if (require.main === module) {
             fresh,
             src,
         ],
-        { stdio: "ignore" },
+        {stdio: "ignore"},
     );
     const bundle = (dir) =>
         fs
             .readFileSync(path.join(dir, "bundle.l10n.json"), "utf8")
             .replace(/\r/g, "");
     const stale = bundle(path.join(__dirname, "..", "l10n")) !== bundle(fresh);
-    fs.rmSync(fresh, { recursive: true, force: true });
+    fs.rmSync(fresh, {recursive: true, force: true});
     if (stale) {
         console.error(
             "l10n/bundle.l10n.json is stale: run npm run l10n:export",
