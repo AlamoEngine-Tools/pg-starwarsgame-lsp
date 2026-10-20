@@ -936,6 +936,12 @@
   <data name="LocKeyed_ThisChangeDoesNotSay" xml:space="preserve">
     <value>This change does not say which entry it applies to.</value>
   </data>
+  <data name="LocLayer_ADependency" xml:space="preserve">
+    <value>a dependency</value>
+  </data>
+  <data name="LocLayer_ReadOnly" xml:space="preserve">
+    <value>'{0}' belongs to {1}, which is read-only. Copy the file into the project's text directory to override it, then edit the copy.</value>
+  </data>
   <data name="LocSetFormat_NoLocalisationYet" xml:space="preserve">
     <value>This project has no localisation set up yet. Use 'New Localisation Project' or 'Import Existing Localisation Files' to create one.</value>
   </data>

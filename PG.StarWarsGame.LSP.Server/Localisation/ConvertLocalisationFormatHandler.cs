@@ -15,6 +15,7 @@ using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -42,6 +43,7 @@ public sealed class ConvertLocalisationFormatHandler
     private readonly IFileHelper _fileHelper;
     private readonly IModProjectFileWriter _fileWriter;
     private readonly ILanguageService _langService;
+    private readonly IProjectLayerMap _layers;
     private readonly ILogger<ConvertLocalisationFormatHandler> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
     private readonly ILocalisationProjectRegistry _projectRegistry;
@@ -62,7 +64,8 @@ public sealed class ConvertLocalisationFormatHandler
         IModProjectReloadService reloadService,
         IModProjectFileWriter fileWriter,
         ILogger<ConvertLocalisationFormatHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        IProjectLayerMap layers)
     {
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
@@ -78,6 +81,7 @@ public sealed class ConvertLocalisationFormatHandler
         _fileWriter = fileWriter;
         _logger = logger;
         _config = config;
+        _layers = layers;
     }
 
     public async Task<ConvertLocalisationFormatResult> Handle(
@@ -93,6 +97,12 @@ public sealed class ConvertLocalisationFormatHandler
         if (!fs.File.Exists(request.ProjectFilePath))
             return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertDoesNotExist",
                 request.ProjectFilePath));
+
+        // A conversion writes the new files beside the source and rewrites the project file's
+        // format, both of which are the dependency's to decide when the source is its file (#276).
+        if (LocalisationLayerGuard.ReadOnlyObjection(
+                _layers, _fileHelper, request.ProjectFilePath, new ConfiguredMessageCatalog(_config)) is { } readOnly)
+            return Fail(readOnly);
 
         var targetFormat = request.TargetFormat ?? string.Empty;
         if (string.Equals(targetFormat, "dat", StringComparison.OrdinalIgnoreCase))

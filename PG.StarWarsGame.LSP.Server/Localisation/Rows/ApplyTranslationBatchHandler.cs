@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -31,8 +32,9 @@ public sealed class ApplyTranslationBatchHandler
         IFileHelper fileHelper,
         ILogger<ApplyTranslationBatchHandler> logger,
         ILspConfigurationProvider config,
-        ILocalisationWriteLedger writeLedger)
-        : base(reloadService, fileHelper, logger, config, writeLedger)
+        ILocalisationWriteLedger writeLedger,
+        IProjectLayerMap layers)
+        : base(reloadService, fileHelper, logger, config, writeLedger, layers)
     {
         _editor = editor;
     }

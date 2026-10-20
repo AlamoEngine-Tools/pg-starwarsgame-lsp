@@ -31,6 +31,18 @@ public sealed class CreateLocalisationLanguageFileHandlerTest
     private const string NlsContent = "TEXT_A=Hello\nTEXT_B=World\n";
 
     [Fact]
+    public async Task Create_BesideADependencysFile_IsRefusedAndWritesNothing()
+    {
+        var (handler, fs) = Build(dependencyOwnsTheSource: true);
+
+        var result = await handler.Handle(Request(EnglishNls, "GERMAN"), CancellationToken.None);
+
+        Assert.NotNull(result.Error);
+        Assert.Contains("read-only", result.Error);
+        Assert.False(fs.File.Exists("/mod/data/text/mastertextfile_german.properties"));
+    }
+
+    [Fact]
     public async Task Create_NamesTheSiblingForTheNewLanguage()
     {
         var (handler, fs) = Build();
@@ -137,7 +149,7 @@ public sealed class CreateLocalisationLanguageFileHandlerTest
     }
 
     private static (CreateLocalisationLanguageFileHandler Handler, MockFileSystem Fs) Build(
-        MockFileSystem? initialFs = null)
+        MockFileSystem? initialFs = null, bool dependencyOwnsTheSource = false)
     {
         var fs = initialFs ?? new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -171,9 +183,24 @@ public sealed class CreateLocalisationLanguageFileHandlerTest
             registry,
             new NoopReloadService(),
             NullLogger<CreateLocalisationLanguageFileHandler>.Instance,
-            new FakeLspConfigurationProvider());
+            new FakeLspConfigurationProvider(),
+            Layers(new FileHelper(fs), dependencyOwnsTheSource));
 
         return (handler, fs);
+    }
+
+    /// <summary>The source's directory as the project's own, or as a dependency's with the project elsewhere.</summary>
+    private static ProjectLayerMap Layers(FileHelper helper, bool dependencyOwnsTheSource)
+    {
+        var map = new ProjectLayerMap(helper);
+        map.SetLayers(dependencyOwnsTheSource
+            ?
+            [
+                new ProjectLayer(0, "Core", [], [], ["/mod/data/text"], [], null),
+                new ProjectLayer(1, "Rev", [], [], ["/leaf/data/text"], [], null)
+            ]
+            : [new ProjectLayer(0, "Root", [], [], ["/mod/data/text"], [], null)]);
+        return map;
     }
 
     /// <summary>The handler asks for a reload so the tree sees the new file; nothing here needs it.</summary>
