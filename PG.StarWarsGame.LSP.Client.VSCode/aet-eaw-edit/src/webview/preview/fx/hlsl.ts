@@ -32,6 +32,14 @@ const TYPES: Record<string, string> = {
     // takes the upper-left block. Conveniently that means an ordinary affine mat4 - which is exactly
     // what three's `Skeleton.boneMatrices` already holds - can be handed over untouched.
     float4x3: "mat4",
+    // The skinning effects that read their bone indices through `D3DCOLORtoUBYTE4` hold them in
+    // an `int4`.
+    int2: "ivec2",
+    int3: "ivec3",
+    int4: "ivec4",
+    bool2: "bvec2",
+    bool3: "bvec3",
+    bool4: "bvec4",
     half: "float",
     half2: "vec2",
     half3: "vec3",
@@ -180,6 +188,21 @@ function translateExpressions(text: string): string {
         args.length === 1 ? `clamp(${args[0]}, 0.0, 1.0)` : null,
     );
 
+    // `int4(x.zyxw * 255.001953)` is how D3DX documents its expansion: the swizzle and the scale
+    // undo a D3DCOLOR packing, and the extra thousandth keeps a packed 255 from truncating to 254.
+    // The skinning effects read their bone indices through it.
+    out = rewriteCalls(out, "D3DCOLORtoUBYTE4", (args) =>
+        args.length === 1 ? `ivec4((${args[0]}).zyxw * 255.001953)` : null,
+    );
+
+    // A swizzle on a NUMBER - `0.5.xx` is HLSL for a float2 of halves, and GLSL reads it as a
+    // malformed literal. Whatever the letters, every component is that one number.
+    out = out.replace(
+        /\b(\d+\.\d*|\d+)\.([xyzw]{2,4})\b/g,
+        (_, literal: string, swizzle: string) =>
+            `vec${swizzle.length}(${literal.includes(".") ? literal : `${literal}.0`})`,
+    );
+
     return out;
 }
 
@@ -240,14 +263,26 @@ function promoteIntegerArguments(text: string): string {
 function promoteScaledLiterals(text: string): string {
     return text
         .split("\n")
-        .map((line) =>
-            /for\s*\(/.test(line)
-                ? line
-                : line
-                      // A literal being scaled BY something, or scaling it: `* 3`, `3 *`, `/ 4`.
-                      .replace(/([*/]\s*)(\d+)(?![\d.eEfF])/g, "$1$2.0")
-                      .replace(/(?<![\w.\]])(\d+)(\s*[*/])/g, "$1.0$2"),
-        )
+        .map((line) => {
+            // The guard's `\b` had been committed as a literal backspace byte, so no header was
+            // ever recognised.
+            if (/\bfor\s*\(/.test(line)) {
+                return line;
+            }
+
+            // The code only: a `//` comment's slashes are not a division, and `#if 0 // ...`
+            // promoted to `#if 0.0` is no preprocessor expression at all.
+            const comment = line.indexOf("//");
+            const code = comment === -1 ? line : line.slice(0, comment);
+            const rest = comment === -1 ? "" : line.slice(comment);
+
+            return (
+                code
+                    // A literal being scaled BY something, or scaling it: `* 3`, `3 *`, `/ 4`.
+                    .replace(/([*/]\s*)(\d+)(?![\d.eEfF])/g, "$1$2.0")
+                    .replace(/(?<![\w.\]])(\d+)(\s*[*/])/g, "$1.0$2") + rest
+            );
+        })
         .join("\n");
 }
 
@@ -291,6 +326,69 @@ function renameTokens(text: string): string {
     return out;
 }
 
+/** The component count of each type a brace list may initialise. */
+const BRACE_WIDTHS: Record<string, number> = {
+    float: 1,
+    int: 1,
+    vec2: 2,
+    vec3: 3,
+    vec4: 4,
+};
+
+/** An integer literal spelled as a float; anything else as it was. */
+function floatLiteral(value: string): string {
+    return /^-?\d+$/.test(value) ? `${value}.0` : value;
+}
+
+/**
+ * Turns a brace initialiser into a constructor.
+ *
+ * HLSL initialises an aggregate with a brace list; GLSL ES takes a constructor, and
+ * `vec4 TexU = { 0.01, 0.0, 0.0, 0.0 };` is a syntax error there. Every terrain effect opens with
+ * a row of them. An array takes its flat list chunked by the element's width - the fog-of-war
+ * kernel's eight numbers are four vec2 taps. A matrix takes its list as it stands: HLSL lists ROWS,
+ * and under the row-vector convention the translator keeps (`mul(v, M)` written `M * v` over the
+ * transposed matrix) those rows are exactly GLSL's columns.
+ *
+ * Runs after the type rename, so the types are already GLSL's. A float initialised with an integer
+ * literal - `float BloomIteration = 0;` - is widened on the way, which GLSL ES will not do itself.
+ */
+function rewriteBraceInitialisers(text: string): string {
+    const out = text.replace(
+        /\b(float|int|vec[234]|mat[234])\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[\s*(\d+)\s*\])?\s*=\s*\{([^{}]*)\}\s*;/g,
+        (
+            _,
+            type: string,
+            name: string,
+            count: string | undefined,
+            list: string,
+        ) => {
+            const values = splitArguments(list)
+                .map((value) => value.trim())
+                .filter((value) => value !== "")
+                .map((value) => (type === "int" ? value : floatLiteral(value)));
+
+            if (count === undefined) {
+                return `${type} ${name} = ${type}(${values.join(", ")});`;
+            }
+
+            const width = BRACE_WIDTHS[type];
+            const elements: string[] = [];
+            for (let i = 0; i < values.length; i += width) {
+                elements.push(
+                    `${type}(${values.slice(i, i + width).join(", ")})`,
+                );
+            }
+            return `${type} ${name}[${count}] = ${type}[${count}](${elements.join(", ")});`;
+        },
+    );
+
+    return out.replace(
+        /\bfloat\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(-?\d+)\s*;/g,
+        "float $1 = $2.0;",
+    );
+}
+
 /**
  * Translates a body of HLSL declarations and functions into GLSL ES.
  *
@@ -303,6 +401,7 @@ export function translateHlslBody(source: string): string {
     let out = stripFloatSuffixes(source);
     out = translateExpressions(out);
     out = renameTokens(out);
+    out = rewriteBraceInitialisers(out);
     out = promoteIntegerArguments(out);
 
     out = rewriteCasts(out);

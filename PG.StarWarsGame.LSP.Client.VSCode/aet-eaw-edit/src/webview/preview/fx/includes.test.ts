@@ -82,6 +82,31 @@ describe("flattenIncludes", () => {
         assert.match(result.text, /engine/);
     });
 
+    /**
+     * The particle effects include their shared header by path - `..\AlamoEngine.fxh`, as they sit
+     * one folder down - and the server refuses anything but a bare file name. The folder is the
+     * server's knowledge; the request names the file alone.
+     */
+    it("asks for a header by its bare file name, whatever path the include wrote", () => {
+        const result = flattenIncludes(
+            '#include "..\\AlamoEngine.fxh"\n#include "Engine/PrimDepthSprite.fxh"\nbody',
+            reader({
+                "alamoengine.fxh": "fromEngineHeader",
+                "primdepthsprite.fxh": "fromSpriteHeader",
+            }),
+        );
+        assert.equal(result.text, "fromEngineHeader\nfromSpriteHeader\nbody");
+        assert.deepEqual(result.included, [
+            "AlamoEngine.fxh",
+            "PrimDepthSprite.fxh",
+        ]);
+    });
+
+    it("reports a header it cannot read by its bare name too", () => {
+        const result = flattenIncludes('#include "../Missing.fxh"', reader({}));
+        assert.deepEqual(result.missing, ["Missing.fxh"]);
+    });
+
     it("leaves an include inside a comment alone", () => {
         // Anchored to its own line, so a commented-out include is not resurrected.
         const result = flattenIncludes(

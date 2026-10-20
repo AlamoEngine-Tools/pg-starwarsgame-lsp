@@ -9,9 +9,12 @@
 //   1. Draw the scene normally. With multisampling on it goes to the BACK BUFFER and is then copied
 //      out (`StretchRect(pBackBuffer -> pHeatSurface)`), so the texture the composite reads is the
 //      exact image the viewer would otherwise have seen.
-//   2. Clear a distortion buffer to a neutral normal and draw the heat sprites into it, alpha
-//      blended - `HeatSaturationRenderer::OverrideStates` forces SRCALPHA / INVSRCALPHA whatever
-//      blend mode the emitter declares.
+//   2. Clear the back buffer's COLOUR to a neutral normal - the depth stays - and draw the heat
+//      sprites into it, alpha blended and depth-tested against the scene, then copy the back
+//      buffer out again as the distortion field. Measured in the game (FoC x64, 2024 release):
+//      the heat phase draws its emitters by the ordinary particle path with the render mode
+//      forced to alpha, the scene's depth-stencil still bound, so a hull hides the haze behind
+//      it. AloViewer's `OverrideStates` forces the same SRCALPHA / INVSRCALPHA blend.
 //   3. Draw one full-screen quad with `Engine/SceneHeat.fx`, which reads the scene through the
 //      distortion field.
 //
@@ -128,7 +131,14 @@ void main() {
 export class HeatPass {
     /** A copy of the finished frame, taken off the canvas rather than rendered again. */
     private frame: THREE.FramebufferTexture | null = null;
-    private heat: THREE.WebGLRenderTarget | null = null;
+
+    /**
+     * The distortion field, also a copy of the canvas: the sprites are drawn onto the canvas over
+     * the scene's depth, as the game draws them into its back buffer, and copied off afterwards.
+     * A target of their own would have no depth to test against, and let a flamethrower's haze
+     * show through the hull holding it.
+     */
+    private distortion: THREE.FramebufferTexture | null = null;
 
     private readonly composite: THREE.ShaderMaterial;
     private readonly quad: THREE.Scene;
@@ -195,22 +205,27 @@ export class HeatPass {
         renderer.render(scene, camera);
         renderer.copyFramebufferToTexture(this.frame!);
 
-        // Then the benders, alone, onto a field that bends nothing. The scene's background has to
-        // stand down for this pass or it would paint over the neutral field with a flat colour
-        // that decodes to a hard pull to one side.
+        // Then the benders, alone, onto a field that bends nothing - on the CANVAS, whose depth
+        // buffer still holds the scene, so a sprite behind the hull is hidden by it. Only the
+        // colour is cleared; a full clear would throw that depth away, and so would the render's
+        // own auto-clear. The scene's background has to stand down for this pass or it would
+        // paint over the neutral field with a flat colour that decodes to a hard pull to one side.
         camera.layers.set(this.heatLayer);
         scene.background = null;
         renderer.setClearColor(NEUTRAL_HEAT, 1);
-        renderer.setRenderTarget(this.heat!);
-        renderer.clear();
+        renderer.clear(true, false, false);
+        const autoClear = renderer.autoClear;
+        renderer.autoClear = false;
         renderer.render(scene, camera);
+        renderer.autoClear = autoClear;
+        renderer.copyFramebufferToTexture(this.distortion!);
 
         camera.layers.mask = layers;
         scene.background = background;
         renderer.setClearColor(this.previousClear, clearAlpha);
 
         this.composite.uniforms.uScene.value = this.frame;
-        this.composite.uniforms.uHeat.value = this.heat!.texture;
+        this.composite.uniforms.uHeat.value = this.distortion;
         this.composite.uniforms.uDebug.value = debug ? 1 : 0;
 
         renderer.setRenderTarget(null);
@@ -219,7 +234,7 @@ export class HeatPass {
 
     dispose(): void {
         this.frame?.dispose();
-        this.heat?.dispose();
+        this.distortion?.dispose();
         this.composite.dispose();
 
         for (const child of this.quad.children) {
@@ -235,29 +250,25 @@ export class HeatPass {
         const width = Math.max(1, this.size.x);
         const height = Math.max(1, this.size.y);
 
-        if (this.frame === null || this.heat === null) {
-            // A copy of the canvas, so it needs neither samples nor a colour space: the pixels
-            // arriving are already resolved and already encoded, and telling the sampler they are
-            // sRGB would have the hardware decode them a second time.
-            this.frame = new THREE.FramebufferTexture(width, height);
-
-            // The distortion field is DATA - a normal - so it stays linear, and it has no depth
-            // buffer because sprites drawn into it never test against one.
-            this.heat = new THREE.WebGLRenderTarget(width, height, {
-                depthBuffer: false,
-            });
+        if (
+            this.frame !== null &&
+            this.distortion !== null &&
+            this.frame.image.width === width &&
+            this.frame.image.height === height
+        ) {
             return;
         }
 
-        if (
-            this.frame.image.width !== width ||
-            this.frame.image.height !== height
-        ) {
-            // A framebuffer texture cannot be resized in place - the copy would land in a buffer of
-            // the wrong shape - so it is rebuilt.
-            this.frame.dispose();
-            this.frame = new THREE.FramebufferTexture(width, height);
-            this.heat.setSize(width, height);
-        }
+        // Copies of the canvas, so they need neither samples nor a colour space: the pixels
+        // arriving are already resolved and already encoded, and telling the sampler they are
+        // sRGB would have the hardware decode them a second time. The distortion field is DATA -
+        // a normal - and stays linear either way. A framebuffer texture cannot be resized in
+        // place - the copy would land in a buffer of the wrong shape - so both are rebuilt.
+        this.frame?.dispose();
+        this.distortion?.dispose();
+        this.frame = new THREE.FramebufferTexture(width, height);
+        this.frame.name = "scene";
+        this.distortion = new THREE.FramebufferTexture(width, height);
+        this.distortion.name = "distortion";
     }
 }

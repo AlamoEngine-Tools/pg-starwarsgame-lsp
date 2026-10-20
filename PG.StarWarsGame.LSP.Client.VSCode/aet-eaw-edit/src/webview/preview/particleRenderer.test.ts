@@ -10,7 +10,16 @@ import type {
     AlamoEmitter,
     AlamoEmitterProperties,
 } from "../../protocol/modelPreview";
-import { emitter, properties, testSystem, volume } from "./particleFixture";
+import { AlamoMaterial } from "./alamoMaterial";
+import type { TranslatedEffect } from "./fx/effect";
+import type { FxMaterialState } from "./fx/renderState";
+import {
+    emitter,
+    properties,
+    testSystem,
+    track,
+    volume,
+} from "./particleFixture";
 import {
     blendingFor,
     HEAT_LAYER,
@@ -718,6 +727,870 @@ describe("chained emitters", () => {
             puffs.every((p) => Math.abs(p.position.z - 7) < 1e-6),
             `the puff was not where its parent died: ${puffs[0].position.z}`,
         );
+    });
+});
+
+describe("freezing", () => {
+    /**
+     * Measured in the game (FoC x64, 2024 release): on the first tick where the emitter's age plus
+     * the step would pass its freeze time, the emitter bakes the particles it has - as they are
+     * BEFORE that step - and never steps, spawns, ages or fades again. A tick that lands exactly
+     * on the freeze time still steps. Every asteroid field and the galaxy's dust freeze this way.
+     */
+    function freezing(
+        freezeTime: number,
+        over: Partial<AlamoEmitter> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "field",
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 5 },
+                    }),
+                    properties: properties({
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                        freezeTime,
+                    }),
+                    ...over,
+                }),
+            ]),
+        );
+    }
+
+    function snapshot(instance: ParticleSystemInstance): string {
+        return JSON.stringify(
+            instance
+                .emitterParticles(0)
+                .map((p) => [p.position.x, p.position.y, p.position.z, p.age]),
+        );
+    }
+
+    it("keeps stepping and spawning while the freeze time is not reached", () => {
+        const instance = freezing(0.5);
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1);
+        }
+        // Five steps of 0.1 s at ten a second, the last one landing exactly on the freeze time.
+        assert.equal(instance.emitterParticles(0).length, 5);
+    });
+
+    it("bakes the particles once the freeze time has passed and leaves them alone", () => {
+        const instance = freezing(0.5);
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1);
+        }
+        const baked = snapshot(instance);
+        for (let i = 0; i < 20; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(
+            snapshot(instance),
+            baked,
+            "a frozen emitter moved or aged its particles",
+        );
+    });
+
+    it("spawns nothing after the freeze", () => {
+        const instance = freezing(0.5);
+        for (let i = 0; i < 30; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(instance.emitterParticles(0).length, 5);
+    });
+
+    it("never freezes an emitter whose freeze time is zero", () => {
+        const instance = freezing(0);
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1);
+        }
+        const before = snapshot(instance);
+        for (let i = 0; i < 20; i++) {
+            instance.update(0.1);
+        }
+        assert.notEqual(snapshot(instance), before);
+        assert.ok(instance.emitterParticles(0).length > 5);
+    });
+
+    it("drives no trail off a frozen parent", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "sparks",
+                    spawnDuringLife: 1,
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                        freezeTime: 0.3,
+                    }),
+                }),
+                emitter({
+                    name: "smoke trail",
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+        for (let i = 0; i < 3; i++) {
+            instance.update(0.1);
+        }
+        const trailed = instance.emitterParticles(1).length;
+        assert.ok(trailed > 0, "the trail never spawned before the freeze");
+        for (let i = 0; i < 10; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(instance.emitterParticles(1).length, trailed);
+    });
+
+    it("takes nothing more into a frozen trail child", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "sparks",
+                    spawnDuringLife: 1,
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                    }),
+                }),
+                emitter({
+                    name: "smoke trail",
+                    properties: properties({
+                        particlesPerSecond: 20,
+                        lifetime: 100,
+                        freezeTime: 0.3,
+                    }),
+                }),
+            ]),
+        );
+        for (let i = 0; i < 3; i++) {
+            instance.update(0.1);
+        }
+        const trailed = instance.emitterParticles(1).length;
+        const sparks = instance.emitterParticles(0).length;
+        assert.ok(trailed > 0, "the trail never spawned before the freeze");
+        for (let i = 0; i < 10; i++) {
+            instance.update(0.1);
+        }
+        // The parent went on spawning, so the trail's standstill is the child's freeze and not
+        // the parent's.
+        assert.ok(
+            instance.emitterParticles(0).length > sparks,
+            "the parent stopped spawning, so the test proves nothing",
+        );
+        assert.equal(instance.emitterParticles(1).length, trailed);
+    });
+
+    /**
+     * Measured in the game: the no-depth-test flag is read on the live path only; the frozen
+     * path always tests against the depth buffer. No shipped emitter sets both, so this is
+     * fidelity rather than a visible fix.
+     */
+    it("depth-tests a frozen batch whatever the file says", () => {
+        const instance = freezing(0.3, {
+            properties: properties({
+                particlesPerSecond: 10,
+                lifetime: 100,
+                freezeTime: 0.3,
+                noDepthTest: true,
+            }),
+        });
+        const material = instance.emitterMesh(0)!.material as THREE.Material;
+        instance.update(0.1);
+        assert.equal(material.depthTest, false);
+        for (let i = 0; i < 4; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(material.depthTest, true);
+    });
+});
+
+describe("pre-simulation", () => {
+    /**
+     * Measured in the game (FoC x64, 2024 release): at an emitter's first tick, one with a skip
+     * time is stepped forward in tenths of a second until its clock is past that time, and only
+     * then does the tick's own step run. Every freezing field sets skip equal to freeze - the
+     * asteroid field is a populated scene on its first frame and frozen on its second.
+     */
+    function skipping(
+        skipTime: number,
+        freezeTime = 0,
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "field",
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 5 },
+                    }),
+                    properties: properties({
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                        skipTime,
+                        freezeTime,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    it("runs the skip time through before the first step", () => {
+        const instance = skipping(1);
+        instance.update(0.1);
+        const particles = instance.emitterParticles(0);
+        // Eleven tenths to pass one second, then the tick itself: twelve spawns at ten a second,
+        // the oldest of them a full second down the road.
+        assert.equal(particles.length, 12);
+        assert.ok(
+            particles.some((p) => p.position.z > 5),
+            "nothing had travelled the skipped second",
+        );
+    });
+
+    /**
+     * The engine's loop runs while the clock is AT OR BELOW the skip time, so a clock that lands
+     * exactly on it takes one more step. Five tenths sum to exactly one half, which is what makes
+     * this case decidable.
+     */
+    it("steps once more when the clock lands exactly on the skip time", () => {
+        const instance = skipping(0.5);
+        instance.update(0.1);
+        // Six pre-simulated steps (0.0 to 0.5 inclusive) plus the tick: seven spawns.
+        assert.equal(instance.emitterParticles(0).length, 7);
+    });
+
+    it("pre-simulates once, on the first tick only", () => {
+        const instance = skipping(1);
+        instance.update(0.1);
+        instance.update(0.1);
+        assert.equal(instance.emitterParticles(0).length, 13);
+    });
+
+    it("does nothing without a skip time", () => {
+        const instance = skipping(0);
+        instance.update(0.1);
+        assert.equal(instance.emitterParticles(0).length, 1);
+    });
+
+    /** Skip equal to freeze, the shape every shipped field has: populated, then frozen at once. */
+    it("freezes a field with skip equal to freeze on its second tick", () => {
+        const instance = skipping(1, 1);
+        instance.update(0.1);
+        const populated = instance.emitterParticles(0).length;
+        assert.equal(populated, 12);
+        instance.update(0.1);
+        const baked = JSON.stringify(
+            instance.emitterParticles(0).map((p) => [p.position.z, p.age]),
+        );
+        for (let i = 0; i < 10; i++) {
+            instance.update(0.1);
+        }
+        assert.equal(instance.emitterParticles(0).length, populated);
+        assert.equal(
+            JSON.stringify(
+                instance.emitterParticles(0).map((p) => [p.position.z, p.age]),
+            ),
+            baked,
+        );
+    });
+});
+
+describe("depth-sorted frozen batch", () => {
+    /**
+     * Measured in the game (FoC x64, 2024 release): a FROZEN emitter with its depth-sort flag set
+     * and the alpha, depth-sprite-alpha or opaque blend mode submits its baked particles sorted by
+     * squared distance from the camera, descending - back to front - and re-sorts every frame
+     * against the camera as it then stands. Any other mode, or the flag clear, submits them in
+     * bake order. Live particles are never sorted.
+     */
+    function field(
+        over: Partial<AlamoEmitterProperties> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "chunks",
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 5 },
+                    }),
+                    properties: properties({
+                        blendMode: "Transparent",
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                        freezeTime: 0.5,
+                        ...over,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    /** A camera standing at `z`, looking at the origin. */
+    function viewFrom(z: number): THREE.Matrix4 {
+        const camera = new THREE.PerspectiveCamera();
+        camera.position.set(0, 0, z);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        return camera.matrixWorldInverse;
+    }
+
+    /** The z of each drawn instance, in the order the instances are drawn. */
+    function drawnZ(instance: ParticleSystemInstance): number[] {
+        const geometry = instance.emitterMesh(0)!
+            .geometry as THREE.InstancedBufferGeometry;
+        const offsets = geometry.getAttribute("iOffset").array;
+        const out: number[] = [];
+        for (let i = 0; i < geometry.instanceCount; i++) {
+            out.push(offsets[i * 3 + 2]);
+        }
+        return out;
+    }
+
+    /** Five ticks at ten a second: particles at z 2, 1.5, 1, 0.5, 0 in spawn order. */
+    function fill(
+        instance: ParticleSystemInstance,
+        view: THREE.Matrix4 | null,
+    ) {
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1, view);
+        }
+    }
+
+    const BAKE_ORDER = [2, 1.5, 1, 0.5, 0];
+
+    it("draws the frozen batch back to front from the camera", () => {
+        const instance = field();
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), [0, 0.5, 1, 1.5, 2]);
+    });
+
+    it("re-sorts every frame as the camera moves", () => {
+        const instance = field();
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        instance.update(0.1, viewFrom(-100));
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), [0, 0.5, 1, 1.5, 2]);
+    });
+
+    for (const blendMode of ["None", "DepthTransparent"] as const) {
+        it(`sorts the ${blendMode} mode too`, () => {
+            const instance = field({ blendMode });
+            fill(instance, viewFrom(100));
+            instance.update(0.1, viewFrom(100));
+            assert.deepEqual(drawnZ(instance), [0, 0.5, 1, 1.5, 2]);
+        });
+    }
+
+    it("leaves an additive batch in bake order", () => {
+        const instance = field({ blendMode: "Additive" });
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+
+    it("leaves the batch in bake order with the flag clear", () => {
+        const instance = field({ depthSort: false });
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+
+    /** An older server sends no flag; the engine's default is on. */
+    it("sorts when the server sent no flag", () => {
+        const instance = field({ depthSort: undefined });
+        fill(instance, viewFrom(100));
+        instance.update(0.1, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), [0, 0.5, 1, 1.5, 2]);
+    });
+
+    it("never sorts live particles", () => {
+        const instance = field({ freezeTime: 0 });
+        fill(instance, viewFrom(100));
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+
+    it("keeps bake order with no camera to sort against", () => {
+        const instance = field();
+        fill(instance, null);
+        instance.update(0.1, null);
+        assert.deepEqual(drawnZ(instance), BAKE_ORDER);
+    });
+});
+
+describe("engine effects", () => {
+    /** The smallest thing that is still a translated effect. */
+    const EFFECT: TranslatedEffect = {
+        vertex: "#version 300 es\nvoid main() { gl_Position = vec4(0.0); }",
+        fragment:
+            "#version 300 es\nprecision highp float;\nout vec4 c;\nvoid main() { c = vec4(1.0); }",
+        semantics: new Map(),
+        defaults: new Map(),
+        samplers: new Map(),
+        types: new Map(),
+    };
+    /** `PrimParticleBumpAlpha.fx`'s DX8 pass, as `materialStateFrom` reads it. */
+    const STATE: FxMaterialState = {
+        depthTest: true,
+        depthWrite: true,
+        depthFunc: "lessEqual",
+        blend: "alpha",
+        cull: "back",
+        alphaTest: 8 / 255,
+        colourScale: 1,
+    };
+    const BUMP = "primparticlebumpalpha.fx";
+
+    function still(over: Partial<AlamoEmitterProperties> = {}): AlamoEmitter {
+        return emitter({
+            name: "rocks",
+            normalTexture: "p_asteroid_n.tga",
+            properties: properties({
+                blendMode: "Bump",
+                particlesPerSecond: 10,
+                lifetime: 100,
+                ...over,
+            }),
+        });
+    }
+
+    function withEffect(
+        instance: ParticleSystemInstance,
+        enabled = true,
+    ): ParticleSystemInstance {
+        instance.applyEffects(
+            new Map([[BUMP, EFFECT]]),
+            new Map([[BUMP, STATE]]),
+            enabled,
+        );
+        return instance;
+    }
+
+    /** A camera at +z looking at the origin: view right is +x, view up is +y. */
+    function viewFrom(z: number): THREE.Matrix4 {
+        const camera = new THREE.PerspectiveCamera();
+        camera.position.set(0, 0, z);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        return camera.matrixWorldInverse;
+    }
+
+    function attribute(
+        instance: ParticleSystemInstance,
+        name: string,
+    ): THREE.BufferAttribute {
+        return instance
+            .emitterMesh(0)!
+            .geometry.getAttribute(name) as THREE.BufferAttribute;
+    }
+
+    it("names the engine effect each of its emitters is drawn with, once", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                still(),
+                still(),
+                emitter({ properties: properties({ blendMode: "Inverse" }) }),
+            ]),
+        );
+        assert.deepEqual(instance.effectNames(), [
+            "PrimModulate.fx",
+            "PrimParticleBumpAlpha.fx",
+        ]);
+    });
+
+    it("draws an emitter through its translated effect once the effect is in hand", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        const mesh = instance.emitterMesh(0)!;
+        assert.ok(mesh.material instanceof AlamoMaterial);
+        assert.equal(attribute(instance, "position").itemSize, 3);
+        assert.equal(attribute(instance, "color").itemSize, 4);
+        assert.equal(attribute(instance, "uv").itemSize, 2);
+    });
+
+    /**
+     * Measured: the engine builds the four corners on the CPU - position plus the camera-rotated
+     * corner offset times the size - and the effect's vertex shader only projects them.
+     */
+    it("writes four corners per particle, facing the camera", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        instance.update(0.1, viewFrom(100));
+        assert.equal(instance.emitterParticles(0).length, 1);
+        const positions = attribute(instance, "position");
+        const corners = [0, 1, 2, 3]
+            .map((i) =>
+                [positions.getX(i), positions.getY(i), positions.getZ(i)]
+                    .map((v) => Math.round(v * 1000) / 1000)
+                    .join(","),
+            )
+            .sort();
+        // Half a unit either way: the scale track's default of 1, halved as the engine halves it.
+        assert.deepEqual(corners, [
+            "-0.5,-0.5,0",
+            "-0.5,0.5,0",
+            "0.5,-0.5,0",
+            "0.5,0.5,0",
+        ]);
+        assert.equal(instance.emitterMesh(0)!.geometry.drawRange.count, 6);
+    });
+
+    /**
+     * Measured: for the bump effect the engine replaces the vertex colour's RGB with the sprite's
+     * rotation tangent in view space, encoded as `0.5 + 0.5 * t`, and keeps the alpha. An
+     * unrotated sprite's tangent is view right.
+     */
+    it("packs the rotation tangent into a bump sprite's colour", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        instance.update(0.1, viewFrom(100));
+        const colour = attribute(instance, "color");
+        assert.deepEqual(
+            [colour.getX(0), colour.getY(0), colour.getZ(0), colour.getW(0)],
+            [1, 0.5, 0.5, 1],
+        );
+    });
+
+    /**
+     * The corner offsets are the VIEW axes expressed in the particles' own space - the rows of
+     * the simulation-to-view rotation, not its columns. A camera off to the side tells them apart.
+     */
+    it("faces the camera wherever it stands", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        // Off to the side AND above, so no axis lines up with another and a transposed basis
+        // lands the corners somewhere else.
+        const camera = new THREE.PerspectiveCamera();
+        camera.position.set(100, 50, 30);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        instance.update(0.1, camera.matrixWorldInverse);
+        const positions = attribute(instance, "position");
+        const right = new THREE.Vector3().setFromMatrixColumn(
+            camera.matrixWorld,
+            0,
+        );
+        const up = new THREE.Vector3().setFromMatrixColumn(
+            camera.matrixWorld,
+            1,
+        );
+        const key = (v: THREE.Vector3): string =>
+            [v.x, v.y, v.z]
+                .map((n) => Math.round(n * 1000) / 1000 + 0)
+                .join(",");
+        const expected = [
+            [-1, -1],
+            [1, -1],
+            [1, 1],
+            [-1, 1],
+        ]
+            .map(([cx, cy]) =>
+                key(
+                    right
+                        .clone()
+                        .multiplyScalar(cx * 0.5)
+                        .addScaledVector(up, cy * 0.5),
+                ),
+            )
+            .sort();
+        const corners = [0, 1, 2, 3]
+            .map((i) =>
+                key(
+                    new THREE.Vector3(
+                        positions.getX(i),
+                        positions.getY(i),
+                        positions.getZ(i),
+                    ),
+                ),
+            )
+            .sort();
+        assert.deepEqual(corners, expected);
+    });
+
+    it("packs the tangent whatever colour the track says", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([
+                    {
+                        ...still(),
+                        tracks: [
+                            track("Red", [
+                                [0, 0.2],
+                                [1, 0.2],
+                            ]),
+                            track("Green", [
+                                [0, 0.3],
+                                [1, 0.3],
+                            ]),
+                            track("Alpha", [
+                                [0, 0.7],
+                                [1, 0.7],
+                            ]),
+                        ],
+                    },
+                ]),
+            ),
+        );
+        instance.update(0.1, viewFrom(100));
+        const colour = attribute(instance, "color");
+        assert.deepEqual(
+            [
+                colour.getX(0),
+                colour.getY(0),
+                colour.getZ(0),
+                colour.getW(0),
+            ].map((v) => Math.round(v * 1000) / 1000),
+            [1, 0.5, 0.5, 0.7],
+        );
+    });
+
+    /** A quarter turn: the tangent swings from view right to view up. */
+    it("packs the tangent of a rotated sprite", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([
+                    still({
+                        randomRotation: true,
+                        randomRotationAverage: 0.25,
+                        randomRotationVariance: 0,
+                    }),
+                ]),
+            ),
+        );
+        instance.update(0.1, viewFrom(100));
+        const colour = attribute(instance, "color");
+        assert.deepEqual(
+            [colour.getX(0), colour.getY(0), colour.getZ(0)].map(
+                (v) => Math.round(v * 1000) / 1000,
+            ),
+            [0.5, 1, 0.5],
+        );
+    });
+
+    it("writes the tracked colour for any other effect", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    properties: properties({
+                        blendMode: "Inverse",
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+        instance.applyEffects(
+            new Map([["primmodulate.fx", EFFECT]]),
+            new Map([["primmodulate.fx", STATE]]),
+            true,
+        );
+        instance.update(0.1, viewFrom(100));
+        const colour = attribute(instance, "color");
+        assert.deepEqual(
+            [colour.getX(0), colour.getY(0), colour.getZ(0), colour.getW(0)],
+            [1, 1, 1, 1],
+        );
+    });
+
+    /**
+     * Measured: a depth sprite's second texture is the emitter's own depth map, read from the same
+     * chunk as a bump emitter's normal map, and the frozen renderer binds it to the effect's
+     * second stage. Not the scene's depth.
+     */
+    it("draws a depth sprite through its effect, its depth map bound as DepthSampler", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "chunks",
+                    normalTexture: "p_chunk_depth.tga",
+                    properties: properties({
+                        blendMode: "DepthTransparent",
+                        particlesPerSecond: 10,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+        instance.applyEffects(
+            new Map([["primdepthspritealpha.fx", EFFECT]]),
+            new Map([["primdepthspritealpha.fx", STATE]]),
+            true,
+        );
+        const depthMap = new THREE.Texture();
+        instance.setTexture("p_chunk_depth.tga", depthMap);
+        const material = instance.emitterMesh(0)!.material;
+        assert.ok(material instanceof AlamoMaterial);
+        assert.equal(material.uniforms.DepthSampler.value, depthMap);
+    });
+
+    /**
+     * The real order of events: the field freezes on its second frame, the effect comes back from
+     * the host later. A bump field is not depth-sorted, so a frozen one is never written again -
+     * and a fresh effect buffer created on arrival stayed empty. Measured on P_asteroid_field00
+     * with the headless render probe: 832 particles, 37 in the frustum, nothing drawn.
+     */
+    it("writes the frozen bake into the effect's buffer when the effect arrives after the freeze", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([still({ freezeTime: 0.3 })]),
+        );
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        assert.ok(instance.emitterParticles(0).length > 0);
+
+        withEffect(instance);
+        instance.update(0.1, viewFrom(100));
+        const mesh = instance.emitterMesh(0)!;
+        assert.ok(mesh.material instanceof AlamoMaterial);
+        assert.equal(
+            mesh.geometry.drawRange.count,
+            instance.emitterParticles(0).length * 6,
+        );
+    });
+
+    it("writes the frozen bake back into the preview's own buffer when the effect is switched off", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([still({ freezeTime: 0.3 })]),
+            ),
+        );
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+
+        withEffect(instance, false);
+        instance.update(0.1, viewFrom(100));
+        const geometry = instance.emitterMesh(0)!
+            .geometry as THREE.InstancedBufferGeometry;
+        assert.equal(
+            geometry.instanceCount,
+            instance.emitterParticles(0).length,
+        );
+    });
+
+    /**
+     * Measured in the game: the corner table is rotated into camera space once per camera change,
+     * and a frozen particle's corners are built from it at every draw. The bake is the particle
+     * STATE, never the vertex stream, so a frozen sprite faces the camera wherever it moves. The
+     * effect buffer wrote the view basis into its positions at the freeze and was not written
+     * again, so the asteroid field's rocks faced wherever the camera stood when it froze.
+     */
+    it("turns a frozen bake drawn through its effect to face a camera that has moved", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([still({ freezeTime: 0.3 })]),
+            ),
+        );
+        for (let i = 0; i < 5; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        assert.ok(instance.emitterParticles(0).length > 0);
+
+        // The camera moves to +x, looking at the origin: a sprite facing it spans y and z and
+        // keeps one x across its four corners.
+        const side = new THREE.PerspectiveCamera();
+        side.position.set(100, 0, 0);
+        side.lookAt(0, 0, 0);
+        side.updateMatrixWorld(true);
+        instance.update(0.1, side.matrixWorldInverse);
+
+        const positions = attribute(instance, "position").array;
+        const xs = [0, 1, 2, 3].map((corner) => positions[corner * 3]);
+        const zs = [0, 1, 2, 3].map((corner) => positions[corner * 3 + 2]);
+        assert.ok(
+            xs.every((x) => Math.abs(x - xs[0]) < 1e-6),
+            `corners spread in x: ${xs.join(", ")}`,
+        );
+        assert.ok(
+            zs.some((z) => Math.abs(z - zs[0]) > 1e-6),
+            `corners flat in z: ${zs.join(", ")}`,
+        );
+    });
+
+    it("depth-tests a frozen batch drawn through its effect, whatever the file says", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance(
+                "test",
+                testSystem([still({ freezeTime: 0.3, noDepthTest: true })]),
+            ),
+        );
+        const material = instance.emitterMesh(0)!.material as THREE.Material;
+        instance.update(0.1, viewFrom(100));
+        assert.equal(material.depthTest, false);
+        for (let i = 0; i < 4; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        assert.equal(material.depthTest, true);
+    });
+
+    for (const [why, over, effectName] of [
+        ["a heat sprite", { isHeatParticle: true }, BUMP],
+        ["a tailed emitter", { hasTail: true }, BUMP],
+    ] as const) {
+        it(`keeps the preview's own shader for ${why}`, () => {
+            const instance = new ParticleSystemInstance(
+                "test",
+                testSystem([still(over)]),
+            );
+            instance.applyEffects(
+                new Map([[effectName, EFFECT]]),
+                new Map([[effectName, STATE]]),
+                true,
+            );
+            assert.ok(
+                !(instance.emitterMesh(0)!.material instanceof AlamoMaterial),
+            );
+        });
+    }
+
+    it("goes back to the preview's own shader when translation is switched off", () => {
+        const instance = withEffect(
+            new ParticleSystemInstance("test", testSystem([still()])),
+        );
+        withEffect(instance, false);
+        assert.ok(
+            !(instance.emitterMesh(0)!.material instanceof AlamoMaterial),
+        );
+        assert.equal(
+            instance.emitterMesh(0)!.geometry.getAttribute("iOffset").itemSize,
+            3,
+        );
+    });
+
+    it("asks for the normal map a bump emitter names, beside its colour texture", () => {
+        const instance = new ParticleSystemInstance(
+            "test",
+            testSystem([still()]),
+        );
+        assert.deepEqual(instance.textureNames(), [
+            "p_particle_master.tga",
+            "p_asteroid_n.tga",
+        ]);
     });
 });
 

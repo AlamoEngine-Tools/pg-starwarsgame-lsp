@@ -158,6 +158,7 @@ import {
 import { HEAT_LAYER, ParticleSystemInstance } from "./particleRenderer";
 import {
     alamoBoneName,
+    alamoNodeName,
     type BoneAttachment,
     type FlatBone,
     labelCandidates,
@@ -1608,7 +1609,7 @@ export class PreviewViewport {
         // made `Ei_trooper` report its root as `Storm_Trooper_LOD2` when bone 0 is `Root`, and
         // every bone count, parent and attachment was then read off the wrong object.
         root.traverse((node) => {
-            const parsed = alamoBoneName(node.name);
+            const parsed = alamoBoneName(alamoNodeName(node));
             if (parsed === null) {
                 return;
             }
@@ -1778,9 +1779,11 @@ export class PreviewViewport {
             }
 
             // First wins. A visibility track names a bone, and a bone name is unique within one
-            // model because the exporter suffixes it with the bone index.
-            if (node.name !== "" && !subject.nodeByName.has(node.name)) {
-                subject.nodeByName.set(node.name, node);
+            // model because the exporter suffixes it with the bone index. Keyed by the name the
+            // exporter wrote, which is the one a track names - three's sanitised copy is not.
+            const name = alamoNodeName(node);
+            if (name !== "" && !subject.nodeByName.has(name)) {
+                subject.nodeByName.set(name, node);
             }
         });
 
@@ -1852,6 +1855,7 @@ export class PreviewViewport {
     applyShaderState(shaderName: string, state: FxMaterialState): void {
         this.shaderStates.set(shaderName.toLowerCase(), state);
         this.applyStoredShaderState(shaderName.toLowerCase(), state);
+        this.applyParticleEffects();
     }
 
     /** Every distinct shader name the loaded geometry names, so each is fetched once. */
@@ -1871,7 +1875,31 @@ export class PreviewViewport {
             }
         });
 
+        // The particle systems' effects too: an emitter is drawn through the engine's own
+        // `Prim*.fx` for its render mode, fetched and translated like any mesh effect.
+        for (const entry of this.particleSystems.values()) {
+            for (const name of entry.instance.effectNames()) {
+                names.add(name);
+            }
+        }
+
         return [...names].sort();
+    }
+
+    /**
+     * Hands every particle system the translated effects in hand, or takes them away.
+     *
+     * Rerun whenever an effect or a pass state arrives and when the translation toggle moves: a
+     * system built before its effect came back has to pick it up the same as one built after.
+     */
+    private applyParticleEffects(): void {
+        for (const entry of this.particleSystems.values()) {
+            entry.instance.applyEffects(
+                this.translated,
+                this.shaderStates,
+                this.translatedShaders,
+            );
+        }
     }
 
     /** Sets the team tint, or clears it back to the model's own colours. */
@@ -2120,7 +2148,7 @@ export class PreviewViewport {
             const extras = (mesh.userData.alamo ?? {}) as MaterialExtras;
 
             if (shieldMeshOffShader(extras)) {
-                names.add(extras.alamoMesh ?? mesh.name);
+                names.add(extras.alamoMesh ?? alamoNodeName(mesh));
             }
         });
 
@@ -2854,7 +2882,8 @@ export class PreviewViewport {
             const node = hull.bonesByIndex.get(index);
             return node === undefined
                 ? ""
-                : (alamoBoneName(node.name)?.name ?? node.name);
+                : (alamoBoneName(alamoNodeName(node))?.name ??
+                      alamoNodeName(node));
         };
 
         this.forEachPartMesh((mesh) => {
@@ -2865,7 +2894,7 @@ export class PreviewViewport {
 
             const placement = meshPlacement(owner, roots, {
                 bone: boneName(owner),
-                mesh: extras.alamoMesh ?? mesh.name,
+                mesh: extras.alamoMesh ?? alamoNodeName(mesh),
             });
 
             // A bone carrying two meshes keeps the first as its own row; the second stays a child
@@ -2909,7 +2938,7 @@ export class PreviewViewport {
 
             return {
                 // The ALO's own mesh name, not the glTF node name.
-                name: extras.alamoMesh ?? mesh.name,
+                name: extras.alamoMesh ?? alamoNodeName(mesh),
                 visible: meshDrawn(mesh),
                 gatedOff:
                     resolveMaterial(extras).hidden ||
@@ -3095,7 +3124,7 @@ export class PreviewViewport {
 
             found.push({
                 kind: "mesh",
-                name: extras.alamoMesh ?? source.mesh.name,
+                name: extras.alamoMesh ?? alamoNodeName(source.mesh),
                 boneName: nameOf(source.ownerBone ?? source.boneIndex ?? -1),
                 vertexCount: vertices,
                 triangleCount: triangleCount(geometry),
@@ -4027,7 +4056,9 @@ export class PreviewViewport {
         return [...hull.bonesByIndex.entries()]
             .map(([index, node]) => ({
                 index,
-                name: alamoBoneName(node.name)?.name ?? node.name,
+                name:
+                    alamoBoneName(alamoNodeName(node))?.name ??
+                    alamoNodeName(node),
                 parent: boneAncestor(node),
                 visible: node.visible,
             }))
@@ -5343,6 +5374,7 @@ export class PreviewViewport {
         for (const [name, texture] of this.textures) {
             this.setTexture(name, texture);
         }
+        this.applyParticleEffects();
     }
 
     /**
@@ -6019,11 +6051,9 @@ export class PreviewViewport {
 
             // Only where THIS node is the one holding the name. `nodeByName` is first-wins, so one
             // part of a subject must not take another part's entry with it.
-            if (
-                node.name !== "" &&
-                subject.nodeByName.get(node.name) === node
-            ) {
-                subject.nodeByName.delete(node.name);
+            const name = alamoNodeName(node);
+            if (name !== "" && subject.nodeByName.get(name) === node) {
+                subject.nodeByName.delete(name);
             }
         }
 
@@ -6422,7 +6452,7 @@ export class PreviewViewport {
 
         const byId = new Map(
             [...hull.bonesByIndex.values()].map(
-                (node) => [node.name, node] as const,
+                (node) => [alamoNodeName(node), node] as const,
             ),
         );
         const id = resolveBoneId(byId.keys(), key);
@@ -6455,7 +6485,9 @@ export class PreviewViewport {
         const skinned = mesh as THREE.SkinnedMesh;
         const ids =
             skinned.isSkinnedMesh === true
-                ? (skinned.skeleton?.bones ?? []).map((bone) => bone.name)
+                ? (skinned.skeleton?.bones ?? []).map((bone) =>
+                      alamoNodeName(bone),
+                  )
                 : [];
 
         this.skinBoneIds.set(mesh, ids);
@@ -6971,6 +7003,12 @@ export class PreviewViewport {
         );
         instance.attachTo(attachment);
         instance.setVisible(this.particlesVisible);
+        // Built after its effects came back, as a hardpoint's blast is: it takes what is in hand.
+        instance.applyEffects(
+            this.translated,
+            this.shaderStates,
+            this.translatedShaders,
+        );
 
         // A system built after the answers came back still has to show the marker: a hardpoint
         // blowing up spawns one long after the textures were asked for.
@@ -7094,7 +7132,7 @@ export class PreviewViewport {
                 return;
             }
 
-            if (track?.bones.has(node.name) === true) {
+            if (track?.bones.has(alamoNodeName(node)) === true) {
                 return;
             }
 
@@ -7176,7 +7214,10 @@ export class PreviewViewport {
             // measured, see `AlamoFireBone.AimDirection` - so that axis gets an arrowhead and a longer
             // reach. Nothing else on the triad says which way the gun points, which was the complaint.
             const firing = this.fireBones.has(
-                (alamoBoneName(node.name)?.name ?? node.name).toLowerCase(),
+                (
+                    alamoBoneName(alamoNodeName(node))?.name ??
+                    alamoNodeName(node)
+                ).toLowerCase(),
             );
 
             for (const [direction, colour] of axes) {
@@ -7465,7 +7506,9 @@ export class PreviewViewport {
                 x: (ndc.x * 0.5 + 0.5) * width,
                 y: (-ndc.y * 0.5 + 0.5) * height,
                 depth: ndc.z,
-                text: alamoBoneName(node.name)?.name ?? node.name,
+                text:
+                    alamoBoneName(alamoNodeName(node))?.name ??
+                    alamoNodeName(node),
                 selected: this.selectedBones.has(index),
             });
         }

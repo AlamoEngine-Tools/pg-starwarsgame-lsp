@@ -39,7 +39,10 @@ export function flattenIncludes(
         return text.replace(
             /^[ \t]*#include\s+"([^"]+)"[ \t]*$/gm,
             (_, rawName: string) => {
-                const name = rawName.trim();
+                // The bare file name, whatever path the include wrote. The particle effects sit
+                // one folder down and include `..\AlamoEngine.fxh`; the server refuses anything
+                // but a name and knows the folders itself.
+                const name = rawName.trim().split(/[\\/]/).pop() ?? "";
                 const key = name.toLowerCase();
 
                 // A cycle would otherwise recurse until the stack gives out. The headers do include each

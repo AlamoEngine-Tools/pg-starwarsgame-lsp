@@ -67,6 +67,24 @@ export function alamoBoneName(
 }
 
 /**
+ * The name the exporter wrote on a node, not the one three.js kept.
+ *
+ * three's glTF loader passes every node name through `PropertyBinding.sanitizeNodeName`, which
+ * turns whitespace into `_` and deletes `[ ] . : /` - a dot is a path separator in an animation
+ * track name, so it cannot stay in a node name. The original is kept in `userData.name`, and that
+ * is the name the XML references: `Weap_Turbo_LS_03_170._FP01` showed in the tree as
+ * `Weap_Turbo_LS_03_170_FP01`, an author copied it, and the server rightly said no such bone
+ * exists (#265). Never written back onto the node, for the same reason the loader took it off.
+ */
+export function alamoNodeName(node: {
+    name: string;
+    userData: Record<string, unknown>;
+}): string {
+    const original = node.userData.name;
+    return typeof original === "string" ? original : node.name;
+}
+
+/**
  * Builds the forest.
  *
  * A parent index outside the list, or one pointing forward, is treated as a root rather than

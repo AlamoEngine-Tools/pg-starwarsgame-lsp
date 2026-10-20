@@ -66,15 +66,20 @@ public sealed class ShaderSourceResolver(
     {
         if (!IsBareShaderName(shaderName))
         {
-            logger.LogDebug("Refused shader name {Name}", shaderName);
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug("Refused shader name {Name}", shaderName);
             return null;
         }
 
         // The mod's own, through the normal asset layering - so a dependency's shader loses to the
-        // root project's, the same way every other asset does.
-        var fromWorkspace = assets.Read(ShaderDirectory + shaderName);
-        if (fromWorkspace is not null)
-            return Decode(fromWorkspace);
+        // root project's, the same way every other asset does. The particle effects and their
+        // header sit one folder down, in Engine/, in every tier; the request names the file alone.
+        foreach (var folder in ShaderFolders)
+        {
+            var fromWorkspace = assets.Read(ShaderDirectory + folder + shaderName);
+            if (fromWorkspace is not null)
+                return Decode(fromWorkspace);
+        }
 
         var directory = ManagedDirectory();
         if (directory is null)
@@ -97,16 +102,27 @@ public sealed class ShaderSourceResolver(
     }
 
     /// <summary>
+    ///     The folders a shader may sit in, relative to a shaders directory: the directory itself
+    ///     for the mesh effects and the headers, <c>Engine/</c> for the particle effects
+    ///     (<c>PrimAlpha.fx</c>, <c>PrimParticleBumpAlpha.fx</c> and the rest) and their own header.
+    /// </summary>
+    private static readonly string[] ShaderFolders = ["", "Engine/"];
+
+    /// <summary>
     ///     Where the shader may sit under the managed directory.
     /// </summary>
     /// <remarks>
     ///     Both forms, because the published archive contains a <c>Shaders/</c> folder and people
-    ///     extract it as-is about as often as they extract its contents.
+    ///     extract it as-is about as often as they extract its contents; each with its
+    ///     <c>Engine/</c> folder.
     /// </remarks>
     private static IEnumerable<string> ManagedCandidates(string directory, string shaderName)
     {
-        yield return Path.Combine(directory, shaderName);
-        yield return Path.Combine(directory, "Shaders", shaderName);
+        foreach (var folder in ShaderFolders)
+        {
+            yield return Path.Combine(directory, folder, shaderName);
+            yield return Path.Combine(directory, "Shaders", folder, shaderName);
+        }
     }
 
     private string? ManagedDirectory()

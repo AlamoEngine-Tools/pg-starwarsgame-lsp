@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Reads a particle .alo with the server's own reader and writes the DTO the webview receives,
+       as JSON, for `render.js`. References the ALREADY BUILT server libraries so that running it
+       never rebuilds the server (whose output the running server locks).
+       Usage: dotnet run - - <file.alo> <out.json> -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <ServerBin>$(MSBuildThisFileDirectory)..\..\..\..\..\PG.StarWarsGame.LSP.Server\bin\Debug\net10.0\</ServerBin>
+    <DefineConstants>$(DefineConstants)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="PG.StarWarsGame.LSP.Assets">
+      <HintPath>$(ServerBin)PG.StarWarsGame.LSP.Assets.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(ServerBin)Newtonsoft.Json.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ServerBin</_Parameter1>
+      <_Parameter2>$([System.IO.Path]::GetFullPath('$(ServerBin)'))</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

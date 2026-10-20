@@ -93,6 +93,54 @@
   - A row applies only with the matching ability type in the unit's first or second ability slot
   - Reported in the hardpoint file on the row, and in the unit file on the hardpoint's name
   - Vanilla: no shipped hardpoint file raises either
+- **Frozen emitters** - a particle emitter with a freeze time freezes as the game freezes it: on the first tick past
+  that time its particles are baked as they stand and never step, spawn, age or fade again
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
+  - A frozen emitter drives no trails or death children, and takes nothing more in as a child
+  - With the depth-sort flag set and the alpha, depth-sprite-alpha or opaque blend mode, the frozen batch is drawn
+    back to front from the camera, re-sorted every frame as the game sorts it; any other mode, or the flag clear,
+    keeps bake order. Live particles are never sorted, as before
+  - Vanilla: 42 emitters freeze - every asteroid, junk and planet-destruction field, the galaxy's dust and stars -
+    and two of them sort
+  - A frozen batch is depth-tested whatever the file says: the game reads the no-depth-test flag on the live path only
+- **Particles drawn through the engine's own effects** - an emitter whose render mode names a programmable effect
+  (`PrimParticleBumpAlpha`, `PrimDecalBumpAlpha`, `PrimModulate`) is drawn through that effect, translated like a
+  mesh shader: CPU-built quads with the engine's vertex layout, the rotation tangent packed into the colour for the
+  bump effects, the normal map bound, the pass's blend, depth and alpha test applied
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
+  - Every asteroid, junk and planet-destruction field is a bump emitter: lit, normal-mapped rocks instead of flat
+    cut-outs
+  - `PrimAlpha`, `PrimAdditive`, `PrimDiffuseAlpha`, `PrimOpaque` and `PrimAlphaScanlines` ship fixed-function only
+    (their programmable technique is commented out in the sources), so they keep the preview's own shader, which is
+    that path; heat sprites keep the distortion pass; tailed emitters keep the preview's shader for now
+  - A depth sprite (`PrimDepthSprite*`) is drawn through its effect too: the emitter's own depth map, read from
+    the same chunk as a bump emitter's normal map, is bound as the effect's second texture, and the pixel
+    shader's depth output reaches the depth buffer, so a chunk sinks into or stands off the hull as the game
+    draws it; a frozen batch drawn through an effect is depth-tested like any other frozen batch
+  - A frozen field whose effect arrives after the freeze - the real order of events, since a field freezes on
+    its second frame and the shader comes back from the host later - is written into the effect's fresh buffer
+    on the next tick; before, an unsorted frozen bake was never written again and the asteroid field vanished
+    the moment its effect was applied
+  - Both compile in a real WebGL2 context, which they did not at first: a `mul` of a float3 by a float4x4 now
+    narrows the matrix as HLSL does, and a shader handle bound to a block of DX8 assembly is stripped with the
+    rest of the effect scaffolding - the bump effect's tangent rotation and the depth sprites' PS1.x fallbacks
+    were each a compile error that left the preview's own shader drawing in silence
+  - The whole shipped set was then compiled the same way, and the translator learned what the rest of the corpus
+    writes: brace initialisers (`float4 TexU = { 0.01, 0, 0, 0 };`, flat array lists, matrices), `int4` and
+    `D3DCOLORtoUBYTE4`, a swizzled literal (`0.5.xx`), a scalar assigned to a vector (`Out.Diff = 0;`), an
+    integer compared with a float, `lerp` over mismatched widths, a `mul` of a float3 by a float4x4 kept at
+    HLSL's float4 result, a comment inside an expression, a sampler with both register and state block or with
+    neither, an annotation block after a semantic, a DX8 `asm` handle, and a `//` comment after a scaled integer.
+    60 of the 69 translatable effects compile, up from 41; the 9 left are development effects that name a
+    function, globals or a header the shipped sources do not have, and fail for an HLSL compiler the same way
+  - The shader resolver looks in the shaders' `Engine/` folder, where the particle effects live, and a header is
+    asked for by its bare name whatever path the include wrote
+  - An emitter with a skip time is pre-simulated through it before its first frame, in tenths of a second as the
+    game does; every shipped field sets skip equal to freeze, so an asteroid field is a populated scene on its first
+    frame and frozen on its second, never a shower filling up
+- **Heat haze hidden by what is in front of it** - heat sprites are drawn over the scene's depth and the distortion
+  field copied off the canvas afterwards, the sequence the game runs; a flamethrower's haze no longer shows through
+  the hull holding it ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
 - **Lua_Script checked against the script the game loads** - a game object's `Lua_Script` resolves the way the
   game finds it: the name as written, every script directory in the game's order, `.lua` then `.lc`, mod folder,
   loose files and MEG archives alike ([#133](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/133))
@@ -106,6 +154,23 @@
 
 ### Fixes
 
+- **Shader note on particle systems** - "No shader sources are reachable" is shown only for a scene that asked for
+  an effect; a particle system asks for none and opened with a note about shaders it never needed
+- **Loading cover on a particle file** - a particle system opened on its own is a scene with one part, asked
+  for as a particle system rather than as geometry; the cover counted geometry alone and stayed over the field
+  for the full idle deadline, hiding the first eight seconds of any effect opened this way
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
+- **Frozen field facing the camera** - a frozen particle batch drawn through its engine effect is built again
+  whenever the camera turns, as the game rebuilds its corners against the camera at every draw; the asteroid
+  field's rocks faced wherever the camera stood when the field froze and showed their edges from anywhere else
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
+- **Hardpoint without an Attachment_Bone** - both findings are errors and say what the game does, measured on the
+  2024 build: the hardpoint is placed at `Fire_Bone_A`, or at the map origin with that unset too; its
+  `Model_To_Attach` is never attached; a targetable one draws its reticle in the screen corner and, at the origin,
+  is never hit, so the unit is never destroyed. The "screen root" the message named does not exist
+- **Bone names with a dot** - the model tree, the inspector and the preview's own bone lookups read the name the
+  exporter wrote; three.js drops `.` from a node name on load and `Weap_Turbo_LS_03_170._FP01` showed as
+  `Weap_Turbo_LS_03_170_FP01` ([#265](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/265))
 - **Vanilla library documentation** - the schema's stub per vanilla library (PGBase, PGCommands, PGEvents,
   PGStateMachine, PGTaskForce and the rest) is read for hover and parameters, without turning a library's
   functions into engine globals: a call without the library's `require` is still reported, and a library

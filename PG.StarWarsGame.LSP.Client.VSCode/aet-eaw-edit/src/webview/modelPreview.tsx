@@ -54,9 +54,15 @@ import {
 import { worstSeverity } from "./loc/validateState";
 import { collectTextureNames } from "./preview/materials";
 import { type InspectorSubject } from "./preview/inspectorSubject";
-import { AssetLedger, loadState, type LoadTally } from "./preview/loadProgress";
+import {
+    AssetLedger,
+    isSubjectSystem,
+    loadState,
+    type LoadTally,
+} from "./preview/loadProgress";
 import { anchorFlyout } from "./preview/flyoutAnchor";
 import { handoffFor } from "./preview/handoff";
+import { shaderGapNotice } from "./preview/shaderGap";
 import { particleNotices } from "./preview/particleNotices";
 import { groundRange, snapToZero } from "./preview/groundRange";
 import { InfoBadge } from "./shared/InfoBadge";
@@ -3358,6 +3364,8 @@ function ModelPreview(): React.JSX.Element {
      * back null and the count is 0 for a reason the reader can actually act on.
      */
     const [anyShaderSource, setAnyShaderSource] = useState(false);
+    /** Whether this scene asked for any effect at all; a particle system asks for none. */
+    const [shaderRequested, setShaderRequested] = useState(false);
 
     /**
      * Effects asked for but not yet delivered, to play the moment they arrive.
@@ -3908,6 +3916,7 @@ function ModelPreview(): React.JSX.Element {
             }
 
             vscode.postMessage({ type: "requestShader", name });
+            setShaderRequested(true);
             syncTally();
         },
         [syncTally],
@@ -4237,7 +4246,14 @@ function ModelPreview(): React.JSX.Element {
         for (const name of viewport.particleTextureNames()) {
             askForTexture(name);
         }
-    }, [refreshStats, effectDrawsNow]);
+        // The effects too: a system names the engine effect it is drawn with, and the geometry
+        // paths asked for shaders before any system existed. Without this a field opened on its
+        // own never asks for its effect, and the preview's own shader stays - with nothing to say
+        // so. Measured on the asteroid field, as "no difference" after two shader fixes.
+        for (const shader of viewport.shaderNames()) {
+            askForShader(shader);
+        }
+    }, [refreshStats, effectDrawsNow, askForShader]);
 
     /**
      * Switches one weapon's arc on or off.
@@ -5019,6 +5035,19 @@ function ModelPreview(): React.JSX.Element {
             }
 
             if (message.type === "particleSystem") {
+                // A particle scene's one part is its own system, asked for here rather than as a
+                // GLB - so it is counted in here, or the cover waits on geometry that never comes.
+                // Before the null check: a system that failed to read is still an answer.
+                if (
+                    sceneRef.current !== null &&
+                    isSubjectSystem(sceneRef.current, message.name)
+                ) {
+                    setTally((current) => ({
+                        ...current,
+                        arrivedParts: current.arrivedParts + 1,
+                    }));
+                }
+
                 const system = message.result.system ?? null;
 
                 if (system === null) {
@@ -5077,9 +5106,13 @@ function ModelPreview(): React.JSX.Element {
                         ),
                     );
 
-                    // Asked for only now, because the system is what names them.
+                    // Asked for only now, because the system is what names them - the effect it
+                    // is drawn with as much as its textures.
                     for (const name of viewport.particleTextureNames()) {
                         askForTexture(name);
+                    }
+                    for (const shader of viewport.shaderNames()) {
+                        askForShader(shader);
                     }
 
                     return;
@@ -7101,19 +7134,22 @@ function ModelPreview(): React.JSX.Element {
 
         // The shader gap is a limitation of the preview rather than a fault in the mod, so it is
         // info. The corner button is the way OUT of it; this is the explanation of it.
-        const fromShaders =
-            translatedOn && !anyShaderSource
-                ? [
-                      {
-                          severity: "info",
-                          message:
-                              "No shader sources are reachable, so nothing can be translated. A " +
-                              "game install ships compiled .fxo; the .fx sources are a separate " +
-                              "Petroglyph download.",
-                          hardpointId: null,
-                      },
-                  ]
-                : [];
+        const fromShaders = shaderGapNotice(
+            translatedOn,
+            shaderRequested,
+            anyShaderSource,
+        )
+            ? [
+                  {
+                      severity: "info",
+                      message:
+                          "No shader sources are reachable, so nothing can be translated. A " +
+                          "game install ships compiled .fxo; the .fx sources are a separate " +
+                          "Petroglyph download.",
+                      hardpointId: null,
+                  },
+              ]
+            : [];
 
         // A shield bubble the model names but does not draw with a shield shader. The NAME is what
         // decides which mesh a shield ability reveals - the author's word - so this corrects
@@ -7146,6 +7182,7 @@ function ModelPreview(): React.JSX.Element {
         attachmentIssues,
         colourFindings,
         translatedOn,
+        shaderRequested,
         anyShaderSource,
         shieldOffShader,
     ]);

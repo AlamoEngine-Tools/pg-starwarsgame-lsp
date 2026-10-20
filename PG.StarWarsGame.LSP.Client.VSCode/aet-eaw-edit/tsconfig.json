@@ -22,6 +22,8 @@
   /* The webview bundle is browser code (DOM, JSX) with its own tsconfig - see src/webview. */
   "exclude": [
     "src/webview",
-    "node_modules"
+    "node_modules",
+    /* The shader rig's probe is browser code bundled by the rig itself - see scripts/shader-rig. */
+    "scripts/shader-rig"
   ]
 }

@@ -161,6 +161,15 @@ export function stripFxScaffolding(source: string): string {
         "",
     );
 
+    // A handle bound to a block of DX8 assembly - the depth-sprite effects carry their PS1.x
+    // fallbacks this way, beside the ps_2_0 entry. Brace-matched like a technique; the semicolon
+    // that closed the declaration is then alone on its line, and GLSL ES has no empty declaration.
+    out = removeBlocks(
+        out,
+        /\b(?:pixelshader|vertexshader)\s+[A-Za-z_0-9]+\s*=\s*asm\s*/gi,
+    );
+    out = out.replace(/^[ \t]*;[ \t]*$/gm, "");
+
     // Only `#include`. Everything else the sources use - eight `#define`s and a handful of `#if`
     // blocks - is the same preprocessor GLSL ES has, so it is kept and left to do its job; removing
     // it took `GEOMETRY_MODS_ENABLED` out from under the one shader that reads it. The two defines
@@ -282,9 +291,25 @@ function removeBlocks(text: string, header: RegExp): string {
 export function declareUniforms(source: string): string {
     let out = source;
 
-    // `sampler Name = sampler_state { ... };` becomes a plain sampler uniform.
+    // `sampler Name = sampler_state { ... };` becomes a plain sampler uniform - with a register
+    // between the name and the state block in the scene passes, which bind by stage as well.
     out = out.replace(
-        /\bsampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*sampler_state\s*\{[^}]*\}\s*;/g,
+        /\bsampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*register\s*\(\s*[a-z][0-9]+\s*\))?\s*=\s*sampler_state\s*\{[^}]*\}\s*;/g,
+        (_, kind: string | undefined, name: string) =>
+            `uniform ${kind === "CUBE" ? "samplerCube" : "sampler2D"} ${name};`,
+    );
+    // `sampler Name;` - neither register nor state. Unindented, so a parameter is not mistaken
+    // for one.
+    out = out.replace(
+        /^sampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/gm,
+        (_, kind: string | undefined, name: string) =>
+            `uniform ${kind === "CUBE" ? "samplerCube" : "sampler2D"} ${name};`,
+    );
+    // `sampler Name : register(sN);` is the particle effects' form - a register and no state
+    // block. The register is the engine's business (it binds textures by stage); here the sampler
+    // is a uniform like any other, bound by name.
+    out = out.replace(
+        /\bsampler(2D|CUBE)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*register\s*\(\s*[a-z][0-9]+\s*\)\s*;/g,
         (_, kind: string | undefined, name: string) =>
             `uniform ${kind === "CUBE" ? "samplerCube" : "sampler2D"} ${name};`,
     );
@@ -338,8 +363,15 @@ function declareSemanticUniforms(source: string): string {
         }
 
         // Everything up to the terminating semicolon belongs to this declaration, initialiser
-        // included - which is why this cannot be a single replace.
-        const semicolon = source.indexOf(";", match.index + match[0].length);
+        // included - which is why this cannot be a single replace. An annotation block may follow
+        // the semantic - `: MaterialDiffuse\n< string UIType = "..."; >` - and the semicolons
+        // inside it are not the declaration's end.
+        let end = match.index + match[0].length;
+        const annotation = /^\s*<[^>]*>/.exec(source.slice(end));
+        if (annotation !== null) {
+            end += annotation[0].length;
+        }
+        const semicolon = source.indexOf(";", end);
         if (semicolon === -1) {
             return out + source.slice(cursor);
         }
@@ -530,6 +562,47 @@ export function buildFragmentShader(
         )
         .join("\n");
 
+    const call =
+        `${handle.entry}(` +
+        [entry.parameterName, ...handle.args].join(", ") +
+        ")";
+
+    // Every pixel entry in the corpus returns the colour itself, bar the depth sprites': theirs
+    // returns a struct with a COLOR0 field and a DEPTH one, which D3D writes into the depth buffer
+    // in place of the fragment's own.
+    const outputStruct = findStructs(hlsl).find(
+        (s) => s.name === entry.returnType,
+    );
+    let results: string[];
+    if (outputStruct === undefined) {
+        results = [`    ${FRAGMENT_OUTPUT} = ${call};`];
+    } else {
+        const colour = outputStruct.fields.find((field) =>
+            /^COLOR0?$/i.test(field.semantic ?? ""),
+        );
+        if (colour === undefined) {
+            return {
+                source: null,
+                refusal:
+                    `'${entry.returnType}' declares no COLOR field, so there is nothing to ` +
+                    "drive the fragment colour with.",
+            };
+        }
+        const depth = outputStruct.fields.find(
+            (field) => field.semantic?.toUpperCase() === "DEPTH",
+        );
+        results = [
+            `    ${entry.returnType} Out = ${call};`,
+            `    ${FRAGMENT_OUTPUT} = Out.${colour.name};`,
+            // D3D's DEPTH output is z over w, which its projection puts in 0..1 - the window
+            // depth as it is. The projection the preview feeds is GL's, whose z over w runs
+            // -1..1, so the window depth is half that plus a half.
+            ...(depth === undefined
+                ? []
+                : [`    gl_FragDepth = Out.${depth.name} * 0.5 + 0.5;`]),
+        ];
+    }
+
     const source = [
         // The version directive must be the very first line, ahead of even a comment.
         "#version 300 es",
@@ -551,9 +624,7 @@ export function buildFragmentShader(
         "{",
         `    ${struct.name} ${entry.parameterName};`,
         assignments,
-        `    ${FRAGMENT_OUTPUT} = ${handle.entry}(` +
-            [entry.parameterName, ...handle.args].join(", ") +
-            ");",
+        ...results,
         "",
         // `AlphaFunc = Greater` in every alpha-tested effect the game ships, so the fragment
         // survives only above the reference.

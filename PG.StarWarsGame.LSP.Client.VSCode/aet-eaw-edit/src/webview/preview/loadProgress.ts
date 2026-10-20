@@ -33,6 +33,27 @@ export interface LoadTally {
 
 export type LoadStage = "scene" | "geometry" | "materials" | "ready";
 
+/**
+ * Whether a particle system reply is the subject's own geometry, the one part its scene expects.
+ *
+ * A particle file opened on its own is a scene with one resolved part - the server builds it the
+ * same shape as a model so the client has one thing to render - but that part is asked for as a
+ * particle system, never as a GLB. Counting geometry by GLB replies alone left the cover waiting on
+ * a reply that was never coming, and it sat over the field until the idle deadline gave up on it.
+ *
+ * Only the subject counts. A system a model mounts is an effect on geometry that arrived by GLB,
+ * and an explosion asked for by name on any scene is not geometry at all.
+ */
+export function isSubjectSystem(
+    scene: { kind: string; subject: string },
+    systemName: string,
+): boolean {
+    return (
+        scene.kind === "Particle" &&
+        scene.subject.toLowerCase() === systemName.toLowerCase()
+    );
+}
+
 export interface LoadState {
     stage: LoadStage;
     /** Whether the half-built model should be hidden behind the cover. */

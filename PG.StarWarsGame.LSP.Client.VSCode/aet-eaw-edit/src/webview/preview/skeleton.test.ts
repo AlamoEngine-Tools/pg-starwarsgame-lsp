@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 
 import {
     alamoBoneName,
+    alamoNodeName,
     ancestorsOf,
     type BoneAttachment,
     buildBoneTree,
@@ -33,6 +34,41 @@ const DESTROYER: FlatBone[] = [
     bone(4, "HP_F-R_Bone", 0),
     bone(5, "Engine_Glow", 0, false),
 ];
+
+describe("alamoNodeName", () => {
+    /**
+     * three's glTF loader deletes `[ ] . : /` from a node name and keeps the original in
+     * `userData.name`. A bone called `Weap_Turbo_LS_03_170._FP01` showed as
+     * `Weap_Turbo_LS_03_170_FP01`, an author copied that into the XML, and the server rightly said
+     * no such bone exists (#265).
+     */
+    it("reads the name the exporter wrote when the loader changed it", () => {
+        const node = {
+            name: "Weap_Turbo_LS_03_170_FP01#12",
+            userData: { name: "Weap_Turbo_LS_03_170._FP01#12" },
+        };
+        assert.equal(alamoNodeName(node), "Weap_Turbo_LS_03_170._FP01#12");
+        assert.deepEqual(alamoBoneName(alamoNodeName(node)), {
+            name: "Weap_Turbo_LS_03_170._FP01",
+            index: 12,
+        });
+    });
+
+    it("reads the node's own name when the loader kept it", () => {
+        assert.equal(
+            alamoNodeName({ name: "HP_F-L_Bone#1", userData: {} }),
+            "HP_F-L_Bone#1",
+        );
+    });
+
+    /** A node the preview made itself carries no glTF extras, and no `name` under userData. */
+    it("ignores a userData name that is not a string", () => {
+        assert.equal(
+            alamoNodeName({ name: "made#3", userData: { name: 7 } }),
+            "made#3",
+        );
+    });
+});
 
 describe("alamoBoneName", () => {
     /** The suffix exists because a hull carries twenty bones with the same name. */

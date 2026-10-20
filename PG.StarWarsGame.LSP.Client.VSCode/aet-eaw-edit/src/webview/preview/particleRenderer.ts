@@ -32,6 +32,11 @@ import {
     stepParticle,
     systemExtent,
 } from "./particleSim";
+import { AlamoMaterial } from "./alamoMaterial";
+import type { TranslatedEffect } from "./fx/effect";
+import type { FxMaterialState } from "./fx/renderState";
+import { applyBlend, applyDepth } from "./materialState";
+import { particleEffectName } from "./particleEffects";
 
 /**
  * Ceiling on live particles per emitter.
@@ -48,6 +53,8 @@ const SPAWN_SCRATCH = new THREE.Vector3();
 const SPACE_SCRATCH = new THREE.Matrix4();
 const VIEW_SCRATCH = new THREE.Matrix4();
 const IDENTITY = new THREE.Matrix4();
+const CAMERA_SCRATCH = new THREE.Vector3();
+const CAMERA_MATRIX_SCRATCH = new THREE.Matrix4();
 
 /**
  * Longest step the simulation will take.
@@ -56,6 +63,12 @@ const IDENTITY = new THREE.Matrix4();
  * particle somewhere absurd. Clamping makes the effect briefly slow instead, which nobody notices.
  */
 const MAX_STEP_SECONDS = 0.1;
+
+/**
+ * The step the game pre-simulates an emitter with, measured: at an emitter's first tick it is run
+ * forward in tenths of a second until its clock is past its skip time.
+ */
+const PRESIMULATE_STEP_SECONDS = 0.1;
 
 /** The blend state one Alamo mode needs, as three.js expresses it. */
 export interface ParticleBlend {
@@ -377,6 +390,11 @@ export interface EmitterFrame {
     velocity: THREE.Vector3;
     /** Simulation space to VIEW space, for the streak maths, which is a screen-space question. */
     toView: THREE.Matrix3;
+    /**
+     * Where the camera stands, in simulation space, or null when nothing is looking. A frozen
+     * batch is sorted by distance from it.
+     */
+    camera: THREE.Vector3 | null;
     /** Where the scene's ground plane falls in simulation space. */
     groundY: number;
     /** The wind, in simulation space. Half the corpus's emitters are thrown by it at birth. */
@@ -453,12 +471,109 @@ export function tailGeometry(
     };
 }
 
+/** The four corners of a sprite, in the index order the quad's two triangles read them. */
+const QUAD_CORNERS = [-1, -1, 1, -1, 1, 1, -1, 1];
+
+/**
+ * The sampler names the engine's particle effects read the colour sheet and the second texture
+ * through. The second texture is one chunk of the file: the bump effects read it as the normal map,
+ * the depth sprites as the depth map.
+ */
+const COLOUR_SAMPLERS = ["TextureSampler", "BaseSampler"];
+const SECOND_TEXTURE_SAMPLERS = ["NormalSampler", "DepthSampler"];
+
+/**
+ * An emitter drawn through the engine's own effect: the translated program, the pass's render
+ * state, and a vertex stream of CPU-built quads sized for the particle ceiling.
+ */
+class EngineDraw {
+    readonly geometry = new THREE.BufferGeometry();
+    readonly material: AlamoMaterial;
+    readonly positions = new Float32Array(MAX_PARTICLES * 4 * 3);
+    readonly colours = new Float32Array(MAX_PARTICLES * 4 * 4);
+    readonly uvs = new Float32Array(MAX_PARTICLES * 4 * 2);
+
+    constructor(
+        effect: TranslatedEffect,
+        state: FxMaterialState,
+        noDepthTest: boolean,
+    ) {
+        // Position, colour, uv: the engine's own particle vertex. The bump effects declare a normal
+        // input their vertex shader never reads; it is fed zeros so the attribute is not missing.
+        this.geometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(this.positions, 3),
+        );
+        this.geometry.setAttribute(
+            "color",
+            new THREE.BufferAttribute(this.colours, 4),
+        );
+        this.geometry.setAttribute(
+            "uv",
+            new THREE.BufferAttribute(this.uvs, 2),
+        );
+        this.geometry.setAttribute(
+            "normal",
+            new THREE.BufferAttribute(
+                new Float32Array(MAX_PARTICLES * 4 * 3),
+                3,
+            ),
+        );
+        const index = new Uint32Array(MAX_PARTICLES * 6);
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            const v = i * 4;
+            index.set([v, v + 1, v + 2, v, v + 2, v + 3], i * 6);
+        }
+        this.geometry.setIndex(new THREE.BufferAttribute(index, 1));
+        this.geometry.setDrawRange(0, 0);
+
+        // No sub-mesh behind a particle, so no parameters of its own: the effect's declared
+        // defaults stand, which for the bump effect is white diffuse and no emissive.
+        this.material = new AlamoMaterial(effect, {});
+        applyDepth(this.material, state);
+        applyBlend(this.material, state.blend);
+        this.material.setAlphaTest(state.alphaTest);
+        // Measured: the particle draw passes cull NONE whatever the pass declares, and the
+        // no-depth-test flag turns the depth test off on the live path.
+        this.material.side = THREE.DoubleSide;
+        this.material.depthTest = state.depthTest && !noDepthTest;
+        this.material.needsUpdate = true;
+    }
+
+    /** Hands the colour sheet and the second texture to whichever samplers the effect declares. */
+    bindTextures(
+        colour: THREE.Texture | null,
+        second: THREE.Texture | null,
+    ): void {
+        for (const sampler of COLOUR_SAMPLERS) {
+            this.material.uniforms[sampler] = { value: colour };
+        }
+        for (const sampler of SECOND_TEXTURE_SAMPLERS) {
+            this.material.uniforms[sampler] = { value: second };
+        }
+    }
+
+    /** Marks the first `count` quads written and ready to draw. */
+    written(count: number): void {
+        this.geometry.setDrawRange(0, count * 6);
+        for (const name of ["position", "color", "uv"]) {
+            this.geometry.attributes[name].needsUpdate = true;
+        }
+    }
+
+    dispose(): void {
+        this.geometry.dispose();
+        this.material.dispose();
+    }
+}
+
 /** An emitter that neither moves nor is moved, for a system standing on its own. */
 function stillFrame(): EmitterFrame {
     return {
         matrix: new THREE.Matrix4(),
         rotation: new THREE.Matrix3(),
         toView: new THREE.Matrix3(),
+        camera: null,
         delta: new THREE.Vector3(),
         velocity: new THREE.Vector3(),
         groundY: 0,
@@ -475,6 +590,13 @@ class EmitterRenderer {
     private readonly geometry: THREE.InstancedBufferGeometry;
     private readonly material: THREE.ShaderMaterial;
 
+    /**
+     * The engine's own effect, once translated and switched on: CPU-built quads through the
+     * effect's program, as the game draws them. Null draws with the preview's shader above.
+     */
+    private engine: EngineDraw | null = null;
+    private normalTexture: THREE.Texture | null = null;
+
     private readonly offsets = new Float32Array(MAX_PARTICLES * 3);
     private readonly colors = new Float32Array(MAX_PARTICLES * 3);
     private readonly alphas = new Float32Array(MAX_PARTICLES);
@@ -486,13 +608,43 @@ class EmitterRenderer {
     /** Reused per particle by the kite maths, so a thousand sparks allocate nothing. */
     private readonly viewVelocity = new THREE.Vector3();
 
+    /** Seconds this emitter has run, the clock its freeze time is measured on. */
+    private age = 0;
+
+    /**
+     * Set once the freeze time has passed. From then on the particles are a baked batch: nothing
+     * steps, spawns, ages or dies, and a parent drives no more trails off them.
+     */
+    private frozen = false;
+    /**
+     * Set by a material switch: the buffer now drawn is empty or stale and the next tick writes
+     * it, even for a frozen bake that would otherwise never be written again.
+     */
+    private rewrite = false;
+    /**
+     * The view basis the effect buffer's corners were last built against, or null before any
+     * were.
+     *
+     * Measured in the game: the corner table is rotated into camera space once per camera change,
+     * and a frozen particle's corners are built from it at every draw. The bake is the particle
+     * STATE, never the vertex stream - a frozen sprite faces the camera wherever it moves. The
+     * effect buffer holds world positions with the basis already applied, so it is written again
+     * whenever the basis moves, at the engine's own cadence: once per camera change, nothing while
+     * the camera rests. The preview's own buffer needs none of this: it billboards in the shader.
+     */
+    private bakedBasis: THREE.Matrix3 | null = null;
+
+    /** The frozen batch's draw order and the depths it was sorted on, reused every frame. */
+    private readonly drawIndex: number[] = [];
+    private readonly depths = new Float32Array(MAX_PARTICLES);
+
     /** Where `EveryVertex` has got to. Kept across ticks, because that walk is ordered. */
     private readonly cursor: EmissionCursor = { subMesh: 0, vertex: 0 };
 
     constructor(
         private readonly emitter: AlamoEmitter,
         private readonly random: Random,
-        texture: THREE.Texture | null,
+        private texture: THREE.Texture | null,
         /** The geometry this emitter is born from, when it emits from a mesh rather than a shape. */
         private readonly emissionMesh: EmissionMesh | null = null,
         /** The owning object's uniform render scale. See {@link ParticleSystemInstance}. */
@@ -606,6 +758,11 @@ class EmitterRenderer {
         return this.particles;
     }
 
+    /** True once the emitter's freeze time has passed and its particles are baked. */
+    get isFrozen(): boolean {
+        return this.frozen;
+    }
+
     /**
      * How fast a child emits, per parent particle.
      *
@@ -634,10 +791,172 @@ class EmitterRenderer {
      * which is most of what the preview is for.
      */
     setTexture(texture: THREE.Texture): void {
+        this.texture = texture;
         this.material.uniforms.uMap.value = texture;
         this.material.uniforms.uHasMap.value = 1;
         this.material.uniforms.uMissing.value = 0;
         this.material.needsUpdate = true;
+        this.engine?.bindTextures(texture, this.normalTexture);
+    }
+
+    /** The normal map a bump emitter names, or an empty string. */
+    get normalTextureName(): string {
+        return this.emitter.normalTexture ?? "";
+    }
+
+    /** Supplies the normal map once it arrives; only the engine's bump effects read it. */
+    setNormalTexture(texture: THREE.Texture): void {
+        this.normalTexture = texture;
+        this.engine?.bindTextures(this.texture, texture);
+    }
+
+    /**
+     * The engine effect this emitter is drawn with, to be fetched like any mesh effect - or null
+     * for a heat sprite, which the distortion pass draws with the preview's own program.
+     */
+    get effectName(): string | null {
+        return this.emitter.properties.isHeatParticle
+            ? null
+            : particleEffectName(this.emitter.properties.blendMode);
+    }
+
+    /**
+     * Draws through the engine's own effect, or goes back to the preview's shader with null.
+     *
+     * Measured in the game: the particle renderer binds the effect its render mode names and
+     * submits CPU-built quads - position, a packed colour, uv - which the effect's vertex shader
+     * only projects. Two kinds keep the preview's shader: a heat sprite (its own pass) and a
+     * tailed emitter (the streak is built in the preview's vertex shader). A depth sprite's effect
+     * reads the emitter's own depth map through its second sampler and writes the offset depth.
+     */
+    applyEffect(
+        effect: TranslatedEffect | null,
+        state: FxMaterialState | null,
+    ): void {
+        const properties = this.emitter.properties;
+        const eligible = !properties.isHeatParticle && !properties.hasTail;
+
+        // Whichever buffer the switch lands on is empty or stale, and a frozen bake is not written
+        // again on its own: the next tick writes it, sorted or not.
+        this.rewrite = true;
+
+        if (effect === null || state === null || !eligible) {
+            this.engine?.dispose();
+            this.engine = null;
+            this.mesh.geometry = this.geometry;
+            this.mesh.material = this.material;
+            return;
+        }
+
+        this.engine?.dispose();
+        this.engine = new EngineDraw(effect, state, properties.noDepthTest);
+        this.engine.bindTextures(this.texture, this.normalTexture);
+        this.mesh.geometry = this.engine.geometry;
+        this.mesh.material = this.engine.material;
+    }
+
+    /**
+     * Whether the effect buffer's corners face a camera that is no longer there.
+     *
+     * Asked of the effect buffer only - the preview's own billboards in the shader - and never of
+     * a world-oriented emitter, whose corners lie in the ground plane whatever the camera does.
+     * Compared exactly: a resting camera gives the same basis to the bit, so nothing is written
+     * while it rests.
+     */
+    private basisMoved(frame: EmitterFrame): boolean {
+        if (this.engine === null || this.emitter.properties.worldOriented) {
+            return false;
+        }
+
+        const baked = this.bakedBasis;
+        if (baked === null) {
+            return true;
+        }
+
+        const a = baked.elements;
+        const b = frame.toView.elements;
+        for (let i = 0; i < 9; i++) {
+            if (a[i] !== b[i]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The engine's vertex stream: four corners per particle, built the way the engine builds them.
+     *
+     * Measured: corner = position + the camera-rotated corner offset times the size, the colour
+     * packed to bytes from the tracked colour and alpha - and for the bump effect the RGB replaced
+     * by the sprite's rotation tangent in VIEW space, encoded `0.5 + 0.5 * t`, the alpha kept. The
+     * uv is the frame's cell of the sheet. The effect's vertex shader projects and nothing more.
+     */
+    private writeQuads(
+        engine: EngineDraw,
+        frame: EmitterFrame,
+        order: number[] | null,
+    ): void {
+        const properties = this.emitter.properties;
+        const bump =
+            properties.blendMode === "Bump" ||
+            properties.blendMode === "DecalBump";
+        const columns = atlasColumns(properties.textureSize);
+        const cell = 1 / columns;
+        const scale = this.scaleFactor;
+        const basis = properties.worldOriented ? GROUND_BASIS : frame.toView;
+        // Copied, not kept: the frame is one object the system rewrites every tick.
+        this.bakedBasis = (this.bakedBasis ?? new THREE.Matrix3()).copy(basis);
+        // Simulation space to view space is a rotation, so the view axes in simulation space are
+        // its rows - which is what the engine's camera-rotated corner table holds.
+        const e = basis.elements;
+        const rightX = e[0];
+        const rightY = e[3];
+        const rightZ = e[6];
+        const upX = e[1];
+        const upY = e[4];
+        const upZ = e[7];
+        const { positions, colours, uvs } = engine;
+
+        for (let i = 0; i < this.particles.length; i++) {
+            const particle = this.particles[order === null ? i : order[i]];
+            const look = appearanceOf(particle, this.emitter);
+            const size = look.size * scale;
+            const angle = look.rotation * 6.2831853;
+            const c = Math.cos(angle);
+            const s = Math.sin(angle);
+            const px = particle.position.x * scale;
+            const py = particle.position.y * scale;
+            const pz = particle.position.z * scale;
+            const index = look.frame % (columns * columns);
+            const originU = (index % columns) * cell;
+            const originV = Math.floor(index / columns) * cell;
+            const r = bump ? 0.5 + 0.5 * c : look.r;
+            const g = bump ? 0.5 + 0.5 * s : look.g;
+            const b = bump ? 0.5 : look.b;
+
+            for (let corner = 0; corner < 4; corner++) {
+                const cx = QUAD_CORNERS[corner * 2];
+                const cy = QUAD_CORNERS[corner * 2 + 1];
+                const spunX = cx * c - cy * s;
+                const spunY = cx * s + cy * c;
+                const vertex = i * 4 + corner;
+                positions[vertex * 3] =
+                    px + (rightX * spunX + upX * spunY) * size;
+                positions[vertex * 3 + 1] =
+                    py + (rightY * spunX + upY * spunY) * size;
+                positions[vertex * 3 + 2] =
+                    pz + (rightZ * spunX + upZ * spunY) * size;
+                colours[vertex * 4] = r;
+                colours[vertex * 4 + 1] = g;
+                colours[vertex * 4 + 2] = b;
+                colours[vertex * 4 + 3] = look.a;
+                uvs[vertex * 2] = originU + (cx * 0.5 + 0.5) * cell;
+                uvs[vertex * 2 + 1] = originV + (cy * 0.5 + 0.5) * cell;
+            }
+        }
+
+        engine.written(this.particles.length);
     }
 
     /**
@@ -667,6 +986,60 @@ class EmitterRenderer {
         frame: EmitterFrame = stillFrame(),
         dependent = false,
     ): AlamoVector3[] {
+        // Measured in the game: on the first tick that would carry the emitter past its freeze
+        // time it bakes the particles it has - as they stand BEFORE that step - and never steps,
+        // spawns, ages or fades again. A tick landing exactly on the freeze time still steps.
+        // Every asteroid field, the junk fields and the galaxy's dust freeze this way; it is what
+        // makes them a scene rather than a shower.
+        const freezeTime = this.emitter.properties.freezeTime;
+        if (this.frozen || (freezeTime > 0 && this.age + dt > freezeTime)) {
+            this.frozen = true;
+            // Measured: the no-depth-test flag is read on the live path only. A frozen batch is
+            // always tested against the depth buffer, whatever the file asked for.
+            this.material.depthTest = true;
+            if (this.engine !== null) {
+                this.engine.material.depthTest = true;
+            }
+            // The bake is drawn as it was written. It is written again when the camera it faces
+            // has moved, when it is depth-sorted and so follows the camera every frame - or once,
+            // into a buffer that a material switch has just left empty. Measured on the asteroid
+            // field: its effect arrives after the freeze, and a bump field is never sorted, so the
+            // fresh effect buffer held nothing and the field vanished.
+            if (
+                this.rewrite ||
+                this.basisMoved(frame) ||
+                (frame.camera !== null && this.sortsFrozenByDepth())
+            ) {
+                this.writeBuffers(frame);
+                this.rewrite = false;
+            }
+            return [];
+        }
+
+        // Measured: at its first tick an emitter with a skip time is run forward, in tenths of a
+        // second, until its clock is past that time - then the tick's own step follows. Every
+        // freezing field sets skip equal to freeze, so the game shows an asteroid field populated
+        // from its first frame and frozen on its second: a scene, never a shower filling up.
+        // Deaths during the pre-simulation go unreported; nothing is watching yet.
+        if (this.age === 0) {
+            const skip = this.emitter.properties.skipTime;
+            while (skip > 0 && this.age <= skip) {
+                this.advance(PRESIMULATE_STEP_SECONDS, frame, dependent, false);
+            }
+        }
+
+        return this.advance(dt, frame, dependent, true);
+    }
+
+    /** One step of the live simulation: age, move, kill, spawn, and write the buffers if asked. */
+    private advance(
+        dt: number,
+        frame: EmitterFrame,
+        dependent: boolean,
+        write: boolean,
+    ): AlamoVector3[] {
+        this.age += dt;
+
         const follow = followFactor(this.emitter.properties);
         const acceleration = this.accelerationIn(frame);
         const deaths: AlamoVector3[] = [];
@@ -749,7 +1122,9 @@ class EmitterRenderer {
             this.particles.push(particle);
         }
 
-        this.writeBuffers(frame);
+        if (write) {
+            this.writeBuffers(frame);
+        }
 
         return deaths;
     }
@@ -764,8 +1139,9 @@ class EmitterRenderer {
      */
     emitFrom(at: AlamoVector3, count: number, frame: EmitterFrame): void {
         // Hidden means not running here too: a trail is spawned by its parent rather than by its
-        // own clock, so the check in `update` never sees it.
-        if (!this.mesh.visible) {
+        // own clock, so the check in `update` never sees it. Frozen likewise - a baked batch takes
+        // nothing more in.
+        if (!this.mesh.visible || this.frozen) {
             return;
         }
 
@@ -801,6 +1177,8 @@ class EmitterRenderer {
     dispose(): void {
         this.geometry.dispose();
         this.material.dispose();
+        this.engine?.dispose();
+        this.engine = null;
     }
 
     /**
@@ -886,9 +1264,15 @@ class EmitterRenderer {
 
     private writeBuffers(frame: EmitterFrame): void {
         const tailed = this.emitter.properties.hasTail;
+        const order = this.frozen ? this.depthOrder(frame) : null;
+
+        if (this.engine !== null) {
+            this.writeQuads(this.engine, frame, order);
+            return;
+        }
 
         for (let i = 0; i < this.particles.length; i++) {
-            const particle = this.particles[i];
+            const particle = this.particles[order === null ? i : order[i]];
             const look = appearanceOf(particle, this.emitter);
 
             // The object's uniform scale, applied to the POSITION and the SIZE together, which is
@@ -930,6 +1314,53 @@ class EmitterRenderer {
         for (const name of tailed ? [...written, "iStretch"] : written) {
             this.geometry.attributes[name].needsUpdate = true;
         }
+    }
+
+    /**
+     * Whether this emitter's FROZEN batch is drawn back to front.
+     *
+     * Measured in the game: the depth-sort flag is read on the frozen path only, and only for the
+     * alpha, depth-sprite-alpha and opaque modes - an additive batch sums the same whatever the
+     * order. The engine's default is on, which is also what an older server sends by sending
+     * nothing.
+     */
+    private sortsFrozenByDepth(): boolean {
+        const properties = this.emitter.properties;
+        if (properties.depthSort === false) {
+            return false;
+        }
+        const mode = properties.blendMode;
+        return (
+            mode === "None" ||
+            mode === "Transparent" ||
+            mode === "DepthTransparent"
+        );
+    }
+
+    /**
+     * The baked particles' indices, farthest from the camera first, or null to draw them in bake
+     * order. Squared distance, as the engine measures it, re-done against the camera as it stands.
+     */
+    private depthOrder(frame: EmitterFrame): number[] | null {
+        const camera = frame.camera;
+        if (camera === null || !this.sortsFrozenByDepth()) {
+            return null;
+        }
+        const count = this.particles.length;
+        const order = this.drawIndex;
+        order.length = count;
+        for (let i = 0; i < count; i++) {
+            // The position as drawn - the object's uniform scale is applied to it in writeBuffers,
+            // and the camera is in the unscaled simulation space.
+            const position = this.particles[i].position;
+            const dx = position.x * this.scaleFactor - camera.x;
+            const dy = position.y * this.scaleFactor - camera.y;
+            const dz = position.z * this.scaleFactor - camera.z;
+            this.depths[i] = dx * dx + dy * dy + dz * dz;
+            order[i] = i;
+        }
+        order.sort((a, b) => this.depths[b] - this.depths[a]);
+        return order;
     }
 
     /**
@@ -1154,15 +1585,47 @@ export class ParticleSystemInstance {
         return this.holds.size === 0 && this.root.visible;
     }
 
-    /** Every texture this system's emitters want, lowercased and de-duplicated. */
+    /** Every texture this system's emitters want, lowercased and de-duplicated - normal maps too. */
     textureNames(): string[] {
         return [
             ...new Set(
                 this.emitters
-                    .map((emitter) => emitter.textureName.toLowerCase())
+                    .flatMap((emitter) => [
+                        emitter.textureName.toLowerCase(),
+                        emitter.normalTextureName.toLowerCase(),
+                    ])
                     .filter((name) => name !== ""),
             ),
         ];
+    }
+
+    /** Every engine effect this system's emitters are drawn with, de-duplicated and sorted. */
+    effectNames(): string[] {
+        return [
+            ...new Set(
+                this.emitters
+                    .map((emitter) => emitter.effectName)
+                    .filter((name): name is string => name !== null),
+            ),
+        ].sort();
+    }
+
+    /**
+     * Draws each emitter through its translated engine effect where one is in hand and the
+     * translation is on; the preview's own shader otherwise. Keys are lower-cased effect names.
+     */
+    applyEffects(
+        effects: ReadonlyMap<string, TranslatedEffect>,
+        states: ReadonlyMap<string, FxMaterialState>,
+        enabled: boolean,
+    ): void {
+        for (const emitter of this.emitters) {
+            const name = emitter.effectName?.toLowerCase();
+            const effect =
+                enabled && name !== undefined ? effects.get(name) : undefined;
+            const state = name === undefined ? undefined : states.get(name);
+            emitter.applyEffect(effect ?? null, state ?? null);
+        }
     }
 
     /**
@@ -1237,6 +1700,9 @@ export class ParticleSystemInstance {
         for (const emitter of this.emitters) {
             if (emitter.textureName.toLowerCase() === wanted) {
                 emitter.setTexture(texture);
+            }
+            if (emitter.normalTextureName.toLowerCase() === wanted) {
+                emitter.setNormalTexture(texture);
             }
         }
     }
@@ -1364,6 +1830,11 @@ export class ParticleSystemInstance {
         step: number,
         frame: EmitterFrame,
     ): void {
+        // A frozen parent no longer runs the modifiers that spawn its children, so its baked
+        // particles trail nothing and die never.
+        if (parent.isFrozen) {
+            return;
+        }
         const trail = this.childOf(parent.description.spawnDuringLife);
 
         if (trail !== null) {
@@ -1511,10 +1982,18 @@ export class ParticleSystemInstance {
      * camera is standing.
      */
     private viewFrom(space: THREE.Object3D, view: THREE.Matrix4 | null): void {
-        this.frame.toView.setFromMatrix4(
-            view === null
-                ? IDENTITY
-                : VIEW_SCRATCH.multiplyMatrices(view, space.matrixWorld),
+        if (view === null) {
+            this.frame.toView.setFromMatrix4(IDENTITY);
+            this.frame.camera = null;
+            return;
+        }
+        VIEW_SCRATCH.multiplyMatrices(view, space.matrixWorld);
+        this.frame.toView.setFromMatrix4(VIEW_SCRATCH);
+        // The camera's own position, brought into the space the particles live in: the inverse
+        // of simulation-to-view takes the view origin back. A frozen batch is sorted by distance
+        // from it, so it is a question every frame, not once.
+        this.frame.camera = CAMERA_SCRATCH.setFromMatrixPosition(
+            CAMERA_MATRIX_SCRATCH.copy(VIEW_SCRATCH).invert(),
         );
     }
 }

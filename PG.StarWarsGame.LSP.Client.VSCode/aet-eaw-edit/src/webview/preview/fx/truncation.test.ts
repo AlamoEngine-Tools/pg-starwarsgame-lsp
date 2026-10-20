@@ -439,6 +439,28 @@ void vs_main(int DO_GEOMETRY_MODS, float amount, bool enabled)
     });
 });
 
+describe("fixBooleanConditions, on a comparison with an integer literal", () => {
+    it("promotes the literal when the other side is a float", () => {
+        // `if (diff <= 0)` - fine in HLSL, a type error in GLSL ES, which compares like with like.
+        const source = `
+void f()
+{
+    float diff;
+    int index;
+    if (diff <= 0) { diff = 1.0; }
+    if (0 < diff) { diff = 1.0; }
+    if (index == 0) { diff = 1.0; }
+}
+`;
+        const fixed = fixBooleanConditions(source);
+
+        assert.ok(/if \(diff <= 0\.0\)/.test(fixed), fixed);
+        assert.ok(/if \(0\.0 < diff\)/.test(fixed), fixed);
+        // An int compared with an int is left alone.
+        assert.ok(/if \(index == 0\)/.test(fixed), fixed);
+    });
+});
+
 describe("fixVectorTruncation, on the skinning shaders", () => {
     // Both of these are implicit in HLSL and rejected outright by GLSL, and every one of the eleven
     // RSkin* effects opens with them.
@@ -472,6 +494,120 @@ void vs_main(VS_INPUT In)
         const fixed = fixVectorTruncation(SKIN_SOURCE);
 
         assert.ok(/skin_rotation \* m_light0Vector\.xyz;/.test(fixed), fixed);
+    });
+
+    it("narrows the matrix against a vector too narrow for it", () => {
+        // `mul(float3, float4x4)`: HLSL drops the matrix's fourth row and the first three
+        // components of its float4 result are the vector against the upper-left 3x3. The bump
+        // particle effect rotates its packed tangent this way; GLSL refuses a mat4 times a vec3.
+        const fixed = fixVectorTruncation(`
+uniform mat4 m_viewInv;
+
+void vs_main()
+{
+    vec3 packed;
+    vec3 plain = m_viewInv * packed;
+    vec3 tangent = m_viewInv * 2.0 * (packed - 0.5);
+}
+`);
+
+        // The vector is widened with a ZERO, not the matrix narrowed: HLSL's float4 result has a
+        // fourth component of its own - the vector against the matrix's last column - and an
+        // effect assigning into a float4 keeps it. Into a float3 the ordinary narrowing follows.
+        assert.ok(
+            /vec3 plain = \(m_viewInv \* vec4\(packed, 0\.0\)\)\.xyz;/.test(
+                fixed,
+            ),
+            fixed,
+        );
+        assert.ok(
+            /\(m_viewInv \* 2\.0 \* vec4\(\(packed - 0\.5\), 0\.0\)\)\.xyz;/.test(
+                fixed,
+            ),
+            fixed,
+        );
+    });
+
+    it("keeps a block comment inside an expression out of the operator split", () => {
+        // `SkinBumpColorize.fx` comments a term out mid-expression: `diff_light /*+ Emissive*/`.
+        // Split on the slash inside it, the comment came out as `/ *+ Emissive * /`.
+        const fixed = fixVectorTruncation(`
+uniform vec3 Diffuse;
+
+void vs_main()
+{
+    vec3 diff_light;
+    vec4 Diff = vec4(Diffuse * diff_light /*+ Emissive*/, 1);
+}
+`);
+
+        assert.ok(!/\/ \*/.test(fixed), fixed);
+        assert.ok(/vec4\(Diffuse \* diff_light\s*, 1/.test(fixed), fixed);
+    });
+
+    it("balances inside a parenthesised expression that is then swizzled", () => {
+        // `(mul(In.position, m_world)).xyz` with a float3 position: the swizzle sits outside the
+        // parentheses, and what is inside still has a vec3 against a mat4 to widen.
+        const fixed = fixVectorTruncation(`
+uniform mat4 m_world;
+
+struct VS_INPUT
+{
+    vec3 position;
+};
+
+void vs_main(VS_INPUT In)
+{
+    vec3 worldVertPos = (m_world * In.position).xyz;
+}
+`);
+
+        assert.ok(
+            /vec3 worldVertPos = \(m_world \* vec4\(In\.position, 0\.0\)\)\.xyz;/.test(
+                fixed,
+            ),
+            fixed,
+        );
+    });
+
+    it("broadcasts a scalar literal assigned to a vector", () => {
+        // `float3 diffColor = 0;` and `Out.Diff = 0;` - HLSL splats the scalar, GLSL ES has no
+        // such conversion. Both the terrain effects and the Dev ones write it.
+        const fixed = fixVectorTruncation(`
+struct VS_OUTPUT
+{
+    vec4 Diff;
+};
+
+void vs_main()
+{
+    VS_OUTPUT Out;
+    vec3 diffColor = 0;
+    Out.Diff = 0;
+}
+`);
+
+        assert.ok(/vec3 diffColor = vec3\(0\.0\);/.test(fixed), fixed);
+        assert.ok(/Out\.Diff = vec4\(0\.0\);/.test(fixed), fixed);
+    });
+
+    it("narrows the arguments of a same-width intrinsic to the narrowest of them", () => {
+        // `lerp(float3, float4, float)` - HLSL drops the fourth component of the wider one; GLSL
+        // finds no `mix` overload at all. The ice terrain blends a reflection this way.
+        const fixed = fixVectorTruncation(`
+void ps_main()
+{
+    vec3 pixel;
+    vec4 reflection_texel;
+    float a;
+    pixel = mix(pixel, reflection_texel, a);
+}
+`);
+
+        assert.ok(
+            /pixel = mix\(pixel, reflection_texel\.xyz, a\);/.test(fixed),
+            fixed,
+        );
     });
 
     it("leaves a matching scalar assignment alone", () => {
