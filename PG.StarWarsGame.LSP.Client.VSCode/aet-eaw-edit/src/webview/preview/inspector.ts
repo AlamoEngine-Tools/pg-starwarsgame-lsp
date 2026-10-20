@@ -331,7 +331,7 @@ function meshPanel(
                 // explanation attached to either side.
                 hint:
                     "Model units, as the file stores them. The viewport draws the subject at " +
-                    "its Scale_Factor, so these are not what you measure on screen.",
+                    "its Scale_Factor, so they differ from what the viewport shows.",
             },
             {
                 label: "Bounds max",

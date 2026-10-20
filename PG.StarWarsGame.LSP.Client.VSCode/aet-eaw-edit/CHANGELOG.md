@@ -4,6 +4,10 @@
 
 ### Features
 
+- **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
+  phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
+  reason when the scene has none
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
 - **Baseline read from a release** - the server reads the newest release of the baseline repository whose
   baseline it can load, the way it reads the schema since 0.4.1; a merge to that repository's `main` no longer
   reaches installed clients. Before the first release exists the default branch is read as before, and the copy
@@ -163,6 +167,38 @@
 
 ### Fixes
 
+- **Particle energy** - a particle system carries the game's energy setting: an ordinary emitter spawns with
+  it as its odds and bears its particles at its share of their speed, a mesh-vertex emitter takes its share
+  of the count, and a weather field draws its share of its particles. It is 1.0 for every system the preview
+  shows, as in the game, where only weather phases, planet corruption, transport dust and surface effects
+  change it
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+- **Cube-shaped spawn and velocity volumes** - drawn at their full size: the file stores a cube's half-extent,
+  and the preview halved it again
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+- **Streak length** - a tailed particle's streak reaches the tail size times its speed across the view over
+  the emitter's ceiling, plus one, as the game draws it; the ceiling is the fastest the emitter's velocity
+  can throw a particle plus its gravity and acceleration, or a fixed 1000 for an emitter linked to its
+  parent's motion; the previous formula came from an editor's emulation
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+- **Wind controls follow the maps** - the direction control is named for what it sets, the heading the wind
+  blows towards, in whole degrees; the speed runs from 0 to 10, the range the shipped maps declare, and starts
+  at the game's default of 2 at heading 0
+- **Wind on ordinary emitters** - an emitter that declares itself affected by wind accelerates by half the
+  viewer's wind every frame, as the game applies it; it used to be thrown by the whole wind once at birth, a
+  rule taken from an editor's emulation rather than the engine
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+- **Preview and localisation texts** - tooltips and notes name the state and stop: no corpus counts, no second
+  person, no full stop on a one-clause tooltip, straight apostrophes
+- **Weather emitters play as the game plays them** - rain, snow, sleet and ash are a field around the camera:
+  every particle is born at once inside a cube of the declared size, none ever dies, one that leaves a face
+  comes back through the opposite one, and what is drawn is the copy inside the cube around the point the
+  declared offset in front of the camera. The fade by distance multiplies the colour of an additive emitter and
+  the alpha otherwise, computed as the game computes it. The per-emitter ceiling is the game's 5003. A weather
+  system used to emit once at the origin and drift off
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+  - A field that declares itself affected by wind drifts with the viewer's wind at five times its speed, every
+    step, as the game applies it; nothing is added at birth, and the streaks tilt along the drift
 - **Registry files reported as read by nothing** - `GameObjectFiles.xml`, `CampaignFiles.xml` and every other
   registry the game opens by name are registered under their own name, so the "No registry names ..." warning
   no longer appears on the registry itself; it still appears on a file nothing names

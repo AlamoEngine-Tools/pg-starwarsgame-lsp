@@ -447,42 +447,31 @@ describe("tailGeometry", () => {
         properties({ hasTail: true, tailSize: 50, ...over });
 
     /**
-     * A kite is an ordinary quad with ONE corner pulled out behind the particle, which is how the
-     * engine draws a streak (`EmitterInstance.cpp:625-640`). The pull is `tailSize` scaled by how
-     * much of the velocity lies across the view - `sqrt(len*len/2)` in the reference, which is
-     * len over root two.
+     * Measured in the game: the trailing corner is pulled out to `tailSize * speed / maxSpeed + 1`
+     * times the half size, where speed is the length of the velocity across the view and maxSpeed
+     * the emitter's ceiling, raised to the speed when the particle is faster.
      */
-    it("pulls the trailing corner out by the tail size", () => {
+    it("pulls the trailing corner out by the tail size over the emitter's ceiling", () => {
         // Straight across the view, so none of the speed is foreshortened away.
-        const kited = tailGeometry(kite(), { x: 10, y: 0, z: 0 }, 10)!;
+        const kited = tailGeometry(kite(), { x: 10, y: 0, z: 0 }, 20)!;
 
-        assert.ok(
-            Math.abs(kited.stretch - 50 / Math.SQRT2) < 1e-6,
-            `${kited.stretch}`,
-        );
+        assert.equal(kited.stretch, (50 * 10) / 20 + 1);
     });
 
     /** Flying at the camera there is nothing to streak: the quad stays a quad. */
     it("leaves a particle coming straight at the camera unstretched", () => {
         assert.equal(
-            tailGeometry(kite(), { x: 0, y: 0, z: 10 }, 10)!.stretch,
+            tailGeometry(kite(), { x: 0, y: 0, z: 10 }, 20)!.stretch,
             1,
         );
     });
 
-    /** `mult = length / 1000` when the particle inherited its emitter's motion. */
-    it("scales the tail by speed for an emitter its particles are linked to", () => {
-        const linked = kite({ parentLinkStrength: 1 });
-
-        const slow = tailGeometry(linked, { x: 10, y: 0, z: 0 }, 10)!.stretch;
-        const fast = tailGeometry(linked, { x: 400, y: 0, z: 0 }, 400)!.stretch;
-
+    /** A particle faster than the ceiling takes its own speed as the ceiling: the full tail. */
+    it("draws the full tail for a particle past the emitter's ceiling", () => {
         assert.equal(
-            slow,
-            1,
-            "a slow linked particle should have no tail worth drawing",
+            tailGeometry(kite(), { x: 30, y: 0, z: 0 }, 20)!.stretch,
+            51,
         );
-        assert.ok(Math.abs(fast - (50 * 0.4) / Math.SQRT2) < 1e-6, `${fast}`);
     });
 
     /**
@@ -497,7 +486,7 @@ describe("tailGeometry", () => {
 
     it("says nothing to do for an emitter without a tail", () => {
         assert.equal(
-            tailGeometry(properties(), { x: 10, y: 0, z: 0 }, 10),
+            tailGeometry(properties(), { x: 10, y: 0, z: 0 }, 20),
             null,
         );
     });
@@ -1944,5 +1933,295 @@ describe("the owning object Scale_Factor", () => {
         // 101 of the 107 shipped particle objects declare 1.0 or nothing, so this is the path that
         // must not move.
         assert.deepEqual(drawn(undefined), drawn(1));
+    });
+});
+
+/**
+ * Measured in the game: every particle group carries an "energy", 1.0 unless a weather phase,
+ * planet corruption, transport dust or a surface effect sets it. An ordinary emitter's spawn
+ * attempt fires only with that probability and its particle is born at that share of its speed;
+ * a weather field draws that share of its particles, the share clamped to 0..1.
+ */
+describe("particle energy", () => {
+    function stream(): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 10 },
+                    }),
+                    properties: properties({
+                        particlesPerSecond: 100,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    function field(): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    properties: properties({
+                        isWeatherParticle: true,
+                        weatherCubeSize: 100,
+                        particlesPerSecond: 10,
+                        lifetime: 1,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    const instances = (instance: ParticleSystemInstance) =>
+        (instance.emitterMesh(0)!.geometry as THREE.InstancedBufferGeometry)
+            .instanceCount;
+
+    it("spawns with the energy as its odds", () => {
+        const full = stream();
+        const half = stream();
+        half.setEnergy(0.5);
+        for (let i = 0; i < 10; i++) {
+            full.update(0.1);
+            half.update(0.1);
+        }
+        const born = half.emitterParticles(0).length;
+        assert.equal(full.emitterParticles(0).length, 100);
+        assert.ok(born > 30 && born < 70, `born ${born}`);
+    });
+
+    it("bears its particles at the energy's share of their speed", () => {
+        const instance = stream();
+        instance.setEnergy(0.5);
+        while (instance.emitterParticles(0).length === 0) {
+            instance.update(0.01);
+        }
+        const { x, y, z } = instance.emitterParticles(0)[0].velocity;
+        assert.ok(Math.abs(Math.hypot(x, y, z) - 5) < 1e-6);
+    });
+
+    it("draws the energy's share of a weather field, never more than all of it", () => {
+        const half = field();
+        half.setEnergy(0.5);
+        half.update(0.1);
+        assert.equal(instances(half), 5);
+
+        const over = field();
+        over.setEnergy(3);
+        over.update(0.1);
+        assert.equal(instances(over), 10);
+    });
+
+    it("says whether it holds weather, which is what a phase's intensity reaches", () => {
+        assert.equal(field().hasWeather, true);
+        assert.equal(stream().hasWeather, false);
+    });
+});
+
+/**
+ * Measured in the game. A weather emitter is a field around the camera, not a stream from a point:
+ * every particle it will ever have is born at once, uniformly inside a cube of the declared edge
+ * around the emitter's origin, with a random age; none ever dies - an age past the lifetime wraps
+ * round - and none is born later. Each step the position is wrapped back into the cube, axis by
+ * axis. What is DRAWN is the copy of each particle inside the cube around the point the declared
+ * camera offset in front of the camera, found by taking that point's phase within its period cell
+ * off the particle before wrapping: the lattice stays fixed in the world, the camera moves through
+ * it. The count is the file's per-second value taken outright, lifetime playing no part.
+ */
+describe("weather emitters", () => {
+    const HALF = 50;
+
+    function weather(
+        over: Partial<AlamoEmitterProperties> = {},
+    ): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    name: "rain",
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: -5, z: 0 },
+                    }),
+                    properties: properties({
+                        isWeatherParticle: true,
+                        weatherCubeSize: HALF * 2,
+                        weatherCubeDistance: 30,
+                        weatherFadeoutDistance: 0,
+                        weatherCutoffDistance: 0,
+                        particlesPerSecond: 10,
+                        lifetime: 1,
+                        blendMode: "Additive",
+                        ...over,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    /** A camera on +z looking at the origin, so the point in front of it is towards -z. */
+    function viewFrom(z: number): THREE.Matrix4 {
+        const camera = new THREE.PerspectiveCamera();
+        camera.position.set(0, 0, z);
+        camera.lookAt(0, 0, 0);
+        camera.updateMatrixWorld(true);
+        return camera.matrixWorldInverse;
+    }
+
+    function inside(value: number, centre: number): boolean {
+        return value >= centre - HALF - 1e-6 && value <= centre + HALF + 1e-6;
+    }
+
+    it("is born complete, inside its cube, and never grows", () => {
+        const instance = weather();
+        instance.update(0.1, viewFrom(100));
+        const born = instance.emitterParticles(0);
+        assert.equal(born.length, 10);
+        for (const particle of born) {
+            assert.ok(
+                inside(particle.position.x, 0),
+                `x ${particle.position.x}`,
+            );
+            assert.ok(
+                inside(particle.position.y, 0),
+                `y ${particle.position.y}`,
+            );
+            assert.ok(
+                inside(particle.position.z, 0),
+                `z ${particle.position.z}`,
+            );
+        }
+
+        for (let i = 0; i < 10; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        assert.equal(instance.emitterParticles(0).length, 10);
+    });
+
+    it("keeps every particle past its lifetime, the age wrapping round", () => {
+        const instance = weather();
+        for (let i = 0; i < 30; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        const live = instance.emitterParticles(0);
+        assert.equal(live.length, 10);
+        assert.ok(live.every((p) => p.age < p.lifetime));
+    });
+
+    it("wraps a particle that leaves a face back in through the opposite one", () => {
+        const instance = weather();
+        instance.update(0.1, viewFrom(100));
+        // Falling at five a second for three seconds crosses the hundred-unit cube more than once.
+        for (let i = 0; i < 30; i++) {
+            instance.update(0.1, viewFrom(100));
+        }
+        for (const particle of instance.emitterParticles(0)) {
+            assert.ok(
+                inside(particle.position.y, 0),
+                `y ${particle.position.y}`,
+            );
+        }
+    });
+
+    it("draws the field in the cube around the point in front of the camera", () => {
+        const instance = weather();
+        // Camera at z 100 looking at the origin; thirty units in front of it is z 70.
+        instance.update(0.1, viewFrom(100));
+        const offsets = instance
+            .emitterMesh(0)!
+            .geometry.getAttribute("iOffset").array;
+        for (let i = 0; i < 10; i++) {
+            assert.ok(inside(offsets[i * 3], 0), `x ${offsets[i * 3]}`);
+            assert.ok(inside(offsets[i * 3 + 1], 0), `y ${offsets[i * 3 + 1]}`);
+            assert.ok(
+                inside(offsets[i * 3 + 2], 70),
+                `z ${offsets[i * 3 + 2]}`,
+            );
+        }
+    });
+
+    /**
+     * Measured: the fade distance is the length of twice the centre point minus the particle's
+     * local position - as the game computes it, not as the numbers were presumably meant. With the
+     * centre at z 70 that distance runs from 90 to 190 here, so a cutoff of 100 with a fade-out of
+     * 200 hides the nearest and draws none fully; for an additive emitter it is the colour that
+     * carries the fade.
+     */
+    it("fades an additive weather particle's colour by the game's distance", () => {
+        const instance = weather({
+            weatherCutoffDistance: 100,
+            weatherFadeoutDistance: 200,
+        });
+        instance.update(0.1, viewFrom(100));
+        const colours = instance
+            .emitterMesh(0)!
+            .geometry.getAttribute("iColor").array;
+        const reds = Array.from({ length: 10 }, (_, i) => colours[i * 3]);
+        assert.ok(
+            reds.every((r) => r < 0.5),
+            `reds ${reds.join(", ")}`,
+        );
+        assert.ok(
+            reds.some((r) => r > 0),
+            "every particle fully hidden",
+        );
+    });
+
+    /**
+     * Measured: a weather emitter that declares itself affected by wind has five times the
+     * scene's wind added to its step every frame - a drift, not an acceleration, and nothing at
+     * birth. The preview's scene wind is the viewer's wind setting.
+     */
+    it("drifts a wind-affected field at five times the wind, every step", () => {
+        const instance = weather({ affectedByWind: true });
+        instance.update(0.1, viewFrom(100));
+        const particle = instance
+            .emitterParticles(0)
+            .find((p) => p.position.x > -HALF + 5 && p.position.x < HALF - 5)!;
+        const before = particle.position.x;
+
+        instance.update(0.1, viewFrom(100), { x: 2, y: 0, z: 0 });
+
+        assert.ok(
+            Math.abs(particle.position.x - (before + 2 * 5 * 0.1)) < 1e-6,
+            `moved ${particle.position.x - before}`,
+        );
+    });
+
+    it("leaves a field that ignores the wind where its own speed takes it", () => {
+        const instance = weather({ affectedByWind: false });
+        instance.update(0.1, viewFrom(100));
+        const particle = instance
+            .emitterParticles(0)
+            .find((p) => p.position.x > -HALF + 5 && p.position.x < HALF - 5)!;
+        const before = particle.position.x;
+
+        instance.update(0.1, viewFrom(100), { x: 2, y: 0, z: 0 });
+
+        assert.equal(particle.position.x, before);
+    });
+
+    /**
+     * Measured: a streak is pulled along the particle's EFFECTIVE velocity - the stored velocity
+     * plus the wind drift for a field - never the stored velocity alone. A uniform field shifted
+     * by the wind still looks uniform; the tilt of the streaks is what the eye reads.
+     */
+    it("tilts a wind-affected field's streaks along the wind", () => {
+        const calm = weather({ affectedByWind: true, hasTail: true });
+        const windy = weather({ affectedByWind: true, hasTail: true });
+        calm.update(0.1, viewFrom(100));
+        windy.update(0.1, viewFrom(100));
+
+        calm.update(0.1, viewFrom(100), { x: 0, y: 0, z: 0 });
+        windy.update(0.1, viewFrom(100), { x: 20, y: 0, z: 0 });
+
+        const turnsOf = (instance: ParticleSystemInstance) =>
+            instance.emitterMesh(0)!.geometry.getAttribute("iRotation")
+                .array[0];
+        assert.notEqual(turnsOf(windy), turnsOf(calm));
     });
 });

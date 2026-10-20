@@ -851,6 +851,8 @@ export class PreviewViewport {
     };
     /** The same wind in the terms the foliage shaders read it: a heading and a speed. */
     private wind: Wind = DEFAULT_VIEWER_SETTINGS.wind;
+    /** The weather phase's intensity, the energy every weather system is drawn at. */
+    private weatherIntensity = DEFAULT_VIEWER_SETTINGS.weatherIntensity;
     /** The starfield and the sky dome, built on first use and then just shown or hidden. */
     private stars: THREE.Points | null = null;
     private sky: THREE.Mesh | null = null;
@@ -1560,6 +1562,31 @@ export class PreviewViewport {
             y: 0,
             z: -Math.sin(heading) * speed || 0,
         };
+    }
+
+    /**
+     * Sets the weather phase's intensity.
+     *
+     * Measured: a phase sets it as the energy of the weather system's group, so it reaches the
+     * systems that hold a weather field and no other effect, which stays at 1.0.
+     */
+    setWeatherIntensity(intensity: number): void {
+        this.weatherIntensity = intensity;
+        for (const entry of this.particleSystems.values()) {
+            if (entry.instance.hasWeather) {
+                entry.instance.setEnergy(intensity);
+            }
+        }
+    }
+
+    /** Whether the scene holds a weather field, for the control that only reaches one. */
+    hasWeather(): boolean {
+        for (const entry of this.particleSystems.values()) {
+            if (entry.instance.hasWeather) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -3837,6 +3864,9 @@ export class PreviewViewport {
         }
 
         this.particleSystems.set(id, entry);
+        if (entry.instance.hasWeather) {
+            entry.instance.setEnergy(this.weatherIntensity);
+        }
         this.refreshParticleVisibility(entry);
 
         // The depth range again, because the effects reach further than the model and they arrive

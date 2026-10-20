@@ -16,7 +16,12 @@ import {
     spawnParticle,
     stepParticle,
     systemExtent,
+    tailMaxSpeed,
+    velocityCeiling,
     volumeExtent,
+    cubePhase,
+    weatherFade,
+    wrapIntoCube,
 } from "./particleSim";
 import { emitter, properties, track, volume } from "./particleFixture";
 import type { AlamoEmitterProperties } from "../../protocol/modelPreview";
@@ -137,8 +142,8 @@ describe("sampleVolume", () => {
         }
     });
 
-    it("centres a cube on the origin", () => {
-        const cube = volume({ shape: "Cube", sideLength: 4 });
+    it("centres a cube on the origin, out to its stored half-extent", () => {
+        const cube = volume({ shape: "Cube", sideLength: 2 });
         const random = seededRandom(3);
 
         for (let i = 0; i < 200; i++) {
@@ -707,24 +712,39 @@ describe("inward motion", () => {
 
 describe("wind", () => {
     /**
-     * `if (affectedByWind) particle.m_initialSpeed += m_engine.GetWind()` - the editor adds it once,
-     * at birth. 484 of the corpus's 1019 emitters set the flag and it was doing nothing, so half
-     * the smoke in the game hung in dead air.
+     * Measured in the game: an ordinary emitter that declares itself affected by wind has half the
+     * scene's wind added to its velocity every frame, times the step - an acceleration that
+     * accumulates - and nothing at birth. The birth kick the preview used to apply came from the
+     * editor's emulation, not from the engine, whose birth path reads no wind at all.
      */
-    it("throws a wind-affected particle downwind at birth", () => {
+    it("adds nothing at birth, whatever the flag says", () => {
+        const blown = spawnParticle(
+            emitter({ properties: properties({ affectedByWind: true }) }),
+            seededRandom(1),
+        );
+        const still = spawnParticle(emitter(), seededRandom(1));
+
+        assert.deepEqual(blown.velocity, still.velocity);
+    });
+
+    it("accelerates a wind-affected particle by half the wind, step after step", () => {
         const e = emitter({ properties: properties({ affectedByWind: true }) });
+        const p = spawnParticle(e, seededRandom(1));
+        const wind = { x: 4, y: 0, z: -2 };
 
-        const p = spawnParticle(e, seededRandom(1), { x: 3, y: 0, z: -4 });
+        // Quarter-second steps: two halves would reach the one-second lifetime and end it.
+        stepParticle(p, e, 0.25, 0, { x: 0, y: 0, z: 0 }, wind);
+        assert.deepEqual(p.velocity, { x: 0.5, y: 0, z: -0.25 });
 
-        assert.deepEqual(p.velocity, { x: 3, y: 0, z: -4 });
+        stepParticle(p, e, 0.25, 0, { x: 0, y: 0, z: 0 }, wind);
+        assert.deepEqual(p.velocity, { x: 1, y: 0, z: -0.5 });
     });
 
     it("leaves an emitter that ignores the wind alone", () => {
-        const p = spawnParticle(emitter(), seededRandom(1), {
-            x: 3,
-            y: 0,
-            z: -4,
-        });
+        const e = emitter();
+        const p = spawnParticle(e, seededRandom(1));
+
+        stepParticle(p, e, 0.5, 0, { x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: -2 });
 
         assert.deepEqual(p.velocity, { x: 0, y: 0, z: 0 });
     });
@@ -1060,8 +1080,8 @@ describe("volumeExtent", () => {
     });
 
     it("measures a cube to its corner, not its face", () => {
-        // Half the side would put the corners outside the frame.
-        const cube = volume({ shape: "Cube", sideLength: 2 });
+        // The stored value is the half-extent; the face alone would leave the corners outside.
+        const cube = volume({ shape: "Cube", sideLength: 1 });
         assert.ok(Math.abs(volumeExtent(cube) - Math.sqrt(3)) < 1e-6);
     });
 
@@ -1182,5 +1202,210 @@ describe("systemExtent", () => {
 
     it("falls back to something visible when there are no emitters", () => {
         assert.ok(systemExtent([]) > 0);
+    });
+});
+
+/**
+ * Measured in the game: the fastest an emitter's velocity property can throw a particle, per
+ * shape, which a streak's length is measured against.
+ */
+describe("velocityCeiling", () => {
+    /**
+     * Measured in the game: a cube's stored value is its HALF-extent - the sampler draws each axis
+     * between minus and plus it. Halving it again drew every cube volume at half its size.
+     */
+    it("samples a cube out to its stored half-extent on every axis", () => {
+        const cube = volume({ shape: "Cube", sideLength: 10 });
+        const random = seededRandom(7);
+        let reach = 0;
+        for (let i = 0; i < 400; i++) {
+            const p = sampleVolume(cube, random);
+            reach = Math.max(
+                reach,
+                Math.abs(p.x),
+                Math.abs(p.y),
+                Math.abs(p.z),
+            );
+        }
+        assert.ok(reach > 9 && reach <= 10, `reach ${reach}`);
+        assert.equal(volumeExtent(cube), 10 * Math.sqrt(3));
+    });
+
+    it("is the exact value's length for a point", () => {
+        assert.equal(
+            velocityCeiling(
+                volume({ shape: "Point", exactValue: { x: 3, y: 0, z: 4 } }),
+            ),
+            5,
+        );
+    });
+
+    it("takes the larger magnitude per axis for a box", () => {
+        assert.equal(
+            velocityCeiling(
+                volume({
+                    shape: "Box",
+                    min: { x: -3, y: 0, z: 1 },
+                    max: { x: 2, y: 0, z: 4 },
+                }),
+            ),
+            5,
+        );
+    });
+
+    it("reaches the corner of a cube whose value is the half-extent", () => {
+        assert.equal(
+            velocityCeiling(volume({ shape: "Cube", sideLength: 2 })),
+            2 * Math.sqrt(3),
+        );
+    });
+
+    it("is the radius of a sphere and the slant of a cylinder", () => {
+        assert.equal(
+            velocityCeiling(volume({ shape: "Sphere", sphereRadius: 7 })),
+            7,
+        );
+        assert.equal(
+            velocityCeiling(
+                volume({
+                    shape: "Cylinder",
+                    cylinderRadius: 3,
+                    cylinderHeight: 4,
+                }),
+            ),
+            5,
+        );
+    });
+});
+
+/**
+ * Measured in the game: a streak's ceiling is 1000 for an emitter linked to its parent's motion,
+ * and otherwise the velocity ceiling plus gravity plus the acceleration's length. A weather field
+ * has gravity, acceleration and the link cleared on reset, so only its velocity counts.
+ */
+describe("tailMaxSpeed", () => {
+    const moving = (over: Partial<AlamoEmitterProperties> = {}) =>
+        emitter({
+            speed: volume({
+                shape: "Point",
+                exactValue: { x: 0, y: 0, z: 10 },
+            }),
+            properties: properties({
+                gravity: 2,
+                acceleration: { x: 3, y: 4, z: 0 },
+                ...over,
+            }),
+        });
+
+    it("adds gravity and the acceleration to the velocity ceiling", () => {
+        assert.equal(tailMaxSpeed(moving()), 10 + 2 + 5);
+    });
+
+    it("is a kilometre a second for an emitter linked to its parent", () => {
+        assert.equal(tailMaxSpeed(moving({ parentLinkStrength: 0.5 })), 1000);
+    });
+
+    it("counts only the velocity for a weather field", () => {
+        assert.equal(
+            tailMaxSpeed(
+                moving({ isWeatherParticle: true, parentLinkStrength: 1 }),
+            ),
+            10,
+        );
+    });
+});
+
+/**
+ * Measured in the game, for weather emitters only: a particle is invisible closer than the cutoff
+ * distance to the fade centre, fully drawn from the cutoff plus the fade-out distance, and faded
+ * linearly in between. Every shipped weather system sets the cutoff to zero; rain and ash set the
+ * fade-out to zero as well, and the game's branch order makes that "fully drawn from the cutoff"
+ * rather than a division by zero.
+ */
+describe("weatherFade", () => {
+    it("hides a particle closer than the cutoff", () => {
+        assert.equal(weatherFade(49, 50, 100), 0);
+    });
+
+    it("fades in linearly over the fade-out distance past the cutoff", () => {
+        assert.equal(weatherFade(50, 50, 100), 0);
+        assert.equal(weatherFade(100, 50, 100), 0.5);
+        assert.equal(weatherFade(150, 50, 100), 1);
+    });
+
+    it("draws fully beyond the cutoff plus the fade-out", () => {
+        assert.equal(weatherFade(1000, 50, 100), 1);
+    });
+
+    it("draws fully from the cutoff when the fade-out is zero, as rain and ash declare", () => {
+        assert.equal(weatherFade(0, 0, 0), 1);
+        assert.equal(weatherFade(10, 0, 0), 1);
+    });
+});
+
+/**
+ * Measured in the game: a weather particle lives in a periodic space around the emitter's origin
+ * with the declared cube size as its period, each axis wrapped on its own - the vertical one too -
+ * by a step of one edge, not a modulo. The cube size is the full edge; the half-extent is derived.
+ */
+describe("wrapIntoCube", () => {
+    const half = 50;
+
+    it("leaves a position inside the cube alone", () => {
+        assert.deepEqual(wrapIntoCube({ x: 10, y: -49, z: 0 }, half), {
+            x: 10,
+            y: -49,
+            z: 0,
+        });
+    });
+
+    it("brings a position past a face back in through the opposite face, per axis", () => {
+        assert.deepEqual(wrapIntoCube({ x: 60, y: 0, z: 0 }, half), {
+            x: -40,
+            y: 0,
+            z: 0,
+        });
+        assert.deepEqual(wrapIntoCube({ x: 0, y: -70, z: 0 }, half), {
+            x: 0,
+            y: 30,
+            z: 0,
+        });
+        assert.deepEqual(wrapIntoCube({ x: 0, y: 0, z: 55 }, half), {
+            x: 0,
+            y: 0,
+            z: -45,
+        });
+    });
+
+    it("steps by one edge and no more, as the game does", () => {
+        // A particle a full edge and a half past the face is stepped back one edge, not folded
+        // into the cube: the game's one correction for a large overshoot takes the integer
+        // quotient off the overshoot, which is not a modulo.
+        const wrapped = wrapIntoCube({ x: 50 + 150, y: 0, z: 0 }, half);
+        assert.equal(wrapped.x, -50 + (150 - Math.trunc(150 / 100)));
+    });
+});
+
+/**
+ * Measured in the game: the rendered copy of each particle is the one inside the cube around the
+ * fade centre, which the game finds by taking the centre's position within its own period cell
+ * off every particle before wrapping. The lattice stays fixed in the world; the camera moves
+ * through it.
+ */
+describe("cubePhase", () => {
+    it("is the centre's offset within its period cell, per axis", () => {
+        assert.deepEqual(cubePhase({ x: 120, y: -30, z: 250 }, 50), {
+            x: 20,
+            y: -30,
+            z: 50,
+        });
+    });
+
+    it("is zero on a cell boundary and for the origin", () => {
+        assert.deepEqual(cubePhase({ x: 200, y: 0, z: -100 }, 50), {
+            x: 0,
+            y: 0,
+            z: 0,
+        });
     });
 });

@@ -2708,6 +2708,11 @@ function ModelPreview(): React.JSX.Element {
     const [captureTransparent, setCaptureTransparent] = useState(true);
     const [captureScenery, setCaptureScenery] = useState(false);
     const [wind, setWind] = useState<Wind>(DEFAULT_VIEWER_SETTINGS.wind);
+    const [weatherIntensity, setWeatherIntensity] = useState(
+        DEFAULT_VIEWER_SETTINGS.weatherIntensity,
+    );
+    /** Whether the scene holds a weather field - the one thing the intensity reaches. */
+    const [hasWeather, setHasWeather] = useState(false);
     const [background, setBackground] = useState<BackgroundKind>(
         DEFAULT_VIEWER_SETTINGS.background,
     );
@@ -2891,6 +2896,7 @@ function ModelPreview(): React.JSX.Element {
         setCameraBindings(room.cameraBindings);
         setFolded(new Set(room.collapsedPanels));
         setWind(room.wind);
+        setWeatherIntensity(room.weatherIntensity);
         setSkeletonOn(room.skeleton);
         setLabelMode(room.boneLabels as LabelMode);
         setFireArcs(room.fireArcs);
@@ -3925,6 +3931,7 @@ function ModelPreview(): React.JSX.Element {
     const refreshStats = useCallback(() => {
         const viewport = viewportRef.current;
         setStats(viewport?.stats() ?? null);
+        setHasWeather(viewport?.hasWeather() ?? false);
         setBones(viewport?.skeleton() ?? []);
         setTreeItems(viewport?.treeItems() ?? []);
         setAttachments(viewport?.attachmentsByBone() ?? new Map());
@@ -5096,6 +5103,7 @@ function ModelPreview(): React.JSX.Element {
                     // Heat emitters are labelled rather than hidden: they draw as a distortion of
                     // the frame behind them, which is easy to miss and easy to mistake for a bug
                     // in the effect if the row does not say what it is.
+                    setHasWeather(viewport.hasWeather());
                     setEmitters(
                         system.emitters.map(
                             (emitter) =>
@@ -5209,6 +5217,7 @@ function ModelPreview(): React.JSX.Element {
                 setCameraBindings(room.cameraBindings);
                 setFolded(new Set(room.collapsedPanels));
                 setWind(room.wind);
+                setWeatherIntensity(room.weatherIntensity);
                 setBackground(room.background);
                 // Only a PRESET is restorable. A camera id names a bone in whatever model was
                 // open at the time, and a stored `camera:1` would light a button for a camera this
@@ -5404,6 +5413,10 @@ function ModelPreview(): React.JSX.Element {
     useEffect(() => {
         viewportRef.current?.setWind(wind.heading, wind.speed);
     }, [wind]);
+
+    useEffect(() => {
+        viewportRef.current?.setWeatherIntensity(weatherIntensity);
+    }, [weatherIntensity]);
 
     useEffect(() => {
         viewportRef.current?.setBackground(background);
@@ -6812,6 +6825,7 @@ function ModelPreview(): React.JSX.Element {
                 cameraBindings,
                 collapsedPanels: [...folded],
                 wind,
+                weatherIntensity,
                 background,
                 cameraPreset: cameraView ?? "",
             },
@@ -6827,6 +6841,7 @@ function ModelPreview(): React.JSX.Element {
         drawDistance,
         lights,
         wind,
+        weatherIntensity,
         cameraPresets,
         cameraBindings,
         folded,
@@ -7312,7 +7327,7 @@ function ModelPreview(): React.JSX.Element {
                 ? "Show targeting marks"
                 : targetable === 0
                   ? "Nothing here can be targeted"
-                  : "Reticle art unreadable - set your game directory",
+                  : "Reticle art unreadable - game directory not set",
         });
     }
 
@@ -7930,7 +7945,7 @@ function ModelPreview(): React.JSX.Element {
                                         icon="reset"
                                         title={
                                             "Put the backdrop, lights, wind and draw distance " +
-                                            "back to their defaults. The model`s own state is " +
+                                            "back to their defaults. The model's own state is " +
                                             "left as it is."
                                         }
                                         onClick={resetRoom}
@@ -7955,7 +7970,7 @@ function ModelPreview(): React.JSX.Element {
                                                     Never lit and never in the
                                                     depth buffer, so a backdrop
                                                     cannot be mistaken for part
-                                                    of the model.
+                                                    of the model
                                                 </>
                                             }
                                         >
@@ -8098,9 +8113,10 @@ function ModelPreview(): React.JSX.Element {
                                                     Turns round the model the
                                                     way the stage does, from the
                                                     same zero: at 0 the light
-                                                    stands where you stand in
-                                                    the Front view, and it moves
-                                                    clockwise seen from above.
+                                                    stands at the Front
+                                                    view&apos;s camera, and it
+                                                    moves clockwise seen from
+                                                    above.
                                                 </>
                                             }
                                         >
@@ -8295,16 +8311,16 @@ function ModelPreview(): React.JSX.Element {
                                             inline
                                             info={
                                                 <>
-                                                    Alamo`s one shadow colour,
-                                                    and it MULTIPLIES: 0.5 grey
-                                                    means half as bright. In
-                                                    Game mode it tints the
-                                                    stencil volume, so it
-                                                    reaches the hull`s own
-                                                    self-shadowing as well as
-                                                    the ground. In Default mode
-                                                    only the ground can catch
-                                                    it.
+                                                    Alamo&apos;s one shadow
+                                                    colour, and it MULTIPLIES:
+                                                    0.5 grey means half as
+                                                    bright. In Game mode it
+                                                    tints the stencil volume, so
+                                                    it reaches the hull&apos;s
+                                                    own self-shadowing as well
+                                                    as the ground. In Default
+                                                    mode only the ground can
+                                                    catch it.
                                                 </>
                                             }
                                         >
@@ -8372,14 +8388,20 @@ function ModelPreview(): React.JSX.Element {
                                         onToggle={toggleSection}
                                     >
                                         <Field
-                                            label="Wind from"
+                                            label="Wind direction"
                                             value={<>{wind.heading} deg</>}
+                                            info={
+                                                <>
+                                                    Heading the wind blows
+                                                    towards
+                                                </>
+                                            }
                                         >
                                             <input
                                                 type="range"
                                                 min={0}
                                                 max={360}
-                                                step={5}
+                                                step={1}
                                                 value={wind.heading}
                                                 onChange={(e) =>
                                                     setWind((current) => ({
@@ -8397,18 +8419,17 @@ function ModelPreview(): React.JSX.Element {
                                             value={wind.speed.toFixed(1)}
                                             info={
                                                 <>
-                                                    Bends the trees, leans the
-                                                    grass, and carries the 484
-                                                    emitters that declare
-                                                    themselves affected by it.
+                                                    Bends foliage and carries
+                                                    the emitters and weather
+                                                    declared affected by wind
                                                 </>
                                             }
                                         >
                                             <input
                                                 type="range"
                                                 min={0}
-                                                max={20}
-                                                step={0.5}
+                                                max={10}
+                                                step={0.1}
                                                 value={wind.speed}
                                                 onChange={(e) =>
                                                     setWind((current) => ({
@@ -8417,6 +8438,43 @@ function ModelPreview(): React.JSX.Element {
                                                             e.target.value,
                                                         ),
                                                     }))
+                                                }
+                                            />
+                                        </Field>
+
+                                        <Field
+                                            label="Weather intensity"
+                                            value={
+                                                hasWeather
+                                                    ? `${Math.round(weatherIntensity * 100)}%`
+                                                    : "no weather"
+                                            }
+                                            info={
+                                                hasWeather ? (
+                                                    <>
+                                                        Share of a weather field
+                                                        drawn, as a weather
+                                                        phase sets it
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        No weather emitter in
+                                                        this scene
+                                                    </>
+                                                )
+                                            }
+                                        >
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={1}
+                                                step={0.05}
+                                                disabled={!hasWeather}
+                                                value={weatherIntensity}
+                                                onChange={(e) =>
+                                                    setWeatherIntensity(
+                                                        Number(e.target.value),
+                                                    )
                                                 }
                                             />
                                         </Field>
@@ -8441,10 +8499,11 @@ function ModelPreview(): React.JSX.Element {
                                                     info={
                                                         <>
                                                             Default reads each
-                                                            sub-mesh`s shader
-                                                            NAME and draws the
-                                                            archetype it names -
-                                                            never wrong about
+                                                            sub-mesh&apos;s
+                                                            shader NAME and
+                                                            draws the archetype
+                                                            it names - never
+                                                            wrong about
                                                             geometry, only about
                                                             how a surface is
                                                             lit. Game draws the
@@ -8494,14 +8553,14 @@ function ModelPreview(): React.JSX.Element {
                                                                 // who stepped to Default unable to return to the mode
                                                                 // the panel opens in.
                                                                 title: anyShaderSource
-                                                                    ? "The model`s own effect shaders, translated, and " +
-                                                                      "the engine`s stencil shadows. " +
+                                                                    ? "The model's own effect shaders, translated, and " +
+                                                                      "the engine's stencil shadows. " +
                                                                       translatedCount.translated +
                                                                       " of " +
                                                                       translatedCount.total +
                                                                       " sub-meshes are " +
                                                                       "drawn this way."
-                                                                    : "The engine`s stencil shadows, which need no " +
+                                                                    : "The engine's stencil shadows, which need no " +
                                                                       "sources. For its effect shaders as well, " +
                                                                       "set the .fx sources up.",
                                                             },
@@ -8963,9 +9022,9 @@ function ModelPreview(): React.JSX.Element {
                                                 <>
                                                     The fit already reaches the
                                                     end of the effects, not just
-                                                    the hull. Reach further for
-                                                    a long trail; a huge model
-                                                    may z-fight then.
+                                                    the hull. A long trail needs
+                                                    more reach; a huge model may
+                                                    z-fight then.
                                                 </>
                                             }
                                         >
@@ -9865,7 +9924,7 @@ function ModelPreview(): React.JSX.Element {
                                                     label="Damage type"
                                                     valueTitle={
                                                         "What the damage table says against this " +
-                                                        "target`s armor. A pair the table does not name is " +
+                                                        "target's armor. A pair the table does not name is " +
                                                         "1.0, which is over half of them."
                                                     }
                                                     value={

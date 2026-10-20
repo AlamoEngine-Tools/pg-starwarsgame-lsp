@@ -20,6 +20,9 @@ import type {
 /** Named for what it is: a value in [0, 1). */
 export type Random = () => number;
 
+/** Measured: the scene wind enters an ordinary emitter's velocity at half strength per second. */
+const ORDINARY_WIND_FACTOR = 0.5;
+
 /**
  * A small deterministic generator.
  *
@@ -154,7 +157,9 @@ export function sampleVolume(volume: AlamoSpawnVolume, random: Random): Vec3 {
             };
 
         case "Cube": {
-            const half = volume.sideLength / 2;
+            // Measured: the stored value is the HALF-extent; the game draws each axis between
+            // minus and plus it.
+            const half = volume.sideLength;
             return {
                 x: lerp(-half, half, random()),
                 y: lerp(-half, half, random()),
@@ -206,8 +211,8 @@ export function volumeExtent(volume: AlamoSpawnVolume): number {
             return Math.max(length(volume.min), length(volume.max));
 
         case "Cube":
-            // To the corner, not the face - half a side would leave the corners outside the frame.
-            return (volume.sideLength / 2) * Math.sqrt(3);
+            // To the corner, not the face. The stored value is the half-extent.
+            return volume.sideLength * Math.sqrt(3);
 
         case "Sphere":
             return volume.sphereRadius;
@@ -364,11 +369,7 @@ export class SpawnClock {
 }
 
 /** Creates one particle at birth, drawing everything random about it now. */
-export function spawnParticle(
-    emitter: AlamoEmitter,
-    random: Random,
-    wind: Vec3 = { x: 0, y: 0, z: 0 },
-): Particle {
+export function spawnParticle(emitter: AlamoEmitter, random: Random): Particle {
     const properties = emitter.properties;
 
     const position = sampleVolume(emitter.position, random);
@@ -395,10 +396,6 @@ export function spawnParticle(
     const direction =
         properties.randomRotationDirection && random() < 0.5 ? -1 : 1;
 
-    // Downwind, once, at birth: `if (affectedByWind) initialSpeed += GetWind()`. 484 of the
-    // corpus's 1019 emitters set the flag, so half the drifting smoke in the game depends on it.
-    const blown = properties.affectedByWind ? wind : { x: 0, y: 0, z: 0 };
-
     // The direction the particle was born in, which is what the inward terms pull along.
     const spread = Math.hypot(position.x, position.y, position.z);
     const inward =
@@ -415,10 +412,12 @@ export function spawnParticle(
         // `initialSpeed -= normpos * inwardSpeed`, with the reader having already negated the
         // stored value - so adding it here throws the particle outward exactly as the file asks.
         // Half the corpus sets this, and it was doing nothing at all.
+        // No wind here. Measured in the game: the birth path reads no wind at all; the wind is a
+        // per-frame acceleration applied in `stepParticle`.
         velocity: {
-            x: speed.x + inward.x * properties.inwardSpeed + blown.x,
-            y: speed.y + inward.y * properties.inwardSpeed + blown.y,
-            z: speed.z + inward.z * properties.inwardSpeed + blown.z,
+            x: speed.x + inward.x * properties.inwardSpeed,
+            y: speed.y + inward.y * properties.inwardSpeed,
+            z: speed.z + inward.z * properties.inwardSpeed,
         },
         inward,
         age: 0,
@@ -497,6 +496,7 @@ export function stepParticle(
     dt: number,
     groundY = 0,
     acceleration: Vec3 = accelerationIn(emitter.properties),
+    wind: Vec3 = { x: 0, y: 0, z: 0 },
 ): boolean {
     const properties = emitter.properties;
 
@@ -508,6 +508,16 @@ export function stepParticle(
     particle.velocity.x += acceleration.x * dt;
     particle.velocity.y += acceleration.y * dt;
     particle.velocity.z += acceleration.z * dt;
+
+    // Measured in the game: an emitter that declares itself affected by wind has half the scene's
+    // wind added to its velocity every frame, times the step - an acceleration that accumulates,
+    // and nothing at birth. A weather field takes the wind differently, in its own step.
+    if (properties.affectedByWind) {
+        const gust = dt * ORDINARY_WIND_FACTOR;
+        particle.velocity.x += wind.x * gust;
+        particle.velocity.y += wind.y * gust;
+        particle.velocity.z += wind.z * gust;
+    }
 
     // Pulls along the direction the particle was BORN in - `normpos`, fixed at spawn. Stored
     // positive and negated by the reader, so adding it here moves the way the file asks.
@@ -656,6 +666,143 @@ export function appearanceOf(
             (particle.rotation + spin(particle, emitter, t)),
         frame: Math.max(0, Math.floor(channel("TextureIndex", 0))),
     };
+}
+
+/**
+ * The fastest an emitter's velocity property can throw a particle.
+ *
+ * Measured in the game, per shape: the exact value's length for a point; for a box the length of
+ * the larger magnitude on each axis; for a cube the corner, the stored value being the
+ * half-extent; a sphere's radius as stored; a cylinder's slant, radius against height.
+ */
+export function velocityCeiling(volume: AlamoSpawnVolume): number {
+    switch (volume.shape) {
+        case "Box":
+            return Math.hypot(
+                Math.max(Math.abs(volume.min.x), Math.abs(volume.max.x)),
+                Math.max(Math.abs(volume.min.y), Math.abs(volume.max.y)),
+                Math.max(Math.abs(volume.min.z), Math.abs(volume.max.z)),
+            );
+
+        case "Cube":
+            return volume.sideLength * Math.sqrt(3);
+
+        case "Sphere":
+            return volume.sphereRadius;
+
+        case "Cylinder":
+            return Math.hypot(volume.cylinderRadius, volume.cylinderHeight);
+
+        default:
+            return length(volume.exactValue);
+    }
+}
+
+/** Measured: the ceiling of an emitter linked to its parent's motion, set by the engine. */
+const LINKED_TAIL_MAX_SPEED = 1000;
+
+/**
+ * The speed a streak's length is measured against.
+ *
+ * Measured in the game: 1000 for an emitter linked to its parent's motion - the server zeroes the
+ * link strength when the file does not set the link, so a non-zero strength is the flag - and
+ * otherwise the velocity ceiling plus gravity plus the acceleration's length. A weather field has
+ * gravity, acceleration and the link cleared on reset, so only its velocity counts.
+ */
+export function tailMaxSpeed(emitter: AlamoEmitter): number {
+    const properties = emitter.properties;
+    const ceiling = velocityCeiling(emitter.speed);
+
+    if (properties.isWeatherParticle) {
+        return ceiling;
+    }
+
+    if (properties.parentLinkStrength !== 0) {
+        return LINKED_TAIL_MAX_SPEED;
+    }
+
+    return ceiling + properties.gravity + length(properties.acceleration);
+}
+
+/**
+ * How much of a weather particle is drawn, by its distance from the fade centre.
+ *
+ * Measured in the game, for weather emitters only: zero closer than the cutoff distance, one from
+ * the cutoff plus the fade-out distance on, linear in between. The game multiplies the colour by
+ * it for an additive emitter and the alpha otherwise. Tested in that branch order: every shipped
+ * weather system declares a cutoff of zero, and rain and ash a fade-out of zero as well, which the
+ * order makes "fully drawn from the cutoff" rather than a division by zero.
+ */
+export function weatherFade(
+    distance: number,
+    cutoff: number,
+    fadeout: number,
+): number {
+    if (distance < cutoff) {
+        return 0;
+    }
+
+    if (distance >= cutoff + fadeout) {
+        return 1;
+    }
+
+    return (distance - cutoff) / fadeout;
+}
+
+/**
+ * Brings a weather particle back into its cube, one axis at a time.
+ *
+ * Measured in the game: a weather particle lives in a periodic space around the emitter's origin
+ * whose period is the declared cube size - the full edge; `half` is the derived half-extent. A
+ * coordinate past a face is stepped back by one edge, the vertical axis like the others. The game's
+ * one provision for an overshoot of a whole edge or more takes the integer quotient off the
+ * overshoot rather than the quotient times the edge, which is not a modulo; reproduced as read,
+ * since a particle that jumps a full edge in one step is what it was written for.
+ */
+export function wrapIntoCube(position: Vec3, half: number): Vec3 {
+    return {
+        x: wrapAxis(position.x, half),
+        y: wrapAxis(position.y, half),
+        z: wrapAxis(position.z, half),
+    };
+}
+
+/** One axis of {@link wrapIntoCube}, for a caller that wraps thousands in place without allocating. */
+export function wrapAxis(value: number, half: number): number {
+    const edge = half * 2;
+
+    if (value < -half) {
+        let overshoot = -half - value;
+        if (overshoot >= edge) {
+            overshoot -= Math.trunc(overshoot / edge);
+        }
+        return half - overshoot;
+    }
+
+    if (value > half) {
+        let overshoot = value - half;
+        if (overshoot >= edge) {
+            overshoot -= Math.trunc(overshoot / edge);
+        }
+        return -half + overshoot;
+    }
+
+    return value;
+}
+
+/**
+ * Where the cube's centre sits within its own period cell, per axis.
+ *
+ * Measured in the game: the rendered copy of each particle is the one inside the cube around the
+ * centre, found by taking this phase off the particle before wrapping. The lattice of copies stays
+ * fixed in the world and the camera moves through it; the particles never drag along.
+ */
+export function cubePhase(centre: Vec3, half: number): Vec3 {
+    const edge = half * 2;
+    const phase = (value: number): number =>
+        value - Math.trunc(value / edge) * edge;
+
+    return { x: phase(centre.x), y: phase(centre.y), z: phase(centre.z) };
 }
 
 /** How far a particle has turned by `t`, in turns. Zero for the emitters that do not spin. */

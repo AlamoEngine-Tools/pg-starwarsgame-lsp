@@ -109,8 +109,7 @@ describe("viewerSettingsFrom", () => {
     });
 
     /**
-     * One wind, three consumers: the tree bend, the grass, and the 484 of 1019 emitters that set
-     * `affectedByWind`. AloViewer exposes exactly these two numbers.
+     * One wind, as a map environment stores it: a heading and a speed.
      */
     it("carries a wind heading and speed", () => {
         assert.equal(typeof DEFAULT_VIEWER_SETTINGS.wind.heading, "number");
@@ -127,6 +126,42 @@ describe("viewerSettingsFrom", () => {
         assert.deepEqual(
             viewerSettingsFrom({ wind: "gale" }).wind,
             DEFAULT_VIEWER_SETTINGS.wind,
+        );
+    });
+
+    /**
+     * Measured: a map environment that sets no wind gets the engine's own, speed 2 along +X -
+     * heading 0. The shipped maps set speeds from 1 to 10 (711 environments in 269 maps, median
+     * 2, ceiling 10 in 15 of them), so 10 is the top of the range.
+     */
+    it("starts at the engine's default wind and stops at the maps' strongest", () => {
+        assert.deepEqual(DEFAULT_VIEWER_SETTINGS.wind, {
+            heading: 0,
+            speed: 2,
+        });
+        assert.equal(
+            viewerSettingsFrom({ wind: { speed: 15 } }).wind.speed,
+            10,
+        );
+    });
+
+    /**
+     * Measured: a weather phase's emitter intensity is the energy of the weather system's group,
+     * 1.0 until a phase sets it and clamped to 0..1 where a field reads it.
+     */
+    it("starts the weather at full intensity and keeps it between none and full", () => {
+        assert.equal(DEFAULT_VIEWER_SETTINGS.weatherIntensity, 1);
+        assert.equal(
+            viewerSettingsFrom({ weatherIntensity: 0.5 }).weatherIntensity,
+            0.5,
+        );
+        assert.equal(
+            viewerSettingsFrom({ weatherIntensity: 3 }).weatherIntensity,
+            1,
+        );
+        assert.equal(
+            viewerSettingsFrom({ weatherIntensity: -1 }).weatherIntensity,
+            0,
         );
     });
 
