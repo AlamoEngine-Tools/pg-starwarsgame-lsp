@@ -145,6 +145,26 @@ describe("viewerSettingsFrom", () => {
         );
     });
 
+    /**
+     * Measured: a weather phase's emitter intensity is the energy of the weather system's group,
+     * 1.0 until a phase sets it and clamped to 0..1 where a field reads it.
+     */
+    it("starts the weather at full intensity and keeps it between none and full", () => {
+        assert.equal(DEFAULT_VIEWER_SETTINGS.weatherIntensity, 1);
+        assert.equal(
+            viewerSettingsFrom({ weatherIntensity: 0.5 }).weatherIntensity,
+            0.5,
+        );
+        assert.equal(
+            viewerSettingsFrom({ weatherIntensity: 3 }).weatherIntensity,
+            1,
+        );
+        assert.equal(
+            viewerSettingsFrom({ weatherIntensity: -1 }).weatherIntensity,
+            0,
+        );
+    });
+
     describe("the light rig", () => {
         /** AloViewer's own shape: a sun and two fills, each with a heading, a tilt and a colour. */
         it("carries three directional lights and the global terms", () => {

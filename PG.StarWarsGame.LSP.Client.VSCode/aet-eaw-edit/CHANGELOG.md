@@ -4,6 +4,10 @@
 
 ### Features
 
+- **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
+  phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
+  reason when the scene has none
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
 - **Baseline read from a release** - the server reads the newest release of the baseline repository whose
   baseline it can load, the way it reads the schema since 0.4.1; a merge to that repository's `main` no longer
   reaches installed clients. Before the first release exists the default branch is read as before, and the copy

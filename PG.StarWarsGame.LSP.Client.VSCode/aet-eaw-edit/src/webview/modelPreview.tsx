@@ -2708,6 +2708,11 @@ function ModelPreview(): React.JSX.Element {
     const [captureTransparent, setCaptureTransparent] = useState(true);
     const [captureScenery, setCaptureScenery] = useState(false);
     const [wind, setWind] = useState<Wind>(DEFAULT_VIEWER_SETTINGS.wind);
+    const [weatherIntensity, setWeatherIntensity] = useState(
+        DEFAULT_VIEWER_SETTINGS.weatherIntensity,
+    );
+    /** Whether the scene holds a weather field - the one thing the intensity reaches. */
+    const [hasWeather, setHasWeather] = useState(false);
     const [background, setBackground] = useState<BackgroundKind>(
         DEFAULT_VIEWER_SETTINGS.background,
     );
@@ -2891,6 +2896,7 @@ function ModelPreview(): React.JSX.Element {
         setCameraBindings(room.cameraBindings);
         setFolded(new Set(room.collapsedPanels));
         setWind(room.wind);
+        setWeatherIntensity(room.weatherIntensity);
         setSkeletonOn(room.skeleton);
         setLabelMode(room.boneLabels as LabelMode);
         setFireArcs(room.fireArcs);
@@ -3925,6 +3931,7 @@ function ModelPreview(): React.JSX.Element {
     const refreshStats = useCallback(() => {
         const viewport = viewportRef.current;
         setStats(viewport?.stats() ?? null);
+        setHasWeather(viewport?.hasWeather() ?? false);
         setBones(viewport?.skeleton() ?? []);
         setTreeItems(viewport?.treeItems() ?? []);
         setAttachments(viewport?.attachmentsByBone() ?? new Map());
@@ -5096,6 +5103,7 @@ function ModelPreview(): React.JSX.Element {
                     // Heat emitters are labelled rather than hidden: they draw as a distortion of
                     // the frame behind them, which is easy to miss and easy to mistake for a bug
                     // in the effect if the row does not say what it is.
+                    setHasWeather(viewport.hasWeather());
                     setEmitters(
                         system.emitters.map(
                             (emitter) =>
@@ -5209,6 +5217,7 @@ function ModelPreview(): React.JSX.Element {
                 setCameraBindings(room.cameraBindings);
                 setFolded(new Set(room.collapsedPanels));
                 setWind(room.wind);
+                setWeatherIntensity(room.weatherIntensity);
                 setBackground(room.background);
                 // Only a PRESET is restorable. A camera id names a bone in whatever model was
                 // open at the time, and a stored `camera:1` would light a button for a camera this
@@ -5404,6 +5413,10 @@ function ModelPreview(): React.JSX.Element {
     useEffect(() => {
         viewportRef.current?.setWind(wind.heading, wind.speed);
     }, [wind]);
+
+    useEffect(() => {
+        viewportRef.current?.setWeatherIntensity(weatherIntensity);
+    }, [weatherIntensity]);
 
     useEffect(() => {
         viewportRef.current?.setBackground(background);
@@ -6812,6 +6825,7 @@ function ModelPreview(): React.JSX.Element {
                 cameraBindings,
                 collapsedPanels: [...folded],
                 wind,
+                weatherIntensity,
                 background,
                 cameraPreset: cameraView ?? "",
             },
@@ -6827,6 +6841,7 @@ function ModelPreview(): React.JSX.Element {
         drawDistance,
         lights,
         wind,
+        weatherIntensity,
         cameraPresets,
         cameraBindings,
         folded,
@@ -8423,6 +8438,43 @@ function ModelPreview(): React.JSX.Element {
                                                             e.target.value,
                                                         ),
                                                     }))
+                                                }
+                                            />
+                                        </Field>
+
+                                        <Field
+                                            label="Weather intensity"
+                                            value={
+                                                hasWeather
+                                                    ? `${Math.round(weatherIntensity * 100)}%`
+                                                    : "no weather"
+                                            }
+                                            info={
+                                                hasWeather ? (
+                                                    <>
+                                                        Share of a weather field
+                                                        drawn, as a weather
+                                                        phase sets it
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        No weather emitter in
+                                                        this scene
+                                                    </>
+                                                )
+                                            }
+                                        >
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={1}
+                                                step={0.05}
+                                                disabled={!hasWeather}
+                                                value={weatherIntensity}
+                                                onChange={(e) =>
+                                                    setWeatherIntensity(
+                                                        Number(e.target.value),
+                                                    )
                                                 }
                                             />
                                         </Field>

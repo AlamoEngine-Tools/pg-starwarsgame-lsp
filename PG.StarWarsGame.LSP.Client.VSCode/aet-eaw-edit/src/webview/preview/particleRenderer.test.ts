@@ -2015,6 +2015,11 @@ describe("particle energy", () => {
         over.update(0.1);
         assert.equal(instances(over), 10);
     });
+
+    it("says whether it holds weather, which is what a phase's intensity reaches", () => {
+        assert.equal(field().hasWeather, true);
+        assert.equal(stream().hasWeather, false);
+    });
 });
 
 /**

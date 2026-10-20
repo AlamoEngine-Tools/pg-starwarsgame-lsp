@@ -179,6 +179,11 @@ export interface ViewerSettings {
      */
     cameraBindings: CameraBinding[];
     wind: Wind;
+    /**
+     * Measured: a weather phase's emitter intensity, which the game sets as the energy of the
+     * weather system's group - the share of the field drawn. 1.0 until a phase sets it.
+     */
+    weatherIntensity: number;
     skeleton: boolean;
     boneLabels: string;
     fireArcs: boolean;
@@ -253,6 +258,7 @@ export const DEFAULT_VIEWER_SETTINGS: ViewerSettings = {
     // Measured: an environment that sets no wind gets speed 2 at heading 0. It is also the median
     // of the 711 environments the shipped maps declare.
     wind: { heading: 0, speed: 2 },
+    weatherIntensity: 1,
     skeleton: false,
     boneLabels: "none",
     fireArcs: false,
@@ -277,6 +283,8 @@ const RANGES: Record<string, { min: number; max: number }> = {
     intensity: { min: 0, max: 8 },
     // The shipped maps set 1 to 10; 10 is the strongest (sandstorms, rain, Honoghr).
     windSpeed: { min: 0, max: 10 },
+    // A weather field reads the intensity clamped to none and full.
+    weatherIntensity: { min: 0, max: 1 },
 };
 
 /**
@@ -410,6 +418,11 @@ export function viewerSettingsFrom(stored: unknown): ViewerSettings {
         cameraBindings: bindingsFrom(raw.cameraBindings),
         collapsedPanels: names(raw.collapsedPanels),
         wind: windFrom(raw.wind),
+        weatherIntensity: number_(
+            raw.weatherIntensity,
+            DEFAULT_VIEWER_SETTINGS.weatherIntensity,
+            RANGES.weatherIntensity,
+        ),
         skeleton: boolean_(raw.skeleton, DEFAULT_VIEWER_SETTINGS.skeleton),
         boneLabels: string_(raw.boneLabels, DEFAULT_VIEWER_SETTINGS.boneLabels),
         fireArcs: boolean_(raw.fireArcs, DEFAULT_VIEWER_SETTINGS.fireArcs),

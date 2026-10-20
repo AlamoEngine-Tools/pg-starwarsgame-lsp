@@ -1712,6 +1712,13 @@ export class ParticleSystemInstance {
         this.frame.energy = energy;
     }
 
+    /** Whether any of its emitters is a weather field - what a weather phase's intensity reaches. */
+    get hasWeather(): boolean {
+        return this.emitters.some(
+            (e) => e.description.properties.isWeatherParticle,
+        );
+    }
+
     constructor(
         readonly name: string,
         system: AlamoParticleContent,
