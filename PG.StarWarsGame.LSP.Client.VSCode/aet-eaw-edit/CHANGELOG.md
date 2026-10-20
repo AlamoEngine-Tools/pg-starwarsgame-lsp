@@ -156,6 +156,10 @@
 
 - **Shader note on particle systems** - "No shader sources are reachable" is shown only for a scene that asked for
   an effect; a particle system asks for none and opened with a note about shaders it never needed
+- **Loading cover on a particle file** - a particle system opened on its own is a scene with one part, asked
+  for as a particle system rather than as geometry; the cover counted geometry alone and stayed over the field
+  for the full idle deadline, hiding the first eight seconds of any effect opened this way
+  ([#261](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/261))
 - **Hardpoint without an Attachment_Bone** - both findings are errors and say what the game does, measured on the
   2024 build: the hardpoint is placed at `Fire_Bone_A`, or at the map origin with that unset too; its
   `Model_To_Attach` is never attached; a targetable one draws its reticle in the screen corner and, at the origin,

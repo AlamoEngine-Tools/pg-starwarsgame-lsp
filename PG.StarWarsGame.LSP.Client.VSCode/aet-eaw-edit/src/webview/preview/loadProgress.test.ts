@@ -4,7 +4,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { AssetLedger, loadState, type LoadTally } from "./loadProgress";
+import {
+    AssetLedger,
+    isSubjectSystem,
+    loadState,
+    type LoadTally,
+} from "./loadProgress";
 
 const tally = (over: Partial<LoadTally> = {}): LoadTally => ({
     expectedParts: 4,
@@ -199,6 +204,54 @@ describe("loadState", () => {
         assert.match(
             loadState(tally({ settledAssets: 3 })).label,
             /texture|material/i,
+        );
+    });
+});
+
+/**
+ * A particle file opened on its own is a scene with ONE resolved part - the server builds it the
+ * same shape as a model so the client has one thing to render - but that part is asked for as a
+ * particle system, never as a GLB. The cover counts geometry by GLB replies, so it waited on a
+ * reply that was never coming and sat over the field until the idle deadline gave up.
+ */
+describe("isSubjectSystem", () => {
+    it("counts a particle scene's own system as its one part", () => {
+        assert.equal(
+            isSubjectSystem(
+                { kind: "Particle", subject: "P_asteroid_field00" },
+                "P_asteroid_field00",
+            ),
+            true,
+        );
+    });
+
+    it("matches the subject whatever casing the reply came back in", () => {
+        assert.equal(
+            isSubjectSystem(
+                { kind: "Particle", subject: "P_asteroid_field00" },
+                "p_asteroid_field00",
+            ),
+            true,
+        );
+    });
+
+    it("does not count a system a model mounts, which is not geometry", () => {
+        assert.equal(
+            isSubjectSystem(
+                { kind: "Model", subject: "ev_star_destroyer" },
+                "ev_star_destroyer",
+            ),
+            false,
+        );
+    });
+
+    it("does not count an effect asked for by name on a particle scene", () => {
+        assert.equal(
+            isSubjectSystem(
+                { kind: "Particle", subject: "P_asteroid_field00" },
+                "Large_Explosion_Space",
+            ),
+            false,
         );
     });
 });

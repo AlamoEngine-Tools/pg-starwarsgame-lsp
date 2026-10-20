@@ -54,7 +54,12 @@ import {
 import { worstSeverity } from "./loc/validateState";
 import { collectTextureNames } from "./preview/materials";
 import { type InspectorSubject } from "./preview/inspectorSubject";
-import { AssetLedger, loadState, type LoadTally } from "./preview/loadProgress";
+import {
+    AssetLedger,
+    isSubjectSystem,
+    loadState,
+    type LoadTally,
+} from "./preview/loadProgress";
 import { anchorFlyout } from "./preview/flyoutAnchor";
 import { handoffFor } from "./preview/handoff";
 import { shaderGapNotice } from "./preview/shaderGap";
@@ -5030,6 +5035,19 @@ function ModelPreview(): React.JSX.Element {
             }
 
             if (message.type === "particleSystem") {
+                // A particle scene's one part is its own system, asked for here rather than as a
+                // GLB - so it is counted in here, or the cover waits on geometry that never comes.
+                // Before the null check: a system that failed to read is still an answer.
+                if (
+                    sceneRef.current !== null &&
+                    isSubjectSystem(sceneRef.current, message.name)
+                ) {
+                    setTally((current) => ({
+                        ...current,
+                        arrivedParts: current.arrivedParts + 1,
+                    }));
+                }
+
                 const system = message.result.system ?? null;
 
                 if (system === null) {
