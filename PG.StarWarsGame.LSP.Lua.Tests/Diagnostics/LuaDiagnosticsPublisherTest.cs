@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -51,14 +52,16 @@ public sealed class LuaDiagnosticsPublisherTest
     // ── the analyzer's findings, folded in (#153) ───────────────────────────
 
     private static (List<PublishDiagnosticsParams> published, FakeGameWorkspaceHost host, FakeAnalyzer analyzer,
-        FakeGameIndexService index) BuildWithAnalyzer(bool running = true)
+        FakeGameIndexService index) BuildWithAnalyzer(bool running = true,
+            ILogger<LuaDiagnosticsPublisher>? logger = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var index = new FakeGameIndexService();
         var host = new FakeGameWorkspaceHost();
         var analyzer = new FakeAnalyzer { IsRunning = running };
         _ = new LuaDiagnosticsPublisher(p => published.Add(p), index, host, new FileHelper(new MockFileSystem()),
-            new LuaApiSchemaProvider([]), NullLogger<LuaDiagnosticsPublisher>.Instance, analyzer: analyzer);
+            new LuaApiSchemaProvider([]), logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance,
+            analyzer: analyzer);
         return (published, host, analyzer, index);
     }
 
@@ -88,6 +91,25 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Contains(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(last));
         Assert.DoesNotContain("param-type-mismatch", Codes(last));
         Assert.DoesNotContain("unused", Codes(last));
+    }
+
+    /// <summary>
+    ///     Every finding the analyzer makes reaches the debug log with its rule and whether it was
+    ///     kept, so the dropped rules can be counted (#278) - in the editor they leave no trace.
+    /// </summary>
+    [Fact]
+    public void AnAnalyzerFinding_IsLoggedWithItsRule_KeptOrDropped()
+    {
+        var logger = new CapturingLogger();
+        var (_, host, analyzer, _) = BuildWithAnalyzer(logger: logger);
+        host.Set(LuaUri, "local x = 1");
+
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused"), AnalyzerFinding("param-type-mismatch", 4));
+
+        var dropped = Assert.Single(logger.Messages, m => m.Contains("param-type-mismatch"));
+        Assert.Contains("dropped", dropped);
+        Assert.Contains(":5", dropped);
+        Assert.Contains(logger.Messages, m => m.Contains("unused") && m.Contains("kept"));
     }
 
     /// <summary>
@@ -666,6 +688,27 @@ public sealed class LuaDiagnosticsPublisherTest
         var clear = Assert.Single(published);
         Assert.Equal(LuaUri, clear.Uri.ToString());
         Assert.Empty(clear.Diagnostics!);
+    }
+
+    private sealed class CapturingLogger : ILogger<LuaDiagnosticsPublisher>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
     }
 
     private sealed class FakeAnalyzer : ILuaAnalyzer
