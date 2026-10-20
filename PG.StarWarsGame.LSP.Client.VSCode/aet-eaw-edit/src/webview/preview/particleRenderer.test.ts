@@ -2095,4 +2095,38 @@ describe("weather emitters", () => {
             "every particle fully hidden",
         );
     });
+
+    /**
+     * Measured: a weather emitter that declares itself affected by wind has five times the
+     * scene's wind added to its step every frame - a drift, not an acceleration, and nothing at
+     * birth. The preview's scene wind is the viewer's wind setting.
+     */
+    it("drifts a wind-affected field at five times the wind, every step", () => {
+        const instance = weather({ affectedByWind: true });
+        instance.update(0.1, viewFrom(100));
+        const particle = instance
+            .emitterParticles(0)
+            .find((p) => p.position.x > -HALF + 5 && p.position.x < HALF - 5)!;
+        const before = particle.position.x;
+
+        instance.update(0.1, viewFrom(100), { x: 2, y: 0, z: 0 });
+
+        assert.ok(
+            Math.abs(particle.position.x - (before + 2 * 5 * 0.1)) < 1e-6,
+            `moved ${particle.position.x - before}`,
+        );
+    });
+
+    it("leaves a field that ignores the wind where its own speed takes it", () => {
+        const instance = weather({ affectedByWind: false });
+        instance.update(0.1, viewFrom(100));
+        const particle = instance
+            .emitterParticles(0)
+            .find((p) => p.position.x > -HALF + 5 && p.position.x < HALF - 5)!;
+        const before = particle.position.x;
+
+        instance.update(0.1, viewFrom(100), { x: 2, y: 0, z: 0 });
+
+        assert.equal(particle.position.x, before);
+    });
 });

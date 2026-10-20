@@ -163,6 +163,8 @@
 
 ### Fixes
 
+- **Preview and localisation texts** - tooltips and notes name the state and stop: no corpus counts, no second
+  person, no full stop on a one-clause tooltip, straight apostrophes
 - **Weather emitters play as the game plays them** - rain, snow, sleet and ash are a field around the camera:
   every particle is born at once inside a cube of the declared size, none ever dies, one that leaves a face
   comes back through the opposite one, and what is drawn is the copy inside the cube around the point the
@@ -170,6 +172,8 @@
   the alpha otherwise, computed as the game computes it. The per-emitter ceiling is the game's 5003. A weather
   system used to emit once at the origin and drift off
   ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
+  - A field that declares itself affected by wind drifts with the viewer's wind at five times its speed, every
+    step, as the game applies it; nothing is added at birth
 - **Registry files reported as read by nothing** - `GameObjectFiles.xml`, `CampaignFiles.xml` and every other
   registry the game opens by name are registered under their own name, so the "No registry names ..." warning
   no longer appears on the registry itself; it still appears on a file nothing names

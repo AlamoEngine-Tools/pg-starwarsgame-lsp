@@ -61,6 +61,8 @@ const IDENTITY = new THREE.Matrix4();
 const CAMERA_SCRATCH = new THREE.Vector3();
 const CAMERA_MATRIX_SCRATCH = new THREE.Matrix4();
 const WEATHER_FORWARD_SCRATCH = new THREE.Vector3();
+/** Measured: the scene wind enters a weather field's step at ten times the half it enters everything else at. */
+const WEATHER_WIND_FACTOR = 5;
 /** Where a weather cube sits when nothing is looking. */
 const ORIGIN: AlamoVector3 = { x: 0, y: 0, z: 0 };
 
@@ -1331,11 +1333,8 @@ class EmitterRenderer {
                 ),
             );
             for (let i = 0; i < count; i++) {
-                const particle = spawnParticle(
-                    this.emitter,
-                    this.random,
-                    frame.wind,
-                );
+                // No wind at birth: a field takes the wind in its step, below.
+                const particle = spawnParticle(this.emitter, this.random);
                 particle.position = {
                     x: (this.random() * 2 - 1) * half,
                     y: (this.random() * 2 - 1) * half,
@@ -1347,6 +1346,16 @@ class EmitterRenderer {
             this.weatherBorn = true;
         }
 
+        // Measured: a field that declares itself affected by wind has FIVE times the scene's
+        // wind added to its step, every frame, as a drift - the stored velocity is never touched,
+        // and nothing is added at birth. The preview's scene wind is the viewer's wind setting.
+        const blown = this.emitter.properties.affectedByWind
+            ? frame.wind
+            : ORIGIN;
+        const driftX = blown.x * WEATHER_WIND_FACTOR;
+        const driftY = blown.y * WEATHER_WIND_FACTOR;
+        const driftZ = blown.z * WEATHER_WIND_FACTOR;
+
         for (const particle of this.particles) {
             particle.age += dt;
             if (particle.lifetime > 0 && particle.age > particle.lifetime) {
@@ -1354,15 +1363,15 @@ class EmitterRenderer {
             }
 
             particle.position.x = wrapAxis(
-                particle.position.x + particle.velocity.x * dt,
+                particle.position.x + (particle.velocity.x + driftX) * dt,
                 half,
             );
             particle.position.y = wrapAxis(
-                particle.position.y + particle.velocity.y * dt,
+                particle.position.y + (particle.velocity.y + driftY) * dt,
                 half,
             );
             particle.position.z = wrapAxis(
-                particle.position.z + particle.velocity.z * dt,
+                particle.position.z + (particle.velocity.z + driftZ) * dt,
                 half,
             );
         }
