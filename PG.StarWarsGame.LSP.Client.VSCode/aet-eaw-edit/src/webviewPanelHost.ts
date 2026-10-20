@@ -12,13 +12,20 @@
 //
 // What actually differs between the three is a view type, a title, a script name and a message
 // switch. Everything above is here.
+//
+// So does the project a panel belongs to (#276): every panel is handed one when it opens, talks to
+// that project's server through it, is filed under it and titled with it. A panel has no other way
+// to reach a server.
 
 import * as vscode from "vscode";
 
 import { readPanelLayout, savePanelSize } from "./panelLayoutStorage";
+import { PanelProject, projectSubjectKey, projectTitle } from "./panelProject";
 
 /** What makes one panel different from another. */
 export interface WebviewPanelSpec {
+    /** The project the panel belongs to for its whole life. */
+    readonly project: PanelProject;
     /**
      * The VS Code view type. Not cosmetic: a `menus` contribution in package.json targets a panel
      * by this, which is why the localisation editor has two of them - a credits file has a crawl to
@@ -56,6 +63,26 @@ export interface WebviewPanelSpec {
  * webview and tearing it down lives here.
  */
 export abstract class WebviewPanelHost {
+    /** Every open panel of every kind, so a change in the project count can retitle them. */
+    private static readonly _live = new Set<WebviewPanelHost>();
+    private static _projectCount = 0;
+
+    /**
+     * Tells every panel how many projects the window runs, and retitles the open ones: a title
+     * names its project only while there are several.
+     */
+    static setProjectCount(count: number): void {
+        WebviewPanelHost._projectCount = count;
+        for (const host of WebviewPanelHost._live) {
+            host._applyTitle();
+        }
+    }
+
+    /** The project this panel belongs to, and the only server it talks to. */
+    readonly project: PanelProject;
+    /** The panel's own title, before the project name is added. */
+    private _title: string;
+
     /**
      * The tab was closed.
      *
@@ -78,6 +105,8 @@ export abstract class WebviewPanelHost {
         spec: WebviewPanelSpec,
         adopt?: vscode.WebviewPanel,
     ) {
+        this.project = spec.project;
+        this._title = spec.title;
         const localResourceRoots = [
             // Everything the webviews load lives under out/. The VSIX is packaged with
             // `vsce package --no-dependencies`, so anything addressed via node_modules 404s in
@@ -130,6 +159,9 @@ export abstract class WebviewPanelHost {
         );
 
         this.onDidDispose = this.panel.onDidDispose;
+        this._applyTitle();
+        WebviewPanelHost._live.add(this);
+        this.onDidDispose(() => WebviewPanelHost._live.delete(this));
         this.panel.webview.onDidReceiveMessage((msg: WebviewMessage) => {
             // Handled here for every editor at once. A dock width is the base class's business -
             // no subclass has an opinion about it, and five identical cases in five switches is
@@ -153,6 +185,20 @@ export abstract class WebviewPanelHost {
                 );
             });
         });
+    }
+
+    /** Retitles the panel; the project's name is added while the window runs several. */
+    protected setTitle(title: string): void {
+        this._title = title;
+        this._applyTitle();
+    }
+
+    private _applyTitle(): void {
+        this.panel.title = projectTitle(
+            this._title,
+            this.project.name,
+            WebviewPanelHost._projectCount,
+        );
     }
 
     reveal(preserveFocus = false): void {
@@ -179,11 +225,15 @@ export interface WebviewMessage {
 }
 
 /**
- * The open panels of one kind, keyed.
+ * The open panels of one kind, keyed by project and subject.
  *
  * An instance held as a `static` on each panel class, rather than a base-class static: a static
  * field on a base is shared by every subclass, so all three kinds would have landed in one map and
  * `disposeAll` on any of them would have closed the lot.
+ *
+ * There is no lookup by subject alone (#276): the same subject opened from two projects is two
+ * panels on two servers, and a lookup that ignored the project handed one project's tab to the
+ * other.
  */
 export class PanelRegistry<T extends WebviewPanelHost> {
     private readonly _panels = new Map<string, T>();
@@ -192,16 +242,25 @@ export class PanelRegistry<T extends WebviewPanelHost> {
         return [...this._panels.values()];
     }
 
-    get(key: string): T | undefined {
-        return this._panels.get(key);
+    /** The open panels of one project: the ones a refresh from its server is for. */
+    forProject(projectKey: string): T[] {
+        return this.all.filter((p) => p.project.key === projectKey);
     }
 
-    has(key: string): boolean {
-        return this._panels.has(key);
+    get(projectKey: string, subject: string): T | undefined {
+        return this._panels.get(projectSubjectKey(projectKey, subject));
     }
 
-    /** Registers a panel and arranges for it to remove itself when its tab closes. */
-    track(key: string, panel: T): T {
+    has(projectKey: string, subject: string): boolean {
+        return this._panels.has(projectSubjectKey(projectKey, subject));
+    }
+
+    /**
+     * Registers a panel under its own project and the subject, and arranges for it to remove
+     * itself when its tab closes.
+     */
+    track(subject: string, panel: T): T {
+        const key = projectSubjectKey(panel.project.key, subject);
         this._panels.set(key, panel);
         panel.onDidDispose(() => this._panels.delete(key));
         return panel;

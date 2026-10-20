@@ -4,19 +4,29 @@
 import * as vscode from "vscode";
 
 import { GetEncyclopediaEntryResult } from "./protocol";
-import { WebviewMessage, WebviewPanelHost } from "./webviewPanelHost";
+import { PanelProject } from "./panelProject";
+import {
+    PanelRegistry,
+    WebviewMessage,
+    WebviewPanelHost,
+} from "./webviewPanelHost";
 import { pickShipName } from "./shipNamePick";
 
 /**
  * The in-game encyclopedia popup for one GameObject, beside the editor.
  *
- * Deliberately a single panel that retargets, rather than a `PanelRegistry` keyed per object. The
+ * Deliberately one panel per project that retargets, rather than one keyed per object. The
  * credits preview is keyed per *file* because previewing two files means two different documents;
  * here a units file holds dozens of objects and clicking through them would otherwise leave a
- * trail of tabs. Whichever object you asked for last is the one on screen.
+ * trail of tabs. Whichever object was asked for last is the one on screen.
+ *
+ * One per project rather than one for the window (#276): a single panel reloaded through whichever
+ * project had opened it last, so a card asked for in one project could be refreshed from another's
+ * index.
  */
 export class EncyclopediaPanel extends WebviewPanelHost {
-    private static _instance: EncyclopediaPanel | undefined;
+    /** The open panels, at most one per project - filed under the empty subject. */
+    private static readonly _panels = new PanelRegistry<EncyclopediaPanel>();
 
     private _ready = false;
     private _pending: unknown | null = null;
@@ -39,8 +49,9 @@ export class EncyclopediaPanel extends WebviewPanelHost {
      */
     private readonly _shipNames = new Map<string, string>();
 
-    private constructor(extensionUri: vscode.Uri) {
+    private constructor(extensionUri: vscode.Uri, project: PanelProject) {
         super(extensionUri, {
+            project,
             viewType: "aetEncyclopediaPreview",
             title: vscode.l10n.t("Encyclopedia"),
             column: vscode.ViewColumn.Beside,
@@ -48,12 +59,6 @@ export class EncyclopediaPanel extends WebviewPanelHost {
             bodyStyle:
                 "  html, body { margin: 0; padding: 0; height: 100%; }\n" +
                 "  #root { height: 100%; }",
-        });
-
-        this.onDidDispose(() => {
-            if (EncyclopediaPanel._instance === this) {
-                EncyclopediaPanel._instance = undefined;
-            }
         });
     }
 
@@ -65,24 +70,30 @@ export class EncyclopediaPanel extends WebviewPanelHost {
      */
     static show(
         extensionUri: vscode.Uri,
+        project: PanelProject,
         entry: GetEncyclopediaEntryResult,
         reload: (multiplayer: boolean) => void,
     ): void {
         const panel =
-            EncyclopediaPanel._instance ??
-            (EncyclopediaPanel._instance = new EncyclopediaPanel(extensionUri));
+            EncyclopediaPanel._panels.get(project.key, "") ??
+            EncyclopediaPanel._panels.track(
+                "",
+                new EncyclopediaPanel(extensionUri, project),
+            );
 
         panel._reload = reload;
-        panel.panel.title = entry.displayName?.trim()
-            ? vscode.l10n.t("Encyclopedia: {0}", entry.displayName)
-            : vscode.l10n.t("Encyclopedia: {0}", entry.objectId);
+        panel.setTitle(
+            entry.displayName?.trim()
+                ? vscode.l10n.t("Encyclopedia: {0}", entry.displayName)
+                : vscode.l10n.t("Encyclopedia: {0}", entry.objectId),
+        );
         panel.reveal(true);
         panel._sendEntry(entry);
     }
 
-    /** Pushes a new entry into an open panel, and does nothing when there is none. */
-    static update(entry: GetEncyclopediaEntryResult): void {
-        EncyclopediaPanel._instance?._sendEntry(entry);
+    /** Pushes a new entry into the project's open panel, and does nothing when there is none. */
+    static update(projectKey: string, entry: GetEncyclopediaEntryResult): void {
+        EncyclopediaPanel._panels.get(projectKey, "")?._sendEntry(entry);
     }
 
     /**
@@ -94,25 +105,24 @@ export class EncyclopediaPanel extends WebviewPanelHost {
      * before the scan against the mod's own 340 after it. Nothing re-asked, so the card stayed
      * vanilla for the whole session.
      */
-    static refresh(): void {
-        const panel = EncyclopediaPanel._instance;
-        panel?._reload?.(panel._multiplayer);
-    }
-
-    static isOpen(): boolean {
-        return EncyclopediaPanel._instance !== undefined;
+    static refresh(projectKey: string): void {
+        for (const panel of EncyclopediaPanel._panels.forProject(projectKey)) {
+            panel._reload?.(panel._multiplayer);
+        }
     }
 
     /**
-     * The SP/MP mode to fetch a newly targeted object in. False when no panel is open, so the
-     * first preview of a session always starts single-player.
+     * The SP/MP mode to fetch a newly targeted object in. False when the project has no panel
+     * open, so its first preview always starts single-player.
      */
-    static multiplayer(): boolean {
-        return EncyclopediaPanel._instance?._multiplayer ?? false;
+    static multiplayer(projectKey: string): boolean {
+        return (
+            EncyclopediaPanel._panels.get(projectKey, "")?._multiplayer ?? false
+        );
     }
 
     static disposeAll(): void {
-        EncyclopediaPanel._instance?.dispose();
+        EncyclopediaPanel._panels.disposeAll();
     }
 
     protected onMessage(msg: WebviewMessage): void {

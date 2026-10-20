@@ -3,6 +3,7 @@
 
 import * as vscode from "vscode";
 
+import { PanelProject } from "./panelProject";
 import {
     panelKey,
     PanelRegistry,
@@ -23,8 +24,13 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
     private _ready = false;
     private _pending: unknown | null = null;
 
-    private constructor(label: string, extensionUri: vscode.Uri) {
+    private constructor(
+        label: string,
+        extensionUri: vscode.Uri,
+        project: PanelProject,
+    ) {
         super(extensionUri, {
+            project,
             viewType: "aetCreditsPreview",
             title: vscode.l10n.t("Preview: {0}", label),
             column: vscode.ViewColumn.Beside,
@@ -45,15 +51,16 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
         filePath: string,
         label: string,
         extensionUri: vscode.Uri,
+        project: PanelProject,
         payload: unknown,
     ): void {
         const key = panelKey(filePath);
-        let panel = CreditsPreviewPanel._panels.get(key);
+        let panel = CreditsPreviewPanel._panels.get(project.key, key);
 
         if (panel === undefined) {
             panel = CreditsPreviewPanel._panels.track(
                 key,
-                new CreditsPreviewPanel(label, extensionUri),
+                new CreditsPreviewPanel(label, extensionUri, project),
             );
         } else {
             panel.reveal(true);
@@ -63,12 +70,18 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
     }
 
     /** Pushes new rows to an open preview, and does nothing when there is none. */
-    static update(filePath: string, payload: unknown): void {
-        CreditsPreviewPanel._panels.get(panelKey(filePath))?._send(payload);
+    static update(
+        project: PanelProject,
+        filePath: string,
+        payload: unknown,
+    ): void {
+        CreditsPreviewPanel._panels
+            .get(project.key, panelKey(filePath))
+            ?._send(payload);
     }
 
-    static isOpen(filePath: string): boolean {
-        return CreditsPreviewPanel._panels.has(panelKey(filePath));
+    static isOpen(project: PanelProject, filePath: string): boolean {
+        return CreditsPreviewPanel._panels.has(project.key, panelKey(filePath));
     }
 
     static disposeAll(): void {

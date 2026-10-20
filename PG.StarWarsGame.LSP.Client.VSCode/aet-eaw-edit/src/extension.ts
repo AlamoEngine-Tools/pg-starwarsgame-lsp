@@ -17,6 +17,8 @@ import {
 } from "vscode-languageclient/node";
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
 import { EncyclopediaPanel } from "./encyclopediaPanel";
+import { PanelProject } from "./panelProject";
+import { WebviewPanelHost } from "./webviewPanelHost";
 import { ModelPreviewEditorProvider } from "./modelPreviewEditor";
 import { ModelInspectorPanel } from "./modelInspectorPanel";
 import { ModelPreviewPanel } from "./modelPreviewPanel";
@@ -396,13 +398,27 @@ const lsp = new RoutedLspGateway(
 const projectGateways = new Map<string, RoutedLspGateway>();
 
 /**
+ * The key a request or a panel is for: the key given, or - for "", which the navigators use for
+ * their one tree while the window holds a single project - that project's.
+ */
+function resolveProjectKey(key: string | undefined): string {
+    if (key) {
+        return key;
+    }
+    return clients.size === 1 ? (primaryClient()?.spec.key ?? "") : "";
+}
+
+/**
  * A gateway bound to one project for as long as the window runs it, across its restarts.
  *
  * A panel opened for a project keeps talking to that project's server whatever document is in
- * front later. With one project it is the window's own gateway.
+ * front later - with one project too, or a second project starting would re-route every panel
+ * opened before it to whichever editor is in front (#276). The window's own routed gateway only
+ * while no project runs.
  */
 function gatewayFor(key: string | undefined): LspGateway {
-    if (!key || clients.size <= 1) {
+    key = resolveProjectKey(key);
+    if (!key) {
         return lsp;
     }
     let gateway = projectGateways.get(key);
@@ -414,6 +430,19 @@ function gatewayFor(key: string | undefined): LspGateway {
         projectGateways.set(key, gateway);
     }
     return gateway;
+}
+
+/**
+ * The project a panel opened for `key` belongs to, for its whole life (#276). Every panel gets its
+ * project here and nowhere else, so none can be handed the routed gateway that follows the editor.
+ */
+function panelProject(key: string | undefined): PanelProject {
+    const resolved = resolveProjectKey(key);
+    return {
+        key: resolved,
+        name: clients.get(resolved)?.spec.name ?? "",
+        gateway: gatewayFor(resolved),
+    };
 }
 
 /** Asks which project, and remembers the answer for this window. */
@@ -446,16 +475,34 @@ async function commandGateway(): Promise<LspGateway | undefined> {
 }
 
 /**
- * The key of the project a command acts on, "" with one project or none, null when the picker was
- * dismissed. Panels are filed under it, so two projects' panels of one name stay apart.
+ * The key of the project a command acts on, "" with none running, null when the picker was
+ * dismissed. Panels are filed under it, so two projects' panels of one name stay apart - and under
+ * the real key with one project too, so a panel keeps its project when a second one starts.
  */
 async function commandProjectKey(): Promise<string | null> {
     if (clients.size <= 1) {
-        return "";
+        return resolveProjectKey("");
     }
     const project =
         activeEditorProject() ?? chosenProject() ?? (await pickProject());
     return project === undefined ? null : project.spec.key;
+}
+
+/**
+ * The project a localisation command acts on: the asking panel's, else the clicked tree row's, else
+ * the command's usual choice. A panel is not a text editor, so without its own key a command run
+ * from it fell through to the remembered project or a pick (#276).
+ */
+async function locCommandProjectKey(arg: unknown): Promise<string | null> {
+    const asked = (arg as { projectKey?: unknown } | undefined)?.projectKey;
+    if (typeof asked === "string" && asked) {
+        return asked;
+    }
+    const row =
+        arg instanceof LocTreeItem
+            ? localisationNavigatorProvider?.projectOf(arg)
+            : undefined;
+    return row ?? (await commandProjectKey());
 }
 
 let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
@@ -476,7 +523,10 @@ function navigatorProjects(): NavigatorProject[] {
           }));
 }
 
-/** The key panels and navigators file a project's things under: "" while the window has one. */
+/**
+ * The key the navigators file a project's tree under: "" while the window has one. Panels always
+ * use the project's real key (#276).
+ */
 function viewKey(project: ProjectClient): string {
     return clients.size <= 1 ? "" : project.spec.key;
 }
@@ -1107,7 +1157,7 @@ function startProjectClient(
         // An encyclopedia card opened during the scan was answered from the baseline alone and kept
         // that answer: measured on EaWX, the popup width came back as vanilla's 262 before the scan
         // and the mod's own 340 after it. Nothing re-asked, so the card stayed vanilla all session.
-        EncyclopediaPanel.refresh();
+        EncyclopediaPanel.refresh(project.spec.key);
     });
 
     lspClient.onNotification("aet/localisationIndexUpdated", () => {
@@ -1115,7 +1165,7 @@ function startProjectClient(
         localisationNavigatorProvider?.refresh(viewKey(project));
         // Open tabs decide for themselves whether to re-read: one with staged edits must not be
         // reloaded out from under the user. The notification fires on our own saves too.
-        LocalisationEditorPanel.invalidateAll();
+        LocalisationEditorPanel.invalidateAll(project.spec.key);
     });
 
     lspClient.onNotification(
@@ -1127,7 +1177,7 @@ function startProjectClient(
             storyNavigatorProvider?.refresh(viewKey(project));
             StoryGraphPanel.refreshInvalidated(
                 params.campaigns ?? [],
-                viewKey(project),
+                project.spec.key,
             );
         },
     );
@@ -1141,7 +1191,7 @@ function startProjectClient(
                     faction: params.faction,
                     scope: params.scope ?? undefined,
                 },
-                viewKey(project),
+                project.spec.key,
             );
         },
     );
@@ -1151,7 +1201,7 @@ function startProjectClient(
         // The server cannot say which previews an edit touches - a scene is assembled from a
         // variant chain, its hardpoints, their models and their weapons, and none of that is
         // tracked back to the files it came from.
-        ModelPreviewPanel.refreshAll(viewKey(project));
+        ModelPreviewPanel.refreshAll(project.spec.key);
     });
 
     return project;
@@ -1190,6 +1240,7 @@ async function stopAllClients(): Promise<void> {
     const running = [...clients.values()];
     clients.clear();
     lsp.routesChanged();
+    WebviewPanelHost.setProjectCount(clients.size);
     await Promise.all(running.map((project) => stopProjectClient(project)));
 }
 
@@ -1298,6 +1349,7 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
         clients.set(key, project);
     }
     lsp.routesChanged();
+    WebviewPanelHost.setProjectCount(clients.size);
     storyNavigatorProvider?.projectsChanged();
     localisationNavigatorProvider?.projectsChanged();
     updateStatus();
@@ -1621,7 +1673,7 @@ export async function activate(
                     folder === undefined ? undefined : folderProject(folder);
                 return project === undefined
                     ? lsp
-                    : gatewayFor(viewKey(project));
+                    : gatewayFor(project.spec.key);
             }),
         ),
         vscode.debug.registerDebugAdapterDescriptorFactory(
@@ -1792,7 +1844,7 @@ export async function activate(
                     arg?.setLabel ?? project.label,
                     project.category,
                     context.extensionUri,
-                    lsp,
+                    panelProject(projectKey),
                     arg?.focusLanguage,
                 );
             },
@@ -1840,9 +1892,11 @@ export async function activate(
                           filePath?: string;
                           targetFormat?: string;
                           category?: string;
+                          /** The asking panel's project (#276). */
+                          projectKey?: string;
                       },
             ) => {
-                const projectKey = await commandProjectKey();
+                const projectKey = await locCommandProjectKey(arg);
                 if (projectKey === null) {
                     return;
                 }
@@ -1993,7 +2047,7 @@ export async function activate(
                         path.basename(result.writtenPath),
                         category ?? LOC_CATEGORY.text,
                         context.extensionUri,
-                        lsp,
+                        panelProject(projectKey),
                     );
                 }
             },
@@ -2062,7 +2116,7 @@ export async function activate(
         ),
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.exportLocalisationToDat",
-            async (arg?: LocTreeItem) => {
+            async (arg?: LocTreeItem & { projectKey?: string }) => {
                 const filePath = arg?.project?.filePath;
                 if (!filePath) {
                     vscode.window.showWarningMessage(
@@ -2072,7 +2126,7 @@ export async function activate(
                     );
                     return;
                 }
-                const projectKey = await commandProjectKey();
+                const projectKey = await locCommandProjectKey(arg);
                 if (projectKey === null) {
                     return;
                 }
@@ -2214,10 +2268,9 @@ export async function activate(
                     StoryGraphPanel.show(
                         target,
                         context.extensionUri,
-                        lsp,
+                        panelProject(projectKey),
                         undefined,
                         false,
-                        projectKey,
                     );
                 }
             },
@@ -2967,11 +3020,9 @@ export async function activate(
     // feature flag says: the flag gates the SERVER endpoints, and a custom editor that vanishes with
     // a setting would leave those files opening as binary with no hint why.
     context.subscriptions.push(
-        ModelPreviewEditorProvider.register(context, (uri) => {
-            const owner = ownerOf(uri.fsPath);
-            const projectKey = owner ? viewKey(owner) : "";
-            return { lsp: gatewayFor(projectKey), projectKey };
-        }),
+        ModelPreviewEditorProvider.register(context, (uri) =>
+            panelProject(ownerOf(uri.fsPath)?.spec.key),
+        ),
     );
 
     // The bug report block. Works with the server down too - "not running" is itself the most
@@ -3034,10 +3085,9 @@ export async function activate(
 
                 ModelPreviewPanel.show(
                     context.extensionUri,
-                    lsp,
+                    panelProject(projectKey),
                     { kind: "model", modelReference: name },
                     name,
-                    projectKey,
                 );
             },
         ),
@@ -3085,10 +3135,9 @@ export async function activate(
                 const id = objectId.trim();
                 ModelPreviewPanel.show(
                     context.extensionUri,
-                    lsp,
+                    panelProject(projectKey),
                     { kind: "object", objectId: id },
                     id,
-                    projectKey,
                 );
             },
         ),
@@ -3142,16 +3191,25 @@ export async function activate(
                     if (retarget) {
                         EncyclopediaPanel.show(
                             context.extensionUri,
+                            panelProject(projectKey),
                             entry,
                             (mp) => void load(mp, false),
                         );
                     } else {
-                        EncyclopediaPanel.update(entry);
+                        EncyclopediaPanel.update(
+                            resolveProjectKey(projectKey),
+                            entry,
+                        );
                     }
                 };
 
                 // Retargeting keeps whatever SP/MP mode the panel is already showing.
-                await load(EncyclopediaPanel.multiplayer(), true);
+                await load(
+                    EncyclopediaPanel.multiplayer(
+                        resolveProjectKey(projectKey),
+                    ),
+                    true,
+                );
             },
         ),
     );
