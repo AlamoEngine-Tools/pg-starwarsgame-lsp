@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 /// <summary>
@@ -57,11 +59,10 @@ public static class LanguageCoverageInspector
     }
 
     /// <summary>The warning text, phrased once so both editors say the same thing.</summary>
-    public static string Message(string language, int empty, int total)
+    public static string Message(string language, int empty, int total, IMessageCatalog? messages = null)
     {
-        return $"{language} has no text in {empty} of {total} entries. Those entries are left out "
-               + $"of the {language} build entirely, so the game falls back to whatever a lower "
-               + "layer provides - or shows nothing.";
+        messages ??= ResxMessageCatalog.Server("en");
+        return messages.Format("LanguageCoverage_Missing", language, empty, total);
     }
 
     private static string? ValueOf(LocRowDto row, string language)

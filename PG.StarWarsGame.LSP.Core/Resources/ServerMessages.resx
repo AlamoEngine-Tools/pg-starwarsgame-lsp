@@ -174,6 +174,9 @@
   <data name="CreditHaltNeedsDurationRule_Requirement" xml:space="preserve">
     <value>a time greater than zero</value>
   </data>
+  <data name="CreditsCoverage_EmptyHeading" xml:space="preserve">
+    <value>In {0}, '{1}' is a heading with nothing under it. The crawl reads it out and moves straight on, which is valid - a credits key is a formatting directive, not an entry. Usually it means the label was translated and the names under it were not; leaving the heading itself empty skips the whole section.</value>
+  </data>
   <data name="CrossLayerShadow_OverridesADefinitionFromIf" xml:space="preserve">
     <value>'{0}' overrides a definition from '{1}'. If that is intended, declare it: &lt;!-- &lt;Override Name="{2}"/&gt; --&gt;</value>
   </data>
@@ -651,6 +654,9 @@
   <data name="LandDamageTableMismatch_CountsDiffer" xml:space="preserve">
     <value>Entry counts differ: &lt;Land_Damage_Thresholds&gt; has {0}, &lt;Land_Damage_Alternates&gt; has {1}. The columns pair by position, so the last {2} of &lt;{3}&gt; pair with nothing.</value>
   </data>
+  <data name="LanguageCoverage_Missing" xml:space="preserve">
+    <value>{0} has no text in {1} of {2} entries. Those entries are left out of the {0} build entirely, so the game falls back to whatever a lower layer provides - or shows nothing.</value>
+  </data>
   <data name="ListLengthHandlerBase_ButHasTheEngineRejects" xml:space="preserve">
     <value>&lt;{0}&gt; {1}, but has {2}. The engine rejects this value on load</value>
   </data>
@@ -674,6 +680,210 @@
   </data>
   <data name="ListMap_StartsWithWhichIsNo" xml:space="preserve">
     <value>&lt;{0}&gt; starts with '{1}', which is no {2}, so its items join the key '{3}' of the previous &lt;{4}&gt;.</value>
+  </data>
+  <data name="LocApplyBatch_CouldNotWriteFile" xml:space="preserve">
+    <value>Could not write the file: {0}</value>
+  </data>
+  <data name="LocApplyBatch_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocApplyBatch_NoProjectFilePathProvided" xml:space="preserve">
+    <value>No project file path provided.</value>
+  </data>
+  <data name="LocConcurrency_FileChangedDiskSinceWas" xml:space="preserve">
+    <value>The file changed on disk since it was last loaded. Reload before editing again.</value>
+  </data>
+  <data name="LocConcurrency_NoContentHashProvidedFetch" xml:space="preserve">
+    <value>No content hash provided - fetch the current entries before writing.</value>
+  </data>
+  <data name="LocConvert_AlreadyFormat" xml:space="preserve">
+    <value>'{0}' is already in that format.</value>
+  </data>
+  <data name="LocConvert_CannotConvertCouldNotBe" xml:space="preserve">
+    <value>Cannot convert '{0}': It could not be read - {1}</value>
+  </data>
+  <data name="LocConvert_CannotConvertDoesNotExist" xml:space="preserve">
+    <value>Cannot convert: '{0}' does not exist.</value>
+  </data>
+  <data name="LocConvert_CannotConvertHoldsNoTranslations" xml:space="preserve">
+    <value>Cannot convert: '{0}' holds no translations.</value>
+  </data>
+  <data name="LocConvert_CannotConvertNotLocalisationFormat" xml:space="preserve">
+    <value>Cannot convert '{0}': {1} is not a localisation format this understands.</value>
+  </data>
+  <data name="LocConvert_DatLanguageUnknown" xml:space="preserve">
+    <value>Cannot convert '{0}': Its name does not say which language it holds (expected '..._&lt;LANGUAGE&gt;.dat').</value>
+  </data>
+  <data name="LocConvert_DatNotATarget" xml:space="preserve">
+    <value>DAT is not a conversion target. It is the format the game loads, one binary file per language - use 'Export Localisation to DAT' to produce it.</value>
+  </data>
+  <data name="LocConvert_NoLocalisationFileWasGiven" xml:space="preserve">
+    <value>No localisation file was given to convert.</value>
+  </data>
+  <data name="LocConvert_NotFormatCanBeWritten" xml:space="preserve">
+    <value>'{0}' is not a format that can be written. Use CSV, XML or NLS.</value>
+  </data>
+  <data name="LocConvert_TargetExists" xml:space="preserve">
+    <value>Cannot convert: '{0}' already exists and was left untouched. Delete or move it first.</value>
+  </data>
+  <data name="LocCreateLanguage_AlreadyPart" xml:space="preserve">
+    <value>'{0}' already exists - that language is already part of this project.</value>
+  </data>
+  <data name="LocCreateLanguage_CouldNotRead" xml:space="preserve">
+    <value>Could not read '{0}': {1}</value>
+  </data>
+  <data name="LocCreateLanguage_CouldNotWrite" xml:space="preserve">
+    <value>Could not write '{0}'.</value>
+  </data>
+  <data name="LocCreateLanguage_DoesNotExist" xml:space="preserve">
+    <value>'{0}' does not exist.</value>
+  </data>
+  <data name="LocCreateLanguage_FilesHoldEveryLanguageOne" xml:space="preserve">
+    <value>{0} files hold every language in one file - add a column instead of a file.</value>
+  </data>
+  <data name="LocCreateLanguage_NoLocalisationFileWasGiven" xml:space="preserve">
+    <value>No localisation file was given.</value>
+  </data>
+  <data name="LocCreateLanguage_NotLanguageThisGameSupports" xml:space="preserve">
+    <value>'{0}' is not a language this game supports.</value>
+  </data>
+  <data name="LocEditor_AlreadyLanguageThisFile" xml:space="preserve">
+    <value>'{0}' is already a language in this file.</value>
+  </data>
+  <data name="LocEditor_CannotInsertAtRowFile" xml:space="preserve">
+    <value>Cannot insert at row {0} (the file has {1} rows).</value>
+  </data>
+  <data name="LocEditor_CannotMoveRowFileHas" xml:space="preserve">
+    <value>Cannot move to row {0} (the file has {1} rows).</value>
+  </data>
+  <data name="LocEditor_Change" xml:space="preserve">
+    <value>Change {0}: {1}</value>
+  </data>
+  <data name="LocEditor_DatFileHoldsSingleLanguage" xml:space="preserve">
+    <value>A .dat file holds a single language and cannot take another column.</value>
+  </data>
+  <data name="LocEditor_FailedParseFile" xml:space="preserve">
+    <value>Failed to parse file: {0}</value>
+  </data>
+  <data name="LocEditor_FailedReadFile" xml:space="preserve">
+    <value>Failed to read the file: {0}</value>
+  </data>
+  <data name="LocEditor_FilesAreSingleLanguageCannot" xml:space="preserve">
+    <value>{0} files are single-language and cannot take another column.</value>
+  </data>
+  <data name="LocEditor_NoLanguageGiven" xml:space="preserve">
+    <value>No language given.</value>
+  </data>
+  <data name="LocEditor_NonAsciiKey" xml:space="preserve">
+    <value>Row {0}: '{1}' cannot be used as a key - a .dat stores keys as ASCII. Rename the entry using unaccented letters; the translation itself is unaffected.</value>
+  </data>
+  <data name="LocEditor_NotLanguageThisFile" xml:space="preserve">
+    <value>'{0}' is not a language in this file.</value>
+  </data>
+  <data name="LocEditor_RowNoLongerReloadBefore" xml:space="preserve">
+    <value>Row {0} is no longer '{1}'. Reload before editing again.</value>
+  </data>
+  <data name="LocEditor_RowOutRangeFileHas" xml:space="preserve">
+    <value>Row {0} is out of range (the file has {1} rows).</value>
+  </data>
+  <data name="LocEditor_UnknownCommand" xml:space="preserve">
+    <value>Unknown command '{0}'.</value>
+  </data>
+  <data name="LocEditor_UnsupportedCommandXML" xml:space="preserve">
+    <value>Unsupported command '{0}' for XML.</value>
+  </data>
+  <data name="LocEditor_UnsupportedFormat" xml:space="preserve">
+    <value>Unsupported format: {0}</value>
+  </data>
+  <data name="LocExportDat_FailedLoadFile" xml:space="preserve">
+    <value>Failed to load file: {0}</value>
+  </data>
+  <data name="LocExportDat_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocExportDat_NoProjectFilePathProvided" xml:space="preserve">
+    <value>No project file path provided.</value>
+  </data>
+  <data name="LocExportDat_UnsupportedFormat" xml:space="preserve">
+    <value>Unsupported format: {0}</value>
+  </data>
+  <data name="LocGetRows_FailedParseFile" xml:space="preserve">
+    <value>Failed to parse file: {0}</value>
+  </data>
+  <data name="LocGetRows_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocGetRows_NoProjectFilePathProvided" xml:space="preserve">
+    <value>No project file path provided.</value>
+  </data>
+  <data name="LocGetRows_UnsupportedFormat" xml:space="preserve">
+    <value>Unsupported format: {0}</value>
+  </data>
+  <data name="LocKeyInspector_AlreadyDefined" xml:space="preserve">
+    <value>'{0}' is already defined on row {1}. Only one of the two would ever be read.</value>
+  </data>
+  <data name="LocKeyInspector_ChecksumCollision" xml:space="preserve">
+    <value>'{0}' has the same checksum (0x{1:X8}) as '{2}' on row {3}, so the game cannot tell them apart and only one would ever be read.</value>
+  </data>
+  <data name="LocKeyInspector_DiffersInCase" xml:space="preserve">
+    <value>'{0}' differs from '{1}' on row {2} only in case. The game treats them as two separate entries, so both are read - but nothing else will make it obvious which is which.</value>
+  </data>
+  <data name="LocKeyInspector_NonAscii" xml:space="preserve">
+    <value>'{0}' cannot be used as a key: {1} cannot be written to a .dat, which stores keys as ASCII. Rename the entry using unaccented letters - the translation itself is unaffected.</value>
+  </data>
+  <data name="LocKeyInspector_ThisEntryHasNoKey" xml:space="preserve">
+    <value>This entry has no key, so the game cannot reference it.</value>
+  </data>
+  <data name="LocKeyed_AlreadyThisFileOnlyOne" xml:space="preserve">
+    <value>'{0}' is already in this file. Only one row per key is ever read.</value>
+  </data>
+  <data name="LocKeyed_BlankKey" xml:space="preserve">
+    <value>A key is required - it is how the game refers to this text.</value>
+  </data>
+  <data name="LocKeyed_KeyOnTwoRows" xml:space="preserve">
+    <value>'{0}' is on both row {1} and row {2}. Only one of them would ever be read - remove one before editing it.</value>
+  </data>
+  <data name="LocKeyed_NotATranslationCommand" xml:space="preserve">
+    <value>'{0}' is not a translation command. Row positions are not addressable in a translation file.</value>
+  </data>
+  <data name="LocKeyed_NotThisFileReloadBefore" xml:space="preserve">
+    <value>'{0}' is not in this file. Reload before editing again.</value>
+  </data>
+  <data name="LocKeyed_ThisChangeDoesNotSay" xml:space="preserve">
+    <value>This change does not say which entry it applies to.</value>
+  </data>
+  <data name="LocSetFormat_NoLocalisationYet" xml:space="preserve">
+    <value>This project has no localisation set up yet. Use 'New Localisation Project' or 'Import Existing Localisation Files' to create one.</value>
+  </data>
+  <data name="LocSetFormat_NoModProjectOpenLocalisation" xml:space="preserve">
+    <value>No mod project is open. The localisation format is stored in the .pgproj.</value>
+  </data>
+  <data name="LocSetFormat_NotBelowProject" xml:space="preserve">
+    <value>The localisation directory '{0}' is not below the project, so it cannot be written back as a relative path.</value>
+  </data>
+  <data name="LocSetFormat_NotLocalisationFormatUseCSV" xml:space="preserve">
+    <value>'{0}' is not a localisation format. Use CSV, XML, NLS or DAT.</value>
+  </data>
+  <data name="LocValidateCredits_Change" xml:space="preserve">
+    <value>Change {0}: {1}</value>
+  </data>
+  <data name="LocValidateCredits_FailedReadFile" xml:space="preserve">
+    <value>Failed to read the file: {0}</value>
+  </data>
+  <data name="LocValidateCredits_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocValidateTranslation_Change" xml:space="preserve">
+    <value>Change {0}: {1}</value>
+  </data>
+  <data name="LocValidateTranslation_FailedReadFile" xml:space="preserve">
+    <value>Failed to read the file: {0}</value>
+  </data>
+  <data name="LocValidateTranslation_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocalisationFeature_Disabled" xml:space="preserve">
+    <value>Localisation features are disabled. Enable 'aet-eaw-edit.features.tools.localisation' in the editor settings.</value>
   </data>
   <data name="LocalisationKeyHandlerBase_LocalisationKeyWasNotFound" xml:space="preserve">
     <value>Localisation key '{0}' was not found in the loaded translation databases.</value>

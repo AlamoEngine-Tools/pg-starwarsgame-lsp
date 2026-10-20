@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -12,17 +13,19 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public static class LocalisationConcurrencyGuard
 {
     public static async Task<LocalisationWriteResult?> CheckAsync(
-        IFileSystem fs, string filePath, string? expectedContentHash, CancellationToken ct)
+        IFileSystem fs, string filePath, string? expectedContentHash, CancellationToken ct,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         if (string.IsNullOrWhiteSpace(expectedContentHash))
             return LocalisationWriteResult.Fail(
-                "No content hash provided - fetch the current entries before writing.");
+                messages.Format("LocConcurrency_NoContentHashProvidedFetch"));
 
         var currentContent = await fs.File.ReadAllTextAsync(filePath, ct);
         var currentHash = LocalisationContentHash.Compute(currentContent);
         if (!string.Equals(currentHash, expectedContentHash, StringComparison.Ordinal))
             return LocalisationWriteResult.Fail(
-                "The file changed on disk since it was last loaded. Reload before editing again.");
+                messages.Format("LocConcurrency_FileChangedDiskSinceWas"));
 
         return null;
     }

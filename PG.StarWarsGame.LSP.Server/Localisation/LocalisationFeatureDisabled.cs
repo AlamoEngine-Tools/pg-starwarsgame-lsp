@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -22,8 +23,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 /// </summary>
 public static class LocalisationFeatureDisabled
 {
-    public const string Message =
-        "Localisation features are disabled. Enable 'aet-eaw-edit.features.tools.localisation' in the editor settings.";
+    public const string MessageKey = "LocalisationFeature_Disabled";
 
     /// <summary>
     ///     Whether the localisation tools may run at all.
@@ -42,6 +42,6 @@ public static class LocalisationFeatureDisabled
     /// </summary>
     public static string? Rejection(ILspConfigurationProvider config)
     {
-        return IsEnabled(config) ? null : Message;
+        return IsEnabled(config) ? null : new ConfiguredMessageCatalog(config).Format(MessageKey);
     }
 }

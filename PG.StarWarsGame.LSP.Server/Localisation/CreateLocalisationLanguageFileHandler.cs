@@ -9,6 +9,7 @@ using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -72,26 +73,27 @@ public sealed class CreateLocalisationLanguageFileHandler
             return Fail(rejection);
 
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
-            return Fail("No localisation file was given.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_NoLocalisationFileWasGiven"));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(request.ProjectFilePath))
-            return Fail($"'{request.ProjectFilePath}' does not exist.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_DoesNotExist",
+                request.ProjectFilePath));
 
         if (!_langService.TryGetByIdentifier(request.Language ?? string.Empty, out var language)
             || language is null)
-            return Fail($"'{request.Language}' is not a language this game supports.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_NotLanguageThisGameSupports",
+                request.Language));
 
         var extension = fs.Path.GetExtension(request.ProjectFilePath).ToLowerInvariant();
         if (!LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(extension))
             return Fail(
-                $"{extension} files hold every language in one file - add a column instead of a file.");
+                new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_FilesHoldEveryLanguageOne", extension));
 
         var targetPath = SiblingPath(request.ProjectFilePath, extension, language.LanguageIdentifier);
         if (fs.File.Exists(targetPath))
-            return Fail(
-                $"'{fs.Path.GetFileName(targetPath)}' already exists - that language is already part " +
-                "of this project.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_AlreadyPart",
+                fs.Path.GetFileName(targetPath)));
 
         LocDocument source;
         try
@@ -102,7 +104,8 @@ public sealed class CreateLocalisationLanguageFileHandler
         {
             _logger.LogWarning(ex, "aet/createLocalisationLanguageFile: could not read '{Path}'.",
                 request.ProjectFilePath);
-            return Fail($"Could not read '{request.ProjectFilePath}': {ex.Message}");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_CouldNotRead",
+                request.ProjectFilePath, ex.Message));
         }
 
         // Credits repeat their keys and their order is the content, so a keyed database would
@@ -117,7 +120,7 @@ public sealed class CreateLocalisationLanguageFileHandler
             db.SetTranslation(row.Key, language, string.Empty);
 
         if (!await WriteAsync(db, extension, targetPath, language, ct))
-            return Fail($"Could not write '{targetPath}'.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocCreateLanguage_CouldNotWrite", targetPath));
 
         _logger.LogInformation(
             "aet/createLocalisationLanguageFile: created '{Target}' with {Count} key(s) from '{Source}'.",

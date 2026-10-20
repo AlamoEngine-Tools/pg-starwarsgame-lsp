@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -77,16 +78,18 @@ public abstract class ApplyLocalisationBatchHandlerBase<TCommand, TResult>
             return Failed(null, rejection);
 
         if (string.IsNullOrWhiteSpace(projectFilePath))
-            return Failed(null, "No project file path provided.");
+            return Failed(null,
+                new ConfiguredMessageCatalog(_config).Format("LocApplyBatch_NoProjectFilePathProvided"));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(projectFilePath))
-            return Failed(null, $"File not found: {projectFilePath}");
+            return Failed(null,
+                new ConfiguredMessageCatalog(_config).Format("LocApplyBatch_FileNotFound", projectFilePath));
 
         // Checked once for the whole batch, before anything is composed: the batch is atomic, so
         // there is no point discovering a stale file halfway through.
         if (await LocalisationConcurrencyGuard.CheckAsync(
-                fs, projectFilePath, expectedContentHash, ct) is { } stale)
+                fs, projectFilePath, expectedContentHash, ct, new ConfiguredMessageCatalog(_config)) is { } stale)
             return Failed(null, stale.Error!);
 
         if (commands.Count == 0)
@@ -103,7 +106,8 @@ public abstract class ApplyLocalisationBatchHandlerBase<TCommand, TResult>
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not write {FileKind} '{Path}'.", FileKind, projectFilePath);
-            return Failed(null, $"Could not write the file: {ex.Message}");
+            return Failed(null,
+                new ConfiguredMessageCatalog(_config).Format("LocApplyBatch_CouldNotWriteFile", ex.Message));
         }
 
         if (!result.Success)

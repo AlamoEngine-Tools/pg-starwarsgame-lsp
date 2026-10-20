@@ -3,6 +3,7 @@
 
 using PG.Commons.Hashing;
 using PG.StarWarsGame.Files.DAT.Binary;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -45,8 +46,9 @@ public static class TranslationKeyInspector
     ///     </para>
     /// </remarks>
     public static IReadOnlyList<LocTranslationProblemDto> Inspect(
-        IReadOnlyList<string> keys, ICrc32HashingService hashing)
+        IReadOnlyList<string> keys, ICrc32HashingService hashing, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var problems = new List<LocTranslationProblemDto>();
 
         // Keyed by the engine's own identity for an entry. Case-insensitive lookup is tracked
@@ -61,7 +63,7 @@ public static class TranslationKeyInspector
             if (string.IsNullOrWhiteSpace(key))
             {
                 problems.Add(new LocTranslationProblemDto(null, null, LocProblemSeverity.Error,
-                    "This entry has no key, so the game cannot reference it.", i));
+                    messages.Format("LocKeyInspector_ThisEntryHasNoKey"), i));
                 continue;
             }
 
@@ -76,9 +78,7 @@ public static class TranslationKeyInspector
             if (NonAsciiIn(key) is { Length: > 0 } offending)
             {
                 problems.Add(new LocTranslationProblemDto(key, null, LocProblemSeverity.Error,
-                    $"'{key}' cannot be used as a key: {offending}cannot be written to a .dat, "
-                    + "which stores keys as ASCII. Rename the entry using unaccented letters - the "
-                    + "translation itself is unaffected.", i));
+                    messages.Format("LocKeyInspector_NonAscii", key, offending), i));
                 continue;
             }
 
@@ -87,7 +87,7 @@ public static class TranslationKeyInspector
             if (byChecksum.TryGetValue(checksum, out var collidesWith))
             {
                 problems.Add(new LocTranslationProblemDto(key, null, LocProblemSeverity.Error,
-                    CollisionMessage(key, keys[collidesWith], collidesWith, checksum), i));
+                    CollisionMessage(key, keys[collidesWith], collidesWith, checksum, messages), i));
                 continue;
             }
 
@@ -96,9 +96,9 @@ public static class TranslationKeyInspector
             // Only reached when the checksums differ, so these really are two separate entries.
             if (byCasing.TryGetValue(key, out var differsInCaseFrom))
                 problems.Add(new LocTranslationProblemDto(key, null, LocProblemSeverity.Warning,
-                    $"'{key}' differs from '{keys[differsInCaseFrom]}' on row {differsInCaseFrom + 1} "
-                    + "only in case. The game treats them as two separate entries, so both are read - "
-                    + "but nothing else will make it obvious which is which.", i));
+                    messages.Format("LocKeyInspector_DiffersInCase", key, keys[differsInCaseFrom],
+                        differsInCaseFrom + 1),
+                    i));
             else
                 byCasing[key] = i;
         }
@@ -124,10 +124,7 @@ public static class TranslationKeyInspector
 
         if (offending.Count == 0) return string.Empty;
 
-        var quoted = offending.Select(c => $"'{c}'").ToList();
-        return quoted.Count == 1
-            ? $"{quoted[0]} "
-            : $"{string.Join(", ", quoted.Take(quoted.Count - 1))} and {quoted[^1]} ";
+        return string.Join(", ", offending.Select(c => $"'{c}'"));
     }
 
     /// <summary>The engine's identity for a key: CRC32 over its ASCII bytes.</summary>
@@ -136,15 +133,13 @@ public static class TranslationKeyInspector
         return (uint)hashing.GetCrc32(key, DatFileConstants.TextKeyEncoding);
     }
 
-    private static string CollisionMessage(string key, string existing, int existingIndex, uint checksum)
+    private static string CollisionMessage(string key, string existing, int existingIndex, uint checksum,
+        IMessageCatalog messages)
     {
         // An identical key is the ordinary case and deserves the ordinary wording; a genuine hash
         // collision between different spellings needs to say so, or it reads as a false positive.
         return string.Equals(key, existing, StringComparison.Ordinal)
-            ? $"'{key}' is already defined on row {existingIndex + 1}. "
-              + "Only one of the two would ever be read."
-            : $"'{key}' has the same checksum (0x{checksum:X8}) as '{existing}' on row "
-              + $"{existingIndex + 1}, so the game cannot tell them apart and only one would ever be "
-              + "read.";
+            ? messages.Format("LocKeyInspector_AlreadyDefined", key, existingIndex + 1)
+            : messages.Format("LocKeyInspector_ChecksumCollision", key, checksum, existing, existingIndex + 1);
     }
 }
