@@ -4,6 +4,12 @@
 
 ### Features
 
+- **Localisable texts** - every user-facing string moves into one catalogue per runtime, the start of
+  translations and the one place the text rules are checked
+  ([#274](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/274))
+  - The extension manifest's 178 texts - command titles, setting descriptions, enum labels, view names,
+    debugger labels - come from `package.nls.json`; `npm run lint` fails on a text written into
+    `package.json` itself or a key the catalogue does not carry
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none
