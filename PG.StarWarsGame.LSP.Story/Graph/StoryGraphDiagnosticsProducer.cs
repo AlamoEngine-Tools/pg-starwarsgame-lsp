@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -14,9 +15,10 @@ namespace PG.StarWarsGame.LSP.Story.Graph;
 ///     per file, prerequisite cycles, unreachable events, suspended threads that nothing
 ///     activates, canonical tag-order violations, and over-long flag names.
 /// </summary>
-public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
+public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema, IMessageCatalog? messages = null)
 {
     private const int MaxFlagNameLength = 31;
+    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
 
     public IReadOnlyList<StoryGraphDiagnostic> Produce(StoryCampaignModel model, string documentUri)
     {
@@ -26,7 +28,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
 
         foreach (var problem in model.Graph.Problems)
             if (string.Equals(problem.DocumentUri, documentUri, StringComparison.Ordinal))
-                diagnostics.Add(At(problem.Range, problem.Message, problem.Kind switch
+                diagnostics.Add(At(problem.Range, _messages.Format(problem.Message), problem.Kind switch
                 {
                     StoryGraphProblemKind.AmbiguousTarget => XmlDiagnosticSeverity.Warning,
                     StoryGraphProblemKind.GenericNeverRaised => XmlDiagnosticSeverity.Warning,
@@ -49,18 +51,18 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
         return diagnostics;
     }
 
-    private static void AddDuplicateNames(List<StoryGraphDiagnostic> diagnostics, StoryThread thread)
+    private void AddDuplicateNames(List<StoryGraphDiagnostic> diagnostics, StoryThread thread)
     {
         foreach (var group in thread.Events
                      .GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
                      .Where(g => g.Count() > 1))
         foreach (var storyEvent in group)
             diagnostics.Add(At(storyEvent.NameRange,
-                $"Event name '{storyEvent.Name}' is defined {group.Count()} times in this file.",
+                _messages.Format("StoryGraph_DuplicateEventName", storyEvent.Name, group.Count()),
                 XmlDiagnosticSeverity.Error));
     }
 
-    private static HashSet<string> AddPrereqCycles(List<StoryGraphDiagnostic> diagnostics,
+    private HashSet<string> AddPrereqCycles(List<StoryGraphDiagnostic> diagnostics,
         StoryCampaignModel model, StoryEvaluator evaluator, string documentUri)
     {
         var members = new HashSet<string>(StringComparer.Ordinal);
@@ -77,7 +79,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 var node = nodesById[id];
                 if (node.ThreadUri is not { } nodeThread || !DocumentUris.Same(nodeThread, documentUri)) continue;
                 diagnostics.Add(At(node.Event!.NameRange,
-                    $"'{node.Label}' is part of a prerequisite cycle ({names}) - none of these events can arm.",
+                    _messages.Format("StoryGraph_PrereqCycle", node.Label, names),
                     XmlDiagnosticSeverity.Warning));
             }
         }
@@ -85,7 +87,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
         return members;
     }
 
-    private static void AddUnreachableEvents(List<StoryGraphDiagnostic> diagnostics,
+    private void AddUnreachableEvents(List<StoryGraphDiagnostic> diagnostics,
         StoryCampaignModel model, StoryEvaluator evaluator, string documentUri,
         HashSet<string> cycleMembers)
     {
@@ -100,12 +102,12 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 || !DocumentUris.Same(eventThread, documentUri)) continue;
             if (reachable.Contains(node.Id) || cycleMembers.Contains(node.Id)) continue;
             diagnostics.Add(At(node.Event!.NameRange,
-                $"'{node.Label}' can never fire: no prerequisite line is satisfiable and nothing triggers it.",
+                _messages.Format("StoryGraph_NeverFires", node.Label),
                 XmlDiagnosticSeverity.Warning));
         }
     }
 
-    private static void AddSuspendedNeverActivated(List<StoryGraphDiagnostic> diagnostics,
+    private void AddSuspendedNeverActivated(List<StoryGraphDiagnostic> diagnostics,
         StoryCampaignModel model, string documentUri)
     {
         if (!model.SuspendedThreadUris.Contains(documentUri)) return;
@@ -129,11 +131,11 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
         if (activated) return;
 
         diagnostics.Add(new StoryGraphDiagnostic(0, 0, 0, 1,
-            $"This plot is suspended in campaign '{model.CampaignName}' and no STORY_ELEMENT reward activates it.",
+            _messages.Format("StoryGraph_SuspendedNeverActivated", model.CampaignName),
             XmlDiagnosticSeverity.Information));
     }
 
-    private static void AddTagOrderViolations(List<StoryGraphDiagnostic> diagnostics, StoryThread thread)
+    private void AddTagOrderViolations(List<StoryGraphDiagnostic> diagnostics, StoryThread thread)
     {
         foreach (var storyEvent in thread.Events)
         {
@@ -146,7 +148,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 if (rank < maxRank)
                 {
                     diagnostics.Add(At(tag.ValueRange,
-                        $"'{tag.Name}' appears after '{maxTag}' - the engine expects the documented event tag order.",
+                        _messages.Format("StoryGraph_TagOrder", tag.Name, maxTag),
                         XmlDiagnosticSeverity.Warning));
                 }
                 else
@@ -183,7 +185,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 foreach (var flag in StoryReferenceTypes.SplitList(slot.RawValue))
                     if (flag.Length > MaxFlagNameLength)
                         diagnostics.Add(At(slot.Range,
-                            $"Flag name '{flag}' is {flag.Length} characters long - the engine truncates at {MaxFlagNameLength}.",
+                            _messages.Format("StoryGraph_FlagNameTooLong", flag, flag.Length, MaxFlagNameLength),
                             XmlDiagnosticSeverity.Error));
             }
         }

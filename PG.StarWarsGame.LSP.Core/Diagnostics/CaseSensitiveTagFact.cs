@@ -22,7 +22,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// </remarks>
 /// <param name="Authored">The spelling in the file, as written.</param>
 /// <param name="Expected">The only spelling the engine's comparison accepts.</param>
-/// <param name="Consequence">What the engine does with it instead, as a sentence.</param>
+/// <param name="ConsequenceKey">The catalogue key of what the engine does with it instead.</param>
 /// <param name="ChangesBehaviour">
 ///     Whether the mis-spelling actually changes what the game does. False where the wrong spelling
 ///     happens to reach the same outcome.
@@ -34,5 +34,5 @@ public sealed record CaseSensitiveTagFact(
     int Length,
     string Authored,
     string Expected,
-    string Consequence,
+    string ConsequenceKey,
     bool ChangesBehaviour) : XmlFact(DocumentUri, Line, Column, Length);

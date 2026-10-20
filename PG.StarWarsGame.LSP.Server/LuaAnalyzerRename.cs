@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 
@@ -38,8 +39,10 @@ internal static class LuaAnalyzerRename
         };
     }
 
-    public static void EnsureWithinProject(WorkspaceEdit edit, IProjectLayerMap? layers)
+    public static void EnsureWithinProject(WorkspaceEdit edit, IProjectLayerMap? layers,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         if (layers is null || layers.Layers.Count == 0) return;
         var leaf = layers.Layers.Max(l => l.Rank);
         var roots = layers.Layers.Where(l => l.Rank == leaf)
@@ -56,7 +59,7 @@ internal static class LuaAnalyzerRename
             var path = Path.GetFullPath(uri.GetFileSystemPath());
             if (!roots.Any(r => path.StartsWith(r, StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException(
-                    $"Rename refused: It edits {Path.GetFileName(path)}, which is not one of this project's scripts");
+                    messages.Format("LuaAnalyzerRename_RenameRefusedEditsWhichNot", Path.GetFileName(path)));
         }
     }
 }

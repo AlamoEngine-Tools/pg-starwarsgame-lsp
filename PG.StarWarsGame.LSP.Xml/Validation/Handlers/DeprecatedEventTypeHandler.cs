@@ -19,7 +19,7 @@ public sealed class DeprecatedEventTypeHandler : XmlDiagnosticsHandler<StoryEven
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{fact.EventType}' is deprecated.")
+                ctx.Messages.Format("DeprecatedEventType_IsDeprecated", fact.EventType))
         ];
     }
 }

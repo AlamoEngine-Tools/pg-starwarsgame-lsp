@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -142,7 +143,7 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
     {
     }
 
-    private static List<Diagnostic> Diagnose(byte[] bytes)
+    private List<Diagnostic> Diagnose(byte[] bytes)
     {
         IReadOnlyList<PreviewProblem> problems;
         try
@@ -155,7 +156,7 @@ public sealed class ParticleFileDiagnosticsPublisher : DiagnosticsPublisherBase
             problems =
             [
                 new PreviewProblem(DiagnosticIds.PreviewModelUnreadable, "error",
-                    $"Malformed particle file: {e.Message}")
+                    new ConfiguredMessageCatalog(_config).Format("ParticleFile_MalformedParticleFile", e.Message))
             ];
         }
 

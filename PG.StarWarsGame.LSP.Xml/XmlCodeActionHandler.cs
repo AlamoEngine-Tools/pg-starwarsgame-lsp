@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -30,7 +31,8 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
 
         var uri = request.TextDocument.Uri;
         var actions = request.Context.Diagnostics
-            .SelectMany(d => _registry.Dispatch(new XmlCodeActionContext(uri, d)))
+            .SelectMany(d => _registry.Dispatch(new XmlCodeActionContext(uri, d)
+                { Messages = new ConfiguredMessageCatalog(_config) }))
             .Concat(_cursorProviders.SelectMany(p => p.Handle(uri, request.Range.Start)))
             .ToList();
 

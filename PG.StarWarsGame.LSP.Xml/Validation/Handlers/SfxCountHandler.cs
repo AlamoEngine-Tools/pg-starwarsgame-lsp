@@ -23,7 +23,7 @@ public sealed class SfxCountHandler : NumberValueHandlerBase
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{trimmed}' is not a valid SFX count for <{fact.Tag.Tag}>. Expected -1 or a non-negative integer. Did you mean {corrected}?",
+                ctx.Messages.Format("SfxCount_IsNotAValidSfx", trimmed, fact.Tag.Tag, corrected),
                 SuggestedFix: corrected)
         ];
     }

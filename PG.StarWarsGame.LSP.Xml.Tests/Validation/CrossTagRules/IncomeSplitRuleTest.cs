@@ -101,9 +101,9 @@ public sealed class IncomeSplitRuleTest
         Assert.Equal("Split_Favors_Owner", fact.FlagTag);
 
         // The engine clears the flag AND zeroes the share, so the repair does both.
-        Assert.Equal(2, fact.Repair!.Edits.Count);
-        Assert.Equal("No", fact.Repair.Edits[0].NewText);
-        Assert.Equal("0.0", fact.Repair.Edits[1].NewText);
+        Assert.Equal(2, fact.RepairEdits!.Count);
+        Assert.Equal("No", fact.RepairEdits[0].NewText);
+        Assert.Equal("0.0", fact.RepairEdits[1].NewText);
     }
 
     /// <summary>With no share tag written there is only one thing to clear.</summary>
@@ -116,7 +116,7 @@ public sealed class IncomeSplitRuleTest
         var fact = Assert.Single(Facts(body, new SplitFavorsOwnerIgnoredRule())
             .OfType<IncomeSplitConflictFact>());
 
-        Assert.Equal("No", Assert.Single(fact.Repair!.Edits).NewText);
+        Assert.Equal("No", Assert.Single(fact.RepairEdits!).NewText);
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public sealed class IncomeSplitRuleTest
             .OfType<IncomeSplitConflictFact>());
 
         Assert.Equal("Full_Amount_To_Everyone", fact.OtherTag);
-        Assert.Equal(2, fact.Repair!.Edits.Count);
+        Assert.Equal(2, fact.RepairEdits!.Count);
     }
 
     /// <summary>

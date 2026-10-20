@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -29,9 +30,8 @@ public sealed class VariantAdditiveMergeHandler : XmlDiagnosticsHandler<VariantA
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Information,
-                $"'{fact.TagName}' is additive: this value is added to the base's rather than replacing it, "
-                + $"so the variant also keeps {Describe(inherited)} inherited from the base. "
-                + "Change the base object if the inherited entries should not apply here.")
+                ctx.Messages.Format("VariantAdditiveMerge_IsAdditiveThisValueIs", fact.TagName,
+                    Describe(inherited, ctx.Messages)))
         ];
     }
 
@@ -40,13 +40,13 @@ public sealed class VariantAdditiveMergeHandler : XmlDiagnosticsHandler<VariantA
         return value.Split(Separators, StringSplitOptions.RemoveEmptyEntries).ToList();
     }
 
-    private static string Describe(List<string> entries)
+    private static string Describe(List<string> entries, IMessageCatalog messages)
     {
-        if (entries.Count == 0) return "its value";
+        if (entries.Count == 0) return messages.Format("VariantAdditiveMerge_ItsValue");
         if (entries.Count <= MaxInlineEntries)
             return $"{string.Join(", ", entries.Select(e => $"'{e}'"))}";
 
         var shown = string.Join(", ", entries.Take(MaxInlineEntries).Select(e => $"'{e}'"));
-        return $"{shown} and {entries.Count - MaxInlineEntries} more";
+        return messages.Format("VariantAdditiveMerge_AndMore", shown, entries.Count - MaxInlineEntries);
     }
 }

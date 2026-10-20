@@ -441,6 +441,12 @@ public sealed class StartupPipelineTest
             _log.Add($"republish.{_name}");
             return Task.CompletedTask;
         }
+
+        public Task ApplyGlobalSuppressionsAsync(CancellationToken ct)
+        {
+            _log.Add($"refilter.{_name}");
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class ThrowingRepublisher : IDiagnosticsRepublisher
@@ -448,6 +454,11 @@ public sealed class StartupPipelineTest
         public Task RepublishAllAsync(CancellationToken ct)
         {
             throw new InvalidOperationException("republish blew up");
+        }
+
+        public Task ApplyGlobalSuppressionsAsync(CancellationToken ct)
+        {
+            throw new InvalidOperationException("refilter blew up");
         }
     }
 

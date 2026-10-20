@@ -23,5 +23,5 @@ public sealed class AngleDegreesFullTurnHandler : NumericRangeHandlerBase
 
     protected override float? Maximum => 360f;
 
-    protected override string Expectation => "must be between 0 and 360 degrees";
+    protected override string ExpectationKey => "AngleDegreesFullTurn_Expectation";
 }

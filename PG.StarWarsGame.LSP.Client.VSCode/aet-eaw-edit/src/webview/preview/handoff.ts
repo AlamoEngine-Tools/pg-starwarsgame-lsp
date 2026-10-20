@@ -8,6 +8,7 @@
 // reading the root chunk - is the only thing that tells them apart. An assembled object is built
 // out of several files and has no single one to hand over, so it gets no hand-off at all.
 
+import * as l10n from "@vscode/l10n";
 import {
     PREVIEW_SCENE_KIND,
     type PreviewSourceFile,
@@ -31,12 +32,16 @@ export function handoffFor(
 ): Handoff | null {
     const base: Handoff | null =
         kind === PREVIEW_SCENE_KIND.model
-            ? { tool: "model", icon: "open", title: "Open in AloViewer" }
+            ? {
+                  tool: "model",
+                  icon: "open",
+                  title: l10n.t("Open in AloViewer"),
+              }
             : kind === PREVIEW_SCENE_KIND.particle
               ? {
                     tool: "particles",
                     icon: "bloom",
-                    title: "Open in the Particle Editor",
+                    title: l10n.t("Open in the Particle Editor"),
                 }
               : null;
 

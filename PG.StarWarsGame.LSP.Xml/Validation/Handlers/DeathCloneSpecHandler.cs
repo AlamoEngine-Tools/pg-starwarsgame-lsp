@@ -20,7 +20,7 @@ public sealed class DeathCloneSpecHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid death clone spec for <{fact.Tag.Tag}>. Expected: Condition, CloneTypeName.")
+                    ctx.Messages.Format("DeathCloneSpec_IsNotAValidDeath", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         return [];

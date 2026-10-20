@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -55,28 +56,24 @@ public sealed class RespawnTimeListHandler : XmlDiagnosticsHandler<XmlTagValueFa
             values.Add(value);
         }
 
-        if (Problem(fact.Tag.Tag, values) is not { } message) return [];
+        if (Problem(fact.Tag.Tag, values, ctx.Messages) is not { } message) return [];
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, message)];
     }
 
     /// <summary>The first failing check, in the engine's own order, or null when the table passes.</summary>
-    private static string? Problem(string tag, IReadOnlyList<float> values)
+    private static string? Problem(string tag, IReadOnlyList<float> values, IMessageCatalog messages)
     {
         if (values.Count != TechLevels)
-            return $"<{tag}> needs one entry per tech level - {TechLevels} values, but has "
-                   + $"{values.Count.ToString(CultureInfo.InvariantCulture)}. The engine discards "
-                   + "the whole respawn table, min and max together";
+            return messages.Format("RespawnTimeList_NeedsOneEntryPerTech", tag, TechLevels,
+                values.Count.ToString(CultureInfo.InvariantCulture));
 
         if (values.Any(v => v < 0.0f))
-            return $"<{tag}> entries must be 0 or greater. The engine discards the whole respawn "
-                   + "table, min and max together";
+            return messages.Format("RespawnTimeList_EntriesMustBeOrGreater", tag);
 
         var zeros = values.Count(v => v == 0.0f);
         if (zeros > 0 && zeros != values.Count)
-            return $"<{tag}> uses zero as a respawn time, which is only allowed when every entry is "
-                   + "zero - that is how the respawn feature is switched off. The engine discards "
-                   + "the whole respawn table, min and max together";
+            return messages.Format("RespawnTimeList_UsesZeroAsARespawn", tag);
 
         return null;
     }

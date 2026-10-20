@@ -13,6 +13,7 @@
 // extras, so this module needs no server round trip. Kept free of three.js so the whole shape is
 // testable - the viewport supplies plain data, this decides what the panel says.
 
+import * as l10n from "@vscode/l10n";
 import {
     type ModelDetail,
     type SubMeshGeometryPage,
@@ -310,11 +311,15 @@ function meshPanel(
             "Level of detail the sub-mesh is tagged for. 0 is the lowest in EaW.",
         ),
         {
-            label: "Triangles",
+            label: l10n.t("Triangles"),
             value: count(source.triangleCount),
             kind: "number",
         },
-        { label: "Vertices", value: count(source.vertexCount), kind: "number" },
+        {
+            label: l10n.t("Vertices"),
+            value: count(source.vertexCount),
+            kind: "number",
+        },
     ];
 
     // The box the FILE stores, not one measured off the exported geometry - the engine culls and
@@ -322,7 +327,7 @@ function meshPanel(
     if (stored !== undefined) {
         mesh.push(
             {
-                label: "Bounds min",
+                label: l10n.t("Bounds min"),
                 value: vector(stored.boundsMin),
                 kind: "vector",
                 // Said out loud because the viewport now draws the subject in WORLD units, scaled
@@ -334,12 +339,12 @@ function meshPanel(
                     "its Scale_Factor, so they differ from what the viewport shows.",
             },
             {
-                label: "Bounds max",
+                label: l10n.t("Bounds max"),
                 value: vector(stored.boundsMax),
                 kind: "vector",
             },
             {
-                label: "Sub-meshes",
+                label: l10n.t("Sub-meshes"),
                 value: String(stored.subMeshCount),
                 kind: "number",
                 hint:
@@ -366,8 +371,8 @@ function meshPanel(
         title: source.name,
         subtitle: extras.alamoShader,
         sections: [
-            { title: "Mesh", rows: mesh },
-            { title: "Material", rows: material },
+            { title: l10n.t("Mesh"), rows: mesh },
+            { title: l10n.t("Material"), rows: material },
             parameterSection(extras),
         ],
     };
@@ -391,7 +396,7 @@ function parameterSection(extras: MaterialExtras): InspectorSection {
     }
 
     return {
-        title: "Shader parameters",
+        title: l10n.t("Shader parameters"),
         rows,
         note:
             rows.length === 0
@@ -411,7 +416,7 @@ function bonePanel(
 
     const rows: InspectorRow[] = [
         text("Name", source.name),
-        { label: "Index", value: String(source.index), kind: "number" },
+        { label: l10n.t("Index"), value: String(source.index), kind: "number" },
         text(
             "Parent",
             source.parentIndex < 0
@@ -440,25 +445,25 @@ function bonePanel(
     if (stored !== undefined) {
         rows.push(
             {
-                label: "Relative transform",
+                label: l10n.t("Relative transform"),
                 value: matrix(stored.relativeTransform),
                 kind: "matrix",
             },
             {
-                label: "Absolute transform",
+                label: l10n.t("Absolute transform"),
                 value: matrix(stored.absoluteTransform),
                 kind: "matrix",
             },
         );
     }
 
-    const sections: InspectorSection[] = [{ title: "Bone", rows }];
+    const sections: InspectorSection[] = [{ title: l10n.t("Bone"), rows }];
 
     // A proxy is a bone with a role - the attachment point a particle system is attached to. The
     // exporter writes none of this into the glTF, so it is unreadable without the server.
     if (proxy !== undefined) {
         sections.push({
-            title: "Proxy",
+            title: l10n.t("Proxy"),
             rows: [
                 text("Name", proxy.name),
                 text("Visible", proxy.visible ? "yes" : "no"),
@@ -489,7 +494,7 @@ function particlePanel(source: ParticleInspection): InspectorPanel {
         title: source.name,
         sections: [
             {
-                title: "Particle system",
+                title: l10n.t("Particle system"),
                 rows: [
                     text("Name", source.name),
                     text(
@@ -497,7 +502,7 @@ function particlePanel(source: ParticleInspection): InspectorPanel {
                         source.boneName === "" ? "none" : source.boneName,
                     ),
                     {
-                        label: "Emitters",
+                        label: l10n.t("Emitters"),
                         value: String(source.emitterCount),
                         kind: "number",
                     },

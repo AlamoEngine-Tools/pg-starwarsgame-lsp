@@ -21,7 +21,7 @@ public sealed partial class IntListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid integer list for <{fact.Tag.Tag}>.", Id: DiagnosticIds.IntListEmpty)
+                    ctx.Messages.Format("IntList_IsNotAValidInteger", fact.Tag.Tag), Id: DiagnosticIds.IntListEmpty)
             ];
 
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
@@ -31,7 +31,7 @@ public sealed partial class IntListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid integer list for <{fact.Tag.Tag}>. Expected space-separated integers.")
+                    ctx.Messages.Format("IntList_IsNotAValidInteger2", trimmed, fact.Tag.Tag))
             ];
 
         // All tokens are valid floats and also valid ints → OK
@@ -50,7 +50,7 @@ public sealed partial class IntListHandler : SingleValueTypeHandlerBase
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{trimmed}' contains float values but <{fact.Tag.Tag}> expects integers. Did you mean '{corrected}'?",
+                ctx.Messages.Format("IntList_ContainsFloatValuesButExpects", trimmed, fact.Tag.Tag, corrected),
                 SuggestedFix: corrected, Id: DiagnosticIds.IntListFloatWhereIntExpected)
         ];
     }

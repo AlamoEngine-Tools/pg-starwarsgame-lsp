@@ -97,7 +97,9 @@ export class LuaDebugConfigurationProvider
             config.program ||= game.get<string>("executable", "");
             if (!config.program) {
                 void vscode.window.showErrorMessage(
-                    'No game executable is configured. Set "aet-eaw-edit.game.executable" or "program" in the launch configuration',
+                    vscode.l10n.t(
+                        'No game executable is configured. Set "aet-eaw-edit.game.executable" or "program" in the launch configuration',
+                    ),
                 );
                 return undefined;
             }
@@ -107,7 +109,9 @@ export class LuaDebugConfigurationProvider
                 : undefined;
             if (override === undefined && layers === undefined) {
                 void vscode.window.showErrorMessage(
-                    'The language server is not running, so the mod chain cannot be built. Start it, or set "modPaths" in the launch configuration',
+                    vscode.l10n.t(
+                        'The language server is not running, so the mod chain cannot be built. Start it, or set "modPaths" in the launch configuration',
+                    ),
                 );
                 return undefined;
             }

@@ -22,6 +22,7 @@ using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -224,6 +225,8 @@ public static class ServerConfigurator
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();
+                // The server's own texts outside a diagnostics run, in the configured locale.
+                services.AddSingleton<IMessageCatalog, ConfiguredMessageCatalog>();
                 services.AddSingleton<IFileSystem, FileSystem>();
                 services.AddSingleton<IFileHelper, FileHelper>();
                 services.AddSingleton<SchemaHttpCache>();
@@ -288,7 +291,8 @@ public static class ServerConfigurator
                         .SendNotification("aet/storySimChanged",
                             new StorySimChangedParams(key.Campaign, key.Faction, key.Scope)),
                     new IndexWorldSymbols(sp.GetRequiredService<IGameIndexService>(),
-                        sp.GetRequiredService<ISchemaProvider>())));
+                        sp.GetRequiredService<ISchemaProvider>()),
+                    sp.GetRequiredService<IMessageCatalog>()));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
                 services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();
@@ -330,7 +334,8 @@ public static class ServerConfigurator
                     sp.GetRequiredService<IFileHelper>(),
                     sp.GetRequiredService<ILogger<ModProjectLoader>>(),
                     sp.GetRequiredService<IPgprojMigrationSink>(),
-                    PgprojMigrations.All));
+                    PgprojMigrations.All,
+                    sp.GetRequiredService<IMessageCatalog>()));
                 services.AddSingleton<ProjectDependencyGraph>();
                 services.AddSingleton<ModProjectResolver>();
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();

@@ -3,6 +3,7 @@
 
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -34,7 +35,9 @@ internal sealed class VariantInlayHintProvider : IXmlInlayHintProvider
         if (!effective.Found)
             return [];
 
-        var label = effective.Cyclic ? "cyclic inheritance" : Summary(effective);
+        var label = effective.Cyclic
+            ? ctx.Messages.Format("VariantInlayHint_CyclicInheritance")
+            : Summary(effective, ctx.Messages);
         if (label is null)
             return [];
 
@@ -50,7 +53,7 @@ internal sealed class VariantInlayHintProvider : IXmlInlayHintProvider
         ];
     }
 
-    private static string? Summary(EffectiveObject effective)
+    private static string? Summary(EffectiveObject effective, IMessageCatalog messages)
     {
         int inherited = 0, overridden = 0, added = 0;
         foreach (var tag in effective.Tags)
@@ -69,9 +72,9 @@ internal sealed class VariantInlayHintProvider : IXmlInlayHintProvider
             }
 
         var parts = new List<string>(3);
-        if (inherited > 0) parts.Add($"inherits {inherited}");
-        if (overridden > 0) parts.Add($"overrides {overridden}");
-        if (added > 0) parts.Add($"adds {added}");
+        if (inherited > 0) parts.Add(messages.Format("VariantInlayHint_Inherits", inherited));
+        if (overridden > 0) parts.Add(messages.Format("VariantInlayHint_Overrides", overridden));
+        if (added > 0) parts.Add(messages.Format("VariantInlayHint_Adds", added));
         return parts.Count == 0 ? null : string.Join(" - ", parts);
     }
 

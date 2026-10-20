@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -175,7 +176,7 @@ public sealed class GetStoryGraphHandler(
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                $"Campaign '{request.Campaign}' was not found."));
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         return Task.FromResult(StoryGraphProjection.Project(
             model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
@@ -197,7 +198,8 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
             n.Kind == StoryNodeKind.Event && n.Id == request.NodeId);
         if (node?.Event is not { } storyEvent)
             return Task.FromResult(new GetStoryNodeDetailResult(null,
-                $"Node '{request.NodeId}' was not found in campaign '{request.Campaign}'."));
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_NodeWasNotFoundCampaign", request.NodeId,
+                    request.Campaign)));
 
         return Task.FromResult(new GetStoryNodeDetailResult(new StoryNodeDetailDto(
             node.Id,
@@ -421,7 +423,7 @@ public sealed class GetStoryDiagnosticsHandler(
         var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
-                $"Campaign '{request.Campaign}' was not found."));
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         // Graph node per event INSTANCE (reference identity - duplicate names get distinct
         // disambiguated node ids, and StoryEvent's record equality would conflate them).

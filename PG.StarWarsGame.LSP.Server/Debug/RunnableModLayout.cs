@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
@@ -16,22 +17,23 @@ namespace PG.StarWarsGame.LSP.Server.Debug;
 public static class RunnableModLayout
 {
     /// <summary>Returns the mod path, or null and the reason the layer cannot be launched as is.</summary>
-    public static (string? ModPath, string? Reason) Judge(ProjectLayer layer)
+    public static (string? ModPath, string? Reason) Judge(ProjectLayer layer, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         ArgumentNullException.ThrowIfNull(layer);
         var projectDirectory = ProjectDirectoryOf(layer);
         if (projectDirectory is null)
-            return (null, "The layer has no project file, so there is no directory to launch it from");
+            return (null, messages.Format("RunnableModLayout_LayerHasNoProjectFile"));
 
         if (projectDirectory.Contains(' '))
             return (null,
-                $"The project directory '{projectDirectory}' contains a space; the game's command line cannot carry a path with one");
+                messages.Format("RunnableModLayout_ProjectDirectoryContainsSpaceGame", projectDirectory));
 
         var dataPrefix = projectDirectory + "/Data/";
         foreach (var directory in AllDirectories(layer))
             if (!DocumentUris.StartsWith(directory + "/", dataPrefix))
                 return (null,
-                    $"'{directory}' is not under '{projectDirectory}/Data', and the game only reads a mod's Data tree");
+                    messages.Format("RunnableModLayout_NotUnderDataGameOnly", directory, projectDirectory));
 
         return (projectDirectory, null);
     }

@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Model;
 
@@ -23,7 +24,7 @@ public sealed class LiveStoryChainProblemStoreTest
     {
         return new StoryChainProblem(
             "Campaigns_Test.xml", uri, 2, 4, 2, 20,
-            StoryChainProblemKind.UnresolvedStoryName, "Story_Plots_X.xml", message,
+            StoryChainProblemKind.UnresolvedStoryName, "Story_Plots_X.xml", new CatalogueText(message),
             XmlDiagnosticSeverity.Error);
     }
 
@@ -39,7 +40,7 @@ public sealed class LiveStoryChainProblemStoreTest
         var store = new LiveStoryChainProblemStore(() => model, new FakeLspConfigurationProvider());
 
         var problem = Assert.Single(store.GetForDocument(CampaignUri));
-        Assert.Equal("live", problem.Message);
+        Assert.Equal("live", problem.Message.Key);
     }
 
     [Fact]
@@ -72,7 +73,7 @@ public sealed class LiveStoryChainProblemStoreTest
         model.Result = ResultWith(Problem(CampaignUri, "typed just now"));
 
         var problem = Assert.Single(store.GetForDocument(CampaignUri));
-        Assert.Equal("typed just now", problem.Message);
+        Assert.Equal("typed just now", problem.Message.Key);
     }
 
     [Fact]
@@ -85,7 +86,7 @@ public sealed class LiveStoryChainProblemStoreTest
         store.Replace([Problem(CampaignUri, "from startup scan")]);
 
         var problem = Assert.Single(store.GetForDocument(CampaignUri));
-        Assert.Equal("from startup scan", problem.Message);
+        Assert.Equal("from startup scan", problem.Message.Key);
     }
 
     [Fact]

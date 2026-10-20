@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Core.Persistence;
 
 /// <summary>Whether a <c>.pgproj</c> can be loaded, and what to tell the user when it cannot.</summary>
@@ -42,32 +44,29 @@ public static class PgprojFormat
     /// </summary>
     public static readonly TypeVersion Current = TypeVersion.Of("aetswg", 1);
 
-    public static PgprojFormatCheck Check(string? declaredVersion, string? declaredType = null)
+    public static PgprojFormatCheck Check(string? declaredVersion, string? declaredType = null,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         // A file claiming to be some other document is not this one at an odd version; reading it
         // anyway would adopt whatever fields happened to match.
         if (declaredType is not null && !string.Equals(declaredType, TypeName, StringComparison.Ordinal))
             return new PgprojFormatCheck(false,
-                $"This file declares itself as '{declaredType}', not a '{TypeName}'. It cannot be "
-                + "opened as a mod project.");
+                messages.Format("PgprojFormat_ThisFileDeclaresItselfAs", declaredType, TypeName));
 
         if (declaredVersion is null) return new PgprojFormatCheck(true, null);
 
         if (!TypeVersion.TryParse(declaredVersion.Trim(), out var declared))
             return new PgprojFormatCheck(false,
-                $"This project declares an unreadable format version '{declaredVersion}'. It must look "
-                + $"like '{Current}'. Fix or remove '_typeVersion' to open the project.");
+                messages.Format("PgprojFormat_ThisProjectDeclaresUnreadableFormat", declaredVersion, Current));
 
         if (!string.Equals(declared.Namespace, Current.Namespace, StringComparison.Ordinal))
             return new PgprojFormatCheck(false,
-                $"This project declares version '{declared}', which is not a version of "
-                + $"'{Current.Namespace}'. It cannot be opened as a mod project.");
+                messages.Format("PgprojFormat_ThisProjectDeclaresVersionWhich", declared, Current.Namespace));
 
         if (declared.CompareTo(Current) <= 0) return new PgprojFormatCheck(true, null);
 
         return new PgprojFormatCheck(false,
-            $"This project is in format {declared.Version}, which this version of aet-eaw-edit does "
-            + $"not understand (it reads and writes {Current.Version}). Update the extension to open "
-            + "it - opening it anyway would risk writing over settings a newer version put there.");
+            messages.Format("PgprojFormat_ThisProjectFormatWhichThis", declared.Version, Current.Version));
     }
 }

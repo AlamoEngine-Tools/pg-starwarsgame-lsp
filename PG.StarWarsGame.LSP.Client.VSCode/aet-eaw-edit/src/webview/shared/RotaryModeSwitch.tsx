@@ -10,6 +10,7 @@
 //
 // A mode keeps its ANGLE when others are hidden, so the one you know stays where your eye expects.
 
+import * as l10n from "@vscode/l10n";
 import * as React from "react";
 
 import { type ChoiceOption } from "./choice";
@@ -112,8 +113,11 @@ export function RotaryModeSwitch<Id extends string>(props: {
                 className="rotary-center"
                 title={
                     order.length > 1
-                        ? `${active.label} - click to switch mode`
-                        : `${active.label} - the other modes are unavailable here`
+                        ? l10n.t("{0} - click to switch mode", active.label)
+                        : l10n.t(
+                              "{0} - the other modes are unavailable here",
+                              active.label,
+                          )
                 }
                 onClick={cycle}
             >

@@ -25,7 +25,7 @@ public sealed class StoryParamEnumHandler : XmlDiagnosticsHandler<StoryParamFact
                 return
                 [
                     new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{token}' is not a valid {enumDef.Name} value.")
+                        ctx.Messages.Format("StoryParamEnum_IsNotAValidValue", token, enumDef.Name))
                 ];
 
         return [];

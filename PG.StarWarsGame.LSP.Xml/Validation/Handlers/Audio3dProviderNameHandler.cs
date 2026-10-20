@@ -19,7 +19,7 @@ public sealed class Audio3dProviderNameHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid 3D audio provider name for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("Audio3dProviderName_IsNotAValidD", fact.Tag.Tag))
             ];
 
         return [];

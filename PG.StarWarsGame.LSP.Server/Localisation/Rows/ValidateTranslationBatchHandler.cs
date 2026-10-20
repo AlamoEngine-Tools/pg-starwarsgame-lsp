@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.JsonRpc;
 using PG.Commons.Hashing;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -47,7 +48,9 @@ public sealed class ValidateTranslationBatchHandler
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath)
             || !fs.File.Exists(request.ProjectFilePath))
             return Task.FromResult(new ValidateTranslationBatchResult(
-                [], $"File not found: {request.ProjectFilePath}"));
+                [],
+                new ConfiguredMessageCatalog(_config).Format("LocValidateTranslation_FileNotFound",
+                    request.ProjectFilePath)));
 
         KeyedTranslationResult translated;
         try
@@ -57,7 +60,7 @@ public sealed class ValidateTranslationBatchHandler
         catch (Exception ex)
         {
             return Task.FromResult(new ValidateTranslationBatchResult(
-                [], $"Failed to read the file: {ex.Message}"));
+                [], new ConfiguredMessageCatalog(_config).Format("LocValidateTranslation_FailedReadFile", ex.Message)));
         }
 
         // An addressing failure is about one staged change, not about an entry, so it is reported
@@ -66,7 +69,8 @@ public sealed class ValidateTranslationBatchHandler
             return Task.FromResult(new ValidateTranslationBatchResult(
             [
                 new LocTranslationProblemDto(null, null, LocProblemSeverity.Error,
-                    $"Change {(translated.FailedIndex ?? 0) + 1}: {translated.Error}")
+                    new ConfiguredMessageCatalog(_config).Format("LocValidateTranslation_Change",
+                        (translated.FailedIndex ?? 0) + 1, translated.Error))
             ]));
 
         var problems = TranslationKeyInspector.Inspect(translated.ResultingKeys ?? [], _hashing).ToList();
@@ -79,7 +83,7 @@ public sealed class ValidateTranslationBatchHandler
             foreach (var (language, empty, total) in
                      LanguageCoverageInspector.Inspect(rows, languages))
                 problems.Add(new LocTranslationProblemDto(null, language, LocProblemSeverity.Warning,
-                    LanguageCoverageInspector.Message(language, empty, total)));
+                    LanguageCoverageInspector.Message(language, empty, total, new ConfiguredMessageCatalog(_config))));
 
         return Task.FromResult(new ValidateTranslationBatchResult(problems));
     }

@@ -8,6 +8,7 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -362,7 +363,7 @@ public sealed class GetServerStatusHandler(
         var warnings = new List<string>();
 
         if (check is null)
-            warnings.Add("Schema: Not loaded");
+            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_SchemaNotLoaded"));
         else if (!check.CanLoad)
             warnings.Add($"Schema: {check.Compatibility}");
 
@@ -379,10 +380,10 @@ public sealed class GetServerStatusHandler(
         // that indexed nothing, and a catalog with no models in it.
         if (recorder.IndexState == StatusIndexState.Complete && problem == ProjectProblem.None
                                                              && files.ProjectFiles == 0)
-            warnings.Add("Project files: 0");
+            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_ProjectFiles"));
 
         if (!index.AssetFiles.GetByExtension(".alo").Any())
-            warnings.Add("Asset catalog: No models");
+            warnings.Add(new ConfiguredMessageCatalog(config).Format("ServerStatus_AssetCatalogNoModels"));
 
         return warnings;
     }

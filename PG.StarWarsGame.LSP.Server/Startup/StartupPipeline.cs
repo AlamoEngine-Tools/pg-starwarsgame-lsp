@@ -5,6 +5,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Status;
@@ -63,18 +64,22 @@ public sealed class StartupPipeline
         _logger = logger;
     }
 
+    /// <summary>The server's texts in the configured locale, English for a setup without one.</summary>
+    private IMessageCatalog Messages =>
+        _configProvider is null ? ResxMessageCatalog.Server("en") : new ConfiguredMessageCatalog(_configProvider);
+
     public async Task RunAsync(IReadOnlyList<string> scanRoots, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
         var failed = false;
         try
         {
-            _progress.Report("Loading schema and baseline", 5);
+            _progress.Report(Messages.Format("StartupPipeline_LoadingSchemaBaseline"), 5);
             await Task.WhenAll(
                 _schema.LoadAsync(ct),
                 _baseline.LoadAsync(ct));
 
-            _progress.Report("Indexing workspace", 30);
+            _progress.Report(Messages.Format("StartupPipeline_IndexingWorkspace"), 30);
             await _reloadService.LoadAsync(scanRoots, ct);
         }
         catch (Exception ex)

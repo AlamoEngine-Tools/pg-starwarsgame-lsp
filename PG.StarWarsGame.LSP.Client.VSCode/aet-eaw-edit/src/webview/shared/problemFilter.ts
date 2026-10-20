@@ -14,6 +14,7 @@
 // completely between a graph, a grid and a 3D scene - and an editor that has no answer yet passes
 // none and is unaffected.
 
+import * as l10n from "@vscode/l10n";
 /** What "belongs to the current view" means. Supplied by the editor; there is no general answer. */
 export type ProblemPredicate<T> = (problem: T) => boolean;
 
@@ -75,7 +76,7 @@ export function filterProblems<T>(
         filterable: hidden > 0,
         label:
             hidden > 0
-                ? `${showAll ? total : matching.length} of ${total}`
+                ? l10n.t("{0} of {1}", showAll ? total : matching.length, total)
                 : String(total),
     };
 }

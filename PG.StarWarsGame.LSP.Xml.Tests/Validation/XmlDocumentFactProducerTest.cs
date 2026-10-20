@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -431,7 +432,7 @@ public sealed class XmlDocumentFactProducerTest
         var facts = Build().Produce(xml, Uri);
         var sf = Assert.Single(facts.OfType<XmlStructureFact>());
         Assert.Equal(Uri, sf.DocumentUri);
-        Assert.Contains("Bar", sf.Reason);
+        Assert.Contains("Bar", ResxMessageCatalog.Server("en").Format(sf.Reason));
     }
 
     [Fact]

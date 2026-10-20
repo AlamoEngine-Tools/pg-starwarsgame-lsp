@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -117,6 +118,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
     protected override void PublishForDocument(string uri, string text, GameIndex index)
     {
         var diagnostics = new List<LspDiagnostic>();
+        var messages = ResxMessageCatalog.Server(_configProvider?.Current.Locale ?? "en");
 
         // One parse shared by the syntax-error pass and all three analyzers (previously four
         // separate parses of the same text) - and via the cache, with indexing and every request
@@ -135,18 +137,20 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         }
 
         // What 5.1 added: both parsers read 5.1 and accept it, the game's 5.0 does not (#157).
-        diagnostics.AddRange(LuaVersionSyntaxAnalyzer.Analyze(parsed.Tree));
+        diagnostics.AddRange(LuaVersionSyntaxAnalyzer.Analyze(parsed.Tree, messages));
 
-        CollectReferenceErrors(uri, index, diagnostics);
-        diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, parsed.Tree, index.Documents, _fileHelper));
-        diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, parsed.Tree, index, _schemaProvider, _fileHelper));
-        diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(parsed.Tree, uri));
-        diagnostics.AddRange(LuaPlanAnalyzer.Analyze(uri, parsed.Tree));
+        CollectReferenceErrors(uri, index, diagnostics, messages);
+        diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, parsed.Tree, index.Documents, _fileHelper, messages));
+        diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, parsed.Tree, index, _schemaProvider, _fileHelper,
+            messages));
+        diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(parsed.Tree, uri, messages));
+        diagnostics.AddRange(LuaPlanAnalyzer.Analyze(uri, parsed.Tree, messages));
         diagnostics.AddRange(LuaStateMachineAnalyzer.Analyze(uri, parsed.Tree,
-            LuaStateMachineContract.For(_fileHelper.NormalizeUri(uri), index.Documents, _parseCache, _fileHelper)));
+            LuaStateMachineContract.For(_fileHelper.NormalizeUri(uri), index.Documents, _parseCache, _fileHelper),
+            messages));
         diagnostics.AddRange(LuaPooledStateAnalyzer.Analyze(uri, parsed.Tree,
             LuaPooledState.For(_fileHelper.NormalizeUri(uri), parsed.Tree.GetRoot(), index.Documents, _parseCache,
-                _fileHelper)));
+                _fileHelper), messages));
 
         // Applied once, on the way out, so every analyzer above is covered without any of them
         // having to know about scopes - and using the parse already in hand.
@@ -194,7 +198,8 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         }
     }
 
-    private void CollectReferenceErrors(string uri, GameIndex index, List<LspDiagnostic> diagnostics)
+    private void CollectReferenceErrors(string uri, GameIndex index, List<LspDiagnostic> diagnostics,
+        IMessageCatalog messages)
     {
         var canonicalUri = _fileHelper.NormalizeUri(uri);
         if (!index.Documents.TryGetValue(canonicalUri, out var docIndex))
@@ -212,7 +217,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
                 {
                     var resolved = index.Resolve(reference.TargetId);
                     var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName,
-                        resolved);
+                        resolved, messages: messages);
                     if (eval is null) continue;
 
                     diagnostics.Add(new LspDiagnostic
@@ -239,7 +244,8 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
                         Code = new LspDiagnosticCode(DiagnosticIds.LocalisationKeyExistence.ToString()),
                         Severity = LspDiagnosticSeverity.Warning,
                         Message =
-                            $"Localisation key '{reference.TargetId}' was not found in the loaded translation databases.",
+                            messages.Format("LocalisationKeyHandlerBase_LocalisationKeyWasNotFound",
+                                reference.TargetId),
                         Range = range,
                         Source = AppProperties.LspServerId
                     });

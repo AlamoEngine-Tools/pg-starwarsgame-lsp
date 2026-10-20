@@ -26,5 +26,5 @@ public sealed class NonNegativeValueHandler : NumericRangeHandlerBase
 
     protected override float? Maximum => null;
 
-    protected override string Expectation => "cannot be less than zero";
+    protected override string ExpectationKey => "NonNegativeValue_Expectation";
 }

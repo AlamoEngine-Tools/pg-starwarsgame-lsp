@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -42,7 +43,7 @@ internal sealed class XmlFormattingRequest(
         var result = XmlFormatter.Format(doc, unit, offsets);
         if (result.Refusal is { } why)
         {
-            notifier.ShowWarning(why);
+            notifier.ShowWarning(new ConfiguredMessageCatalog(config).Format(why));
             return null;
         }
 

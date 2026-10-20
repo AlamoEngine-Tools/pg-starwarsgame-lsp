@@ -16,6 +16,7 @@
 // The shape, as they set it: the play state on the left, vertically centred across the card; the
 // name on the top row, left aligned; the takes on the bottom row, left aligned and filling right.
 
+import * as l10n from "@vscode/l10n";
 import { Icon } from "../shared/Icon";
 import { type AnimationAction } from "./animationNames";
 
@@ -45,8 +46,11 @@ export function AnimationTile({
                 aria-label={action.label}
                 title={
                     several
-                        ? `Play ${action.label} - a take at random each time round, as the game does`
-                        : `Play ${action.label}`
+                        ? l10n.t(
+                              "Play {0} - a take at random each time round, as the game does",
+                              action.label,
+                          )
+                        : l10n.t("Play {0}", action.label)
                 }
                 onClick={() => onPlay(action)}
             >

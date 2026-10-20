@@ -30,8 +30,8 @@ public abstract class TagComparisonRuleBase : IXmlCrossTagRule
     /// <summary>The tag it is compared against.</summary>
     protected abstract string RightTag { get; }
 
-    /// <summary>The relation as a sentence fragment completing "&lt;Left&gt; ... &lt;Right&gt;".</summary>
-    protected abstract string Expectation { get; }
+    /// <summary>The catalogue key of the relation, a fragment completing "&lt;Left&gt; ... &lt;Right&gt;".</summary>
+    protected abstract string ExpectationKey { get; }
 
     /// <summary>
     ///     Whether the engine repairs a violation by EXCHANGING the two values, as measured in its
@@ -75,7 +75,7 @@ public abstract class TagComparisonRuleBase : IXmlCrossTagRule
                 RightTag,
                 left,
                 right,
-                Expectation,
+                ExpectationKey,
                 SwapEdits(leftNode, rightNode, lineIndex))
         ];
     }

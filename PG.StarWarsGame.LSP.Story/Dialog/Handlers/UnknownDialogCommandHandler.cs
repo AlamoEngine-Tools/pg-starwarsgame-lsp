@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -17,7 +18,7 @@ public sealed class UnknownDialogCommandHandler : IDialogDiagnosticsHandler
 
         var command = fact.Command;
         yield return new DialogDiagnostic(XmlDiagnosticSeverity.Error,
-            $"Unknown story-dialog command '{command.RawName}'.",
+            new CatalogueText("UnknownDialogCommand_Unknown", command.RawName),
             command.Line, command.Column, command.Column + command.RawName.Length);
     }
 }

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -67,6 +68,6 @@ public sealed class XmlStructureHandler : XmlDiagnosticsHandler<XmlStructureFact
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlStructureFact fact, DiagnosticsContext ctx)
     {
         var (id, severity) = ByCategory[fact.Category];
-        return [new XmlDiagnosticResult(severity, fact.Reason, Id: id)];
+        return [new XmlDiagnosticResult(severity, ctx.Messages.Format(fact.Reason), Id: id)];
     }
 }

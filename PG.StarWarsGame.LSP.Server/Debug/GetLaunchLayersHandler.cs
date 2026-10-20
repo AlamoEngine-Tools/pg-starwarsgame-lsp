@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Debug;
@@ -27,7 +28,7 @@ public sealed class GetLaunchLayersHandler : IJsonRpcRequestHandler<GetLaunchLay
             .OrderByDescending(layer => layer.Rank)
             .Select(layer =>
             {
-                var (modPath, reason) = RunnableModLayout.Judge(layer);
+                var (modPath, reason) = RunnableModLayout.Judge(layer, new ConfiguredMessageCatalog(_config));
                 return new LaunchLayer(layer.Name, layer.Rank, layer.ProjectPath,
                     RunnableModLayout.ProjectDirectoryOf(layer), layer.ScriptRoots, modPath, reason);
             })

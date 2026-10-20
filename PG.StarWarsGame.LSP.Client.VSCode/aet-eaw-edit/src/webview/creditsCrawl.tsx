@@ -10,6 +10,7 @@
 // The scroll is a single CSS transform animation rather than a per-frame JS loop: nothing to keep
 // in sync, and it stays smooth over a long roll. No external assets or fonts are used.
 
+import * as l10n from "@vscode/l10n";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 
@@ -75,7 +76,7 @@ export function CreditsCrawl(props: {
     return (
         <Overlay
             role="dialog"
-            aria-label="Credits preview"
+            aria-label={l10n.t("Credits preview")}
             tabIndex={-1}
             onKeyDown={(e) => {
                 if (e.key === "Escape") {
@@ -87,12 +88,12 @@ export function CreditsCrawl(props: {
             <div className="controls">
                 <IconButton
                     icon={running ? "pause" : "play"}
-                    title={running ? "Pause" : "Play"}
+                    title={running ? l10n.t("Pause") : l10n.t("Play")}
                     onClick={() => setRunning((r) => !r)}
                 />
                 <IconButton
                     icon="restart"
-                    title="Restart"
+                    title={l10n.t("Restart")}
                     onClick={() => {
                         setRunId((id) => id + 1);
                         setRunning(true);
@@ -102,11 +103,11 @@ export function CreditsCrawl(props: {
                 <select
                     value={speed}
                     onChange={(e) => setSpeed(Number(e.target.value))}
-                    title="Speed"
+                    title={l10n.t("Speed")}
                 >
                     {SPEEDS.map((s) => (
                         <option key={s} value={s}>
-                            {s}x
+                            {l10n.t("{0}x", s)}
                         </option>
                     ))}
                 </select>
@@ -114,7 +115,7 @@ export function CreditsCrawl(props: {
                 <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    title="Language"
+                    title={l10n.t("Language")}
                 >
                     {props.languages.map((l) => (
                         <option key={l} value={l}>
@@ -123,10 +124,12 @@ export function CreditsCrawl(props: {
                     ))}
                 </select>
 
-                <span className="count">{blocks.length} lines</span>
+                <span className="count">
+                    {l10n.t("{0} lines", blocks.length)}
+                </span>
                 <IconButton
                     icon="close"
-                    title="Close the preview (Esc)"
+                    title={l10n.t("Close the preview (Esc)")}
                     onClick={props.onClose}
                 />
             </div>
@@ -151,7 +154,10 @@ export function CreditsCrawl(props: {
 
                 {blocks.length === 0 ? (
                     <p className="empty">
-                        Nothing to show - this file has no text in {language}.
+                        {l10n.t(
+                            "Nothing to show - this file has no text in {0}.",
+                            language,
+                        )}
                     </p>
                 ) : (
                     <div

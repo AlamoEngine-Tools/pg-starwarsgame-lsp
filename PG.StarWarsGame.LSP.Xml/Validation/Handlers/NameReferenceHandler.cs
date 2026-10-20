@@ -20,7 +20,8 @@ public sealed class NameReferenceHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid name reference for <{fact.Tag.Tag}>.", Id: DiagnosticIds.NameReferenceEmpty)
+                    ctx.Messages.Format("NameReference_IsNotAValidName", fact.Tag.Tag),
+                    Id: DiagnosticIds.NameReferenceEmpty)
             ];
 
         if (fact.Tag.ReferenceKind == ReferenceKind.HardcodedSet && fact.Tag.HardcodedSet is { } set)
@@ -30,7 +31,7 @@ public sealed class NameReferenceHandler : SingleValueTypeHandlerBase
                 return
                 [
                     new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{trimmed}' is not a known value for '{set.Name}' on <{fact.Tag.Tag}>.")
+                        ctx.Messages.Format("NameReference_IsNotAKnownValue", trimmed, set.Name, fact.Tag.Tag))
                 ];
         }
 

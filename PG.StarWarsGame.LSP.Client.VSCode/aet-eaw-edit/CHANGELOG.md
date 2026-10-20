@@ -4,6 +4,48 @@
 
 ### Features
 
+- **Localisable texts** - every user-facing string moves into one catalogue per runtime, the start of
+  translations and the one place the text rules are checked
+  ([#274](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/274))
+  - The extension manifest's 178 texts - command titles, setting descriptions, enum labels, view names,
+    debugger labels - come from `package.nls.json`; `npm run lint` fails on a text written into
+    `package.json` itself or a key the catalogue does not carry
+  - The extension host's 180 texts - notifications and their buttons, prompts, quick picks, progress, tree
+    items and panel titles - go through `vscode.l10n.t` into `l10n/bundle.l10n.json`; the lint fails on a
+    text written in place or a bundle that no longer matches the code. Six texts in second person were
+    reworded on the way, and plural messages are whole sentences
+  - The webviews' 650 texts - the model preview, story graph, localisation editor, encyclopedia and credits
+    - come from the same bundle, which the host hands every page; text interrupted by values is one
+    message with placeholders. The page's language follows VS Code's display language. Curly quotes in one
+    message became straight ones, and texts in second person were reworded
+  - The server's own texts come from one catalogue, `ServerMessages.resx`, in the language
+    `aet-eaw-edit.lsp.locale` names, English where no translation exists; values in a message keep the
+    form the XML holds - `0.5`, never `0,5`. A test ties every key the code asks for to the catalogue
+    and back
+  - The XML diagnostics read the configured locale; it was fixed to English, so neither the server's
+    texts nor the schema's per-language notes ever reached a diagnostic in another language
+  - The XML structure findings, the cross-tag rules, every message fragment and every engine-repair
+    quick fix come from the catalogue as well. The findings keep the key until they are shown, so a
+    changed locale needs no re-parse. Fix titles take a capital after the colon, and the gated-flag
+    message no longer says "for you"
+  - The Lua analyzers' messages - Lua 5.1 syntax, requires, task forces, pooled state, state machines,
+    upvalues - come from the catalogue in the configured locale
+  - The story texts come from the catalogue: graph, chain and dialog diagnostics, the simulator's log,
+    the story editor's commands and refusals. A dialog command's argument count reads as one sentence
+    for any count, and the read-only layer message no longer addresses the reader
+  - Hovers, value-format hints, quick fixes, suppression actions, code lenses, inlay hints, the
+    effective-object view and the formatter's refusals come from the catalogue, XML and Lua alike
+  - The localisation editor's refusals, key and coverage problems and conversion errors come from the
+    catalogue; a key with several non-ASCII characters lists them without the English "and"
+  - The model preview's problems and refusals come from the catalogue. A model file's own format error
+    is quoted as the reader states it, inside a translated sentence
+  - Startup, project loading, localisation commands, settings-file notices and the Lua debugger's
+    refusals come from the catalogue. The debugger follows the language the debug client reports,
+    since it runs outside the language server's settings
+  - Every catalogue is held to the text rules by `npm run lint`: ASCII only, no second person, a capital
+    after a colon, no full stop on a one-clause label, no counts of the game's own data. The texts that
+    broke them were reworded - "Did you mean" suggestions now name the nearest valid value - and a test
+    fails any server text written in place where a reader sees it
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none
@@ -166,6 +208,15 @@
   - Vanilla and a large total-conversion mod: every reference resolves inside `Data/Scripts/GameObject`
 
 ### Fixes
+
+- **Project-wide suppression re-analysed the workspace** - adding one from a quick fix revalidated every
+  document in every language. It now filters the diagnostics already shown and sends only the documents
+  that lose one; nothing is analysed again
+
+- **Command not found from a quick fix** - "Suppress across the project" and "Create localisation key"
+  failed with `command 'aet-eaw-edit.lsp...' not found`. The server announces its commands in one batch,
+  the batch collided with commands the extension registers itself and was dropped whole; the extension now
+  forwards every server command itself
 
 - **Particle energy** - a particle system carries the game's energy setting: an ordinary emitter spawns with
   it as its odds and bears its particles at its share of their speed, a mesh-vertex emitter takes its share

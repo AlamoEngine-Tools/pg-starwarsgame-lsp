@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Story.Tests.Model;
@@ -173,7 +174,7 @@ public sealed class StoryThreadParserTest
         Assert.Empty(thread.Events);
         var problem = Assert.Single(thread.Problems);
         Assert.Equal(1, problem.Range.StartLine);
-        Assert.Contains("Name", problem.Message);
+        Assert.Contains("Name", ResxMessageCatalog.Server("en").Format(problem.Message));
     }
 
     [Fact]

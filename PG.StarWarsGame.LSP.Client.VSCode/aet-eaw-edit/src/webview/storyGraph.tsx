@@ -14,6 +14,8 @@
 // re-implements it). Staged edits are re-applied after each graph rebuild (reapplyStagedCommands) so
 // a reconcile never reverts them.
 
+import "./shared/l10nSetup";
+import * as l10n from "@vscode/l10n";
 import {
     CSSProperties,
     DragEvent,
@@ -3532,7 +3534,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const dto: StoryGraphNodeDto = {
                 id: `local:${kind}:${stagingCounter}`,
                 kind: kind === "and" ? "StagingAnd" : "StagingOr",
-                label: kind === "and" ? "AND" : "OR",
+                label: kind === "and" ? l10n.t("AND") : l10n.t("OR"),
                 threadUri: null,
                 line: null,
                 eventType: null,
@@ -3885,7 +3887,7 @@ function VirtualNodeView(props: {
                 <Drag.NoDrag>
                     <button
                         className="discard"
-                        title="Discard - nothing was saved"
+                        title={l10n.t("Discard - nothing was saved")}
                         onClick={() =>
                             editorHandleRef?.discardStagingJunction(dto.id)
                         }
@@ -3900,8 +3902,10 @@ function VirtualNodeView(props: {
                         className="jump"
                         title={
                             currentMode === "simulate"
-                                ? "Open this battle's graph in Simulation"
-                                : "Open this battle's graph"
+                                ? l10n.t(
+                                      "Open this battle's graph in Simulation",
+                                  )
+                                : l10n.t("Open this battle's graph")
                         }
                         onClick={() =>
                             onOpenBattleRequested(
@@ -3929,7 +3933,7 @@ function VirtualNodeView(props: {
                 <Drag.NoDrag>
                     <button
                         className="jump back"
-                        title="Open the campaign graph on this event"
+                        title={l10n.t("Open the campaign graph on this event")}
                         onClick={() =>
                             onRevealGalacticRequested(dto.portalTarget!)
                         }
@@ -4561,7 +4565,9 @@ function EventParamRows(props: {
                                     }
                                 >
                                     <option value="">
-                                        {row.missing ? "(required)" : "(unset)"}
+                                        {row.missing
+                                            ? l10n.t("(required)")
+                                            : l10n.t("(unset)")}
                                     </option>
                                     {[...new Set([row.value, ...enumValues])]
                                         .filter((v) => v)
@@ -4578,9 +4584,9 @@ function EventParamRows(props: {
                                     disabled={props.readOnly}
                                     placeholder={
                                         row.missing
-                                            ? "required"
+                                            ? l10n.t("required")
                                             : optionalUnset
-                                              ? "(optional)"
+                                              ? l10n.t("(optional)")
                                               : undefined
                                     }
                                     onCommit={(v) => commit(row.position, v)}
@@ -4600,9 +4606,9 @@ function EventParamRows(props: {
                                     disabled={props.readOnly}
                                     placeholder={
                                         row.missing
-                                            ? "required"
+                                            ? l10n.t("required")
                                             : optionalUnset
-                                              ? "(optional)"
+                                              ? l10n.t("(optional)")
                                               : undefined
                                     }
                                     onCommit={(v) => commit(row.position, v)}
@@ -4613,7 +4619,11 @@ function EventParamRows(props: {
                             <Drag.NoDrag>
                                 <button
                                     className="goto"
-                                    title={`Go to the definition of '${firstToken}' (${referenceType})`}
+                                    title={l10n.t(
+                                        "Go to the definition of '{0}' ({1})",
+                                        firstToken,
+                                        referenceType,
+                                    )}
                                     onClick={() =>
                                         vscode.postMessage({
                                             type: "resolveRef",
@@ -4657,8 +4667,14 @@ function SectionHead(props: {
                     className="section-toggle"
                     title={
                         collapsed
-                            ? `Expand the ${label.toLowerCase()} section`
-                            : `Collapse the ${label.toLowerCase()} section`
+                            ? l10n.t(
+                                  "Expand the {0} section",
+                                  label.toLowerCase(),
+                              )
+                            : l10n.t(
+                                  "Collapse the {0} section",
+                                  label.toLowerCase(),
+                              )
                     }
                     onClick={() => toggleSection(props.nodeId, props.section)}
                 >
@@ -4690,7 +4706,7 @@ function TypeRow(props: {
         props.kind === "trigger" ? "clearEventType" : "clearRewardType";
     return (
         <div className="row">
-            <label>Type</label>
+            <label>{l10n.t("Type")}</label>
             {props.typeName ? (
                 <>
                     <Drag.NoDrag>
@@ -4706,7 +4722,10 @@ function TypeRow(props: {
                                 ),
                                 color: "var(--vscode-editor-foreground)",
                             }}
-                            title={`${props.typeName} - remove the type to attach a different one`}
+                            title={l10n.t(
+                                "{0} - remove the type to attach a different one",
+                                props.typeName,
+                            )}
                         >
                             <span
                                 className={`codicon ${props.kind === "trigger" ? "codicon-zap" : "codicon-gift"}`}
@@ -4721,7 +4740,10 @@ function TypeRow(props: {
                         <Drag.NoDrag>
                             <button
                                 className="goto chip-remove"
-                                title={`Remove this ${props.kind} and its parameters`}
+                                title={l10n.t(
+                                    "Remove this {0} and its parameters",
+                                    props.kind,
+                                )}
                                 onClick={() =>
                                     sendCommand(
                                         {
@@ -4741,8 +4763,11 @@ function TypeRow(props: {
             ) : (
                 <span className="type-empty">
                     {props.readOnly
-                        ? "(none)"
-                        : `drop a ${props.kind === "trigger" ? "trigger" : "reward"} type here`}
+                        ? l10n.t("(none)")
+                        : l10n.t(
+                              "drop a {0} type here",
+                              props.kind === "trigger" ? "trigger" : "reward",
+                          )}
                 </span>
             )}
         </div>
@@ -4789,7 +4814,7 @@ function EventNodeView(props: {
             {props.data.simFireCount > 0 ? (
                 <span
                     className="fire-badge"
-                    title={"Fired " + props.data.simFireCount + "x"}
+                    title={l10n.t("Fired {0}x", props.data.simFireCount)}
                 >
                     {props.data.simFireCount}
                 </span>
@@ -4816,7 +4841,9 @@ function EventNodeView(props: {
             {props.data.simBreakpoint ? (
                 <span
                     className="bp-mark"
-                    title="Breakpoint - the clock halts after this fires"
+                    title={l10n.t(
+                        "Breakpoint - the clock halts after this fires",
+                    )}
                 />
             ) : null}
             {input ? (
@@ -4955,7 +4982,7 @@ function EventForm(props: {
                         <Drag.NoDrag>
                             <button
                                 className="rename-ok"
-                                title="Apply rename (Enter)"
+                                title={l10n.t("Apply rename (Enter)")}
                                 onMouseDown={(e) => {
                                     e.preventDefault();
                                     commitTitle();
@@ -4966,7 +4993,7 @@ function EventForm(props: {
                         </Drag.NoDrag>
                         <Drag.NoDrag>
                             <button
-                                title="Cancel (Esc)"
+                                title={l10n.t("Cancel (Esc)")}
                                 onMouseDown={(e) => {
                                     e.preventDefault();
                                     cancelRename();
@@ -4984,7 +5011,7 @@ function EventForm(props: {
                     // click; that's why rename is a dedicated NoDrag button.)
                     <span
                         className="title"
-                        title={`${dto.label} - drag to move`}
+                        title={l10n.t("{0} - drag to move", dto.label)}
                     >
                         {dto.label}
                     </span>
@@ -5002,7 +5029,10 @@ function EventForm(props: {
                 ) : null}
                 {readOnly || editingTitle ? null : (
                     <Drag.NoDrag>
-                        <button title="Rename this event" onClick={openRename}>
+                        <button
+                            title={l10n.t("Rename this event")}
+                            onClick={openRename}
+                        >
                             <span className="codicon codicon-edit" />
                         </button>
                     </Drag.NoDrag>
@@ -5028,7 +5058,7 @@ function EventForm(props: {
                 ) : null}
                 <Drag.NoDrag>
                     <button
-                        title="Open in XML"
+                        title={l10n.t("Open in XML")}
                         onClick={() =>
                             vscode.postMessage({
                                 type: "openXml",
@@ -5058,7 +5088,7 @@ function EventForm(props: {
                     <Drag.NoDrag>
                         <button
                             className="danger"
-                            title="Delete this event"
+                            title={l10n.t("Delete this event")}
                             onClick={() =>
                                 sendCommand(
                                     {
@@ -5084,7 +5114,7 @@ function EventForm(props: {
             {isSectionCollapsed(dto.id, "general") ? null : (
                 <>
                     <div className="row">
-                        <label>Branch</label>
+                        <label>{l10n.t("Branch")}</label>
                         <Drag.NoDrag>
                             <BlurCommitInput
                                 value={dto.branch ?? ""}
@@ -5101,7 +5131,7 @@ function EventForm(props: {
                         </Drag.NoDrag>
                     </div>
                     <div className="row">
-                        <label>Perpetual</label>
+                        <label>{l10n.t("Perpetual")}</label>
                         <Drag.NoDrag>
                             <input
                                 type="checkbox"
@@ -5119,7 +5149,7 @@ function EventForm(props: {
                         </Drag.NoDrag>
                     </div>
                     <div className="row">
-                        <label>Dialog</label>
+                        <label>{l10n.t("Dialog")}</label>
                         <Drag.NoDrag>
                             <BlurCommitInput
                                 value={dto.storyDialog ?? ""}
@@ -7702,7 +7732,7 @@ function App(): React.JSX.Element {
                             <div className="stage-chrome key-corner">
                                 <IconButton
                                     icon="details"
-                                    title="Colour key"
+                                    title={l10n.t("Colour key")}
                                     className={
                                         colourKeyOpen ? "active" : undefined
                                     }
@@ -7801,7 +7831,9 @@ function App(): React.JSX.Element {
                                             "header-left" +
                                             (pendingCount > 0 ? " active" : "")
                                         }
-                                        title="Save - write all staged changes to the XML files"
+                                        title={l10n.t(
+                                            "Save - write all staged changes to the XML files",
+                                        )}
                                         badge={
                                             pendingCount > 0
                                                 ? ` ${pendingCount}`
@@ -7844,7 +7876,9 @@ function App(): React.JSX.Element {
                                 <SeverityTag
                                     severity={severity}
                                     count={problems.length}
-                                    title="Validate - check the story for problems (opens the panel below)"
+                                    title={l10n.t(
+                                        "Validate - check the story for problems (opens the panel below)",
+                                    )}
                                     onClick={() => {
                                         validateEdits();
                                     }}
@@ -7870,13 +7904,14 @@ function App(): React.JSX.Element {
                                 ) : null}
                                 {mode === "simulate" && !simState?.running ? (
                                     <div className="dock-hint">
-                                        Starting simulation...
+                                        {l10n.t("Starting simulation...")}
                                     </div>
                                 ) : null}
                                 {mode === "view" ? (
                                     <div className="dock-hint">
-                                        Read-only. Switch to Edit to change the
-                                        story, or Simulation to run it forward.
+                                        {l10n.t(
+                                            "Read-only. Switch to Edit to change the story, or Simulation to run it forward.",
+                                        )}
                                     </div>
                                 ) : null}
                             </>
@@ -7910,14 +7945,16 @@ function App(): React.JSX.Element {
                                 ) : null}
                                 <div className="dock-search">
                                     <div className="dock-section-title">
-                                        Filter
+                                        {l10n.t("Filter")}
                                     </div>
                                     <div className="search-field">
                                         {/* The box shows what was typed at once; only the APPLIED filter waits -
                                     each one costs a server request and a full rebuild (#131). */}
                                         <input
                                             type="text"
-                                            placeholder="Filter event names..."
+                                            placeholder={l10n.t(
+                                                "Filter event names...",
+                                            )}
                                             value={nameDraft}
                                             onChange={(e) =>
                                                 setNameDraft(e.target.value)
@@ -7961,11 +7998,13 @@ function App(): React.JSX.Element {
                                                     ),
                                                 );
                                             }}
-                                            title="Arrange - recompute the automatic layout"
+                                            title={l10n.t(
+                                                "Arrange - recompute the automatic layout",
+                                            )}
                                         />
                                         <IconButton
                                             icon="frame"
-                                            title="Fit graph to view"
+                                            title={l10n.t("Fit graph to view")}
                                             onClick={() =>
                                                 editorRef.current?.fit()
                                             }
@@ -7982,7 +8021,9 @@ function App(): React.JSX.Element {
                                                 showThreadLanes &&
                                                 scope === null
                                             }
-                                            title="Toggle thread lanes"
+                                            title={l10n.t(
+                                                "Toggle thread lanes",
+                                            )}
                                             disabled={scope !== null}
                                             disabledReason="Thread lanes - galactic graph only"
                                             onClick={() => toggleLane("thread")}
@@ -7995,7 +8036,9 @@ function App(): React.JSX.Element {
                                                     : undefined
                                             }
                                             pressed={showChapterLanes}
-                                            title="Toggle chapter lanes"
+                                            title={l10n.t(
+                                                "Toggle chapter lanes",
+                                            )}
                                             onClick={() =>
                                                 toggleLane("chapter")
                                             }
@@ -8009,12 +8052,12 @@ function App(): React.JSX.Element {
                                     <SelectField
                                         value={filters.branch}
                                         ariaLabel="Branch"
-                                        title="Branch"
+                                        title={l10n.t("Branch")}
                                         icon="search"
                                         options={[
                                             {
                                                 value: "",
-                                                label: "All branches",
+                                                label: l10n.t("All branches"),
                                             },
                                             ...branches.map((b) => ({
                                                 value: b,
@@ -8027,12 +8070,12 @@ function App(): React.JSX.Element {
                                     <SelectField
                                         value={filters.lifecycle}
                                         ariaLabel="Lifecycle"
-                                        title="Lifecycle"
+                                        title={l10n.t("Lifecycle")}
                                         icon="search"
                                         options={[
                                             {
                                                 value: "",
-                                                label: "Any lifecycle",
+                                                label: l10n.t("Any lifecycle"),
                                             },
                                             ...LIFECYCLES.map((l) => ({
                                                 value: l,
@@ -8046,11 +8089,13 @@ function App(): React.JSX.Element {
                                         value={filters.plotState}
                                         ariaLabel="Plot state"
                                         icon="search"
-                                        title="Plot state - how this faction's manifest registers the thread an event lives in"
+                                        title={l10n.t(
+                                            "Plot state - how this faction's manifest registers the thread an event lives in",
+                                        )}
                                         options={[
                                             {
                                                 value: "",
-                                                label: "Any plot state",
+                                                label: l10n.t("Any plot state"),
                                             },
                                             ...PLOT_STATES.map((p) => ({
                                                 value: p,
@@ -8100,7 +8145,7 @@ function ProblemsBar(props: {
             className="problems"
             memoKey="storyGraph.problems"
             defaultHeight={150}
-            title={`Problems (${props.label})`}
+            title={l10n.t("Problems ({0})", props.label)}
             filter={props.filter}
             onClose={props.onClose}
         >
@@ -8113,7 +8158,7 @@ function ProblemsBar(props: {
                         key={i}
                         title={
                             problem.nodeId
-                                ? "Click to show this node in the graph"
+                                ? l10n.t("Click to show this node in the graph")
                                 : undefined
                         }
                         onClick={
@@ -8161,7 +8206,7 @@ function ProblemsBar(props: {
                                     line: problem.line,
                                 });
                             }}
-                            title="Open in XML"
+                            title={l10n.t("Open in XML")}
                         >
                             <span className="codicon codicon-go-to-file" />
                         </button>
@@ -8179,9 +8224,9 @@ function ProblemsBar(props: {
  * here, and every request it makes would be refused server-side.
  */
 const STORY_MODES: RotaryMode<EditorMode>[] = [
-    { id: "view", icon: "eye", label: "View", angle: 210 },
-    { id: "edit", icon: "edit", label: "Edit", angle: 270 },
-    { id: "simulate", icon: "play", label: "Simulation", angle: 330 },
+    { id: "view", icon: "eye", label: l10n.t("View"), angle: 210 },
+    { id: "edit", icon: "edit", label: l10n.t("Edit"), angle: 270 },
+    { id: "simulate", icon: "play", label: l10n.t("Simulation"), angle: 330 },
 ];
 
 const MINIMAP_H = 118;
@@ -8218,7 +8263,9 @@ function Minimap(props: {
 
     let inner: React.JSX.Element;
     if (!data || data.nodes.length === 0) {
-        inner = <div className="minimap minimap-empty">no nodes</div>;
+        inner = (
+            <div className="minimap minimap-empty">{l10n.t("no nodes")}</div>
+        );
     } else {
         // Extent comes from the NODES only. The viewport rect is measured in graph coordinates, so
         // zooming out inflates it without bound (w = canvasWidth / k); letting it drive the extent
@@ -8275,7 +8322,7 @@ function Minimap(props: {
                     dragging.current = false;
                 }}
             >
-                <title>Overview - click or drag to navigate</title>
+                <title>{l10n.t("Overview - click or drag to navigate")}</title>
                 {data.nodes.map((n, i) => (
                     <rect
                         key={i}
@@ -8489,7 +8536,7 @@ function TacticalCreateBar(props: {
 
     return (
         <div className="toolbar">
-            <span>New tactical link:</span>
+            <span>{l10n.t("New tactical link:")}</span>
             <input
                 type="text"
                 value={name}
@@ -8503,14 +8550,14 @@ function TacticalCreateBar(props: {
             <select
                 value={value}
                 onChange={(e) => setValue(e.target.value as "land" | "space")}
-                title="Battle type"
+                title={l10n.t("Battle type")}
             >
-                <option value="land">Land</option>
-                <option value="space">Space</option>
+                <option value="land">{l10n.t("Land")}</option>
+                <option value="space">{l10n.t("Space")}</option>
             </select>
             <input
                 type="text"
-                placeholder="Tactical plot manifest file..."
+                placeholder={l10n.t("Tactical plot manifest file...")}
                 value={file}
                 onChange={(e) => setFile(e.target.value)}
                 onKeyDown={(e) => {
@@ -8522,10 +8569,10 @@ function TacticalCreateBar(props: {
             <select
                 value={thread}
                 onChange={(e) => setThread(e.target.value)}
-                title="Thread file"
+                title={l10n.t("Thread file")}
             >
                 {props.threads.length === 0 ? (
-                    <option value="">(no thread files)</option>
+                    <option value="">{l10n.t("(no thread files)")}</option>
                 ) : null}
                 {props.threads.map((t) => (
                     <option key={t} value={t}>
@@ -8539,9 +8586,9 @@ function TacticalCreateBar(props: {
                 disabledReason="Pick a thread file and give the story a name"
                 onClick={create}
             >
-                Create
+                {l10n.t("Create")}
             </Button>
-            <Button onClick={props.onClose}>Cancel</Button>
+            <Button onClick={props.onClose}>{l10n.t("Cancel")}</Button>
         </div>
     );
 }
@@ -8698,7 +8745,7 @@ function NodePalette(props: {
                 <div className="search-field">
                     <input
                         type="text"
-                        placeholder="Search node types..."
+                        placeholder={l10n.t("Search node types...")}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
@@ -8751,7 +8798,7 @@ function NodePalette(props: {
             )}
             {q !== "" && !eventTypes.length && !rewardTypes.length ? (
                 <p className="palette-empty">
-                    No node types match &ldquo;{search}&rdquo;.
+                    {l10n.t('No node types match "{0}".', search)}
                 </p>
             ) : null}
         </div>

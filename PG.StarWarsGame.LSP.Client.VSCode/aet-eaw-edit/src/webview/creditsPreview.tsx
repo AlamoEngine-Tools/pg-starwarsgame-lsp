@@ -8,6 +8,8 @@
 // appears before you save, which is the whole point of previewing an ordered format. The editor
 // pushes its rows here whenever they change.
 
+import "./shared/l10nSetup";
+import * as l10n from "@vscode/l10n";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -48,7 +50,7 @@ function App(): React.JSX.Element {
     if (payload === null) {
         return (
             <p style={{ padding: 12, opacity: 0.7 }}>
-                Waiting for the editor...
+                {l10n.t("Waiting for the editor...")}
             </p>
         );
     }

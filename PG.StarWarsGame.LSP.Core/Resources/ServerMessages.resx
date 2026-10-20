@@ -1,0 +1,2938 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AbilityModFlag_IsNotAValidAbility" xml:space="preserve">
+    <value>'{0}' is not a valid ability flag for &lt;{1}&gt;. Expected: FlagType, Boolean.</value>
+  </data>
+  <data name="AbilityModMultiplier_IsNotAValidAbility" xml:space="preserve">
+    <value>'{0}' is not a valid ability multiplier for &lt;{1}&gt;. Expected: MultiplierType, Float.</value>
+  </data>
+  <data name="AbilitySfxMap_IsNotAKnownAbilitytype" xml:space="preserve">
+    <value>'{0}' is not a known AbilityType value for &lt;{1}&gt;.</value>
+  </data>
+  <data name="AbilitySfxMap_IsNotAValidAbility" xml:space="preserve">
+    <value>'{0}' is not a valid ability SFX map for &lt;{1}&gt;. Expected: AbilityName, SFXEventName.</value>
+  </data>
+  <data name="AbsorbBlasterApplicableUnitsRule_Consequence" xml:space="preserve">
+    <value>cannot absorb fire from any source</value>
+  </data>
+  <data name="AllowedValues_HereOnlySupportsTheEngine" xml:space="preserve">
+    <value>&lt;{0}&gt; here only supports {1} - the engine overwrites anything else.</value>
+  </data>
+  <data name="AngleDegreesFullTurn_Expectation" xml:space="preserve">
+    <value>must be between 0 and 360 degrees</value>
+  </data>
+  <data name="AngleDegreesHalfTurn_Expectation" xml:space="preserve">
+    <value>must be between 0 and 180 degrees</value>
+  </data>
+  <data name="ApplicableUnitRule_AffectsNoUnits" xml:space="preserve">
+    <value>affects no units at all</value>
+  </data>
+  <data name="ApplicableUnitRule_Empty" xml:space="preserve">
+    <value>empty</value>
+  </data>
+  <data name="ApplicableUnitRule_ListOne" xml:space="preserve">
+    <value>list at least one unit category or type</value>
+  </data>
+  <data name="AssetFileExistenceHandlerBase_FileWasNotFoundIn" xml:space="preserve">
+    <value>{0} file '{1}' was not found in the game data or workspace asset files.{2}</value>
+  </data>
+  <data name="AssetFileExistence_AlsoChecked" xml:space="preserve">
+    <value> Also checked {0} (the game treats these formats interchangeably).</value>
+  </data>
+  <data name="AssetKind_Asset" xml:space="preserve">
+    <value>Asset</value>
+  </data>
+  <data name="AssetKind_Audio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="AssetKind_Map" xml:space="preserve">
+    <value>Map</value>
+  </data>
+  <data name="AssetKind_Model" xml:space="preserve">
+    <value>Model</value>
+  </data>
+  <data name="AssetKind_Texture" xml:space="preserve">
+    <value>Texture</value>
+  </data>
+  <data name="AssetTiers_BaseGame" xml:space="preserve">
+    <value>the base game</value>
+  </data>
+  <data name="AssetTiers_BaseGameAndExpansion" xml:space="preserve">
+    <value>the base game and the expansion</value>
+  </data>
+  <data name="AssetTiers_Expansion" xml:space="preserve">
+    <value>the expansion</value>
+  </data>
+  <data name="AssetTiers_Resolving" xml:space="preserve">
+    <value>Resolving from this workspace, {0}, and the archives ({1}).</value>
+  </data>
+  <data name="AssetTiers_WorkspaceOnly" xml:space="preserve">
+    <value>Only this workspace's own files can be resolved. Set aet-eaw-edit.lsp.source.baseGameDirectory (and expansionDirectory) to preview models that ship with the game.</value>
+  </data>
+  <data name="AtLeastNegativeOne_Expectation" xml:space="preserve">
+    <value>cannot be less than -1.0</value>
+  </data>
+  <data name="AtLeastOneSecond_Expectation" xml:space="preserve">
+    <value>should have at least one second of time</value>
+  </data>
+  <data name="AttackAbilityApplicableUnitsRule_Consequence" xml:space="preserve">
+    <value>cannot activate</value>
+  </data>
+  <data name="AttackDistanceBeyondHardpointRange_ClosesOnlyToTargetingMax" xml:space="preserve">
+    <value>'{0}' closes only to Targeting_Max_Attack_Distance {1}, but its longest-reaching hardpoint weapon '{2}' fires to {3}, so it can stop where no hardpoint fires.</value>
+  </data>
+  <data name="Audio3dProviderName_IsNotAValidD" xml:space="preserve">
+    <value>'' is not a valid 3D audio provider name for &lt;{0}&gt;.</value>
+  </data>
+  <data name="AudioFileFormat_IsNotAValidAudio" xml:space="preserve">
+    <value>'{0}' is not a valid audio filename for &lt;{1}&gt;. Expected a .wav or .mp3 file.</value>
+  </data>
+  <data name="AudioParamInt_IsNotAValidAudio" xml:space="preserve">
+    <value>'{0}' is not a valid audio parameter integer for &lt;{1}&gt;. {2} is the nearest valid value.</value>
+  </data>
+  <data name="AutomaticDespawn_ApplyTheEngineSCorrection" xml:space="preserve">
+    <value>Apply the engine's own correction: Turn Causes_Despawn off</value>
+  </data>
+  <data name="AutomaticDespawn_CausesDespawnIsOnUnder" xml:space="preserve">
+    <value>&lt;Causes_Despawn&gt; is on under Activation_Style: {0} - the engine turns it off for every automatic style</value>
+  </data>
+  <data name="BelowOne_Expectation" xml:space="preserve">
+    <value>must be less than 1.0</value>
+  </data>
+  <data name="BonusPercentage_Expectation" xml:space="preserve">
+    <value>must be greater than -1.0, since -1.0 would cancel the stat outright</value>
+  </data>
+  <data name="BooleanGatedRequirement_IsOnSoMustBe" xml:space="preserve">
+    <value>&lt;{0}&gt; is on, so &lt;{1}&gt; must be {2} - the engine otherwise {3}.</value>
+  </data>
+  <data name="BooleanGatedRequirement_SetToTrue" xml:space="preserve">
+    <value>set to true</value>
+  </data>
+  <data name="BooleanGatedRequirement_TurnsItOn" xml:space="preserve">
+    <value>turns it on</value>
+  </data>
+  <data name="BooleanValue_IsNotAValidBoolean" xml:space="preserve">
+    <value>'{0}' is not a valid Boolean for &lt;{1}&gt;. Expected: True, False, Yes or No.</value>
+  </data>
+  <data name="CableRenderMode_IsNotAValidCable" xml:space="preserve">
+    <value>'' is not a valid cable render mode for &lt;{0}&gt;.</value>
+  </data>
+  <data name="CampaignStoryAttachment_AlsoAtLine" xml:space="preserve">
+    <value> Also at line {0}.</value>
+  </data>
+  <data name="CampaignStoryAttachment_AlsoAtLines" xml:space="preserve">
+    <value> Also at lines {0}.</value>
+  </data>
+  <data name="CampaignStoryAttachment_CampaignAttachesPlotsThroughBoth" xml:space="preserve">
+    <value>Campaign{0} attaches plots through both the faction-specific &lt;Faction_Story_Name&gt; tags and the generic &lt;{1}&gt; tuple list. Both are read by the engine; only the generic form can attach a non-major faction.</value>
+  </data>
+  <data name="CampaignStoryAttachment_InCampaign" xml:space="preserve">
+    <value> in campaign '{0}'</value>
+  </data>
+  <data name="CampaignStoryAttachment_TakesASinglePlotManifest" xml:space="preserve">
+    <value>&lt;{0}&gt; takes a single plot manifest file, not a 'Faction, PlotFile' tuple - the tag already names the faction. Use &lt;{1}&gt;{2}&lt;/{3}&gt; for the generic form, or drop the leading token.</value>
+  </data>
+  <data name="CampaignStoryAttachment_TheFactionIsAttachedTo" xml:space="preserve">
+    <value>The {0} faction is attached to '{1}' more than once{2}. Only one attachment is needed.{3}</value>
+  </data>
+  <data name="CampaignStoryAttachment_TheFactionIsAttachedTo2" xml:space="preserve">
+    <value>The {0} faction is attached to {1} different plot manifests{2}: {3}. Keep one.{4}</value>
+  </data>
+  <data name="CaseSensitiveTag_HasToBeSpelledExactly" xml:space="preserve">
+    <value>&lt;{0}&gt; has to be spelled exactly &lt;{1}&gt;. Unlike the rest of the game's tags this one is matched letter by letter, so {2}.</value>
+  </data>
+  <data name="CaseSensitiveTags_ActivePlot" xml:space="preserve">
+    <value>the plot loads as suspended and never starts</value>
+  </data>
+  <data name="CaseSensitiveTags_SuspendedPlot" xml:space="preserve">
+    <value>the tag is not recognised, and a plot it does not recognise is suspended anyway - so the outcome is the intended one</value>
+  </data>
+  <data name="CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs" xml:space="preserve">
+    <value>'{0}' could not be resolved as an SFX event for &lt;{1}&gt;.</value>
+  </data>
+  <data name="CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs2" xml:space="preserve">
+    <value>'{0}' could not be resolved as a game object for &lt;{1}&gt;.</value>
+  </data>
+  <data name="CommandBarProperty_IsNotAValidCommand" xml:space="preserve">
+    <value>'' is not a valid command bar property for &lt;{0}&gt;.</value>
+  </data>
+  <data name="ConditionalSfxEvent_IsNotAValidConditional" xml:space="preserve">
+    <value>'{0}' is not a valid conditional SFX event for &lt;{1}&gt;. Expected: UnitType, SFXEventName.</value>
+  </data>
+  <data name="ConditionalSpeechEvent_IsNotAValidConditional" xml:space="preserve">
+    <value>'{0}' is not a valid conditional speech event for &lt;{1}&gt;. Expected: UnitTypeCondition, SpeechEventName.</value>
+  </data>
+  <data name="ControlPointCurve_Expectation" xml:space="preserve">
+    <value>needs at least two control points</value>
+  </data>
+  <data name="CreateLocKeyAction_CreateLocalisationKey" xml:space="preserve">
+    <value>Create localisation key '{0}'</value>
+  </data>
+  <data name="CreateLocKeyAction_CreateLocalisationKey2" xml:space="preserve">
+    <value>Create localisation key</value>
+  </data>
+  <data name="CreditHaltNeedsDurationRule_Repair" xml:space="preserve">
+    <value>forces it to 10.0 seconds</value>
+  </data>
+  <data name="CreditHaltNeedsDurationRule_Requirement" xml:space="preserve">
+    <value>a time greater than zero</value>
+  </data>
+  <data name="CreditsCoverage_EmptyHeading" xml:space="preserve">
+    <value>In {0}, '{1}' is a heading with nothing under it. The crawl reads it out and moves straight on, which is valid - a credits key is a formatting directive, not an entry. Usually it means the label was translated and the names under it were not; leaving the heading itself empty skips the whole section.</value>
+  </data>
+  <data name="CrossLayerShadow_OverridesADefinitionFromIf" xml:space="preserve">
+    <value>'{0}' overrides a definition from '{1}'. If that is intended, declare it: &lt;!-- &lt;Override Name="{2}"/&gt; --&gt;</value>
+  </data>
+  <data name="CrossTypeShadow_IsDefinedAsBothAnd" xml:space="preserve">
+    <value>'{0}' is defined as both {1} and {2}. Typed references resolve to the matching type, but untyped lookups pick the highest-rank definition. If that is intended, declare it: &lt;!-- &lt;Override Name="{3}"/&gt; --&gt;</value>
+  </data>
+  <data name="DamageAbsorbsNothing_BothAre" xml:space="preserve">
+    <value>Both are {0}</value>
+  </data>
+  <data name="DamageAbsorbsNothing_ThisAbsorbsNoDamageAnd" xml:space="preserve">
+    <value>This absorbs no damage. {0}, and the amount healed is (damage * Damage_Absorb_Percentage) + Damage_Absorb_Amount, so one of them must be non-zero.</value>
+  </data>
+  <data name="DamageAbsorbsNothing_WithNo" xml:space="preserve">
+    <value>{0} with no {1}</value>
+  </data>
+  <data name="DamageNonzero_MustBeGreaterThanFor" xml:space="preserve">
+    <value>&lt;{0}&gt; must be greater than 0 for the AI to use this unit.</value>
+  </data>
+  <data name="DamageRadiusWithinChaseRadiusRule_Expectation" xml:space="preserve">
+    <value>must be less than</value>
+  </data>
+  <data name="DamageStageNotOnModel_LandDamageAlternatesDeclaresDamage" xml:space="preserve">
+    <value>&lt;Land_Damage_Alternates&gt; declares damage {0}, but '{1}' {2}. The unit reaches that state and does not change.</value>
+  </data>
+  <data name="DamageStageNotOnModel_Stage" xml:space="preserve">
+    <value>stage {0}</value>
+  </data>
+  <data name="DamageStageNotOnModel_Stages" xml:space="preserve">
+    <value>stages {0}</value>
+  </data>
+  <data name="DamageStageNotOnModel_TagsNone" xml:space="preserve">
+    <value>tags no damage stage at all</value>
+  </data>
+  <data name="DamageStageNotOnModel_TagsOnly" xml:space="preserve">
+    <value>tags only {0}</value>
+  </data>
+  <data name="DamageToArmorMod_IsNotAKnownArmortype" xml:space="preserve">
+    <value>'{0}' is not a known ArmorType value.</value>
+  </data>
+  <data name="DamageToArmorMod_IsNotAKnownDamagetype" xml:space="preserve">
+    <value>'{0}' is not a known DamageType value.</value>
+  </data>
+  <data name="DamageToArmorMod_IsNotAValidDamage" xml:space="preserve">
+    <value>'{0}' is not a valid damage-to-armor modifier for &lt;{1}&gt;. Expected: DamageType, ArmorType, Float.</value>
+  </data>
+  <data name="DamageTypes_OutOfOrder" xml:space="preserve">
+    <value>'{0}' must be '{1}' - the last {2} entries of &lt;Damage_Types&gt; must exactly match the engine's hardcoded order or the game will crash.</value>
+  </data>
+  <data name="DamageTypes_TooShort" xml:space="preserve">
+    <value>&lt;Damage_Types&gt; must end with the engine's {1} hardcoded damage types, in order, or the game will crash. It holds {0}.</value>
+  </data>
+  <data name="DeathAnimationClip_NoAnimation" xml:space="preserve">
+    <value>'{0}' has no {1} animation</value>
+  </data>
+  <data name="DeathAnimationClip_NoSuchTake" xml:space="preserve">
+    <value>{2} takes on '{0}' - {1}, so {3} {4} does not exist</value>
+  </data>
+  <data name="DeathAnimationClip_PlaysNone" xml:space="preserve">
+    <value>plays no death animation.</value>
+  </data>
+  <data name="DeathAnimationClip_Removed" xml:space="preserve">
+    <value>plays no death animation and, with Remove_Upon_Death, is removed the moment it dies.</value>
+  </data>
+  <data name="DeathAnimationClip_RemovedUnlessSpins" xml:space="preserve">
+    <value>plays no death animation and, with Remove_Upon_Death, is removed the moment it dies unless it spins away.</value>
+  </data>
+  <data name="DeathAnimationClip_So" xml:space="preserve">
+    <value>{0}, so '{1}' {2}</value>
+  </data>
+  <data name="DeathCloneSpec_IsNotAValidDeath" xml:space="preserve">
+    <value>'{0}' is not a valid death clone spec for &lt;{1}&gt;. Expected: Condition, CloneTypeName.</value>
+  </data>
+  <data name="DefinitionLocator_DefinedBaseGameArchiveThere" xml:space="preserve">
+    <value>'{0}' is defined in the base game or an archive - there is no workspace file to open.</value>
+  </data>
+  <data name="DefinitionLocator_DoesNotResolveAnyKnown" xml:space="preserve">
+    <value>'{0}' does not resolve to any known definition.</value>
+  </data>
+  <data name="DefinitionLocator_NothingResolve" xml:space="preserve">
+    <value>Nothing to resolve.</value>
+  </data>
+  <data name="DemolitionBombTypeRule_Repair" xml:space="preserve">
+    <value>defaults it to Demolition_Bomb</value>
+  </data>
+  <data name="DependencyOwnership_ReadOnly" xml:space="preserve">
+    <value>'{0}' is a referenced project and is read-only here. Edit this thread in '{0}' itself.</value>
+  </data>
+  <data name="DeprecatedEventType_IsDeprecated" xml:space="preserve">
+    <value>'{0}' is deprecated.</value>
+  </data>
+  <data name="DeprecatedTag_IsDeprecatedAndShouldNot" xml:space="preserve">
+    <value>&lt;{0}&gt; is deprecated and should not be used.</value>
+  </data>
+  <data name="DiagnosticGroup_Assets" xml:space="preserve">
+    <value>Asset files</value>
+  </data>
+  <data name="DiagnosticGroup_CrossTag" xml:space="preserve">
+    <value>Cross-tag rules</value>
+  </data>
+  <data name="DiagnosticGroup_Engine" xml:space="preserve">
+    <value>Engine constraints</value>
+  </data>
+  <data name="DiagnosticGroup_Enums" xml:space="preserve">
+    <value>Enum values</value>
+  </data>
+  <data name="DiagnosticGroup_Localisation" xml:space="preserve">
+    <value>Localisation</value>
+  </data>
+  <data name="DiagnosticGroup_LuaAnalyzer" xml:space="preserve">
+    <value>Lua analyzer</value>
+  </data>
+  <data name="DiagnosticGroup_Preview" xml:space="preserve">
+    <value>Model preview</value>
+  </data>
+  <data name="DiagnosticGroup_References" xml:space="preserve">
+    <value>References</value>
+  </data>
+  <data name="DiagnosticGroup_Story" xml:space="preserve">
+    <value>Story and campaigns</value>
+  </data>
+  <data name="DiagnosticGroup_Structure" xml:space="preserve">
+    <value>Document structure</value>
+  </data>
+  <data name="DiagnosticGroup_Suppression" xml:space="preserve">
+    <value>Suppression comments</value>
+  </data>
+  <data name="DiagnosticGroup_Symbols" xml:space="preserve">
+    <value>Symbols and layers</value>
+  </data>
+  <data name="DiagnosticGroup_Syntax" xml:space="preserve">
+    <value>Syntax</value>
+  </data>
+  <data name="DiagnosticGroup_Values" xml:space="preserve">
+    <value>Value format</value>
+  </data>
+  <data name="DiagnosticGroup_Variants" xml:space="preserve">
+    <value>Variant inheritance</value>
+  </data>
+  <data name="DiagnosticGroup_XmlStrictness" xml:space="preserve">
+    <value>XML strictness</value>
+  </data>
+  <data name="DialogArgReference_UnknownLocalisationKey" xml:space="preserve">
+    <value>'{0}' is not a known localisation key.</value>
+  </data>
+  <data name="DialogArgReference_UnknownObject" xml:space="preserve">
+    <value>'{0}' is not a recognized {1}.</value>
+  </data>
+  <data name="DialogArgValue_NotNonNegative" xml:space="preserve">
+    <value>'{0}' is not a valid non-negative number for '{1}' argument {2}.</value>
+  </data>
+  <data name="DialogArgValue_NotNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number for '{1}' argument {2}.</value>
+  </data>
+  <data name="DialogArgValue_NotSwitch" xml:space="preserve">
+    <value>'{0}' is not valid for '{1}': Use 1 (on) or 0 (off).</value>
+  </data>
+  <data name="DialogCodeAction_ChapterTarget" xml:space="preserve">
+    <value>chapter</value>
+  </data>
+  <data name="DialogCommandArity_TakesNone" xml:space="preserve">
+    <value>'{0}' takes no arguments, got {1}.</value>
+  </data>
+  <data name="DialogCommandArity_WrongCount" xml:space="preserve">
+    <value>Wrong argument count for '{0}' - expected {1}, got {2}.</value>
+  </data>
+  <data name="DisallowedOrOperator_DoesNotSupportOrEvery" xml:space="preserve">
+    <value>&lt;{0}&gt; does not support '|' (OR) - every listed value is required (AND only). This engine only supports OR-expressions on tags explicitly documented for it (e.g. Required_Special_Structures).</value>
+  </data>
+  <data name="DocumentMigrator_DoesNotTerminate" xml:space="preserve">
+    <value>the migration chain does not terminate</value>
+  </data>
+  <data name="DocumentMigrator_NoMigration" xml:space="preserve">
+    <value>version {0} has no migration leading to {1}</value>
+  </data>
+  <data name="DocumentMigrator_Overshoot" xml:space="preserve">
+    <value>the chain ended at {0}, past the {1} this build writes</value>
+  </data>
+  <data name="DuplicateSymbol_DuplicateSymbolAlsoDefinedIn" xml:space="preserve">
+    <value>Duplicate symbol '{0}': Also defined in {1}.</value>
+  </data>
+  <data name="DuplicateSymbol_OtherDefinition" xml:space="preserve">
+    <value>Other definition of '{0}'</value>
+  </data>
+  <data name="DynamicEnumValue_ExpectsASingleEnumIdentifier" xml:space="preserve">
+    <value>&lt;{0}&gt; expects a single enum identifier; '|' is not allowed here.</value>
+  </data>
+  <data name="DynamicEnumValue_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known value for enum '{1}' on &lt;{2}&gt;.</value>
+  </data>
+  <data name="DynamicEnumValue_IsNotAKnownValue2" xml:space="preserve">
+    <value>'{0}' is not a known {1} value.</value>
+  </data>
+  <data name="DynamicEnumValue_IsNotAValidEnum" xml:space="preserve">
+    <value>'' is not a valid enum identifier for &lt;{0}&gt;.</value>
+  </data>
+  <data name="DynamicEnumValue_IsNotAValidEnum2" xml:space="preserve">
+    <value>'{0}' is not a valid enum identifier for &lt;{1}&gt;.</value>
+  </data>
+  <data name="EffectiveObject_AddedByVariant" xml:space="preserve">
+    <value>added by variant</value>
+  </data>
+  <data name="EffectiveObject_Chain" xml:space="preserve">
+    <value>variant chain: {0}</value>
+  </data>
+  <data name="EffectiveObject_Cyclic" xml:space="preserve">
+    <value>WARNING: Cyclic inheritance detected at {0}</value>
+  </data>
+  <data name="EffectiveObject_Header" xml:space="preserve">
+    <value>Effective object: {0}</value>
+  </data>
+  <data name="EffectiveObject_HeaderTyped" xml:space="preserve">
+    <value>Effective object: {0} ({1})</value>
+  </data>
+  <data name="EffectiveObject_InheritedFrom" xml:space="preserve">
+    <value>inherited from {0}</value>
+  </data>
+  <data name="EffectiveObject_MergedWithBase" xml:space="preserve">
+    <value>merged with base</value>
+  </data>
+  <data name="EffectiveObject_MergedWithBaseContributes" xml:space="preserve">
+    <value>merged with base - base contributes {0}</value>
+  </data>
+  <data name="EffectiveObject_OverridesBase" xml:space="preserve">
+    <value>overrides base</value>
+  </data>
+  <data name="EffectiveObject_OverridesBaseWas" xml:space="preserve">
+    <value>overrides base - was {0}</value>
+  </data>
+  <data name="EitherOrRequirement_AndAreBothSoThis" xml:space="preserve">
+    <value>&lt;{0}&gt; and &lt;{1}&gt; are both {2}, so this {3} {4} - {5}</value>
+  </data>
+  <data name="EitherOrRequirement_DoesNothing" xml:space="preserve">
+    <value>does nothing</value>
+  </data>
+  <data name="EitherOrRequirement_Off" xml:space="preserve">
+    <value>off</value>
+  </data>
+  <data name="EitherOrRequirement_SetOneToYes" xml:space="preserve">
+    <value>set one of them to Yes</value>
+  </data>
+  <data name="EncyclopediaCodeLens_PreviewEncyclopedia" xml:space="preserve">
+    <value>preview encyclopedia</value>
+  </data>
+  <data name="EngineTextLimit_HasRoomForMoreCharacters" xml:space="preserve">
+    <value>{0} has room for {1} more characters. Going over stops the game from starting.</value>
+  </data>
+  <data name="EngineTextLimit_IsCharactersTooLongFor" xml:space="preserve">
+    <value>{0} is {1} characters too long for the engine, and the game will not start. Remove at least {2} characters, or shorten the names inside it.</value>
+  </data>
+  <data name="EngineTextLimit_ObjectName" xml:space="preserve">
+    <value>The name '{0}'</value>
+  </data>
+  <data name="EngineTextLimit_Tag" xml:space="preserve">
+    <value>&lt;{0}&gt;</value>
+  </data>
+  <data name="FactionReference_Noun" xml:space="preserve">
+    <value>faction reference</value>
+  </data>
+  <data name="FireConeDegrees_AboveMaximumConsequence" xml:space="preserve">
+    <value>The engine halves the cone and compares it against a deviation of at most 180 degrees, so anything past a full turn has no further effect</value>
+  </data>
+  <data name="FireConeDegrees_BelowMinimumConsequence" xml:space="preserve">
+    <value>A hardpoint with this cone cannot point at anything</value>
+  </data>
+  <data name="FireConeDegrees_Expectation" xml:space="preserve">
+    <value>must be greater than 0 and at most 360 degrees</value>
+  </data>
+  <data name="FiresForward_FiresForwardDoesNothingOn" xml:space="preserve">
+    <value>Fires_Forward does nothing on '{0}': Only the {1} behaviour reads it, and this object has none.</value>
+  </data>
+  <data name="FiresForward_FiresForwardSkipsTheFiring" xml:space="preserve">
+    <value>Fires_Forward skips the firing-arc check, so {0} still swing the turret but no longer limit where '{1}' fires.</value>
+  </data>
+  <data name="FiresForward_FiresForwardSkipsTheFiring2" xml:space="preserve">
+    <value>Fires_Forward skips the firing-arc check, so {0} no longer limit where '{1}' fires.</value>
+  </data>
+  <data name="FixSuggestionAction_Replace" xml:space="preserve">
+    <value>Replace with '{0}'</value>
+  </data>
+  <data name="FixTitle_ApplyTheEngineSOwn" xml:space="preserve">
+    <value>Apply the engine's own value: {0}</value>
+  </data>
+  <data name="FixTitle_SetToTheLongestHardpoint" xml:space="preserve">
+    <value>Set to the longest hardpoint range ({0})</value>
+  </data>
+  <data name="FixTitle_SpellIt" xml:space="preserve">
+    <value>Spell it &lt;{0}&gt;</value>
+  </data>
+  <data name="FixTitle_UseTheModelSMesh" xml:space="preserve">
+    <value>Use the model's mesh '{0}'</value>
+  </data>
+  <data name="FloatList_IsNotAValidFloat" xml:space="preserve">
+    <value>'' is not a valid float list for &lt;{0}&gt;.</value>
+  </data>
+  <data name="FloatList_IsNotAValidFloat2" xml:space="preserve">
+    <value>'{0}' is not a valid float list for &lt;{1}&gt;. Expected space-separated floats.</value>
+  </data>
+  <data name="FloatTupleList_IsNotAValidFloat" xml:space="preserve">
+    <value>'' is not a valid float tuple list for &lt;{0}&gt;.</value>
+  </data>
+  <data name="FloatTupleList_IsNotAValidFloat2" xml:space="preserve">
+    <value>'{0}' is not a valid float tuple list for &lt;{1}&gt;. Expected space/comma-separated floats.</value>
+  </data>
+  <data name="FloatValue_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid float for &lt;{1}&gt;.</value>
+  </data>
+  <data name="FloatVector2_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid Float2 for &lt;{1}&gt;. Expected 2 floats separated by spaces or commas.</value>
+  </data>
+  <data name="FloatVector3List_IsNotAValidFloat" xml:space="preserve">
+    <value>'' is not a valid Float3 list for &lt;{0}&gt;.</value>
+  </data>
+  <data name="FloatVector3List_IsNotAValidFloat2" xml:space="preserve">
+    <value>'{0}' is not a valid Float3 list for &lt;{1}&gt;. Expected a multiple of 3 floats.</value>
+  </data>
+  <data name="FloatVector3List_IsNotAValidFloat3" xml:space="preserve">
+    <value>'{0}' is not a valid Float3 list for &lt;{1}&gt;. Expected space-separated floats.</value>
+  </data>
+  <data name="FloatVector3_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid Float3 for &lt;{1}&gt;. Expected 3 floats separated by spaces or commas.</value>
+  </data>
+  <data name="FloatVector4_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid Float4 for &lt;{1}&gt;. Expected 4 floats separated by spaces or commas.</value>
+  </data>
+  <data name="ForceDeploymentList_IsNotAValidForce" xml:space="preserve">
+    <value>'{0}' is not a valid force deployment entry for &lt;{1}&gt;. Expected: FactionName, PlanetName, UnitTypeName.</value>
+  </data>
+  <data name="FractionBelowOne_Expectation" xml:space="preserve">
+    <value>must be at least 0.0 and less than 1.0</value>
+  </data>
+  <data name="GrenadeProjectile_NamesWhoseIsThisAbility" xml:space="preserve">
+    <value>&lt;{0}&gt; names '{1}', whose &lt;{2}&gt; is {3} - this ability only accepts a {4} projectile and refuses anything else</value>
+  </data>
+  <data name="HardPointSfxMap_IsNotAKnownHardpointtype" xml:space="preserve">
+    <value>'{0}' is not a known HardPointType value for &lt;{1}&gt;.</value>
+  </data>
+  <data name="HardPointSfxMap_IsNotAValidHard" xml:space="preserve">
+    <value>'{0}' is not a valid hard point SFX map for &lt;{1}&gt;. Expected: HardPointType, SFXEventName.</value>
+  </data>
+  <data name="HardPointTypeToTextureMap_IsNotAValidHard" xml:space="preserve">
+    <value>'{0}' is not a valid hard point texture map for &lt;{1}&gt;. Expected: HardPointType, TextureName.</value>
+  </data>
+  <data name="HardcodedSet_Deprecated" xml:space="preserve">
+    <value>'{0}' is deprecated.</value>
+  </data>
+  <data name="HardcodedSet_Unknown" xml:space="preserve">
+    <value>'{0}' is not a known {1}. Check the schema for valid names.</value>
+  </data>
+  <data name="HardpointAbilityNotOnOwner_DefinedElsewhere" xml:space="preserve">
+    <value>'{0}' is defined, but on a different object - it has to be declared on '{1}' (or something it inherits from) to take effect here.</value>
+  </data>
+  <data name="HardpointAbilityNotOnOwner_HardpointEnablesAbilityOnWhich" xml:space="preserve">
+    <value>Hardpoint '{0}' enables ability '{1}' on '{2}', which does not have it. {3}</value>
+  </data>
+  <data name="HardpointAbilityNotOnOwner_NotDeclared" xml:space="preserve">
+    <value>No object declares an ability called '{0}'.</value>
+  </data>
+  <data name="HardpointBoneNotOnModel_NamesBoneWhichDoesNot" xml:space="preserve">
+    <value>&lt;{0}&gt; names bone '{1}', which does not exist on {2}{3}.</value>
+  </data>
+  <data name="HardpointBoneNotOnModel_NamesWhichDoesNotExist" xml:space="preserve">
+    <value>&lt;{0}&gt; names '{1}', which does not exist as a mesh or a bone on {2}{3}. Aimed fire and land projectiles still reach it; untargeted space fire never does.</value>
+  </data>
+  <data name="HardpointBoneNotOnModel_NorOnAttached" xml:space="preserve">
+    <value>, nor on '{0}', the hardpoint's own Model_To_Attach</value>
+  </data>
+  <data name="HardpointBoneNotOnModel_OwnModel" xml:space="preserve">
+    <value>its own model '{0}'</value>
+  </data>
+  <data name="HardpointBoneNotOnModel_OwnerModel" xml:space="preserve">
+    <value>'{0}', the model of '{1}' which attaches it</value>
+  </data>
+  <data name="HardpointMissingAttachmentBone_HardpointIsIsDestroyableBut" xml:space="preserve">
+    <value>Hardpoint '{0}' is Is_Destroyable but has no &lt;Attachment_Bone&gt;. The engine cannot attach it to the parent model, so it is indestructible and can never be shot off.</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_Abilities" xml:space="preserve">
+    <value>unit abilities {0}</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_HardpointSetsWhichNeverApplies" xml:space="preserve">
+    <value>Hardpoint '{0}' sets '{1}', which never applies here. {2}</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_NoAbility" xml:space="preserve">
+    <value>no unit ability</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_NotInSlots" xml:space="preserve">
+    <value>'{0}' has {1}; the game reads the row only while an active {2} ability sits in its first or second slot.</value>
+  </data>
+  <data name="HardpointModeRowWithoutAbility_SlotTooLate" xml:space="preserve">
+    <value>'{0}' has {1} in slot {2} of {3}; the game reads the row for the first two slots only.</value>
+  </data>
+  <data name="HardpointModelBonesUnavailable_NoBoneDataCouldBe" xml:space="preserve">
+    <value>No bone data could be read for model '{0}' (declared by '{1}'), so this bone reference was not verified. The model may be missing, unreadable, or an unsupported .alo version.</value>
+  </data>
+  <data name="HardpointNeverFires_HardpointNeverFiresFireWhen" xml:space="preserve">
+    <value>Hardpoint '{0}' never fires. Fire_When_In_Rocket_Attack_Mode and Fire_When_In_Normal_Attack_Mode are both off, so no attack mode lets it fire.</value>
+  </data>
+  <data name="HardpointNeverFires_HardpointNeverFiresOnFire" xml:space="preserve">
+    <value>Hardpoint '{0}' never fires on '{1}'. Fire_When_In_Normal_Attack_Mode is off, so it fires only while a ROCKET_ATTACK ability is active - and '{2}' has none.</value>
+  </data>
+  <data name="HardpointUnhittable_IsDestroyableButNamesNo" xml:space="preserve">
+    <value>'{0}' is destroyable but names no &lt;Collision_Mesh&gt; - damage reaches a hardpoint through its collision mesh, so nothing can ever hit this one</value>
+  </data>
+  <data name="HardpointUnhittable_SharesItsCollisionMeshWith" xml:space="preserve">
+    <value>'{0}' shares its &lt;Collision_Mesh&gt; with '{1}', which claims it first - damage routes to the first match, so this hardpoint can never be hit</value>
+  </data>
+  <data name="HoverUtility_DefinedInADependency" xml:space="preserve">
+    <value>Defined in a dependency project</value>
+  </data>
+  <data name="HoverUtility_DefinedInDependency" xml:space="preserve">
+    <value>Defined in dependency **{0}**</value>
+  </data>
+  <data name="HoverUtility_Deprecated" xml:space="preserve">
+    <value>Deprecated</value>
+  </data>
+  <data name="HoverUtility_KindFile" xml:space="preserve">
+    <value>*{0} file*</value>
+  </data>
+  <data name="HoverUtility_NoDescription" xml:space="preserve">
+    <value>_No description available. Help the community by [contributing one via a PR](https://github.com/AlamoEngine-Tools/eaw-schema)._</value>
+  </data>
+  <data name="HoverUtility_Note" xml:space="preserve">
+    <value>Note</value>
+  </data>
+  <data name="HoverUtility_NoteDoesNotWork" xml:space="preserve">
+    <value>Does not work</value>
+  </data>
+  <data name="HoverUtility_NoteSince" xml:space="preserve">
+    <value>Since</value>
+  </data>
+  <data name="HoverUtility_NoteUntested" xml:space="preserve">
+    <value>Untested</value>
+  </data>
+  <data name="HoverUtility_PackedInBaseGame" xml:space="preserve">
+    <value>Packed in the base game - `{0}`</value>
+  </data>
+  <data name="HoverUtility_PackedPath" xml:space="preserve">
+    <value>Packed - `{0}`</value>
+  </data>
+  <data name="HoverUtility_Since" xml:space="preserve">
+    <value>Since {0}</value>
+  </data>
+  <data name="HullFiringArc_HasNoTurretBehaviourSo" xml:space="preserve">
+    <value>'{0}' has no TURRET behaviour, so these limit where its hull can shoot, measured from its facing: {1}.</value>
+  </data>
+  <data name="HullFiringArc_Pitch" xml:space="preserve">
+    <value>{0} {1} (up to {1} degrees up or down)</value>
+  </data>
+  <data name="HullFiringArc_Yaw" xml:space="preserve">
+    <value>{0} {1} (up to {1} degrees either side)</value>
+  </data>
+  <data name="IconAwaitingRepack_IconExistsAsASource" xml:space="preserve">
+    <value>Icon '{0}' exists as a source image but is missing from this project's mega texture, so the game will not display it. Rebuild the .mtd to include it.</value>
+  </data>
+  <data name="InaccuracyMap_IsNotAKnownGameobjectcategorytype" xml:space="preserve">
+    <value>'{0}' is not a known GameObjectCategoryType value for &lt;{1}&gt;.</value>
+  </data>
+  <data name="InaccuracyMap_IsNotAValidInaccuracy" xml:space="preserve">
+    <value>'{0}' is not a valid inaccuracy map entry for &lt;{1}&gt;. Expected: Category, Float.</value>
+  </data>
+  <data name="IncomeSplitHandlers_OwnerIncomePercentageIsBut" xml:space="preserve">
+    <value>&lt;Owner_Income_Percentage&gt; is {0}, but a split that favours the owner needs at least 0 and less than 1 - the engine clamps it to {1}</value>
+  </data>
+  <data name="IncomeSplitHandlers_TheEngine" xml:space="preserve">
+    <value>&lt;{0}&gt; {1} - the engine {2}</value>
+  </data>
+  <data name="IntFloatTupleList_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
+  </data>
+  <data name="IntFloatTupleList_IsNotAValidFloat" xml:space="preserve">
+    <value>'{0}' is not a valid float for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
+  </data>
+  <data name="IntFloatTupleList_IsNotAValidInt" xml:space="preserve">
+    <value>'{0}' is not a valid int-float tuple list for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
+  </data>
+  <data name="IntFloatTupleList_IsNotAValidInteger" xml:space="preserve">
+    <value>'{0}' is not a valid integer for &lt;{1}&gt;. Expected alternating integer and float pairs.</value>
+  </data>
+  <data name="IntList_ContainsFloatValuesButExpects" xml:space="preserve">
+    <value>'{0}' contains float values but &lt;{1}&gt; expects integers. '{2}' is the nearest valid value.</value>
+  </data>
+  <data name="IntList_IsNotAValidInteger" xml:space="preserve">
+    <value>'' is not a valid integer list for &lt;{0}&gt;.</value>
+  </data>
+  <data name="IntList_IsNotAValidInteger2" xml:space="preserve">
+    <value>'{0}' is not a valid integer list for &lt;{1}&gt;. Expected space-separated integers.</value>
+  </data>
+  <data name="IntValue_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
+  </data>
+  <data name="IntValue_IsOutOfRangeFor" xml:space="preserve">
+    <value>'{0}' is out of range for &lt;{1}&gt;. Expected a valid integer.</value>
+  </data>
+  <data name="LandDamageTableMismatch_CountsDiffer" xml:space="preserve">
+    <value>Entry counts differ: &lt;Land_Damage_Thresholds&gt; has {0}, &lt;Land_Damage_Alternates&gt; has {1}. The columns pair by position, so the last {2} of &lt;{3}&gt; pair with nothing.</value>
+  </data>
+  <data name="LanguageCoverage_Missing" xml:space="preserve">
+    <value>{0} has no text in {1} of {2} entries. Those entries are left out of the {0} build entirely, so the game falls back to whatever a lower layer provides - or shows nothing.</value>
+  </data>
+  <data name="ListLengthHandlerBase_ButHasTheEngineRejects" xml:space="preserve">
+    <value>&lt;{0}&gt; {1}, but has {2}. The engine rejects this value on load</value>
+  </data>
+  <data name="ListMap_AVariantReadsOnlyIts" xml:space="preserve">
+    <value>A variant reads only its last &lt;{0}&gt;, on line {1}. Each one replaces the list.</value>
+  </data>
+  <data name="ListMap_AlreadyStartsAGroupOf" xml:space="preserve">
+    <value>'{0}' already starts a group of &lt;{1}&gt; on line {2}. The engine keeps the groups apart and does not merge them.</value>
+  </data>
+  <data name="ListMap_HasToStartWithIs" xml:space="preserve">
+    <value>&lt;{0}&gt; has to start with {1} {2}: '{3}' is none. The engine drops the whole value.</value>
+  </data>
+  <data name="ListMap_IsANotTheEngine" xml:space="preserve">
+    <value>'{0}' is a {1}, not {2} {3}. The engine accepts any object in &lt;{4}&gt;, and loads it all the same.</value>
+  </data>
+  <data name="ListMap_IsAsWellAsAn" xml:space="preserve">
+    <value>'{0}' is {1} {2} as well as an object, so the engine starts a new group with it instead of adding it to '{3}'.</value>
+  </data>
+  <data name="ListMap_IsNotTheEngineAccepts" xml:space="preserve">
+    <value>'{0}' is not {1} {2}. The engine accepts any object in &lt;{3}&gt;, and loads it all the same.</value>
+  </data>
+  <data name="ListMap_StartsWithWhichIsNo" xml:space="preserve">
+    <value>&lt;{0}&gt; starts with '{1}', which is no {2}, so its items join the key '{3}' of the previous &lt;{4}&gt;.</value>
+  </data>
+  <data name="LocApplyBatch_CouldNotWriteFile" xml:space="preserve">
+    <value>Could not write the file: {0}</value>
+  </data>
+  <data name="LocApplyBatch_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocApplyBatch_NoProjectFilePathProvided" xml:space="preserve">
+    <value>No project file path provided.</value>
+  </data>
+  <data name="LocConcurrency_FileChangedDiskSinceWas" xml:space="preserve">
+    <value>The file changed on disk since it was last loaded. Reload before editing again.</value>
+  </data>
+  <data name="LocConcurrency_NoContentHashProvidedFetch" xml:space="preserve">
+    <value>No content hash provided - fetch the current entries before writing.</value>
+  </data>
+  <data name="LocConvert_AlreadyFormat" xml:space="preserve">
+    <value>'{0}' is already in that format.</value>
+  </data>
+  <data name="LocConvert_CannotConvertCouldNotBe" xml:space="preserve">
+    <value>Cannot convert '{0}': It could not be read - {1}</value>
+  </data>
+  <data name="LocConvert_CannotConvertDoesNotExist" xml:space="preserve">
+    <value>Cannot convert: '{0}' does not exist.</value>
+  </data>
+  <data name="LocConvert_CannotConvertHoldsNoTranslations" xml:space="preserve">
+    <value>Cannot convert: '{0}' holds no translations.</value>
+  </data>
+  <data name="LocConvert_CannotConvertNotLocalisationFormat" xml:space="preserve">
+    <value>Cannot convert '{0}': {1} is not a localisation format this understands.</value>
+  </data>
+  <data name="LocConvert_DatLanguageUnknown" xml:space="preserve">
+    <value>Cannot convert '{0}': Its name does not say which language it holds (expected '..._&lt;LANGUAGE&gt;.dat').</value>
+  </data>
+  <data name="LocConvert_DatNotATarget" xml:space="preserve">
+    <value>DAT is not a conversion target. It is the format the game loads, one binary file per language - use 'Export Localisation to DAT' to produce it.</value>
+  </data>
+  <data name="LocConvert_NoLocalisationFileWasGiven" xml:space="preserve">
+    <value>No localisation file was given to convert.</value>
+  </data>
+  <data name="LocConvert_NotFormatCanBeWritten" xml:space="preserve">
+    <value>'{0}' is not a format that can be written. Use CSV, XML or NLS.</value>
+  </data>
+  <data name="LocConvert_TargetExists" xml:space="preserve">
+    <value>Cannot convert: '{0}' already exists and was left untouched. Delete or move it first.</value>
+  </data>
+  <data name="LocCreateLanguage_AlreadyPart" xml:space="preserve">
+    <value>'{0}' already exists - that language is already part of this project.</value>
+  </data>
+  <data name="LocCreateLanguage_CouldNotRead" xml:space="preserve">
+    <value>Could not read '{0}': {1}</value>
+  </data>
+  <data name="LocCreateLanguage_CouldNotWrite" xml:space="preserve">
+    <value>Could not write '{0}'.</value>
+  </data>
+  <data name="LocCreateLanguage_DoesNotExist" xml:space="preserve">
+    <value>'{0}' does not exist.</value>
+  </data>
+  <data name="LocCreateLanguage_FilesHoldEveryLanguageOne" xml:space="preserve">
+    <value>{0} files hold every language in one file - add a column instead of a file.</value>
+  </data>
+  <data name="LocCreateLanguage_NoLocalisationFileWasGiven" xml:space="preserve">
+    <value>No localisation file was given.</value>
+  </data>
+  <data name="LocCreateLanguage_NotLanguageThisGameSupports" xml:space="preserve">
+    <value>'{0}' is not a language this game supports.</value>
+  </data>
+  <data name="LocEditor_AlreadyLanguageThisFile" xml:space="preserve">
+    <value>'{0}' is already a language in this file.</value>
+  </data>
+  <data name="LocEditor_CannotInsertAtRowFile" xml:space="preserve">
+    <value>Cannot insert at row {0} (the file has {1} rows).</value>
+  </data>
+  <data name="LocEditor_CannotMoveRowFileHas" xml:space="preserve">
+    <value>Cannot move to row {0} (the file has {1} rows).</value>
+  </data>
+  <data name="LocEditor_Change" xml:space="preserve">
+    <value>Change {0}: {1}</value>
+  </data>
+  <data name="LocEditor_DatFileHoldsSingleLanguage" xml:space="preserve">
+    <value>A .dat file holds a single language and cannot take another column.</value>
+  </data>
+  <data name="LocEditor_FailedParseFile" xml:space="preserve">
+    <value>Failed to parse file: {0}</value>
+  </data>
+  <data name="LocEditor_FailedReadFile" xml:space="preserve">
+    <value>Failed to read the file: {0}</value>
+  </data>
+  <data name="LocEditor_FilesAreSingleLanguageCannot" xml:space="preserve">
+    <value>{0} files are single-language and cannot take another column.</value>
+  </data>
+  <data name="LocEditor_NoLanguageGiven" xml:space="preserve">
+    <value>No language given.</value>
+  </data>
+  <data name="LocEditor_NonAsciiKey" xml:space="preserve">
+    <value>Row {0}: '{1}' cannot be used as a key - a .dat stores keys as ASCII. Rename the entry using unaccented letters; the translation itself is unaffected.</value>
+  </data>
+  <data name="LocEditor_NotLanguageThisFile" xml:space="preserve">
+    <value>'{0}' is not a language in this file.</value>
+  </data>
+  <data name="LocEditor_RowNoLongerReloadBefore" xml:space="preserve">
+    <value>Row {0} is no longer '{1}'. Reload before editing again.</value>
+  </data>
+  <data name="LocEditor_RowOutRangeFileHas" xml:space="preserve">
+    <value>Row {0} is out of range (the file has {1} rows).</value>
+  </data>
+  <data name="LocEditor_UnknownCommand" xml:space="preserve">
+    <value>Unknown command '{0}'.</value>
+  </data>
+  <data name="LocEditor_UnsupportedCommandXML" xml:space="preserve">
+    <value>Unsupported command '{0}' for XML.</value>
+  </data>
+  <data name="LocEditor_UnsupportedFormat" xml:space="preserve">
+    <value>Unsupported format: {0}</value>
+  </data>
+  <data name="LocExportDat_FailedLoadFile" xml:space="preserve">
+    <value>Failed to load file: {0}</value>
+  </data>
+  <data name="LocExportDat_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocExportDat_NoProjectFilePathProvided" xml:space="preserve">
+    <value>No project file path provided.</value>
+  </data>
+  <data name="LocExportDat_UnsupportedFormat" xml:space="preserve">
+    <value>Unsupported format: {0}</value>
+  </data>
+  <data name="LocGetRows_FailedParseFile" xml:space="preserve">
+    <value>Failed to parse file: {0}</value>
+  </data>
+  <data name="LocGetRows_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocGetRows_NoProjectFilePathProvided" xml:space="preserve">
+    <value>No project file path provided.</value>
+  </data>
+  <data name="LocGetRows_UnsupportedFormat" xml:space="preserve">
+    <value>Unsupported format: {0}</value>
+  </data>
+  <data name="LocImport_CannotConvertNoTargetFolder" xml:space="preserve">
+    <value>Cannot convert {0} to {1}: No target folder was given for the converted file.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesCommand" xml:space="preserve">
+    <value>Cannot import localisation files: The command was invoked without any settings to import with. Run it from the Localisation view rather than directly.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesDifferent" xml:space="preserve">
+    <value>Cannot import localisation files: '{0}' is on a different drive or root from the .pgproj, so it cannot be recorded as a relative path. Copy the files inside the project folder first.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesFolder" xml:space="preserve">
+    <value>Cannot import localisation files: The folder '{0}' does not exist.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesNo" xml:space="preserve">
+    <value>Cannot import localisation files: No .pgproj file was found in this workspace, so there is nowhere to record the imported localisation settings.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesNot" xml:space="preserve">
+    <value>Cannot import localisation files: '{0}' is not a format that can be written. Use CSV, XML or NLS.</value>
+  </data>
+  <data name="LocImport_CannotImportLocalisationFilesSource" xml:space="preserve">
+    <value>Cannot import localisation files: The source format, source folder and target format are all required.</value>
+  </data>
+  <data name="LocImport_FileSCouldNotBe" xml:space="preserve">
+    <value>Files in '{2}' that could not be read and were left out of the import - {0} of {1}. The EaWEdit LSP output names them.</value>
+  </data>
+  <data name="LocImport_LocalisationProjectImportedConvertedFile" xml:space="preserve">
+    <value>Localisation project imported into '{2}'. Converted {1} files - {0}.</value>
+  </data>
+  <data name="LocImport_LocalisationProjectImportedRegisteredFile" xml:space="preserve">
+    <value>Localisation project imported from '{2}'. Registered {1} files - {0}. The files themselves were not changed.</value>
+  </data>
+  <data name="LocImport_NothingImportNoFilesWere" xml:space="preserve">
+    <value>Nothing to import: No {0} files were found in '{1}'. Check that the folder and the source format match what is actually there.</value>
+  </data>
+  <data name="LocImport_NothingWasImportedAlreadyExists" xml:space="preserve">
+    <value>Nothing was imported: '{0}' already exists and was left untouched. Delete or move it first, or choose a different target folder.</value>
+  </data>
+  <data name="LocInit_CannotInitialiseLocalisationProjectNo" xml:space="preserve">
+    <value>Cannot initialise a localisation project: No .pgproj file was found in this workspace, so there is nowhere to record the new localisation settings.</value>
+  </data>
+  <data name="LocInit_CannotInitialiseLocalisationProjectNot" xml:space="preserve">
+    <value>Cannot initialise a localisation project: '{0}' is not a format that can be created. Use CSV, XML or NLS.</value>
+  </data>
+  <data name="LocInit_CannotInitialiseLocalisationProjectThis" xml:space="preserve">
+    <value>Cannot initialise a localisation project: This project does not declare one yet, and no format and directory were given to create it with.</value>
+  </data>
+  <data name="LocInit_LocalisationProjectInitialisedCreated" xml:space="preserve">
+    <value>Localisation project initialised: Created '{0}'.</value>
+  </data>
+  <data name="LocInit_LocalisationProjectNotInitialisedAlready" xml:space="preserve">
+    <value>Localisation project not initialised: '{0}' already exists and was left untouched. Delete or move it first to start over.</value>
+  </data>
+  <data name="LocKeyInspector_AlreadyDefined" xml:space="preserve">
+    <value>'{0}' is already defined on row {1}. Only one of the two would ever be read.</value>
+  </data>
+  <data name="LocKeyInspector_ChecksumCollision" xml:space="preserve">
+    <value>'{0}' has the same checksum (0x{1:X8}) as '{2}' on row {3}, so the game cannot tell them apart and only one would ever be read.</value>
+  </data>
+  <data name="LocKeyInspector_DiffersInCase" xml:space="preserve">
+    <value>'{0}' differs from '{1}' on row {2} only in case. The game treats them as two separate entries, so both are read - but nothing else will make it obvious which is which.</value>
+  </data>
+  <data name="LocKeyInspector_NonAscii" xml:space="preserve">
+    <value>'{0}' cannot be used as a key: {1} cannot be written to a .dat, which stores keys as ASCII. Rename the entry using unaccented letters - the translation itself is unaffected.</value>
+  </data>
+  <data name="LocKeyInspector_ThisEntryHasNoKey" xml:space="preserve">
+    <value>This entry has no key, so the game cannot reference it.</value>
+  </data>
+  <data name="LocKeyed_AlreadyThisFileOnlyOne" xml:space="preserve">
+    <value>'{0}' is already in this file. Only one row per key is ever read.</value>
+  </data>
+  <data name="LocKeyed_BlankKey" xml:space="preserve">
+    <value>A key is required - it is how the game refers to this text.</value>
+  </data>
+  <data name="LocKeyed_KeyOnTwoRows" xml:space="preserve">
+    <value>'{0}' is on both row {1} and row {2}. Only one of them would ever be read - remove one before editing it.</value>
+  </data>
+  <data name="LocKeyed_NotATranslationCommand" xml:space="preserve">
+    <value>'{0}' is not a translation command. Row positions are not addressable in a translation file.</value>
+  </data>
+  <data name="LocKeyed_NotThisFileReloadBefore" xml:space="preserve">
+    <value>'{0}' is not in this file. Reload before editing again.</value>
+  </data>
+  <data name="LocKeyed_ThisChangeDoesNotSay" xml:space="preserve">
+    <value>This change does not say which entry it applies to.</value>
+  </data>
+  <data name="LocSetFormat_NoLocalisationYet" xml:space="preserve">
+    <value>This project has no localisation set up yet. Use 'New Localisation Project' or 'Import Existing Localisation Files' to create one.</value>
+  </data>
+  <data name="LocSetFormat_NoModProjectOpenLocalisation" xml:space="preserve">
+    <value>No mod project is open. The localisation format is stored in the .pgproj.</value>
+  </data>
+  <data name="LocSetFormat_NotBelowProject" xml:space="preserve">
+    <value>The localisation directory '{0}' is not below the project, so it cannot be written back as a relative path.</value>
+  </data>
+  <data name="LocSetFormat_NotLocalisationFormatUseCSV" xml:space="preserve">
+    <value>'{0}' is not a localisation format. Use CSV, XML, NLS or DAT.</value>
+  </data>
+  <data name="LocValidateCredits_Change" xml:space="preserve">
+    <value>Change {0}: {1}</value>
+  </data>
+  <data name="LocValidateCredits_FailedReadFile" xml:space="preserve">
+    <value>Failed to read the file: {0}</value>
+  </data>
+  <data name="LocValidateCredits_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocValidateTranslation_Change" xml:space="preserve">
+    <value>Change {0}: {1}</value>
+  </data>
+  <data name="LocValidateTranslation_FailedReadFile" xml:space="preserve">
+    <value>Failed to read the file: {0}</value>
+  </data>
+  <data name="LocValidateTranslation_FileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="LocalisationFeature_Disabled" xml:space="preserve">
+    <value>Localisation features are disabled. Enable 'aet-eaw-edit.features.tools.localisation' in the editor settings.</value>
+  </data>
+  <data name="LocalisationKeyHandlerBase_LocalisationKeyWasNotFound" xml:space="preserve">
+    <value>Localisation key '{0}' was not found in the loaded translation databases.</value>
+  </data>
+  <data name="LocalisationKeyInlayHint_Missing" xml:space="preserve">
+    <value>{0}: MISSING</value>
+  </data>
+  <data name="LocalisationToTextureMap_IsNotAValidLocalisation" xml:space="preserve">
+    <value>'{0}' is not a valid localisation texture map for &lt;{1}&gt;. Expected: LocalisationKey, TextureName.</value>
+  </data>
+  <data name="LuaAnalyzerRename_RenameRefusedEditsWhichNot" xml:space="preserve">
+    <value>Rename refused: It edits {0}, which is not one of this project's scripts</value>
+  </data>
+  <data name="LuaCodeAction_FunctionTarget" xml:space="preserve">
+    <value>function</value>
+  </data>
+  <data name="LuaCodeAction_MoveLocalInsideFunction" xml:space="preserve">
+    <value>Move local inside function</value>
+  </data>
+  <data name="LuaCodeAction_RemoveDuplicateRequire" xml:space="preserve">
+    <value>Remove duplicate require</value>
+  </data>
+  <data name="LuaCodeAction_RemoveRedundantRequire" xml:space="preserve">
+    <value>Remove redundant require</value>
+  </data>
+  <data name="LuaCodeAction_SuppressUpvalueOk" xml:space="preserve">
+    <value>Suppress with ---@upvalue-ok</value>
+  </data>
+  <data name="LuaDebugAdapter_CannotResolveHostIPvAddress" xml:space="preserve">
+    <value>Cannot resolve host '{0}' to an IPv4 address</value>
+  </data>
+  <data name="LuaDebugAdapter_FileUnderNoneConfiguredScript" xml:space="preserve">
+    <value>The file is under none of the configured script roots</value>
+  </data>
+  <data name="LuaDebugAdapter_FrameBelongsEarlierStop" xml:space="preserve">
+    <value>That frame belongs to an earlier stop</value>
+  </data>
+  <data name="LuaDebugAdapter_GameDidNotAnswerWithin" xml:space="preserve">
+    <value>The game did not answer on {0}:{1} within {2:0} s. Is it a debug build with the Lua debug server started (console command luadebug)?</value>
+  </data>
+  <data name="LuaDebugAdapter_GameDoesNotEvaluateBreakpoint" xml:space="preserve">
+    <value>The game does not evaluate breakpoint conditions, hit counts or log messages; the breakpoint was not set</value>
+  </data>
+  <data name="LuaDebugAdapter_GameExitedCodeBeforeDebugger" xml:space="preserve">
+    <value>The game exited with code {0} before the debugger could attach</value>
+  </data>
+  <data name="LuaDebugAdapter_LaunchConfigurationNamesNoGame" xml:space="preserve">
+    <value>The launch configuration names no game executable ('program')</value>
+  </data>
+  <data name="LuaDebugAdapter_NoFrameLevel" xml:space="preserve">
+    <value>No frame with level {0}</value>
+  </data>
+  <data name="LuaDebugAdapter_NoScriptSuspended" xml:space="preserve">
+    <value>No script is suspended</value>
+  </data>
+  <data name="LuaDebugAdapter_NotAttachedGame" xml:space="preserve">
+    <value>Not attached to the game</value>
+  </data>
+  <data name="LuaDebugAdapter_OnlyPlainVariableNameCan" xml:space="preserve">
+    <value>Only a plain variable name can be read from the game; use the debug console to run Lua</value>
+  </data>
+  <data name="LuaDebugAdapter_Script" xml:space="preserve">
+    <value>script {0}</value>
+  </data>
+  <data name="LuaDebugAdapter_SelectScriptStopOneBefore" xml:space="preserve">
+    <value>Select a script or stop in one before evaluating</value>
+  </data>
+  <data name="LuaDebugAdapter_SourceHasNoFilePath" xml:space="preserve">
+    <value>The source has no file path</value>
+  </data>
+  <data name="LuaDebugAdapter_ThreadNotThreadScriptAny" xml:space="preserve">
+    <value>Thread {0} is not a thread of script {1} any more; refresh its threads</value>
+  </data>
+  <data name="LuaDebugAdapter_UnknownVariableReference" xml:space="preserve">
+    <value>Unknown variable reference</value>
+  </data>
+  <data name="LuaDebugAdapter_VariableReferenceBelongsEarlierStop" xml:space="preserve">
+    <value>That variable reference belongs to an earlier stop</value>
+  </data>
+  <data name="LuaDebugAdapter_WaitingGameBreakpointSetOnce" xml:space="preserve">
+    <value>Waiting for the game; the breakpoint is set once the debugger is attached</value>
+  </data>
+  <data name="LuaDebugConnection_ConnectionWasClosed" xml:space="preserve">
+    <value>The connection was closed</value>
+  </data>
+  <data name="LuaDebugConnection_DebuggerConnectionFailed" xml:space="preserve">
+    <value>The debugger connection failed</value>
+  </data>
+  <data name="LuaDebugConnection_GameAtDidNotComplete" xml:space="preserve">
+    <value>The game at {0} did not complete the debugger handshake within {1:0.#} s. Is a debug build running with its Lua debug server started (console command luadebug)?</value>
+  </data>
+  <data name="LuaDebugConnection_GameAtDidNotComplete2" xml:space="preserve">
+    <value>The game at {0} did not complete the debugger handshake within {1:0.#} s</value>
+  </data>
+  <data name="LuaDebugConnection_GameClosedDebuggerConnection" xml:space="preserve">
+    <value>The game closed the debugger connection</value>
+  </data>
+  <data name="LuaDebugConnection_NoPacketFromGameS" xml:space="preserve">
+    <value>No packet from the game for {0:0.#} s; the connection is presumed lost</value>
+  </data>
+  <data name="LuaDebugSession_BreakAlreadyArmedWaitingNext" xml:space="preserve">
+    <value>A break is already armed and waiting for the next Lua line</value>
+  </data>
+  <data name="LuaDebugSession_CannotBreakScriptAlreadySuspended" xml:space="preserve">
+    <value>Cannot break: A script is already suspended; continue or step first</value>
+  </data>
+  <data name="LuaDebugSession_CannotBreakThreadNoScript" xml:space="preserve">
+    <value>Cannot break a thread: No script is selected</value>
+  </data>
+  <data name="LuaDebugSession_CannotBreakThreadScriptAlready" xml:space="preserve">
+    <value>Cannot break a thread: A script is already suspended; continue first</value>
+  </data>
+  <data name="LuaDebugSession_CannotContinueNoScriptSuspended" xml:space="preserve">
+    <value>Cannot continue: No script is suspended</value>
+  </data>
+  <data name="LuaDebugSession_CannotSelectFrameNoScript" xml:space="preserve">
+    <value>Cannot select a frame: No script is suspended</value>
+  </data>
+  <data name="LuaDebugSession_CannotSelectScriptWhileOne" xml:space="preserve">
+    <value>Cannot select a script while one is suspended; continue first</value>
+  </data>
+  <data name="LuaDebugSession_CannotStepNoScriptSuspended" xml:space="preserve">
+    <value>Cannot step: No script is suspended</value>
+  </data>
+  <data name="LuaDebugSession_CannotWhileDebugger" xml:space="preserve">
+    <value>Cannot {0} while the debugger is {1}</value>
+  </data>
+  <data name="LuaDebugSession_DebuggerConnectionGone" xml:space="preserve">
+    <value>The debugger connection is gone</value>
+  </data>
+  <data name="LuaDebugSession_FrameOutsideCallStackFrames" xml:space="preserve">
+    <value>Frame {0} is outside the call stack of {1} frames</value>
+  </data>
+  <data name="LuaDebugSession_GameDidNotAnswerWithin" xml:space="preserve">
+    <value>The game did not answer {0} within {1:0.#} s</value>
+  </data>
+  <data name="LuaDebugSession_ScriptNotGameSScript" xml:space="preserve">
+    <value>Script {0} is not in the game's script list; refresh it first</value>
+  </data>
+  <data name="LuaDebugSession_SourceWideBreakpointNeedsThread" xml:space="preserve">
+    <value>A source-wide breakpoint needs thread id -1 as well as script id -1</value>
+  </data>
+  <data name="LuaDebugSession_ThreadNotKnownThreadScript" xml:space="preserve">
+    <value>Thread {0} is not a known thread of script {1}; request its threads first</value>
+  </data>
+  <data name="LuaDebugTransport_GameResetDebuggerConnection" xml:space="preserve">
+    <value>The game reset the debugger connection</value>
+  </data>
+  <data name="LuaGlobalScope_CyclicRequire" xml:space="preserve">
+    <value>require("{0}") creates a cyclic dependency.</value>
+  </data>
+  <data name="LuaGlobalScope_DefinedInNotRequired" xml:space="preserve">
+    <value>Global '{0}' is defined in '{1}' which is not required.</value>
+  </data>
+  <data name="LuaGlobalScope_DuplicateRequire" xml:space="preserve">
+    <value>require("{0}") is a duplicate; already required on line {1}.</value>
+  </data>
+  <data name="LuaGlobalScope_OverridesRequired" xml:space="preserve">
+    <value>Global '{0}' overrides a symbol from a required file. Add ---@Override to suppress.</value>
+  </data>
+  <data name="LuaGlobalScope_RedundantRequire" xml:space="preserve">
+    <value>require("{0}") is redundant, it is already transitively included by require("{1}").</value>
+  </data>
+  <data name="LuaGlobalScope_UnusedRequire" xml:space="preserve">
+    <value>require("{0}") is unused - no exported globals are referenced.</value>
+  </data>
+  <data name="LuaHover_CalledByGame" xml:space="preserve">
+    <value>Called by the game</value>
+  </data>
+  <data name="LuaHover_CalledByIfDefined" xml:space="preserve">
+    <value>Called by {0}, if defined</value>
+  </data>
+  <data name="LuaHover_EntryPoint" xml:space="preserve">
+    <value>**function** `{0}` - entry point</value>
+  </data>
+  <data name="LuaHover_EntryPointCaller" xml:space="preserve">
+    <value>{0} - scripts: {1}</value>
+  </data>
+  <data name="LuaHover_Function" xml:space="preserve">
+    <value>**function** `{0}({1})`</value>
+  </data>
+  <data name="LuaHover_FunctionBare" xml:space="preserve">
+    <value>**function** `{0}`</value>
+  </data>
+  <data name="LuaHover_InitialState" xml:space="preserve">
+    <value>initial state</value>
+  </data>
+  <data name="LuaHover_InlineFunction" xml:space="preserve">
+    <value>inline function</value>
+  </data>
+  <data name="LuaHover_Message" xml:space="preserve">
+    <value>**message** - state `{0}`
+`OnEnter` (1) once on entering the state, `OnUpdate` (2) every service tick while it stays, `OnExit` (3) once on leaving it</value>
+  </data>
+  <data name="LuaHover_Parameters" xml:space="preserve">
+    <value>**Parameters:**</value>
+  </data>
+  <data name="LuaHover_Registered" xml:space="preserve">
+    <value>**{0}** `{1}` - handler `{2}`</value>
+  </data>
+  <data name="LuaHover_Require" xml:space="preserve">
+    <value>**require** `{0}`
+-&gt; `{1}`</value>
+  </data>
+  <data name="LuaHover_RequireNotFound" xml:space="preserve">
+    <value>**require** `{0}`
+*Module not found in workspace*</value>
+  </data>
+  <data name="LuaHover_Returns" xml:space="preserve">
+    <value>**Returns:** `{0}`</value>
+  </data>
+  <data name="LuaHover_State" xml:space="preserve">
+    <value>state</value>
+  </data>
+  <data name="LuaHover_StateHandler" xml:space="preserve">
+    <value>**state handler** - {0} `{1}`
+Called with `OnEnter` once, `OnUpdate` every service tick until the state changes, then `OnExit` once</value>
+  </data>
+  <data name="LuaHover_StateNotRegisteredThisScript" xml:space="preserve">
+    <value>**state** `{0}` - not registered in this script</value>
+  </data>
+  <data name="LuaHover_StoryEventState" xml:space="preserve">
+    <value>A story event: Entered when the event fires and the machine is not already changing state</value>
+  </data>
+  <data name="LuaImport_CannotFindModule" xml:space="preserve">
+    <value>Cannot find module '{0}'. No matching '.lua' file found in workspace.</value>
+  </data>
+  <data name="LuaPlan_NoThreadFunction" xml:space="preserve">
+    <value>Task force '{0}' has no thread function: The engine starts '{1}' when the plan loads and cannot run the force without it.</value>
+  </data>
+  <data name="LuaPooledState_BleedsBetweenInstances" xml:space="preserve">
+    <value>'{0}' is set at run time and read before it is set, and Definitions does not set it again: The game reuses this script's state, so its next instance reads the value left here.</value>
+  </data>
+  <data name="LuaPooledState_EventsNotReset" xml:space="preserve">
+    <value>This script's state is reused for its next instance, and nothing that runs on release calls GetEvent.Reset(): Task force events left in the queue reach the next instance.</value>
+  </data>
+  <data name="LuaPooledState_HostGlobalTooEarly" xml:space="preserve">
+    <value>'{0}' is read in {1}: The game sets it only after Base_Definitions returns, so it is nil here.</value>
+  </data>
+  <data name="LuaPooledState_NoFlushG" xml:space="preserve">
+    <value>This script's state is reused for its next instance, and nothing in it defines Flush_G: Every global, tables included, carries over.</value>
+  </data>
+  <data name="LuaPooledState_RunsAtDefinitionTime" xml:space="preserve">
+    <value>'{0}', which runs at definition time,</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptCarriesItsExtension" xml:space="preserve">
+    <value>Lua script '{0}' carries its extension. The game appends '.lua' itself and looks for '{1}.lua'.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptClimbsOutOf" xml:space="preserve">
+    <value>Lua script '{0}' climbs out of the script directory with '..'. That resolves for a loose file on Windows only, never inside a MEG archive.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptContainsABackslash" xml:space="preserve">
+    <value>Lua script '{0}' contains a backslash. The game reads the name inside a Lua string, where a backslash is an escape, so the script never loads. '/' separates directories.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptLoadsFromOutside" xml:space="preserve">
+    <value>Lua script '{0}' loads from '{1}', outside {2}.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptLoadsFromWhich" xml:space="preserve">
+    <value>Lua script '{0}' loads from '{1}', which shadows '{2}': The game searches that directory first.</value>
+  </data>
+  <data name="LuaScriptReference_LuaScriptWasNotFound" xml:space="preserve">
+    <value>Lua script '{0}' was not found: No '{1}.lua' or '{2}.lc' in any script directory. The object runs without a script.</value>
+  </data>
+  <data name="LuaStateMachine_AnonymousHandler" xml:space="preserve">
+    <value>function</value>
+  </data>
+  <data name="LuaStateMachine_HandlerNotFunction" xml:space="preserve">
+    <value>State '{0}' is registered with '{1}', which is not a function: The state machine logs Invalid State and stops when it reaches this state.</value>
+  </data>
+  <data name="LuaStateMachine_HandlerParameters" xml:space="preserve">
+    <value>State handler '{0}' takes {1} parameters: The state machine passes one, the message - OnEnter, OnUpdate or OnExit.</value>
+  </data>
+  <data name="LuaStateMachine_MessageComparison" xml:space="preserve">
+    <value>'{0}' compared with '{1}': The state machine passes only OnEnter, OnUpdate or OnExit.</value>
+  </data>
+  <data name="LuaStateMachine_NotRegistered" xml:space="preserve">
+    <value>State '{0}' is not registered: Set_Next_State ignores it and the state machine stays where it is.</value>
+  </data>
+  <data name="LuaStateMachine_RegisteredAgain" xml:space="preserve">
+    <value>State '{0}' is registered again: The later function replaces the earlier one and keeps its place in the order.</value>
+  </data>
+  <data name="LuaStateMachine_StoryEventNotFunction" xml:space="preserve">
+    <value>Story event '{0}' maps to '{1}', which is not a function: The story library skips the event with an Invalid function object message.</value>
+  </data>
+  <data name="LuaStateMachine_StoryEventUndefined" xml:space="preserve">
+    <value>Story event '{0}' names '{1}', which is not defined: The entry is nil, so the event is never registered and does nothing.</value>
+  </data>
+  <data name="LuaTypeNames_Type" xml:space="preserve">
+    <value>type {0}</value>
+  </data>
+  <data name="LuaTypeNames_UnknownScript" xml:space="preserve">
+    <value>unknown script</value>
+  </data>
+  <data name="LuaUpvalue_Captured" xml:space="preserve">
+    <value>File-level local '{0}' is captured as an upvalue by '{1}'. This persists across save/load cycles and may corrupt save games. Move the variable inside the function, or use a global.</value>
+  </data>
+  <data name="LuaUpvalue_FunctionDeclaration" xml:space="preserve">
+    <value>function declaration</value>
+  </data>
+  <data name="LuaUpvalue_LocalDeclaration" xml:space="preserve">
+    <value>local declaration</value>
+  </data>
+  <data name="LuaVersionSyntax_Length" xml:space="preserve">
+    <value>The length operator '#' is Lua 5.1: The game runs Lua 5.0 and does not load this script; use table.getn for a table, string.len for a string.</value>
+  </data>
+  <data name="LuaVersionSyntax_LongComment" xml:space="preserve">
+    <value>A long comment with '=' levels is Lua 5.1: Lua 5.0 reads '--[=[' as a line comment, so the game takes the lines after the first as code; Lua 5.0 nests --[[ ]] instead.</value>
+  </data>
+  <data name="LuaVersionSyntax_LongString" xml:space="preserve">
+    <value>A long string with '=' levels is Lua 5.1: The game runs Lua 5.0 and does not load this script; Lua 5.0 nests [[ ]] instead.</value>
+  </data>
+  <data name="LuaVersionSyntax_Modulo" xml:space="preserve">
+    <value>The modulo operator '%' is Lua 5.1: The game runs Lua 5.0 and does not load this script.</value>
+  </data>
+  <data name="LuaVersionSyntax_Vararg" xml:space="preserve">
+    <value>'...' as a value is Lua 5.1: The game runs Lua 5.0 and does not load this script; a Lua 5.0 vararg function reads its extra arguments from the table 'arg'.</value>
+  </data>
+  <data name="MapFileFormat_IsNotAValidMap" xml:space="preserve">
+    <value>'{0}' is not a valid map filename for &lt;{1}&gt;. Expected a .ted file.</value>
+  </data>
+  <data name="MegArchiveOrigin_Packed" xml:space="preserve">
+    <value>Packed in `{0}` -&gt; `{1}` - read-only, cannot be renamed or navigated to.</value>
+  </data>
+  <data name="MissingRequiredTag_AndTheEngine" xml:space="preserve">
+    <value>and the engine {0}</value>
+  </data>
+  <data name="MissingRequiredTag_ApplyTheEngineSDefault" xml:space="preserve">
+    <value>Apply the engine's own default: &lt;{0}&gt;{1}&lt;/{0}&gt;</value>
+  </data>
+  <data name="MissingRequiredTag_IsNotSetNeedsIt" xml:space="preserve">
+    <value>&lt;{0}&gt; is not set. {1} needs it, {2}</value>
+  </data>
+  <data name="MissingRequiredTag_ReportsItAsUnset" xml:space="preserve">
+    <value>and the engine reports it as unset on load</value>
+  </data>
+  <data name="ModProjectReload_ShippedGameBaselineCouldNot" xml:space="preserve">
+    <value>The shipped-game baseline could not be loaded, so nothing in this project can be checked against the game. Set 'aet-eaw-edit.lsp.source.baseline.type' to 'http' to download it, or to 'local' and point it at a baseline file. Nothing has been indexed.</value>
+  </data>
+  <data name="ModProject_AtLine" xml:space="preserve">
+    <value> at line {0}</value>
+  </data>
+  <data name="ModProject_AtLineColumn" xml:space="preserve">
+    <value> at line {0}, column {1}</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject" xml:space="preserve">
+    <value>Could not load mod project '{0}'{1}: {2}</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject10" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'icons.megaTexture' must not be empty. Omit it entirely to use the default '{1}'.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject11" xml:space="preserve">
+    <value>Could not load mod project '{0}': The file is empty.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject12" xml:space="preserve">
+    <value>Could not load mod project '{0}': {1}</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject13" xml:space="preserve">
+    <value>Could not load mod project '{0}': The property '{1}' appears more than once. Keep one of them.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject14" xml:space="preserve">
+    <value>Could not load mod project '{0}': The file is empty or is not a JSON object.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject2" xml:space="preserve">
+    <value>Could not load mod project '{0}': {1}.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject3" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'directories.text' and 'directories.textResourceType' were removed in 0.2.0. Move the localisation directory into a top-level 'localisation' node instead, e.g. "localisation": {{ "type": "CSV", "directory": "data/text" }}. See the extension's 'Upgrading from 0.1.x' README section for the full migration steps.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject4" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'localisation.credits.files' must name at least one file when 'localisation.credits.detection' is 'explicit'.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject5" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'localisation.credits.detection' must be one of convention, explicit, none (got '{1}').</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject6" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'localisation.directory' is required when 'localisation' is present.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject7" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'localisation.type' must be one of CSV, DAT, XML, NLS (got '{1}').</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject8" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'icons.sourceRoots' must not contain empty entries.</value>
+  </data>
+  <data name="ModProject_CouldNotLoadModProject9" xml:space="preserve">
+    <value>Could not load mod project '{0}': 'icons.megaTexture' must be given without a file extension (got '{1}'). It names both the .mtd directory and the .tga atlas, e.g. "megaTexture": "{2}".</value>
+  </data>
+  <data name="ModProject_FileNotValidJSONDoes" xml:space="preserve">
+    <value>The file is not valid JSON or does not match the .pgproj schema.</value>
+  </data>
+  <data name="ModProject_ProjectReferencesMustBeArrayReferences" xml:space="preserve">
+    <value>'projectReferences' must be an array of references - either path strings or {{ "path": "..." }} objects, e.g. [ {{ "path": "../core/core.pgproj" }} ].</value>
+  </data>
+  <data name="ModelFileFormat_IsNotAValidModel" xml:space="preserve">
+    <value>'{0}' is not a valid model filename for &lt;{1}&gt;. Expected a .alo file.</value>
+  </data>
+  <data name="ModelTextureExistence_ModelReferencesTextureWhichWas" xml:space="preserve">
+    <value>Model '{0}' references texture '{1}', which was not found in the game data or workspace asset files. The reference is inside the model, so the fix is in the art rather than on this line.</value>
+  </data>
+  <data name="MovieFrameTrigger_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
+  </data>
+  <data name="MovieFrameTrigger_IsNotAValidMovie" xml:space="preserve">
+    <value>'{0}' is not a valid movie frame trigger for &lt;{1}&gt;. Expected: EventKey, NonNegativeInteger.</value>
+  </data>
+  <data name="MusicEventReference_Noun" xml:space="preserve">
+    <value>music event reference</value>
+  </data>
+  <data name="NameCrcCollision_HasTheSameNameHash" xml:space="preserve">
+    <value>'{0}' has the same name hash as {1} (0x{2:X8}). The engine finds objects by that hash, so only the one it loads first can be referenced.</value>
+  </data>
+  <data name="NameCrcCollision_SameNameHash" xml:space="preserve">
+    <value>Object with the same name hash</value>
+  </data>
+  <data name="NameReferenceList_Noun" xml:space="preserve">
+    <value>name reference list</value>
+  </data>
+  <data name="NameReference_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known value for '{1}' on &lt;{2}&gt;.</value>
+  </data>
+  <data name="NameReference_IsNotAValidName" xml:space="preserve">
+    <value>'' is not a valid name reference for &lt;{0}&gt;.</value>
+  </data>
+  <data name="NamedEnumValueHandlerBase_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known value for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NamedEnumValueHandlerBase_IsNotAValidValue" xml:space="preserve">
+    <value>'' is not a valid value for &lt;{0}&gt;.</value>
+  </data>
+  <data name="NegativeFraction_Expectation" xml:space="preserve">
+    <value>must be between -1.0 and 0.0</value>
+  </data>
+  <data name="NonEmptyReferenceHandlerBase_IsNotAValidFor" xml:space="preserve">
+    <value>'' is not a valid {0} for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NonNegativeValue_Expectation" xml:space="preserve">
+    <value>cannot be less than zero</value>
+  </data>
+  <data name="NormalizedFloat_IsNotAValidNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NormalizedFloat_ValueIsOutOfRange" xml:space="preserve">
+    <value>Value {0} is out of range [0, 1] for &lt;{1}&gt;. {2} is the nearest valid value.</value>
+  </data>
+  <data name="NumberValueHandlerBase_IsNotAValidNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
+  </data>
+  <data name="NumericRangeHandlerBase_" xml:space="preserve">
+    <value>&lt;{0}&gt; {1}. {2}</value>
+  </data>
+  <data name="NumericRangeHandlerBase_Consequence" xml:space="preserve">
+    <value>The engine rejects this value on load</value>
+  </data>
+  <data name="OneEntryPerTag_OnlyIsReadIsDropped" xml:space="preserve">
+    <value>Only '{0}' is read - '{1}' is dropped. Each &lt;{2}&gt; holds one entry; further entries need their own tag.</value>
+  </data>
+  <data name="OverrideCodeLens_ReferencedProject" xml:space="preserve">
+    <value>a referenced project</value>
+  </data>
+  <data name="OverrideCodeLens_VOverridesFrom" xml:space="preserve">
+    <value>v Overrides '{0}' from {1}</value>
+  </data>
+  <data name="ParticleFile_MalformedParticleFile" xml:space="preserve">
+    <value>Malformed particle file: {0}</value>
+  </data>
+  <data name="PerFactionIntMap_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
+  </data>
+  <data name="PerFactionIntMap_IsNotAValidPer" xml:space="preserve">
+    <value>'{0}' is not a valid per-faction int map for &lt;{1}&gt;. Expected: FactionName, Integer.</value>
+  </data>
+  <data name="PerFactionPlanet_IsNotAValidPer" xml:space="preserve">
+    <value>'{0}' is not a valid per-faction planet for &lt;{1}&gt;. Expected: FactionName, PlanetName.</value>
+  </data>
+  <data name="PerFactionValue_IsNotAValidPer" xml:space="preserve">
+    <value>'{0}' is not a valid per-faction value for &lt;{1}&gt;. Expected: FactionName, Number.</value>
+  </data>
+  <data name="PerFactionValue_IsNotAValidPlanet" xml:space="preserve">
+    <value>'{0}' is not a valid planet value for &lt;{1}&gt;. Expected: Planet, Number.</value>
+  </data>
+  <data name="PgprojFormat_ThisFileDeclaresItselfAs" xml:space="preserve">
+    <value>This file declares itself as '{0}', not a '{1}'. It cannot be opened as a mod project.</value>
+  </data>
+  <data name="PgprojFormat_ThisProjectDeclaresUnreadableFormat" xml:space="preserve">
+    <value>This project declares an unreadable format version '{0}'. It must look like '{1}'. Fix or remove '_typeVersion' to open the project.</value>
+  </data>
+  <data name="PgprojFormat_ThisProjectDeclaresVersionWhich" xml:space="preserve">
+    <value>This project declares version '{0}', which is not a version of '{1}'. It cannot be opened as a mod project.</value>
+  </data>
+  <data name="PgprojFormat_ThisProjectFormatWhichThis" xml:space="preserve">
+    <value>This project is in format {0}, which this version of aet-eaw-edit does not understand (it reads and writes {1}). Update the extension to open it - opening it anyway would risk writing over settings a newer version put there.</value>
+  </data>
+  <data name="PgprojIconProposal_ThisProjectHasIconSources" xml:space="preserve">
+    <value>This project has icon sources at {0} that nothing is configured to read, so every icon falls back to the base game. The proposed 'icons' node points at them.</value>
+  </data>
+  <data name="PgprojMigrationOffer_UpdatedPreviousFileAt" xml:space="preserve">
+    <value>'{0}' updated. The previous file is at '{1}'.</value>
+  </data>
+  <data name="PlanetModeExclusionList_HasNoModeIsA" xml:space="preserve">
+    <value>'{0}' has no mode. &lt;{1}&gt; is a flat list of (planet, mode) pairs, so every planet must be followed by the mode it is excluded in.</value>
+  </data>
+  <data name="PlanetModeExclusionList_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known {1} value. Each entry in &lt;{2}&gt; is a planet followed by the mode it is excluded in.</value>
+  </data>
+  <data name="PositionLabel_IsNotAValidPosition" xml:space="preserve">
+    <value>'' is not a valid position label for &lt;{0}&gt;.</value>
+  </data>
+  <data name="PositiveValue_Expectation" xml:space="preserve">
+    <value>must be greater than zero</value>
+  </data>
+  <data name="PrerequisiteExpression_ExpectsAPrerequisiteExpressionValue" xml:space="preserve">
+    <value>&lt;{0}&gt; expects a prerequisite expression; value must not be empty.</value>
+  </data>
+  <data name="PrerequisiteExpression_IsNotAValidPrerequisite" xml:space="preserve">
+    <value>'{0}' is not a valid prerequisite expression for &lt;{1}&gt;. Expected game object names connected by '|' (OR) and ',' or spaces (AND). Example: "StructA | StructB, StructC" means (StructA OR StructB) AND StructC.</value>
+  </data>
+  <data name="PreviewAbility_IconNotFound" xml:space="preserve">
+    <value>Ability {0} names icon '{1}', which is not in this project's mega texture or icon sources. The game will draw missing art.</value>
+  </data>
+  <data name="PreviewHandlers_CouldNotBeExported" xml:space="preserve">
+    <value>'{0}' could not be exported: {1}</value>
+  </data>
+  <data name="PreviewHandlers_CouldNotBeInspected" xml:space="preserve">
+    <value>'{0}' could not be inspected: {1}</value>
+  </data>
+  <data name="PreviewHandlers_CouldNotBeRead" xml:space="preserve">
+    <value>'{0}' could not be read: {1}</value>
+  </data>
+  <data name="PreviewHandlers_ModelPreviewTurnedOff" xml:space="preserve">
+    <value>The model preview is turned off.</value>
+  </data>
+  <data name="PreviewHandlers_ModelPreviewTurnedOffAet" xml:space="preserve">
+    <value>The model preview is turned off (aet-eaw-edit.features.tools.modelPreview).</value>
+  </data>
+  <data name="PreviewHandlers_ModelWasNotFound" xml:space="preserve">
+    <value>Model '{0}' was not found. {1}</value>
+  </data>
+  <data name="PreviewHandlers_NoModelWasNamed" xml:space="preserve">
+    <value>No model was named.</value>
+  </data>
+  <data name="PreviewHandlers_NoObjectModelAnimationWas" xml:space="preserve">
+    <value>No object, model or animation was named.</value>
+  </data>
+  <data name="PreviewHandlers_NoParticleSystemWasNamed" xml:space="preserve">
+    <value>No particle system was named.</value>
+  </data>
+  <data name="PreviewHandlers_NoProjectileWasNamed" xml:space="preserve">
+    <value>No projectile was named.</value>
+  </data>
+  <data name="PreviewHandlers_NoTextureWasNamed" xml:space="preserve">
+    <value>No texture was named.</value>
+  </data>
+  <data name="PreviewHandlers_ParticleSystemWasNotFound" xml:space="preserve">
+    <value>Particle system '{0}' was not found. {1}</value>
+  </data>
+  <data name="PreviewHandlers_ProjectileNotDefinedThisProject" xml:space="preserve">
+    <value>Projectile '{0}' is not defined in this project.</value>
+  </data>
+  <data name="PreviewHandlers_TextureResolvedButCouldNot" xml:space="preserve">
+    <value>Texture '{0}' resolved but could not be read.</value>
+  </data>
+  <data name="PreviewHandlers_TextureWasNotFound" xml:space="preserve">
+    <value>Texture '{0}' was not found. {1}</value>
+  </data>
+  <data name="PreviewModelAction_NotFound" xml:space="preserve">
+    <value>Model file not found</value>
+  </data>
+  <data name="PreviewModelAction_Preview" xml:space="preserve">
+    <value>Preview model {0}</value>
+  </data>
+  <data name="PreviewScene_AnimationSkeletonDiffers" xml:space="preserve">
+    <value>'{0}' takes its animations from '{1}', whose skeleton differs from '{2}' ({3} bones against {4}). The clips play, bound by bone index - where the two skeletons disagree, a clip drives whatever bone sits at that index.</value>
+  </data>
+  <data name="PreviewScene_BreakoffPropNotDefined" xml:space="preserve">
+    <value>Breakoff prop '{0}' is not defined in this project, so the hardpoint will vanish instead of breaking off.</value>
+  </data>
+  <data name="PreviewScene_CouldNotBeReadIts" xml:space="preserve">
+    <value>'{0}' could not be read for its cameras: {1}</value>
+  </data>
+  <data name="PreviewScene_CouldNotBeReadIts2" xml:space="preserve">
+    <value>'{0}' could not be read for its particle effects: {1}</value>
+  </data>
+  <data name="PreviewScene_DamageStageUntagged" xml:space="preserve">
+    <value>'{0}' declares damage {1}, which nothing in '{2}' is tagged for. The unit reaches that state and does not change.</value>
+  </data>
+  <data name="PreviewScene_DeathCloneNotDefinedThis" xml:space="preserve">
+    <value>Death clone '{0}' is not defined in this project.</value>
+  </data>
+  <data name="PreviewScene_DeclaresNoTacticalModelSo" xml:space="preserve">
+    <value>'{0}' declares no tactical model, so there is nothing to draw.</value>
+  </data>
+  <data name="PreviewScene_HardpointAttachesModelWhichWas" xml:space="preserve">
+    <value>Hardpoint '{0}' attaches model '{1}', which was not found.</value>
+  </data>
+  <data name="PreviewScene_HardpointBoneMissing" xml:space="preserve">
+    <value>Hardpoint '{0}' attaches to bone '{1}', which model '{2}' does not have.</value>
+  </data>
+  <data name="PreviewScene_HardpointMountedButNotDefined" xml:space="preserve">
+    <value>Hardpoint '{0}' is mounted but not defined in this project.</value>
+  </data>
+  <data name="PreviewScene_HardpointNoBone" xml:space="preserve">
+    <value>Hardpoint '{0}' names no {1}. {2}; a Model_To_Attach is never attached.</value>
+  </data>
+  <data name="PreviewScene_HardpointUnreachable" xml:space="preserve">
+    <value>Hardpoint '{0}' is destroyable but names no Collision_Mesh, so no shot can reach it. The unit can never be finished through its hardpoints.</value>
+  </data>
+  <data name="PreviewScene_InheritanceCycle" xml:space="preserve">
+    <value>'{0}' inherits in a cycle through '{1}'; the assembled scene may be incomplete.</value>
+  </data>
+  <data name="PreviewScene_ModelWasNotFound" xml:space="preserve">
+    <value>Model '{0}' was not found. {1}</value>
+  </data>
+  <data name="PreviewScene_Muzzle" xml:space="preserve">
+    <value>Muzzle A</value>
+  </data>
+  <data name="PreviewScene_NoModelForAnimation" xml:space="preserve">
+    <value>No model name prefixes '{0}', so there is nothing to play it on.</value>
+  </data>
+  <data name="PreviewScene_NoMuzzleBones" xml:space="preserve">
+    <value>'{0}' has a WEAPON behaviour but its model declares no MuzzleA bones, so the engine has no muzzle to fire from.</value>
+  </data>
+  <data name="PreviewScene_NoObjectNamedIndexed" xml:space="preserve">
+    <value>No object named '{0}' is indexed.</value>
+  </data>
+  <data name="PreviewScene_NoReticle" xml:space="preserve">
+    <value>GameConstants maps no targeting reticle for hardpoint type '{0}', so the game draws nothing over those hardpoints.</value>
+  </data>
+  <data name="PreviewScene_NotAModel" xml:space="preserve">
+    <value>'{0}' is not an Alamo model or particle system: Its root chunk id is neither. The file may be renamed or truncated.</value>
+  </data>
+  <data name="PreviewScene_PlacedAtFireBone" xml:space="preserve">
+    <value>The game places it at Fire_Bone_A '{0}'</value>
+  </data>
+  <data name="PreviewScene_PlacedAtOrigin" xml:space="preserve">
+    <value>The game places it at the map origin</value>
+  </data>
+  <data name="PreviewScene_ProjectileNotDefinedThisProject" xml:space="preserve">
+    <value>Projectile '{0}' is not defined in this project.</value>
+  </data>
+  <data name="PreviewScene_SkeletonMismatch" xml:space="preserve">
+    <value>'{0}' does not match the skeleton of {1}. An animation exported against a different revision of a model cannot be played on it.</value>
+  </data>
+  <data name="PreviewScene_TargetableNoBone" xml:space="preserve">
+    <value>Hardpoint '{0}' is targetable but names no {1}. {2} and draws its reticle in the screen corner.</value>
+  </data>
+  <data name="PreviewScene_TargetableNoBoneUnkillable" xml:space="preserve">
+    <value>Hardpoint '{0}' is targetable but names no {1}. {2} and draws its reticle in the screen corner. It cannot be hit, so the unit cannot be destroyed.</value>
+  </data>
+  <data name="PreviewScene_UnboundAbilityEffect" xml:space="preserve">
+    <value>{0} names {1} by its prefix, but this object declares no such ability - the effect is unbound.</value>
+  </data>
+  <data name="PreviewSubMesh_NoSuchBone" xml:space="preserve">
+    <value>(no such bone: {0})</value>
+  </data>
+  <data name="PreviewSubMesh_NoSuchMesh" xml:space="preserve">
+    <value>Model '{0}' has {1} meshes; {2} is not one of them.</value>
+  </data>
+  <data name="PreviewSubMesh_NoSuchSubMesh" xml:space="preserve">
+    <value>Mesh '{0}' has {1} sub-meshes; {2} is not one of them.</value>
+  </data>
+  <data name="PreviewUnitCodeLens_PreviewUnit" xml:space="preserve">
+    <value>preview unit</value>
+  </data>
+  <data name="ProjectConfig_CouldNotLoadModProject" xml:space="preserve">
+    <value>Could not load mod project configuration: {0}</value>
+  </data>
+  <data name="ProjectConfig_LoadedOtherProjectFileS" xml:space="preserve">
+    <value>Loaded '{0}'. Other project files under this workspace are not served by this server - {1}; open their folders to work on them.</value>
+  </data>
+  <data name="ProjectConfig_NoPgprojFileWasFound" xml:space="preserve">
+    <value>No .pgproj file was found under [{0}]. This folder is not a mod project, so nothing has been indexed and no XML or Lua support is available here. Open the folder that contains the .pgproj, or create one.</value>
+  </data>
+  <data name="ProjectConfig_ProjectFileDoesNotExist" xml:space="preserve">
+    <value>The project file '{0}' does not exist. Nothing has been indexed; reopen the folder once the file is back, or remove it from the workspace.</value>
+  </data>
+  <data name="ProjectileCategoryList_IsNotAKnownOn" xml:space="preserve">
+    <value>'{0}' is not a known {1} on &lt;{2}&gt; - the engine never matches it, so that projectile is not intercepted.</value>
+  </data>
+  <data name="RedirectBlasterApplicableUnitsRule_Consequence" xml:space="preserve">
+    <value>cannot block or redirect fire</value>
+  </data>
+  <data name="ReferenceResolution_BehaviourSeparator" xml:space="preserve">
+    <value> or </value>
+  </data>
+  <data name="ReferenceResolution_CannotResolve" xml:space="preserve">
+    <value>Cannot resolve reference '{0}': No object with this name exists in the workspace.</value>
+  </data>
+  <data name="ReferenceResolution_CannotVerify" xml:space="preserve">
+    <value>Cannot verify reference '{0}': Checking {1} references is not supported yet.</value>
+  </data>
+  <data name="ReferenceResolution_KindMismatch" xml:space="preserve">
+    <value>Type mismatch for '{0}': Expected a {1}{2}.</value>
+  </data>
+  <data name="ReferenceResolution_NoBehaviour" xml:space="preserve">
+    <value>, but it has no {0} behaviour</value>
+  </data>
+  <data name="ReferenceResolution_TypeMismatch" xml:space="preserve">
+    <value>Type mismatch for '{0}': Expected '{1}' but found '{2}'.</value>
+  </data>
+  <data name="ReferencesCodeLens_Reference" xml:space="preserve">
+    <value>1 reference</value>
+  </data>
+  <data name="ReferencesCodeLens_References" xml:space="preserve">
+    <value>{0} references</value>
+  </data>
+  <data name="RemoveEarlierDuplicatesAction_Remove" xml:space="preserve">
+    <value>Remove the earlier duplicates of '{0}' ({1}) - the game keeps the last occurrence</value>
+  </data>
+  <data name="RemoveRedundantOverrideAction_RemoveRedundantOverride" xml:space="preserve">
+    <value>Remove redundant override '{0}'</value>
+  </data>
+  <data name="RequiredFirstEntry_MustListFirstItIs" xml:space="preserve">
+    <value>&lt;{0}&gt; must list '{1}' first - it is entry 0, which the engine hands out whenever a lookup misses, so putting '{2}' there silently repoints every default that falls back to it</value>
+  </data>
+  <data name="RespawnTimeList_EntriesMustBeOrGreater" xml:space="preserve">
+    <value>&lt;{0}&gt; entries must be 0 or greater. The engine discards the whole respawn table, min and max together</value>
+  </data>
+  <data name="RespawnTimeList_NeedsOneEntryPerTech" xml:space="preserve">
+    <value>&lt;{0}&gt; needs one entry per tech level - {1} values, but has {2}. The engine discards the whole respawn table, min and max together</value>
+  </data>
+  <data name="RespawnTimeList_UsesZeroAsARespawn" xml:space="preserve">
+    <value>&lt;{0}&gt; uses zero as a respawn time, which is only allowed when every entry is zero - that is how the respawn feature is switched off. The engine discards the whole respawn table, min and max together</value>
+  </data>
+  <data name="RespawnTimeOrderRule_Expectation" xml:space="preserve">
+    <value>cannot be greater than</value>
+  </data>
+  <data name="RgbaValue_ContainsFloatComponentsButExpects" xml:space="preserve">
+    <value>'{0}' contains float components but &lt;{1}&gt; expects integers. '{2}' is the nearest valid value.</value>
+  </data>
+  <data name="RgbaValue_IsNotAValidRgba" xml:space="preserve">
+    <value>'{0}' is not a valid RGBA color for &lt;{1}&gt;. Expected 3 or 4 integers in 0-255, separated by spaces or commas.</value>
+  </data>
+  <data name="RunnableModLayout_LayerHasNoProjectFile" xml:space="preserve">
+    <value>The layer has no project file, so there is no directory to launch it from</value>
+  </data>
+  <data name="RunnableModLayout_NotUnderDataGameOnly" xml:space="preserve">
+    <value>'{0}' is not under '{1}/Data', and the game only reads a mod's Data tree</value>
+  </data>
+  <data name="RunnableModLayout_ProjectDirectoryContainsSpaceGame" xml:space="preserve">
+    <value>The project directory '{0}' contains a space; the game's command line cannot carry a path with one</value>
+  </data>
+  <data name="SFXEventReference_Noun" xml:space="preserve">
+    <value>SFX event reference</value>
+  </data>
+  <data name="SchemaBootstrapper_NoSchemaPointAetEaw" xml:space="preserve">
+    <value>No schema in {0}. Point "aet-eaw-edit.lsp.schema.localPath" at the schema's eaw folder, the one holding _index.json</value>
+  </data>
+  <data name="ServerStatus_AssetCatalogNoModels" xml:space="preserve">
+    <value>Asset catalog: No models</value>
+  </data>
+  <data name="ServerStatus_ProjectFiles" xml:space="preserve">
+    <value>Project files: 0</value>
+  </data>
+  <data name="ServerStatus_SchemaNotLoaded" xml:space="preserve">
+    <value>Schema: Not loaded</value>
+  </data>
+  <data name="SfxCount_IsNotAValidSfx" xml:space="preserve">
+    <value>'{0}' is not a valid SFX count for &lt;{1}&gt;. Expected -1 or a non-negative integer. {2} is the nearest valid value.</value>
+  </data>
+  <data name="SfxEventHudReference_Noun" xml:space="preserve">
+    <value>SFX HUD event reference</value>
+  </data>
+  <data name="SfxEventType_Noun" xml:space="preserve">
+    <value>SFX event</value>
+  </data>
+  <data name="SfxPercentage_IsNotAValidSfx" xml:space="preserve">
+    <value>'{0}' is not a valid SFX percentage for &lt;{1}&gt;. Expected [0, 100]. {2} is the nearest valid value.</value>
+  </data>
+  <data name="ShaderVersionHex_IsNotAValidHex" xml:space="preserve">
+    <value>'{0}' is not a valid hex literal for &lt;{1}&gt;. Expected format: 0x[0-9A-Fa-f]+.</value>
+  </data>
+  <data name="ShipClassType_IsNotAValidShip" xml:space="preserve">
+    <value>'' is not a valid ship class type for &lt;{0}&gt;.</value>
+  </data>
+  <data name="Sidecar_CouldNotBeBroughtForward" xml:space="preserve">
+    <value>'{0}' could not be brought forward: {1}. Defaults are in use and the file was left alone.</value>
+  </data>
+  <data name="Sidecar_CouldNotBeReadWas" xml:space="preserve">
+    <value>'{0}' could not be read and was left alone. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_CouldNotWrite" xml:space="preserve">
+    <value>Could not write '{0}': {1}</value>
+  </data>
+  <data name="Sidecar_DeclaresNoSoThereNo" xml:space="preserve">
+    <value>'{0}' declares no '{1}' or '{2}', so there is no way to tell which shape it holds. It was left alone and defaults are in use.</value>
+  </data>
+  <data name="Sidecar_DeclaresUnreadableVersionDefaultsAre" xml:space="preserve">
+    <value>'{0}' declares an unreadable version '{1}'. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_DeclaresVersionWhichNotVersion" xml:space="preserve">
+    <value>'{0}' declares version '{1}', which is not a version of '{2}'. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_DoesNotMatchShapeDefaults" xml:space="preserve">
+    <value>'{0}' does not match the shape of '{1}'. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_EmptyDefaultsAreUse" xml:space="preserve">
+    <value>'{0}' is empty. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_HoldsNotDefaultsAreUse" xml:space="preserve">
+    <value>'{0}' holds '{1}', not '{2}'. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_NotJSONObjectNoMigration" xml:space="preserve">
+    <value>'{0}' is not a JSON object and no migration made it one. Defaults are in use.</value>
+  </data>
+  <data name="Sidecar_VersionWhichThisVersionAet" xml:space="preserve">
+    <value>'{0}' is version {1}, which this version of aet-eaw-edit does not understand (it writes {2}). Update the extension to open this project. The file has been left untouched.</value>
+  </data>
+  <data name="Sidecar_WasWrittenByNewerVersion" xml:space="preserve">
+    <value>'{0}' was written by a newer version of aet-eaw-edit and is left untouched. Update the extension to edit this project.</value>
+  </data>
+  <data name="SlotItemChecks_FileWasNotFoundIn" xml:space="preserve">
+    <value>{0} file '{1}' was not found in the game data or workspace asset files.</value>
+  </data>
+  <data name="SlotItemChecks_IsNotAValidModel" xml:space="preserve">
+    <value>'{0}' is not a valid model filename for the {1} of &lt;{2}&gt;. Expected a .alo file.</value>
+  </data>
+  <data name="SlotItemChecks_IsNotAValueWhich" xml:space="preserve">
+    <value>'{0}' is not a {1} value, which the {2} of &lt;{3}&gt; has to be.</value>
+  </data>
+  <data name="SpecialWeaponBehavior_HasNeitherTheSpecialWeapon" xml:space="preserve">
+    <value>'{0}' has neither the SPECIAL_WEAPON nor the LOBBING_SUPERWEAPON behaviour, so the game never registers it as a special weapon.</value>
+  </data>
+  <data name="SpecialWeaponIndex_HasNoSoTheGame" xml:space="preserve">
+    <value>'{0}' has no {1}, so the game never registers it as a special weapon.</value>
+  </data>
+  <data name="SpecialWeaponIndex_HasOutsideToSoThe" xml:space="preserve">
+    <value>'{0}' has {1} {2}, outside 0 to {3}, so the game never registers it as a special weapon.</value>
+  </data>
+  <data name="SpeechEventReference_Noun" xml:space="preserve">
+    <value>speech event reference</value>
+  </data>
+  <data name="SplitFavorsOwnerIgnoredRule_Consequence" xml:space="preserve">
+    <value>turns it off and zeroes Owner_Income_Percentage</value>
+  </data>
+  <data name="SplitFavorsOwnerIgnoredRule_Problem" xml:space="preserve">
+    <value>does nothing without &lt;{0}&gt;</value>
+  </data>
+  <data name="SplitFavorsOwnerIgnoredRule_RepairTitle" xml:space="preserve">
+    <value>Apply the engine's own correction: Turn Split_Favors_Owner off</value>
+  </data>
+  <data name="SplitFavorsOwnerVsFullAmountRule_Consequence" xml:space="preserve">
+    <value>turns both off</value>
+  </data>
+  <data name="SplitFavorsOwnerVsFullAmountRule_Problem" xml:space="preserve">
+    <value>cannot be set together with &lt;{0}&gt;</value>
+  </data>
+  <data name="SplitFavorsOwnerVsFullAmountRule_RepairTitle" xml:space="preserve">
+    <value>Apply the engine's own correction: Turn both flags off</value>
+  </data>
+  <data name="SquadronOffsetsMismatch_SquadronHasUnitSBut" xml:space="preserve">
+    <value>Squadron has {0} unit(s) but only {1} Squadron_Offsets. Add {2} more.</value>
+  </data>
+  <data name="SquadronOffsetsMismatch_SquadronHasUnitSBut2" xml:space="preserve">
+    <value>Squadron has {0} unit(s) but {1} Squadron_Offsets. Remove {2} excess.</value>
+  </data>
+  <data name="SquadronSyncAction_AddMissingSquadronOffsets" xml:space="preserve">
+    <value>Add {0} missing Squadron_Offsets (0, 0, 0)</value>
+  </data>
+  <data name="SquadronSyncAction_RemoveExcessSquadronOffsets" xml:space="preserve">
+    <value>Remove {0} excess Squadron_Offsets</value>
+  </data>
+  <data name="SquadronSyncAction_SyncAllSquadronOffsetsSquadron" xml:space="preserve">
+    <value>Sync all Squadron_Offsets to Squadron_Units</value>
+  </data>
+  <data name="StartupPipeline_IndexingWorkspace" xml:space="preserve">
+    <value>Indexing workspace</value>
+  </data>
+  <data name="StartupPipeline_LoadingSchemaBaseline" xml:space="preserve">
+    <value>Loading schema and baseline</value>
+  </data>
+  <data name="StartupProgress_StarWarsLSPStarting" xml:space="preserve">
+    <value>Star Wars LSP - starting</value>
+  </data>
+  <data name="StoryChain_NotAManifest" xml:space="preserve">
+    <value>'{0}' is not a valid story plot manifest: Missing &lt;Story_Mode_Plots&gt; root element.</value>
+  </data>
+  <data name="StoryChain_PlotFileMissing" xml:space="preserve">
+    <value>Story plot file '{0}' does not exist in any project layer or the baseline.</value>
+  </data>
+  <data name="StoryChain_StoryFileMissing" xml:space="preserve">
+    <value>Story file '{0}' does not exist in any project layer or the baseline.</value>
+  </data>
+  <data name="StoryCommand_ADependency" xml:space="preserve">
+    <value>a dependency</value>
+  </data>
+  <data name="StoryCommand_AddPlotManifestNeedsFaction" xml:space="preserve">
+    <value>addPlotManifest needs the faction.</value>
+  </data>
+  <data name="StoryCommand_AddPrereq" xml:space="preserve">
+    <value>Add prereq to '{0}'</value>
+  </data>
+  <data name="StoryCommand_AddPrereqAlternatives" xml:space="preserve">
+    <value>Add prereq alternatives to '{0}'</value>
+  </data>
+  <data name="StoryCommand_AddPrereqAlternativesNeedsTokens" xml:space="preserve">
+    <value>addPrereqAlternatives needs tokens.</value>
+  </data>
+  <data name="StoryCommand_AddPrereqGroup" xml:space="preserve">
+    <value>Add prereq group to '{0}'</value>
+  </data>
+  <data name="StoryCommand_AddPrereqGroupNeedsTokens" xml:space="preserve">
+    <value>addPrereqGroup needs tokens.</value>
+  </data>
+  <data name="StoryCommand_AddPrereqNeedsToken" xml:space="preserve">
+    <value>addPrereq needs a token.</value>
+  </data>
+  <data name="StoryCommand_AlreadyNamesEventCampaign" xml:space="preserve">
+    <value>'{0}' already names an event in campaign '{1}'.</value>
+  </data>
+  <data name="StoryCommand_AttachLuaScript" xml:space="preserve">
+    <value>Attach Lua script '{0}'</value>
+  </data>
+  <data name="StoryCommand_AttachPlotManifest" xml:space="preserve">
+    <value>Attach plot manifest '{0}'</value>
+  </data>
+  <data name="StoryCommand_CampaignSetFileDeclaringCould" xml:space="preserve">
+    <value>The campaign set file declaring '{0}' could not be located.</value>
+  </data>
+  <data name="StoryCommand_CampaignWasNotFound" xml:space="preserve">
+    <value>Campaign '{0}' was not found in '{1}'.</value>
+  </data>
+  <data name="StoryCommand_CannotBeRenamedNotOwned" xml:space="preserve">
+    <value>'{0}' cannot be renamed (not owned by the project layer).</value>
+  </data>
+  <data name="StoryCommand_CommandNeedsEventName" xml:space="preserve">
+    <value>The command needs an eventName.</value>
+  </data>
+  <data name="StoryCommand_CommandNeedsPlotManifestFile" xml:space="preserve">
+    <value>The command needs the plot manifest file.</value>
+  </data>
+  <data name="StoryCommand_CommandNeedsThreadUri" xml:space="preserve">
+    <value>The command needs a threadUri.</value>
+  </data>
+  <data name="StoryCommand_CommandNeedsValueThreadFile" xml:space="preserve">
+    <value>The command needs a value (thread file or script name).</value>
+  </data>
+  <data name="StoryCommand_CommandProducedNoChanges" xml:space="preserve">
+    <value>The command produced no changes.</value>
+  </data>
+  <data name="StoryCommand_CreateStoryEvent" xml:space="preserve">
+    <value>Create story event '{0}'</value>
+  </data>
+  <data name="StoryCommand_CreateStoryThread" xml:space="preserve">
+    <value>Create story thread '{0}'</value>
+  </data>
+  <data name="StoryCommand_CreateTacticalAttachment" xml:space="preserve">
+    <value>Create tactical attachment '{0}'</value>
+  </data>
+  <data name="StoryCommand_CreateTacticalAttachmentNeedsTacticalManifestFile" xml:space="preserve">
+    <value>createTacticalAttachment needs the tactical manifest file.</value>
+  </data>
+  <data name="StoryCommand_DeleteStoryEvent" xml:space="preserve">
+    <value>Delete story event '{0}'</value>
+  </data>
+  <data name="StoryCommand_DetachPlotManifest" xml:space="preserve">
+    <value>Detach plot manifest '{0}'</value>
+  </data>
+  <data name="StoryCommand_DetachStoryThread" xml:space="preserve">
+    <value>Detach story thread '{0}'</value>
+  </data>
+  <data name="StoryCommand_EventWasNotFoundCampaign" xml:space="preserve">
+    <value>Event '{0}' was not found in campaign '{1}'.</value>
+  </data>
+  <data name="StoryCommand_EventWasNotFoundThread" xml:space="preserve">
+    <value>Event '{0}' was not found in the thread.</value>
+  </data>
+  <data name="StoryCommand_HasNoPrereq" xml:space="preserve">
+    <value>'{0}' has no prereq '{1}'.</value>
+  </data>
+  <data name="StoryCommand_HasNoPrereqGroup" xml:space="preserve">
+    <value>'{0}' has no prereq group {1}.</value>
+  </data>
+  <data name="StoryCommand_NameTakenCampaignWide" xml:space="preserve">
+    <value>'{0}' already names an event in campaign '{1}' - event names resolve campaign-wide.</value>
+  </data>
+  <data name="StoryCommand_NamesEventsThisThreadFix" xml:space="preserve">
+    <value>'{0}' names {1} events in this thread - fix the duplicate first.</value>
+  </data>
+  <data name="StoryCommand_NeedsNewName" xml:space="preserve">
+    <value>{0} needs a newName.</value>
+  </data>
+  <data name="StoryCommand_NotAttachedCampaign" xml:space="preserve">
+    <value>'{0}' is not attached to campaign '{1}'.</value>
+  </data>
+  <data name="StoryCommand_NotListedNeverDeleted" xml:space="preserve">
+    <value>'{0}' is not listed in '{1}'. The file itself is never deleted - remove it manually if intended.</value>
+  </data>
+  <data name="StoryCommand_NotListedOrAlready" xml:space="preserve">
+    <value>'{0}' is not listed in '{1}', or it is already in the requested state.</value>
+  </data>
+  <data name="StoryCommand_NotReadable" xml:space="preserve">
+    <value>'{0}' is not readable.</value>
+  </data>
+  <data name="StoryCommand_PlotManifestWasNotFound" xml:space="preserve">
+    <value>Plot manifest '{0}' was not found in the workspace.</value>
+  </data>
+  <data name="StoryCommand_PrereqGroupHasNoToken" xml:space="preserve">
+    <value>Prereq group {0} of '{1}' has no token '{2}'.</value>
+  </data>
+  <data name="StoryCommand_ReadOnlyLayer" xml:space="preserve">
+    <value>'{0}' belongs to {1}, which is read-only. Copy the file into the project's xml directory to override it, then edit the copy.</value>
+  </data>
+  <data name="StoryCommand_RemovePrereqFrom" xml:space="preserve">
+    <value>Remove prereq from '{0}'</value>
+  </data>
+  <data name="StoryCommand_RemovePrereqNeedsToken" xml:space="preserve">
+    <value>removePrereq needs a token.</value>
+  </data>
+  <data name="StoryCommand_RemoveReward" xml:space="preserve">
+    <value>Remove the reward of '{0}'</value>
+  </data>
+  <data name="StoryCommand_RemoveTrigger" xml:space="preserve">
+    <value>Remove the trigger of '{0}'</value>
+  </data>
+  <data name="StoryCommand_RenameAmbiguous" xml:space="preserve">
+    <value>'{0}' names {1} events in campaign '{2}' - rename is ambiguous. Disambiguate them first.</value>
+  </data>
+  <data name="StoryCommand_RenameEventNeedsEventNameNewName" xml:space="preserve">
+    <value>renameEvent needs eventName and newName.</value>
+  </data>
+  <data name="StoryCommand_RenameProducedNoChanges" xml:space="preserve">
+    <value>The rename produced no changes.</value>
+  </data>
+  <data name="StoryCommand_RenameStoryEvent" xml:space="preserve">
+    <value>Rename story event '{0}'</value>
+  </data>
+  <data name="StoryCommand_RetargetControlEdge" xml:space="preserve">
+    <value>Retarget control edge of '{0}'</value>
+  </data>
+  <data name="StoryCommand_RetargetControlEdgeNeedsGroupIndexRewardSlot" xml:space="preserve">
+    <value>retargetControlEdge needs groupIndex (the reward slot) and token.</value>
+  </data>
+  <data name="StoryCommand_SetBranch" xml:space="preserve">
+    <value>Set branch of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetDialog" xml:space="preserve">
+    <value>Set dialog of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetEventType" xml:space="preserve">
+    <value>Set event type of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetParams" xml:space="preserve">
+    <value>Set params of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetParamsNeedsParamKindEventReward" xml:space="preserve">
+    <value>setParams needs paramKind 'event' or 'reward'.</value>
+  </data>
+  <data name="StoryCommand_SetParamsNeedsParams" xml:space="preserve">
+    <value>setParams needs params.</value>
+  </data>
+  <data name="StoryCommand_SetPerpetual" xml:space="preserve">
+    <value>Set perpetual of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetRewardType" xml:space="preserve">
+    <value>Set reward type of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetThreadState" xml:space="preserve">
+    <value>Set thread state of '{0}'</value>
+  </data>
+  <data name="StoryCommand_SetThreadStateNeedsFlagTrueSuspended" xml:space="preserve">
+    <value>setThreadState needs flag (true = suspended).</value>
+  </data>
+  <data name="StoryCommand_UnknownStoryCommand" xml:space="preserve">
+    <value>Unknown story command '{0}'.</value>
+  </data>
+  <data name="StoryDialogReference_ChapterIsNotDefinedIn" xml:space="preserve">
+    <value>Chapter {0} is not defined in story dialog '{1}' ({2}).</value>
+  </data>
+  <data name="StoryDialogReference_DefinedChapters" xml:space="preserve">
+    <value>defined chapters: {0}</value>
+  </data>
+  <data name="StoryDialogReference_NoChapters" xml:space="preserve">
+    <value>the file defines no chapters</value>
+  </data>
+  <data name="StoryDialogReference_StoryDialogDoesNotResolve" xml:space="preserve">
+    <value>Story dialog '{0}' does not resolve to a .txt script under the project's storyDialog directories.</value>
+  </data>
+  <data name="StoryDialog_BeforeFirstChapter" xml:space="preserve">
+    <value>'{0}' appears before the first [CHAPTER &lt;number&gt;] header.</value>
+  </data>
+  <data name="StoryDialog_ChapterDefinedTwice" xml:space="preserve">
+    <value>Chapter {0} is already defined in this file.</value>
+  </data>
+  <data name="StoryDialog_MalformedChapterHeader" xml:space="preserve">
+    <value>Malformed chapter header '{0}': Expected '[CHAPTER &lt;number&gt;]'.</value>
+  </data>
+  <data name="StoryEditingFeature_Disabled" xml:space="preserve">
+    <value>Story editing is disabled. Enable 'aet-eaw-edit.features.tools.storyEditing' in the editor settings.</value>
+  </data>
+  <data name="StoryEditorFeature_Disabled" xml:space="preserve">
+    <value>The story editor is disabled. Enable 'aet-eaw-edit.features.tools.storyEditor' in the editor settings.</value>
+  </data>
+  <data name="StoryEditorFeature_DiscoveryMissing" xml:space="preserve">
+    <value>The story editor requires story discovery. Enable 'aet-eaw-edit.features.story.discovery' in the editor settings.</value>
+  </data>
+  <data name="StoryGraph_AmbiguousTarget" xml:space="preserve">
+    <value>'{0}' names more than one event in the same plot file - the engine's pick is undefined.</value>
+  </data>
+  <data name="StoryGraph_ControlTarget" xml:space="preserve">
+    <value>{0} target</value>
+  </data>
+  <data name="StoryGraph_DuplicateEventName" xml:space="preserve">
+    <value>Event name '{0}' is defined {1} times in this file.</value>
+  </data>
+  <data name="StoryGraph_EventInOtherFile" xml:space="preserve">
+    <value>{0} '{1}' is not an event in this plot file - the engine only looks here and asserts. An event of that name is in {2}.</value>
+  </data>
+  <data name="StoryGraph_FlagNameTooLong" xml:space="preserve">
+    <value>Flag name '{0}' is {1} characters long - the engine truncates at {2}.</value>
+  </data>
+  <data name="StoryGraph_GenericNeverRaised" xml:space="preserve">
+    <value>The game never raises '{0}' as a generic trigger and no TRIGGER_EVENT pushes '{1}' - it never fires. The game raises {2}.</value>
+  </data>
+  <data name="StoryGraph_MissionLostAfterSummary" xml:space="preserve">
+    <value>'{0}' never fires: The game delivers STORY_MISSION_LOST before the battle summary closes, and '{0}' arms only after '{1}' (battle_end_closed). After a lost battle the game offers a retry instead.</value>
+  </data>
+  <data name="StoryGraph_NeverFires" xml:space="preserve">
+    <value>'{0}' can never fire: No prerequisite line is satisfiable and nothing triggers it.</value>
+  </data>
+  <data name="StoryGraph_NoMatchingEvent" xml:space="preserve">
+    <value>{0} '{1}' does not match any event in this campaign.</value>
+  </data>
+  <data name="StoryGraph_PrereqCycle" xml:space="preserve">
+    <value>'{0}' is part of a prerequisite cycle ({1}) - none of these events can arm.</value>
+  </data>
+  <data name="StoryGraph_Prerequisite" xml:space="preserve">
+    <value>Prerequisite</value>
+  </data>
+  <data name="StoryGraph_SuspendedNeverActivated" xml:space="preserve">
+    <value>This plot is suspended in campaign '{0}' and no STORY_ELEMENT reward activates it.</value>
+  </data>
+  <data name="StoryGraph_TagOrder" xml:space="preserve">
+    <value>'{0}' appears after '{1}' - the engine expects the documented event tag order.</value>
+  </data>
+  <data name="StoryHandlers_ApplyStoryChangeS" xml:space="preserve">
+    <value>Apply story changes ({0})</value>
+  </data>
+  <data name="StoryHandlers_CampaignCouldNotBeAssembled" xml:space="preserve">
+    <value>Campaign '{0}' could not be assembled from the staged changes.</value>
+  </data>
+  <data name="StoryHandlers_CampaignWasNotFound" xml:space="preserve">
+    <value>Campaign '{0}' was not found.</value>
+  </data>
+  <data name="StoryHandlers_ChangeCanTBeStaged" xml:space="preserve">
+    <value>Change {0} of {1} can't be staged: {2}</value>
+  </data>
+  <data name="StoryHandlers_NodeWasNotFoundCampaign" xml:space="preserve">
+    <value>Node '{0}' was not found in campaign '{1}'.</value>
+  </data>
+  <data name="StoryLayout_DroppedPositions" xml:space="preserve">
+    <value>Saved node positions that named a story file no longer matching exactly one thread were dropped - {0}. Those events are arranged automatically the next time their graph opens.</value>
+  </data>
+  <data name="StoryParamEnum_IsNotAValidValue" xml:space="preserve">
+    <value>'{0}' is not a valid {1} value.</value>
+  </data>
+  <data name="StoryParamRequired_Requires" xml:space="preserve">
+    <value>{0} requires {1}.</value>
+  </data>
+  <data name="StoryParamRequired_Requires2" xml:space="preserve">
+    <value>{0} requires {1} - {2}.</value>
+  </data>
+  <data name="StoryParamUnknownSlot_IsNotUsedBy" xml:space="preserve">
+    <value>'{0}' is not used by {1}.</value>
+  </data>
+  <data name="StoryParamValueNotes_BuggedInEngine" xml:space="preserve">
+    <value>'{0}' is accepted but does nothing in the engine.</value>
+  </data>
+  <data name="StoryParamValueNotes_Deprecated" xml:space="preserve">
+    <value>'{0}' is deprecated and should not be used.</value>
+  </data>
+  <data name="StoryParamValueNotes_Untested" xml:space="preserve">
+    <value>'{0}' is documented but untested - it may not work in the engine.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidBoolean" xml:space="preserve">
+    <value>'{0}' is not a valid boolean value. Use 0, 1, true, or false.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidD" xml:space="preserve">
+    <value>'{0}' is not a valid 3D vector. Expected three space- or comma-separated numbers.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidInteger" xml:space="preserve">
+    <value>'{0}' is not a valid integer.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number.</value>
+  </data>
+  <data name="StoryParamValue_IsNotAValidNumber2" xml:space="preserve">
+    <value>'{0}' is not a valid number in vector '{1}'.</value>
+  </data>
+  <data name="StorySimFeature_Disabled" xml:space="preserve">
+    <value>The story simulator is disabled. Enable 'aet-eaw-edit.features.tools.storySimulator' in the editor settings.</value>
+  </data>
+  <data name="StorySimLua_EmissionIn" xml:space="preserve">
+    <value>{0} in {1:0.#}s</value>
+  </data>
+  <data name="StorySimLua_Entered" xml:space="preserve">
+    <value>{0}: Entered '{1}'.</value>
+  </data>
+  <data name="StorySimLua_Left" xml:space="preserve">
+    <value>{0}: Left '{1}'.</value>
+  </data>
+  <data name="StorySimLua_NextState" xml:space="preserve">
+    <value>{0}: Next state '{1}'.</value>
+  </data>
+  <data name="StorySimLua_Owes" xml:space="preserve">
+    <value>owes {0}.</value>
+  </data>
+  <data name="StorySimLua_SetNextState" xml:space="preserve">
+    <value>{0}: Set_Next_State '{1}'.</value>
+  </data>
+  <data name="StorySimLua_StoryEventFromNoArmed" xml:space="preserve">
+    <value>Story_Event("{0}") from '{1}' - no armed event listens.</value>
+  </data>
+  <data name="StorySimLua_TriggerDroppedTransitionPending" xml:space="preserve">
+    <value>{0}: Trigger '{1}' dropped - a transition to '{2}' is pending.</value>
+  </data>
+  <data name="StorySimService_BattleAlready" xml:space="preserve">
+    <value>Battle '{0}' is already {1}</value>
+  </data>
+  <data name="StorySimService_BattleHasNoOutcomeRetry" xml:space="preserve">
+    <value>Battle '{0}' has no outcome to retry</value>
+  </data>
+  <data name="StorySimService_BattleRestartRunAgain" xml:space="preserve">
+    <value>Battle '{0}' is {1} - restart to run it again</value>
+  </data>
+  <data name="StorySimService_BattleStillRunningResolveFirst" xml:space="preserve">
+    <value>Battle '{0}' is still running - resolve it first</value>
+  </data>
+  <data name="StorySimService_GalaxyPausedBattleRunning" xml:space="preserve">
+    <value>Galaxy paused - battle '{0}' running</value>
+  </data>
+  <data name="StorySimService_GalaxyPausedBattleStarting" xml:space="preserve">
+    <value>Galaxy paused - battle '{0}' starting</value>
+  </data>
+  <data name="StorySimService_NoSimulationRunning" xml:space="preserve">
+    <value>No simulation running for {0}</value>
+  </data>
+  <data name="StorySimService_NotBattle" xml:space="preserve">
+    <value>'{0}' is not a battle of {1}.</value>
+  </data>
+  <data name="StorySimService_TickOutsideRun" xml:space="preserve">
+    <value>Tick {0} is outside the run (0 to {1}).</value>
+  </data>
+  <data name="StorySimService_WasNotFound" xml:space="preserve">
+    <value>{0} was not found.</value>
+  </data>
+  <data name="StorySimWorld_ABattleStartsAt" xml:space="preserve">
+    <value>a battle starts at {0}</value>
+  </data>
+  <data name="StorySimWorld_AllDestroyed" xml:space="preserve">
+    <value>all {0} of {1} destroyed</value>
+  </data>
+  <data name="StorySimWorld_AllObjectivesRemoved" xml:space="preserve">
+    <value>all objectives removed.</value>
+  </data>
+  <data name="StorySimWorld_AssumeMetNeedsEvent" xml:space="preserve">
+    <value>AssumeMet needs an event.</value>
+  </data>
+  <data name="StorySimWorld_BattleBegins" xml:space="preserve">
+    <value>battle {0} begins.</value>
+  </data>
+  <data name="StorySimWorld_BattlePendingFightAutoResolve" xml:space="preserve">
+    <value>battle {0} pending: Fight or auto-resolve.</value>
+  </data>
+  <data name="StorySimWorld_BattleStartsAt" xml:space="preserve">
+    <value>{0} battle starts at {1}</value>
+  </data>
+  <data name="StorySimWorld_BouncedAt" xml:space="preserve">
+    <value>{0} bounced at {1}</value>
+  </data>
+  <data name="StorySimWorld_BuildsXAt" xml:space="preserve">
+    <value>{0} builds {1} x {2} at {3}</value>
+  </data>
+  <data name="StorySimWorld_Captures" xml:space="preserve">
+    <value>{0} captures {1}</value>
+  </data>
+  <data name="StorySimWorld_Corrupted" xml:space="preserve">
+    <value>{0} corrupted</value>
+  </data>
+  <data name="StorySimWorld_Credits" xml:space="preserve">
+    <value>{0} credits {1:+#;-#;0}</value>
+  </data>
+  <data name="StorySimWorld_Destroyed" xml:space="preserve">
+    <value>{0} destroyed</value>
+  </data>
+  <data name="StorySimWorld_Enters" xml:space="preserve">
+    <value>{0} enters {1}</value>
+  </data>
+  <data name="StorySimWorld_EraBegins" xml:space="preserve">
+    <value>era {0} begins</value>
+  </data>
+  <data name="StorySimWorld_FORCECLICKGUIPressedGame" xml:space="preserve">
+    <value>FORCE_CLICK_GUI {0}: Pressed in the game; no listener hears a forced click.</value>
+  </data>
+  <data name="StorySimWorld_GUIClicked" xml:space="preserve">
+    <value>GUI {0} clicked</value>
+  </data>
+  <data name="StorySimWorld_GameWouldActHereSimulator" xml:space="preserve">
+    <value>{0}: The game would act here; the simulator records no fact for it.</value>
+  </data>
+  <data name="StorySimWorld_Generic" xml:space="preserve">
+    <value>generic {0}</value>
+  </data>
+  <data name="StorySimWorld_IgnoredNotKnownName" xml:space="preserve">
+    <value>{0} ignored - '{1}' is not a known name.</value>
+  </data>
+  <data name="StorySimWorld_LINKTACTICALFromInsideBattle" xml:space="preserve">
+    <value>LINK_TACTICAL {0} from inside a battle: Queued for the galaxy, not modelled here.</value>
+  </data>
+  <data name="StorySimWorld_LINKTACTICALNamesNoBattle" xml:space="preserve">
+    <value>LINK_TACTICAL names no battle the model knows.</value>
+  </data>
+  <data name="StorySimWorld_LINKTACTICALWhilePendingGame" xml:space="preserve">
+    <value>LINK_TACTICAL {0} while {1} is pending: The game queues nothing.</value>
+  </data>
+  <data name="StorySimWorld_LosesAt" xml:space="preserve">
+    <value>{0} loses at {1}</value>
+  </data>
+  <data name="StorySimWorld_MaxTech" xml:space="preserve">
+    <value>{0} max tech {1}.</value>
+  </data>
+  <data name="StorySimWorld_Moves" xml:space="preserve">
+    <value>{0} moves to {1}</value>
+  </data>
+  <data name="StorySimWorld_NowBelongs" xml:space="preserve">
+    <value>{0} now belongs to {1}.</value>
+  </data>
+  <data name="StorySimWorld_ObjectiveAdded" xml:space="preserve">
+    <value>objective {0} added.</value>
+  </data>
+  <data name="StorySimWorld_ObjectiveComplete" xml:space="preserve">
+    <value>objective {0} complete.</value>
+  </data>
+  <data name="StorySimWorld_ObjectiveFailed" xml:space="preserve">
+    <value>objective {0} failed.</value>
+  </data>
+  <data name="StorySimWorld_ObjectiveRemoved" xml:space="preserve">
+    <value>objective {0} removed.</value>
+  </data>
+  <data name="StorySimWorld_PressedAutoResolvedDecideIts" xml:space="preserve">
+    <value>{0} pressed: {1} is auto-resolved - decide its outcome.</value>
+  </data>
+  <data name="StorySimWorld_PressedBattleBegins" xml:space="preserve">
+    <value>{0} pressed: The battle {1} begins.</value>
+  </data>
+  <data name="StorySimWorld_Removed" xml:space="preserve">
+    <value>{0} removed.</value>
+  </data>
+  <data name="StorySimWorld_Selected" xml:space="preserve">
+    <value>{0} selected</value>
+  </data>
+  <data name="StorySimWorld_SpawnedAt" xml:space="preserve">
+    <value>{0} spawned at {1}.</value>
+  </data>
+  <data name="StorySimWorld_TechLevel" xml:space="preserve">
+    <value>{0} tech level {1}</value>
+  </data>
+  <data name="StorySimWorld_TutorialDialogUpContinueRaises" xml:space="preserve">
+    <value>tutorial dialog {0} up - Continue raises {1}.</value>
+  </data>
+  <data name="StorySimWorld_Units" xml:space="preserve">
+    <value>units</value>
+  </data>
+  <data name="StorySimWorld_WinsAt" xml:space="preserve">
+    <value>{0} wins at {1}</value>
+  </data>
+  <data name="StorySimWorld_World" xml:space="preserve">
+    <value>World: {0}</value>
+  </data>
+  <data name="StorySimWorld_XAt" xml:space="preserve">
+    <value>{0} x {1} at {2}.</value>
+  </data>
+  <data name="StorySimWorld_XDestroyed" xml:space="preserve">
+    <value>{0} x {1} of {2} destroyed</value>
+  </data>
+  <data name="StorySim_ActivatedThread" xml:space="preserve">
+    <value>activated thread '{0}'.</value>
+  </data>
+  <data name="StorySim_AlreadyRuledOut" xml:space="preserve">
+    <value>'{0}' is already ruled out</value>
+  </data>
+  <data name="StorySim_Armed" xml:space="preserve">
+    <value>armed '{0}'.</value>
+  </data>
+  <data name="StorySim_BattleStarted" xml:space="preserve">
+    <value>Battle {0} started</value>
+  </data>
+  <data name="StorySim_DISABLEBRANCHIgnoredMissingParameter" xml:space="preserve">
+    <value>DISABLE_BRANCH ignored - missing parameter.</value>
+  </data>
+  <data name="StorySim_DISABLESTORYEVENTIgnoredMissing" xml:space="preserve">
+    <value>DISABLE_STORY_EVENT ignored - missing parameter.</value>
+  </data>
+  <data name="StorySim_DISABLESTORYEVENTNoEvent" xml:space="preserve">
+    <value>DISABLE_STORY_EVENT: No event named '{0}'.</value>
+  </data>
+  <data name="StorySim_Disabled" xml:space="preserve">
+    <value>disabled '{0}'.</value>
+  </data>
+  <data name="StorySim_DisabledFireSwallowed" xml:space="preserve">
+    <value>'{0}' is disabled - fire swallowed.</value>
+  </data>
+  <data name="StorySim_Enabled" xml:space="preserve">
+    <value>enabled '{0}'.</value>
+  </data>
+  <data name="StorySim_Fired" xml:space="preserve">
+    <value>Fired '{0}' ({1}).</value>
+  </data>
+  <data name="StorySim_Flag" xml:space="preserve">
+    <value>Flag {0} = {1}.</value>
+  </data>
+  <data name="StorySim_Flag2" xml:space="preserve">
+    <value>flag {0} = {1}.</value>
+  </data>
+  <data name="StorySim_FlagProgress" xml:space="preserve">
+    <value>{0} {1} of {2}</value>
+  </data>
+  <data name="StorySim_HaltedAt" xml:space="preserve">
+    <value>Halted at '{0}'.</value>
+  </data>
+  <data name="StorySim_LeftAuthor" xml:space="preserve">
+    <value>{0} '{1}' left to the author.</value>
+  </data>
+  <data name="StorySim_LuaStoryEvent" xml:space="preserve">
+    <value>Lua Story_Event("{0}").</value>
+  </data>
+  <data name="StorySim_NoArmedEventListens" xml:space="preserve">
+    <value>No armed event listens for '{0}'.</value>
+  </data>
+  <data name="StorySim_NotArmedTriggerIgnored" xml:space="preserve">
+    <value>'{0}' is not armed - trigger ignored.</value>
+  </data>
+  <data name="StorySim_NotFiredTriggerChainDeeper" xml:space="preserve">
+    <value>'{0}' not fired - trigger chain deeper than {1}.</value>
+  </data>
+  <data name="StorySim_NotRuledOut" xml:space="preserve">
+    <value>'{0}' is not ruled out</value>
+  </data>
+  <data name="StorySim_OwedNextTick" xml:space="preserve">
+    <value>{0} '{1}' owed on the next tick.</value>
+  </data>
+  <data name="StorySim_PrereqNotItsThreadEngine" xml:space="preserve">
+    <value>Prereq '{0}' of '{1}' is not in its thread - the engine drops it from the line.</value>
+  </data>
+  <data name="StorySim_RESETBRANCHIgnoredMissingParameter" xml:space="preserve">
+    <value>RESET_BRANCH ignored - missing parameter.</value>
+  </data>
+  <data name="StorySim_RESETBRANCHNoEventThis" xml:space="preserve">
+    <value>RESET_BRANCH: No event '{0}' in this thread.</value>
+  </data>
+  <data name="StorySim_RESETEVENTNoEventThis" xml:space="preserve">
+    <value>RESET_EVENT: No event '{0}' in this thread.</value>
+  </data>
+  <data name="StorySim_ReconsideredDecisionAgain" xml:space="preserve">
+    <value>'{0}' reconsidered - a decision again</value>
+  </data>
+  <data name="StorySim_Reset" xml:space="preserve">
+    <value>reset '{0}'.</value>
+  </data>
+  <data name="StorySim_ResetBranch" xml:space="preserve">
+    <value>reset '{0}' (branch '{1}').</value>
+  </data>
+  <data name="StorySim_RuledOutArmedNoDecision" xml:space="preserve">
+    <value>'{0}' ruled out - armed, no decision</value>
+  </data>
+  <data name="StorySim_SimulationStarted" xml:space="preserve">
+    <value>Simulation started</value>
+  </data>
+  <data name="StorySim_TRIGGEREVENTIgnoredMissingParameter" xml:space="preserve">
+    <value>TRIGGER_EVENT ignored - missing parameter.</value>
+  </data>
+  <data name="StorySim_TRIGGEREVENTNoEventNamed" xml:space="preserve">
+    <value>TRIGGER_EVENT: No event named '{0}'.</value>
+  </data>
+  <data name="StorySim_TickS" xml:space="preserve">
+    <value>Tick {0} ({1:0.##}s)</value>
+  </data>
+  <data name="StorySim_TickSGameplayPausedBattle" xml:space="preserve">
+    <value>Tick {0} ({1:0.##}s, gameplay paused for the battle)</value>
+  </data>
+  <data name="StorySim_UnknownEventNode" xml:space="preserve">
+    <value>Unknown event node '{0}'.</value>
+  </data>
+  <data name="StorySim_Unset" xml:space="preserve">
+    <value>{0} unset</value>
+  </data>
+  <data name="StoryThread_EventWithoutName" xml:space="preserve">
+    <value>Event without a Name attribute - the block is not addressable and was skipped.</value>
+  </data>
+  <data name="Suppression_AcrossProject" xml:space="preserve">
+    <value>Suppress {0} across the project</value>
+  </data>
+  <data name="Suppression_DiagnosticAcrossProject" xml:space="preserve">
+    <value>Suppress diagnostic across the project</value>
+  </data>
+  <data name="Suppression_ForThisLine" xml:space="preserve">
+    <value>Suppress {0} for this line</value>
+  </data>
+  <data name="Suppression_ForThisObject" xml:space="preserve">
+    <value>Suppress {0} for this {1}</value>
+  </data>
+  <data name="Suppression_InThisFile" xml:space="preserve">
+    <value>Suppress {0} in this file</value>
+  </data>
+  <data name="Suppression_OpenReport" xml:space="preserve">
+    <value>Open report for {0} in editor</value>
+  </data>
+  <data name="Suppression_ReportOnGitHub" xml:space="preserve">
+    <value>Report {0} on GitHub</value>
+  </data>
+  <data name="Suppressions_See" xml:space="preserve">
+    <value> See '{0}'.</value>
+  </data>
+  <data name="Suppressions_UnreadableEntries" xml:space="preserve">
+    <value>suppressions.json holds entries that are not diagnostic ids and suppress nothing - {0}. Expected aetswg-&lt;group&gt;-&lt;number&gt; or aetswg-&lt;group&gt;-*.</value>
+  </data>
+  <data name="SystemSpyDuration_DurationInSecsIsBut" xml:space="preserve">
+    <value>&lt;Duration_In_Secs&gt; is {0}, but a {1} system spy needs a duration {2} - the engine overwrites it with {3}</value>
+  </data>
+  <data name="TagComparison_ApplyTheEngineSCorrection" xml:space="preserve">
+    <value>Apply the engine's own correction: Swap &lt;{0}&gt; and &lt;{1}&gt;</value>
+  </data>
+  <data name="TagComparison_ButIsAgainst" xml:space="preserve">
+    <value>&lt;{0}&gt; {1} &lt;{2}&gt;, but is {3} against {4}</value>
+  </data>
+  <data name="TextureFileFormat_IsNotAValidTexture" xml:space="preserve">
+    <value>'{0}' is not a valid texture filename for &lt;{1}&gt;. Expected a .tga or .dds file.</value>
+  </data>
+  <data name="TupleItems_CommaSeparatedPairs" xml:space="preserve">
+    <value>comma-separated pairs</value>
+  </data>
+  <data name="TupleItems_Groups" xml:space="preserve">
+    <value>`{0}` groups</value>
+  </data>
+  <data name="TupleItems_KeysFollowedByItems" xml:space="preserve">
+    <value>`{0}` keys, each followed by `{1}` items</value>
+  </data>
+  <data name="TupleItems_Pairs" xml:space="preserve">
+    <value>`{0}` pairs</value>
+  </data>
+  <data name="TupleList_HoldsItemSWhichIs" xml:space="preserve">
+    <value>&lt;{0}&gt; holds {1} item(s), which is not a whole number of {2}.</value>
+  </data>
+  <data name="TupleSlotHover_Enum" xml:space="preserve">
+    <value>enum</value>
+  </data>
+  <data name="TypeReferenceList_Noun" xml:space="preserve">
+    <value>type reference list</value>
+  </data>
+  <data name="TypeReference_Noun" xml:space="preserve">
+    <value>type reference</value>
+  </data>
+  <data name="Uint_IsNotAValidNon" xml:space="preserve">
+    <value>'{0}' is not a valid non-negative integer for &lt;{1}&gt;. {2} is the nearest valid value.</value>
+  </data>
+  <data name="Uint_IsNotAValidNumber" xml:space="preserve">
+    <value>'{0}' is not a valid number for &lt;{1}&gt;.</value>
+  </data>
+  <data name="UnitSpawnProbabilityTable_IsNotAValidSpawn" xml:space="preserve">
+    <value>'{0}' is not a valid spawn probability for &lt;{1}&gt;. Expected a float in [0.0, 1.0].</value>
+  </data>
+  <data name="UnitSpawnProbabilityTable_IsNotAValidSpawn2" xml:space="preserve">
+    <value>'{0}' is not a valid spawn probability table for &lt;{1}&gt;. Expected pairs of UnitTypeName, Float [0.0, 1.0].</value>
+  </data>
+  <data name="UnitSpawnTable_IsAFloatButExpects" xml:space="preserve">
+    <value>'{0}' is a float but &lt;{1}&gt; expects an integer. {2} is the nearest valid value.</value>
+  </data>
+  <data name="UnitSpawnTable_IsNotAValidUnit" xml:space="preserve">
+    <value>'{0}' is not a valid unit spawn entry for &lt;{1}&gt;. Expected: UnitTypeName, Integer &gt;= -1.</value>
+  </data>
+  <data name="UnknownDialogCommand_Unknown" xml:space="preserve">
+    <value>Unknown story-dialog command '{0}'.</value>
+  </data>
+  <data name="UnknownTag_IsNotAKnownTag" xml:space="preserve">
+    <value>&lt;{0}&gt; is not a known {1} tag. The engine discards it.</value>
+  </data>
+  <data name="UnknownTag_IsNotAKnownTag2" xml:space="preserve">
+    <value>&lt;{0}&gt; is not a known {1} tag. &lt;{2}&gt; is the nearest known tag.</value>
+  </data>
+  <data name="UnnamedObject_HasNoItCannotBe" xml:space="preserve">
+    <value>&lt;{0}&gt; has no {1} - it cannot be referenced or overridden, and is ignored as a {2}.</value>
+  </data>
+  <data name="UnregisteredXmlFile_NoRegistryNamesSoThe" xml:space="preserve">
+    <value>No registry names '{0}', so the game never reads it.</value>
+  </data>
+  <data name="UntestedDialogCommand_Untested" xml:space="preserve">
+    <value>'{0}' is documented but untested - it may not work in the engine.</value>
+  </data>
+  <data name="UvSlotIndex_IsNotAValidUv" xml:space="preserve">
+    <value>'{0}' is not a valid UV slot index for &lt;{1}&gt;. Expected an integer in [0, 3]. {2} is the nearest valid value.</value>
+  </data>
+  <data name="ValueTypeHint_EnumOneValues" xml:space="preserve">
+    <value>**Enum:** one of the values in `{0}`</value>
+  </data>
+  <data name="ValueTypeHint_EnumPredefinedEnumValue" xml:space="preserve">
+    <value>**Enum:** predefined enum value</value>
+  </data>
+  <data name="ValueTypeHint_EnumShipClassEG" xml:space="preserve">
+    <value>**Enum:** ship class - e.g. `Infantry`, `Corvette`, `Frigate`, `Capital`</value>
+  </data>
+  <data name="ValueTypeHint_EnumSpaceSeparatedEnumValues" xml:space="preserve">
+    <value>**Enum:** space-separated enum values</value>
+  </data>
+  <data name="ValueTypeHint_EnumSpaceSeparatedValuesFrom" xml:space="preserve">
+    <value>**Enum:** space-separated values from `{0}`</value>
+  </data>
+  <data name="ValueTypeHint_FormatAbilityFlagTypeTrueFalseTuples" xml:space="preserve">
+    <value>**Format:** `AbilityFlagType, True|False` tuples</value>
+  </data>
+  <data name="ValueTypeHint_FormatAbilityMultiplierTypeFloatTuples" xml:space="preserve">
+    <value>**Format:** `AbilityMultiplierType, float` tuples</value>
+  </data>
+  <data name="ValueTypeHint_FormatAbilityNameSFXEventNamePairsEmpty" xml:space="preserve">
+    <value>**Format:** `AbilityName, SFXEventName` pairs (empty name = no sound)</value>
+  </data>
+  <data name="ValueTypeHint_FormatCategoryFloatAccuracyModifier" xml:space="preserve">
+    <value>**Format:** `category, float` accuracy modifier pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatCommaSeparatedFloatPairs" xml:space="preserve">
+    <value>**Format:** comma-separated float pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatCommaSeparatedIntFloat" xml:space="preserve">
+    <value>**Format:** comma-separated `(int, float)` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatCommaSpaceSeparatedFloats" xml:space="preserve">
+    <value>**Format:** comma or space-separated floats (`1`, `1.0`, `1.0f`)</value>
+  </data>
+  <data name="ValueTypeHint_FormatCommaSpaceSeparatedIntegers" xml:space="preserve">
+    <value>**Format:** comma or space-separated integers</value>
+  </data>
+  <data name="ValueTypeHint_FormatConditionUnitTypePairs" xml:space="preserve">
+    <value>**Format:** `condition, UnitType` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatDamageTypeArmorTypeModifierGroups" xml:space="preserve">
+    <value>**Format:** `DamageType, ArmorType, modifier` groups</value>
+  </data>
+  <data name="ValueTypeHint_FormatF" xml:space="preserve">
+    <value>**Format:** `1`, `1.0`, or `1.0f`</value>
+  </data>
+  <data name="ValueTypeHint_FormatFactionNameIntegerPairs" xml:space="preserve">
+    <value>**Format:** `FactionName, integer` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatFactionNameValuePairs" xml:space="preserve">
+    <value>**Format:** `FactionName, value` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatFloatEGF" xml:space="preserve">
+    <value>**Format:** float in `[0.0, 1.0]` - e.g. `0.5`, `0.75f`</value>
+  </data>
+  <data name="ValueTypeHint_FormatHardPointTypeSFXEventNamePairsEmpty" xml:space="preserve">
+    <value>**Format:** `HardPointType, SFXEventName` pairs (empty name = no sound)</value>
+  </data>
+  <data name="ValueTypeHint_FormatHardPointTypeTexturePathPairs" xml:space="preserve">
+    <value>**Format:** `HardPointType, texturePath` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatHexStringEG" xml:space="preserve">
+    <value>**Format:** hex string, e.g. `0x0200` (= Shader Model 2.0)</value>
+  </data>
+  <data name="ValueTypeHint_FormatHexStringGPUVendor" xml:space="preserve">
+    <value>**Format:** hex string GPU vendor ID, e.g. `0x10DE` (NVIDIA)</value>
+  </data>
+  <data name="ValueTypeHint_FormatInteger" xml:space="preserve">
+    <value>**Format:** integer `0`-`100`</value>
+  </data>
+  <data name="ValueTypeHint_FormatInteger2" xml:space="preserve">
+    <value>**Format:** integer `0`-`3`</value>
+  </data>
+  <data name="ValueTypeHint_FormatIntegerUnlimited" xml:space="preserve">
+    <value>**Format:** integer; `-1` = unlimited</value>
+  </data>
+  <data name="ValueTypeHint_FormatLocaleTexturePathPairs" xml:space="preserve">
+    <value>**Format:** `locale, texturePath` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatRGBFour" xml:space="preserve">
+    <value>**Format:** `R, G, B, A` - four integers `0`-`255`</value>
+  </data>
+  <data name="ValueTypeHint_FormatTrueFalseYesNo" xml:space="preserve">
+    <value>**Format:** `True`, `False`, `Yes`, `No`, `1`, or `0`</value>
+  </data>
+  <data name="ValueTypeHint_FormatTuple" xml:space="preserve">
+    <value>**Format:** {0}</value>
+  </data>
+  <data name="ValueTypeHint_FormatUnitTypeCountPairsUnlimited" xml:space="preserve">
+    <value>**Format:** `UnitType, count` pairs; `-1` = unlimited</value>
+  </data>
+  <data name="ValueTypeHint_FormatUnitTypeProbabilityPairs" xml:space="preserve">
+    <value>**Format:** `UnitType, probability` pairs</value>
+  </data>
+  <data name="ValueTypeHint_FormatUnsignedInteger" xml:space="preserve">
+    <value>**Format:** unsigned integer</value>
+  </data>
+  <data name="ValueTypeHint_FormatXYTwoComma" xml:space="preserve">
+    <value>**Format:** `X, Y` - two comma-separated floats</value>
+  </data>
+  <data name="ValueTypeHint_FormatXYZThree" xml:space="preserve">
+    <value>**Format:** `X, Y, Z` - three comma-separated floats</value>
+  </data>
+  <data name="ValueTypeHint_FormatXYZW" xml:space="preserve">
+    <value>**Format:** `X, Y, Z, W` - four comma-separated floats</value>
+  </data>
+  <data name="ValueTypeHint_ObjectTypeName" xml:space="preserve">
+    <value>**Reference:** `{0}`</value>
+  </data>
+  <data name="ValueTypeHint_ObjectTypeNames" xml:space="preserve">
+    <value>**Reference:** space-separated list of `{0}` names</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceAloDModelFilename" xml:space="preserve">
+    <value>**Reference:** `.alo` 3D model filename</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceAudioSampleFilename" xml:space="preserve">
+    <value>**Reference:** audio sample filename</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceBoneNameFromModel" xml:space="preserve">
+    <value>**Reference:** bone name from the model skeleton</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceLocalisationStringKeyTEXT" xml:space="preserve">
+    <value>**Reference:** localisation string key (`TEXT_xxx` format)</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameMusicEvent" xml:space="preserve">
+    <value>**Reference:** name of a `MusicEvent`</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameSFXEvent" xml:space="preserve">
+    <value>**Reference:** name of an `SFXEvent`</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameSFXEventHUDFeedback" xml:space="preserve">
+    <value>**Reference:** name of an `SFXEvent` (HUD feedback)</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameSingleGameObject" xml:space="preserve">
+    <value>**Reference:** name of a single game object type</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceNameSpeechEvent" xml:space="preserve">
+    <value>**Reference:** name of a `SpeechEvent`</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedBoneNames" xml:space="preserve">
+    <value>**Reference:** space-separated bone names from the model skeleton</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedGameObject" xml:space="preserve">
+    <value>**Reference:** space-separated game object type names</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedListAlo" xml:space="preserve">
+    <value>**Reference:** space-separated list of `.alo` model filenames</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedListAudio" xml:space="preserve">
+    <value>**Reference:** space-separated list of audio sample filenames</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedListTga" xml:space="preserve">
+    <value>**Reference:** space-separated list of `.tga` / `.dds` texture filenames</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceSpaceSeparatedLocalisationString" xml:space="preserve">
+    <value>**Reference:** space-separated localisation string keys (`TEXT_xxx`)</value>
+  </data>
+  <data name="ValueTypeHint_ReferenceTgaDdsTextureFilename" xml:space="preserve">
+    <value>**Reference:** `.tga` or `.dds` texture filename</value>
+  </data>
+  <data name="ValueTypeHint_XmlObjectName" xml:space="preserve">
+    <value>**Reference:** XML object name</value>
+  </data>
+  <data name="ValueTypeHint_XmlObjectNames" xml:space="preserve">
+    <value>**Reference:** space-separated list of XML object names</value>
+  </data>
+  <data name="VariantAdditiveMerge_AndMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
+  <data name="VariantAdditiveMerge_IsAdditiveThisValueIs" xml:space="preserve">
+    <value>'{0}' is additive: This value is added to the base's rather than replacing it, so the variant also keeps {1} inherited from the base. Change the base object if the inherited entries should not apply here.</value>
+  </data>
+  <data name="VariantAdditiveMerge_ItsValue" xml:space="preserve">
+    <value>its value</value>
+  </data>
+  <data name="VariantBaseUnresolved_VariantBaseDoesNotResolve" xml:space="preserve">
+    <value>Variant base '{0}' does not resolve - the engine ignores the tag silently, so '{1}' inherits nothing.</value>
+  </data>
+  <data name="VariantChainTooDeep_VariantChainIsDeepAbove" xml:space="preserve">
+    <value>Variant chain is {0} deep, above the engine's 10 resolution passes - '{1}' may inherit nothing from '{2}' depending on the order the files load in, and the failure is silent.</value>
+  </data>
+  <data name="VariantCodeLens_Variant" xml:space="preserve">
+    <value>1 variant</value>
+  </data>
+  <data name="VariantCodeLens_VariantShowEffectiveObject" xml:space="preserve">
+    <value>^ Variant of {0} - show effective object</value>
+  </data>
+  <data name="VariantCodeLens_Variants" xml:space="preserve">
+    <value>{0} variants</value>
+  </data>
+  <data name="VariantCycle_VariantHasACircularInheritance" xml:space="preserve">
+    <value>Variant '{0}' has a circular inheritance chain (loops at '{1}').</value>
+  </data>
+  <data name="VariantIgnoredOverride_TagIsIgnoredOnVariants" xml:space="preserve">
+    <value>Tag '{0}' is ignored on variants; the engine will not apply it here.</value>
+  </data>
+  <data name="VariantInlayHint_Adds" xml:space="preserve">
+    <value>adds {0}</value>
+  </data>
+  <data name="VariantInlayHint_CyclicInheritance" xml:space="preserve">
+    <value>cyclic inheritance</value>
+  </data>
+  <data name="VariantInlayHint_Inherits" xml:space="preserve">
+    <value>inherits {0}</value>
+  </data>
+  <data name="VariantInlayHint_Overrides" xml:space="preserve">
+    <value>overrides {0}</value>
+  </data>
+  <data name="VariantOverrideInlayHint_AddsBase" xml:space="preserve">
+    <value>adds to base</value>
+  </data>
+  <data name="VariantOverrideInlayHint_AddsInherited" xml:space="preserve">
+    <value>adds to {0} inherited</value>
+  </data>
+  <data name="VariantOverrideInlayHint_Merges" xml:space="preserve">
+    <value>merges with {0}</value>
+  </data>
+  <data name="VariantOverrideInlayHint_Overrides" xml:space="preserve">
+    <value>overrides {0}</value>
+  </data>
+  <data name="VariantOverrideInlayHint_OverridesBase" xml:space="preserve">
+    <value>overrides base</value>
+  </data>
+  <data name="VariantRedundantOverride_TagHasTheSameValue" xml:space="preserve">
+    <value>Tag '{0}' has the same value as the inherited base; this override is redundant.</value>
+  </data>
+  <data name="VariantTagNotSupported_DoesNothingOnAOnly" xml:space="preserve">
+    <value>&lt;{0}&gt; does nothing on a {1} - only GameObjectType inherits. The engine logs it as an unprocessed entry and loads the object without it.</value>
+  </data>
+  <data name="VehicleThiefClone_HasNoAbilitySoA" xml:space="preserve">
+    <value>'{0}' has no {1} ability, so a thief who captures this vehicle can never get out.</value>
+  </data>
+  <data name="VehicleThiefClone_KeepsTheBehaviourWhichA" xml:space="preserve">
+    <value>'{0}' keeps the {1} behaviour, which a capture clone must not have. The thief rides in the same container garrisoned units are loaded into.</value>
+  </data>
+  <data name="VendorIdHex_IsNotAValidHex" xml:space="preserve">
+    <value>'{0}' is not a valid hex literal for &lt;{1}&gt;. Expected format: 0x[0-9A-Fa-f]+.</value>
+  </data>
+  <data name="VictoryConditionList_IsNotAKnownValue" xml:space="preserve">
+    <value>'{0}' is not a known value for enum '{1}' on &lt;{2}&gt;.</value>
+  </data>
+  <data name="XmlCodeLens_GroupMembers" xml:space="preserve">
+    <value>{0} in this group - {1}</value>
+  </data>
+  <data name="XmlCodeLens_Member" xml:space="preserve">
+    <value>member</value>
+  </data>
+  <data name="XmlDuplicateTag_DuplicateTagOnlyOneOccurrence" xml:space="preserve">
+    <value>Duplicate tag '{0}': Only one occurrence is used per object - the game keeps the LAST one.{1}</value>
+  </data>
+  <data name="XmlDuplicateTag_OtherLines" xml:space="preserve">
+    <value> Line numbers of the other occurrences - {0}.</value>
+  </data>
+  <data name="XmlFormatter_NotWellFormed" xml:space="preserve">
+    <value>Formatting refused: Not well-formed XML at line {0}, column {1}</value>
+  </data>
+  <data name="XmlFormatter_WouldChangeContent" xml:space="preserve">
+    <value>Formatting refused: The result would change the document's content</value>
+  </data>
+  <data name="XmlGameReader_AttributeHasNoGameDrops" xml:space="preserve">
+    <value>Attribute {0} on &lt;{1}&gt; has no '=': The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_AttributeHasNoOpeningGame" xml:space="preserve">
+    <value>Attribute {0} on &lt;{1}&gt; has no opening '"': The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_AttributeUsesSingleQuotesGame" xml:space="preserve">
+    <value>Attribute {0} on &lt;{1}&gt; uses single quotes: The game requires double quotes and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_CloseAnd" xml:space="preserve">
+    <value>Close {0} and {1}</value>
+  </data>
+  <data name="XmlGameReader_CloseOne" xml:space="preserve">
+    <value>Close {0}</value>
+  </data>
+  <data name="XmlGameReader_CommentInsideValueGameCuts" xml:space="preserve">
+    <value>Comment inside a value: The game cuts it out and joins the text on both sides, but standard XML readers return two separate text nodes, so other tools may read a different value</value>
+  </data>
+  <data name="XmlGameReader_CommentNeverClosedGameDrops" xml:space="preserve">
+    <value>Comment is never closed: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_EndTagDoesNotMatch" xml:space="preserve">
+    <value>End tag &lt;/{0}&gt; does not match &lt;{1}&gt;: The game compares them byte for byte and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_EndTagHasNoGame" xml:space="preserve">
+    <value>End tag &lt;/{0}&gt; has no '&gt;': The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_EndTagOutsideAnyElement" xml:space="preserve">
+    <value>End tag outside any element: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_EndTagWhereStartTag" xml:space="preserve">
+    <value>End tag where a start tag is expected: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_FileEndsInsideAttributeGame" xml:space="preserve">
+    <value>File ends inside attribute {0} of &lt;{1}&gt;: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_FileEndsInsideMarkupGame" xml:space="preserve">
+    <value>File ends inside markup: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_FileEndsInsideStartTag" xml:space="preserve">
+    <value>File ends inside the start tag of &lt;{0}&gt;: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_FileEndsInsideXMLDeclaration" xml:space="preserve">
+    <value>File ends inside the XML declaration: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_InsertXMLDeclaration" xml:space="preserve">
+    <value>Insert the XML declaration</value>
+  </data>
+  <data name="XmlGameReader_InsideCommentGameDropsWhole" xml:space="preserve">
+    <value>'--' inside a comment: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_MoveCommentAboveElement" xml:space="preserve">
+    <value>Move the comment above the element</value>
+  </data>
+  <data name="XmlGameReader_NeverClosedGameDropsWhole" xml:space="preserve">
+    <value>&lt;{0}&gt; is never closed: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NeverClosedGamePairsEvery" xml:space="preserve">
+    <value>&lt;{0}&gt; is never closed: The game pairs every later end tag one level off and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NeverClosedGameReadsWhere" xml:space="preserve">
+    <value>&lt;{0}&gt; is never closed: The game reads &lt;/{1}&gt; where it expects &lt;/{0}&gt; and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NoRootElementGameDrops" xml:space="preserve">
+    <value>No root element: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NoXMLDeclarationGameRequires" xml:space="preserve">
+    <value>No XML declaration: The game requires '&lt;?xml ...?&gt;' before the root element and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_NotFollowedByGameDrops" xml:space="preserve">
+    <value>'/' not followed by '&gt;' in &lt;{0}&gt;: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_RemoveEndTag" xml:space="preserve">
+    <value>Remove the end tag</value>
+  </data>
+  <data name="XmlGameReader_RemoveTextGameSkips" xml:space="preserve">
+    <value>Remove the text the game skips</value>
+  </data>
+  <data name="XmlGameReader_RemoveUFromEndValue" xml:space="preserve">
+    <value>Remove U+{0:X4} from the end of the value</value>
+  </data>
+  <data name="XmlGameReader_RenameEndTag" xml:space="preserve">
+    <value>Rename the end tag to &lt;/{0}&gt;</value>
+  </data>
+  <data name="XmlGameReader_RootElementWithoutChildElements" xml:space="preserve">
+    <value>Root element without child elements: The game drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_SecondRootElementGameReads" xml:space="preserve">
+    <value>Second root element: The game reads one root per file and drops the whole file</value>
+  </data>
+  <data name="XmlGameReader_SeparateHyphens" xml:space="preserve">
+    <value>Separate the hyphens</value>
+  </data>
+  <data name="XmlGameReader_TextAfterChildElementGame" xml:space="preserve">
+    <value>Text after a child element: The game skips it; values must come before the first child</value>
+  </data>
+  <data name="XmlGameReader_UseDoubleQuotes" xml:space="preserve">
+    <value>Use double quotes</value>
+  </data>
+  <data name="XmlGameReader_ValueEndsUGameTrims" xml:space="preserve">
+    <value>Value ends in U+{0:X4}: The game trims only space, tab, CR and LF, so the character is part of the value it reads</value>
+  </data>
+  <data name="XmlStructuralValidator_EndDeclaration" xml:space="preserve">
+    <value>End the declaration with '?&gt;'</value>
+  </data>
+  <data name="XmlStructuralValidator_InvalidXMLGameReadsFile" xml:space="preserve">
+    <value>Invalid XML ({0}): The game reads the file, standard XML tools reject it</value>
+  </data>
+  <data name="XmlStructuralValidator_StartsNoEntityGameReads" xml:space="preserve">
+    <value>'&amp;' that starts no entity: The game reads it as a plain character, standard XML tools reject the file</value>
+  </data>
+  <data name="XmlStructuralValidator_XMLDeclarationMustEndGame" xml:space="preserve">
+    <value>XML declaration must end in '?&gt;': The game reads it, standard XML tools reject the file</value>
+  </data>
+  <data name="XmlStructureRepair_FixAll" xml:space="preserve">
+    <value>Fix all repairable XML structure problems in this file</value>
+  </data>
+</root>

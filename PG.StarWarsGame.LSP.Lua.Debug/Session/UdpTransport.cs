@@ -3,6 +3,7 @@
 
 using System.Net;
 using System.Net.Sockets;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Lua.Debug.Session;
 
@@ -48,7 +49,8 @@ public sealed class UdpTransport : IUdpTransport
             }
             catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionReset)
             {
-                throw new LuaDebugConnectionLostException("The game reset the debugger connection", e);
+                throw new LuaDebugConnectionLostException(
+                    new CatalogueText("LuaDebugTransport_GameResetDebuggerConnection"), e);
             }
             catch (ObjectDisposedException)
             {

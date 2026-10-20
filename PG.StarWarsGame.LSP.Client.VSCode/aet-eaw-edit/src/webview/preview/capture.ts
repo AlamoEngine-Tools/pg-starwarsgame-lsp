@@ -7,6 +7,7 @@
 // whole roster, written out at the size the icon pipeline wants. The webview cannot save a file
 // itself, so it hands the bytes to the panel host - see the `capture` message.
 
+import * as l10n from "@vscode/l10n";
 /** One size the capture offers, with what the game uses it for. */
 export interface CaptureSize {
     id: string;
@@ -48,8 +49,8 @@ export const CAPTURE_SIZES: readonly CaptureSize[] = [
         id: "100x50",
         width: 100,
         height: 50,
-        label: "100x50",
-        title: "100x50 - large icon, double width",
+        label: l10n.t("100x50"),
+        title: l10n.t("100x50 - large icon, double width"),
         iconPrefix: "big_",
     },
     { ...square(100, "large icon, double both ways"), iconPrefix: "big_" },

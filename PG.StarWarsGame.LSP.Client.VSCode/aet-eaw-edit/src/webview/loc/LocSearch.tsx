@@ -8,6 +8,7 @@
 // toggles now sit inside the box the way an editor's find widget puts them, which buys back a row,
 // and what is left is a labelled field with room to breathe.
 
+import * as l10n from "@vscode/l10n";
 import { ReactNode } from "react";
 
 import { FilterMode } from "../locFilter";
@@ -46,28 +47,28 @@ export interface LocSearchProps {
 const MODES: ChoiceOption<FilterMode>[] = [
     {
         id: "text",
-        label: "text",
+        label: l10n.t("text"),
         icon: "searchLiteral",
-        title: "Plain text search",
+        title: l10n.t("Plain text search"),
     },
     {
         id: "wildcard",
-        label: "wildcard",
+        label: l10n.t("wildcard"),
         icon: "searchWildcard",
-        title: "Wildcard: * matches any text, ? matches one character",
+        title: l10n.t("Wildcard: * matches any text, ? matches one character"),
     },
     {
         id: "regex",
-        label: "regex",
+        label: l10n.t("regex"),
         icon: "searchRegex",
-        title: "Regular expression (case-insensitive)",
+        title: l10n.t("Regular expression (case-insensitive)"),
     },
 ];
 
 export function LocSearch(props: LocSearchProps): React.JSX.Element {
     return (
         <div className="dock-search">
-            <div className="dock-section-title">Search</div>
+            <div className="dock-section-title">{l10n.t("Search")}</div>
 
             <div className="search-field with-modes">
                 <input
@@ -83,7 +84,7 @@ export function LocSearch(props: LocSearchProps): React.JSX.Element {
                         reporting its own pressed state - which says nothing about them
                         being alternatives to one another. */}
                     <ModeSelector
-                        label="How the pattern is read"
+                        label={l10n.t("How the pattern is read")}
                         value={props.mode}
                         options={MODES}
                         onSelect={props.onMode}
@@ -95,12 +96,12 @@ export function LocSearch(props: LocSearchProps): React.JSX.Element {
                 pattern is not valid" - the two are identical on screen. */}
             {props.error && <div className="filter-error">{props.error}</div>}
 
-            <Field label="Search in" as="label">
+            <Field label={l10n.t("Search in")} as="label">
                 <select
                     value={props.scope}
                     onChange={(e) => props.onScope(e.target.value)}
                 >
-                    <option value="all">All fields</option>
+                    <option value="all">{l10n.t("All fields")}</option>
                     <option value="key">{props.keyScopeLabel}</option>
                     {props.languages.map((language) => (
                         <option key={language} value={language}>

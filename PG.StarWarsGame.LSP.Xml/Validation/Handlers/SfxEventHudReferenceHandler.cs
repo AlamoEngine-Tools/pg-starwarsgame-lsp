@@ -12,5 +12,5 @@ public sealed class SfxEventHudReferenceHandler : NonEmptyReferenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.SfxEventHudReference;
 
     protected override XmlValueType TargetType => XmlValueType.SfxEventHudReference;
-    protected override string ReferenceNoun => "SFX HUD event reference";
+    protected override string ReferenceNounKey => "SfxEventHudReference_Noun";
 }

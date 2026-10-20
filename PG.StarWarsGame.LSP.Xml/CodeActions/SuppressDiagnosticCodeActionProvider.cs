@@ -54,7 +54,7 @@ internal sealed class SuppressDiagnosticCodeActionProvider : IXmlCodeActionProvi
         points.Add(new SuppressionInsertionPoint(SuppressionScope.File, FirstBodyLine(parsed.Html)));
 
         return SuppressionCodeActionBuilder.Build(
-            ctx.DocumentUri, ctx.Diagnostic, id, SuppressionCommentFormat.Xml, parsed.Lines, points);
+            ctx.DocumentUri, ctx.Diagnostic, id, SuppressionCommentFormat.Xml, parsed.Lines, points, ctx.Messages);
     }
 
     /// <summary>

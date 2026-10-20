@@ -66,7 +66,7 @@ internal sealed class SquadronSyncCodeActionProvider : IXmlCodeActionProvider
             var newText = BuildOffsetLines(indent, missing);
 
             actions.Add(MakeAction(
-                $"Add {missing} missing Squadron_Offsets (0, 0, 0)",
+                ctx.Messages.Format("SquadronSyncAction_AddMissingSquadronOffsets", missing),
                 CodeActionKind.QuickFix, true, ctx, insertPos, insertPos, newText));
         }
         else if (actualOffsets > expectedOffsets)
@@ -79,7 +79,7 @@ internal sealed class SquadronSyncCodeActionProvider : IXmlCodeActionProvider
             var removeEnd = new Position(EndHapLine(lastExcess), 0);
 
             actions.Add(MakeAction(
-                $"Remove {excessCount} excess Squadron_Offsets",
+                ctx.Messages.Format("SquadronSyncAction_RemoveExcessSquadronOffsets", excessCount),
                 CodeActionKind.QuickFix, true, ctx, removeStart, removeEnd, ""));
         }
 
@@ -91,7 +91,7 @@ internal sealed class SquadronSyncCodeActionProvider : IXmlCodeActionProvider
             var replaceEnd = new Position(EndHapLine(lastOffset), 0);
             var newText = BuildOffsetLines(indent, expectedOffsets);
 
-            actions.Add(MakeAction("Sync all Squadron_Offsets to Squadron_Units",
+            actions.Add(MakeAction(ctx.Messages.Format("SquadronSyncAction_SyncAllSquadronOffsetsSquadron"),
                 CodeActionKind.Refactor, false, ctx, replaceStart, replaceEnd, newText));
         }
         else
@@ -101,7 +101,7 @@ internal sealed class SquadronSyncCodeActionProvider : IXmlCodeActionProvider
             var insertPos = new Position(insertHapLine, 0);
             var newText = BuildOffsetLines(indent, expectedOffsets);
 
-            actions.Add(MakeAction("Sync all Squadron_Offsets to Squadron_Units",
+            actions.Add(MakeAction(ctx.Messages.Format("SquadronSyncAction_SyncAllSquadronOffsetsSquadron"),
                 CodeActionKind.Refactor, false, ctx, insertPos, insertPos, newText));
         }
 

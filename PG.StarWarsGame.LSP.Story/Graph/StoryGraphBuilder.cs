@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -181,8 +182,8 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             var listed = string.Join(", ", names);
             state.Problems.Add(new StoryGraphProblem(StoryGraphProblemKind.GenericNeverRaised, thread.DocumentUri,
                 slot.Range, listed,
-                $"The game never raises '{listed}' as a generic trigger and no TRIGGER_EVENT pushes '{storyEvent.Name}' - it never fires. " +
-                $"The game raises {string.Join(", ", StoryGenericNames.EngineRaised)}."));
+                new CatalogueText("StoryGraph_GenericNeverRaised", listed, storyEvent.Name,
+                    string.Join(", ", StoryGenericNames.EngineRaised))));
         }
 
         // Pass 3d: loss listeners that arm too late. Measured: STORY_MISSION_LOST is delivered to
@@ -220,9 +221,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
                 continue;
             state.Problems.Add(new StoryGraphProblem(StoryGraphProblemKind.MissionLostAfterSummary,
                 thread.DocumentUri, storyEvent.NameRange, storyEvent.Name,
-                $"'{storyEvent.Name}' never fires: the game delivers STORY_MISSION_LOST before the battle summary closes, " +
-                $"and '{storyEvent.Name}' arms only after '{summaryListener}' (battle_end_closed). " +
-                "After a lost battle the game offers a retry instead."));
+                new CatalogueText("StoryGraph_MissionLostAfterSummary", storyEvent.Name, summaryListener)));
         }
 
         // Pass 4: tactical entry edges - root events (no incoming Prereq/Control) of a tactical
@@ -386,7 +385,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
 
             foreach (var token in group.Tokens)
             foreach (var source in ResolveEventName(state, thread, token.Text, token.Range,
-                         StoryGraphProblemKind.DanglingPrereq, "Prerequisite", false))
+                         StoryGraphProblemKind.DanglingPrereq, new CatalogueText("StoryGraph_Prerequisite"), false))
                 state.AddEdge(new StoryEdge(source.Id, groupSinkId, StoryEdgeKind.Prereq));
         }
     }
@@ -463,7 +462,9 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         string typeName, StoryParamSlot slot, bool campaignWide)
     {
         foreach (var target in ResolveEventName(state, thread, slot.RawValue, slot.Range,
-                     StoryGraphProblemKind.UnresolvedControlTarget, $"{typeName} target", campaignWide))
+                     StoryGraphProblemKind.UnresolvedControlTarget,
+                     new CatalogueText("StoryGraph_ControlTarget", typeName),
+                     campaignWide))
             if (target.ThreadUri is { } targetThread && DocumentUris.Same(targetThread, thread.DocumentUri))
             {
                 state.AddEdge(new StoryEdge(node.Id, target.Id, StoryEdgeKind.Control, typeName));
@@ -484,7 +485,8 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
     // events of one name in one file record an ambiguity AND yield both: the graph shows every
     // candidate instead of guessing, and the engine cannot tell them apart either.
     private static IReadOnlyList<StoryNode> ResolveEventName(BuildState state, StoryThread thread,
-        string name, StorySourceRange range, StoryGraphProblemKind unresolvedKind, string what, bool campaignWide)
+        string name, StorySourceRange range, StoryGraphProblemKind unresolvedKind, CatalogueText what,
+        bool campaignWide)
     {
         var everywhere = state.EventsByName.GetValueOrDefault(name) ?? [];
         var matches = campaignWide
@@ -500,9 +502,8 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
                 .Select(FileNameOf)
                 .ToList();
             var message = everywhere.Count == 0
-                ? $"{what} '{name}' does not match any event in this campaign."
-                : $"{what} '{name}' is not an event in this plot file - the engine only looks here and asserts. " +
-                  $"An event of that name is in {string.Join(", ", elsewhere)}.";
+                ? new CatalogueText("StoryGraph_NoMatchingEvent", what, name)
+                : new CatalogueText("StoryGraph_EventInOtherFile", what, name, string.Join(", ", elsewhere));
             state.Problems.Add(new StoryGraphProblem(unresolvedKind, thread.DocumentUri, range, name, message));
             return [];
         }
@@ -513,7 +514,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         if (sameFileTwins)
             state.Problems.Add(new StoryGraphProblem(StoryGraphProblemKind.AmbiguousTarget,
                 thread.DocumentUri, range, name,
-                $"'{name}' names more than one event in the same plot file - the engine's pick is undefined."));
+                new CatalogueText("StoryGraph_AmbiguousTarget", name)));
 
         return matches;
     }

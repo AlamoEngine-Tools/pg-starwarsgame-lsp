@@ -17,7 +17,7 @@ public sealed class DamageRadiusWithinChaseRadiusRule : TagComparisonRuleBase
 
     protected override string RightTag => "Chase_Radius";
 
-    protected override string Expectation => "must be less than";
+    protected override string ExpectationKey => "DamageRadiusWithinChaseRadiusRule_Expectation";
 
     // "less than", not "at most": the engine rejects equality too.
     protected override bool IsAcceptable(double left, double right)

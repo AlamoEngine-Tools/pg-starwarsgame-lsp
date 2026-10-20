@@ -47,7 +47,8 @@ public sealed partial class StorySimulator
             if (script.TransitionPending)
             {
                 snapshot = Note(snapshot, stateId, eventNode.Id, StorySimCause.Ignored,
-                    $"{machine.ScriptName}: trigger '{name}' dropped - a transition to '{script.Next}' is pending.");
+                    _messages.Format("StorySimLua_TriggerDroppedTransitionPending", machine.ScriptName, name,
+                        script.Next));
                 continue;
             }
 
@@ -57,7 +58,7 @@ public sealed partial class StorySimulator
                     script with { Next = state.Name, TriggeredBy = eventNode.Id })
             };
             snapshot = Note(snapshot, stateId, eventNode.Id, StorySimCause.LuaTrigger,
-                $"{machine.ScriptName}: next state '{state.Name}'.");
+                _messages.Format("StorySimLua_NextState", machine.ScriptName, state.Name));
         }
 
         return snapshot;
@@ -86,7 +87,8 @@ public sealed partial class StorySimulator
             {
                 snapshot = RunPhase(snapshot, machine, leaving, leaving.OnExit, script.TriggeredBy);
                 snapshot = Note(snapshot, StoryGraphBuilder.LuaStateNodeId(machine.ScriptUri, leaving.Name),
-                    script.TriggeredBy, StorySimCause.LuaExit, $"{machine.ScriptName}: left '{leaving.Name}'.");
+                    script.TriggeredBy, StorySimCause.LuaExit,
+                    _messages.Format("StorySimLua_Left", machine.ScriptName, leaving.Name));
             }
 
             var entering = script.Next is { } next ? FindState(machine, next) : null;
@@ -95,7 +97,8 @@ public sealed partial class StorySimulator
             if (entering is null) continue;
 
             snapshot = Note(snapshot, StoryGraphBuilder.LuaStateNodeId(machine.ScriptUri, entering.Name),
-                script.TriggeredBy, StorySimCause.LuaEnter, $"{machine.ScriptName}: entered '{entering.Name}'.");
+                script.TriggeredBy, StorySimCause.LuaEnter,
+                _messages.Format("StorySimLua_Entered", machine.ScriptName, entering.Name));
             snapshot = RunPhase(snapshot, machine, entering, entering.OnEnter, script.TriggeredBy);
         }
 
@@ -116,7 +119,10 @@ public sealed partial class StorySimulator
         snapshot = snapshot with { Runtime = runtime };
         if (phase.Emissions.Count > 0)
             snapshot = Note(snapshot, stateId, null, StorySimCause.Fact,
-                $"  -> owes {string.Join(", ", phase.Emissions.Select(e => $"{e.Id} in {e.DelaySeconds:0.#}s"))}.");
+                "  -> " + _messages.Format("StorySimLua_Owes",
+                    string.Join(", ",
+                        phase.Emissions.Select(e =>
+                            _messages.Format("StorySimLua_EmissionIn", e.Id, e.DelaySeconds)))));
 
         foreach (var spawn in phase.Spawns)
         {
@@ -138,7 +144,7 @@ public sealed partial class StorySimulator
                     script with { Next = target, TriggeredBy = triggeredBy })
             };
             snapshot = Note(snapshot, StoryGraphBuilder.LuaStateNodeId(machine.ScriptUri, target), stateId,
-                StorySimCause.LuaTrigger, $"{machine.ScriptName}: Set_Next_State '{target}'.");
+                StorySimCause.LuaTrigger, _messages.Format("StorySimLua_SetNextState", machine.ScriptName, target));
         }
 
         return snapshot;
@@ -171,7 +177,7 @@ public sealed partial class StorySimulator
 
             if (!fired)
                 snapshot = Note(snapshot, stateId, null, StorySimCause.Ignored,
-                    $"Story_Event(\"{emission.Id}\") from '{emission.State}' - no armed event listens.");
+                    _messages.Format("StorySimLua_StoryEventFromNoArmed", emission.Id, emission.State));
         }
 
         return snapshot;

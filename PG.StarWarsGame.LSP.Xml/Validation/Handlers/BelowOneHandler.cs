@@ -38,5 +38,5 @@ public sealed class BelowOneHandler : NumericRangeHandlerBase
 
     protected override bool MaximumInclusive => false;
 
-    protected override string Expectation => "must be less than 1.0";
+    protected override string ExpectationKey => "BelowOne_Expectation";
 }

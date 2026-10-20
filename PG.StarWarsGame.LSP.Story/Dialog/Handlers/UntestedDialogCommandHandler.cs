@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -18,7 +19,7 @@ public sealed class UntestedDialogCommandHandler : IDialogDiagnosticsHandler
 
         var command = fact.Command;
         yield return new DialogDiagnostic(XmlDiagnosticSeverity.Warning,
-            $"'{command.Name}' is documented but untested - it may not work in the engine.",
+            new CatalogueText("UntestedDialogCommand_Untested", command.Name),
             command.Line, command.Column, command.Column + command.RawName.Length);
     }
 }

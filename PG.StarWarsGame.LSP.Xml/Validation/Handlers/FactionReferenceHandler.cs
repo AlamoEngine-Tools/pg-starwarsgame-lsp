@@ -12,5 +12,5 @@ public sealed class FactionReferenceHandler : NonEmptyReferenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.FactionReference;
 
     protected override XmlValueType TargetType => XmlValueType.FactionReference;
-    protected override string ReferenceNoun => "faction reference";
+    protected override string ReferenceNounKey => "FactionReference_Noun";
 }

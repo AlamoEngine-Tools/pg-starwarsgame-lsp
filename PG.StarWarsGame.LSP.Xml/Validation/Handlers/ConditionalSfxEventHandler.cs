@@ -20,7 +20,8 @@ public sealed class ConditionalSfxEventHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid conditional SFX event for <{fact.Tag.Tag}>. Expected: UnitType, SFXEventName.")
+                    ctx.Messages.Format("ConditionalSfxEvent_IsNotAValidConditional", fact.RawValue.Trim(),
+                        fact.Tag.Tag))
             ];
 
         return [];

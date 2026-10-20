@@ -10,6 +10,7 @@
 // rows: draggable from its top edge, a counted title, a close button, and remembering the height
 // it was dragged to. That had been written twice, down to the class names.
 
+import * as l10n from "@vscode/l10n";
 import { useEdgeResize } from "../useEdgeResize";
 import { readPanelSize, writePanelSize } from "./panelLayout";
 
@@ -81,7 +82,7 @@ export function ProblemsPanel(props: {
         <div className={props.className + " panel-frame"} style={{ height }}>
             <div
                 className="resize-handle-n"
-                title="Drag to resize"
+                title={l10n.t("Drag to resize")}
                 {...handleProps}
             />
             <div className="panel-bar">
@@ -116,7 +117,7 @@ export function ProblemsPanel(props: {
                             }
                         />
                         {props.filter.hidden > 0 && !props.filter.showingAll
-                            ? ` ${props.filter.hidden} hidden`
+                            ? " " + l10n.t("{0} hidden", props.filter.hidden)
                             : ""}
                     </button>
                 )}
@@ -124,7 +125,7 @@ export function ProblemsPanel(props: {
                 <button
                     className="panel-close"
                     onClick={props.onClose}
-                    title="Close"
+                    title={l10n.t("Close")}
                 >
                     <span className="codicon codicon-close" />
                 </button>

@@ -21,7 +21,7 @@ public sealed class InaccuracyMapHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid inaccuracy map entry for <{fact.Tag.Tag}>. Expected: Category, Float.")
+                    ctx.Messages.Format("InaccuracyMap_IsNotAValidInaccuracy", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         // Slot 0 is a GameObjectCategoryType member (Fighter, Bomber, ...) - validate it against
@@ -32,7 +32,7 @@ public sealed class InaccuracyMapHandler : CommaSeparatedPairHandlerBase
             return
             [
                 AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{category}' is not a known GameObjectCategoryType value for <{fact.Tag.Tag}>.",
+                        ctx.Messages.Format("InaccuracyMap_IsNotAKnownGameobjectcategorytype", category, fact.Tag.Tag),
                         Id: DiagnosticIds.InaccuracyMapUnknownCategory),
                     fact, 0)
             ];

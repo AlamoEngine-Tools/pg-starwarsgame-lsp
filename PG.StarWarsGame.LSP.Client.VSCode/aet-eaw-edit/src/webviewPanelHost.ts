@@ -265,7 +265,7 @@ function buildHtml(
     // stylesheet and its .ttf load from the extension origin (cspSource covers style-src and
     // font-src).
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeAttribute(vscode.env.language)}">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
@@ -280,7 +280,7 @@ ${bodyStyle}
     }
 </head>
 <body>
-<div id="root" data-panel-layout="${escapeAttribute(JSON.stringify(panelLayout))}"></div>
+<div id="root" data-panel-layout="${escapeAttribute(JSON.stringify(panelLayout))}" data-l10n="${escapeAttribute(JSON.stringify(vscode.l10n.bundle ?? {}))}"></div>
 <script src="${scriptUri}"></script>
 </body>
 </html>`;

@@ -3,6 +3,7 @@
 
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -207,7 +208,7 @@ public sealed class StoryChainScanner
                 state.Manifests.Add(rel); // baseline ships it - typed, but nothing to recurse into
             else
                 state.AddProblem(origin, unresolvedKind,
-                    $"Story plot file '{rawReference}' does not exist in any project layer or the baseline.");
+                    new CatalogueText("StoryChain_PlotFileMissing", rawReference));
             return;
         }
 
@@ -223,7 +224,7 @@ public sealed class StoryChainScanner
         {
             // Anchored to the entry that referenced the manifest - that is where the user can act.
             state.AddProblem(origin, StoryChainProblemKind.MalformedManifest,
-                $"'{origin.Reference}' is not a valid story plot manifest: missing <Story_Mode_Plots> root element.");
+                new CatalogueText("StoryChain_NotAManifest", origin.Reference));
             return;
         }
 
@@ -270,7 +271,7 @@ public sealed class StoryChainScanner
                 state.Threads.Add(rel);
             else
                 state.AddProblem(origin, StoryChainProblemKind.UnresolvedPlotEntry,
-                    $"Story file '{rawReference}' does not exist in any project layer or the baseline.");
+                    new CatalogueText("StoryChain_StoryFileMissing", rawReference));
             return;
         }
 
@@ -341,7 +342,7 @@ public sealed class StoryChainScanner
         public List<StoryTacticalReference> TacticalReferences { get; } = [];
         public HashSet<(string, string)> TacticalSeen { get; } = [];
 
-        public void AddProblem(SourceLocation origin, StoryChainProblemKind kind, string message)
+        public void AddProblem(SourceLocation origin, StoryChainProblemKind kind, CatalogueText message)
         {
             // Vanilla data ships broken story links (debug plots); a user cannot fix those in a
             // baseline-shipped file, so problems there are warnings instead of errors.

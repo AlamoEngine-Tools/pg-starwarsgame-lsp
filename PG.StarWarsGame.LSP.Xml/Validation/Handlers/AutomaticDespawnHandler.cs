@@ -24,12 +24,11 @@ public sealed class AutomaticDespawnHandler : XmlDiagnosticsHandler<AutomaticDes
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<Causes_Despawn> is on under Activation_Style: {fact.ActivationStyle} - the "
-                + "engine turns it off for every automatic style",
+                ctx.Messages.Format("AutomaticDespawn_CausesDespawnIsOnUnder", fact.ActivationStyle),
                 EngineRepair: fact.Repair is null
                     ? null
                     : new XmlEngineRepair(
-                        "Apply the engine's own correction: turn Causes_Despawn off",
+                        ctx.Messages.Format("AutomaticDespawn_ApplyTheEngineSCorrection"),
                         [fact.Repair]))
         ];
     }

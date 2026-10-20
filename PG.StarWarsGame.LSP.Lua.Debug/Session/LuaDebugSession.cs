@@ -3,6 +3,7 @@
 
 using System.Net;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Lua.Debug.Protocol;
 using Stateless;
 
@@ -273,11 +274,11 @@ public sealed class LuaDebugSession : ILuaDebugSession
         lock (_gate)
         {
             if (ContextScriptId is not { } context)
-                throw new LuaDebugStateException("Cannot break a thread: no script is selected");
+                throw new LuaDebugStateException(new CatalogueText("LuaDebugSession_CannotBreakThreadNoScript"));
             if (threadId != -1 && !(_threads.TryGetValue(context, out var threads) &&
                                     threads.Any(t => t.ThreadIndex == threadId)))
                 throw new LuaDebugStateException(
-                    $"Thread {threadId} is not a known thread of script {context}; request its threads first");
+                    new CatalogueText("LuaDebugSession_ThreadNotKnownThreadScript", threadId, context));
         }
 
         return CommandAsync(Trigger.ArmBreakThread, new BreakThreadMessage(threadId),
@@ -316,10 +317,10 @@ public sealed class LuaDebugSession : ILuaDebugSession
         lock (_gate)
         {
             if (RunState != DebugRunState.Suspended || SuspendedScriptId is not { } suspended)
-                throw new LuaDebugStateException("Cannot select a frame: no script is suspended");
+                throw new LuaDebugStateException(new CatalogueText("LuaDebugSession_CannotSelectFrameNoScript"));
             if (level < 0 || level >= Callstack.Count)
                 throw new LuaDebugStateException(
-                    $"Frame {level} is outside the call stack of {Callstack.Count} frames");
+                    new CatalogueText("LuaDebugSession_FrameOutsideCallStackFrames", level, Callstack.Count));
             scriptId = suspended;
         }
 
@@ -372,26 +373,27 @@ public sealed class LuaDebugSession : ILuaDebugSession
     private void Require(Trigger trigger)
     {
         if (_lost is not null)
-            throw new LuaDebugConnectionLostException("The debugger connection is gone", _lost);
+            throw new LuaDebugConnectionLostException(new CatalogueText("LuaDebugSession_DebuggerConnectionGone"),
+                _lost);
         if (!_machine.CanFire(trigger))
             throw new LuaDebugStateException(Refusal(trigger));
     }
 
-    private string Refusal(Trigger trigger)
+    private CatalogueText Refusal(Trigger trigger)
     {
         return (trigger, RunState) switch
         {
             (Trigger.ArmBreakAll, DebugRunState.Suspended) =>
-                "Cannot break: a script is already suspended; continue or step first",
+                new CatalogueText("LuaDebugSession_CannotBreakScriptAlreadySuspended"),
             (Trigger.ArmBreakAll, DebugRunState.BreakArmed) =>
-                "A break is already armed and waiting for the next Lua line",
+                new CatalogueText("LuaDebugSession_BreakAlreadyArmedWaitingNext"),
             (Trigger.ArmBreakThread, DebugRunState.Suspended) =>
-                "Cannot break a thread: a script is already suspended; continue first",
+                new CatalogueText("LuaDebugSession_CannotBreakThreadScriptAlready"),
             (Trigger.SelectScript, DebugRunState.Suspended) =>
-                "Cannot select a script while one is suspended; continue first",
-            (Trigger.ArmStep, _) => "Cannot step: no script is suspended",
-            (Trigger.Resume, _) => "Cannot continue: no script is suspended",
-            _ => $"Cannot {trigger} while the debugger is {RunState}"
+                new CatalogueText("LuaDebugSession_CannotSelectScriptWhileOne"),
+            (Trigger.ArmStep, _) => new CatalogueText("LuaDebugSession_CannotStepNoScriptSuspended"),
+            (Trigger.Resume, _) => new CatalogueText("LuaDebugSession_CannotContinueNoScriptSuspended"),
+            _ => new CatalogueText("LuaDebugSession_CannotWhileDebugger", trigger, RunState)
         };
     }
 
@@ -400,10 +402,11 @@ public sealed class LuaDebugSession : ILuaDebugSession
         lock (_gate)
         {
             if (_lost is not null)
-                throw new LuaDebugConnectionLostException("The debugger connection is gone", _lost);
+                throw new LuaDebugConnectionLostException(new CatalogueText("LuaDebugSession_DebuggerConnectionGone"),
+                    _lost);
             if (!_scripts.ContainsKey(scriptId))
                 throw new LuaDebugStateException(
-                    $"Script {scriptId} is not in the game's script list; refresh it first");
+                    new CatalogueText("LuaDebugSession_ScriptNotGameSScript", scriptId));
         }
     }
 
@@ -412,14 +415,14 @@ public sealed class LuaDebugSession : ILuaDebugSession
         if (scriptId == -1 && threadId == -1)
             return;
         if (scriptId < 0)
-            throw new LuaDebugStateException("A source-wide breakpoint needs thread id -1 as well as script id -1");
+            throw new LuaDebugStateException(new CatalogueText("LuaDebugSession_SourceWideBreakpointNeedsThread"));
         RequireKnownScript(scriptId);
         lock (_gate)
         {
             if (threadId != -1 && !(_threads.TryGetValue(scriptId, out var threads) &&
                                     threads.Any(t => t.ThreadIndex == threadId)))
                 throw new LuaDebugStateException(
-                    $"Thread {threadId} is not a known thread of script {scriptId}; request its threads first");
+                    new CatalogueText("LuaDebugSession_ThreadNotKnownThreadScript", threadId, scriptId));
         }
     }
 
@@ -430,7 +433,8 @@ public sealed class LuaDebugSession : ILuaDebugSession
         lock (_gate)
         {
             if (_lost is not null)
-                throw new LuaDebugConnectionLostException("The debugger connection is gone", _lost);
+                throw new LuaDebugConnectionLostException(new CatalogueText("LuaDebugSession_DebuggerConnectionGone"),
+                    _lost);
             _waiters.Add(waiter);
         }
 
@@ -446,8 +450,9 @@ public sealed class LuaDebugSession : ILuaDebugSession
             catch (OperationCanceledException) when (deadline.IsCancellationRequested &&
                                                      !cancellationToken.IsCancellationRequested)
             {
-                throw new TimeoutException(
-                    $"The game did not answer {request.Id} within {RequestTimeout.TotalSeconds:0.#} s");
+                throw new LuaDebugTimeoutException(
+                    new CatalogueText("LuaDebugSession_GameDidNotAnswerWithin", request.Id,
+                        RequestTimeout.TotalSeconds));
             }
         }
         finally
@@ -600,7 +605,7 @@ public sealed class LuaDebugSession : ILuaDebugSession
             .Permit(Trigger.ContextCleared, DebugRunState.Running);
 
         machine.OnUnhandledTrigger((state, trigger) =>
-            throw new LuaDebugStateException($"Cannot {trigger} while the debugger is {state}"));
+            throw new LuaDebugStateException(new CatalogueText("LuaDebugSession_CannotWhileDebugger", trigger, state)));
         return machine;
     }
 

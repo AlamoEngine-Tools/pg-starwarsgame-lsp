@@ -6,6 +6,7 @@ using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -208,12 +209,18 @@ internal static class LuaPooledStateAnalyzer
     private static readonly HashSet<string> s_hostGlobals = new(StringComparer.Ordinal)
         { "Object", "PlayerObject", "Target", "AITarget", "Budget", "FreeStore" };
 
-    public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree, LuaPooledState state)
+    // Calls that pump events: a callback can run inside them.
+    private static readonly HashSet<string> s_pumps = new(StringComparer.Ordinal)
+        { "Sleep", "PumpEvents", "BlockOnCommand" };
+
+    public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree, LuaPooledState state,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var definitionTime = DefinitionTime(root, state);
         var diagnostics = new List<LspDiagnostic>();
-        HostGlobalsInDefinitions(definitionTime, diagnostics);
+        HostGlobalsInDefinitions(definitionTime, diagnostics, messages);
 
         // Only a script a host attaches per instance is pooled and reused; a library is the
         // requiring script's, an evaluator is loaded once.
@@ -223,20 +230,16 @@ internal static class LuaPooledStateAnalyzer
         if (!state.HasFlushG && state.RequiresResolved)
             diagnostics.Add(Diagnostic(DiagnosticIds.LuaPooledScriptWithoutFlushG, LspDiagnosticSeverity.Warning,
                 new LspRange(new LspPosition(0, 0), new LspPosition(0, 0)),
-                "This script's state is reused for its next instance, and nothing in it defines Flush_G: Every global, tables included, carries over."));
+                messages.Format("LuaPooledState_NoFlushG")));
 
         if (!state.ResetsEvents && state.RequiresResolved)
             diagnostics.Add(Diagnostic(DiagnosticIds.LuaPooledScriptEventsNotReset, LspDiagnosticSeverity.Warning,
                 new LspRange(new LspPosition(0, 0), new LspPosition(0, 0)),
-                "This script's state is reused for its next instance, and nothing that runs on release calls GetEvent.Reset(): Task force events left in the queue reach the next instance."));
+                messages.Format("LuaPooledState_EventsNotReset")));
 
-        Bleeding(root, state, definitionTime, diagnostics);
+        Bleeding(root, state, definitionTime, diagnostics, messages);
         return diagnostics;
     }
-
-    // Calls that pump events: a callback can run inside them.
-    private static readonly HashSet<string> s_pumps = new(StringComparer.Ordinal)
-        { "Sleep", "PumpEvents", "BlockOnCommand" };
 
     // Globals a state handler resets when the state machine calls it with OnUpdate. The library calls
     // a handler with OnEnter, then OnUpdate, and pumps events only after that - so the reset precedes
@@ -297,7 +300,7 @@ internal static class LuaPooledStateAnalyzer
     }
 
     private static void HostGlobalsInDefinitions(IEnumerable<FunctionDeclarationStatementSyntax> definitionTime,
-        List<LspDiagnostic> diagnostics)
+        List<LspDiagnostic> diagnostics, IMessageCatalog messages)
     {
         foreach (var function in definitionTime)
         {
@@ -310,16 +313,17 @@ internal static class LuaPooledStateAnalyzer
                     continue;
                 var where = name is "Definitions" or "Base_Definitions"
                     ? name
-                    : $"'{name}', which runs at definition time,";
+                    : messages.Format("LuaPooledState_RunsAtDefinitionTime", name);
                 diagnostics.Add(Diagnostic(DiagnosticIds.LuaHostGlobalInDefinitions, LspDiagnosticSeverity.Error,
                     RangeOf(read.GetLocation()),
-                    $"'{read.Name}' is read in {where}: The game sets it only after Base_Definitions returns, so it is nil here."));
+                    messages.Format("LuaPooledState_HostGlobalTooEarly", read.Name, where)));
             }
         }
     }
 
     private static void Bleeding(SyntaxNode root, LuaPooledState state,
-        HashSet<FunctionDeclarationStatementSyntax> definitionTime, List<LspDiagnostic> diagnostics)
+        HashSet<FunctionDeclarationStatementSyntax> definitionTime, List<LspDiagnostic> diagnostics,
+        IMessageCatalog messages)
     {
         var reset = new HashSet<string>(state.ResetOnRelease, StringComparer.Ordinal);
         foreach (var function in definitionTime)
@@ -349,7 +353,7 @@ internal static class LuaPooledStateAnalyzer
                 reported.Add(name.Name);
                 diagnostics.Add(Diagnostic(DiagnosticIds.LuaGlobalBleedsBetweenInstances, LspDiagnosticSeverity.Warning,
                     RangeOf(name.GetLocation()),
-                    $"'{name.Name}' is set at run time and read before it is set, and Definitions does not set it again: The game reuses this script's state, so its next instance reads the value left here."));
+                    messages.Format("LuaPooledState_BleedsBetweenInstances", name.Name)));
             }
         }
     }

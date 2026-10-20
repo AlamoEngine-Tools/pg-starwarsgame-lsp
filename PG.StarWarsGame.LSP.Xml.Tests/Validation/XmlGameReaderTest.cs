@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
@@ -70,8 +71,8 @@ public sealed class XmlGameReaderTest
         Assert.Equal(2, e.Line);
         Assert.Equal("\t<Top_Color>1".Length, e.Column);
         Assert.Equal("</Bottom_Color>".Length, e.Length);
-        Assert.Contains("Top_Color", e.Reason);
-        Assert.Contains("Bottom_Color", e.Reason);
+        Assert.Contains("Top_Color", ResxMessageCatalog.Server("en").Format(e.Reason));
+        Assert.Contains("Bottom_Color", ResxMessageCatalog.Server("en").Format(e.Reason));
     }
 
     [Fact]

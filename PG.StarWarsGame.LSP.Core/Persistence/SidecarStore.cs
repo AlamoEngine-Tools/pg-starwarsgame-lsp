@@ -4,6 +4,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Core.Persistence;
@@ -48,6 +49,7 @@ public sealed class SidecarStore<T> where T : class
     private readonly object _gate = new();
     private readonly ISidecarLocator _locator;
     private readonly ILogger _logger;
+    private readonly IMessageCatalog _messages;
     private readonly IReadOnlyList<IDocumentMigration> _migrations;
     private readonly string _typeName;
 
@@ -64,8 +66,10 @@ public sealed class SidecarStore<T> where T : class
         ISidecarLocator locator,
         IFileHelper fileHelper,
         ILogger logger,
-        Func<T> createDefault)
+        Func<T> createDefault,
+        IMessageCatalog? messages = null)
     {
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _fileName = fileName;
         _typeName = typeName;
         _current = current;
@@ -100,8 +104,7 @@ public sealed class SidecarStore<T> where T : class
         {
             if (_writesBlocked)
             {
-                error = $"'{_fileName}' was written by a newer version of aet-eaw-edit and is left "
-                        + "untouched. Update the extension to edit this project.";
+                error = _messages.Format("Sidecar_WasWrittenByNewerVersion", _fileName);
                 return false;
             }
 
@@ -118,7 +121,7 @@ public sealed class SidecarStore<T> where T : class
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Could not persist '{File}' - the change stays in memory", _fileName);
-                error = $"Could not write '{_fileName}': {ex.Message}";
+                error = _messages.Format("Sidecar_CouldNotWrite", _fileName, ex.Message);
                 return false;
             }
         }
@@ -144,7 +147,7 @@ public sealed class SidecarStore<T> where T : class
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "'{File}' is unreadable - continuing with defaults", _fileName);
-            return Defaulted($"'{_fileName}' could not be read and was left alone. Defaults are in use.");
+            return Defaulted(_messages.Format("Sidecar_CouldNotBeReadWas", _fileName));
         }
 
         // A document that is not an object carries no envelope and cannot: both sidecars that
@@ -156,7 +159,7 @@ public sealed class SidecarStore<T> where T : class
         // would silently adopt whatever fields happened to match.
         var declaredType = (string?)envelope?[TypeField];
         if (declaredType is not null && !string.Equals(declaredType, _typeName, StringComparison.Ordinal))
-            return Defaulted($"'{_fileName}' holds '{declaredType}', not '{_typeName}'. Defaults are in use.");
+            return Defaulted(_messages.Format("Sidecar_HoldsNotDefaultsAreUse", _fileName, declaredType, _typeName));
 
         var rawVersion = (string?)envelope?[VersionField];
         TypeVersion version;
@@ -169,20 +172,18 @@ public sealed class SidecarStore<T> where T : class
             // is one we cannot place, and adopting it would mean guessing which shape it holds.
             if (!DocumentMigrator.HasInitialMigration(_typeName, _current, _migrations))
                 return Defaulted(
-                    $"'{_fileName}' declares no '{TypeField}' or '{VersionField}', so there is no way "
-                    + "to tell which shape it holds. It was left alone and defaults are in use.");
+                    _messages.Format("Sidecar_DeclaresNoSoThereNo", _fileName, TypeField, VersionField));
 
             version = TypeVersion.Zero(_current.Namespace);
         }
         else if (!TypeVersion.TryParse(rawVersion, out version))
         {
-            return Defaulted($"'{_fileName}' declares an unreadable version '{rawVersion}'. Defaults are in use.");
+            return Defaulted(_messages.Format("Sidecar_DeclaresUnreadableVersionDefaultsAre", _fileName, rawVersion));
         }
 
         if (!string.Equals(version.Namespace, _current.Namespace, StringComparison.Ordinal))
             return Defaulted(
-                $"'{_fileName}' declares version '{version}', which is not a version of "
-                + $"'{_current.Namespace}'. Defaults are in use.");
+                _messages.Format("Sidecar_DeclaresVersionWhichNotVersion", _fileName, version, _current.Namespace));
 
         var order = version.CompareTo(_current);
         if (order > 0)
@@ -191,19 +192,17 @@ public sealed class SidecarStore<T> where T : class
             // guessing at it would be a downgrade dressed up as a read.
             _writesBlocked = true;
             return new SidecarLoad<T>(_createDefault(), SidecarStatus.RefusedNewer,
-                $"'{_fileName}' is version {version.Version}, which this version of aet-eaw-edit does "
-                + $"not understand (it writes {_current.Version}). Update the extension to open this "
-                + "project. The file has been left untouched.", []);
+                _messages.Format("Sidecar_VersionWhichThisVersionAet", _fileName, version.Version, _current.Version),
+                []);
         }
 
         IReadOnlyList<string> notices = [];
         if (order < 0)
         {
-            var migration = DocumentMigrator.Run(document, _typeName, version, _current, _migrations);
+            var migration = DocumentMigrator.Run(document, _typeName, version, _current, _migrations, _messages);
             if (migration.Document is null)
                 return Defaulted(
-                    $"'{_fileName}' could not be brought forward: {migration.Failure}. Defaults are in "
-                    + "use and the file was left alone.");
+                    _messages.Format("Sidecar_CouldNotBeBroughtForward", _fileName, migration.Failure));
 
             document = migration.Document;
             notices = migration.Notices;
@@ -213,7 +212,7 @@ public sealed class SidecarStore<T> where T : class
         // carries the envelope and what T deserializes from.
         if (document is not JsonObject migrated)
             return Defaulted(
-                $"'{_fileName}' is not a JSON object and no migration made it one. Defaults are in use.");
+                _messages.Format("Sidecar_NotJSONObjectNoMigration", _fileName));
 
         T? value;
         try
@@ -225,10 +224,10 @@ public sealed class SidecarStore<T> where T : class
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "'{File}' does not match {Type} - continuing with defaults", _fileName, typeof(T));
-            return Defaulted($"'{_fileName}' does not match the shape of '{_typeName}'. Defaults are in use.");
+            return Defaulted(_messages.Format("Sidecar_DoesNotMatchShapeDefaults", _fileName, _typeName));
         }
 
-        if (value is null) return Defaulted($"'{_fileName}' is empty. Defaults are in use.");
+        if (value is null) return Defaulted(_messages.Format("Sidecar_EmptyDefaultsAreUse", _fileName));
         if (order == 0) return new SidecarLoad<T>(value, SidecarStatus.Loaded, null, []);
 
         // Migrated: persist the new shape now, so the next read is a plain load and the chain does

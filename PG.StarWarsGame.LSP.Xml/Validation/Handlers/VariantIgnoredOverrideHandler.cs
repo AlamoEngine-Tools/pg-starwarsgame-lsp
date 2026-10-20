@@ -35,7 +35,7 @@ public sealed class VariantIgnoredOverrideHandler : XmlDiagnosticsHandler<Varian
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"Tag '{fact.TagName}' is ignored on variants; the engine will not apply it here.")
+                ctx.Messages.Format("VariantIgnoredOverride_TagIsIgnoredOnVariants", fact.TagName))
         ];
     }
 }

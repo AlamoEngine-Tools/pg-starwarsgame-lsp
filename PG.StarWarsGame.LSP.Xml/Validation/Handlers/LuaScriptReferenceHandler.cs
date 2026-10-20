@@ -47,7 +47,7 @@ public sealed class LuaScriptReferenceHandler : XmlDiagnosticsHandler<XmlTagValu
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"Lua script '{name}' contains a backslash. The game reads the name inside a Lua string, where a backslash is an escape, so the script never loads. '/' separates directories.",
+                    ctx.Messages.Format("LuaScriptReference_LuaScriptContainsABackslash", name),
                     Id: DiagnosticIds.LuaScriptBackslash)
             ];
 
@@ -55,7 +55,7 @@ public sealed class LuaScriptReferenceHandler : XmlDiagnosticsHandler<XmlTagValu
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"Lua script '{name}' climbs out of the script directory with '..'. That resolves for a loose file on Windows only, never inside a MEG archive.",
+                    ctx.Messages.Format("LuaScriptReference_LuaScriptClimbsOutOf", name),
                     Id: DiagnosticIds.LuaScriptParentPath)
             ];
 
@@ -64,7 +64,7 @@ public sealed class LuaScriptReferenceHandler : XmlDiagnosticsHandler<XmlTagValu
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"Lua script '{name}' carries its extension. The game appends '.lua' itself and looks for '{name}.lua'.",
+                    ctx.Messages.Format("LuaScriptReference_LuaScriptCarriesItsExtension", name, name),
                     Id: DiagnosticIds.LuaScriptExtension)
             ];
 
@@ -73,7 +73,7 @@ public sealed class LuaScriptReferenceHandler : XmlDiagnosticsHandler<XmlTagValu
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"Lua script '{name}' was not found: no '{name}.lua' or '{name}.lc' in any script directory. The object runs without a script.",
+                    ctx.Messages.Format("LuaScriptReference_LuaScriptWasNotFound", name, name, name),
                     Id: DiagnosticIds.LuaScriptExistence)
             ];
 
@@ -83,8 +83,9 @@ public sealed class LuaScriptReferenceHandler : XmlDiagnosticsHandler<XmlTagValu
 
         var shadowed = candidates.FirstOrDefault(LuaScriptLookup.IsInGameObjectDirectory);
         var message = shadowed is null
-            ? $"Lua script '{name}' loads from '{loaded}', outside {LuaScriptLookup.GameObjectDirectory.TrimEnd('/')}."
-            : $"Lua script '{name}' loads from '{loaded}', which shadows '{shadowed}': the game searches that directory first.";
+            ? ctx.Messages.Format("LuaScriptReference_LuaScriptLoadsFromOutside", name, loaded,
+                LuaScriptLookup.GameObjectDirectory.TrimEnd('/'))
+            : ctx.Messages.Format("LuaScriptReference_LuaScriptLoadsFromWhich", name, loaded, shadowed);
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, message,

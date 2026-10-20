@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -39,6 +40,7 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
     private readonly DialogFactProducer _factProducer;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
+    private readonly IMessageCatalog _messages;
     private readonly DialogDiagnosticsHandlerRegistry _registry;
     private readonly IStoryDialogScope _scope;
     private readonly IDocumentTextSource _textSource;
@@ -57,11 +59,12 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         // dependency is the one shape the container is free to skip without a word.
         IProjectLayerMap layerMap,
         ServerOptions? options = null,
-        IGlobalSuppressionStore? globalSuppressions = null)
+        IGlobalSuppressionStore? globalSuppressions = null,
+        IMessageCatalog? messages = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost, scope,
             factProducer, registry, fileHelper, textSource,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds, logger,
-            globalSuppressions, layerMap)
+            globalSuppressions, layerMap, messages)
     {
     }
 
@@ -77,7 +80,8 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         int debounceMs = 0,
         ILogger<DialogDiagnosticsPublisher>? logger = null,
         IGlobalSuppressionStore? globalSuppressions = null,
-        IProjectLayerMap? layerMap = null)
+        IProjectLayerMap? layerMap = null,
+        IMessageCatalog? messages = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions, layerMap)
     {
         _indexService = indexService;
@@ -85,6 +89,7 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         _factProducer = factProducer;
         _registry = registry;
         _fileHelper = fileHelper;
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _textSource = textSource ?? new DocumentTextSource(workspaceHost, fileHelper,
             NullLogger<DocumentTextSource>.Instance);
     }
@@ -147,12 +152,12 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         });
     }
 
-    private static Diagnostic ToLspDiagnostic(DialogDiagnostic diagnostic)
+    private Diagnostic ToLspDiagnostic(DialogDiagnostic diagnostic)
     {
         return new Diagnostic
         {
             Severity = diagnostic.Severity.ToLsp(),
-            Message = diagnostic.Message,
+            Message = _messages.Format(diagnostic.Message),
             Range = new Range(diagnostic.Line, diagnostic.Column, diagnostic.Line, diagnostic.EndColumn),
             Source = AppProperties.LspServerId,
             // Always set in practice: the registry stamps each handler's DefaultId, and the

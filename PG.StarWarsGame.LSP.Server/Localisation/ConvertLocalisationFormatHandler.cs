@@ -13,6 +13,7 @@ using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -86,25 +87,26 @@ public sealed class ConvertLocalisationFormatHandler
             return Fail(rejection);
 
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
-            return Fail("No localisation file was given to convert.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_NoLocalisationFileWasGiven"));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(request.ProjectFilePath))
-            return Fail($"Cannot convert: '{request.ProjectFilePath}' does not exist.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertDoesNotExist",
+                request.ProjectFilePath));
 
         var targetFormat = request.TargetFormat ?? string.Empty;
         if (string.Equals(targetFormat, "dat", StringComparison.OrdinalIgnoreCase))
-            return Fail(
-                "DAT is not a conversion target. It is the format the game loads, one binary file " +
-                "per language - use 'Export Localisation to DAT' to produce it.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_DatNotATarget"));
 
         var targetExtension = _converter.ExtensionFor(targetFormat);
         if (targetExtension is null)
-            return Fail($"'{request.TargetFormat}' is not a format that can be written. Use CSV, XML or NLS.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_NotFormatCanBeWritten",
+                request.TargetFormat));
 
         var sourceExtension = fs.Path.GetExtension(request.ProjectFilePath).ToLowerInvariant();
         if (string.Equals(sourceExtension, targetExtension, StringComparison.OrdinalIgnoreCase))
-            return Fail($"'{request.ProjectFilePath}' is already in that format.");
+            return Fail(
+                new ConfiguredMessageCatalog(_config).Format("LocConvert_AlreadyFormat", request.ProjectFilePath));
 
         // A single-language target gets one file per language in the source. Writing one file would
         // mean picking a language and dropping the others, which is exactly the silent data loss this
@@ -130,18 +132,18 @@ public sealed class ConvertLocalisationFormatHandler
             : [fs.Path.ChangeExtension(request.ProjectFilePath, targetExtension)];
 
         if (targets.Count == 0)
-            return Fail($"Cannot convert: '{request.ProjectFilePath}' holds no translations.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertHoldsNoTranslations",
+                request.ProjectFilePath));
 
         // Checked before anything is written, so a collision cannot leave half a fan-out on disk.
         foreach (var existing in targets.Where(fs.File.Exists))
-            return Fail(
-                $"Cannot convert: '{existing}' already exists and was left untouched. Delete or " +
-                "move it first.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocConvert_TargetExists", existing));
 
         foreach (var target in targets)
             if (!await _converter.WriteAsync(db, targetFormat, target, ct))
                 return Fail(
-                    $"'{request.TargetFormat}' is not a format that can be written. Use CSV, XML or NLS.");
+                    new ConfiguredMessageCatalog(_config).Format("LocConvert_NotFormatCanBeWritten",
+                        request.TargetFormat));
 
         _logger.LogInformation(
             "aet/convertLocalisationFormat: wrote {Count} file(s) from '{Source}': {Targets}.",
@@ -192,8 +194,7 @@ public sealed class ConvertLocalisationFormatHandler
             if (extension == ".dat")
             {
                 if (!LocalisationFileNameLanguageResolver.TryResolve(path, _langService, out var language))
-                    return $"Cannot convert '{path}': its name does not say which language it holds " +
-                           "(expected '..._<LANGUAGE>.dat').";
+                    return new ConfiguredMessageCatalog(_config).Format("LocConvert_DatLanguageUnknown", path);
 
                 using var datFile = _datFileService.LoadFile(path);
                 _datImporter.Import(datFile.Content, language!, db);
@@ -221,13 +222,14 @@ public sealed class ConvertLocalisationFormatHandler
 
                     return null;
                 default:
-                    return $"Cannot convert '{path}': {extension} is not a localisation format this understands.";
+                    return new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertNotLocalisationFormat",
+                        path, extension);
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "aet/convertLocalisationFormat: failed to read '{Path}'.", path);
-            return $"Cannot convert '{path}': It could not be read - {ex.Message}";
+            return new ConfiguredMessageCatalog(_config).Format("LocConvert_CannotConvertCouldNotBe", path, ex.Message);
         }
     }
 

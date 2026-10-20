@@ -12,5 +12,5 @@ public sealed class TypeReferenceHandler : NonEmptyReferenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.TypeReference;
 
     protected override XmlValueType TargetType => XmlValueType.TypeReference;
-    protected override string ReferenceNoun => "type reference";
+    protected override string ReferenceNounKey => "TypeReference_Noun";
 }

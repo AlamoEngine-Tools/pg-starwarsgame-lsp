@@ -12,5 +12,5 @@ public sealed class SpeechEventReferenceHandler : NonEmptyReferenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.SpeechEventReference;
 
     protected override XmlValueType TargetType => XmlValueType.SpeechEventReference;
-    protected override string ReferenceNoun => "speech event reference";
+    protected override string ReferenceNounKey => "SpeechEventReference_Noun";
 }

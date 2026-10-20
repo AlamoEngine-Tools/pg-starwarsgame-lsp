@@ -58,15 +58,13 @@ public sealed class VehicleThiefCloneHandler : XmlDiagnosticsHandler<XmlTagValue
 
         if (!ObjectAbilities.Has(resolved, RequiredAbility))
             results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{value}' has no {RequiredAbility} ability, so a thief who captures this vehicle " +
-                "can never get out."));
+                ctx.Messages.Format("VehicleThiefClone_HasNoAbilitySoA", value, RequiredAbility)));
 
         // Read off the effective object, so a behaviour inherited from the base counts - which is
         // exactly how both vanilla hits keep it.
         if (ObjectBehaviors.Has(resolved, ForbiddenBehavior))
             results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{value}' keeps the {ForbiddenBehavior} behaviour, which a capture clone must not have. " +
-                "The thief rides in the same container garrisoned units are loaded into.",
+                ctx.Messages.Format("VehicleThiefClone_KeepsTheBehaviourWhichA", value, ForbiddenBehavior),
                 Id: DiagnosticIds.VehicleThiefCloneGarrison));
 
         return results;

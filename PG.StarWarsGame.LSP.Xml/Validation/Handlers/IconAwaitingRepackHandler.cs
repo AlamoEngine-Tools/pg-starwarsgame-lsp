@@ -50,8 +50,7 @@ public sealed class IconAwaitingRepackHandler : XmlDiagnosticsHandler<XmlTagValu
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"Icon '{value}' exists as a source image but is missing from this project's mega " +
-                "texture, so the game will not display it. Rebuild the .mtd to include it.")
+                ctx.Messages.Format("IconAwaitingRepack_IconExistsAsASource", value))
         ];
     }
 

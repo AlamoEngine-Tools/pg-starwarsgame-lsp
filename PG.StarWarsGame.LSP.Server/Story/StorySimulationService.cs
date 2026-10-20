@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Story.Graph;
@@ -93,19 +94,21 @@ public sealed class StorySimulationService(
     IGameIndexService indexService,
     ISchemaProvider schema,
     Action<StorySimKey> notifyChanged,
-    IStoryWorldSymbols? symbols = null) : IStorySimulationService
+    IStoryWorldSymbols? symbols = null,
+    IMessageCatalog? messages = null) : IStorySimulationService
 {
     private const int LogTail = 200;
     private const string Won = "won";
     private const string Lost = "lost";
     private readonly object _gate = new();
+    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
     private readonly Dictionary<StorySimKey, Session> _sessions = new();
 
     public (StorySimStateDto? State, string? Error) Start(StorySimKey key, StorySimOptions? options = null)
     {
         var model = modelService.GetCampaignModel(key.Campaign, key.Faction);
         if (model is null)
-            return (null, $"{key.Model} was not found.");
+            return (null, _messages.Format("StorySimService_WasNotFound", key.Model));
 
         var toNotify = new List<StorySimKey> { key };
         Session session;
@@ -120,7 +123,7 @@ public sealed class StorySimulationService(
                     toNotify.Add(battleKey);
                 }
 
-                var simulator = new StorySimulator(model, schema, symbols, null, options);
+                var simulator = new StorySimulator(model, schema, symbols, null, options, _messages);
                 session = new Session(key, simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts),
                     ImmutableList<SimCommand>.Empty, StorySimBreakpoints.None, model.LuaMachines, model.Battles)
                 {
@@ -135,16 +138,16 @@ public sealed class StorySimulationService(
             {
                 var battle = model.Battles.FirstOrDefault(b => b.Key == key.Scope);
                 if (battle is null)
-                    return (null, $"'{key.Scope}' is not a battle of {key.Model}.");
+                    return (null, _messages.Format("StorySimService_NotBattle", key.Scope, key.Model));
                 if (RunningBattle(key.Model, key) is { } running)
-                    return (null, $"Battle '{running.Label}' is still running - resolve it first");
+                    return (null, _messages.Format("StorySimService_BattleStillRunningResolveFirst", running.Label));
 
                 // The battle starts where the galaxy stands: its flags and its world, as the game
                 // hands a tactical mission the campaign state, and under the galaxy's options.
                 // Without a galactic session it runs on its own from the campaign seed.
                 _sessions.TryGetValue(key.Galactic, out var galactic);
                 var simulator = new StorySimulator(model, schema, symbols, key.Scope,
-                    galactic?.Simulator.Options ?? options);
+                    galactic?.Simulator.Options ?? options, _messages);
                 var seedFlags = galactic?.Snapshot.Runtime.Flags;
                 var seedWorld = galactic?.Snapshot.Runtime.World;
                 session = new Session(key, simulator,
@@ -254,11 +257,11 @@ public sealed class StorySimulationService(
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
-                return (null, $"No simulation running for {key}");
+                return (null, _messages.Format("StorySimService_NoSimulationRunning", key));
             if (Refusal(session) is { } refusal)
                 return (null, refusal);
             if (tick < 0 || tick > session.Snapshot.Tick)
-                return (null, $"Tick {tick} is outside the run (0 to {session.Snapshot.Tick}).");
+                return (null, _messages.Format("StorySimService_TickOutsideRun", tick, session.Snapshot.Tick));
             next = Replay(session, tick);
             _sessions[key] = next;
 
@@ -290,7 +293,7 @@ public sealed class StorySimulationService(
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
-                return (null, $"No simulation running for {key}");
+                return (null, _messages.Format("StorySimService_NoSimulationRunning", key));
             next = session with
             {
                 Breakpoints = new StorySimBreakpoints(
@@ -317,12 +320,12 @@ public sealed class StorySimulationService(
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key.Galactic, out var galactic))
-                return (null, $"No simulation running for {key.Model}");
+                return (null, _messages.Format("StorySimService_NoSimulationRunning", key.Model));
             var resolved = galactic.Commands.Any(c => c.Kind == SimCommandKind.Battle
                                                       && string.Equals(c.Text, battleSession.Scope,
                                                           StringComparison.OrdinalIgnoreCase));
             if (!resolved || !galactic.RetryPoints.TryGetValue(battleSession.Scope!, out var point))
-                return (null, $"Battle '{battleKey}' has no outcome to retry");
+                return (null, _messages.Format("StorySimService_BattleHasNoOutcomeRetry", battleKey));
             next = galactic with
             {
                 Snapshot = point.Snapshot, Commands = point.Commands,
@@ -347,7 +350,7 @@ public sealed class StorySimulationService(
             _sessions.TryGetValue(key.Galactic, out var galactic);
             _sessions.TryGetValue(battleSession, out var battle);
             if (galactic is null && battle is null)
-                return (null, $"No simulation running for {key.Model}");
+                return (null, _messages.Format("StorySimService_NoSimulationRunning", key.Model));
             // A resolved session of a mission the galaxy has since linked again is the old attempt.
             if (battle?.Outcome is not null && galactic is not null
                                             && !ResolvedBattles(galactic).ContainsKey(battleSession.Scope!))
@@ -358,11 +361,11 @@ public sealed class StorySimulationService(
             }
 
             if (battle?.Outcome is not null)
-                return (null, $"Battle '{battle.Label}' is already {battle.Outcome}");
+                return (null, _messages.Format("StorySimService_BattleAlready", battle.Label, battle.Outcome));
             var model = modelService.GetCampaignModel(key.Campaign, key.Faction);
             var label = model?.Battles.FirstOrDefault(b => b.Key == battleSession.Scope)?.Label;
             if (label is null)
-                return (null, $"'{battleKey}' is not a battle of {key.Model}.");
+                return (null, _messages.Format("StorySimService_NotBattle", battleKey, key.Model));
 
             var kind = won ? StoryWorldChangeKind.BattleWon : StoryWorldChangeKind.BattleLost;
             var faction = model!.Faction;
@@ -388,7 +391,7 @@ public sealed class StorySimulationService(
             else
             {
                 var implicitSim = new StorySimulator(model, schema, symbols, battleSession.Scope,
-                    galactic?.Simulator.Options);
+                    galactic?.Simulator.Options, _messages);
                 seed = galactic?.Snapshot.Runtime.Flags ?? StoryRuntimeState.Initial.Flags;
                 ended = Apply(implicitSim, implicitSim.Start(seed, galactic?.Snapshot.Runtime.World), outcome,
                     StorySimBreakpoints.None);
@@ -438,7 +441,7 @@ public sealed class StorySimulationService(
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
-                return (null, $"No simulation running for {key}");
+                return (null, _messages.Format("StorySimService_NoSimulationRunning", key));
             if (Refusal(session) is { } refusal)
             {
                 // Running to the next decision is not a command that can fail while a battle holds
@@ -466,15 +469,15 @@ public sealed class StorySimulationService(
     private string? Refusal(Session session)
     {
         if (session.Outcome is not null)
-            return $"Battle '{session.Label}' is {session.Outcome} - restart to run it again";
+            return _messages.Format("StorySimService_BattleRestartRunAgain", session.Label, session.Outcome);
         if (session.Key.IsGalactic && RunningBattle(session.Key.Model, null) is { } running)
-            return $"Galaxy paused - battle '{running.Label}' running";
+            return _messages.Format("StorySimService_GalaxyPausedBattleRunning", running.Label);
         // The fight was chosen but the battle's panel is not up yet: the tactical mode is loading
         // and the galactic story is already frozen.
         if (session.Key.IsGalactic && session.Snapshot.Runtime.World is
                 { PendingBattle: { } pending, PendingBattleChoice: StoryBattleChoice.Fight })
-            return $"Galaxy paused - battle '{
-                session.Battles.FirstOrDefault(b => b.Key == pending)?.Label ?? pending}' starting";
+            return _messages.Format("StorySimService_GalaxyPausedBattleStarting",
+                session.Battles.FirstOrDefault(b => b.Key == pending)?.Label ?? pending);
         return null;
     }
 

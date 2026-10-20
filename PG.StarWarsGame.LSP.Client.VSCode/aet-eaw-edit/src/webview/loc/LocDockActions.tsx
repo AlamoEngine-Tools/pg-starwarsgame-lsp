@@ -9,6 +9,7 @@
 // is a tile that opens a dialog: all three change the file as a whole, which is not something to
 // have happen the instant a control is touched.
 
+import * as l10n from "@vscode/l10n";
 import { useState } from "react";
 
 import { DIALOG_IDS } from "../shared/dialogGeometryStore";
@@ -166,16 +167,20 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
     return (
         <>
-            <DockSection title="File">
+            <DockSection title={l10n.t("File")}>
                 <LocTileGrid>
                     {(props.canAddLanguage || props.addLanguageCreatesFile) && (
                         <LocTile
                             icon="add"
-                            label="Add language"
+                            label={l10n.t("Add language")}
                             title={
                                 props.addLanguageCreatesFile
-                                    ? "Create a file for another language beside this one"
-                                    : "Add a language column to this file"
+                                    ? l10n.t(
+                                          "Create a file for another language beside this one",
+                                      )
+                                    : l10n.t(
+                                          "Add a language column to this file",
+                                      )
                             }
                             onClick={() => {
                                 setLanguage("");
@@ -188,8 +193,10 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         canSeed) && (
                         <LocTile
                             icon="copy"
-                            label="Fill language"
-                            title="Copy one language into the cells another has left empty"
+                            label={l10n.t("Fill language")}
+                            title={l10n.t(
+                                "Copy one language into the cells another has left empty",
+                            )}
                             onClick={() => {
                                 // Fill the second language from the first, which is the common
                                 // case: the first is the one that was written, the rest follow it.
@@ -227,14 +234,16 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     )}
                     <LocTile
                         icon="replace-all"
-                        label="Convert"
-                        title="Write this file in another format, keeping the original"
+                        label={l10n.t("Convert")}
+                        title={l10n.t(
+                            "Write this file in another format, keeping the original",
+                        )}
                         onClick={() => setDialog("convert")}
                     />
                     <LocTile
                         icon="package"
-                        label="Export DAT"
-                        title="Write the .dat files the game loads"
+                        label={l10n.t("Export DAT")}
+                        title={l10n.t("Write the .dat files the game loads")}
                         onClick={() => setDialog("export")}
                     />
                 </LocTileGrid>
@@ -253,7 +262,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                             : "The column is added to every row, and nothing reaches the file " +
                               "until it is saved."
                     }
-                    title="Add a language"
+                    title={l10n.t("Add a language")}
                     confirmLabel="Add"
                     canConfirm={language !== ""}
                     onCancel={close}
@@ -261,8 +270,9 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                 >
                     {addable.length === 0 ? (
                         <p className="modal-note">
-                            This file already has every language the game
-                            supports.
+                            {l10n.t(
+                                "This file already has every language the game supports.",
+                            )}
                         </p>
                     ) : (
                         <>
@@ -294,7 +304,9 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                 !props.addLanguageCreatesFile && (
                                     <label
                                         className="check-field"
-                                        title="Copy the game's own text for this language into the keys it defines"
+                                        title={l10n.t(
+                                            "Copy the game's own text for this language into the keys it defines",
+                                        )}
                                     >
                                         <input
                                             type="checkbox"
@@ -307,12 +319,22 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                             }
                                         />
                                         <span>
-                                            Fill from the game's translations
+                                            {l10n.t(
+                                                "Fill from the game's translations",
+                                            )}
                                             {fillCount !== undefined && (
                                                 <span className="check-detail">
                                                     {fillCount === 0
-                                                        ? " - the game translates none of these keys"
-                                                        : ` - ${fillCount} of ${props.rowCount} entries`}
+                                                        ? " - " +
+                                                          l10n.t(
+                                                              "the game translates none of these keys",
+                                                          )
+                                                        : " - " +
+                                                          l10n.t(
+                                                              "{0} of {1} entries",
+                                                              fillCount,
+                                                              props.rowCount,
+                                                          )}
                                                 </span>
                                             )}
                                         </span>
@@ -326,7 +348,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
             {dialog === "copy" && (
                 <Modal
                     dialogId={DIALOG_IDS.fillLanguage}
-                    title="Fill in a language"
+                    title={l10n.t("Fill in a language")}
                     confirmLabel="Fill"
                     canConfirm={copyCount > 0}
                     onCancel={close}
@@ -341,7 +363,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         close();
                     }}
                 >
-                    <Field label="Fill in" as="label">
+                    <Field label={l10n.t("Fill in")} as="label">
                         <select
                             value={copyTo}
                             onChange={(e) => changeCopyTo(e.target.value)}
@@ -366,10 +388,10 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                     onChange={() => setFillSource("language")}
                                 />
                                 <span className="choice-label">
-                                    From another language
+                                    {l10n.t("From another language")}
                                 </span>
                                 <span className="choice-detail">
-                                    this file's own text
+                                    {l10n.t("this file's own text")}
                                 </span>
                             </label>
                         )}
@@ -384,10 +406,10 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                     onChange={() => setFillSource("baseline")}
                                 />
                                 <span className="choice-label">
-                                    From the game
+                                    {l10n.t("From the game")}
                                 </span>
                                 <span className="choice-detail">
-                                    what Empire at War already ships
+                                    {l10n.t("what Empire at War already ships")}
                                 </span>
                             </label>
                         )}
@@ -411,18 +433,19 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                     }}
                                 />
                                 <span className="choice-label">
-                                    From another file
+                                    {l10n.t("From another file")}
                                 </span>
                                 <span className="choice-detail">
-                                    this project&apos;s own text, ready to
-                                    translate
+                                    {l10n.t(
+                                        "this project's own text, ready to translate",
+                                    )}
                                 </span>
                             </label>
                         )}
                     </div>
 
                     {fromFile && (
-                        <Field label="Copy from" as="label">
+                        <Field label={l10n.t("Copy from")} as="label">
                             <select
                                 value={seedFrom}
                                 onChange={(e) => setSeedFrom(e.target.value)}
@@ -439,7 +462,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     )}
 
                     {fromLanguage && (
-                        <Field label="Copy from" as="label">
+                        <Field label={l10n.t("Copy from")} as="label">
                             {/* The language being filled in is left out: copying it into itself
                                 fills nothing, so offering it can only produce a disabled Fill. */}
                             <select
@@ -457,25 +480,32 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
                     <p className="modal-note">
                         {fromFile
-                            ? `${copyCount} line(s) would be copied in, in that file's order, ` +
-                              `as ${copyTo} - ready to translate over.`
+                            ? l10n.t(
+                                  "{0} line(s) would be copied in, in that file's order, as {1} - ready to translate over.",
+                                  copyCount,
+                                  copyTo,
+                              )
                             : copyCount === 0
-                              ? `There is nothing left to fill in for ${copyTo}.`
+                              ? l10n.t(
+                                    "There is nothing left to fill in for {0}.",
+                                    copyTo,
+                                )
                               : props.fillsByAdding && fromGame
-                                ? `${copyCount} line(s) would be added, in the order the game ` +
-                                  "plays them. Unwanted lines can be edited or deleted afterwards."
-                                : `${copyCount} empty cell(s) would be filled. Anything ` +
-                                  `${copyTo} already says is left alone.`}
+                                ? l10n.t(
+                                      "{0} line(s) would be added, in the order the game plays them. Unwanted lines can be edited or deleted afterwards.",
+                                      copyCount,
+                                  )
+                                : l10n.t(
+                                      "{0} empty cell(s) would be filled. Anything {1} already says is left alone.",
+                                      copyCount,
+                                      copyTo,
+                                  )}
                     </p>
                     {fromLanguage && (
                         <p className="modal-note">
-                            Most of a credits list is names, and a name is
-                            usually the same in every language. Only do this
-                            where that holds: a cell left empty is dropped from
-                            that language on export, which is how one file
-                            carries lists of different lengths - a dub recorded
-                            with a smaller cast, for instance - so filling those
-                            in would credit the wrong people.
+                            {l10n.t(
+                                "Most of a credits list is names, and a name is usually the same in every language. Only do this where that holds: A cell left empty is dropped from that language on export, which is how one file carries lists of different lengths - a dub recorded with a smaller cast, for instance - so filling those in would credit the wrong people.",
+                            )}
                         </p>
                     )}
                 </Modal>
@@ -487,7 +517,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     footnote={
                         "The new file is written beside this one and the original is kept."
                     }
-                    title="Convert to another format"
+                    title={l10n.t("Convert to another format")}
                     confirmLabel="Convert"
                     onCancel={close}
                     onConfirm={() => {
@@ -520,7 +550,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
             {dialog === "export" && (
                 <Modal
                     dialogId={DIALOG_IDS.exportDat}
-                    title="Export to DAT"
+                    title={l10n.t("Export to DAT")}
                     confirmLabel="Export"
                     onCancel={close}
                     onConfirm={() => {
@@ -529,13 +559,14 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     }}
                 >
                     <p className="modal-note">
-                        Writes the binary files the game loads, one per
-                        language, beside this file. Existing .dat files with
-                        those names are overwritten.
+                        {l10n.t(
+                            "Writes the binary files the game loads, one per language, beside this file. Existing .dat files with those names are overwritten.",
+                        )}
                     </p>
                     <p className="modal-note">
-                        This exports what is saved on disk, not what is staged -
-                        save first if you want your pending edits included.
+                        {l10n.t(
+                            "This exports what is saved on disk, not what is staged - pending edits are included once saved.",
+                        )}
                     </p>
                 </Modal>
             )}

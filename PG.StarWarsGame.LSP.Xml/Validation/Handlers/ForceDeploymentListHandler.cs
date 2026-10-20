@@ -21,9 +21,9 @@ public sealed class ForceDeploymentListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid force deployment entry for <{fact.Tag.Tag}>. Expected: FactionName, PlanetName, UnitTypeName.")
+                    ctx.Messages.Format("ForceDeploymentList_IsNotAValidForce", trimmed, fact.Tag.Tag))
             ];
 
-        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 3) is { } extra ? [extra] : [];
+        return OneEntryPerTag.ExtraTokens(fact.Tag.Tag, parts, 3, ctx.Messages) is { } extra ? [extra] : [];
     }
 }

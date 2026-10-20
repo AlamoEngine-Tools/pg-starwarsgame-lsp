@@ -37,10 +37,10 @@ public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
     protected abstract IReadOnlyList<string> RequiredTags { get; }
 
     /// <summary>
-    ///     What the engine substitutes when the tag is absent, as a sentence fragment. Empty when
-    ///     it only complains.
+    ///     The catalogue key of what the engine substitutes when the tag is absent, a sentence
+    ///     fragment. Empty when it only complains.
     /// </summary>
-    protected virtual string Repair => string.Empty;
+    protected virtual string RepairKey => string.Empty;
 
     /// <summary>
     ///     The value the engine writes in when the tag is absent, where it writes one. Null for the
@@ -76,7 +76,8 @@ public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
                 XmlUtility.GetOpeningTagLength(objectNode),
                 OwningType,
                 tag,
-                Repair,
+                RepairKey,
+                DefaultValue,
                 BuildInsertion(objectNode, lineIndex, tag)));
         }
 
@@ -102,14 +103,13 @@ public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
     /// <summary>
     ///     The engine's default written into the document, where there is one to write.
     /// </summary>
-    private XmlEngineRepair? BuildInsertion(HtmlNode objectNode, LineOffsetIndex lineIndex, string tag)
+    private IReadOnlyList<XmlDiagnosticEdit>? BuildInsertion(HtmlNode objectNode, LineOffsetIndex lineIndex,
+        string tag)
     {
         if (DefaultValue is not { } value) return null;
 
         var edit = TagInsertionFactory.InsertLastChild(objectNode, lineIndex, tag, value);
 
-        return edit is null
-            ? null
-            : new XmlEngineRepair($"Apply the engine's own default: <{tag}>{value}</{tag}>", [edit]);
+        return edit is null ? null : [edit];
     }
 }

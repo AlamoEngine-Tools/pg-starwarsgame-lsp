@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Util;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -43,7 +44,7 @@ internal sealed class TupleSlotHoverStrategy : IXmlHoverStrategy
                 ReferenceKind.ModelFile or ReferenceKind.TextureFile or ReferenceKind.AudioFile
                     or ReferenceKind.MapFile => HoverUtility.BuildAssetReferenceHover(
                         tagDef with { ReferenceKind = item.Slot.ReferenceKind }, item.Text, ctx.Index.AssetFiles,
-                        line, column, item.Text.Length),
+                        line, column, item.Text.Length, ctx.Locale),
                 _ => null
             };
         }
@@ -54,7 +55,10 @@ internal sealed class TupleSlotHoverStrategy : IXmlHoverStrategy
     private static Hover EnumHover(TupleItem item, string locale, int line, int column)
     {
         var slot = item.Slot!;
-        var lines = new List<string> { $"**{slot.Label}** - `{slot.Enum?.Name ?? "enum"}`" };
+        var lines = new List<string>
+        {
+            $"**{slot.Label}** - `{slot.Enum?.Name ?? ResxMessageCatalog.Server(locale).Format("TupleSlotHover_Enum")}`"
+        };
 
         var value = slot.Enum?.Values.FirstOrDefault(v => v.Name.Equals(item.Text, StringComparison.OrdinalIgnoreCase));
         var description = value is null

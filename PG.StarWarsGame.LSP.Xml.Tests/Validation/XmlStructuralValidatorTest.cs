@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
@@ -29,7 +30,7 @@ public sealed class XmlStructuralValidatorTest
         var e = Assert.Single(Sut.Validate(Decl + "<Foo>\n  <Bar>1</Baz>\n</Foo>"));
         Assert.Equal(XmlStrictnessCategory.EndTagMismatch, e.Category);
         Assert.Equal(2, e.Line);
-        Assert.Contains("Bar", e.Reason);
+        Assert.Contains("Bar", ResxMessageCatalog.Server("en").Format(e.Reason));
     }
 
     [Fact]

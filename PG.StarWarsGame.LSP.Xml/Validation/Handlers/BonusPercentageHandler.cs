@@ -34,6 +34,5 @@ public sealed class BonusPercentageHandler : NumericRangeHandlerBase
 
     protected override bool MinimumInclusive => false;
 
-    protected override string Expectation =>
-        "must be greater than -1.0, since -1.0 would cancel the stat outright";
+    protected override string ExpectationKey => "BonusPercentage_Expectation";
 }

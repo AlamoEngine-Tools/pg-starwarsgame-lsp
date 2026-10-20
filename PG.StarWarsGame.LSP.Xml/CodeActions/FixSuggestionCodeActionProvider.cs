@@ -29,7 +29,7 @@ internal sealed class FixSuggestionCodeActionProvider : IXmlCodeActionProvider
             {
                 // A handler that knows what the ENGINE substitutes says so in its own words;
                 // everything else is a suggestion and reads like one.
-                Title = (string?)d.Data?["fixTitle"] ?? $"Replace with '{fix}'",
+                Title = (string?)d.Data?["fixTitle"] ?? ctx.Messages.Format("FixSuggestionAction_Replace", fix),
                 Kind = CodeActionKind.QuickFix,
                 Diagnostics = new Container<Diagnostic>(d),
                 IsPreferred = true,

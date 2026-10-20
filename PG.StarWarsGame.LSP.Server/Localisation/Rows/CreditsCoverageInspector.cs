@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 /// <summary>
@@ -62,12 +64,10 @@ public static class CreditsCoverageInspector
         return orphaned;
     }
 
-    public static string Message(string language, string label)
+    public static string Message(string language, string label, IMessageCatalog? messages = null)
     {
-        return $"In {language}, '{label}' is a heading with nothing under it. The crawl reads it out "
-               + "and moves straight on, which is valid - a credits key is a formatting directive, "
-               + "not an entry. Usually it means the label was translated and the names under it were "
-               + "not; leaving the heading itself empty skips the whole section.";
+        messages ??= ResxMessageCatalog.Server("en");
+        return messages.Format("CreditsCoverage_EmptyHeading", language, label);
     }
 
     private static bool IsHeader(LocRowDto row)

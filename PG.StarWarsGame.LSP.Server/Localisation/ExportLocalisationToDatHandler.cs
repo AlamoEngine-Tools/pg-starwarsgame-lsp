@@ -14,6 +14,7 @@ using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -73,11 +74,13 @@ public sealed class ExportLocalisationToDatHandler
             return Task.FromResult(new ExportLocalisationToDatResult([], rejection));
 
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
-            return Task.FromResult(new ExportLocalisationToDatResult([], "No project file path provided."));
+            return Task.FromResult(new ExportLocalisationToDatResult([],
+                new ConfiguredMessageCatalog(_config).Format("LocExportDat_NoProjectFilePathProvided")));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(request.ProjectFilePath))
-            return Task.FromResult(new ExportLocalisationToDatResult([], $"File not found: {request.ProjectFilePath}"));
+            return Task.FromResult(new ExportLocalisationToDatResult([],
+                new ConfiguredMessageCatalog(_config).Format("LocExportDat_FileNotFound", request.ProjectFilePath)));
 
         var languages = _langService.OfficiallySupported();
         var isCredits = LocalisationCategoryResolver.Resolve(
@@ -136,13 +139,15 @@ public sealed class ExportLocalisationToDatHandler
 
                     break;
                 default:
-                    return Task.FromResult(new ExportLocalisationToDatResult([], $"Unsupported format: {ext}"));
+                    return Task.FromResult(new ExportLocalisationToDatResult([],
+                        new ConfiguredMessageCatalog(_config).Format("LocExportDat_UnsupportedFormat", ext)));
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load workspace file '{Path}'.", request.ProjectFilePath);
-            return Task.FromResult(new ExportLocalisationToDatResult([], $"Failed to load file: {ex.Message}"));
+            return Task.FromResult(new ExportLocalisationToDatResult([],
+                new ConfiguredMessageCatalog(_config).Format("LocExportDat_FailedLoadFile", ex.Message)));
         }
 
         var dir = fs.Path.GetDirectoryName(request.ProjectFilePath)!;

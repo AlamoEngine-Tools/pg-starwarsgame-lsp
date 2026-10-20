@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -39,7 +40,7 @@ public sealed class PreviewStoryGraphHandler(
         var baseModel = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (baseModel is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                $"Campaign '{request.Campaign}' was not found."));
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignWasNotFound", request.Campaign)));
 
         // No staged commands → identical to the committed graph.
         if (request.Commands.Count == 0)
@@ -48,14 +49,16 @@ public sealed class PreviewStoryGraphHandler(
                 request.PlotState, request.ReachableDirection, request.Scope));
 
         var executor = new StoryCommandExecutor(
-            modelService, indexService, textSource, schema, fileHelper, reloadService, NullLogger.Instance);
+            modelService, indexService, textSource, schema, fileHelper, reloadService, NullLogger.Instance,
+            new ConfiguredMessageCatalog(config));
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, error) = executor.Compose(
             baseModel, request.Commands.Select(c => c.ToParams(request.Campaign, request.Faction)).ToList(), texts);
         if (error is not null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                $"Change {(failedIndex ?? 0) + 1} of {request.Commands.Count} can't be staged: {error}"));
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_ChangeCanTBeStaged", (failedIndex ?? 0) + 1,
+                    request.Commands.Count, error)));
 
         // Re-assemble the campaign over the composed working copy. The chain (campaign → manifest →
         // thread) comes from committed state; graph gestures only touch thread files, which the
@@ -64,7 +67,8 @@ public sealed class PreviewStoryGraphHandler(
             .Assemble(request.Campaign, request.Faction, modelService.GetChainResult(), ReadThread);
         if (previewModel is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
-                $"Campaign '{request.Campaign}' could not be assembled from the staged changes."));
+                new ConfiguredMessageCatalog(config).Format("StoryHandlers_CampaignCouldNotBeAssembled",
+                    request.Campaign)));
 
         return Task.FromResult(StoryGraphProjection.Project(
             previewModel, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,

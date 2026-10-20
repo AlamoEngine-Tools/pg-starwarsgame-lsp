@@ -5,6 +5,7 @@ using System.IO.Abstractions;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua;
@@ -165,8 +166,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     {
         if (provider.AllTags.Count > 0) return;
 
-        var message = $"No schema in {localPath}. Point \"aet-eaw-edit.lsp.schema.localPath\" at the schema's eaw "
-                      + "folder, the one holding _index.json";
+        var message = new ConfiguredMessageCatalog(_config).Format("SchemaBootstrapper_NoSchemaPointAetEaw", localPath);
         _logger.LogError("{Message}", message);
         _notifier.ShowError(message);
     }

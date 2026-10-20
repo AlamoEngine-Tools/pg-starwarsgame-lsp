@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Story;
@@ -314,7 +315,7 @@ public sealed class StorySimulationServiceTest
         var result = await new StorySimStartHandler(service, config)
             .Handle(new StorySimStartParams("GC", "Rebel"), CancellationToken.None);
 
-        Assert.Equal(StorySimFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StorySimFeature.DisabledKey), result.Error);
     }
 
     // Measured over the wire: a start request without the field arrived with the option OFF, since

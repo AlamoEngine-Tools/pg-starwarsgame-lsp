@@ -26,8 +26,7 @@ public sealed class VariantBaseUnresolvedHandler : XmlDiagnosticsHandler<Variant
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"Variant base '{fact.BaseId}' does not resolve - the engine ignores the tag " +
-                $"silently, so '{fact.ObjectId}' inherits nothing.")
+                ctx.Messages.Format("VariantBaseUnresolved_VariantBaseDoesNotResolve", fact.BaseId, fact.ObjectId))
         ];
     }
 }

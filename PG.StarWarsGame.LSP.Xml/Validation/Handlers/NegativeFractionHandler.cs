@@ -25,5 +25,5 @@ public sealed class NegativeFractionHandler : NumericRangeHandlerBase
 
     protected override float? Maximum => 0f;
 
-    protected override string Expectation => "must be between -1.0 and 0.0";
+    protected override string ExpectationKey => "NegativeFraction_Expectation";
 }

@@ -25,7 +25,7 @@ public sealed class IntValueHandler : NumberValueHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"'{trimmed}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {corrected}?",
+                    ctx.Messages.Format("IntValue_IsAFloatButExpects", trimmed, fact.Tag.Tag, corrected),
                     SuggestedFix: corrected, Id: DiagnosticIds.IntValueFloatWhereIntExpected)
             ];
         }
@@ -33,7 +33,7 @@ public sealed class IntValueHandler : NumberValueHandlerBase
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"'{trimmed}' is out of range for <{fact.Tag.Tag}>. Expected a valid integer.",
+                ctx.Messages.Format("IntValue_IsOutOfRangeFor", trimmed, fact.Tag.Tag),
                 Id: DiagnosticIds.IntValueOutOfRange)
         ];
     }

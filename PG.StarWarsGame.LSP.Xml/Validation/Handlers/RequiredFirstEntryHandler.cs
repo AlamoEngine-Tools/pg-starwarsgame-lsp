@@ -62,9 +62,7 @@ public sealed class RequiredFirstEntryHandler : XmlDiagnosticsHandler<XmlTagValu
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<{fact.Tag.Tag}> must list '{required}' first - it is entry 0, which the engine "
-                + $"hands out whenever a lookup misses, so putting '{first}' there silently "
-                + "repoints every default that falls back to it")
+                ctx.Messages.Format("RequiredFirstEntry_MustListFirstItIs", fact.Tag.Tag, required, first))
         ];
     }
 

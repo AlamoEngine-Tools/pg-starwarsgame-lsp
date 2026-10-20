@@ -24,6 +24,6 @@ public sealed class ContextNameListHandler : XmlDiagnosticsHandler<XmlTagValueFa
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        return TupleShape.WholeGroups(fact) is { } error ? [error] : [];
+        return TupleShape.WholeGroups(fact, ctx.Messages) is { } error ? [error] : [];
     }
 }

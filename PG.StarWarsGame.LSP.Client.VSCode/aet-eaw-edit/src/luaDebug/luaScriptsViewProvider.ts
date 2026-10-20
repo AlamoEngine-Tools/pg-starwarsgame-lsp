@@ -221,7 +221,7 @@ export class LuaScriptsViewProvider
             item.resourceUri = vscode.Uri.file(row.path);
             item.command = {
                 command: "vscode.open",
-                title: "Open Script",
+                title: vscode.l10n.t("Open Script"),
                 arguments: [vscode.Uri.file(row.path)],
             };
         }
@@ -324,7 +324,7 @@ export class LuaScriptsViewProvider
         const session = this._session;
         if (session === undefined) {
             void vscode.window.showWarningMessage(
-                "No Lua debug session is active",
+                vscode.l10n.t("No Lua debug session is active"),
             );
             return undefined;
         }

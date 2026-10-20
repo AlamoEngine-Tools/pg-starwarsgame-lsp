@@ -24,7 +24,7 @@ public sealed class UnregisteredXmlFileHandler : XmlDiagnosticsHandler<XmlUnregi
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"No registry names '{fact.FileName}', so the game never reads it.")
+                ctx.Messages.Format("UnregisteredXmlFile_NoRegistryNamesSoThe", fact.FileName))
         ];
     }
 }

@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -47,7 +48,7 @@ public sealed class GetEffectiveObjectHandler
             effective.Cyclic,
             effective.CycleObjectId,
             effective.Chain,
-            EffectiveObjectXmlRenderer.Render(effective),
+            EffectiveObjectXmlRenderer.Render(effective, new ConfiguredMessageCatalog(_config)),
             effective.TypeName));
     }
 }

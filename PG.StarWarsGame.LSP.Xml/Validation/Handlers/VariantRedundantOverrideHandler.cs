@@ -16,7 +16,7 @@ public sealed class VariantRedundantOverrideHandler : XmlDiagnosticsHandler<Vari
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint,
-                $"Tag '{fact.TagName}' has the same value as the inherited base; this override is redundant.",
+                ctx.Messages.Format("VariantRedundantOverride_TagHasTheSameValue", fact.TagName),
                 Tags: [XmlDiagnosticTag.Unnecessary],
                 RemoveRedundantOverride: true)
         ];

@@ -7,6 +7,8 @@
 // no meaning the user can see, which is also why the grid can be sorted freely and why adding an
 // entry never asks where to put it.
 
+import "./shared/l10nSetup";
+import * as l10n from "@vscode/l10n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -310,7 +312,7 @@ function App(): React.JSX.Element {
         return <LocGridMessage>{error}</LocGridMessage>;
     }
     if (!loaded) {
-        return <LocGridMessage>Loading...</LocGridMessage>;
+        return <LocGridMessage>{l10n.t("Loading...")}</LocGridMessage>;
     }
 
     const duplicateCount = countDuplicateKeys(rows);
@@ -357,7 +359,12 @@ function App(): React.JSX.Element {
 
     const header = (
         <>
-            <HeadCell label="Key" column="key" sort={sort} onSort={setSort} />
+            <HeadCell
+                label={l10n.t("Key")}
+                column="key"
+                sort={sort}
+                onSort={setSort}
+            />
             {shownLanguages.map((language) => (
                 <HeadCell
                     key={language}
@@ -505,7 +512,9 @@ function App(): React.JSX.Element {
                 read. Row counts live under the table, where they describe it. */}
             {duplicateCount > 0 && (
                 <div className="counts">
-                    <div className="warn">{duplicateCount} duplicate keys</div>
+                    <div className="warn">
+                        {l10n.t("{0} duplicate keys", duplicateCount)}
+                    </div>
                 </div>
             )}
         </>
@@ -526,14 +535,16 @@ function App(): React.JSX.Element {
         >
             <label
                 className="inherited-toggle"
-                title="Show entries whose value is identical to the layer below this file"
+                title={l10n.t(
+                    "Show entries whose value is identical to the layer below this file",
+                )}
             >
                 <input
                     type="checkbox"
                     checked={showInherited}
                     onChange={(e) => setShowInherited(e.target.checked)}
                 />
-                Inherited
+                {l10n.t("Inherited")}
                 {inherited.size > 0 && (
                     <span className="badge">{inherited.size}</span>
                 )}
@@ -621,7 +632,7 @@ function TranslationRowMenu(props: {
             onClose={props.onClose}
         >
             <button role="menuitem" onClick={run(props.onAdd)}>
-                Add translation...
+                {l10n.t("Add translation...")}
             </button>
 
             {props.onReset && (
@@ -629,10 +640,12 @@ function TranslationRowMenu(props: {
                     <div className="sep" />
                     <button
                         role="menuitem"
-                        title="Replace this entry with the value the layer below it provides"
+                        title={l10n.t(
+                            "Replace this entry with the value the layer below it provides",
+                        )}
                         onClick={run(() => props.onReset?.())}
                     >
-                        Reset to inherited value
+                        {l10n.t("Reset to inherited value")}
                     </button>
                 </>
             )}
@@ -645,7 +658,7 @@ function TranslationRowMenu(props: {
                         className="danger"
                         onClick={run(() => props.onDelete?.())}
                     >
-                        Delete row
+                        {l10n.t("Delete row")}
                     </button>
                 </>
             )}
@@ -679,7 +692,7 @@ function HeadCell(props: {
                       ? "ascending"
                       : "descending"
             }
-            title={`Sort by ${props.label}`}
+            title={l10n.t("Sort by {0}", props.label)}
             onClick={() => props.onSort(nextSort(props.sort, props.column))}
             onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -783,7 +796,7 @@ function AddTranslationDialog(props: {
                 className="modal modal-wide"
                 role="dialog"
                 aria-modal="true"
-                aria-label="Add translation"
+                aria-label={l10n.t("Add translation")}
                 onSubmit={(e) => {
                     e.preventDefault();
                     submit();
@@ -796,14 +809,14 @@ function AddTranslationDialog(props: {
                 {...dialogProps}
             >
                 <h2 className="drag-handle" {...dragHandleProps}>
-                    Add translation
+                    {l10n.t("Add translation")}
                 </h2>
 
                 {/* Pinned: the key is what every other field is about, and its error is the reason
                     Add is disabled - both have to stay readable while the language list scrolls,
                     or a small dialog hides the thing you are being asked to fix. */}
                 <div className="modal-pinned">
-                    <Field label="Key" as="label">
+                    <Field label={l10n.t("Key")} as="label">
                         <input
                             type="text"
                             value={draft.key}
@@ -886,16 +899,16 @@ function AddTranslationDialog(props: {
                             className="codicon codicon-info"
                             aria-hidden="true"
                         />
-                        Languages left empty stay empty.
+                        {l10n.t("Languages left empty stay empty.")}
                     </p>
-                    <Button onClick={props.onCancel}>Cancel</Button>
+                    <Button onClick={props.onCancel}>{l10n.t("Cancel")}</Button>
                     <Button
                         submit
                         className="primary"
                         disabled={error !== null}
                         disabledReason={error ?? "Fill in the fields above"}
                     >
-                        Add
+                        {l10n.t("Add")}
                     </Button>
                 </div>
                 <ResizeHandles handleProps={resizeHandleProps} />
@@ -910,7 +923,7 @@ function valueOf(row: LocRow, language: string): string {
 
 // Examples from this file's own vocabulary.
 const PLACEHOLDERS: Record<FilterMode, string> = {
-    text: "Filter rows...",
+    text: l10n.t("Filter rows..."),
     wildcard: "TEXT_*_NAME",
     regex: "^TEXT_.*NAME$",
 };

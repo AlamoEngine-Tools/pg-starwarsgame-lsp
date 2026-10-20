@@ -16,7 +16,7 @@ public sealed class CrossLayerShadowHandler : XmlDiagnosticsHandler<XmlLayerShad
         // against the code, where a suppression would only hide the message.
         yield return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Warning,
-            $"'{fact.SymbolId}' overrides a definition from '{fact.ShadowedLayerName}'. " +
-            $"If that is intended, declare it: <!-- <Override Name=\"{fact.SymbolId}\"/> -->");
+            ctx.Messages.Format("CrossLayerShadow_OverridesADefinitionFromIf", fact.SymbolId, fact.ShadowedLayerName,
+                fact.SymbolId));
     }
 }

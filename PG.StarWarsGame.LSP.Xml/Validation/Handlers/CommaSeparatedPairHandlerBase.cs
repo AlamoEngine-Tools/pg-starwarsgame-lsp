@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -69,7 +70,8 @@ public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
         return end > start ? (start, end - start) : null;
     }
 
-    protected static XmlDiagnosticResult? TryValidateSfxEvent(string sfxEventName, string tagName, GameIndex index)
+    protected static XmlDiagnosticResult? TryValidateSfxEvent(string sfxEventName, string tagName, GameIndex index,
+        IMessageCatalog messages)
     {
         if (sfxEventName.Length == 0)
             return null;
@@ -78,16 +80,17 @@ public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
         if (index.Resolve(sfxEventName) is not null)
             return null;
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"'{sfxEventName}' could not be resolved as an SFX event for <{tagName}>.");
+            messages.Format("CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs", sfxEventName, tagName));
     }
 
-    protected static XmlDiagnosticResult? TryValidateGameObjectName(string name, string tagName, GameIndex index)
+    protected static XmlDiagnosticResult? TryValidateGameObjectName(string name, string tagName, GameIndex index,
+        IMessageCatalog messages)
     {
         if (index.Baseline.Symbols.Count == 0 && index.WorkspaceDefinitions.Count == 0)
             return null;
         if (index.Resolve(name) is not null)
             return null;
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"'{name}' could not be resolved as a game object for <{tagName}>.");
+            messages.Format("CommaSeparatedPairHandlerBase_CouldNotBeResolvedAs2", name, tagName));
     }
 }

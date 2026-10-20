@@ -20,7 +20,8 @@ public sealed class LocalisationToTextureMapHandler : CommaSeparatedPairHandlerB
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid localisation texture map for <{fact.Tag.Tag}>. Expected: LocalisationKey, TextureName.")
+                    ctx.Messages.Format("LocalisationToTextureMap_IsNotAValidLocalisation", fact.RawValue.Trim(),
+                        fact.Tag.Tag))
             ];
 
         return [];

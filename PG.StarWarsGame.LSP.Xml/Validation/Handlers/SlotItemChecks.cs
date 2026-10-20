@@ -32,7 +32,7 @@ internal static class SlotItemChecks
             return null;
 
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-            $"'{value}' is not a {slot.Enum!.Name} value, which the {slot.Label} of <{tag.Tag}> has to be.",
+            ctx.Messages.Format("SlotItemChecks_IsNotAValueWhich", value, slot.Enum!.Name, slot.Label, tag.Tag),
             Id: DiagnosticIds.TupleSlotEnumValue);
     }
 
@@ -51,7 +51,7 @@ internal static class SlotItemChecks
         if (slot.ReferenceKind == ReferenceKind.ModelFile &&
             !value.EndsWith(".alo", StringComparison.OrdinalIgnoreCase))
             return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"'{value}' is not a valid model filename for the {slot.Label} of <{tag.Tag}>. Expected a .alo file.",
+                ctx.Messages.Format("SlotItemChecks_IsNotAValidModel", value, slot.Label, tag.Tag),
                 Id: DiagnosticIds.TupleSlotModelFileFormat);
 
         if (AssetFileLookup.Resolves(ctx.Index.AssetFiles, value, rule.AllowedExtensions,
@@ -62,7 +62,7 @@ internal static class SlotItemChecks
             return null;
 
         return new XmlDiagnosticResult(rule.MissingSeverity,
-            $"{rule.Noun} file '{value}' was not found in the game data or workspace asset files.",
+            ctx.Messages.Format("SlotItemChecks_FileWasNotFoundIn", ctx.Messages.Format(rule.NounKey), value),
             Id: slot.ReferenceKind == ReferenceKind.ModelFile
                 ? DiagnosticIds.TupleSlotModelFileExistence
                 : DiagnosticIds.TupleSlotAssetFileExistence);

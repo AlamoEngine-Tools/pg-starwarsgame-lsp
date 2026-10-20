@@ -31,12 +31,11 @@ public sealed class LandDamageTableMismatchHandler
 
         var keep = Math.Min(fact.Thresholds, fact.Alternates);
         var surplus = Math.Max(fact.Thresholds, fact.Alternates) - keep;
-        var entries = surplus == 1 ? "entry" : "entries";
 
+        // Worded with no noun after a count, so it reads right for one entry or many in any language.
         var message =
-            $"<Land_Damage_Thresholds> has {fact.Thresholds} and <Land_Damage_Alternates> has "
-            + $"{fact.Alternates} {(fact.Alternates == 1 ? "entry" : "entries")}. The columns pair by "
-            + $"position, so the last {surplus} {entries} of <{longerTag}> pair with nothing.";
+            ctx.Messages.Format("LandDamageTableMismatch_CountsDiffer", fact.Thresholds, fact.Alternates, surplus,
+                longerTag);
 
         // Trimming to zero would empty the table rather than fix it, so an empty companion column
         // gets the report without a fix - what to write there is the author's decision.

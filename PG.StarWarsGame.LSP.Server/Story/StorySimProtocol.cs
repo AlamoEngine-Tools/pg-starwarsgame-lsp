@@ -4,19 +4,21 @@
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
 /// <summary>Gating for the <c>aet/storySim*</c> endpoints - same pattern as <see cref="StoryEditorFeature" />.</summary>
 public static class StorySimFeature
 {
-    public const string DisabledMessage =
-        "The story simulator is disabled. Enable 'aet-eaw-edit.features.tools.storySimulator' in the editor settings.";
+    public const string DisabledKey = "StorySimFeature_Disabled";
 
     public static string? Rejection(ILspConfigurationProvider config)
     {
-        if (!config.Current.Features.Tools.StorySimulator) return DisabledMessage;
-        if (!config.Current.Features.Story.Discovery) return StoryEditorFeature.DiscoveryMissingMessage;
+        if (!config.Current.Features.Tools.StorySimulator)
+            return new ConfiguredMessageCatalog(config).Format(DisabledKey);
+        if (!config.Current.Features.Story.Discovery)
+            return new ConfiguredMessageCatalog(config).Format(StoryEditorFeature.DiscoveryMissingKey);
         return null;
     }
 }

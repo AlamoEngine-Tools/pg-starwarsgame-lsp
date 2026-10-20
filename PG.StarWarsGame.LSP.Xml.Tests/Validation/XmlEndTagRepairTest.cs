@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
@@ -38,9 +39,9 @@ public sealed class XmlEndTagRepairTest
         var error = Error(broken);
 
         Assert.Equal(XmlStrictnessCategory.EndTagMismatch, error.Category);
-        Assert.Contains("<Ability> is never closed", error.Reason);
+        Assert.Contains("<Ability> is never closed", ResxMessageCatalog.Server("en").Format(error.Reason));
         Assert.Equal(4, error.Line); // anchored on the unclosed start tag
-        Assert.Equal("Close <Ability>", error.Repair!.Title);
+        Assert.Equal("Close <Ability>", ResxMessageCatalog.Server("en").Format(error.Repair!.Title));
         Assert.Equal(original, Repaired(broken));
     }
 
@@ -156,7 +157,7 @@ public sealed class XmlEndTagRepairTest
 
         var error = Error(broken);
 
-        Assert.Equal("Close <Data> and <Unit>", error.Repair!.Title);
+        Assert.Equal("Close <Data> and <Unit>", ResxMessageCatalog.Server("en").Format(error.Repair!.Title));
         Assert.Equal(original, Repaired(broken));
     }
 
@@ -168,7 +169,7 @@ public sealed class XmlEndTagRepairTest
 
         var error = Error(broken);
 
-        Assert.Equal("Rename the end tag to </Unit>", error.Repair!.Title);
+        Assert.Equal("Rename the end tag to </Unit>", ResxMessageCatalog.Server("en").Format(error.Repair!.Title));
         Assert.Equal(original, Repaired(broken));
     }
 
@@ -180,7 +181,7 @@ public sealed class XmlEndTagRepairTest
 
         var error = Error(broken);
 
-        Assert.Equal("Remove the end tag", error.Repair!.Title);
+        Assert.Equal("Remove the end tag", ResxMessageCatalog.Server("en").Format(error.Repair!.Title));
         Assert.Equal(original, Repaired(broken));
     }
 

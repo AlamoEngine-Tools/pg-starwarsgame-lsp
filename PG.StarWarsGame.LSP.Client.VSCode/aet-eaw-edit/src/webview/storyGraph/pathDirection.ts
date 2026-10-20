@@ -11,6 +11,7 @@
 // anything else there means Downstream, so an older client and an unfiltered request behave as they
 // always did.
 
+import * as l10n from "@vscode/l10n";
 export type PathDirection = "Upstream" | "Both" | "Downstream";
 
 export interface PathDirectionChoice {
@@ -29,9 +30,9 @@ export interface PathDirectionChoice {
  * paths are what it arms. Order is what the menu renders, so it is reading order and nothing else.
  */
 export const PATH_DIRECTIONS: readonly PathDirectionChoice[] = [
-    { direction: "Upstream", label: "Incoming", icon: "arrow-left" },
-    { direction: "Both", label: "Both", icon: "arrow-both" },
-    { direction: "Downstream", label: "Outgoing", icon: "arrow-right" },
+    { direction: "Upstream", label: l10n.t("Incoming"), icon: "arrow-left" },
+    { direction: "Both", label: l10n.t("Both"), icon: "arrow-both" },
+    { direction: "Downstream", label: l10n.t("Outgoing"), icon: "arrow-right" },
 ];
 
 const DEFAULT_DIRECTION: PathDirection = "Downstream";

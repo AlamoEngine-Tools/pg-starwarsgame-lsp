@@ -57,8 +57,7 @@ public sealed class FiresForwardHandler : XmlDiagnosticsHandler<FiresForwardFact
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint,
-                    $"Fires_Forward does nothing on '{fact.ObjectId}': only the {WeaponBehavior} behaviour " +
-                    "reads it, and this object has none.",
+                    ctx.Messages.Format("FiresForward_FiresForwardDoesNothingOn", fact.ObjectId, WeaponBehavior),
                     Id: DiagnosticIds.FiresForwardWithoutWeapon)
             ];
 
@@ -69,10 +68,8 @@ public sealed class FiresForwardHandler : XmlDiagnosticsHandler<FiresForwardFact
 
         var named = string.Join(" and ", extents);
         var message = behaviours.Contains(TurretBehavior)
-            ? $"Fires_Forward skips the firing-arc check, so {named} still swing the turret but no longer " +
-              $"limit where '{fact.ObjectId}' fires."
-            : $"Fires_Forward skips the firing-arc check, so {named} no longer limit where " +
-              $"'{fact.ObjectId}' fires.";
+            ? ctx.Messages.Format("FiresForward_FiresForwardSkipsTheFiring", named, fact.ObjectId)
+            : ctx.Messages.Format("FiresForward_FiresForwardSkipsTheFiring2", named, fact.ObjectId);
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, message, Id: DiagnosticIds.FiresForwardIgnoresArc)];
     }

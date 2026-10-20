@@ -26,9 +26,8 @@ public sealed class VariantChainTooDeepHandler : XmlDiagnosticsHandler<VariantCh
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"Variant chain is {fact.BaseCount} deep, above the engine's 10 resolution passes " +
-                $"- '{fact.ObjectId}' may inherit nothing from '{fact.RootBaseId}' depending on the " +
-                "order the files load in, and the failure is silent.")
+                ctx.Messages.Format("VariantChainTooDeep_VariantChainIsDeepAbove", fact.BaseCount, fact.ObjectId,
+                    fact.RootBaseId))
         ];
     }
 }

@@ -22,7 +22,7 @@ public sealed class ConditionalSpeechEventHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid conditional speech event for <{fact.Tag.Tag}>. Expected: UnitTypeCondition, SpeechEventName.")
+                    ctx.Messages.Format("ConditionalSpeechEvent_IsNotAValidConditional", trimmed, fact.Tag.Tag))
             ];
 
         return [];

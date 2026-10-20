@@ -26,15 +26,13 @@ public sealed class DamageAbsorbsNothingHandler : XmlDiagnosticsHandler<DamageAb
                 : null;
 
         var state = missing is null
-            ? $"Both are {Show(fact.Percentage)}"
-            : $"{Show(fact.Percentage ?? fact.Amount)} with no {missing}";
+            ? ctx.Messages.Format("DamageAbsorbsNothing_BothAre", Show(fact.Percentage))
+            : ctx.Messages.Format("DamageAbsorbsNothing_WithNo", Show(fact.Percentage ?? fact.Amount), missing);
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"This absorbs no damage. {state}, and the amount healed is " +
-                "(damage * Damage_Absorb_Percentage) + Damage_Absorb_Amount, so one of them must " +
-                "be non-zero.")
+                ctx.Messages.Format("DamageAbsorbsNothing_ThisAbsorbsNoDamageAnd", state))
         ];
     }
 

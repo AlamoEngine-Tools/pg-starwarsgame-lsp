@@ -58,15 +58,17 @@ public sealed class SuppressDiagnosticGloballyCommandHandlerTest
     }
 
     // Published diagnostics do not know the store changed, so without this the suppression would
-    // not visibly take effect until each file was next edited.
+    // not visibly take effect until each file was next edited. The refresh filters what is shown;
+    // re-analysing the workspace for it is what this replaced.
     [Fact]
-    public async Task Handle_RevalidatesSoTheSuppressionTakesEffectImmediately()
+    public async Task Handle_RefiltersSoTheSuppressionTakesEffectImmediately()
     {
         var (handler, _, republishers) = Build();
 
         await handler.Handle(Params("aetswg-004-0001"), CancellationToken.None);
 
         Assert.All(republishers, r => Assert.True(r.Called));
+        Assert.All(republishers, r => Assert.False(r.Reanalysed));
     }
 
     // The failure this prevents: suppressing project-wide from a Lua or dialog file wrote the
@@ -147,9 +149,17 @@ public sealed class SuppressDiagnosticGloballyCommandHandlerTest
     {
         public bool Called { get; private set; }
 
+        public bool Reanalysed { get; private set; }
+
         public bool Throw { get; set; }
 
         public Task RepublishAllAsync(CancellationToken ct)
+        {
+            Reanalysed = true;
+            return Task.CompletedTask;
+        }
+
+        public Task ApplyGlobalSuppressionsAsync(CancellationToken ct)
         {
             Called = true;
             return Throw ? Task.FromException(new InvalidOperationException("boom")) : Task.CompletedTask;

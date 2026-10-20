@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Core.Schema;
 
 /// <summary>One item of a tuple value.</summary>
@@ -72,14 +74,15 @@ public static class TupleItems
     }
 
     /// <summary>The value's shape in words, for hover and diagnostics: <c>`Terrain, Model` pairs</c>.</summary>
-    public static string Describe(XmlTagDefinition tag)
+    public static string Describe(XmlTagDefinition tag, IMessageCatalog? messages = null)
     {
-        if (tag.Slots.Count == 0) return "comma-separated pairs";
+        messages ??= ResxMessageCatalog.Server("en");
+        if (tag.Slots.Count == 0) return messages.Format("TupleItems_CommaSeparatedPairs");
 
         if (tag.ValueType == XmlValueType.ListMap && tag.Slots.Count == 2)
-            return $"`{tag.Slots[0].Label}` keys, each followed by `{tag.Slots[1].Label}` items";
+            return messages.Format("TupleItems_KeysFollowedByItems", tag.Slots[0].Label, tag.Slots[1].Label);
 
         var labels = string.Join(", ", tag.Slots.Select(s => s.Label));
-        return tag.Slots.Count == 2 ? $"`{labels}` pairs" : $"`{labels}` groups";
+        return messages.Format(tag.Slots.Count == 2 ? "TupleItems_Pairs" : "TupleItems_Groups", labels);
     }
 }

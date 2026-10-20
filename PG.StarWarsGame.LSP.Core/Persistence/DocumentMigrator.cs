@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.Json.Nodes;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Core.Persistence;
 
@@ -31,8 +32,10 @@ public static class DocumentMigrator
         string typeName,
         TypeVersion from,
         TypeVersion current,
-        IReadOnlyList<IDocumentMigration> migrations)
+        IReadOnlyList<IDocumentMigration> migrations,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var notices = new List<string>();
         var version = from;
         var guard = 0;
@@ -46,21 +49,21 @@ public static class DocumentMigrator
             // at a version whose shape it does not have would paper over it.
             if (step is null)
                 return new DocumentMigrationResult(null,
-                    $"version {version.Version} has no migration leading to {current.Version}", notices);
+                    messages.Format("DocumentMigrator_NoMigration", version.Version, current.Version), notices);
 
             document = step.Migrate(document);
-            if (!string.IsNullOrWhiteSpace(step.UserNotice)) notices.Add(step.UserNotice);
+            if (step.UserNotice is { } notice) notices.Add(messages.Format(notice));
             version = step.To;
 
             if (++guard > migrations.Count)
-                return new DocumentMigrationResult(null, "the migration chain does not terminate", notices);
+                return new DocumentMigrationResult(null, messages.Format("DocumentMigrator_DoesNotTerminate"), notices);
         }
 
         // Overshooting means a step declared a To beyond current: the chain is mis-registered, and
         // the document now has a shape nothing here can read.
         if (version.CompareTo(current) != 0)
             return new DocumentMigrationResult(null,
-                $"the chain ended at {version.Version}, past the {current.Version} this build writes",
+                messages.Format("DocumentMigrator_Overshoot", version.Version, current.Version),
                 notices);
 
         return new DocumentMigrationResult(document, null, notices);

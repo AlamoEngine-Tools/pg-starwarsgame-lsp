@@ -24,7 +24,7 @@ public sealed class DamageToArmorModHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid damage-to-armor modifier for <{fact.Tag.Tag}>. Expected: DamageType, ArmorType, Float.")
+                    ctx.Messages.Format("DamageToArmorMod_IsNotAValidDamage", trimmed, fact.Tag.Tag))
             ];
 
         var results = new List<XmlDiagnosticResult>();
@@ -35,7 +35,7 @@ public sealed class DamageToArmorModHandler : SingleValueTypeHandlerBase
             var damageValue = parts[0].Trim();
             if (!knownDamageTypes.Contains(damageValue))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"'{damageValue}' is not a known DamageType value.",
+                    ctx.Messages.Format("DamageToArmorMod_IsNotAKnownDamagetype", damageValue),
                     Id: DiagnosticIds.DamageToArmorModUnknownDamageType));
         }
 
@@ -45,7 +45,7 @@ public sealed class DamageToArmorModHandler : SingleValueTypeHandlerBase
             var armorValue = parts[1].Trim();
             if (!knownArmorTypes.Contains(armorValue))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"'{armorValue}' is not a known ArmorType value.",
+                    ctx.Messages.Format("DamageToArmorMod_IsNotAKnownArmortype", armorValue),
                     Id: DiagnosticIds.DamageToArmorModUnknownArmorType));
         }
 

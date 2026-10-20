@@ -8,6 +8,7 @@
 // sees red and green differently. The vanilla data makes the point on its own: Bothan, Hostile and
 // Sarlacc all ship 153,21,223, and Empire and Imperial both ship 54,134,242.
 
+import * as l10n from "@vscode/l10n";
 import type { PreviewRgba } from "../../protocol/modelPreview";
 
 /** CIE L*a*b*. */
@@ -280,8 +281,8 @@ export function reviewFactionColour(
                 severity: "warning",
                 message:
                     distance < 1
-                        ? `The same colour as ${other.name}.`
-                        : `Hard to tell apart from ${other.name}.`,
+                        ? l10n.t("The same colour as {0}.", other.name)
+                        : l10n.t("Hard to tell apart from {0}.", other.name),
             });
             continue;
         }
@@ -300,7 +301,11 @@ export function reviewFactionColour(
             if (simulated < COLLISION_DELTA_E) {
                 findings.push({
                     severity: "warning",
-                    message: `Indistinguishable from ${other.name} under ${kind}.`,
+                    message: l10n.t(
+                        "Indistinguishable from {0} under {1}.",
+                        other.name,
+                        kind,
+                    ),
                 });
                 break;
             }
@@ -316,7 +321,7 @@ export function reviewFactionColour(
         if (lowContrast && closeInHue) {
             findings.push({
                 severity: "info",
-                message: `Hard to pick out against ${backdrop.name}.`,
+                message: l10n.t("Hard to pick out against {0}.", backdrop.name),
             });
         }
     }

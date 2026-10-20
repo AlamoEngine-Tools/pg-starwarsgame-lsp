@@ -21,7 +21,7 @@ public sealed partial class FloatListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid float list for <{fact.Tag.Tag}>.", Id: DiagnosticIds.FloatListEmpty)
+                    ctx.Messages.Format("FloatList_IsNotAValidFloat", fact.Tag.Tag), Id: DiagnosticIds.FloatListEmpty)
             ];
 
         var parts = Separator().Split(trimmed);
@@ -29,7 +29,7 @@ public sealed partial class FloatListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid float list for <{fact.Tag.Tag}>. Expected space-separated floats.")
+                    ctx.Messages.Format("FloatList_IsNotAValidFloat2", trimmed, fact.Tag.Tag))
             ];
 
         return [];

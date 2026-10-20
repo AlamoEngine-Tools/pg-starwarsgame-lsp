@@ -4,6 +4,7 @@
 using MediatR;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
@@ -14,16 +15,15 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 /// </summary>
 public static class StoryEditorFeature
 {
-    public const string DisabledMessage =
-        "The story editor is disabled. Enable 'aet-eaw-edit.features.tools.storyEditor' in the editor settings.";
+    public const string DisabledKey = "StoryEditorFeature_Disabled";
 
-    public const string DiscoveryMissingMessage =
-        "The story editor requires story discovery. Enable 'aet-eaw-edit.features.story.discovery' in the editor settings.";
+    public const string DiscoveryMissingKey = "StoryEditorFeature_DiscoveryMissing";
 
     public static string? Rejection(ILspConfigurationProvider config)
     {
-        if (!config.Current.Features.Tools.StoryEditor) return DisabledMessage;
-        if (!config.Current.Features.Story.Discovery) return DiscoveryMissingMessage;
+        if (!config.Current.Features.Tools.StoryEditor) return new ConfiguredMessageCatalog(config).Format(DisabledKey);
+        if (!config.Current.Features.Story.Discovery)
+            return new ConfiguredMessageCatalog(config).Format(DiscoveryMissingKey);
         return null;
     }
 }
@@ -40,13 +40,13 @@ public static class StoryEditorFeature
 /// </summary>
 public static class StoryEditingFeature
 {
-    public const string DisabledMessage =
-        "Story editing is disabled. Enable 'aet-eaw-edit.features.tools.storyEditing' in the editor settings.";
+    public const string DisabledKey = "StoryEditingFeature_Disabled";
 
     public static string? Rejection(ILspConfigurationProvider config)
     {
         if (StoryEditorFeature.Rejection(config) is { } rejection) return rejection;
-        if (!config.Current.Features.Tools.StoryEditing) return DisabledMessage;
+        if (!config.Current.Features.Tools.StoryEditing)
+            return new ConfiguredMessageCatalog(config).Format(DisabledKey);
         return null;
     }
 }

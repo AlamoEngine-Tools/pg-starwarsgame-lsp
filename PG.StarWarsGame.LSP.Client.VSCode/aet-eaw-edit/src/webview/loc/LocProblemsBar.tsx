@@ -8,6 +8,7 @@
 // so every message was truncated, and a list that appears and disappears there shifts the controls
 // above it.
 
+import * as l10n from "@vscode/l10n";
 import { ProblemsPanel } from "../shared/ProblemsPanel";
 import { LocProblem } from "./useLocPanel";
 
@@ -45,7 +46,9 @@ export function LocProblemsBar(props: {
                             className={`problem-row${jump ? " clickable" : ""}`}
                             title={
                                 jump
-                                    ? "Click to show this entry in the table"
+                                    ? l10n.t(
+                                          "Click to show this entry in the table",
+                                      )
                                     : undefined
                             }
                             onClick={jump ?? undefined}

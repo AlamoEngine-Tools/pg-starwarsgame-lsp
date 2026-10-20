@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Story.Model;
 
 /// <summary>A 0-based source span, possibly crossing lines.</summary>
@@ -60,7 +62,7 @@ public sealed record StoryEvent
 }
 
 /// <summary>A structural defect found while parsing a story thread.</summary>
-public sealed record StoryParseProblem(StorySourceRange Range, string Message);
+public sealed record StoryParseProblem(StorySourceRange Range, CatalogueText Message);
 
 /// <summary>The parsed shape of one story thread file.</summary>
 public sealed record StoryThread(

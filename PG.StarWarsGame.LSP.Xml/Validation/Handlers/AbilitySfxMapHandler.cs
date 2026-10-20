@@ -21,7 +21,7 @@ public sealed class AbilitySfxMapHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid ability SFX map for <{fact.Tag.Tag}>. Expected: AbilityName, SFXEventName.")
+                    ctx.Messages.Format("AbilitySfxMap_IsNotAValidAbility", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         var abilityCode = parts[0].Trim();
@@ -35,11 +35,11 @@ public sealed class AbilitySfxMapHandler : CommaSeparatedPairHandlerBase
             var known = abilityTypeSet.Values.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (!known.Contains(abilityCode))
                 results.Add(AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{abilityCode}' is not a known AbilityType value for <{fact.Tag.Tag}>.",
+                    ctx.Messages.Format("AbilitySfxMap_IsNotAKnownAbilitytype", abilityCode, fact.Tag.Tag),
                     Id: DiagnosticIds.AbilitySfxMapUnknownAbilityType), fact, 0));
         }
 
-        var sfxResult = TryValidateSfxEvent(sfxEventName, fact.Tag.Tag, ctx.Index);
+        var sfxResult = TryValidateSfxEvent(sfxEventName, fact.Tag.Tag, ctx.Index, ctx.Messages);
         if (sfxResult is not null)
             results.Add(AtPairSlot(sfxResult, fact, 1));
 

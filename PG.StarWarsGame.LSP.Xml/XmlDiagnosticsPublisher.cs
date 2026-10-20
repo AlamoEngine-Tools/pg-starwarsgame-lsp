@@ -17,6 +17,7 @@ using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -218,6 +219,9 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     protected override bool DiagnosticsEnabled =>
         _configProvider?.Current.Features.Xml.Diagnostics ?? true;
 
+    /// <summary>The server's texts in the configured locale.</summary>
+    private IMessageCatalog Messages => ResxMessageCatalog.Server(_configProvider?.Current.Locale ?? "en");
+
     /// <summary>Documents with a fix-token map; never pruned, so a workspace sweep fills it for every file.</summary>
     public CacheStatistics Snapshot()
     {
@@ -238,8 +242,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             ? null
             : new EffectiveObjectResolver(index, _schema, _variantTagSource);
 
-        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en",
-            _iconRepack?.IconsAwaitingRepack, _modelTextures, _iconNames, objects);
+        // The configured locale picks the server's own texts and the schema's notes alike. It was a
+        // fixed "en" here, so neither ever reached a diagnostic in another language.
+        var locale = _configProvider?.Current.Locale ?? "en";
+        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, locale,
+            _iconRepack?.IconsAwaitingRepack, _modelTextures, _iconNames, objects)
+        {
+            Messages = ResxMessageCatalog.Server(locale)
+        };
 
         // One parse shared by every producer - and via the parse cache, shared with the indexing
         // parse and every request handler touching the same content.
@@ -297,7 +307,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (_storyChainProblems is not null)
             Phase("storyChain",
                 () => allDiags.AddRange(
-                    _storyChainProblems.GetForDocument(canonicalUri).Select(ToLspDiagnostic)));
+                    _storyChainProblems.GetForDocument(canonicalUri)
+                        .Select(p => ToLspDiagnostic(p, ctx.Messages))));
 
         if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
             Phase("storyGraph",
@@ -562,9 +573,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
-                    Message =
-                        $"<Damage_Types> has only {tokens.Count} value(s); it must end with the engine's " +
-                        $"{RequiredDamageTypeTail.Length} hardcoded damage types, in order, or the game will crash.",
+                    Message = Messages.Format("DamageTypes_TooShort", tokens.Count, RequiredDamageTypeTail.Length),
                     Range = SafeRange(line, col, len),
                     Source = AppProperties.LspServerId,
                     Code = DiagnosticIds.DamageTypesIncomplete.ToString()
@@ -583,10 +592,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             diagnostics.Add(new Diagnostic
             {
                 Severity = DiagnosticSeverity.Error,
-                Message =
-                    $"'{tail[i].Token}' must be '{RequiredDamageTypeTail[i]}' - the last " +
-                    $"{RequiredDamageTypeTail.Length} entries of <Damage_Types> must exactly match the " +
-                    "engine's hardcoded order or the game will crash.",
+                Message = Messages.Format("DamageTypes_OutOfOrder", tail[i].Token, RequiredDamageTypeTail[i],
+                    RequiredDamageTypeTail.Length),
                 Range = SafeRange(line, col, tail[i].Token.Length),
                 Source = AppProperties.LspServerId,
                 Code = DiagnosticIds.DamageTypesOutOfOrder.ToString()
@@ -623,7 +630,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         }
     }
 
-    private static void EmitHardcodedRefDiagnostics(
+    private void EmitHardcodedRefDiagnostics(
         HtmlNode child, XmlTagDefinition tagDef, HardcodedReferenceSet set,
         LineOffsetIndex lineIndex, List<Diagnostic> diagnostics)
     {
@@ -661,8 +668,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
-                    Message =
-                        $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
+                    Message = Messages.Format("HardcodedSet_Unknown", token, tagDef.HardcodedSet?.Name),
                     Range = SafeRange(line0, col0, len0),
                     Source = AppProperties.LspServerId,
                     Code = DiagnosticIds.UnknownHardcodedSetValue.ToString()
@@ -676,7 +682,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Warning,
-                    Message = $"'{token}' is deprecated.",
+                    Message = Messages.Format("HardcodedSet_Deprecated", token),
                     Range = SafeRange(line0, col0, len0),
                     Source = AppProperties.LspServerId,
                     Code = DiagnosticIds.DeprecatedHardcodedSetValue.ToString()
@@ -690,12 +696,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         return _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
     }
 
-    private static Diagnostic ToLspDiagnostic(StoryChainProblem problem)
+    private static Diagnostic ToLspDiagnostic(StoryChainProblem problem, IMessageCatalog messages)
     {
         return new Diagnostic
         {
             Severity = problem.Severity.ToLsp(),
-            Message = problem.Message,
+            Message = messages.Format(problem.Message),
             Range = SafeRange(problem.Line, problem.Column, problem.EndLine, problem.EndColumn),
             Source = AppProperties.LspServerId,
             Code = DiagnosticIds.StoryChain.ToString()

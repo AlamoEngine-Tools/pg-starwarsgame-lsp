@@ -47,9 +47,7 @@ public sealed class DisallowedOrOperatorHandler : XmlDiagnosticsHandler<XmlTagVa
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<{fact.Tag.Tag}> does not support '|' (OR) - every listed value is required (AND only). " +
-                "This engine only supports OR-expressions on tags explicitly documented for it " +
-                "(e.g. Required_Special_Structures).",
+                ctx.Messages.Format("DisallowedOrOperator_DoesNotSupportOrEvery", fact.Tag.Tag),
                 SuggestedFix: corrected)
         ];
     }

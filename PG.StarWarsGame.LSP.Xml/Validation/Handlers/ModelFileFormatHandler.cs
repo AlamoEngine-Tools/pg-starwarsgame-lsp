@@ -21,7 +21,7 @@ public sealed class ModelFileFormatHandler : XmlDiagnosticsHandler<XmlTagValueFa
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{value}' is not a valid model filename for <{fact.Tag.Tag}>. Expected a .alo file.")
+                    ctx.Messages.Format("ModelFileFormat_IsNotAValidModel", value, fact.Tag.Tag))
             ];
 
         return [];

@@ -6,6 +6,7 @@ using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -103,8 +104,9 @@ internal static class LuaStateMachineAnalyzer
         { "OnEnter", "OnUpdate", "OnExit" };
 
     public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree,
-        LuaStateMachineContract contract)
+        LuaStateMachineContract contract, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         // A library's machine runs in the scripts that require it; the file alone cannot be judged.
         if (!contract.StateMachine || LuaFileClassifier.IsLibraryUri(documentUri)) return [];
         var machine = LuaStateMachine.Read(tree.GetRoot());
@@ -120,11 +122,11 @@ internal static class LuaStateMachineAnalyzer
             if (!registered.Add(registration.Name))
                 diagnostics.Add(Diagnostic(DiagnosticIds.LuaStateRegisteredTwice, LspDiagnosticSeverity.Warning,
                     registration.NameLocation,
-                    $"State '{registration.Name}' is registered again: The later function replaces the earlier one and keeps its place in the order."));
+                    messages.Format("LuaStateMachine_RegisteredAgain", registration.Name)));
 
             if (registration.Handler is { } handler)
             {
-                CheckHandler(handler, diagnostics);
+                CheckHandler(handler, diagnostics, messages);
                 continue;
             }
 
@@ -136,31 +138,33 @@ internal static class LuaStateMachineAnalyzer
             diagnostics.Add(registration.Source == LuaStateSource.DEFINE_STATE
                 ? Diagnostic(DiagnosticIds.LuaStateHandlerNotFunction, LspDiagnosticSeverity.Error,
                     registration.Value.GetLocation(),
-                    $"State '{registration.Name}' is registered with '{written}', which is not a function: The state machine logs Invalid State and stops when it reaches this state.")
+                    messages.Format("LuaStateMachine_HandlerNotFunction", registration.Name, written))
                 : Diagnostic(DiagnosticIds.LuaStoryEventHandlerMissing, LspDiagnosticSeverity.Warning,
                     registration.Value.GetLocation(),
                     registration.Value is IdentifierNameSyntax
-                        ? $"Story event '{registration.Name}' names '{written}', which is not defined: The entry is nil, so the event is never registered and does nothing."
-                        : $"Story event '{registration.Name}' maps to '{written}', which is not a function: The story library skips the event with an Invalid function object message."));
+                        ? messages.Format("LuaStateMachine_StoryEventUndefined", registration.Name, written)
+                        : messages.Format("LuaStateMachine_StoryEventNotFunction", registration.Name, written)));
         }
 
         if (!machine.HasComputedRegistration)
             foreach (var transition in machine.Transitions.Where(t => !registered.Contains(t.Name)))
                 diagnostics.Add(Diagnostic(DiagnosticIds.LuaStateTransitionUnregistered, LspDiagnosticSeverity.Error,
                     transition.NameLocation,
-                    $"State '{transition.Name}' is not registered: Set_Next_State ignores it and the state machine stays where it is."));
+                    messages.Format("LuaStateMachine_NotRegistered", transition.Name)));
 
         return diagnostics;
     }
 
-    private static void CheckHandler(LuaStateHandler handler, List<LspDiagnostic> diagnostics)
+    private static void CheckHandler(LuaStateHandler handler, List<LspDiagnostic> diagnostics,
+        IMessageCatalog messages)
     {
         var parameters = handler.Parameters.Parameters;
         if (parameters.Count != 1)
         {
             diagnostics.Add(Diagnostic(DiagnosticIds.LuaStateHandlerParameters, LspDiagnosticSeverity.Warning,
                 handler.Parameters.GetLocation(),
-                $"State handler '{handler.Name ?? "function"}' takes {parameters.Count} parameters: The state machine passes one, the message - OnEnter, OnUpdate or OnExit."));
+                messages.Format("LuaStateMachine_HandlerParameters",
+                    handler.Name ?? messages.Format("LuaStateMachine_AnonymousHandler"), parameters.Count)));
             if (parameters.Count == 0) return;
         }
 
@@ -172,11 +176,12 @@ internal static class LuaStateMachineAnalyzer
             var other = IsName(comparison.Left, message.Identifier.Text) ? comparison.Right
                 : IsName(comparison.Right, message.Identifier.Text) ? comparison.Left
                 : null;
-            if (other is null || other is IdentifierNameSyntax { Name: var name } && s_messages.Contains(name))
+            if (other is null || (other is IdentifierNameSyntax { Name: var name } && s_messages.Contains(name)))
                 continue;
             diagnostics.Add(Diagnostic(DiagnosticIds.LuaStateMessageComparison, LspDiagnosticSeverity.Warning,
                 comparison.GetLocation(),
-                $"'{message.Identifier.Text}' compared with '{other.ToString().Trim()}': The state machine passes only OnEnter, OnUpdate or OnExit."));
+                messages.Format("LuaStateMachine_MessageComparison", message.Identifier.Text,
+                    other.ToString().Trim())));
         }
     }
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.Commons.Hashing;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
@@ -27,10 +28,6 @@ public static class KeyedCommandTranslator
     ///     a lookup table has no such concept, so one is refused outright rather than written and
     ///     reported as a problem afterwards.
     /// </summary>
-    private const string BlankKey =
-        "A key is required - it is how the game refers to this text.";
-
-
     /// <summary>
     ///     Translates a whole batch, or fails without producing anything.
     ///     <para>
@@ -41,8 +38,9 @@ public static class KeyedCommandTranslator
     /// </summary>
     public static KeyedTranslationResult Translate(
         LocDocument document, IReadOnlyList<LocKeyedCommandDto> commands,
-        ICrc32HashingService hashing)
+        ICrc32HashingService hashing, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         // The working key list mirrors what the document will look like as each command lands. Only
         // the keys are tracked, because position is the only thing that has to be derived.
         var keys = document.Rows.Select(row => row.Key).ToList();
@@ -56,7 +54,7 @@ public static class KeyedCommandTranslator
             {
                 case "setValue":
                 {
-                    if (Resolve(keys, command.Key, out var index, out var error))
+                    if (Resolve(keys, command.Key, messages, out var index, out var error))
                         translated.Add(new LocEditCommandDto(
                             "setCell", index, Language: command.Language, Value: command.Value));
                     else
@@ -68,11 +66,11 @@ public static class KeyedCommandTranslator
                 {
                     var key = command.Key ?? string.Empty;
                     if (string.IsNullOrWhiteSpace(key))
-                        return KeyedTranslationResult.Fail(i, BlankKey);
+                        return KeyedTranslationResult.Fail(i, messages.Format("LocKeyed_BlankKey"));
 
                     if (Collides(keys, key, hashing))
                         return KeyedTranslationResult.Fail(i,
-                            $"'{key}' is already in this file. Only one row per key is ever read.");
+                            messages.Format("LocKeyed_AlreadyThisFileOnlyOne", key));
 
                     translated.Add(new LocEditCommandDto(
                         "insertRow", keys.Count, Key: key, Values: command.Values));
@@ -82,7 +80,7 @@ public static class KeyedCommandTranslator
 
                 case "deleteEntry":
                 {
-                    if (!Resolve(keys, command.Key, out var index, out var error))
+                    if (!Resolve(keys, command.Key, messages, out var index, out var error))
                         return KeyedTranslationResult.Fail(i, error);
 
                     translated.Add(new LocEditCommandDto("deleteRow", index));
@@ -92,17 +90,17 @@ public static class KeyedCommandTranslator
 
                 case "renameKey":
                 {
-                    if (!Resolve(keys, command.Key, out var index, out var error))
+                    if (!Resolve(keys, command.Key, messages, out var index, out var error))
                         return KeyedTranslationResult.Fail(i, error);
 
                     var newKey = command.NewKey ?? string.Empty;
                     if (string.IsNullOrWhiteSpace(newKey))
-                        return KeyedTranslationResult.Fail(i, BlankKey);
+                        return KeyedTranslationResult.Fail(i, messages.Format("LocKeyed_BlankKey"));
 
                     // Excluding the row being renamed, so changing only a key's casing is allowed.
                     if (Collides(keys, newKey, hashing, index))
                         return KeyedTranslationResult.Fail(i,
-                            $"'{newKey}' is already in this file. Only one row per key is ever read.");
+                            messages.Format("LocKeyed_AlreadyThisFileOnlyOne", newKey));
 
                     translated.Add(new LocEditCommandDto("setKey", index, Key: newKey));
                     keys[index] = newKey;
@@ -116,8 +114,7 @@ public static class KeyedCommandTranslator
 
                 default:
                     return KeyedTranslationResult.Fail(i,
-                        $"'{command.Kind}' is not a translation command. "
-                        + "Row positions are not addressable in a translation file.");
+                        messages.Format("LocKeyed_NotATranslationCommand", command.Kind));
             }
         }
 
@@ -133,14 +130,15 @@ public static class KeyedCommandTranslator
     ///         at.
     ///     </para>
     /// </summary>
-    private static bool Resolve(List<string> keys, string? key, out int index, out string error)
+    private static bool Resolve(List<string> keys, string? key, IMessageCatalog messages, out int index,
+        out string error)
     {
         index = -1;
         error = string.Empty;
 
         if (string.IsNullOrEmpty(key))
         {
-            error = "This change does not say which entry it applies to.";
+            error = messages.Format("LocKeyed_ThisChangeDoesNotSay");
             return false;
         }
 
@@ -151,8 +149,7 @@ public static class KeyedCommandTranslator
 
             if (found >= 0)
             {
-                error = $"'{key}' is on both row {found + 1} and row {i + 1}. "
-                        + "Only one of them would ever be read - remove one before editing it.";
+                error = messages.Format("LocKeyed_KeyOnTwoRows", key, found + 1, i + 1);
                 return false;
             }
 
@@ -161,7 +158,7 @@ public static class KeyedCommandTranslator
 
         if (found < 0)
         {
-            error = $"'{key}' is not in this file. Reload before editing again.";
+            error = messages.Format("LocKeyed_NotThisFileReloadBefore", key);
             return false;
         }
 

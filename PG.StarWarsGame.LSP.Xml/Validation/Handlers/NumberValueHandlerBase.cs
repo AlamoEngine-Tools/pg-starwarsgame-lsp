@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
@@ -29,7 +29,7 @@ public abstract class NumberValueHandlerBase : XmlDiagnosticsHandler<XmlTagValue
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid number for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("NumberValueHandlerBase_IsNotAValidNumber", trimmed, fact.Tag.Tag))
             ];
 
         return HandlePrecise(fact, trimmed, floatVal, ctx);

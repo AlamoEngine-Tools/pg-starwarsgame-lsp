@@ -66,8 +66,8 @@ public sealed class CreditHaltNeedsDurationRule : BooleanGatedRequirementRuleBas
     protected override string ElementName => "galactic_sabotage_ability";
     protected override string GateTag => "Can_Halt_Credit_Production";
     protected override string RequiredTag => "Duration_Of_Credit_Halt";
-    protected override string Requirement => "a time greater than zero";
-    protected override string Repair => "forces it to 10.0 seconds";
+    protected override string RequirementKey => "CreditHaltNeedsDurationRule_Requirement";
+    protected override string RepairKey => "CreditHaltNeedsDurationRule_Repair";
 
     protected override bool IsSatisfied(string value)
     {

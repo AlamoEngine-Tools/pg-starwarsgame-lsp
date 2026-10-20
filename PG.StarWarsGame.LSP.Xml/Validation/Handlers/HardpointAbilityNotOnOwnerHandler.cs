@@ -22,15 +22,14 @@ public sealed class HardpointAbilityNotOnOwnerHandler
         // Naming the two cases separately matters: one is a typo, the other is an ability sitting on
         // the wrong unit, and they are fixed in different files.
         var tail = fact.DefinedElsewhere
-            ? $"'{fact.AbilityName}' is defined, but on a different object - it has to be declared on "
-              + $"'{fact.OwnerId}' (or something it inherits from) to take effect here."
-            : $"No object declares an ability called '{fact.AbilityName}'.";
+            ? ctx.Messages.Format("HardpointAbilityNotOnOwner_DefinedElsewhere", fact.AbilityName, fact.OwnerId)
+            : ctx.Messages.Format("HardpointAbilityNotOnOwner_NotDeclared", fact.AbilityName);
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"Hardpoint '{fact.HardpointId}' enables ability '{fact.AbilityName}' on '{fact.OwnerId}', "
-                + $"which does not have it. {tail}")
+                ctx.Messages.Format("HardpointAbilityNotOnOwner_HardpointEnablesAbilityOnWhich", fact.HardpointId,
+                    fact.AbilityName, fact.OwnerId, tail))
         ];
     }
 }

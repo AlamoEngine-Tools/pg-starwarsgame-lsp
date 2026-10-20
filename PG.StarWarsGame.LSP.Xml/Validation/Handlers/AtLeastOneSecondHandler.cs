@@ -25,5 +25,5 @@ public sealed class AtLeastOneSecondHandler : NumericRangeHandlerBase
 
     protected override float? Maximum => null;
 
-    protected override string Expectation => "should have at least one second of time";
+    protected override string ExpectationKey => "AtLeastOneSecond_Expectation";
 }

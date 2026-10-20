@@ -22,9 +22,7 @@ public sealed class HardpointModelBonesUnavailableHandler
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"No bone data could be read for model '{fact.ModelName}' (declared by '{fact.OwnerId}'), "
-                + "so this bone reference was not verified. The model may be missing, unreadable, or an "
-                + "unsupported .alo version.")
+                ctx.Messages.Format("HardpointModelBonesUnavailable_NoBoneDataCouldBe", fact.ModelName, fact.OwnerId))
         ];
     }
 }

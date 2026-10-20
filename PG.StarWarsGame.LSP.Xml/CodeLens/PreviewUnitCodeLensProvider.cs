@@ -64,7 +64,7 @@ internal sealed class PreviewUnitCodeLensProvider : IXmlCodeLensProvider
             Range = new LspRange(new Position(ctx.Origin.Line, 0), new Position(ctx.Origin.Line, 0)),
             Command = new Command
             {
-                Title = "preview unit",
+                Title = ctx.Messages.Format("PreviewUnitCodeLens_PreviewUnit"),
                 Name = PreviewUnitCommand,
                 Arguments = JArray.FromObject(new object[] { ctx.Symbol.Id })
             }

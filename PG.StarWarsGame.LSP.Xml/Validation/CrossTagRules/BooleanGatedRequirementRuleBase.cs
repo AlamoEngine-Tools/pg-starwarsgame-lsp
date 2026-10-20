@@ -36,11 +36,11 @@ public abstract class BooleanGatedRequirementRuleBase : IXmlCrossTagRule
     /// <summary>The tag that must then be set.</summary>
     protected abstract string RequiredTag { get; }
 
-    /// <summary>What the required tag must be, completing "&lt;Required&gt; must be ...".</summary>
-    protected virtual string Requirement => "set to true";
+    /// <summary>The catalogue key of what the required tag must be, completing "&lt;Required&gt; must be ...".</summary>
+    protected virtual string RequirementKey => "BooleanGatedRequirement_SetToTrue";
 
-    /// <summary>What the engine silently does instead when the requirement is unmet.</summary>
-    protected virtual string Repair => "turns it on for you";
+    /// <summary>The catalogue key of what the engine silently does instead when the requirement is unmet.</summary>
+    protected virtual string RepairKey => "BooleanGatedRequirement_TurnsItOn";
 
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
@@ -68,8 +68,8 @@ public abstract class BooleanGatedRequirementRuleBase : IXmlCrossTagRule
                 XmlUtility.GetOpeningTagLength(gateNode),
                 GateTag,
                 RequiredTag,
-                Requirement,
-                Repair)
+                RequirementKey,
+                RepairKey)
         ];
     }
 

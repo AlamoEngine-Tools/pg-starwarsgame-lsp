@@ -3,6 +3,7 @@
 
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Persistence;
@@ -57,7 +58,7 @@ public static class WorkspaceSettingsDocument
         public string TypeName => WorkspaceSettingsDocument.TypeName;
         public TypeVersion From => TypeVersion.Zero("aetswg");
         public TypeVersion To => Version;
-        public string? UserNotice => null;
+        public CatalogueText? UserNotice => null;
 
         public JsonNode Migrate(JsonNode document)
         {
@@ -86,13 +87,14 @@ public sealed class WorkspaceSettingsStore : IWorkspaceSettingsStore
     public WorkspaceSettingsStore(
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
-        ILogger<WorkspaceSettingsStore> logger)
+        ILogger<WorkspaceSettingsStore> logger,
+        IMessageCatalog? messages = null)
     {
         _store = new SidecarStore<WorkspaceSettings>(
             "settings/workspace.settings.json", WorkspaceSettingsDocument.TypeName,
             WorkspaceSettingsDocument.Version, WorkspaceSettingsDocument.Migrations,
             new AetswgSidecarLocator(reloadService), fileHelper, logger,
-            () => new WorkspaceSettings());
+            () => new WorkspaceSettings(), messages);
     }
 
     public WorkspaceSettings Get()

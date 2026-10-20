@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
@@ -18,6 +19,7 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 public sealed class StartupProgress : IStartupProgress
 {
     private readonly ILogger<StartupProgress> _logger;
+    private readonly IMessageCatalog _messages;
     private readonly ServerOptions _options;
     private readonly IServerWorkDoneManager? _workDone;
 
@@ -25,8 +27,9 @@ public sealed class StartupProgress : IStartupProgress
     private bool _started;
 
     public StartupProgress(ILogger<StartupProgress> logger, ServerOptions? options = null,
-        IServerWorkDoneManager? workDone = null)
+        IServerWorkDoneManager? workDone = null, IMessageCatalog? messages = null)
     {
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _logger = logger;
         _options = options ?? ServerOptions.Default;
         _workDone = workDone;
@@ -64,7 +67,7 @@ public sealed class StartupProgress : IStartupProgress
         var createTask = _workDone!.Create(
             new WorkDoneProgressBegin
             {
-                Title = "Star Wars LSP - starting",
+                Title = _messages.Format("StartupProgress_StarWarsLSPStarting"),
                 Message = "Initialising...",
                 Cancellable = false,
                 Percentage = 0

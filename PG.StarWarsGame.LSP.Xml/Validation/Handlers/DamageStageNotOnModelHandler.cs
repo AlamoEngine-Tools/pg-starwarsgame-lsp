@@ -23,20 +23,20 @@ public sealed class DamageStageNotOnModelHandler
         DamageStageNotOnModelFact fact, DiagnosticsContext ctx)
     {
         var which = fact.MissingStages.Count == 1
-            ? $"stage {fact.MissingStages[0]}"
-            : $"stages {string.Join(", ", fact.MissingStages)}";
+            ? ctx.Messages.Format("DamageStageNotOnModel_Stage", fact.MissingStages[0])
+            : ctx.Messages.Format("DamageStageNotOnModel_Stages", string.Join(", ", fact.MissingStages));
 
         // What the model DOES tag, so the reader can see whether this is one stage missed or a model
         // that stages nothing at all - the two want different fixes.
         var has = fact.TaggedStages.Count == 0
-            ? "tags no damage stage at all"
-            : $"tags only {string.Join(", ", fact.TaggedStages)}";
+            ? ctx.Messages.Format("DamageStageNotOnModel_TagsNone")
+            : ctx.Messages.Format("DamageStageNotOnModel_TagsOnly", string.Join(", ", fact.TaggedStages));
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<Land_Damage_Alternates> declares damage {which}, but '{fact.ModelName}' {has}. "
-                + "The unit reaches that state and does not change.")
+                ctx.Messages.Format("DamageStageNotOnModel_LandDamageAlternatesDeclaresDamage", which, fact.ModelName,
+                    has))
         ];
     }
 }

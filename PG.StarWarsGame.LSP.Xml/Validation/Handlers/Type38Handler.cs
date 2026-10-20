@@ -13,5 +13,5 @@ public sealed class Type38Handler : NonEmptyReferenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.Type38;
 
     protected override XmlValueType TargetType => XmlValueType.Type38;
-    protected override string ReferenceNoun => "SFX event";
+    protected override string ReferenceNounKey => "SfxEventType_Noun";
 }

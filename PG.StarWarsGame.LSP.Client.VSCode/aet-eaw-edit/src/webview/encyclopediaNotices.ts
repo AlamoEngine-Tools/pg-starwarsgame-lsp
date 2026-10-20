@@ -9,6 +9,7 @@
 // which matters, because most of these describe a fault in the MOD's data and the whole value of
 // saying so is naming the fix.
 
+import * as l10n from "@vscode/l10n";
 import { GetEncyclopediaEntryResult } from "../protocol/encyclopedia";
 import { isSubstitutedFont } from "./encyclopediaFonts";
 import { worstSeverity } from "./loc/validateState";
@@ -58,16 +59,18 @@ export function encyclopediaNotices(
         if (icon.source === "Fallback") {
             notices.push({
                 severity: "warning",
-                message:
-                    `No artwork anywhere for '${icon.name}' - the card is showing the ` +
-                    "missing-icon placeholder.",
+                message: l10n.t(
+                    "No artwork anywhere for '{0}' - the card is showing the missing-icon placeholder.",
+                    icon.name,
+                ),
             });
         } else if (icon.isMegaTextureStale) {
             notices.push({
                 severity: "warning",
-                message:
-                    `'${icon.name}' was found as a source image but is not in the workspace ` +
-                    "mega texture. Rebuild the MTD, or the game will not show it.",
+                message: l10n.t(
+                    "'{0}' was found as a source image but is not in the workspace mega texture. Rebuild the MTD, or the game will not show it.",
+                    icon.name,
+                ),
             });
         }
     }
@@ -80,10 +83,10 @@ export function encyclopediaNotices(
     if (gaps.length > 0) {
         notices.push({
             severity: "warning",
-            message:
-                `No icon sources configured for ${gaps.join(", ")} - every icon falls back to ` +
-                'the base game. Add an "icons" node naming the source folders to each project ' +
-                "file, or build the mega texture.",
+            message: l10n.t(
+                'No icon sources configured for {0} - every icon falls back to the base game. Add an "icons" node naming the source folders to each project file, or build the mega texture.',
+                gaps.join(", "),
+            ),
         });
     }
 
@@ -91,18 +94,20 @@ export function encyclopediaNotices(
     if (ships && !ships.fileFound) {
         notices.push({
             severity: "warning",
-            message:
-                `Ship name file not found: ${ships.sourcePath}. The card falls back to the ` +
-                "class line.",
+            message: l10n.t(
+                "Ship name file not found: {0}. The card falls back to the class line.",
+                ships.sourcePath,
+            ),
         });
     } else if (ships && ships.names.length === 0) {
         // A different fault with a different fix, so it gets its own sentence rather than being
         // folded into the one above: the path is right and the encoding is not.
         notices.push({
             severity: "warning",
-            message:
-                `No names read from ${ships.sourcePath}. These files must be UTF-16 with a ` +
-                "byte order mark, which is how the game ships them.",
+            message: l10n.t(
+                "No names read from {0}. These files must be UTF-16 with a byte order mark, which is how the game ships them.",
+                ships.sourcePath,
+            ),
         });
     } else if (ships) {
         // Nothing is wrong here - it explains why this card shows a name where every other object
@@ -111,10 +116,10 @@ export function encyclopediaNotices(
         // otherwise would be untrue.
         notices.push({
             severity: "info",
-            message:
-                "This object draws an individual name instead of showing its class. The game " +
-                "picks one and remembers which are used; the preview just picks, and keeps its " +
-                `pick while this panel is open. Names come from ${ships.sourcePath}.`,
+            message: l10n.t(
+                "This object draws an individual name instead of showing its class. The game picks one and remembers which are used; the preview just picks, and keeps its pick while this panel is open. Names come from {0}.",
+                ships.sourcePath,
+            ),
         });
     }
 
@@ -125,9 +130,10 @@ export function encyclopediaNotices(
     ) {
         notices.push({
             severity: "warning",
-            message:
-                `No artwork in the mega texture for '${frame.textureName}' - the card falls ` +
-                "back to its measured border.",
+            message: l10n.t(
+                "No artwork in the mega texture for '{0}' - the card falls back to its measured border.",
+                frame.textureName,
+            ),
         });
     }
 
@@ -135,10 +141,11 @@ export function encyclopediaNotices(
     if (fonts.length > 0) {
         notices.push({
             severity: "info",
-            message:
-                `${fonts.join(" and ")} ${fonts.length > 1 ? "are" : "is"} substituted. The ` +
-                "game ships those fonts inside its executable under a commercial licence, so they " +
-                "are not ours to redistribute; glyph widths in the affected rows are approximate.",
+            message: l10n.t(
+                "{0} {1} substituted. The game ships those fonts inside its executable under a commercial licence, so they are not ours to redistribute; glyph widths in the affected rows are approximate.",
+                fonts.join(" and "),
+                fonts.length > 1 ? "are" : "is",
+            ),
         });
     }
 
@@ -159,18 +166,18 @@ export function encyclopediaNotices(
     ) {
         notices.push({
             severity: "info",
-            message:
-                'The cost reads "$" because the game writes a literal dollar sign there and ' +
-                "draws it with a font whose dollar glyph is the credits symbol. In game it is a " +
-                "coin.",
+            message: l10n.t(
+                'The cost reads "$" because the game writes a literal dollar sign there and draws it with a font whose dollar glyph is the credits symbol. In game it is a coin.',
+            ),
         });
     }
 
     if (view.multiplayer && !entry.usedMultiplayerBody) {
         notices.push({
             severity: "info",
-            message:
+            message: l10n.t(
                 "No MP_Encyclopedia_Text on this object - showing the single-player body.",
+            ),
         });
     }
 

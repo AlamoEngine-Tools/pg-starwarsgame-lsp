@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Abilities;
@@ -40,7 +41,8 @@ public sealed class PreviewSceneBuilder(
     IGameIndexService indexService,
     ISchemaProvider schema,
     IVariantTagSource tagSource,
-    IGameAssetResolver assets)
+    IGameAssetResolver assets,
+    IMessageCatalog? messages = null)
 {
     private const string HardPointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
@@ -135,6 +137,8 @@ public sealed class PreviewSceneBuilder(
         "Fire_When_In_Normal_Attack_Mode", "Fire_When_In_Defend_Mode"
     ];
 
+    private readonly IMessageCatalog _messages = messages ?? ResxMessageCatalog.Server("en");
+
     /// <summary>
     ///     A scene for a single <c>.alo</c>, opened directly - a model or a particle system.
     /// </summary>
@@ -158,7 +162,7 @@ public sealed class PreviewSceneBuilder(
         var problems = new List<PreviewProblem>();
         if (!resolved)
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelNotFound, "error",
-                $"Model '{modelReference}' was not found. {assets.Tiers.Explain()}"));
+                _messages.Format("PreviewScene_ModelWasNotFound", modelReference, assets.Tiers.Explain(_messages))));
 
         var kind = PreviewSceneKind.Model;
         if (resolved)
@@ -170,8 +174,7 @@ public sealed class PreviewSceneBuilder(
 
                 case AloFileKind.Unknown:
                     problems.Add(new PreviewProblem(DiagnosticIds.PreviewNotAModel, "error",
-                        $"'{modelReference}' is not an Alamo model or particle system: Its root chunk id is "
-                        + "neither. The file may be renamed or truncated."));
+                        _messages.Format("PreviewScene_NotAModel", modelReference)));
                     break;
 
                 case AloFileKind.Model:
@@ -243,7 +246,7 @@ public sealed class PreviewSceneBuilder(
         catch (AloFormatException e)
         {
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelUnreadable, "warning",
-                $"'{modelReference}' could not be read for its cameras: {e.Message}"));
+                _messages.Format("PreviewScene_CouldNotBeReadIts", modelReference, e.Message)));
             return [];
         }
     }
@@ -306,9 +309,8 @@ public sealed class PreviewSceneBuilder(
         }
 
         var reason = candidates.Count == 0
-            ? $"No model name prefixes '{animation}', so there is nothing to play it on."
-            : $"'{animation}' does not match the skeleton of {string.Join(", ", candidates.Take(3))}. "
-              + "An animation exported against a different revision of a model cannot be played on it.";
+            ? _messages.Format("PreviewScene_NoModelForAnimation", animation)
+            : _messages.Format("PreviewScene_SkeletonMismatch", animation, string.Join(", ", candidates.Take(3)));
 
         return PreviewScene.NotFound(animation, reason, assets.Tiers);
     }
@@ -328,13 +330,13 @@ public sealed class PreviewSceneBuilder(
         var effective = resolver.Resolve(objectId);
 
         if (!effective.Found)
-            return PreviewScene.NotFound(objectId, $"No object named '{objectId}' is indexed.", assets.Tiers);
+            return PreviewScene.NotFound(objectId, _messages.Format("PreviewScene_NoObjectNamedIndexed", objectId),
+                assets.Tiers);
 
         var problems = new List<PreviewProblem>();
         if (effective.Cyclic)
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewInheritanceCycle, "error",
-                $"'{objectId}' inherits in a cycle through '{effective.CycleObjectId}'; " +
-                "the assembled scene may be incomplete."));
+                _messages.Format("PreviewScene_InheritanceCycle", objectId, effective.CycleObjectId)));
 
         var bones = new HardpointBoneModelResolver(index, schema, tagSource);
         var parts = new List<PreviewPart>();
@@ -348,7 +350,7 @@ public sealed class PreviewSceneBuilder(
 
         if (hull is null)
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoTacticalModel, "error",
-                $"'{effective.ObjectId}' declares no tactical model, so there is nothing to draw."));
+                _messages.Format("PreviewScene_DeclaresNoTacticalModelSo", effective.ObjectId)));
         else
             parts.Add(new PreviewPart("hull", hull, null, null, PreviewPartOrigin.Hull, null,
                 assets.Locate(PreviewModelReference.ModelPath(hull)) is not null));
@@ -375,7 +377,7 @@ public sealed class PreviewSceneBuilder(
 
         if (hull is not null && !parts[0].Resolved)
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelNotFound, "error",
-                $"Model '{hull}' was not found. {assets.Tiers.Explain()}"));
+                _messages.Format("PreviewScene_ModelWasNotFound", hull, assets.Tiers.Explain(_messages))));
 
         // Every part, not just the hull: a turret carries its own muzzle flashes and engine glow.
         var particles = parts
@@ -454,12 +456,11 @@ public sealed class PreviewSceneBuilder(
             return;
 
         var which = missing.Count == 1
-            ? $"stage {missing[0]}"
-            : $"stages {string.Join(", ", missing)}";
+            ? _messages.Format("DamageStageNotOnModel_Stage", missing[0])
+            : _messages.Format("DamageStageNotOnModel_Stages", string.Join(", ", missing));
 
         problems.Add(new PreviewProblem(DiagnosticIds.PreviewDamageStageNotInModel, "warning",
-            $"'{objectId}' declares damage {which}, which nothing in '{hull}' is tagged for. "
-            + "The unit reaches that state and does not change."));
+            _messages.Format("PreviewScene_DamageStageUntagged", objectId, which, hull)));
     }
 
     /// <summary>
@@ -495,7 +496,7 @@ public sealed class PreviewSceneBuilder(
                 // A real mistake, unlike an unbound ability effect: the wreck simply never appears
                 // and the game says nothing about it.
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewDeathCloneNotDefined, "warning",
-                    $"Death clone '{row[1]}' is not defined in this project."));
+                    _messages.Format("PreviewScene_DeathCloneNotDefinedThis", row[1])));
                 clones.Add(new PreviewDeathClone(Blank(row[0]), row[1], null, playsIdle));
                 continue;
             }
@@ -539,7 +540,7 @@ public sealed class PreviewSceneBuilder(
     ///         <c>Ev_mdu_fieldgen</c> carries <c>prs_at-aa_fx</c> and declares no ability at all.
     ///     </para>
     /// </remarks>
-    private static List<PreviewAbility> Abilities(
+    private List<PreviewAbility> Abilities(
         EffectiveObject effective,
         IReadOnlyList<PreviewParticle> particles,
         IReadOnlyList<string> animations,
@@ -557,8 +558,7 @@ public sealed class PreviewSceneBuilder(
 
         foreach (var (ability, names) in bound.Unbound)
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewUnboundAbilityEffect, "info",
-                $"{string.Join(", ", names)} names {ability} by its prefix, but this object "
-                + "declares no such ability - the effect is unbound."));
+                _messages.Format("PreviewScene_UnboundAbilityEffect", string.Join(", ", names), ability)));
 
         var abilities = new List<PreviewAbility>();
 
@@ -588,7 +588,8 @@ public sealed class PreviewSceneBuilder(
                 icons,
                 localisation,
                 problems,
-                ability.Tag("Alternate_Description_Text")));
+                ability.Tag("Alternate_Description_Text"),
+                _messages));
         }
 
         return abilities;
@@ -802,7 +803,7 @@ public sealed class PreviewSceneBuilder(
     ///     mirrored batteries fire the same bolt and a copy each would have the client build the
     ///     same material twice.
     /// </remarks>
-    private static List<PreviewProjectile> Projectiles(
+    private List<PreviewProjectile> Projectiles(
         EffectiveObjectResolver resolver,
         IReadOnlyList<PreviewWeapon> weapons,
         List<PreviewProblem> problems)
@@ -811,7 +812,8 @@ public sealed class PreviewSceneBuilder(
             resolver,
             weapons.Select(w => w.ProjectileType).Where(id => !string.IsNullOrEmpty(id))
                 .Select(id => id!),
-            problems);
+            problems,
+            _messages);
     }
 
     /// <summary>Whether an object's own behaviour lists name <c>PROJECTILE</c>.</summary>
@@ -839,8 +841,10 @@ public sealed class PreviewSceneBuilder(
     internal static List<PreviewProjectile> ProjectilesFor(
         EffectiveObjectResolver resolver,
         IEnumerable<string> ids,
-        List<PreviewProblem> problems)
+        List<PreviewProblem> problems,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var projectiles = new List<PreviewProjectile>();
 
@@ -850,7 +854,7 @@ public sealed class PreviewSceneBuilder(
             if (!effective.Found)
             {
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewProjectileNotDefined, "warning",
-                    $"Projectile '{id}' is not defined in this project."));
+                    messages.Format("PreviewScene_ProjectileNotDefinedThisProject", id)));
                 continue;
             }
 
@@ -920,8 +924,7 @@ public sealed class PreviewSceneBuilder(
                 byType[type] = states;
             else
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoReticleForType, "info",
-                    $"GameConstants maps no targeting reticle for hardpoint type '{type}', so the " +
-                    "game draws nothing over those hardpoints."));
+                    _messages.Format("PreviewScene_NoReticle", type)));
 
         return new PreviewReticles(byType, new Dictionary<string, string>(),
             map.EnemyScreenSize, map.FriendlyScreenSize);
@@ -953,8 +956,7 @@ public sealed class PreviewSceneBuilder(
             if (!effective.Found)
             {
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewBreakoffPropNotDefined, "warning",
-                    $"Breakoff prop '{id}' is not defined in this project, so the hardpoint will " +
-                    "vanish instead of breaking off."));
+                    _messages.Format("PreviewScene_BreakoffPropNotDefined", id)));
                 props.Add(new PreviewBreakoffProp(id, null, false, null, null, null, null, null,
                     null, false));
                 continue;
@@ -1080,7 +1082,7 @@ public sealed class PreviewSceneBuilder(
         {
             // The geometry request will fail the same way and say so; this only costs the effects.
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelUnreadable, "warning",
-                $"'{modelRef}' could not be read for its particle effects: {e.Message}"));
+                _messages.Format("PreviewScene_CouldNotBeReadIts2", modelRef, e.Message)));
             return [];
         }
     }
@@ -1125,10 +1127,8 @@ public sealed class PreviewSceneBuilder(
         if (!hullBones.IsDefaultOrEmpty && !overrideBones.IsDefaultOrEmpty
                                         && !hullBones.SequenceEqual(overrideBones, StringComparer.OrdinalIgnoreCase))
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewAnimationSkeletonMismatch, "info",
-                $"'{effective.ObjectId}' takes its animations from '{overrideModel}', whose skeleton "
-                + $"differs from '{hull}' ({overrideBones.Length} bones against "
-                + $"{hullBones.Length}). The clips play, bound by bone index - where the two "
-                + "skeletons disagree, a clip drives whatever bone sits at that index."));
+                _messages.Format("PreviewScene_AnimationSkeletonDiffers", effective.ObjectId, overrideModel, hull,
+                    overrideBones.Length, hullBones.Length)));
 
         return overrideModel;
     }
@@ -1156,7 +1156,7 @@ public sealed class PreviewSceneBuilder(
         if (!effective.Found)
         {
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointNotDefined, "warning",
-                $"Hardpoint '{hardpointId}' is mounted but not defined in this project.", hardpointId));
+                _messages.Format("PreviewScene_HardpointMountedButNotDefined", hardpointId), hardpointId));
             return;
         }
 
@@ -1176,7 +1176,7 @@ public sealed class PreviewSceneBuilder(
 
             if (!resolved)
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointModelNotFound, "warning",
-                    $"Hardpoint '{hardpointId}' attaches model '{model}', which was not found.",
+                    _messages.Format("PreviewScene_HardpointAttachesModelWhichWas", hardpointId, model),
                     hardpointId));
         }
 
@@ -1197,26 +1197,25 @@ public sealed class PreviewSceneBuilder(
         {
             var fireBoneA = Tag(effective, "Fire_Bone_A");
             var placed = string.IsNullOrEmpty(fireBoneA)
-                ? "The game places it at the map origin"
-                : $"The game places it at Fire_Bone_A '{fireBoneA}'";
+                ? _messages.Format("PreviewScene_PlacedAtOrigin")
+                : _messages.Format("PreviewScene_PlacedAtFireBone", fireBoneA);
             problems.Add(isTargetable
                 ? new PreviewProblem(DiagnosticIds.PreviewTargetableHardpointNoBone, "error",
-                    $"Hardpoint '{hardpointId}' is targetable but names no {AttachmentBoneTag}. "
-                    + $"{placed} and draws its reticle in the screen corner."
-                    + (string.IsNullOrEmpty(fireBoneA)
-                        ? " It cannot be hit, so the unit cannot be destroyed."
-                        : string.Empty),
+                    _messages.Format(string.IsNullOrEmpty(fireBoneA)
+                            ? "PreviewScene_TargetableNoBoneUnkillable"
+                            : "PreviewScene_TargetableNoBone",
+                        hardpointId, AttachmentBoneTag, placed),
                     hardpointId)
                 : new PreviewProblem(DiagnosticIds.PreviewHardpointNoBone, "error",
-                    $"Hardpoint '{hardpointId}' names no {AttachmentBoneTag}. "
-                    + $"{placed}; a Model_To_Attach is never attached.",
+                    _messages.Format("PreviewScene_HardpointNoBone", hardpointId, AttachmentBoneTag, placed),
                     hardpointId));
         }
         else if (hull is not null &&
                  !HardpointBoneModelResolver.ModelHasBone(indexService.Current, hull, attachBone))
+        {
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointBoneMissing, "warning",
-                $"Hardpoint '{hardpointId}' attaches to bone '{attachBone}', which model '{hull}' " +
-                "does not have.", hardpointId));
+                _messages.Format("PreviewScene_HardpointBoneMissing", hardpointId, attachBone, hull), hardpointId));
+        }
 
         // Can a shot ever REACH this hardpoint? Only one shape makes it impossible: no Collision_Mesh
         // at all.
@@ -1239,8 +1238,7 @@ public sealed class PreviewSceneBuilder(
             && diesWithHardpoints
             && string.IsNullOrWhiteSpace(Tag(effective, "Collision_Mesh")))
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointUnreachable, "error",
-                $"Hardpoint '{hardpointId}' is destroyable but names no Collision_Mesh, so no shot can "
-                + "reach it. The unit can never be finished through its hardpoints.",
+                _messages.Format("PreviewScene_HardpointUnreachable", hardpointId),
                 hardpointId));
 
         var tooltipKey = Tag(effective, "Tooltip_Text");
@@ -1319,8 +1317,7 @@ public sealed class PreviewSceneBuilder(
         if (bones.Count == 0)
         {
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoMuzzleBones, "warning",
-                $"'{effective.ObjectId}' has a WEAPON behaviour but its model declares no " +
-                "MuzzleA bones, so the engine has no muzzle to fire from."));
+                _messages.Format("PreviewScene_NoMuzzleBones", effective.ObjectId)));
             return null;
         }
 
@@ -1328,7 +1325,7 @@ public sealed class PreviewSceneBuilder(
             "weapon:A",
             PreviewWeaponSource.Unit,
             null,
-            "Muzzle A",
+            _messages.Format("PreviewScene_Muzzle"),
             bones,
             // Randomize_Between_Fire_Bones is a HardPoint parameter and is not on GameObjectType at
             // all, so this case has no other branch.

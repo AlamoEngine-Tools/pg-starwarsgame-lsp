@@ -22,7 +22,8 @@ internal abstract class LocalisationKeyInlayHintProviderBase : IXmlInlayHintProv
 
     protected InlayHint CreateHintForTranslationKey(InlayHintContext ctx, string extractedValue)
     {
-        var translated = ctx.Index.Localisation.GetValue(extractedValue) ?? extractedValue + ": MISSING";
+        var translated = ctx.Index.Localisation.GetValue(extractedValue) ??
+                         ctx.Messages.Format("LocalisationKeyInlayHint_Missing", extractedValue);
         return new InlayHint
             {
                 Position = new Position(ctx.Line, int.MaxValue),

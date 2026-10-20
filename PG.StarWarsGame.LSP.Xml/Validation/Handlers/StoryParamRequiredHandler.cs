@@ -23,8 +23,8 @@ public sealed class StoryParamRequiredHandler : XmlDiagnosticsHandler<StoryParam
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                 label is null
-                    ? $"{fact.EventType} requires {tagName}."
-                    : $"{fact.EventType} requires {tagName} - {label}.")
+                    ? ctx.Messages.Format("StoryParamRequired_Requires", fact.EventType, tagName)
+                    : ctx.Messages.Format("StoryParamRequired_Requires2", fact.EventType, tagName, label))
         ];
     }
 }

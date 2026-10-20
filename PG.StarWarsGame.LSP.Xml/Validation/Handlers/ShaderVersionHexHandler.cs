@@ -20,7 +20,7 @@ public sealed class ShaderVersionHexHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid hex literal for <{fact.Tag.Tag}>. Expected format: 0x[0-9A-Fa-f]+.")
+                    ctx.Messages.Format("ShaderVersionHex_IsNotAValidHex", trimmed, fact.Tag.Tag))
             ];
 
         return [];

@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -44,7 +45,9 @@ public sealed class ValidateCreditsBatchHandler
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath)
             || !fs.File.Exists(request.ProjectFilePath))
             return Task.FromResult(new ValidateCreditsBatchResult(
-                [], $"File not found: {request.ProjectFilePath}"));
+                [],
+                new ConfiguredMessageCatalog(_config).Format("LocValidateCredits_FileNotFound",
+                    request.ProjectFilePath)));
 
         LocalisationEditResult composed;
         try
@@ -54,7 +57,7 @@ public sealed class ValidateCreditsBatchHandler
         catch (Exception ex)
         {
             return Task.FromResult(new ValidateCreditsBatchResult(
-                [], $"Failed to read the file: {ex.Message}"));
+                [], new ConfiguredMessageCatalog(_config).Format("LocValidateCredits_FailedReadFile", ex.Message)));
         }
 
         // An addressing failure is about one staged change, not about a row, so it is reported
@@ -67,7 +70,8 @@ public sealed class ValidateCreditsBatchHandler
             return Task.FromResult(new ValidateCreditsBatchResult(
             [
                 new LocProblemDto(null, null, LocProblemSeverity.Error,
-                    $"Change {(composed.FailedIndex ?? 0) + 1}: {composed.Error}")
+                    new ConfiguredMessageCatalog(_config).Format("LocValidateCredits_Change",
+                        (composed.FailedIndex ?? 0) + 1, composed.Error))
             ]));
 
         // Nothing about a credits key is checkable - duplicates and blanks are the format. Nor is
@@ -86,7 +90,7 @@ public sealed class ValidateCreditsBatchHandler
             foreach (var (language, index, label) in
                      CreditsCoverageInspector.Inspect(rows, languages))
                 problems.Add(new LocProblemDto(index, language, LocProblemSeverity.Info,
-                    CreditsCoverageInspector.Message(language, label)));
+                    CreditsCoverageInspector.Message(language, label, new ConfiguredMessageCatalog(_config))));
 
         return Task.FromResult(new ValidateCreditsBatchResult(problems));
     }

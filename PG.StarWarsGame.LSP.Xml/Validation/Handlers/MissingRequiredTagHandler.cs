@@ -22,15 +22,20 @@ public sealed class MissingRequiredTagHandler : XmlDiagnosticsHandler<MissingReq
     {
         // Where the engine substitutes a value, saying WHICH one is the more useful half of the
         // message: the author's complaint is not that nothing happened, it is that something did.
-        var consequence = fact.Repair.Length > 0
-            ? $"and the engine {fact.Repair}"
-            : "and the engine reports it as unset on load";
+        var consequence = fact.RepairKey.Length > 0
+            ? ctx.Messages.Format("MissingRequiredTag_AndTheEngine", ctx.Messages.Format(fact.RepairKey))
+            : ctx.Messages.Format("MissingRequiredTag_ReportsItAsUnset");
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.TagName}> is not set. {fact.OwningType} needs it, {consequence}",
-                EngineRepair: fact.Insertion)
+                ctx.Messages.Format("MissingRequiredTag_IsNotSetNeedsIt", fact.TagName, fact.OwningType, consequence),
+                EngineRepair: fact.InsertionEdits is null
+                    ? null
+                    : new XmlEngineRepair(
+                        ctx.Messages.Format("MissingRequiredTag_ApplyTheEngineSDefault", fact.TagName,
+                            fact.DefaultValue),
+                        fact.InsertionEdits))
         ];
     }
 }

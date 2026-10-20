@@ -49,12 +49,9 @@ public sealed class FireConeDegreesHandler : NumericRangeHandlerBase
     /// <summary>The assert is <c>&gt; 0.0f</c>, so zero is out.</summary>
     protected override bool MinimumInclusive => false;
 
-    protected override string Expectation => "must be greater than 0 and at most 360 degrees";
+    protected override string ExpectationKey => "FireConeDegrees_Expectation";
 
-    protected override string BelowMinimumConsequence =>
-        "A hardpoint with this cone cannot point at anything";
+    protected override string BelowMinimumConsequenceKey => "FireConeDegrees_BelowMinimumConsequence";
 
-    protected override string AboveMaximumConsequence =>
-        "The engine halves the cone and compares it against a deviation of at most 180 degrees, so "
-        + "anything past a full turn has no further effect";
+    protected override string AboveMaximumConsequenceKey => "FireConeDegrees_AboveMaximumConsequence";
 }

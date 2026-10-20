@@ -12,6 +12,7 @@
 // keeps the mark the same size when the panel is made wider, which is how the rest of the game's
 // HUD behaves. If it turns out to be width, this is the one function to change.
 
+import * as l10n from "@vscode/l10n";
 import type {
     PreviewHardpoint,
     PreviewReticles,
@@ -29,13 +30,13 @@ export type ReticleState = keyof PreviewReticleStates;
  * for the disabled pair - a mod giving them separate art has nowhere else to see it.
  */
 export const RETICLE_STATES: readonly { id: ReticleState; label: string }[] = [
-    { id: "enemy", label: "Enemy" },
-    { id: "enemyTracked", label: "Enemy, tracked" },
-    { id: "friendly", label: "Friendly" },
-    { id: "friendlyTracked", label: "Friendly, tracked" },
-    { id: "friendlyRepairing", label: "Repairing" },
-    { id: "friendlyDisabled", label: "Disabled" },
-    { id: "friendlyDisabledTracked", label: "Disabled, tracked" },
+    { id: "enemy", label: l10n.t("Enemy") },
+    { id: "enemyTracked", label: l10n.t("Enemy, tracked") },
+    { id: "friendly", label: l10n.t("Friendly") },
+    { id: "friendlyTracked", label: l10n.t("Friendly, tracked") },
+    { id: "friendlyRepairing", label: l10n.t("Repairing") },
+    { id: "friendlyDisabled", label: l10n.t("Disabled") },
+    { id: "friendlyDisabledTracked", label: l10n.t("Disabled, tracked") },
 ];
 
 /** One mark the viewport projects and draws. */

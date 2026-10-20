@@ -67,9 +67,7 @@ internal sealed class RemoveEarlierDuplicatesCodeActionProvider : IXmlCodeAction
         [
             new CommandOrCodeAction(new CodeAction
             {
-                Title = count == 1
-                    ? $"Remove the earlier duplicate '{tagName}' (the game keeps the last occurrence)"
-                    : $"Remove the {count} earlier duplicate '{tagName}' occurrences (the game keeps the last)",
+                Title = ctx.Messages.Format("RemoveEarlierDuplicatesAction_Remove", tagName, count),
                 Kind = CodeActionKind.QuickFix,
                 IsPreferred = true,
                 Diagnostics = new Container<Diagnostic>(ctx.Diagnostic),

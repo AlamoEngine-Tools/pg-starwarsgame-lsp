@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -60,18 +61,17 @@ public sealed class SetLocalisationProjectFormatHandler
 
         var extension = LocalisationFormatUtility.ToExtension(request.Format);
         if (extension is null)
-            return Fail($"'{request.Format}' is not a localisation format. Use CSV, XML, NLS or DAT.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NotLocalisationFormatUseCSV",
+                request.Format));
 
         var rootLayer = _reloadService.LastWorkspaceConfig?.Layers
             .OrderByDescending(l => l.Rank).FirstOrDefault();
 
         if (rootLayer?.ProjectPath is not { } pgprojPath)
-            return Fail("No mod project is open. The localisation format is stored in the .pgproj.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NoModProjectOpenLocalisation"));
 
         if (rootLayer.TextResourceType is not { } previous || rootLayer.TextRoots.Count == 0)
-            return Fail(
-                "This project has no localisation set up yet. Use 'New Localisation Project' or " +
-                "'Import Existing Localisation Files' to create one.");
+            return Fail(new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NoLocalisationYet"));
 
         var format = request.Format.ToUpperInvariant();
         if (string.Equals(previous, format, StringComparison.OrdinalIgnoreCase))
@@ -81,8 +81,7 @@ public sealed class SetLocalisationProjectFormatHandler
         var relative = fs.Path.GetRelativePath(fs.Path.GetDirectoryName(pgprojPath)!, rootLayer.TextRoots[0]);
         if (fs.Path.IsPathRooted(relative))
             return Fail(
-                $"The localisation directory '{rootLayer.TextRoots[0]}' is not below the project, so it " +
-                "cannot be written back as a relative path.");
+                new ConfiguredMessageCatalog(_config).Format("LocSetFormat_NotBelowProject", rootLayer.TextRoots[0]));
 
         // The same shape the conversion writes, so the two never disagree about the node.
         await _fileWriter.SetLocalisationAsync(

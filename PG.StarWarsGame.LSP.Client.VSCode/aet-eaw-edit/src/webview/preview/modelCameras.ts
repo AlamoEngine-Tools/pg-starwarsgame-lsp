@@ -7,6 +7,7 @@
 // is exactly the framing an icon wants. The other 87% declare none, and say so rather than dropping
 // the control: a reader who never sees the entry never learns the feature is there.
 
+import * as l10n from "@vscode/l10n";
 import { type PreviewCamera } from "../../protocol/modelPreview";
 import { type ChoiceOption } from "../shared/choice";
 
@@ -42,11 +43,11 @@ export type ModelCameraEntry = ChoiceOption<string> & {
 /** What the list says when the subject declares no camera of its own. */
 const NONE: ModelCameraEntry = {
     id: "camera:none",
-    label: "Author",
+    label: l10n.t("Author"),
     // 447 of the 3340 shipped models carry one, as a Camera01 / Camera01.Target bone pair. That is
     // the note at the top of this file, which is where it belongs - a reader who wants to know what
     // the entry IS has the disabled button in front of them saying this model has none.
-    title: "Look from the model's own camera",
+    title: l10n.t("Look from the model's own camera"),
     disabled: true,
     disabledReason: "Author - this model carries no camera of its own",
     position: null,
@@ -71,7 +72,7 @@ export function modelCameraEntries(
         // The Get_Bone_Position tip that used to ride here was the best thing in the tooltip and
         // the reason nobody read the tooltip. It is in the docs for `label` above, which is where
         // someone looking for it will be.
-        title: `Look from ${camera.name}, the author's own camera`,
+        title: l10n.t("Look from {0}, the author's own camera", camera.name),
         position: camera.position ?? null,
         target: camera.target ?? null,
     }));

@@ -13,6 +13,7 @@
 // A control with nothing to act on is disabled and says why; it is never removed. Here that also
 // makes the column a fixed height, which is the whole of the layout fix.
 
+import * as l10n from "@vscode/l10n";
 import type { GraphFilters } from "../../protocol/story";
 import { IconButton } from "../shared/Button";
 
@@ -46,7 +47,7 @@ export function ClearFiltersButton({
     return (
         <IconButton
             icon="clearFilter"
-            title="Clear all filters"
+            title={l10n.t("Clear all filters")}
             disabled={!active}
             disabledReason="Clear all filters - no filters are set"
             onClick={onClear}

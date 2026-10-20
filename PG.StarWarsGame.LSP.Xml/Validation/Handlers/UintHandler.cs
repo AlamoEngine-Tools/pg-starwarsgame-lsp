@@ -24,7 +24,7 @@ public sealed class UintHandler : XmlDiagnosticsHandler<XmlTagValueFact>
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid number for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("Uint_IsNotAValidNumber", trimmed, fact.Tag.Tag))
             ];
 
         if (uint.TryParse(trimmed, out _))
@@ -35,7 +35,7 @@ public sealed class UintHandler : XmlDiagnosticsHandler<XmlTagValueFact>
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{trimmed}' is not a valid non-negative integer for <{fact.Tag.Tag}>. Did you mean {corrected}?",
+                ctx.Messages.Format("Uint_IsNotAValidNon", trimmed, fact.Tag.Tag, corrected),
                 SuggestedFix: corrected, Id: DiagnosticIds.UintNegativeOrFractional)
         ];
     }

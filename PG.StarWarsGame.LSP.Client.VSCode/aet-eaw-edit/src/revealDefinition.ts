@@ -43,7 +43,10 @@ export async function revealDefinition(
 
     if (result.error || !result.uri) {
         void vscode.window.showWarningMessage(
-            `EaWEdit: ${result.error ?? `Cannot resolve '${value}'.`}`,
+            vscode.l10n.t(
+                "EaWEdit: {0}",
+                result.error ?? vscode.l10n.t("Cannot resolve '{0}'.", value),
+            ),
         );
         return;
     }
@@ -62,7 +65,11 @@ export async function revealDefinition(
         });
     } catch (e) {
         void vscode.window.showErrorMessage(
-            `EaWEdit: Cannot open ${result.uri} - ${e}`,
+            vscode.l10n.t(
+                "EaWEdit: Cannot open {0} - {1}",
+                result.uri,
+                String(e),
+            ),
         );
     }
 }

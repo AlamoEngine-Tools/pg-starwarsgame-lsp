@@ -17,14 +17,14 @@ public sealed class SquadronOffsetsMismatchHandler : XmlDiagnosticsHandler<Squad
         if (fact.TotalOffsets < fact.TotalUnits)
         {
             var missing = fact.TotalUnits - fact.TotalOffsets;
-            message = $"Squadron has {fact.TotalUnits} unit(s) but only {fact.TotalOffsets} Squadron_Offsets. " +
-                      $"Add {missing} more.";
+            message = ctx.Messages.Format("SquadronOffsetsMismatch_SquadronHasUnitSBut", fact.TotalUnits,
+                fact.TotalOffsets, missing);
         }
         else
         {
             var excess = fact.TotalOffsets - fact.TotalUnits;
-            message = $"Squadron has {fact.TotalUnits} unit(s) but {fact.TotalOffsets} Squadron_Offsets. " +
-                      $"Remove {excess} excess.";
+            message = ctx.Messages.Format("SquadronOffsetsMismatch_SquadronHasUnitSBut2", fact.TotalUnits,
+                fact.TotalOffsets, excess);
         }
 
         return

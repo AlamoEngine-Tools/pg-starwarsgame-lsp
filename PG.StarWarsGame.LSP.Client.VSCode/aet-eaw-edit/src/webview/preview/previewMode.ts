@@ -15,6 +15,7 @@
 // playing while you hop into Model mode to hide a mesh - so each lens carries a one-line chip
 // saying what the others are up to. Without that, a soft switch just hides state.
 
+import * as l10n from "@vscode/l10n";
 import type { RotaryMode } from "../shared/RotaryModeSwitch";
 
 export type PreviewMode = "model" | "animation" | "gameplay";
@@ -54,18 +55,18 @@ export function previewModes(counts: SubjectCounts): RotaryMode<PreviewMode>[] {
         {
             id: "animation",
             icon: "play",
-            label: "Animation",
+            label: l10n.t("Animation"),
             angle: 210,
             count: counts.animations,
         },
-        { id: "model", icon: "package", label: "Model", angle: 270 },
+        { id: "model", icon: "package", label: l10n.t("Model"), angle: 270 },
         {
             // Everything the lens can act on, not only the hardpoints. It counted hardpoints alone
             // until the lens grew weapons and abilities, which read 0 on a fighter that carries its
             // guns on the unit itself - a dial position claiming a subject has nothing to see.
             id: "gameplay",
             icon: "zap",
-            label: "Gameplay",
+            label: l10n.t("Gameplay"),
             angle: 330,
             count: counts.hardpoints + counts.weapons + counts.abilities,
         },
@@ -139,13 +140,20 @@ export function otherModeChips(
     const chips: { mode: PreviewMode; text: string }[] = [];
 
     if (mode !== "animation" && activity.playing !== null) {
-        chips.push({ mode: "animation", text: `${activity.playing} playing` });
+        chips.push({
+            mode: "animation",
+            text: l10n.t("{0} playing", activity.playing),
+        });
     }
 
     if (mode !== "gameplay" && activity.destroyed > 0) {
         chips.push({
             mode: "gameplay",
-            text: `${activity.destroyed} hardpoint${activity.destroyed === 1 ? "" : "s"} destroyed`,
+            text: l10n.t(
+                "{0} hardpoint{1} destroyed",
+                activity.destroyed,
+                activity.destroyed === 1 ? "" : "s",
+            ),
         });
     }
 
@@ -154,7 +162,11 @@ export function otherModeChips(
     if (mode !== "gameplay" && activity.abilities > 0) {
         chips.push({
             mode: "gameplay",
-            text: `${activity.abilities} abilit${activity.abilities === 1 ? "y" : "ies"} active`,
+            text: l10n.t(
+                "{0} abilit{1} active",
+                activity.abilities,
+                activity.abilities === 1 ? "y" : "ies",
+            ),
         });
     }
 

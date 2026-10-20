@@ -21,7 +21,7 @@ public sealed class NonEmptyReferenceHandlerBaseTest
     {
         var d = Assert.Single(Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx));
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
-        Assert.Equal("'' is not a valid widget reference for <X>.", d.Message);
+        Assert.Equal("'' is not a valid faction reference for <X>.", d.Message);
     }
 
     [Theory]
@@ -42,6 +42,6 @@ public sealed class NonEmptyReferenceHandlerBaseTest
     private sealed class TestReferenceHandler : NonEmptyReferenceHandlerBase
     {
         protected override XmlValueType TargetType => XmlValueType.FactionReference;
-        protected override string ReferenceNoun => "widget reference";
+        protected override string ReferenceNounKey => "FactionReference_Noun";
     }
 }

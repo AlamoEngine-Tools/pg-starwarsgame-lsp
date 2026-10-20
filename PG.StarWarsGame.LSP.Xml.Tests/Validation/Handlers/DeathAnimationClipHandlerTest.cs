@@ -112,7 +112,7 @@ public sealed class DeathAnimationClipHandlerTest
 
         var d = Assert.Single(Sut.Handle(Fact(), ctx).ToList());
         Assert.Contains("Specific_Death_Anim_Index 1", d.Message);
-        Assert.Contains("1 DIE take", d.Message);
+        Assert.Contains("DIE takes on 'NI_Mandalorian.alo' - 1", d.Message);
     }
 
     [Fact]

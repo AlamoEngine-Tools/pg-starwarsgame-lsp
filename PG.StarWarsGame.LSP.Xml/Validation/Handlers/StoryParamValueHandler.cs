@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -22,17 +23,17 @@ public sealed class StoryParamValueHandler : XmlDiagnosticsHandler<StoryParamFac
             XmlValueType.Int or XmlValueType.UInt =>
                 int.TryParse(fact.RawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)
                     ? null
-                    : $"'{fact.RawValue}' is not a valid integer.",
+                    : ctx.Messages.Format("StoryParamValue_IsNotAValidInteger", fact.RawValue),
             XmlValueType.Float =>
                 float.TryParse(fact.RawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out _)
                     ? null
-                    : $"'{fact.RawValue}' is not a valid number.",
+                    : ctx.Messages.Format("StoryParamValue_IsNotAValidNumber", fact.RawValue),
             XmlValueType.Boolean =>
                 IsBooleanValue(fact.RawValue)
                     ? null
-                    : $"'{fact.RawValue}' is not a valid boolean value. Use 0, 1, true, or false.",
+                    : ctx.Messages.Format("StoryParamValue_IsNotAValidBoolean", fact.RawValue),
             XmlValueType.FloatVector3 =>
-                ValidateFloatVector3(fact.RawValue),
+                ValidateFloatVector3(fact.RawValue, ctx.Messages),
             _ => null
         };
 
@@ -47,14 +48,14 @@ public sealed class StoryParamValueHandler : XmlDiagnosticsHandler<StoryParamFac
                value.Equals("false", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? ValidateFloatVector3(string value)
+    private static string? ValidateFloatVector3(string value, IMessageCatalog messages)
     {
         var parts = value.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 3)
-            return $"'{value}' is not a valid 3D vector. Expected three space- or comma-separated numbers.";
+            return messages.Format("StoryParamValue_IsNotAValidD", value);
         foreach (var part in parts)
             if (!float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
-                return $"'{part}' is not a valid number in vector '{value}'.";
+                return messages.Format("StoryParamValue_IsNotAValidNumber2", part, value);
         return null;
     }
 }

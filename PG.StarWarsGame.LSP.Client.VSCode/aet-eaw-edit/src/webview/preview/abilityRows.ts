@@ -12,6 +12,7 @@
 // `project_preview_effect_rows`. Nothing here needs to know about it beyond routing visibility
 // through the same call every other effect uses.
 
+import * as l10n from "@vscode/l10n";
 import type {
     PreviewAbility,
     PreviewParticle,
@@ -365,8 +366,11 @@ export function abilityRows(
             undeployClip,
             drivesSomething,
             title: drivesSomething
-                ? `Show what ${ability.type} drives on this model`
-                : `${ability.type} drives nothing on this model - it is an order, not an effect`,
+                ? l10n.t("Show what {0} drives on this model", ability.type)
+                : l10n.t(
+                      "{0} drives nothing on this model - it is an order, not an effect",
+                      ability.type,
+                  ),
         };
     });
 }

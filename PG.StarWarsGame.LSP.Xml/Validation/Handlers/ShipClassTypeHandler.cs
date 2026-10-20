@@ -19,7 +19,7 @@ public sealed class ShipClassTypeHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid ship class type for <{fact.Tag.Tag}>.")
+                    ctx.Messages.Format("ShipClassType_IsNotAValidShip", fact.Tag.Tag))
             ];
 
         return [];

@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -129,7 +130,7 @@ public sealed class ExecuteStoryCommandHandlerTest
         var result = await Handler(new CapturingApplier(), false)
             .Handle(Command("deleteEvent", eventName: "Start"), CancellationToken.None);
 
-        Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditorFeature.DisabledKey), result.Error);
     }
 
     /// <summary>
@@ -144,7 +145,7 @@ public sealed class ExecuteStoryCommandHandlerTest
         var result = await Handler(applier, storyEditing: false)
             .Handle(Command("deleteEvent", eventName: "Start"), CancellationToken.None);
 
-        Assert.Equal(StoryEditingFeature.DisabledMessage, result.Error);
+        Assert.Equal(ResxMessageCatalog.Server("en").Format(StoryEditingFeature.DisabledKey), result.Error);
         Assert.Null(applier.Edit);
     }
 

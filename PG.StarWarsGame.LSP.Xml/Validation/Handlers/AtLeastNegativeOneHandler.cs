@@ -35,5 +35,5 @@ public sealed class AtLeastNegativeOneHandler : NumericRangeHandlerBase
 
     protected override float? Maximum => null;
 
-    protected override string Expectation => "cannot be less than -1.0";
+    protected override string ExpectationKey => "AtLeastNegativeOne_Expectation";
 }

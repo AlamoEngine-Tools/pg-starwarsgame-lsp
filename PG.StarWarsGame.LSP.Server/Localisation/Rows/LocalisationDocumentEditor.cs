@@ -10,6 +10,7 @@ using CsvHelper.Configuration;
 using PG.Commons.Hashing;
 using PG.StarWarsGame.Files.DAT.Data;
 using PG.StarWarsGame.Files.DAT.Services;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -22,14 +23,17 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
     private readonly IDatService _datFileService;
     private readonly IFileHelper _fileHelper;
     private readonly ICrc32HashingService _hashing;
+    private readonly IMessageCatalog _messages;
     private readonly ILocalisationRowReader _reader;
 
     public LocalisationDocumentEditor(
         ILocalisationRowReader reader,
         IDatService datFileService,
         ICrc32HashingService hashing,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        IMessageCatalog? messages = null)
     {
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _reader = reader;
         _datFileService = datFileService;
         _hashing = hashing;
@@ -73,7 +77,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             }
             catch (Exception ex)
             {
-                return LocalisationEditResult.Fail(0, $"Failed to read the file: {ex.Message}");
+                return LocalisationEditResult.Fail(0, _messages.Format("LocEditor_FailedReadFile", ex.Message));
             }
 
             var rows = document.Rows.ToList();
@@ -101,7 +105,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         }
         catch (Exception ex)
         {
-            return ([], [], $"Failed to read the file: {ex.Message}");
+            return ([], [], _messages.Format("LocEditor_FailedReadFile", ex.Message));
         }
 
         // Applied to the rows in memory rather than by composing and re-reading: a .dat has no text
@@ -127,7 +131,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             }
 
             if (ApplyToRows(rows, command, languages) is { } error)
-                return ([], [], $"Change {i + 1}: {error}");
+                return ([], [], _messages.Format("LocEditor_Change", i + 1, error));
         }
 
         return (rows, languages, null);
@@ -166,10 +170,10 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         catch (NotSupportedException)
         {
             var extension = _fileHelper.FileSystem.Path.GetExtension(filePath).ToLowerInvariant();
-            return KeyedTranslationResult.Fail(0, $"Unsupported format: {extension}");
+            return KeyedTranslationResult.Fail(0, _messages.Format("LocEditor_UnsupportedFormat", extension));
         }
 
-        return KeyedCommandTranslator.Translate(document, commands, _hashing);
+        return KeyedCommandTranslator.Translate(document, commands, _hashing, _messages);
     }
 
     public LocalisationEditResult Apply(
@@ -188,10 +192,10 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         }
         catch (NotSupportedException)
         {
-            return LocalisationEditResult.Fail(0, $"Unsupported format: {extension}");
+            return LocalisationEditResult.Fail(0, _messages.Format("LocEditor_UnsupportedFormat", extension));
         }
 
-        var state = new EditState(document, extension);
+        var state = new EditState(document, extension, _messages);
 
         for (var i = 0; i < commands.Count; i++)
             if (state.Apply(commands[i]) is { } error)
@@ -251,9 +255,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             if (!rows[i].Key.All(char.IsAscii))
                 return LocalisationEditResult.Fail(
                     i,
-                    $"Row {i + 1}: '{rows[i].Key}' cannot be used as a key - a .dat stores keys as "
-                    + "ASCII. Rename the entry using unaccented letters; the translation itself is "
-                    + "unaffected.");
+                    _messages.Format("LocEditor_NonAsciiKey", i + 1, rows[i].Key));
 
         // Materialised HERE, not left lazy. Building an entry is what validates its key, and the
         // sequence used to be enumerated inside CreateDatFile - by which point File.Create had
@@ -295,18 +297,18 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
     ///     The row-list half of the commands, shared by the DAT path. Text formats go through
     ///     <see cref="EditState" /> instead, which additionally tracks each row's original text.
     /// </summary>
-    private static string? ApplyToRows(
+    private string? ApplyToRows(
         List<LocRowDto> rows, LocEditCommandDto command, IReadOnlyList<string> languages)
     {
         var index = command.Index ?? -1;
         var addressed = command.Kind is "setCell" or "setKey" or "deleteRow" or "moveRow";
 
         if (addressed && (index < 0 || index >= rows.Count))
-            return $"Row {command.Index} is out of range (the file has {rows.Count} rows).";
+            return _messages.Format("LocEditor_RowOutRangeFileHas", command.Index, rows.Count);
 
         if (addressed && command.ExpectedKey is { } expected
                       && !string.Equals(rows[index].Key, expected, StringComparison.Ordinal))
-            return $"Row {index} is no longer '{expected}'. Reload before editing again.";
+            return _messages.Format("LocEditor_RowNoLongerReloadBefore", index, expected);
 
         switch (command.Kind)
         {
@@ -329,7 +331,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             case "moveRow":
                 var to = command.ToIndex ?? 0;
                 if (to < 0 || to >= rows.Count)
-                    return $"Cannot move to row {to} (the file has {rows.Count} rows).";
+                    return _messages.Format("LocEditor_CannotMoveRowFileHas", to, rows.Count);
                 var moved = rows[index];
                 rows.RemoveAt(index);
                 rows.Insert(to, moved);
@@ -338,17 +340,17 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             case "insertRow":
                 var at = command.Index ?? rows.Count;
                 if (at < 0 || at > rows.Count)
-                    return $"Cannot insert at row {at} (the file has {rows.Count} rows).";
+                    return _messages.Format("LocEditor_CannotInsertAtRowFile", at, rows.Count);
                 rows.Insert(at, new LocRowDto(at, command.Key ?? string.Empty, [.. command.Values ?? []]));
                 break;
 
             // A DAT holds exactly one language - the one in its filename - so a second column
             // cannot be represented.
             case "addLanguage":
-                return "A .dat file holds a single language and cannot take another column.";
+                return _messages.Format("LocEditor_DatFileHoldsSingleLanguage");
 
             default:
-                return $"Unknown command '{command.Kind}'.";
+                return _messages.Format("LocEditor_UnknownCommand", command.Kind);
         }
 
         // Positions are the addressing scheme, so they have to stay equal to the index.
@@ -361,7 +363,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
     // ── XML ──────────────────────────────────────────────────────────────────
 
-    private static LocalisationEditResult ApplyXml(string text, IReadOnlyList<LocEditCommandDto> commands)
+    private LocalisationEditResult ApplyXml(string text, IReadOnlyList<LocEditCommandDto> commands)
     {
         XDocument document;
         try
@@ -370,7 +372,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         }
         catch (Exception ex)
         {
-            return LocalisationEditResult.Fail(0, $"Failed to parse file: {ex.Message}");
+            return LocalisationEditResult.Fail(0, _messages.Format("LocEditor_FailedParseFile", ex.Message));
         }
 
         var ns = XNamespace.Get(XmlNs);
@@ -442,25 +444,25 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             last.AddAfterSelf(translation);
     }
 
-    private static string? ApplyXmlCommand(LocEditCommandDto command, List<XElement> rows, XNamespace ns)
+    private string? ApplyXmlCommand(LocEditCommandDto command, List<XElement> rows, XNamespace ns)
     {
         if (command.Kind == "addLanguage")
             return string.IsNullOrWhiteSpace(command.Language)
-                ? "No language given."
+                ? _messages.Format("LocEditor_NoLanguageGiven")
                 : null; // A language exists in XML only where a value does; nothing to declare.
 
         if (command.Index is not { } index || index < 0 || index >= rows.Count)
-            return $"Row {command.Index} is out of range (the file has {rows.Count} rows).";
+            return _messages.Format("LocEditor_RowOutRangeFileHas", command.Index, rows.Count);
 
         var element = rows[index];
         if (command.ExpectedKey is { } expected
             && !string.Equals(element.Attribute("key")?.Value, expected, StringComparison.Ordinal))
-            return $"Row {index} is no longer '{expected}'. Reload before editing again.";
+            return _messages.Format("LocEditor_RowNoLongerReloadBefore", index, expected);
 
         switch (command.Kind)
         {
             case "setCell":
-                if (string.IsNullOrWhiteSpace(command.Language)) return "No language given.";
+                if (string.IsNullOrWhiteSpace(command.Language)) return _messages.Format("LocEditor_NoLanguageGiven");
 
                 var data = element.Elements(ns + "TranslationData").FirstOrDefault();
                 if (data is null)
@@ -498,7 +500,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
                 return null;
 
             default:
-                return $"Unsupported command '{command.Kind}' for XML.";
+                return _messages.Format("LocEditor_UnsupportedCommandXML", command.Kind);
         }
     }
 
@@ -528,12 +530,14 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         private readonly string _extension;
         private readonly List<string> _languages;
         private readonly string _lineEnding;
+        private readonly IMessageCatalog _messages;
         private readonly List<RowState> _rows;
         private string _preamble;
 
-        public EditState(LocDocument document, string extension)
+        public EditState(LocDocument document, string extension, IMessageCatalog messages)
         {
             _extension = extension;
+            _messages = messages;
             _lineEnding = document.LineEnding;
             _preamble = document.Preamble;
             _languages = [.. document.Languages];
@@ -559,7 +563,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
                 case "setKey": return Mutate(command, SetKey);
                 case "deleteRow": return DeleteRow(command);
                 case "moveRow": return MoveRow(command);
-                default: return $"Unknown command '{command.Kind}'.";
+                default: return _messages.Format("LocEditor_UnknownCommand", command.Kind);
             }
         }
 
@@ -642,7 +646,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         {
             var index = _languages.FindIndex(l =>
                 string.Equals(l, command.Language, StringComparison.OrdinalIgnoreCase));
-            if (index < 0) return $"'{command.Language}' is not a language in this file.";
+            if (index < 0) return _messages.Format("LocEditor_NotLanguageThisFile", command.Language);
 
             var language = _languages[index];
             var existing = row.Values.FindIndex(v =>
@@ -665,7 +669,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         {
             var at = command.Index ?? _rows.Count;
             if (at < 0 || at > _rows.Count)
-                return $"Cannot insert at row {at} (the file has {_rows.Count} rows).";
+                return _messages.Format("LocEditor_CannotInsertAtRowFile", at, _rows.Count);
 
             // A file with nothing in it declares no columns, so the FIRST row to arrive establishes
             // them - the same thing addLanguage does, just implied rather than asked for. Without
@@ -708,7 +712,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
             var to = command.ToIndex ?? 0;
             if (to < 0 || to >= _rows.Count)
-                return $"Cannot move to row {to} (the file has {_rows.Count} rows).";
+                return _messages.Format("LocEditor_CannotMoveRowFileHas", to, _rows.Count);
 
             _rows.RemoveAt(command.Index!.Value);
             _rows.Insert(to, row!);
@@ -717,13 +721,13 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
         private string? AddLanguage(LocEditCommandDto command)
         {
-            if (string.IsNullOrWhiteSpace(command.Language)) return "No language given.";
+            if (string.IsNullOrWhiteSpace(command.Language)) return _messages.Format("LocEditor_NoLanguageGiven");
 
             if (!SupportsMultipleLanguages(_extension))
-                return $"{_extension} files are single-language and cannot take another column.";
+                return _messages.Format("LocEditor_FilesAreSingleLanguageCannot", _extension);
 
             if (_languages.Any(l => string.Equals(l, command.Language, StringComparison.OrdinalIgnoreCase)))
-                return $"'{command.Language}' is already a language in this file.";
+                return _messages.Format("LocEditor_AlreadyLanguageThisFile", command.Language);
 
             _languages.Add(command.Language);
             _preamble = $"{_preamble},{command.Language}";
@@ -746,7 +750,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
 
             if (command.Index is not { } index || index < 0 || index >= _rows.Count)
             {
-                error = $"Row {command.Index} is out of range (the file has {_rows.Count} rows).";
+                error = _messages.Format("LocEditor_RowOutRangeFileHas", command.Index, _rows.Count);
                 return false;
             }
 
@@ -755,7 +759,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             if (command.ExpectedKey is { } expected
                 && !string.Equals(row.Key, expected, StringComparison.Ordinal))
             {
-                error = $"Row {index} is no longer '{expected}'. Reload before editing again.";
+                error = _messages.Format("LocEditor_RowNoLongerReloadBefore", index, expected);
                 return false;
             }
 

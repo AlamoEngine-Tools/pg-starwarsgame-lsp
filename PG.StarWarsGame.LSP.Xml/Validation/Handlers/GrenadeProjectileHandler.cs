@@ -86,8 +86,8 @@ public sealed class GrenadeProjectileHandler : XmlDiagnosticsHandler<XmlTagValue
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<{fact.Tag.Tag}> names '{named}', whose <{CategoryTag}> is {category} - this "
-                + $"ability only accepts a {RequiredCategory} projectile and refuses anything else")
+                ctx.Messages.Format("GrenadeProjectile_NamesWhoseIsThisAbility", fact.Tag.Tag, named, CategoryTag,
+                    category, RequiredCategory))
         ];
     }
 }

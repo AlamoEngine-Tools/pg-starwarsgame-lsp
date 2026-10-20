@@ -23,7 +23,7 @@ public sealed class SfxPercentageHandler : NumberValueHandlerBase
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{trimmed}' is not a valid SFX percentage for <{fact.Tag.Tag}>. Expected [0, 100]. Did you mean {corrected}?",
+                ctx.Messages.Format("SfxPercentage_IsNotAValidSfx", trimmed, fact.Tag.Tag, corrected),
                 SuggestedFix: corrected)
         ];
     }

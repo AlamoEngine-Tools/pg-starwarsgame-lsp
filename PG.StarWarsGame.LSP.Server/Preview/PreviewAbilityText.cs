@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Messages;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -45,8 +46,10 @@ public static class PreviewAbilityText
         IconCatalog? icons,
         ILocalisationIndex? localisation,
         IList<PreviewProblem> problems,
-        string? alternateDescriptionKey = null)
+        string? alternateDescriptionKey = null,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         ArgumentNullException.ThrowIfNull(ability);
         ArgumentNullException.ThrowIfNull(problems);
 
@@ -55,7 +58,7 @@ public static class PreviewAbilityText
             Name = Text(localisation, alternateNameKey, AbilityTextKeys.NameKeyFor(ability.Type)),
             Description = Text(
                 localisation, alternateDescriptionKey, AbilityTextKeys.DescriptionKeyFor(ability.Type)),
-            IconDataUri = Icon(ability, alternateIconName, icons, problems)
+            IconDataUri = Icon(ability, alternateIconName, icons, problems, messages)
         };
     }
 
@@ -78,7 +81,8 @@ public static class PreviewAbilityText
 
     private static string? Icon(
         PreviewAbility ability, string? alternateIconName, IconCatalog? icons,
-        IList<PreviewProblem> problems)
+        IList<PreviewProblem> problems,
+        IMessageCatalog messages)
     {
         var resolved = AbilityIconResolver.Resolve(icons, ability.Type, alternateIconName);
 
@@ -92,8 +96,7 @@ public static class PreviewAbilityText
             // author's to fix, so it is reported rather than passed over in silence.
             case AbilityIconOutcome.DeclaredButMissing:
                 problems.Add(new PreviewProblem(DiagnosticIds.PreviewAbilityIconNotFound, "warning",
-                    $"Ability {ability.Type} names icon '{alternateIconName}', which is not in this "
-                    + "project's mega texture or icon sources. The game will draw missing art."));
+                    messages.Format("PreviewAbility_IconNotFound", ability.Type, alternateIconName)));
                 return DataUri(FallbackIcon.Png);
 
             // Ambiguous, and deliberately silent: I_SA_<TYPE> is only a guess at the name the engine

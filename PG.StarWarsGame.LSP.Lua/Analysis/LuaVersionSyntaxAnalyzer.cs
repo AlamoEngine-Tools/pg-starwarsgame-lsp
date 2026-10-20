@@ -6,6 +6,7 @@ using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticCode;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
@@ -25,10 +26,9 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis;
 /// </summary>
 internal static class LuaVersionSyntaxAnalyzer
 {
-    private const string NotLoaded = "The game runs Lua 5.0 and does not load this script";
-
-    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree)
+    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var diagnostics = new List<LspDiagnostic>();
         var root = tree.GetRoot();
         foreach (var node in root.DescendantNodes())
@@ -36,21 +36,21 @@ internal static class LuaVersionSyntaxAnalyzer
             {
                 case UnaryExpressionSyntax length when length.IsKind(SyntaxKind.LengthExpression):
                     diagnostics.Add(Diagnostic(length.OperatorToken.GetLocation(),
-                        $"The length operator '#' is Lua 5.1: {NotLoaded}; use table.getn for a table, string.len for a string."));
+                        messages.Format("LuaVersionSyntax_Length")));
                     break;
                 case BinaryExpressionSyntax modulo when modulo.IsKind(SyntaxKind.ModuloExpression):
                     diagnostics.Add(Diagnostic(modulo.OperatorToken.GetLocation(),
-                        $"The modulo operator '%' is Lua 5.1: {NotLoaded}."));
+                        messages.Format("LuaVersionSyntax_Modulo")));
                     break;
                 case VarArgExpressionSyntax varargs:
                     diagnostics.Add(Diagnostic(varargs.GetLocation(),
-                        $"'...' as a value is Lua 5.1: {NotLoaded}; a Lua 5.0 vararg function reads its extra arguments from the table 'arg'."));
+                        messages.Format("LuaVersionSyntax_Vararg")));
                     break;
             }
 
         foreach (var token in root.DescendantTokens())
             if (token.IsKind(SyntaxKind.StringLiteralToken) && token.Text.StartsWith("[=", StringComparison.Ordinal))
-                diagnostics.Add(Diagnostic(token.GetLocation(), LevelMessage));
+                diagnostics.Add(Diagnostic(token.GetLocation(), messages.Format("LuaVersionSyntax_LongString")));
 
         // The game's lexer opens a long comment only on "--[[": "--[=[" is a line comment there. One
         // line long, nothing changes; longer, every line after the first is read as code.
@@ -60,13 +60,10 @@ internal static class LuaVersionSyntaxAnalyzer
                 trivia.GetLocation().GetLineSpan() is var span &&
                 span.EndLinePosition.Line > span.StartLinePosition.Line)
                 diagnostics.Add(Diagnostic(trivia.GetLocation(),
-                    "A long comment with '=' levels is Lua 5.1: Lua 5.0 reads '--[=[' as a line comment, so the game takes the lines after the first as code; Lua 5.0 nests --[[ ]] instead."));
+                    messages.Format("LuaVersionSyntax_LongComment")));
 
         return diagnostics;
     }
-
-    private static string LevelMessage =>
-        $"A long string with '=' levels is Lua 5.1: {NotLoaded}; Lua 5.0 nests [[ ]] instead.";
 
     private static LspDiagnostic Diagnostic(Location location, string message)
     {

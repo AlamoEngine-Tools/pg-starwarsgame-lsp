@@ -12,5 +12,5 @@ public sealed class MusicEventReferenceHandler : NonEmptyReferenceHandlerBase
     public override DiagnosticId? DefaultId => DiagnosticIds.MusicEventReference;
 
     protected override XmlValueType TargetType => XmlValueType.MusicEventReference;
-    protected override string ReferenceNoun => "music event reference";
+    protected override string ReferenceNounKey => "MusicEventReference_Noun";
 }

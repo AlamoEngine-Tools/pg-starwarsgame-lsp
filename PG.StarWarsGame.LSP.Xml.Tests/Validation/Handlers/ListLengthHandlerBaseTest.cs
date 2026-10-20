@@ -98,7 +98,7 @@ public sealed class ListLengthHandlerBaseTest
         public override string ValidationId => "test-bounded";
         protected override int? MinimumEntries => 1;
         protected override int? MaximumEntries => 4;
-        protected override string Expectation => "takes between one and four values";
+        protected override string ExpectationKey => "ControlPointCurve_Expectation";
     }
 
     private sealed class EvenCountListHandler : ListLengthHandlerBase
@@ -106,7 +106,7 @@ public sealed class ListLengthHandlerBaseTest
         public override string ValidationId => "test-even";
         protected override int? MinimumEntries => null;
         protected override int? MaximumEntries => null;
-        protected override string Expectation => "takes an even number of values";
+        protected override string ExpectationKey => "ControlPointCurve_Expectation";
 
         protected override bool IsAcceptable(int entries)
         {

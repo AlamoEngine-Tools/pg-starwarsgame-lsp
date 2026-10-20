@@ -21,7 +21,7 @@ public sealed class MovieFrameTriggerHandler : CommaSeparatedPairHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid movie frame trigger for <{fact.Tag.Tag}>. Expected: EventKey, NonNegativeInteger.")
+                    ctx.Messages.Format("MovieFrameTrigger_IsNotAValidMovie", fact.RawValue.Trim(), fact.Tag.Tag))
             ];
 
         if (wasFloat)
@@ -29,7 +29,8 @@ public sealed class MovieFrameTriggerHandler : CommaSeparatedPairHandlerBase
             return
             [
                 AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                        $"'{parts[1].Trim()}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {frame}?",
+                        ctx.Messages.Format("MovieFrameTrigger_IsAFloatButExpects", parts[1].Trim(), fact.Tag.Tag,
+                            frame),
                         SuggestedFix: frame.ToString(), Id: DiagnosticIds.MovieFrameTriggerFloatWhereIntExpected),
                     fact, 1)
             ];

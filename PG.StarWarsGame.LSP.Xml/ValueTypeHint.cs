@@ -1,197 +1,201 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 internal static class ValueTypeHint
 {
-    public static string? Build(XmlTagDefinition tag)
+    public static string? Build(XmlTagDefinition tag, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         return tag.ValueType switch
         {
             XmlValueType.Float =>
-                "**Format:** `1`, `1.0`, or `1.0f`",
+                messages.Format("ValueTypeHint_FormatF"),
 
             XmlValueType.NormalizedFloat =>
-                "**Format:** float in `[0.0, 1.0]` - e.g. `0.5`, `0.75f`",
+                messages.Format("ValueTypeHint_FormatFloatEGF"),
 
             XmlValueType.Boolean =>
-                "**Format:** `True`, `False`, `Yes`, `No`, `1`, or `0`",
+                messages.Format("ValueTypeHint_FormatTrueFalseYesNo"),
 
             XmlValueType.SfxCount =>
-                "**Format:** integer; `-1` = unlimited",
+                messages.Format("ValueTypeHint_FormatIntegerUnlimited"),
 
             XmlValueType.SfxPercentage =>
-                "**Format:** integer `0`-`100`",
+                messages.Format("ValueTypeHint_FormatInteger"),
 
             XmlValueType.HardwareUInt =>
-                "**Format:** unsigned integer",
+                messages.Format("ValueTypeHint_FormatUnsignedInteger"),
 
             XmlValueType.UvSlotIndex =>
-                "**Format:** integer `0`-`3`",
+                messages.Format("ValueTypeHint_FormatInteger2"),
 
             XmlValueType.ShaderVersionHex =>
-                "**Format:** hex string, e.g. `0x0200` (= Shader Model 2.0)",
+                messages.Format("ValueTypeHint_FormatHexStringEG"),
 
             XmlValueType.VendorIdHex =>
-                "**Format:** hex string GPU vendor ID, e.g. `0x10DE` (NVIDIA)",
+                messages.Format("ValueTypeHint_FormatHexStringGPUVendor"),
 
             XmlValueType.FloatVector2 =>
-                "**Format:** `X, Y` - two comma-separated floats",
+                messages.Format("ValueTypeHint_FormatXYTwoComma"),
 
             XmlValueType.FloatVector3 =>
-                "**Format:** `X, Y, Z` - three comma-separated floats",
+                messages.Format("ValueTypeHint_FormatXYZThree"),
 
             XmlValueType.FloatVector4 =>
-                "**Format:** `X, Y, Z, W` - four comma-separated floats",
+                messages.Format("ValueTypeHint_FormatXYZW"),
 
             XmlValueType.RGBA =>
-                "**Format:** `R, G, B, A` - four integers `0`-`255`",
+                messages.Format("ValueTypeHint_FormatRGBFour"),
 
             XmlValueType.IntList =>
-                "**Format:** comma or space-separated integers",
+                messages.Format("ValueTypeHint_FormatCommaSpaceSeparatedIntegers"),
 
             XmlValueType.FloatList =>
-                "**Format:** comma or space-separated floats (`1`, `1.0`, `1.0f`)",
+                messages.Format("ValueTypeHint_FormatCommaSpaceSeparatedFloats"),
 
             XmlValueType.FloatTupleList =>
-                "**Format:** comma-separated float pairs",
+                messages.Format("ValueTypeHint_FormatCommaSeparatedFloatPairs"),
 
             XmlValueType.IntFloatTupleList =>
-                "**Format:** comma-separated `(int, float)` pairs",
+                messages.Format("ValueTypeHint_FormatCommaSeparatedIntFloat"),
 
-            XmlValueType.NameReference => BuildNameReferenceHint(tag, false),
-            XmlValueType.NameReferenceList => BuildNameReferenceHint(tag, true),
+            XmlValueType.NameReference => BuildNameReferenceHint(tag, false, messages),
+            XmlValueType.NameReferenceList => BuildNameReferenceHint(tag, true, messages),
 
             XmlValueType.TypeReference =>
-                "**Reference:** name of a single game object type",
+                messages.Format("ValueTypeHint_ReferenceNameSingleGameObject"),
 
             XmlValueType.TypeReferenceList or XmlValueType.GameObjectTypeReferenceList =>
-                "**Reference:** space-separated game object type names",
+                messages.Format("ValueTypeHint_ReferenceSpaceSeparatedGameObject"),
 
             XmlValueType.SFXEventReference =>
-                "**Reference:** name of an `SFXEvent`",
+                messages.Format("ValueTypeHint_ReferenceNameSFXEvent"),
 
             XmlValueType.SpeechEventReference =>
-                "**Reference:** name of a `SpeechEvent`",
+                messages.Format("ValueTypeHint_ReferenceNameSpeechEvent"),
 
             XmlValueType.MusicEventReference =>
-                "**Reference:** name of a `MusicEvent`",
+                messages.Format("ValueTypeHint_ReferenceNameMusicEvent"),
 
             XmlValueType.SfxEventHudReference =>
-                "**Reference:** name of an `SFXEvent` (HUD feedback)",
+                messages.Format("ValueTypeHint_ReferenceNameSFXEventHUDFeedback"),
 
-            XmlValueType.DynamicEnumValue => BuildEnumHint(tag),
+            XmlValueType.DynamicEnumValue => BuildEnumHint(tag, messages),
 
             XmlValueType.ShipClassType =>
-                "**Enum:** ship class - e.g. `Infantry`, `Corvette`, `Frigate`, `Capital`",
+                messages.Format("ValueTypeHint_EnumShipClassEG"),
 
             XmlValueType.PerFactionValue =>
-                "**Format:** `FactionName, value` pairs",
+                messages.Format("ValueTypeHint_FormatFactionNameValuePairs"),
 
             XmlValueType.PerFactionIntMap =>
-                "**Format:** `FactionName, integer` pairs",
+                messages.Format("ValueTypeHint_FormatFactionNameIntegerPairs"),
 
             XmlValueType.DamageToArmorMod =>
-                "**Format:** `DamageType, ArmorType, modifier` groups",
+                messages.Format("ValueTypeHint_FormatDamageTypeArmorTypeModifierGroups"),
 
             XmlValueType.InaccuracyMap =>
-                "**Format:** `category, float` accuracy modifier pairs",
+                messages.Format("ValueTypeHint_FormatCategoryFloatAccuracyModifier"),
 
             XmlValueType.LocalisationToTextureMap =>
-                "**Format:** `locale, texturePath` pairs",
+                messages.Format("ValueTypeHint_FormatLocaleTexturePathPairs"),
 
             XmlValueType.HardPointTypeToTextureMap =>
-                "**Format:** `HardPointType, texturePath` pairs",
+                messages.Format("ValueTypeHint_FormatHardPointTypeTexturePathPairs"),
 
             XmlValueType.HardPointSfxMap =>
-                "**Format:** `HardPointType, SFXEventName` pairs (empty name = no sound)",
+                messages.Format("ValueTypeHint_FormatHardPointTypeSFXEventNamePairsEmpty"),
 
             XmlValueType.AbilitySfxMap =>
-                "**Format:** `AbilityName, SFXEventName` pairs (empty name = no sound)",
+                messages.Format("ValueTypeHint_FormatAbilityNameSFXEventNamePairsEmpty"),
 
             XmlValueType.AbilityModMultiplier =>
-                "**Format:** `AbilityMultiplierType, float` tuples",
+                messages.Format("ValueTypeHint_FormatAbilityMultiplierTypeFloatTuples"),
 
             XmlValueType.AbilityModFlag =>
-                "**Format:** `AbilityFlagType, True|False` tuples",
+                messages.Format("ValueTypeHint_FormatAbilityFlagTypeTrueFalseTuples"),
 
             XmlValueType.UnitSpawnTable =>
-                "**Format:** `UnitType, count` pairs; `-1` = unlimited",
+                messages.Format("ValueTypeHint_FormatUnitTypeCountPairsUnlimited"),
 
             XmlValueType.UnitSpawnProbabilityTable =>
-                "**Format:** `UnitType, probability` pairs",
+                messages.Format("ValueTypeHint_FormatUnitTypeProbabilityPairs"),
 
             // What the items are belongs to the tag's slots, not to the type: TupleList is the
             // engine's generic pair list, used for music events AND for terrain/model pairs, and a
             // ListMap maps factions to objects AND animation states to units.
             XmlValueType.TupleList or XmlValueType.ListMap =>
-                $"**Format:** {TupleItems.Describe(tag)}",
+                messages.Format("ValueTypeHint_FormatTuple", TupleItems.Describe(tag, messages)),
 
             XmlValueType.DeathCloneSpec =>
-                "**Format:** `condition, UnitType` pairs",
+                messages.Format("ValueTypeHint_FormatConditionUnitTypePairs"),
 
             _ => null
         };
     }
 
-    private static string? BuildNameReferenceHint(XmlTagDefinition tag, bool plural)
+    private static string? BuildNameReferenceHint(XmlTagDefinition tag, bool plural, IMessageCatalog messages)
     {
-        var sep = plural ? "space-separated list of " : string.Empty;
-        var suffix = plural ? " names" : string.Empty;
         return tag.ReferenceKind switch
         {
             ReferenceKind.XmlObject when tag.ObjectType is not null =>
-                $"**Reference:** {sep}`{tag.ObjectType.TypeName}`{suffix}",
+                plural
+                    ? messages.Format("ValueTypeHint_ObjectTypeNames", tag.ObjectType.TypeName)
+                    : messages.Format("ValueTypeHint_ObjectTypeName", tag.ObjectType.TypeName),
 
             ReferenceKind.XmlObject =>
-                $"**Reference:** {sep}XML object name{(plural ? "s" : string.Empty)}",
+                plural
+                    ? messages.Format("ValueTypeHint_XmlObjectNames")
+                    : messages.Format("ValueTypeHint_XmlObjectName"),
 
             ReferenceKind.ModelFile =>
                 plural
-                    ? "**Reference:** space-separated list of `.alo` model filenames"
-                    : "**Reference:** `.alo` 3D model filename",
+                    ? messages.Format("ValueTypeHint_ReferenceSpaceSeparatedListAlo")
+                    : messages.Format("ValueTypeHint_ReferenceAloDModelFilename"),
 
             ReferenceKind.TextureFile =>
                 plural
-                    ? "**Reference:** space-separated list of `.tga` / `.dds` texture filenames"
-                    : "**Reference:** `.tga` or `.dds` texture filename",
+                    ? messages.Format("ValueTypeHint_ReferenceSpaceSeparatedListTga")
+                    : messages.Format("ValueTypeHint_ReferenceTgaDdsTextureFilename"),
 
             ReferenceKind.AudioFile =>
                 plural
-                    ? "**Reference:** space-separated list of audio sample filenames"
-                    : "**Reference:** audio sample filename",
+                    ? messages.Format("ValueTypeHint_ReferenceSpaceSeparatedListAudio")
+                    : messages.Format("ValueTypeHint_ReferenceAudioSampleFilename"),
 
             ReferenceKind.BoneName =>
                 plural
-                    ? "**Reference:** space-separated bone names from the model skeleton"
-                    : "**Reference:** bone name from the model skeleton",
+                    ? messages.Format("ValueTypeHint_ReferenceSpaceSeparatedBoneNames")
+                    : messages.Format("ValueTypeHint_ReferenceBoneNameFromModel"),
 
             ReferenceKind.LocalisationKey =>
                 plural
-                    ? "**Reference:** space-separated localisation string keys (`TEXT_xxx`)"
-                    : "**Reference:** localisation string key (`TEXT_xxx` format)",
+                    ? messages.Format("ValueTypeHint_ReferenceSpaceSeparatedLocalisationString")
+                    : messages.Format("ValueTypeHint_ReferenceLocalisationStringKeyTEXT"),
 
             ReferenceKind.Enum when tag.Enum is not null =>
                 plural
-                    ? $"**Enum:** space-separated values from `{tag.Enum.Name}`"
-                    : $"**Enum:** one of the values in `{tag.Enum.Name}`",
+                    ? messages.Format("ValueTypeHint_EnumSpaceSeparatedValuesFrom", tag.Enum.Name)
+                    : messages.Format("ValueTypeHint_EnumOneValues", tag.Enum.Name),
 
             ReferenceKind.Enum =>
                 plural
-                    ? "**Enum:** space-separated enum values"
-                    : "**Enum:** predefined enum value",
+                    ? messages.Format("ValueTypeHint_EnumSpaceSeparatedEnumValues")
+                    : messages.Format("ValueTypeHint_EnumPredefinedEnumValue"),
 
             _ => null
         };
     }
 
-    private static string BuildEnumHint(XmlTagDefinition tag)
+    private static string BuildEnumHint(XmlTagDefinition tag, IMessageCatalog messages)
     {
         return tag.Enum is not null
-            ? $"**Enum:** one of the values in `{tag.Enum.Name}`"
-            : "**Enum:** predefined enum value";
+            ? messages.Format("ValueTypeHint_EnumOneValues", tag.Enum.Name)
+            : messages.Format("ValueTypeHint_EnumPredefinedEnumValue");
     }
 }

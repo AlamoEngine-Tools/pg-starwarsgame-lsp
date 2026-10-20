@@ -64,8 +64,7 @@ public sealed class SpecialWeaponBehaviorHandler : XmlDiagnosticsHandler<XmlTagV
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{value}' has neither the SPECIAL_WEAPON nor the LOBBING_SUPERWEAPON behaviour, so the " +
-                "game never registers it as a special weapon.")
+                ctx.Messages.Format("SpecialWeaponBehavior_HasNeitherTheSpecialWeapon", value))
         ];
     }
 }

@@ -22,7 +22,7 @@ public sealed partial class FloatVector4Handler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid Float4 for <{fact.Tag.Tag}>. Expected 4 floats separated by spaces or commas.")
+                    ctx.Messages.Format("FloatVector4_IsNotAValidFloat", trimmed, fact.Tag.Tag))
             ];
 
         return [];

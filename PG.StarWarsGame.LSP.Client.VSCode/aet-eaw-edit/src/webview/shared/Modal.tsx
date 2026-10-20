@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
 import { createContext, ReactNode, useContext, useEffect } from "react";
 import { createPortal } from "react-dom";
 
@@ -129,7 +130,9 @@ export function Modal(props: ModalProps): React.JSX.Element {
                     )}
                     {props.onConfirm ? (
                         <>
-                            <Button onClick={onCancel}>Cancel</Button>
+                            <Button onClick={onCancel}>
+                                {l10n.t("Cancel")}
+                            </Button>
                             <Button
                                 className="primary"
                                 disabled={!confirmable}
@@ -143,7 +146,7 @@ export function Modal(props: ModalProps): React.JSX.Element {
                             </Button>
                         </>
                     ) : (
-                        <Button onClick={onCancel}>Close</Button>
+                        <Button onClick={onCancel}>{l10n.t("Close")}</Button>
                     )}
                 </div>
                 {props.form ? null : (

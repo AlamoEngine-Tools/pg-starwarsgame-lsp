@@ -31,7 +31,7 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
     private AssetKindRule Rule => AssetKindRules.For(TargetKind)
                                   ?? throw new InvalidOperationException($"{TargetKind} names no asset kind.");
 
-    private string AssetNoun => Rule.Noun;
+    private string AssetNounKey => Rule.NounKey;
     private IReadOnlyList<string> AllowedExtensions => Rule.AllowedExtensions;
     private IReadOnlyList<string> InterchangeableExtensions => Rule.InterchangeableExtensions;
     private bool ResolvesFromMegaTexture => Rule.ResolvesFromMegaTexture;
@@ -65,10 +65,12 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
 
             var alternates = AssetFileLookup.AlternateNames(se, InterchangeableExtensions).ToList();
             var alsoChecked = alternates.Count > 0
-                ? $" Also checked {string.Join(", ", alternates.Select(a => $"'{a}'"))} (the game treats these formats interchangeably)."
+                ? ctx.Messages.Format("AssetFileExistence_AlsoChecked",
+                    string.Join(", ", alternates.Select(a => $"'{a}'")))
                 : string.Empty;
             var result = new XmlDiagnosticResult(MissingSeverity,
-                $"{AssetNoun} file '{se}' was not found in the game data or workspace asset files.{alsoChecked}");
+                ctx.Messages.Format("AssetFileExistenceHandlerBase_FileWasNotFoundIn",
+                    ctx.Messages.Format(AssetNounKey), se, alsoChecked));
 
             // Each name in a list carries its own squiggle. A single value already covers exactly
             // the span the fact does, so it is left alone.

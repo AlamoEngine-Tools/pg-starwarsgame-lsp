@@ -8,6 +8,8 @@
 // content. None of that can be named by key, which is why this editor and the translation editor
 // are separate programs over a shared grid rather than one grid deciding what kind of file it has.
 
+import "./shared/l10nSetup";
+import * as l10n from "@vscode/l10n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -454,7 +456,7 @@ function App(): React.JSX.Element {
         return <LocGridMessage>{error}</LocGridMessage>;
     }
     if (!loaded) {
-        return <LocGridMessage>Loading...</LocGridMessage>;
+        return <LocGridMessage>{l10n.t("Loading...")}</LocGridMessage>;
     }
 
     const overlays = (
@@ -501,7 +503,7 @@ function App(): React.JSX.Element {
         <>
             {/* The key column holds a formatting instruction, not an identifier - calling it "Key"
                 would misdescribe it. */}
-            <div className="cell">Format</div>
+            <div className="cell">{l10n.t("Format")}</div>
             {shownLanguages.map((language) => (
                 <div className="cell" key={language}>
                     {language}
@@ -521,7 +523,7 @@ function App(): React.JSX.Element {
             // rather than typed over.
             <div className="cell spacer-cell" tabIndex={0}>
                 <span className="spacer-rule" />
-                <span className="spacer-label">blank line</span>
+                <span className="spacer-label">{l10n.t("blank line")}</span>
                 <span className="spacer-rule" />
             </div>
         ) : (
@@ -684,7 +686,7 @@ function App(): React.JSX.Element {
                 Dropping says where far more directly than choosing "insert above" does. On the same
                 tile grid as the actions above: two tile species in one dock read as two unrelated
                 control sets. */}
-            <DockSection title="Content elements">
+            <DockSection title={l10n.t("Content elements")}>
                 <LocTileGrid>
                     {CREDITS_STEPS.map((step) => (
                         <LocTile
@@ -694,7 +696,10 @@ function App(): React.JSX.Element {
                             // The token this becomes in the file, so the tile and the Format column
                             // are visibly the same thing.
                             badge={step.token}
-                            title={`Drag onto the table, or click to add at the end - ${step.description}`}
+                            title={l10n.t(
+                                "Drag onto the table, or click to add at the end - {0}",
+                                step.description,
+                            )}
                             draggable
                             onDragStart={(e) => {
                                 e.dataTransfer.setData(STEP_MIME, step.id);
@@ -707,7 +712,9 @@ function App(): React.JSX.Element {
                     ))}
                 </LocTileGrid>
                 <p className="step-help">
-                    Drag onto the table to place, or click to add at the end.
+                    {l10n.t(
+                        "Drag onto the table to place, or click to add at the end.",
+                    )}
                 </p>
             </DockSection>
         </>
@@ -827,25 +834,25 @@ function CreditsRowMenu(props: {
                         role="menuitem"
                         onClick={run(() => props.onInsert("above"))}
                     >
-                        Insert row above
+                        {l10n.t("Insert row above")}
                     </button>
                     <button
                         role="menuitem"
                         onClick={run(() => props.onInsert("below"))}
                     >
-                        Insert row below
+                        {l10n.t("Insert row below")}
                     </button>
                     <button
                         role="menuitem"
                         onClick={run(() => props.onInsertSpacer("above"))}
                     >
-                        Insert blank line above
+                        {l10n.t("Insert blank line above")}
                     </button>
                     <button
                         role="menuitem"
                         onClick={run(() => props.onInsertSpacer("below"))}
                     >
-                        Insert blank line below
+                        {l10n.t("Insert blank line below")}
                     </button>
                 </>
             ) : (
@@ -854,13 +861,13 @@ function CreditsRowMenu(props: {
                         role="menuitem"
                         onClick={run(() => props.onInsert("end"))}
                     >
-                        Add row
+                        {l10n.t("Add row")}
                     </button>
                     <button
                         role="menuitem"
                         onClick={run(() => props.onInsertSpacer("end"))}
                     >
-                        Add blank line
+                        {l10n.t("Add blank line")}
                     </button>
                 </>
             )}
@@ -875,7 +882,7 @@ function CreditsRowMenu(props: {
                             props.onMove(props.index, props.index - 1),
                         )}
                     >
-                        Move up
+                        {l10n.t("Move up")}
                     </button>
                     <button
                         role="menuitem"
@@ -884,7 +891,7 @@ function CreditsRowMenu(props: {
                             props.onMove(props.index, props.index + 1),
                         )}
                     >
-                        Move down
+                        {l10n.t("Move down")}
                     </button>
 
                     <div className="sep" />
@@ -893,7 +900,9 @@ function CreditsRowMenu(props: {
                         className="danger"
                         onClick={run(() => props.onDelete(props.index))}
                     >
-                        {props.spacer ? "Remove blank line" : "Delete row"}
+                        {props.spacer
+                            ? l10n.t("Remove blank line")
+                            : l10n.t("Delete row")}
                     </button>
                 </>
             )}
@@ -953,7 +962,7 @@ async function requestFullScreen(): Promise<void> {
 
 // Examples from this file's own vocabulary.
 const PLACEHOLDERS: Record<FilterMode, string> = {
-    text: "Filter rows...",
+    text: l10n.t("Filter rows..."),
     wildcard: "CENTER*",
     regex: "^HEADER$",
 };

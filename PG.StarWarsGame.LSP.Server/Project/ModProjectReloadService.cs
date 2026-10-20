@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -30,6 +31,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly ILocalisationLoader _localisation;
     private readonly ILogger<ModProjectReloadService> _logger;
     private readonly ILuaAnalyzerStarter? _luaAnalyzer;
+    private readonly IMessageCatalog _messages;
     private readonly PgprojMigrationOffer? _migrationOffer;
     private readonly IUserNotifier _notifier;
     private readonly IClientRefreshNotifier? _refresh;
@@ -61,8 +63,10 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         // the bulk parse's fragmentation stays for the session (MEASURED: about 200 MB).
         IHeapTrimmer? heapTrimmer = null,
         // Optional like the rest: started (or restarted) with every project load in production.
-        ILuaAnalyzerStarter? luaAnalyzer = null)
+        ILuaAnalyzerStarter? luaAnalyzer = null,
+        IMessageCatalog? messages = null)
     {
+        _messages = messages ?? ResxMessageCatalog.Server("en");
         _status = status;
         _heapTrimmer = heapTrimmer ?? new NullHeapTrimmer();
         _luaAnalyzer = luaAnalyzer;
@@ -169,9 +173,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
             _logger.LogError("No baseline is loaded; refusing to index '{Roots}'.", string.Join(", ", roots));
             _status?.RecordProject(true, ProjectProblem.BaselineRefused);
             _notifier.ShowError(
-                "The shipped-game baseline could not be loaded, so nothing in this project can be "
-                + "checked against the game. Set 'aet-eaw-edit.lsp.source.baseline.type' to 'http' to "
-                + "download it, or to 'local' and point it at a baseline file. Nothing has been indexed.");
+                _messages.Format("ModProjectReload_ShippedGameBaselineCouldNot"));
             return;
         }
 

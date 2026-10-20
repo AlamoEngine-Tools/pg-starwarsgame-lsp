@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Story.Graph;
@@ -107,7 +108,7 @@ public sealed record StoryGraphProblem(
     string DocumentUri,
     StorySourceRange Range,
     string Reference,
-    string Message);
+    CatalogueText Message);
 
 /// <summary>The campaign-wide story graph: every thread's events plus virtual nodes and typed edges.</summary>
 public sealed record StoryGraph(

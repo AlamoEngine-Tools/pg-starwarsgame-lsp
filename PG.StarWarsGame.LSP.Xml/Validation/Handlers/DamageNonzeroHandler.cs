@@ -22,7 +22,7 @@ public sealed class DamageNonzeroHandler : XmlDiagnosticsHandler<XmlTagValueFact
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"<{fact.Tag.Tag}> must be greater than 0 for the AI to use this unit.")
+                    ctx.Messages.Format("DamageNonzero_MustBeGreaterThanFor", fact.Tag.Tag))
             ];
 
         return [];

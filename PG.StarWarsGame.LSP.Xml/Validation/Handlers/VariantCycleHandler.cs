@@ -15,7 +15,7 @@ public sealed class VariantCycleHandler : XmlDiagnosticsHandler<VariantCycleFact
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"Variant '{fact.ObjectId}' has a circular inheritance chain (loops at '{fact.CycleObjectId}').")
+                ctx.Messages.Format("VariantCycle_VariantHasACircularInheritance", fact.ObjectId, fact.CycleObjectId))
         ];
     }
 }

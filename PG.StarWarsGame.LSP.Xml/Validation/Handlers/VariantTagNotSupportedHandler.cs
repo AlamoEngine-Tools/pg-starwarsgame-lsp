@@ -26,9 +26,7 @@ public sealed class VariantTagNotSupportedHandler : XmlDiagnosticsHandler<Varian
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.TagName}> does nothing on a {fact.TypeName} - only GameObjectType " +
-                "inherits. The engine logs it as an unprocessed entry and loads the object " +
-                "without it.")
+                ctx.Messages.Format("VariantTagNotSupported_DoesNothingOnAOnly", fact.TagName, fact.TypeName))
         ];
     }
 }

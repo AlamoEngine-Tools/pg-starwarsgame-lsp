@@ -41,14 +41,14 @@ public abstract class EitherOrRequirementRuleBase : IXmlCrossTagRule
     /// <summary>The other half.</summary>
     protected abstract string SecondTag { get; }
 
-    /// <summary>How the message describes both halves being unset - "off" for flags.</summary>
-    protected virtual string State => "off";
+    /// <summary>The catalogue key of how the message describes both halves being unset - "off" for flags.</summary>
+    protected virtual string StateKey => "EitherOrRequirement_Off";
 
-    /// <summary>What the object cannot do, in the engine's own words where it gives them.</summary>
-    protected virtual string Consequence => "does nothing";
+    /// <summary>The catalogue key of what the object cannot do, in the engine's own words where it gives them.</summary>
+    protected virtual string ConsequenceKey => "EitherOrRequirement_DoesNothing";
 
-    /// <summary>What the author should do about it.</summary>
-    protected virtual string Remedy => "set one of them to Yes";
+    /// <summary>The catalogue key of what the author should do about it.</summary>
+    protected virtual string RemedyKey => "EitherOrRequirement_SetOneToYes";
 
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
@@ -72,9 +72,9 @@ public abstract class EitherOrRequirementRuleBase : IXmlCrossTagRule
                 OwningTypeOf(objectNode),
                 FirstTag,
                 SecondTag,
-                State,
-                Consequence,
-                Remedy)
+                StateKey,
+                ConsequenceKey,
+                RemedyKey)
         ];
     }
 

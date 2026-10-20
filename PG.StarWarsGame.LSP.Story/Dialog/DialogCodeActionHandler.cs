@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
@@ -89,10 +90,11 @@ public sealed class DialogCodeActionHandler : CodeActionHandlerBase
             .ToList();
     }
 
-    private static IEnumerable<CommandOrCodeAction> ActionsFor(
+    private IEnumerable<CommandOrCodeAction> ActionsFor(
         DocumentUri documentUri, Diagnostic diagnostic, StoryDialogDocument document, string[] lines)
     {
         DiagnosticId.TryParse(diagnostic.Code?.String, out var id);
+        var messages = new ConfiguredMessageCatalog(_config);
 
         var line = diagnostic.Range.Start.Line;
         var points = new List<SuppressionInsertionPoint> { new(SuppressionScope.Node, line) };
@@ -101,11 +103,12 @@ public sealed class DialogCodeActionHandler : CodeActionHandlerBase
         // header has no section, and an -object directive there would collapse onto its own line -
         // an action whose title promised the chapter and delivered one line.
         if (DialogSuppressionCommentParser.ChapterHeaderLine(document, line) is { } header)
-            points.Add(new SuppressionInsertionPoint(SuppressionScope.Object, header + 1, "chapter"));
+            points.Add(new SuppressionInsertionPoint(SuppressionScope.Object, header + 1,
+                messages.Format("DialogCodeAction_ChapterTarget")));
 
         points.Add(new SuppressionInsertionPoint(SuppressionScope.File, 0));
 
         return SuppressionCodeActionBuilder.Build(
-            documentUri, diagnostic, id, SuppressionCommentFormat.DialogText, lines, points);
+            documentUri, diagnostic, id, SuppressionCommentFormat.DialogText, lines, points, messages);
     }
 }

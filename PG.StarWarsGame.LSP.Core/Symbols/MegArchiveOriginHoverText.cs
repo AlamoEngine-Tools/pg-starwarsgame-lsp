@@ -1,14 +1,16 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Messages;
+
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 public static class MegArchiveOriginHoverText
 {
-    public static string Describe(MegArchiveOrigin origin)
+    public static string Describe(MegArchiveOrigin origin, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var archiveName = Path.GetFileName(origin.ArchivePath);
-        return
-            $"Packed in `{archiveName}` -> `{origin.InternalPath}` - read-only, cannot be renamed or navigated to.";
+        return messages.Format("MegArchiveOrigin_Packed", archiveName, origin.InternalPath);
     }
 }

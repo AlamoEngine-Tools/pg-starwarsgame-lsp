@@ -12,9 +12,7 @@ public sealed class XmlDuplicateTagHandler : XmlDiagnosticsHandler<XmlDuplicateT
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlDuplicateTagFact fact, DiagnosticsContext ctx)
     {
-        var othersText = fact.OtherLines.Count == 1
-            ? $" Also at line {fact.OtherLines[0]}."
-            : $" Also at lines {string.Join(", ", fact.OtherLines)}.";
+        var othersText = ctx.Messages.Format("XmlDuplicateTag_OtherLines", string.Join(", ", fact.OtherLines));
 
         // Warning, not Error: the game loads the object top to bottom and the LAST occurrence
         // wins, so duplicates technically work - they are just misleading style. Earlier
@@ -23,7 +21,7 @@ public sealed class XmlDuplicateTagHandler : XmlDiagnosticsHandler<XmlDuplicateT
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"Duplicate tag '{fact.Tag.Tag}': only one occurrence is used per object - the game keeps the LAST one.{othersText}",
+                ctx.Messages.Format("XmlDuplicateTag_DuplicateTagOnlyOneOccurrence", fact.Tag.Tag, othersText),
                 Tags: fact.IsLastOccurrence ? null : [XmlDiagnosticTag.Unnecessary],
                 OfferRemoveEarlierDuplicates: true)
         ];

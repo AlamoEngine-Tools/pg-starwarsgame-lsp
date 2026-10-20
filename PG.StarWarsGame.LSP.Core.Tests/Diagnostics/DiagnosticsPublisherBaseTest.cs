@@ -477,6 +477,46 @@ public sealed class DiagnosticsPublisherBaseTest
         Assert.Equal(2, result.Count);
     }
 
+    // A suppression added while documents are open changes which of their diagnostics are shown,
+    // never what was found: the published set is filtered again, and nothing is analysed again.
+    [Fact]
+    public async Task ApplyGlobalSuppressions_DropsTheNewlySuppressed_WithoutAnalysingAgain()
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeIndexService();
+        var workspaceHost = new FakeWorkspaceHost();
+        var store = new FakeGlobalSuppressionStore([]);
+        var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, ".xml",
+            0, true, [Diag("aetswg-004-0001", 3), Diag("aetswg-005-0001", 4)], null, store);
+        workspaceHost.Add("file:///a.xml", "content");
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        store.Add(SuppressionMatcher.ForId(new DiagnosticId(4, 1)));
+        await publisher.ApplyGlobalSuppressionsAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, published.Count);
+        Assert.Equal("aetswg-005-0001", Assert.Single(published[^1].Diagnostics).Code?.String);
+        Assert.Equal(1, publisher.Analysed);
+    }
+
+    [Fact]
+    public async Task ApplyGlobalSuppressions_SendsNothingForADocumentItDoesNotChange()
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeIndexService();
+        var workspaceHost = new FakeWorkspaceHost();
+        var store = new FakeGlobalSuppressionStore([]);
+        var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, ".xml",
+            0, true, [Diag("aetswg-005-0001", 4)], null, store);
+        workspaceHost.Add("file:///a.xml", "content");
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        store.Add(SuppressionMatcher.ForId(new DiagnosticId(4, 1)));
+        await publisher.ApplyGlobalSuppressionsAsync(TestContext.Current.CancellationToken);
+
+        Assert.Single(published);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class ConcretePublisher : DiagnosticsPublisherBase
@@ -507,8 +547,12 @@ public sealed class DiagnosticsPublisherBaseTest
 
         protected override bool DiagnosticsEnabled { get; }
 
+        /// <summary>How many times a document was analysed - the work a suppression must not repeat.</summary>
+        public int Analysed { get; private set; }
+
         protected override void PublishForDocument(string uri, string text, GameIndex index)
         {
+            Analysed++;
             // Where a real publisher applies it: with the diagnostics and the parsed document it
             // built them from both in hand.
             Publish(new PublishDiagnosticsParams
@@ -521,11 +565,11 @@ public sealed class DiagnosticsPublisherBaseTest
 
     private sealed class FakeGlobalSuppressionStore : IGlobalSuppressionStore
     {
-        private readonly IReadOnlyList<SuppressionMatcher> _matchers;
+        private readonly List<SuppressionMatcher> _matchers;
 
         public FakeGlobalSuppressionStore(IReadOnlyList<SuppressionMatcher> matchers)
         {
-            _matchers = matchers;
+            _matchers = [.. matchers];
         }
 
         public IReadOnlyList<SuppressionMatcher> GetAll()
@@ -535,6 +579,7 @@ public sealed class DiagnosticsPublisherBaseTest
 
         public void Add(SuppressionMatcher matcher, string? reason = null)
         {
+            _matchers.Add(matcher);
         }
 
         public void Remove(SuppressionMatcher matcher)

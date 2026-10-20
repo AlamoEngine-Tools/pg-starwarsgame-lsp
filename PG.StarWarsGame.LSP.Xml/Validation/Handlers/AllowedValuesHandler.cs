@@ -49,10 +49,9 @@ public sealed class AllowedValuesHandler : XmlDiagnosticsHandler<XmlTagValueFact
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<{fact.Tag.Tag}> here only supports {Listed(allowed)} - the engine overwrites " +
-                "anything else.",
+                ctx.Messages.Format("AllowedValues_HereOnlySupportsTheEngine", fact.Tag.Tag, Listed(allowed)),
                 SuggestedFix: repair,
-                FixTitle: repair is null ? null : $"Apply the engine's own value: {repair}")
+                FixTitle: repair is null ? null : ctx.Messages.Format("FixTitle_ApplyTheEngineSOwn", repair))
         ];
     }
 

@@ -28,8 +28,8 @@ public abstract class ApplicableUnitRuleBase : EitherOrRequirementRuleBase
 {
     protected override string FirstTag => "Applicable_Unit_Categories";
     protected override string SecondTag => "Applicable_Unit_Types";
-    protected override string State => "empty";
-    protected override string Remedy => "list at least one unit category or type";
+    protected override string StateKey => "ApplicableUnitRule_Empty";
+    protected override string RemedyKey => "ApplicableUnitRule_ListOne";
 
     /// <summary>
     ///     A list is set when it has CONTENT. It must not inherit the boolean reading: a unit
@@ -53,7 +53,7 @@ public sealed class CombatBonusApplicableUnitsRule : ApplicableUnitRuleBase
         "find_weakness_ability"
     ];
 
-    protected override string Consequence => "affects no units at all";
+    protected override string ConsequenceKey => "ApplicableUnitRule_AffectsNoUnits";
 }
 
 /// <summary>
@@ -70,7 +70,7 @@ public sealed class ForceHealingApplicableUnitsRule : ApplicableUnitRuleBase
     private const string RangeTag = "Heal_Range";
 
     protected override IReadOnlyList<string> ElementNames => ["force_healing_ability"];
-    protected override string Consequence => "affects no units at all";
+    protected override string ConsequenceKey => "ApplicableUnitRule_AffectsNoUnits";
 
     protected override bool Applies(IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName)
     {
@@ -86,14 +86,14 @@ public sealed class ForceHealingApplicableUnitsRule : ApplicableUnitRuleBase
 public sealed class AbsorbBlasterApplicableUnitsRule : ApplicableUnitRuleBase
 {
     protected override IReadOnlyList<string> ElementNames => ["absorb_blaster_ability"];
-    protected override string Consequence => "cannot absorb fire from any source";
+    protected override string ConsequenceKey => "AbsorbBlasterApplicableUnitsRule_Consequence";
 }
 
 /// <summary>An engine message, referenced by <c>RedirectBlasterAbilityClass</c> alone.</summary>
 public sealed class RedirectBlasterApplicableUnitsRule : ApplicableUnitRuleBase
 {
     protected override IReadOnlyList<string> ElementNames => ["redirect_blaster_ability"];
-    protected override string Consequence => "cannot block or redirect fire";
+    protected override string ConsequenceKey => "RedirectBlasterApplicableUnitsRule_Consequence";
 }
 
 /// <summary>One engine message - 23 classes, the widest-reaching rule here.</summary>
@@ -126,5 +126,5 @@ public sealed class AttackAbilityApplicableUnitsRule : ApplicableUnitRuleBase
         "vehicle_thief_ability"
     ];
 
-    protected override string Consequence => "cannot activate";
+    protected override string ConsequenceKey => "AttackAbilityApplicableUnitsRule_Consequence";
 }

@@ -66,15 +66,14 @@ public sealed class HullFiringArcHandler : XmlDiagnosticsHandler<HullFiringArcFa
 
             var text = bound.ToString("0.###", CultureInfo.InvariantCulture);
             restricting.Add(pitch
-                ? $"{tag} {text} (up to {text} degrees up or down)"
-                : $"{tag} {text} (up to {text} degrees either side)");
+                ? ctx.Messages.Format("HullFiringArc_Pitch", tag, text)
+                : ctx.Messages.Format("HullFiringArc_Yaw", tag, text));
         }
 
         if (restricting.Count == 0) return [];
 
         var message =
-            $"'{fact.ObjectId}' has no TURRET behaviour, so these limit where its hull can shoot, measured from " +
-            $"its facing: {string.Join(", ", restricting)}.";
+            ctx.Messages.Format("HullFiringArc_HasNoTurretBehaviourSo", fact.ObjectId, string.Join(", ", restricting));
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, message, Id: DiagnosticIds.HullFiringArc)];
     }

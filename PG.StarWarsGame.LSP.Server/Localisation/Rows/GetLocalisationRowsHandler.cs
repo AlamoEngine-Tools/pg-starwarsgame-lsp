@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -46,11 +47,12 @@ public sealed class GetLocalisationRowsHandler
             return Failure(rejection);
 
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
-            return Failure("No project file path provided.");
+            return Failure(new ConfiguredMessageCatalog(_config).Format("LocGetRows_NoProjectFilePathProvided"));
 
         var fs = _fileHelper.FileSystem;
         if (!fs.File.Exists(request.ProjectFilePath))
-            return Failure($"File not found: {request.ProjectFilePath}");
+            return Failure(
+                new ConfiguredMessageCatalog(_config).Format("LocGetRows_FileNotFound", request.ProjectFilePath));
 
         var content = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);
         var extension = fs.Path.GetExtension(request.ProjectFilePath).ToLowerInvariant();
@@ -64,12 +66,12 @@ public sealed class GetLocalisationRowsHandler
         }
         catch (NotSupportedException)
         {
-            return Failure($"Unsupported format: {extension}");
+            return Failure(new ConfiguredMessageCatalog(_config).Format("LocGetRows_UnsupportedFormat", extension));
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to parse localisation file '{Path}'.", request.ProjectFilePath);
-            return Failure($"Failed to parse file: {ex.Message}");
+            return Failure(new ConfiguredMessageCatalog(_config).Format("LocGetRows_FailedParseFile", ex.Message));
         }
 
         // Source and Leading exist for the save path; sending them would multiply the payload of a

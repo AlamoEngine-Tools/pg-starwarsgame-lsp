@@ -23,8 +23,7 @@ public sealed class HardpointMissingAttachmentBoneHandler
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"Hardpoint '{fact.HardpointId}' is Is_Destroyable but has no <Attachment_Bone>. The engine "
-                + "cannot attach it to the parent model, so it is indestructible and can never be shot off.")
+                ctx.Messages.Format("HardpointMissingAttachmentBone_HardpointIsIsDestroyableBut", fact.HardpointId))
         ];
     }
 }
