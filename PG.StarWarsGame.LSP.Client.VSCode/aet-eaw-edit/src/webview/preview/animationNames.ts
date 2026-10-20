@@ -26,6 +26,7 @@
 // Whether an action LOOPS falls out of the same reading: the idles and the locomotion do, and
 // nothing else does unless the file says so in its own name.
 
+import * as l10n from "@vscode/l10n";
 /** The families, in the order they are shown. */
 const FAMILIES = [
     "idle",
@@ -67,8 +68,12 @@ const STANCES: readonly {
     stance: AnimationStance;
     label: string;
 }[] = [
-    { prefix: "crouch", stance: "crouched", label: "spread out" },
-    { prefix: "deployed_", stance: "deployed", label: "deployed" },
+    { prefix: "crouch", stance: "crouched", label: l10n.t("spread out") },
+    {
+        prefix: "deployed_",
+        stance: "deployed",
+        label: l10n.t("deployed"),
+    },
 ];
 
 /**

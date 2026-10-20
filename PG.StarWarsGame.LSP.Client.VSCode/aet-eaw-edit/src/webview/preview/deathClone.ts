@@ -8,6 +8,7 @@
 // what killed it - which is the weapon built in the attacker panel - and a turret's traverse is a
 // number in the XML until something sweeps through it.
 
+import * as l10n from "@vscode/l10n";
 import type {
     PreviewDeathClone,
     PreviewTurret,
@@ -88,7 +89,7 @@ export function deathCloneRows(
         // A row naming no damage type is the catch-all, and saying so beats a blank cell.
         label:
             (clone.damageType ?? "") === ""
-                ? "Any other damage"
+                ? l10n.t("Any other damage")
                 : clone.damageType!,
         resolved: (clone.modelFile ?? "") !== "",
         selected:

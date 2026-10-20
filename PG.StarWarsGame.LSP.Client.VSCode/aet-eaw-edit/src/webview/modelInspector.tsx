@@ -13,6 +13,7 @@
 // runs the same `inspectPanels` over them and fetches its own geometry pages, which were always a
 // server round trip.
 
+import "./shared/l10nSetup";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import styled from "styled-components";

@@ -5,9 +5,10 @@ const assert = require("node:assert/strict");
 const { describe, it } = require("node:test");
 const path = require("node:path");
 
-const { rawStrings, hostFiles } = require("./host-strings");
+const { rawStrings, hostFiles, webviewFiles } = require("./host-strings");
 
 const texts = (source) => rawStrings("fixture.ts", source).map((s) => s.text);
+const jsx = (source) => rawStrings("fixture.tsx", source).map((s) => s.text);
 
 describe("host strings", () => {
     it("finds a notification written in place, and its buttons", () => {
@@ -65,6 +66,43 @@ describe("host strings", () => {
                 rawStrings(file).map(
                     (s) => `${path.basename(file)}:${s.line} ${s.text}`,
                 ),
+        );
+
+        assert.deepEqual(found, []);
+    });
+
+    it("finds text between tags and in text attributes", () => {
+        assert.deepEqual(
+            jsx(
+                'const a = <Field label="Wind speed" info={<>Bends foliage</>}>\n' +
+                    '    <span title="Heading">{count} hidden</span>\n' +
+                    "</Field>;",
+            ),
+            ['"Wind speed"', "Bends foliage", '"Heading"', "hidden"],
+        );
+    });
+
+    it("finds text built in a JSX expression, and leaves wrapped text, classes and values alone", () => {
+        assert.deepEqual(
+            jsx(
+                'const a = <div className="dock" title={`Open ${name}`}>\n' +
+                    '    {ready ? "Ready" : l10n.t("Waiting")}\n' +
+                    '    <option value="none">{l10n.t("None")}</option>\n' +
+                    "    {`${a} - ${b}`}\n" +
+                    "</div>;",
+            ),
+            ["`Open ${name}`", 'ready ? "Ready" : l10n.t("Waiting")'],
+        );
+    });
+
+    /** Every text the webviews show a reader comes from the same bundle. */
+    it("finds no text written in place in the webviews", () => {
+        const found = webviewFiles(
+            path.join(__dirname, "..", "src", "webview"),
+        ).flatMap((file) =>
+            rawStrings(file).map(
+                (s) => `${path.basename(file)}:${s.line} ${s.text}`,
+            ),
         );
 
         assert.deepEqual(found, []);

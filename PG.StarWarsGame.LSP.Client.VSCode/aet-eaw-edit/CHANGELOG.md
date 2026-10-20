@@ -14,6 +14,10 @@
     items and panel titles - go through `vscode.l10n.t` into `l10n/bundle.l10n.json`; the lint fails on a
     text written in place or a bundle that no longer matches the code. Six texts in second person were
     reworded on the way, and plural messages are whole sentences
+  - The webviews' 650 texts - the model preview, story graph, localisation editor, encyclopedia and credits
+    - come from the same bundle, which the host hands every page; text interrupted by values is one
+    message with placeholders. The page's language follows VS Code's display language. Curly quotes in one
+    message became straight ones, and texts in second person were reworded
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none

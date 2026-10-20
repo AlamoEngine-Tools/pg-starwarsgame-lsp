@@ -8,6 +8,7 @@
 // `inspectPanels`, the same function the preview's flyout used, so moving the inspector into its
 // own tab did not fork how a mesh's facts are described.
 
+import * as l10n from "@vscode/l10n";
 import { Fragment } from "react";
 
 import { inspectPanels } from "../preview/inspector";
@@ -42,9 +43,11 @@ export function InspectorBody({
     if (subject === null) {
         return (
             <div className="inspect-empty">
-                <p>No selection.</p>
+                <p>{l10n.t("No selection.")}</p>
                 <p className="field-note">
-                    Inspect a bone, mesh or effect from the model preview tree.
+                    {l10n.t(
+                        "Inspect a bone, mesh or effect from the model preview tree.",
+                    )}
                 </p>
             </div>
         );
@@ -58,7 +61,7 @@ export function InspectorBody({
     if (panels === null) {
         return (
             <div className="inspect-empty">
-                <p>This item is no longer in the model.</p>
+                <p>{l10n.t("This item is no longer in the model.")}</p>
             </div>
         );
     }
@@ -126,7 +129,7 @@ export function InspectorBody({
                 bone, a particle system - shows the tabs inert rather than dropping them, so the
                 reader can see the tables exist and that this row has none. */}
             <div className="inspect-group inspect-geometry">
-                <div className="inspect-title">Geometry</div>
+                <div className="inspect-title">{l10n.t("Geometry")}</div>
 
                 <GeometryTabs
                     rows={geometry}
@@ -136,7 +139,9 @@ export function InspectorBody({
                 />
 
                 {key === null && (
-                    <div className="field-note">This item has no geometry.</div>
+                    <div className="field-note">
+                        {l10n.t("This item has no geometry.")}
+                    </div>
                 )}
 
                 {geometryError !== null && (
@@ -152,7 +157,9 @@ export function InspectorBody({
                         // straight away, so nothing below it jumps when the rows land.
                         <div className="geometry-panel" role="tabpanel">
                             <div className="geometry-scroll">
-                                <div className="field-note">Loading</div>
+                                <div className="field-note">
+                                    {l10n.t("Loading")}
+                                </div>
                             </div>
                         </div>
                     )

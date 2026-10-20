@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
 import { IconButton } from "./Button";
 import { parseInteger, stepInteger } from "./integerValue";
 
@@ -26,7 +27,7 @@ export function IntegerField(props: {
         <div className="integer-field">
             <IconButton
                 icon="decrement"
-                title="Decrease"
+                title={l10n.t("Decrease")}
                 disabled={props.disabled ?? false}
                 disabledReason={reason}
                 onClick={() => props.onChange(stepInteger(props.value, -1))}
@@ -54,7 +55,7 @@ export function IntegerField(props: {
             />
             <IconButton
                 icon="add"
-                title="Increase"
+                title={l10n.t("Increase")}
                 disabled={props.disabled ?? false}
                 disabledReason={reason}
                 onClick={() => props.onChange(stepInteger(props.value, 1))}

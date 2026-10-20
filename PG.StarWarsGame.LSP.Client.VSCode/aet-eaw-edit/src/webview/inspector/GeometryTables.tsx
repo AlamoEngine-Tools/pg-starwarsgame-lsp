@@ -12,6 +12,7 @@
 // rows and a Star Destroyer sub-mesh is 3814 faces, so the next page is fetched as the scroller
 // nears its end. `geometryRows` holds what has arrived and decides when to ask.
 
+import * as l10n from "@vscode/l10n";
 import { useEffect, useRef } from "react";
 
 import {
@@ -50,7 +51,7 @@ export function GeometryTabs({
         <div
             className="geometry-tabs"
             role="tablist"
-            aria-label="Which table to read"
+            aria-label={l10n.t("Which table to read")}
         >
             {geometryTabs(rows).map((tab) => {
                 const open = selected === tab.id;
@@ -160,8 +161,12 @@ export function GeometryRowsTable({
                 EXISTED rather than whenever one was in flight, which is a different thing and was
                 wrong every time the reader stopped scrolling. */}
             <div className="geometry-foot">
-                {rows.rows.length.toLocaleString()} of{" "}
-                {rows.total.toLocaleString()}
+                {l10n.t(
+                    "{0} of{1}{2}",
+                    rows.rows.length.toLocaleString(),
+                    " ",
+                    rows.total.toLocaleString(),
+                )}
             </div>
         </div>
     );

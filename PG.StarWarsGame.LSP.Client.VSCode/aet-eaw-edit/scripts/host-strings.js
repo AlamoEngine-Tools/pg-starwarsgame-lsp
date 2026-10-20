@@ -3,9 +3,10 @@
 
 // Every text the extension host shows a reader goes through `vscode.l10n.t` (or `l10n.t` from
 // `@vscode/l10n` in a module that cannot import `vscode`), so it lands in the l10n bundle. This
-// walks the host's syntax trees and finds literals that reach a user-facing API directly:
+// walks the syntax trees and finds literals that reach a user-facing API directly: in the host,
 // notifications and their buttons, quick picks, input boxes, progress, status bar, tree items and
-// panel titles. Run directly, it checks `src/` outside the webviews and fails `npm run lint`.
+// panel titles; in the webviews, text between tags and text attributes as well. Run directly, it
+// checks all of `src/`, then that the committed bundle matches the code, and fails `npm run lint`.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -68,6 +69,20 @@ function calleeName(call) {
     return ts.isIdentifier(callee) ? callee.text : "";
 }
 
+/** JSX attributes that are shown. `className`, `value`, ids and the like are not text. */
+const SHOWN_ATTRIBUTES = new Set([
+    "title",
+    "label",
+    "placeholder",
+    "aria-label",
+    "alt",
+    "info",
+    "hint",
+    "detail",
+    "description",
+    "caption",
+]);
+
 /** The raw texts in one file, each with its line and source text. */
 function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
     const tree = ts.createSourceFile(
@@ -75,6 +90,7 @@ function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
         source,
         ts.ScriptTarget.Latest,
         true,
+        file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
     const found = [];
     const report = (node) => {
@@ -85,6 +101,31 @@ function rawStrings(file, source = fs.readFileSync(file, "utf8")) {
     };
 
     const visit = (node) => {
+        // Text between tags is shown by definition; a whitespace-only run is layout.
+        if (ts.isJsxText(node) && hasWords(node.text)) {
+            report(node);
+        }
+        if (
+            ts.isJsxAttribute(node) &&
+            SHOWN_ATTRIBUTES.has(node.name.getText(tree)) &&
+            node.initializer !== undefined
+        ) {
+            const value = ts.isJsxExpression(node.initializer)
+                ? node.initializer.expression
+                : node.initializer;
+            if (value !== undefined && isRaw(value)) {
+                report(value);
+            }
+        }
+        // `{cond ? "A" : "B"}` or a template as a child of an element is shown text too.
+        if (
+            ts.isJsxExpression(node) &&
+            node.expression !== undefined &&
+            (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent)) &&
+            isRaw(node.expression)
+        ) {
+            report(node.expression);
+        }
         if (ts.isCallExpression(node)) {
             const name = calleeName(node);
             if (SHOWN_ARGUMENTS.has(name)) {
@@ -159,12 +200,36 @@ function hostFiles(src) {
     return files.sort();
 }
 
-module.exports = { rawStrings, hostFiles };
+/** The webviews' own sources, tests excluded. */
+function webviewFiles(src) {
+    const files = [];
+    const walk = (dir) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                walk(full);
+            } else if (
+                /\.tsx?$/.test(entry.name) &&
+                !/\.test\.tsx?$/.test(entry.name)
+            ) {
+                files.push(full);
+            }
+        }
+    };
+    walk(src);
+    return files.sort();
+}
+
+module.exports = { rawStrings, hostFiles, webviewFiles };
 
 if (require.main === module) {
     const src = path.join(__dirname, "..", "src");
     let count = 0;
-    for (const file of hostFiles(src)) {
+    const files = [
+        ...hostFiles(src),
+        ...webviewFiles(path.join(src, "webview")),
+    ];
+    for (const file of files) {
         for (const s of rawStrings(file)) {
             console.error(
                 `${path.relative(src, file)}:${s.line} text written in place: ${s.text}`,
@@ -203,5 +268,5 @@ if (require.main === module) {
         );
         process.exit(1);
     }
-    console.log("host strings: every one through l10n");
+    console.log("host and webview strings: every one through l10n");
 }

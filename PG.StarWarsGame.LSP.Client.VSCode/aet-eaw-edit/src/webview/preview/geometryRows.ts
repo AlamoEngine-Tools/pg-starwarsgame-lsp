@@ -11,6 +11,7 @@
 // 3814 faces - it stopped being the reader's problem. This module holds what has arrived, says what
 // to ask for next, and says when the scroller is close enough to its end to want it.
 
+import * as l10n from "@vscode/l10n";
 import { geometryTable } from "./inspector";
 import {
     type GeometryTable,
@@ -29,18 +30,22 @@ export const GEOMETRY_PAGE = 500;
 const TABLES: readonly { id: GeometryTable; label: string; title: string }[] = [
     {
         id: "vertices",
-        label: "Vertices",
-        title: "Position, normal, UVs, tangents, colour and bone binding, per vertex",
+        label: l10n.t("Vertices"),
+        title: l10n.t(
+            "Position, normal, UVs, tangents, colour and bone binding, per vertex",
+        ),
     },
     {
         id: "faces",
-        label: "Faces",
-        title: "Each triangle as the three vertex indices it draws",
+        label: l10n.t("Faces"),
+        title: l10n.t("Each triangle as the three vertex indices it draws"),
     },
     {
         id: "boneMapping",
-        label: "Bone mapping",
-        title: "Which model bone each local bone slot of this sub-mesh resolves to",
+        label: l10n.t("Bone mapping"),
+        title: l10n.t(
+            "Which model bone each local bone slot of this sub-mesh resolves to",
+        ),
     },
 ];
 

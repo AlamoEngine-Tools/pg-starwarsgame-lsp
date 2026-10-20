@@ -14,6 +14,7 @@
 // The shell is the model preview's stage flyout (`stageFlyoutCss`), on purpose: the same panel,
 // opened the same way, from the same kind of corner plate.
 
+import * as l10n from "@vscode/l10n";
 import { IconButton } from "../shared/Button";
 import { DockSection } from "../shared/DockSection";
 
@@ -37,14 +38,18 @@ export function ColourKeyFlyout({
         <div
             className="stage-flyout from-bottom on-right colour-key"
             role="dialog"
-            aria-label="Colour key"
+            aria-label={l10n.t("Colour key")}
         >
             <div className="stage-flyout-head">
-                Colour key
-                <IconButton icon="close" title="Close" onClick={onClose} />
+                {l10n.t("Colour key")}
+                <IconButton
+                    icon="close"
+                    title={l10n.t("Close")}
+                    onClick={onClose}
+                />
             </div>
             <div className="stage-flyout-body">
-                <DockSection title="Nodes">
+                <DockSection title={l10n.t("Nodes")}>
                     <ul className="key-list">
                         {/* Generated from the same mapping the node borders are, so a swatch cannot
                             come to disagree with the node it describes. */}
@@ -55,7 +60,9 @@ export function ColourKeyFlyout({
                                     borderColor: `var(${UNKNOWN_LIFECYCLE_TOKEN})`,
                                 }}
                             />
-                            <span className="key-label">Inactive</span>
+                            <span className="key-label">
+                                {l10n.t("Inactive")}
+                            </span>
                         </li>
                         {Object.entries(LIFECYCLE_TOKENS).map(
                             ([lifecycle, token]) => (
@@ -72,16 +79,16 @@ export function ColourKeyFlyout({
                         )}
                         <li>
                             <span className="shape-diamond" />
-                            <span className="key-label">OR</span>
+                            <span className="key-label">{l10n.t("OR")}</span>
                         </li>
                         <li>
                             <span className="shape-circle" />
-                            <span className="key-label">AND</span>
+                            <span className="key-label">{l10n.t("AND")}</span>
                         </li>
                     </ul>
                 </DockSection>
 
-                <DockSection title="Edges">
+                <DockSection title={l10n.t("Edges")}>
                     <ul className="key-list">
                         {/* Real strokes from EDGE_KINDS - same token, same dash array as the graph,
                             because the dash is part of what a kind means. */}
@@ -108,21 +115,20 @@ export function ColourKeyFlyout({
                         ))}
                     </ul>
                     <p className="field-note">
-                        Drag socket to socket to add a Requires edge
+                        {l10n.t("Drag socket to socket to add a Requires edge")}
                     </p>
                 </DockSection>
 
-                <DockSection title="Branches" count={branches.length}>
+                <DockSection title={l10n.t("Branches")} count={branches.length}>
                     {/* The branch hues are the lifecycle hues, so this has to say which one wins. */}
                     <p className="field-note">
-                        Zoomed out, a node in a branch is drawn in the branch
-                        colour instead of its lifecycle. The glow round a node
-                        and the Requires edges into it take the branch colour
-                        too.
+                        {l10n.t(
+                            "Zoomed out, a node in a branch is drawn in the branch colour instead of its lifecycle. The glow round a node and the Requires edges into it take the branch colour too.",
+                        )}
                     </p>
                     {branches.length === 0 ? (
                         <p className="field-note">
-                            No event in this view names a branch
+                            {l10n.t("No event in this view names a branch")}
                         </p>
                     ) : (
                         <ul className="key-list">
@@ -144,7 +150,10 @@ export function ColourKeyFlyout({
                                     </span>
                                     {entry.sharedWith.length > 0 && (
                                         <span className="key-shared">
-                                            {`Same colour as ${entry.sharedWith.join(", ")}`}
+                                            {l10n.t(
+                                                "Same colour as {0}",
+                                                entry.sharedWith.join(", "),
+                                            )}
                                         </span>
                                     )}
                                 </li>

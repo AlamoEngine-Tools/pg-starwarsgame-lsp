@@ -8,6 +8,7 @@
 // and a checkbox labelled "Multiplayer body" says nothing about there being a single-player one to
 // compare it against. Split out of the panel so the options can be tested without a DOM.
 
+import * as l10n from "@vscode/l10n";
 import { type ChoiceOption } from "./shared/choice";
 import type { EncyclopediaFactionFrame } from "../protocol/encyclopedia";
 
@@ -28,7 +29,7 @@ export function factionModes(
         return [
             {
                 id: "0",
-                label: "None",
+                label: l10n.t("None"),
                 disabled: true,
                 disabledReason:
                     "This card declares no faction frame, so there is none to draw.",
@@ -66,11 +67,15 @@ export function factionSlotOf(id: string): number {
  * facts; the second one is the notice beside the card, not a dead control.
  */
 export const BODY_MODES: readonly ChoiceOption<BodyMode>[] = [
-    { id: "sp", label: "Singleplayer", title: "The Encyclopedia_Text body" },
+    {
+        id: "sp",
+        label: l10n.t("Singleplayer"),
+        title: l10n.t("The Encyclopedia_Text body"),
+    },
     {
         id: "mp",
-        label: "Multiplayer",
-        title: "The MP_Encyclopedia_Text body, where one is defined",
+        label: l10n.t("Multiplayer"),
+        title: l10n.t("The MP_Encyclopedia_Text body, where one is defined"),
     },
 ];
 

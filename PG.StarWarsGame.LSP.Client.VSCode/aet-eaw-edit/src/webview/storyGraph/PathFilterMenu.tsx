@@ -12,6 +12,7 @@
 // clipped by the canvas. `placeTooltip` decides above or below from the room available, so a node at
 // the bottom edge opens upwards.
 
+import * as l10n from "@vscode/l10n";
 import {
     useCallback,
     useEffect,
@@ -163,7 +164,7 @@ export function PathFilterMenu({
         <>
             <button
                 ref={buttonRef}
-                title="Filter by path"
+                title={l10n.t("Filter by path")}
                 aria-haspopup="menu"
                 aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
@@ -214,7 +215,7 @@ export function PathDirectionMenu({
             ref={ref}
             className="path-menu"
             role="menu"
-            aria-label="Filter by path"
+            aria-label={l10n.t("Filter by path")}
             style={
                 placement === null
                     ? // Measured before it is placed: render it out of sight rather than at the corner,

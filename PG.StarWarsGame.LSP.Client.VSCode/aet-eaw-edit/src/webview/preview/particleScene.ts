@@ -20,6 +20,7 @@
 // It stays a flat list of bulk switches rather than a second tree. A tree would force each system
 // into one parent, and a system genuinely can belong to two meanings at once.
 
+import * as l10n from "@vscode/l10n";
 import {
     PREVIEW_PARTICLE_GATE,
     type PreviewHardpoint,
@@ -141,25 +142,29 @@ interface EffectFamily {
 const FAMILIES: readonly EffectFamily[] = [
     {
         id: "engines",
-        label: "Engines",
+        label: l10n.t("Engines"),
         gates: [PREVIEW_PARTICLE_GATE.hardpointAlive],
         prefixes: ["pe"],
     },
     {
         id: "hardpointDamage",
-        label: "Hardpoint damage",
+        label: l10n.t("Hardpoint damage"),
         gates: [PREVIEW_PARTICLE_GATE.hardpointDestroyed],
         prefixes: ["p_hp"],
     },
     {
         id: "turbo",
-        label: "Turbo engines",
+        label: l10n.t("Turbo engines"),
         prefixes: ["pte"],
         replaces: "engines",
     },
-    { id: "powerToWeapons", label: "Power to weapons", prefixes: ["pptw"] },
-    { id: "missileShield", label: "Missile shield", prefixes: ["prs"] },
-    { id: "gravityWell", label: "Gravity well", prefixes: ["pgw"] },
+    {
+        id: "powerToWeapons",
+        label: l10n.t("Power to weapons"),
+        prefixes: ["pptw"],
+    },
+    { id: "missileShield", label: l10n.t("Missile shield"), prefixes: ["prs"] },
+    { id: "gravityWell", label: l10n.t("Gravity well"), prefixes: ["pgw"] },
     // ION STUN, not "internal damage" - the user's correction, and the name was a guess from the
     // start. An ion-stunned ship is what this draws: the tag is `Projectile_Ion_Stun_On_Detonation`,
     // carried by exactly TWO shipped projectiles (`Proj_Ion_Cannon_Planetary` and
@@ -168,7 +173,7 @@ const FAMILIES: readonly EffectFamily[] = [
     //
     // The three assets agree: `Pi_damage_elec_cap00`, `_sd00` and `_small00` - electrical damage in
     // capital, Star Destroyer and small sizes, which is what a stunned hull crackles with.
-    { id: "ionStun", label: "Ion stun", prefixes: ["pi"] },
+    { id: "ionStun", label: l10n.t("Ion stun"), prefixes: ["pi"] },
 ];
 
 /** Whether a family recognises this system, by either kind of evidence. */

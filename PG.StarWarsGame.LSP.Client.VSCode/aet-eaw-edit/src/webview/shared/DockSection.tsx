@@ -16,6 +16,7 @@
 // eighty-eight pixels to the left; and a folded body is unmounted rather than hidden, because a
 // folded section has no business holding a slider that still answers to the keyboard.
 
+import * as l10n from "@vscode/l10n";
 import { ReactNode } from "react";
 
 import { Icon } from "./Icon";
@@ -88,8 +89,8 @@ export function DockSection({
                     aria-expanded={!folded}
                     title={
                         folded
-                            ? `Open ${title.toLowerCase()}`
-                            : `Fold ${title.toLowerCase()} away`
+                            ? l10n.t("Open {0}", title.toLowerCase())
+                            : l10n.t("Fold {0} away", title.toLowerCase())
                     }
                     onClick={() => onToggle(id)}
                 >

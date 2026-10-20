@@ -11,6 +11,7 @@
 // Everything here reads the flat state document and sends a request; storyGraph.tsx owns the state
 // and the canvas, and simModel.ts owns the arithmetic.
 
+import * as l10n from "@vscode/l10n";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
@@ -204,7 +205,7 @@ export function SimStatus(props: {
                 kind: "battle",
                 glyph: <Icon name="tactical" size={14} />,
                 text: state.pausedFor,
-                title: `Galaxy paused - battle ${state.pausedFor}`,
+                title: l10n.t("Galaxy paused - battle {0}", state.pausedFor),
                 onClick: () =>
                     battle &&
                     props.onSelect({ kind: "battle", key: battle.key }),
@@ -216,7 +217,7 @@ export function SimStatus(props: {
                 kind: "resolved " + state.outcome,
                 glyph: <Icon name="tactical" size={14} />,
                 text,
-                title: `Battle ${state.outcome}`,
+                title: l10n.t("Battle {0}", state.outcome),
             };
         }
         if (retry && props.onRetry) {
@@ -226,8 +227,8 @@ export function SimStatus(props: {
             return {
                 kind: "lost",
                 glyph: <Icon name="restart" size={14} />,
-                text: `Battle lost - ${label}`,
-                title: "Retry - back to just before the outcome",
+                text: l10n.t("Battle lost - {0}", label),
+                title: l10n.t("Retry - back to just before the outcome"),
                 onClick: () => props.onRetry!(retry),
             };
         }
@@ -237,7 +238,7 @@ export function SimStatus(props: {
                 kind: "halted",
                 glyph: <Icon name="breakpoint" size={14} />,
                 text: name,
-                title: `Breakpoint - ${name}`,
+                title: l10n.t("Breakpoint - {0}", name),
                 onClick: () =>
                     props.onSelect({ kind: "node", nodeId: state.haltedAt! }),
             };
@@ -247,8 +248,12 @@ export function SimStatus(props: {
             return {
                 kind: "owed",
                 glyph: <Icon name="decision" size={14} />,
-                text: "Waiting for input",
-                title: `Waiting for input - ${owed} decision${owed === 1 ? "" : "s"}`,
+                text: l10n.t("Waiting for input"),
+                title: l10n.t(
+                    "Waiting for input - {0} decision{1}",
+                    owed,
+                    owed === 1 ? "" : "s",
+                ),
                 onClick: () =>
                     props.onSelect({ kind: "decision", nodeId: first.nodeId }),
             };
@@ -257,16 +262,16 @@ export function SimStatus(props: {
             return {
                 kind: "running",
                 glyph: <span className="sim-status-dot" aria-hidden="true" />,
-                text: "Running",
-                title: "Running - press to pause",
+                text: l10n.t("Running"),
+                title: l10n.t("Running - press to pause"),
                 onClick: props.onPlayPause,
             };
         }
         return {
             kind: "paused",
             glyph: <Icon name="pause" size={14} />,
-            text: "Paused",
-            title: "Paused - press to play",
+            text: l10n.t("Paused"),
+            title: l10n.t("Paused - press to play"),
             onClick: props.onPlayPause,
         };
     })();
@@ -346,7 +351,7 @@ export function SimInventory(props: {
     return (
         <div className="sim-inventory">
             <DockSection
-                title="Decisions"
+                title={l10n.t("Decisions")}
                 count={state.interventions.length}
                 id="sim-decisions"
                 collapsed={folded.has("sim-decisions")}
@@ -355,15 +360,15 @@ export function SimInventory(props: {
                 {groups.length === 0 ? (
                     <p className="field-note">
                         {state.haltedAt
-                            ? "Halted at breakpoint"
-                            : "No decision pending"}
+                            ? l10n.t("Halted at breakpoint")
+                            : l10n.t("No decision pending")}
                     </p>
                 ) : null}
                 {groups.length > 0 ? (
                     <p className="field-note">
                         {waitingOnAuthor(state)
-                            ? "Clock idle - answer one to continue"
-                            : "Clock running - answer any to steer"}
+                            ? l10n.t("Clock idle - answer one to continue")
+                            : l10n.t("Clock running - answer any to steer")}
                     </p>
                 ) : null}
                 {groups.map((group) => (
@@ -398,14 +403,16 @@ export function SimInventory(props: {
                     <div className="sim-group">
                         <div className="sim-group-title">
                             <Icon name="remove" size={13} />
-                            Ruled out
+                            {l10n.t("Ruled out")}
                         </div>
                         {state.ruledOut.map((nodeId) => (
                             <div className="sim-row decision" key={nodeId}>
                                 <button
                                     type="button"
                                     className="sim-row-main"
-                                    title="Never fires in this run - open the event"
+                                    title={l10n.t(
+                                        "Never fires in this run - open the event",
+                                    )}
                                     onClick={() =>
                                         pick({ kind: "node", nodeId })
                                     }
@@ -414,12 +421,14 @@ export function SimInventory(props: {
                                         {labelFor(nodeId, props.labelOf)}
                                     </span>
                                     <span className="sim-row-value">
-                                        Ruled out
+                                        {l10n.t("Ruled out")}
                                     </span>
                                 </button>
                                 <IconButton
                                     icon="reset"
-                                    title="Reconsider - a decision again"
+                                    title={l10n.t(
+                                        "Reconsider - a decision again",
+                                    )}
                                     onClick={() =>
                                         actions.ruleOut(nodeId, false)
                                     }
@@ -432,7 +441,7 @@ export function SimInventory(props: {
 
             {state.scope ? (
                 <DockSection
-                    title="Battle"
+                    title={l10n.t("Battle")}
                     id="sim-battle"
                     collapsed={folded.has("sim-battle")}
                     onToggle={toggle}
@@ -446,7 +455,7 @@ export function SimInventory(props: {
             ) : null}
             {!state.scope && state.battles?.length ? (
                 <DockSection
-                    title="Battles"
+                    title={l10n.t("Battles")}
                     count={state.battles.length}
                     id="sim-battles"
                     collapsed={folded.has("sim-battles")}
@@ -479,7 +488,7 @@ export function SimInventory(props: {
             ) : null}
 
             <DockSection
-                title="World"
+                title={l10n.t("World")}
                 count={`${state.world.planets.length} planets`}
                 id="sim-world"
                 collapsed={folded.has("sim-world")}
@@ -494,20 +503,24 @@ export function SimInventory(props: {
                 ))}
                 <div className="sim-row static">
                     <Icon name="unit" size={13} />
-                    <span className="sim-row-name">Units</span>
+                    <span className="sim-row-name">{l10n.t("Units")}</span>
                     <span className="sim-row-value">{unitCount}</span>
                 </div>
                 {state.world.tech.map((t) => (
                     <div className="sim-row static" key={"tech-" + t.name}>
                         <Icon name="tech" size={13} />
-                        <span className="sim-row-name">{t.name} tech</span>
+                        <span className="sim-row-name">
+                            {l10n.t("{0} tech", t.name)}
+                        </span>
                         <span className="sim-row-value">{t.value}</span>
                     </div>
                 ))}
                 {state.world.credits.map((c) => (
                     <div className="sim-row static" key={"credits-" + c.name}>
                         <Icon name="credits" size={13} />
-                        <span className="sim-row-name">{c.name} credits</span>
+                        <span className="sim-row-name">
+                            {l10n.t("{0} credits", c.name)}
+                        </span>
                         <span className="sim-row-value">{c.value}</span>
                     </div>
                 ))}
@@ -541,7 +554,7 @@ export function SimInventory(props: {
             </DockSection>
 
             <DockSection
-                title="Flags"
+                title={l10n.t("Flags")}
                 count={state.flags.length}
                 id="sim-flags"
                 collapsed={folded.has("sim-flags")}
@@ -557,11 +570,11 @@ export function SimInventory(props: {
                             ? " selected"
                             : "")
                     }
-                    title="Set a flag"
+                    title={l10n.t("Set a flag")}
                     onClick={() => pick({ kind: "flag", name: "" })}
                 >
                     <Icon name="add" size={13} />
-                    <span className="sim-row-name">Set a flag</span>
+                    <span className="sim-row-name">{l10n.t("Set a flag")}</span>
                 </button>
                 {state.flags.map((flag) => (
                     <button
@@ -584,14 +597,14 @@ export function SimInventory(props: {
             </DockSection>
 
             <DockSection
-                title="Scripts"
+                title={l10n.t("Scripts")}
                 count={state.luaStates.length}
                 id="sim-scripts"
                 collapsed={folded.has("sim-scripts")}
                 onToggle={toggle}
             >
                 {state.luaStates.length === 0 ? (
-                    <p className="field-note">No script attached</p>
+                    <p className="field-note">{l10n.t("No script attached")}</p>
                 ) : null}
                 {state.luaStates.map((script) => (
                     <button
@@ -645,7 +658,7 @@ function DecisionRow(props: {
     const quick =
         item.kind === "lua" && item.options.length === 1
             ? {
-                  title: `Story_Event("${item.options[0]}")`,
+                  title: l10n.t('Story_Event("{0}")', item.options[0]),
                   run: () => actions.luaNotify(item.options[0]),
               }
             : item.suggested
@@ -655,7 +668,7 @@ function DecisionRow(props: {
                 }
               : !item.facet && item.kind !== "lua"
                 ? {
-                      title: "Assume the trigger met",
+                      title: l10n.t("Assume the trigger met"),
                       run: () => actions.satisfy(item.nodeId),
                   }
                 : null;
@@ -766,14 +779,14 @@ function ShowInGraph(props: {
 }): React.JSX.Element {
     return (
         <Button
-            title="Centre the graph on it"
+            title={l10n.t("Centre the graph on it")}
             onClick={() => {
                 props.onClose();
                 props.actions.centerNode(props.nodeId);
             }}
         >
             <Icon name="search" size={13} />
-            Show
+            {l10n.t("Show")}
         </Button>
     );
 }
@@ -846,7 +859,7 @@ function BattleControls(props: {
             <div className="sim-row static">
                 <Icon name="tactical" size={13} />
                 <span className="sim-row-name">
-                    {props.titled ? "Status" : label}
+                    {props.titled ? l10n.t("Status") : label}
                 </span>
                 <span className="sim-row-value">{status}</span>
             </div>
@@ -855,7 +868,9 @@ function BattleControls(props: {
                     <button
                         type="button"
                         className="btn sim-answer"
-                        title="Fight - the battle runs in its own panel"
+                        title={l10n.t(
+                            "Fight - the battle runs in its own panel",
+                        )}
                         onClick={() =>
                             actions.world({
                                 kind: "clickGui",
@@ -864,12 +879,12 @@ function BattleControls(props: {
                         }
                     >
                         <Icon name="tactical" size={13} />
-                        Fight
+                        {l10n.t("Fight")}
                     </button>
                     <button
                         type="button"
                         className="btn sim-answer"
-                        title="Auto-resolve - decide the outcome here"
+                        title={l10n.t("Auto-resolve - decide the outcome here")}
                         onClick={() =>
                             actions.world({
                                 kind: "clickGui",
@@ -878,7 +893,7 @@ function BattleControls(props: {
                         }
                     >
                         <Icon name="decision" size={13} />
-                        Auto-resolve
+                        {l10n.t("Auto-resolve")}
                     </button>
                 </div>
             ) : null}
@@ -889,12 +904,15 @@ function BattleControls(props: {
                     disabled={resolved}
                     title={
                         resolved
-                            ? `Battle ${status.toLowerCase()} - restart the galaxy to play it again`
+                            ? l10n.t(
+                                  "Battle {0} - restart the galaxy to play it again",
+                                  status.toLowerCase(),
+                              )
                             : running
-                              ? "Show the battle panel"
+                              ? l10n.t("Show the battle panel")
                               : starting
-                                ? "Play the battle in its own panel"
-                                : "Open the battle in its own panel"
+                                ? l10n.t("Play the battle in its own panel")
+                                : l10n.t("Open the battle in its own panel")
                     }
                     onClick={() =>
                         actions.openBattle(battleKey, label, !running)
@@ -902,16 +920,18 @@ function BattleControls(props: {
                 >
                     <Icon name="tactical" size={13} />
                     {running
-                        ? "Show the battle"
+                        ? l10n.t("Show the battle")
                         : starting
-                          ? "Play the battle"
-                          : "Enter the battle"}
+                          ? l10n.t("Play the battle")
+                          : l10n.t("Enter the battle")}
                 </button>
             ) : null}
             {writes.length > 0 && !resolved ? (
                 <div className="sim-picks">
                     <p className="field-note">
-                        Flags the battle can write - pick what it did
+                        {l10n.t(
+                            "Flags the battle can write - pick what it did",
+                        )}
                     </p>
                     {writes.map((w) => (
                         <label
@@ -939,15 +959,18 @@ function BattleControls(props: {
                         disabled={resolved}
                         title={
                             resolved
-                                ? `Battle ${status.toLowerCase()}`
-                                : `${label} won - the galaxy takes the victory`
+                                ? l10n.t("Battle {0}", status.toLowerCase())
+                                : l10n.t(
+                                      "{0} won - the galaxy takes the victory",
+                                      label,
+                                  )
                         }
                         onClick={() =>
                             actions.resolveBattle(battleKey, true, picks)
                         }
                     >
                         <Icon name="check" size={13} />
-                        Won
+                        {l10n.t("Won")}
                     </button>
                     <button
                         type="button"
@@ -955,15 +978,18 @@ function BattleControls(props: {
                         disabled={resolved}
                         title={
                             resolved
-                                ? `Battle ${status.toLowerCase()}`
-                                : `${label} lost - the galaxy takes the defeat`
+                                ? l10n.t("Battle {0}", status.toLowerCase())
+                                : l10n.t(
+                                      "{0} lost - the galaxy takes the defeat",
+                                      label,
+                                  )
                         }
                         onClick={() =>
                             actions.resolveBattle(battleKey, false, picks)
                         }
                     >
                         <Icon name="close" size={13} />
-                        Lost
+                        {l10n.t("Lost")}
                     </button>
                 </div>
             ) : null}
@@ -972,11 +998,11 @@ function BattleControls(props: {
                 <button
                     type="button"
                     className="btn sim-answer"
-                    title="Retry - back to just before the outcome"
+                    title={l10n.t("Retry - back to just before the outcome")}
                     onClick={() => actions.retryBattle(battleKey)}
                 >
                     <Icon name="restart" size={13} />
-                    Retry
+                    {l10n.t("Retry")}
                 </button>
             ) : null}
         </>
@@ -1023,7 +1049,7 @@ function AnswerDialog(
     if (!item) {
         return (
             <Modal title={name} onCancel={props.onClose}>
-                <p className="modal-note">Answered</p>
+                <p className="modal-note">{l10n.t("Answered")}</p>
             </Modal>
         );
     }
@@ -1040,7 +1066,7 @@ function AnswerDialog(
                     />
                     {!item.battleKey && item.suggested ? (
                         <Button
-                            title="The change the event names"
+                            title={l10n.t("The change the event names")}
                             onClick={() =>
                                 answer(() => actions.world(item.suggested!))
                             }
@@ -1060,16 +1086,18 @@ function AnswerDialog(
                         // A battle is not a trigger: it ends through its outcome or nothing.
                         <>
                             <Button
-                                title="Assume the trigger met"
+                                title={l10n.t("Assume the trigger met")}
                                 onClick={() =>
                                     answer(() => actions.satisfy(item.nodeId))
                                 }
                             >
                                 <Icon name="decision" size={13} />
-                                Fire
+                                {l10n.t("Fire")}
                             </Button>
                             <Button
-                                title="Never fires in this run - stays armed"
+                                title={l10n.t(
+                                    "Never fires in this run - stays armed",
+                                )}
                                 onClick={() =>
                                     answer(() =>
                                         actions.ruleOut(item.nodeId, true),
@@ -1077,7 +1105,7 @@ function AnswerDialog(
                                 }
                             >
                                 <Icon name="remove" size={13} />
-                                Rule out
+                                {l10n.t("Rule out")}
                             </Button>
                         </>
                     ) : null}
@@ -1091,7 +1119,7 @@ function AnswerDialog(
                           type="button"
                           className="btn sim-answer"
                           key={id}
-                          title={`Story_Event("${id}")`}
+                          title={l10n.t('Story_Event("{0}")', id)}
                           onClick={() => answer(() => actions.luaNotify(id))}
                       >
                           <Icon name="script" size={13} />
@@ -1155,18 +1183,20 @@ function EventDialog(
                     <Button
                         title={
                             hasBreakpoint
-                                ? "Clear the breakpoint"
-                                : "Break after this fires"
+                                ? l10n.t("Clear the breakpoint")
+                                : l10n.t("Break after this fires")
                         }
                         className={hasBreakpoint ? "active" : undefined}
                         onClick={toggleBreakpoint}
                     >
                         <Icon name="breakpoint" size={13} />
-                        {hasBreakpoint ? "Clear break" : "Break here"}
+                        {hasBreakpoint
+                            ? l10n.t("Clear break")
+                            : l10n.t("Break here")}
                     </Button>
                     {owed ? (
                         <Button
-                            title="Its decision"
+                            title={l10n.t("Its decision")}
                             onClick={() =>
                                 props.onSelect({
                                     kind: "decision",
@@ -1175,26 +1205,26 @@ function EventDialog(
                             }
                         >
                             <Icon name="decision" size={13} />
-                            Answer
+                            {l10n.t("Answer")}
                         </Button>
                     ) : (
                         <Button
-                            title="Fire now"
+                            title={l10n.t("Fire now")}
                             disabled={!armed}
                             disabledReason="Not armed"
                             onClick={() => actions.satisfy(props.nodeId)}
                         >
                             <Icon name="fire" size={13} />
-                            Fire
+                            {l10n.t("Fire")}
                         </Button>
                     )}
                 </>
             }
         >
             <p className="modal-note">{dto?.eventType ?? ""}</p>
-            <DockSection title="State">
+            <DockSection title={l10n.t("State")}>
                 <div className="sim-row static">
-                    <span className="sim-row-name">Lifecycle</span>
+                    <span className="sim-row-name">{l10n.t("Lifecycle")}</span>
                     <span
                         className={
                             "sim-row-value lc-" +
@@ -1205,14 +1235,14 @@ function EventDialog(
                     </span>
                 </div>
                 <div className="sim-row static">
-                    <span className="sim-row-name">Fired</span>
+                    <span className="sim-row-name">{l10n.t("Fired")}</span>
                     <span className="sim-row-value">
-                        {nodeState?.fireCount ?? 0}x
+                        {l10n.t("{0}x", nodeState?.fireCount ?? 0)}
                     </span>
                 </div>
                 {nodeState?.gateLabel ? (
                     <div className="sim-row static">
-                        <span className="sim-row-name">Gate</span>
+                        <span className="sim-row-name">{l10n.t("Gate")}</span>
                         <span className="sim-row-value">
                             {nodeState.gateLabel}
                         </span>
@@ -1220,13 +1250,18 @@ function EventDialog(
                 ) : null}
                 {dto?.perpetual ? (
                     <p className="field-note">
-                        Perpetual - re-arms after every fire
+                        {l10n.t("Perpetual - re-arms after every fire")}
                     </p>
                 ) : null}
             </DockSection>
-            <DockSection title="Arms when" count={lines.length || undefined}>
+            <DockSection
+                title={l10n.t("Arms when")}
+                count={lines.length || undefined}
+            >
                 {lines.length === 0 ? (
-                    <p className="field-note">Root - armed at plot load</p>
+                    <p className="field-note">
+                        {l10n.t("Root - armed at plot load")}
+                    </p>
                 ) : null}
                 {lines.map((line, i) => (
                     <div
@@ -1236,18 +1271,26 @@ function EventDialog(
                         }
                         key={i}
                     >
-                        {i > 0 ? <span className="sim-arm-or">or</span> : null}
+                        {i > 0 ? (
+                            <span className="sim-arm-or">{l10n.t("or")}</span>
+                        ) : null}
                         {line.members.map((m, j) => (
                             <span key={m.nodeId} className="sim-arm-member">
                                 {j > 0 ? (
-                                    <span className="sim-arm-and">and</span>
+                                    <span className="sim-arm-and">
+                                        {l10n.t("and")}
+                                    </span>
                                 ) : null}
                                 <button
                                     type="button"
                                     className={
                                         "link" + (m.fired ? " fired" : "")
                                     }
-                                    title={m.fired ? "Fired" : "Not fired"}
+                                    title={
+                                        m.fired
+                                            ? l10n.t("Fired")
+                                            : l10n.t("Not fired")
+                                    }
                                     onClick={() =>
                                         props.onSelect({
                                             kind: "node",
@@ -1324,28 +1367,34 @@ function PlanetDialog(props: {
                     <Combobox
                         value={owner}
                         onChange={setOwner}
-                        placeholder="Owner"
+                        placeholder={l10n.t("Owner")}
                         ariaLabel="Owner"
                         icon="search"
                         options={factions.map((f) => ({ value: f }))}
                         autoFocus
                     />
                     <div className="sim-row static">
-                        <span className="sim-row-name">Revealed</span>
+                        <span className="sim-row-name">
+                            {l10n.t("Revealed")}
+                        </span>
                         <span className="sim-row-value">
-                            {planet.revealed ? "yes" : "no"}
+                            {planet.revealed ? l10n.t("yes") : l10n.t("no")}
                         </span>
                     </div>
                     <div className="sim-row static">
-                        <span className="sim-row-name">Corrupted</span>
+                        <span className="sim-row-name">
+                            {l10n.t("Corrupted")}
+                        </span>
                         <span className="sim-row-value">
-                            {planet.corrupted ? "yes" : "no"}
+                            {planet.corrupted ? l10n.t("yes") : l10n.t("no")}
                         </span>
                     </div>
                     <div className="sim-row static">
-                        <span className="sim-row-name">Destroyed</span>
+                        <span className="sim-row-name">
+                            {l10n.t("Destroyed")}
+                        </span>
                         <span className="sim-row-value">
-                            {planet.destroyed ? "yes" : "no"}
+                            {planet.destroyed ? l10n.t("yes") : l10n.t("no")}
                         </span>
                     </div>
                     {here.map((u) => (
@@ -1355,13 +1404,13 @@ function PlanetDialog(props: {
                         >
                             <span className="sim-row-name">{u.type}</span>
                             <span className="sim-row-value">
-                                {u.owner} x{u.count}
+                                {l10n.t("{0} x{1}", u.owner, u.count)}
                             </span>
                         </div>
                     ))}
                 </>
             ) : (
-                <p className="modal-note">Not in the world</p>
+                <p className="modal-note">{l10n.t("Not in the world")}</p>
             )}
         </Modal>
     );
@@ -1388,7 +1437,9 @@ function FlagDialog(props: {
     return (
         <Modal
             form
-            title={existing ? `Set ${existing.name}` : "Set flag"}
+            title={
+                existing ? l10n.t("Set {0}", existing.name) : l10n.t("Set flag")
+            }
             confirmLabel="OK"
             canConfirm={valid}
             disabledReason={
@@ -1407,7 +1458,7 @@ function FlagDialog(props: {
                     <Combobox
                         value={name}
                         onChange={setName}
-                        placeholder="Flag name"
+                        placeholder={l10n.t("Flag name")}
                         ariaLabel="Flag name"
                         icon="search"
                         options={state.flags.map((f) => ({
@@ -1464,22 +1515,22 @@ function DecisionDialog(props: {
             actions={
                 <>
                     <Button
-                        title="Assume the trigger met"
+                        title={l10n.t("Assume the trigger met")}
                         onClick={() =>
                             answer(() => actions.satisfy(item.nodeId))
                         }
                     >
                         <Icon name="decision" size={13} />
-                        Fire
+                        {l10n.t("Fire")}
                     </Button>
                     <Button
-                        title="Never fires in this run - stays armed"
+                        title={l10n.t("Never fires in this run - stays armed")}
                         onClick={() =>
                             answer(() => actions.ruleOut(item.nodeId, true))
                         }
                     >
                         <Icon name="remove" size={13} />
-                        Rule out
+                        {l10n.t("Rule out")}
                     </Button>
                 </>
             }
@@ -1538,10 +1589,10 @@ function decisionPicker(
     return {
         title:
             kind === "planet"
-                ? "Select a planet"
+                ? l10n.t("Select a planet")
                 : kind === "unit"
-                  ? "Select a unit type"
-                  : "Enter a name",
+                  ? l10n.t("Select a unit type")
+                  : l10n.t("Enter a name"),
         noun:
             kind === "planet"
                 ? "Planet"
@@ -1575,8 +1626,8 @@ function ScriptDialog(
     const script = state.luaStates.find((s) => s.scriptUri === props.scriptUri);
     if (!script) {
         return (
-            <Modal title="Script" onCancel={props.onClose}>
-                <p className="modal-note">Not in this plot</p>
+            <Modal title={l10n.t("Script")} onCancel={props.onClose}>
+                <p className="modal-note">{l10n.t("Not in this plot")}</p>
             </Modal>
         );
     }
@@ -1596,21 +1647,23 @@ function ScriptDialog(
                 ) : undefined
             }
         >
-            <DockSection title="Where it is">
+            <DockSection title={l10n.t("Where it is")}>
                 <div className="sim-row static">
-                    <span className="sim-row-name">Current</span>
+                    <span className="sim-row-name">{l10n.t("Current")}</span>
                     <span className="sim-row-value">
                         {script.current ?? "not started"}
                     </span>
                 </div>
                 <div className="sim-row static">
-                    <span className="sim-row-name">Next</span>
+                    <span className="sim-row-name">{l10n.t("Next")}</span>
                     <span className="sim-row-value">{script.next ?? "-"}</span>
                 </div>
             </DockSection>
-            <DockSection title="Owes" count={script.pending.length}>
+            <DockSection title={l10n.t("Owes")} count={script.pending.length}>
                 {script.pending.length === 0 ? (
-                    <p className="field-note">No Story_Event pending</p>
+                    <p className="field-note">
+                        {l10n.t("No Story_Event pending")}
+                    </p>
                 ) : null}
                 {script.pending.map((p) => (
                     <div
@@ -1619,15 +1672,22 @@ function ScriptDialog(
                     >
                         <span className="sim-row-name">{p.id}</span>
                         <span className="sim-row-value">
-                            {p.state} at {p.dueClock.toFixed(0)} s
+                            {l10n.t(
+                                "{0} at {1} s",
+                                p.state,
+                                p.dueClock.toFixed(0),
+                            )}
                         </span>
                     </div>
                 ))}
             </DockSection>
             {state.luaNotifications.length ? (
-                <DockSection title="Send" count={state.luaNotifications.length}>
+                <DockSection
+                    title={l10n.t("Send")}
+                    count={state.luaNotifications.length}
+                >
                     <p className="field-note">
-                        Story_Event ids the plot listens for
+                        {l10n.t("Story_Event ids the plot listens for")}
                     </p>
                     <div className="sim-chip-row">
                         {state.luaNotifications.map((id) => (
@@ -1635,7 +1695,7 @@ function ScriptDialog(
                                 type="button"
                                 className="btn sim-pick"
                                 key={id}
-                                title={`Story_Event("${id}")`}
+                                title={l10n.t('Story_Event("{0}")', id)}
                                 onClick={() => actions.luaNotify(id)}
                             >
                                 {id}
@@ -1685,14 +1745,14 @@ export function SimTransport(props: {
             <div className="player-row">
                 <IconButton
                     icon="firstFrame"
-                    title="Restart"
+                    title={l10n.t("Restart")}
                     disabled={state.tick === 0 || frozen !== null}
                     disabledReason={frozen ?? "Already at tick 0"}
                     onClick={actions.restart}
                 />
                 <IconButton
                     icon="previousClip"
-                    title="Back one tick"
+                    title={l10n.t("Back one tick")}
                     disabled={state.tick === 0 || frozen !== null}
                     disabledReason={frozen ?? "Already at tick 0"}
                     onClick={actions.back}
@@ -1701,27 +1761,31 @@ export function SimTransport(props: {
                     icon={playing ? "pause" : "play"}
                     title={
                         pace.mode === "step"
-                            ? "One tick"
+                            ? l10n.t("One tick")
                             : playing
-                              ? "Pause"
+                              ? l10n.t("Pause")
                               : halted
-                                ? "Resume from the breakpoint"
+                                ? l10n.t("Resume from the breakpoint")
                                 : idle
-                                  ? "Play - clock idle"
-                                  : "Play"
+                                  ? l10n.t("Play - clock idle")
+                                  : l10n.t("Play")
                     }
                     {...gate}
                     onClick={actions.playPause}
                 />
                 <IconButton
                     icon="nextClip"
-                    title={idle ? "One tick - clock idle" : "One tick"}
+                    title={
+                        idle
+                            ? l10n.t("One tick - clock idle")
+                            : l10n.t("One tick")
+                    }
                     {...gate}
                     onClick={actions.tick}
                 />
                 <IconButton
                     icon="lastFrame"
-                    title="Run to next decision or breakpoint"
+                    title={l10n.t("Run to next decision or breakpoint")}
                     {...gate}
                     onClick={actions.runToDecision}
                 />
@@ -1732,7 +1796,7 @@ export function SimTransport(props: {
                         (state.breakOnGates ? " active" : "")
                     }
                     pressed={state.breakOnGates}
-                    title="Break on gates"
+                    title={l10n.t("Break on gates")}
                     onClick={() =>
                         actions.setBreakpoints(
                             state.breakpoints,
@@ -1754,15 +1818,15 @@ export function SimTransport(props: {
                     {props.notice}
                 </span>
             ) : null}
-            <Field label="Speed" value={speedLabel(pace)}>
+            <Field label={l10n.t("Speed")} value={speedLabel(pace)}>
                 <input
                     type="range"
                     min={0}
                     max={SPEED_STOPS.length - 1}
                     step={1}
                     value={stop}
-                    title="Speed"
-                    aria-label="Speed"
+                    title={l10n.t("Speed")}
+                    aria-label={l10n.t("Speed")}
                     onChange={(e) =>
                         props.setPace(SPEED_STOPS[Number(e.target.value)])
                     }
@@ -1790,14 +1854,14 @@ export function SimViewToggles(props: {
                 icon="trace"
                 className={props.traceOpen ? "active" : undefined}
                 pressed={props.traceOpen}
-                title="Trace"
+                title={l10n.t("Trace")}
                 onClick={() => props.setTraceOpen(!props.traceOpen)}
             />
             <IconButton
                 icon="flow"
                 className={lenses.hideFlow ? undefined : "active"}
                 pressed={!lenses.hideFlow}
-                title="Flow"
+                title={l10n.t("Flow")}
                 onClick={() =>
                     props.setLenses({ ...lenses, hideFlow: !lenses.hideFlow })
                 }
@@ -1806,7 +1870,7 @@ export function SimViewToggles(props: {
                 icon="fire"
                 className={lenses.activeOnly ? "active" : undefined}
                 pressed={lenses.activeOnly}
-                title="Active path"
+                title={l10n.t("Active path")}
                 onClick={() =>
                     props.setLenses({
                         ...lenses,
@@ -1818,7 +1882,7 @@ export function SimViewToggles(props: {
                 icon="script"
                 className={lenses.hideLua ? undefined : "active"}
                 pressed={!lenses.hideLua}
-                title="Script states"
+                title={l10n.t("Script states")}
                 onClick={() =>
                     props.setLenses({ ...lenses, hideLua: !lenses.hideLua })
                 }
@@ -1865,19 +1929,22 @@ export function TracePanel(props: {
             className="sim-trace"
             memoKey="storyGraph.simLog"
             defaultHeight={160}
-            title={`Trace (${query ? `${shown.length} of ${rows.length}` : rows.length})`}
+            title={l10n.t(
+                "Trace ({0})",
+                query ? `${shown.length} of ${rows.length}` : rows.length,
+            )}
             onClose={props.onClose}
         >
             <div className="sim-trace-tools">
                 <input
                     type="text"
-                    placeholder="Filter (t12 = tick 12)"
+                    placeholder={l10n.t("Filter (t12 = tick 12)")}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                 />
                 <IconButton
                     icon="copy"
-                    title="Copy"
+                    title={l10n.t("Copy")}
                     disabled={shown.length === 0}
                     disabledReason="Nothing to copy"
                     onClick={() => props.actions.copy(copyText())}
@@ -1886,8 +1953,10 @@ export function TracePanel(props: {
             <div className="problem-list">
                 {tail.length < shown.length ? (
                     <div className="sim-trace-row muted">
-                        {shown.length - tail.length} earlier rows not shown -
-                        narrow the filter
+                        {l10n.t(
+                            "{0} earlier rows not shown - narrow the filter",
+                            shown.length - tail.length,
+                        )}
                     </div>
                 ) : null}
                 {tail.map((row, i) => (
@@ -1899,14 +1968,16 @@ export function TracePanel(props: {
                         }
                         key={row.seq}
                         ref={i === tail.length - 1 ? endRef : undefined}
-                        title={row.nodeId ? "Show in graph" : undefined}
+                        title={row.nodeId ? l10n.t("Show in graph") : undefined}
                         onClick={
                             row.nodeId
                                 ? () => props.actions.centerNode(row.nodeId)
                                 : undefined
                         }
                     >
-                        <span className="sim-trace-tick">t{row.tick}</span>
+                        <span className="sim-trace-tick">
+                            {l10n.t("t{0}", row.tick)}
+                        </span>
                         <span className="sim-trace-node" title={row.nodeId}>
                             {row.node || shortId(row.nodeId)}
                         </span>
@@ -1918,7 +1989,7 @@ export function TracePanel(props: {
                             className="sim-trace-via"
                             title={row.viaId ?? undefined}
                         >
-                            {row.via ? `via ${row.via}` : ""}
+                            {row.via ? l10n.t("via {0}", row.via) : ""}
                         </span>
                         <span
                             className="sim-trace-detail problem-msg"

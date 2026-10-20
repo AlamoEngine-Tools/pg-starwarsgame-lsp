@@ -13,6 +13,7 @@
 // This is the one definition. `dockChrome.ts` supplies the styles it expects; a consumer
 // interpolates `rightDockCss` (and `dockChromeCss` for the sections inside it).
 
+import * as l10n from "@vscode/l10n";
 import { ReactNode } from "react";
 
 import { useEdgeResize } from "../useEdgeResize";
@@ -77,7 +78,7 @@ export function RightDock({
         <div className="right-dock" style={{ width: size }}>
             <div
                 className="resize-handle-w"
-                title="Drag to resize"
+                title={l10n.t("Drag to resize")}
                 {...handleProps}
             />
             {header !== undefined && (

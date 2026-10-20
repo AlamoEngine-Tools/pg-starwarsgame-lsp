@@ -20,6 +20,7 @@
 // mattering once dealt with. Colouring the mark rather than the sentence means the panel can be
 // scanned for problems without reading a word.
 
+import * as l10n from "@vscode/l10n";
 import {
     ReactNode,
     useCallback,
@@ -195,7 +196,7 @@ export function InfoBadge({
                 ref={mark}
                 className={`info-badge sev-${severity}`}
                 aria-expanded={open}
-                aria-label="More about this"
+                aria-label={l10n.t("More about this")}
                 onPointerEnter={() => setShowing(true)}
                 onPointerLeave={() => setShowing(false)}
                 onFocus={() => setShowing(true)}

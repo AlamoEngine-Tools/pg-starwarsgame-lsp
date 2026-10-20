@@ -18,6 +18,8 @@
 // preview/viewport.ts, held in a ref, because the two lifecycles do not line up: React re-renders
 // when a checkbox moves, and a render loop must not be torn down for that.
 
+import "./shared/l10nSetup";
+import * as l10n from "@vscode/l10n";
 import {
     Fragment,
     useCallback,
@@ -2629,11 +2631,19 @@ const PRESETS: { view: PresetView; label: string; title: string }[] = [
     {
         view: "threeQuarter",
         label: "3/4",
-        title: "Look from three-quarters on",
+        title: l10n.t("Look from three-quarters on"),
     },
-    { view: "front", label: "Front", title: "Look from the front" },
-    { view: "side", label: "Side", title: "Look from the side" },
-    { view: "top", label: "Top", title: "Look from above" },
+    {
+        view: "front",
+        label: l10n.t("Front"),
+        title: l10n.t("Look from the front"),
+    },
+    {
+        view: "side",
+        label: l10n.t("Side"),
+        title: l10n.t("Look from the side"),
+    },
+    { view: "top", label: l10n.t("Top"), title: l10n.t("Look from above") },
 ];
 
 function ModelPreview(): React.JSX.Element {
@@ -2807,7 +2817,7 @@ function ModelPreview(): React.JSX.Element {
             targets.push({
                 kind: "object",
                 value: subjectFacts.objectId,
-                label: "Bind this object",
+                label: l10n.t("Bind this object"),
                 what: `'${subjectFacts.objectId}'`,
             });
         }
@@ -2816,7 +2826,7 @@ function ModelPreview(): React.JSX.Element {
             targets.push({
                 kind: "type",
                 value: subjectFacts.objectType,
-                label: `Bind type ${subjectFacts.objectType}`,
+                label: l10n.t("Bind type {0}", subjectFacts.objectType),
                 what: subjectFacts.objectType,
             });
         }
@@ -2829,7 +2839,7 @@ function ModelPreview(): React.JSX.Element {
             targets.push({
                 kind: "category",
                 value: category,
-                label: `Bind category ${category}`,
+                label: l10n.t("Bind category {0}", category),
                 what: category,
             });
         }
@@ -6466,7 +6476,9 @@ function ModelPreview(): React.JSX.Element {
                 <span className="detail">{aimText(handle, aim)}</span>
                 <IconButton
                     icon="reset"
-                    title="Return this turret to the pose the model authored"
+                    title={l10n.t(
+                        "Return this turret to the pose the model authored",
+                    )}
                     disabled={!moved}
                     disabledReason="This turret is already at its authored pose"
                     onClick={(event) => {
@@ -7157,10 +7169,9 @@ function ModelPreview(): React.JSX.Element {
             ? [
                   {
                       severity: "info",
-                      message:
-                          "No shader sources are reachable, so nothing can be translated. A " +
-                          "game install ships compiled .fxo; the .fx sources are a separate " +
-                          "Petroglyph download.",
+                      message: l10n.t(
+                          "No shader sources are reachable, so nothing can be translated. A game install ships compiled .fxo; the .fx sources are a separate Petroglyph download.",
+                      ),
                       hardpointId: null,
                   },
               ]
@@ -7176,11 +7187,11 @@ function ModelPreview(): React.JSX.Element {
                 : [
                       {
                           severity: "warning",
-                          message:
-                              `${shieldOffShader.join(", ")} ${
-                                  shieldOffShader.length === 1 ? "is" : "are"
-                              } named as a shield mesh but not drawn with a shield shader ` +
-                              "- draws as solid geometry, not a field.",
+                          message: l10n.t(
+                              "{0} {1} named as a shield mesh but not drawn with a shield shader - draws as solid geometry, not a field.",
+                              shieldOffShader.join(", "),
+                              shieldOffShader.length === 1 ? "is" : "are",
+                          ),
                           hardpointId: null,
                       },
                   ];
@@ -7226,30 +7237,30 @@ function ModelPreview(): React.JSX.Element {
     }[] = [
         {
             id: "grid",
-            label: "Grid",
+            label: l10n.t("Grid"),
             icon: "grid",
             on: grid,
             set: setGrid,
-            title: "Show ground grid and world axes",
+            title: l10n.t("Show ground grid and world axes"),
         },
         {
             id: "floor",
-            label: "Ground",
+            label: l10n.t("Ground"),
             icon: "ground",
             on: floor,
             set: setFloor,
-            title: "Show lit floor",
+            title: l10n.t("Show lit floor"),
         },
         {
             // With the view toggles rather than in the scene panel: this is flipped constantly
             // while reading geometry, the same way the grid is, and it describes how the model is
             // DRAWN rather than what the room is like.
             id: "wireframe",
-            label: "Wireframe",
+            label: l10n.t("Wireframe"),
             icon: "geometry",
             on: wireframe,
             set: setWireframe,
-            title: "Draw meshes as edges",
+            title: l10n.t("Draw meshes as edges"),
         },
     ];
 
@@ -7259,14 +7270,14 @@ function ModelPreview(): React.JSX.Element {
 
     overlays.push({
         id: "particles",
-        label: "Effects",
+        label: l10n.t("Effects"),
         icon: "effects",
         on: particlesOn && anyEffect,
         set: setParticlesOn,
         disabled: !anyEffect,
         title: !anyEffect
-            ? "No particle systems on this model"
-            : "Show every particle system",
+            ? l10n.t("No particle systems on this model")
+            : l10n.t("Show every particle system"),
     });
     // Arcs LAST, and deliberately so. It is the one pill here that still comes and goes - it
     // belongs to the Gameplay lens, which is a statement about which lens you are in rather than
@@ -7286,7 +7297,7 @@ function ModelPreview(): React.JSX.Element {
             // the list below is for refining afterwards. It does not preserve a previous selection
             // across a press - that is the point of an all-or-nothing master.
             id: "arcs",
-            label: "Arcs",
+            label: l10n.t("Arcs"),
             icon: "arcs",
             on: fireArcs && anyArc,
             set: (on: boolean) => {
@@ -7295,10 +7306,14 @@ function ModelPreview(): React.JSX.Element {
             },
             disabled: !anyArc,
             title: !anyArc
-                ? "No firing arcs on this model"
+                ? l10n.t("No firing arcs on this model")
                 : shown === drawable.length
-                  ? "Show every firing arc"
-                  : `Show firing arcs - ${shown} of ${drawable.length} weapons on`,
+                  ? l10n.t("Show every firing arc")
+                  : l10n.t(
+                        "Show firing arcs - {0} of {1} weapons on",
+                        shown,
+                        drawable.length,
+                    ),
         });
 
         // Whether a mark can be DRAWN, which is a different question from whether the subject has
@@ -7318,16 +7333,16 @@ function ModelPreview(): React.JSX.Element {
 
         overlays.push({
             id: "reticles",
-            label: "Reticles",
+            label: l10n.t("Reticles"),
             icon: "target",
             on: reticlesOn && anyReticle,
             set: setReticlesOn,
             disabled: !anyReticle,
             title: anyReticle
-                ? "Show targeting marks"
+                ? l10n.t("Show targeting marks")
                 : targetable === 0
-                  ? "Nothing here can be targeted"
-                  : "Reticle art unreadable - game directory not set",
+                  ? l10n.t("Nothing here can be targeted")
+                  : l10n.t("Reticle art unreadable - game directory not set"),
         });
     }
 
@@ -7669,8 +7684,12 @@ function ModelPreview(): React.JSX.Element {
                                         }}
                                     >
                                         <span className="capture-frame-size">
-                                            {captureDims.width} x{" "}
-                                            {captureDims.height}
+                                            {l10n.t(
+                                                "{0} x{1}{2}",
+                                                captureDims.width,
+                                                " ",
+                                                captureDims.height,
+                                            )}
                                         </span>
                                     </div>
                                 </div>
@@ -7719,7 +7738,7 @@ function ModelPreview(): React.JSX.Element {
                                             (worldOpen ? " active" : "")
                                         }
                                         expanded={worldOpen}
-                                        title="Scene settings"
+                                        title={l10n.t("Scene settings")}
                                         onClick={() =>
                                             setWorldOpen((open) => !open)
                                         }
@@ -7779,7 +7798,7 @@ function ModelPreview(): React.JSX.Element {
                                     <div
                                         className="stage-chrome faction-palette"
                                         role="group"
-                                        aria-label="Faction colour"
+                                        aria-label={l10n.t("Faction colour")}
                                     >
                                         <button
                                             type="button"
@@ -7790,7 +7809,7 @@ function ModelPreview(): React.JSX.Element {
                                                     ? " active"
                                                     : "")
                                             }
-                                            title="No team colour"
+                                            title={l10n.t("No team colour")}
                                             onClick={() => chooseTint("", null)}
                                         >
                                             <Icon name="none" />
@@ -7839,7 +7858,9 @@ function ModelPreview(): React.JSX.Element {
                                                     )?.color ?? NEUTRAL_COLOUR,
                                                 )
                                             }
-                                            title="Pick a custom colour"
+                                            title={l10n.t(
+                                                "Pick a custom colour",
+                                            )}
                                             onChange={(e) =>
                                                 chooseTint(
                                                     faction,
@@ -7868,7 +7889,9 @@ function ModelPreview(): React.JSX.Element {
                             <span className="stage-slot stage-slot-end">
                                 <div className="stage-chrome">
                                     <ModeSelector
-                                        label="Where the camera looks from"
+                                        label={l10n.t(
+                                            "Where the camera looks from",
+                                        )}
                                         value={cameraView}
                                         options={cameraViews}
                                         onSelect={(id) => {
@@ -7924,7 +7947,7 @@ function ModelPreview(): React.JSX.Element {
                                             cameraOpen ? "active" : undefined
                                         }
                                         expanded={cameraOpen}
-                                        title="Camera settings"
+                                        title={l10n.t("Camera settings")}
                                         onClick={() =>
                                             setCameraOpen((open) => !open)
                                         }
@@ -7940,59 +7963,68 @@ function ModelPreview(): React.JSX.Element {
                                 ref={worldRef}
                             >
                                 <div className="stage-flyout-head">
-                                    Scene
+                                    {l10n.t("Scene")}
                                     <IconButton
                                         icon="reset"
-                                        title={
-                                            "Put the backdrop, lights, wind and draw distance " +
-                                            "back to their defaults. The model's own state is " +
-                                            "left as it is."
-                                        }
+                                        title={l10n.t(
+                                            "Put the backdrop, lights, wind and draw distance back to their defaults. The model's own state is left as it is.",
+                                        )}
                                         onClick={resetRoom}
                                     />
                                     <IconButton
                                         icon="close"
-                                        title="Close"
+                                        title={l10n.t("Close")}
                                         onClick={() => setWorldOpen(false)}
                                     />
                                 </div>
                                 <div className="stage-flyout-body">
                                     <DockSection
                                         id="scene.room"
-                                        title="Room"
+                                        title={l10n.t("Room")}
                                         collapsed={folded.has("scene.room")}
                                         onToggle={toggleSection}
                                     >
                                         <Field
-                                            label="Backdrop"
+                                            label={l10n.t("Backdrop")}
                                             info={
                                                 <>
-                                                    Never lit and never in the
-                                                    depth buffer, so a backdrop
-                                                    cannot be mistaken for part
-                                                    of the model
+                                                    {l10n.t(
+                                                        "Never lit and never in the depth buffer, so a backdrop cannot be mistaken for part of the model",
+                                                    )}
                                                 </>
                                             }
                                         >
                                             <ModeSelector
-                                                label="Backdrop"
+                                                label={l10n.t("Backdrop")}
                                                 value={background}
                                                 options={
                                                     [
                                                         {
                                                             id: "flat",
-                                                            label: "Flat",
-                                                            title: "A plain, neutral field",
+                                                            label: l10n.t(
+                                                                "Flat",
+                                                            ),
+                                                            title: l10n.t(
+                                                                "A plain, neutral field",
+                                                            ),
                                                         },
                                                         {
                                                             id: "starfield",
-                                                            label: "Stars",
-                                                            title: "A starfield",
+                                                            label: l10n.t(
+                                                                "Stars",
+                                                            ),
+                                                            title: l10n.t(
+                                                                "A starfield",
+                                                            ),
                                                         },
                                                         {
                                                             id: "sky",
-                                                            label: "Sky",
-                                                            title: "A sky with a horizon",
+                                                            label: l10n.t(
+                                                                "Sky",
+                                                            ),
+                                                            title: l10n.t(
+                                                                "A sky with a horizon",
+                                                            ),
                                                         },
                                                     ] satisfies ChoiceOption<BackgroundKind>[]
                                                 }
@@ -8001,20 +8033,13 @@ function ModelPreview(): React.JSX.Element {
                                         </Field>
 
                                         <Field
-                                            label="Ground height"
+                                            label={l10n.t("Ground height")}
                                             value={floorLevel}
                                             info={
                                                 <>
-                                                    Zero is the middle of the
-                                                    track - the plane the model
-                                                    itself stands on. The ends
-                                                    are one model radius either
-                                                    way, so the control means
-                                                    the same thing on a trooper
-                                                    and on a Star Destroyer. The
-                                                    grid moves with it: it is
-                                                    the ruler for the ground,
-                                                    not for the origin.
+                                                    {l10n.t(
+                                                        "Zero is the middle of the track - the plane the model itself stands on. The ends are one model radius either way, so the control means the same thing on a trooper and on a Star Destroyer. The grid moves with it: it is the ruler for the ground, not for the origin.",
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8030,10 +8055,13 @@ function ModelPreview(): React.JSX.Element {
                                                     disabled={!floor}
                                                     title={
                                                         floor
-                                                            ? `Where the ground and its grid sit, in model units. The track runs ` +
-                                                              `${ground.limit} either side of the origin, which is the middle, ` +
-                                                              `and catches there when dragged.`
-                                                            : "Switch the ground on to place it"
+                                                            ? l10n.t(
+                                                                  "Where the ground and its grid sit, in model units. The track runs {0} either side of the origin, which is the middle, and catches there when dragged.",
+                                                                  ground.limit,
+                                                              )
+                                                            : l10n.t(
+                                                                  "Switch the ground on to place it",
+                                                              )
                                                     }
                                                     onPointerDown={() => {
                                                         groundDragging.current = true;
@@ -8068,24 +8096,24 @@ function ModelPreview(): React.JSX.Element {
 
                                     <DockSection
                                         id="scene.light"
-                                        title="Light"
+                                        title={l10n.t("Light")}
                                         collapsed={folded.has("scene.light")}
                                         onToggle={toggleSection}
                                     >
                                         <Field
-                                            label="Light"
+                                            label={l10n.t("Light")}
                                             info={
                                                 <>
-                                                    The engine's own rig: a sun
-                                                    that casts the shadow and
-                                                    two fills that do not. All
-                                                    three reach the translated
-                                                    shaders.
+                                                    {l10n.t(
+                                                        "The engine's own rig: a sun that casts the shadow and two fills that do not. All three reach the translated shaders.",
+                                                    )}
                                                 </>
                                             }
                                         >
                                             <ModeSelector
-                                                label="Light being edited"
+                                                label={l10n.t(
+                                                    "Light being edited",
+                                                )}
                                                 value={editing}
                                                 options={LIGHT_NAMES.map(
                                                     (name) => ({
@@ -8093,7 +8121,12 @@ function ModelPreview(): React.JSX.Element {
                                                         label: LIGHT_LABELS[
                                                             name
                                                         ],
-                                                        title: `Edit the ${LIGHT_LABELS[name].toLowerCase()}`,
+                                                        title: l10n.t(
+                                                            "Edit the {0}",
+                                                            LIGHT_LABELS[
+                                                                name
+                                                            ].toLowerCase(),
+                                                        ),
                                                     }),
                                                 )}
                                                 onSelect={setEditing}
@@ -8101,22 +8134,22 @@ function ModelPreview(): React.JSX.Element {
                                         </Field>
 
                                         <Field
-                                            label="Light around"
+                                            label={l10n.t("Light around")}
                                             value={
                                                 <>
-                                                    {lights[editing].azimuth}{" "}
-                                                    deg, from {bearing.from}
+                                                    {l10n.t(
+                                                        "{0}{1}deg, from {2}",
+                                                        lights[editing].azimuth,
+                                                        " ",
+                                                        bearing.from,
+                                                    )}
                                                 </>
                                             }
                                             info={
                                                 <>
-                                                    Turns round the model the
-                                                    way the stage does, from the
-                                                    same zero: at 0 the light
-                                                    stands at the Front
-                                                    view&apos;s camera, and it
-                                                    moves clockwise seen from
-                                                    above.
+                                                    {l10n.t(
+                                                        "Turns round the model the way the stage does, from the same zero: at 0 the light stands at the Front view's camera, and it moves clockwise seen from above.",
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8137,7 +8170,7 @@ function ModelPreview(): React.JSX.Element {
                                         </Field>
 
                                         <Field
-                                            label="Light height"
+                                            label={l10n.t("Light height")}
                                             infoSeverity={
                                                 bearing.belowGround
                                                     ? "warning"
@@ -8147,18 +8180,26 @@ function ModelPreview(): React.JSX.Element {
                                                 <>
                                                     {bearing.belowGround
                                                         ? editing === "sun"
-                                                            ? "Under the ground plane. The floor is between the sun and the model, so " +
-                                                              "it lights the hull from beneath and casts nothing onto the ground."
-                                                            : "Under the ground plane, which is where the engine puts both of its own " +
-                                                              "fills. They cast no shadow, so nothing is hidden by it."
-                                                        : "The sun drives the shadow. Straight overhead flattens the hull and hides " +
-                                                          "the shadow under it; raking is what makes panel lines read."}
+                                                            ? l10n.t(
+                                                                  "Under the ground plane. The floor is between the sun and the model, so it lights the hull from beneath and casts nothing onto the ground.",
+                                                              )
+                                                            : l10n.t(
+                                                                  "Under the ground plane, which is where the engine puts both of its own fills. They cast no shadow, so nothing is hidden by it.",
+                                                              )
+                                                        : l10n.t(
+                                                              "The sun drives the shadow. Straight overhead flattens the hull and hides the shadow under it; raking is what makes panel lines read.",
+                                                          )}
                                                 </>
                                             }
                                             value={
                                                 <>
-                                                    {lights[editing].elevation}{" "}
-                                                    deg, {bearing.height}
+                                                    {l10n.t(
+                                                        "{0}{1}deg, {2}",
+                                                        lights[editing]
+                                                            .elevation,
+                                                        " ",
+                                                        bearing.height,
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8181,13 +8222,15 @@ function ModelPreview(): React.JSX.Element {
                                         </Field>
 
                                         <Field
-                                            label="Light colour"
+                                            label={l10n.t("Light colour")}
                                             value={
                                                 <>
-                                                    {lights[
-                                                        editing
-                                                    ].intensity.toFixed(2)}
-                                                    x
+                                                    {l10n.t(
+                                                        "{0}x",
+                                                        lights[
+                                                            editing
+                                                        ].intensity.toFixed(2),
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8226,22 +8269,22 @@ function ModelPreview(): React.JSX.Element {
                                         </Field>
 
                                         <Field
-                                            label="Ambient"
+                                            label={l10n.t("Ambient")}
                                             value={
                                                 <>
-                                                    {lights.ambient.intensity.toFixed(
-                                                        2,
+                                                    {l10n.t(
+                                                        "{0}x",
+                                                        lights.ambient.intensity.toFixed(
+                                                            2,
+                                                        ),
                                                     )}
-                                                    x
                                                 </>
                                             }
                                             info={
                                                 <>
-                                                    What reaches the parts no
-                                                    light does. Too much and the
-                                                    model reads flat; none at
-                                                    all and its shadowed side is
-                                                    black.
+                                                    {l10n.t(
+                                                        "What reaches the parts no light does. Too much and the model reads flat; none at all and its shadowed side is black.",
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8307,20 +8350,13 @@ function ModelPreview(): React.JSX.Element {
             not the one stored - measured, a stored #ffffff drew as #bdbdbd. A sibling keeps its
             own colour and still reaches the far edge, because the well carries the auto margin. */}
                                         <Field
-                                            label="Shadow colour"
+                                            label={l10n.t("Shadow colour")}
                                             inline
                                             info={
                                                 <>
-                                                    Alamo&apos;s one shadow
-                                                    colour, and it MULTIPLIES:
-                                                    0.5 grey means half as
-                                                    bright. In Game mode it
-                                                    tints the stencil volume, so
-                                                    it reaches the hull&apos;s
-                                                    own self-shadowing as well
-                                                    as the ground. In Default
-                                                    mode only the ground can
-                                                    catch it.
+                                                    {l10n.t(
+                                                        "Alamo's one shadow colour, and it MULTIPLIES: 0.5 grey means half as bright. In Game mode it tints the stencil volume, so it reaches the hull's own self-shadowing as well as the ground. In Default mode only the ground can catch it.",
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8352,15 +8388,13 @@ function ModelPreview(): React.JSX.Element {
                                         </Field>
 
                                         <Field
-                                            label="Highlight colour"
+                                            label={l10n.t("Highlight colour")}
                                             inline
                                             info={
                                                 <>
-                                                    One global specular for all
-                                                    three lights, as the engine
-                                                    keeps it. Only the
-                                                    translated effect shaders
-                                                    read it.
+                                                    {l10n.t(
+                                                        "One global specular for all three lights, as the engine keeps it. Only the translated effect shaders read it.",
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8383,17 +8417,25 @@ function ModelPreview(): React.JSX.Element {
 
                                     <DockSection
                                         id="scene.weather"
-                                        title="Weather"
+                                        title={l10n.t("Weather")}
                                         collapsed={folded.has("scene.weather")}
                                         onToggle={toggleSection}
                                     >
                                         <Field
-                                            label="Wind direction"
-                                            value={<>{wind.heading} deg</>}
+                                            label={l10n.t("Wind direction")}
+                                            value={
+                                                <>
+                                                    {l10n.t(
+                                                        "{0} deg",
+                                                        wind.heading,
+                                                    )}
+                                                </>
+                                            }
                                             info={
                                                 <>
-                                                    Heading the wind blows
-                                                    towards
+                                                    {l10n.t(
+                                                        "Heading the wind blows towards",
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8415,13 +8457,13 @@ function ModelPreview(): React.JSX.Element {
                                         </Field>
 
                                         <Field
-                                            label="Wind speed"
+                                            label={l10n.t("Wind speed")}
                                             value={wind.speed.toFixed(1)}
                                             info={
                                                 <>
-                                                    Bends foliage and carries
-                                                    the emitters and weather
-                                                    declared affected by wind
+                                                    {l10n.t(
+                                                        "Bends foliage and carries the emitters and weather declared affected by wind",
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8443,7 +8485,7 @@ function ModelPreview(): React.JSX.Element {
                                         </Field>
 
                                         <Field
-                                            label="Weather intensity"
+                                            label={l10n.t("Weather intensity")}
                                             value={
                                                 hasWeather
                                                     ? `${Math.round(weatherIntensity * 100)}%`
@@ -8452,14 +8494,15 @@ function ModelPreview(): React.JSX.Element {
                                             info={
                                                 hasWeather ? (
                                                     <>
-                                                        Share of a weather field
-                                                        drawn, as a weather
-                                                        phase sets it
+                                                        {l10n.t(
+                                                            "Share of a weather field drawn, as a weather phase sets it",
+                                                        )}
                                                     </>
                                                 ) : (
                                                     <>
-                                                        No weather emitter in
-                                                        this scene
+                                                        {l10n.t(
+                                                            "No weather emitter in this scene",
+                                                        )}
                                                     </>
                                                 )
                                             }
@@ -8482,7 +8525,7 @@ function ModelPreview(): React.JSX.Element {
 
                                     <DockSection
                                         id="scene.effects"
-                                        title="Effects"
+                                        title={l10n.t("Effects")}
                                         collapsed={folded.has("scene.effects")}
                                         onToggle={toggleSection}
                                     >
@@ -8495,34 +8538,19 @@ function ModelPreview(): React.JSX.Element {
                                         {scene !== null &&
                                             scene.kind !== "Particle" && (
                                                 <Field
-                                                    label="Renderer"
+                                                    label={l10n.t("Renderer")}
                                                     info={
                                                         <>
-                                                            Default reads each
-                                                            sub-mesh&apos;s
-                                                            shader NAME and
-                                                            draws the archetype
-                                                            it names - never
-                                                            wrong about
-                                                            geometry, only about
-                                                            how a surface is
-                                                            lit. Game draws the
-                                                            model the way the
-                                                            engine does: its own
-                                                            effect shaders,
-                                                            translated, and
-                                                            stencil shadow
-                                                            volumes cast by its
-                                                            authored shadow
-                                                            mesh. Only the
-                                                            shaders need the .fx
-                                                            sources; the shadows
-                                                            work without them.
+                                                            {l10n.t(
+                                                                "Default reads each sub-mesh's shader NAME and draws the archetype it names - never wrong about geometry, only about how a surface is lit. Game draws the model the way the engine does: its own effect shaders, translated, and stencil shadow volumes cast by its authored shadow mesh. Only the shaders need the .fx sources; the shadows work without them.",
+                                                            )}
                                                         </>
                                                     }
                                                 >
                                                     <ModeSelector
-                                                        label="Which renderer draws the model"
+                                                        label={l10n.t(
+                                                            "Which renderer draws the model",
+                                                        )}
                                                         /* What is actually RUNNING, not what could be fully delivered. The stencil
                                                        shadow pass follows this switch alone and needs no .fx sources, so a reader
                                                        with none was shown Default while the engine's own shadows were being cast -
@@ -8536,15 +8564,18 @@ function ModelPreview(): React.JSX.Element {
                                                         options={[
                                                             {
                                                                 id: "default",
-                                                                label: "Default",
-                                                                title:
-                                                                    "Every sub-mesh drawn with the archetype reading " +
-                                                                    "of its shader name. Never wrong about geometry - " +
-                                                                    "only about how a surface is lit.",
+                                                                label: l10n.t(
+                                                                    "Default",
+                                                                ),
+                                                                title: l10n.t(
+                                                                    "Every sub-mesh drawn with the archetype reading of its shader name. Never wrong about geometry - only about how a surface is lit.",
+                                                                ),
                                                             },
                                                             {
                                                                 id: "game",
-                                                                label: "Game",
+                                                                label: l10n.t(
+                                                                    "Game",
+                                                                ),
                                                                 // Selectable with no sources, because the mode still
                                                                 // DOES something without them: the stencil shadows
                                                                 // follow this switch and need no .fx at all. It was
@@ -8553,16 +8584,14 @@ function ModelPreview(): React.JSX.Element {
                                                                 // who stepped to Default unable to return to the mode
                                                                 // the panel opens in.
                                                                 title: anyShaderSource
-                                                                    ? "The model's own effect shaders, translated, and " +
-                                                                      "the engine's stencil shadows. " +
-                                                                      translatedCount.translated +
-                                                                      " of " +
-                                                                      translatedCount.total +
-                                                                      " sub-meshes are " +
-                                                                      "drawn this way."
-                                                                    : "The engine's stencil shadows, which need no " +
-                                                                      "sources. For its effect shaders as well, " +
-                                                                      "set the .fx sources up.",
+                                                                    ? l10n.t(
+                                                                          "The model's own effect shaders, translated, and the engine's stencil shadows. {0} of {1} sub-meshes are drawn this way.",
+                                                                          translatedCount.translated,
+                                                                          translatedCount.total,
+                                                                      )
+                                                                    : l10n.t(
+                                                                          "The engine's stencil shadows, which need no sources. For its effect shaders as well, set the .fx sources up.",
+                                                                      ),
                                                             },
                                                         ]}
                                                         onSelect={(id) =>
@@ -8581,11 +8610,15 @@ function ModelPreview(): React.JSX.Element {
                                                     {anyShaderSource ? (
                                                         <span className="shader-state">
                                                             <Icon name="check" />
-                                                            Shader sources ready
+                                                            {l10n.t(
+                                                                "Shader sources ready",
+                                                            )}
                                                         </span>
                                                     ) : (
                                                         <Button
-                                                            title="Fetch the .fx shader sources"
+                                                            title={l10n.t(
+                                                                "Fetch the .fx shader sources",
+                                                            )}
                                                             onClick={() =>
                                                                 vscode.postMessage(
                                                                     {
@@ -8595,29 +8628,21 @@ function ModelPreview(): React.JSX.Element {
                                                             }
                                                         >
                                                             <Icon name="download" />
-                                                            Set up shader
-                                                            sources
+                                                            {l10n.t(
+                                                                "Set up shader sources",
+                                                            )}
                                                         </Button>
                                                     )}
                                                 </Field>
                                             )}
 
                                         <Field
-                                            label="Heat distortion"
+                                            label={l10n.t("Heat distortion")}
                                             info={
                                                 <>
-                                                    Debug draws the heat BUFFER
-                                                    instead of the bent picture
-                                                    - the only way to see which
-                                                    pixels a distortion covers,
-                                                    since its whole effect is a
-                                                    displacement. Red and green
-                                                    carry the direction, blue
-                                                    the strength, and ALL BLACK
-                                                    means nothing on this model
-                                                    is distorting anything. It
-                                                    keeps the buffers alive
-                                                    while it is on.
+                                                    {l10n.t(
+                                                        "Debug draws the heat BUFFER instead of the bent picture - the only way to see which pixels a distortion covers, since its whole effect is a displacement. Red and green carry the direction, blue the strength, and ALL BLACK means nothing on this model is distorting anything. It keeps the buffers alive while it is on.",
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -8633,7 +8658,7 @@ function ModelPreview(): React.JSX.Element {
                                                             )
                                                         }
                                                     />
-                                                    Bend the frame
+                                                    {l10n.t("Bend the frame")}
                                                 </label>
                                                 <label className="field-label">
                                                     <input
@@ -8647,7 +8672,7 @@ function ModelPreview(): React.JSX.Element {
                                                             )
                                                         }
                                                     />
-                                                    Debug
+                                                    {l10n.t("Debug")}
                                                 </label>
                                             </span>
                                         </Field>
@@ -8667,17 +8692,14 @@ function ModelPreview(): React.JSX.Element {
                                                             )
                                                         }
                                                     />
-                                                    Bloom
+                                                    {l10n.t("Bloom")}
                                                 </label>
                                             }
                                             info={
                                                 <>
-                                                    Off by default, as it is in
-                                                    the game. It runs after the
-                                                    heat pass, so the two
-                                                    compose in that order rather
-                                                    than fighting over the
-                                                    frame.
+                                                    {l10n.t(
+                                                        "Off by default, as it is in the game. It runs after the heat pass, so the two compose in that order rather than fighting over the frame.",
+                                                    )}
                                                 </>
                                             }
                                         />
@@ -8696,26 +8718,23 @@ function ModelPreview(): React.JSX.Element {
                                 ref={cameraRef}
                             >
                                 <div className="stage-flyout-head">
-                                    Camera
+                                    {l10n.t("Camera")}
                                     <IconButton
                                         icon="close"
-                                        title="Close"
+                                        title={l10n.t("Close")}
                                         onClick={() => setCameraOpen(false)}
                                     />
                                 </div>
                                 <div className="stage-flyout-body">
                                     <DockSection
                                         id="camera.shots"
-                                        title="Camera presets"
+                                        title={l10n.t("Camera presets")}
                                         count={cameraPresets.length}
                                         end={
                                             <InfoBadge>
-                                                Kept in radii, not game units,
-                                                so one preset frames a trooper
-                                                and a Star Destroyer the same
-                                                way. Copy as Lua works the
-                                                distance out for the model on
-                                                screen.
+                                                {l10n.t(
+                                                    "Kept in radii, not game units, so one preset frames a trooper and a Star Destroyer the same way. Copy as Lua works the distance out for the model on screen.",
+                                                )}
                                             </InfoBadge>
                                         }
                                         collapsed={folded.has("camera.shots")}
@@ -8734,7 +8753,9 @@ function ModelPreview(): React.JSX.Element {
                                                         <input
                                                             type="text"
                                                             className="preset-name"
-                                                            aria-label="Preset name"
+                                                            aria-label={l10n.t(
+                                                                "Preset name",
+                                                            )}
                                                             defaultValue={
                                                                 saved.name
                                                             }
@@ -8779,11 +8800,19 @@ function ModelPreview(): React.JSX.Element {
                                                     ) : (
                                                         <Button
                                                             className="preset-apply"
-                                                            title={
-                                                                `Frame this model the way ${saved.name} does: ` +
-                                                                `${saved.distance.toFixed(1)} radii out, pitch ` +
-                                                                `${Math.round(saved.pitch)}, yaw ${Math.round(saved.yaw)}`
-                                                            }
+                                                            title={l10n.t(
+                                                                "Frame this model the way {0} does: {1} radii out, pitch {2}, yaw {3}",
+                                                                saved.name,
+                                                                saved.distance.toFixed(
+                                                                    1,
+                                                                ),
+                                                                Math.round(
+                                                                    saved.pitch,
+                                                                ),
+                                                                Math.round(
+                                                                    saved.yaw,
+                                                                ),
+                                                            )}
                                                             onClick={() => {
                                                                 const viewport =
                                                                     viewportRef.current;
@@ -8815,7 +8844,10 @@ function ModelPreview(): React.JSX.Element {
                                                     )}
                                                     <IconButton
                                                         icon="rename"
-                                                        title={`Rename ${saved.name}`}
+                                                        title={l10n.t(
+                                                            "Rename {0}",
+                                                            saved.name,
+                                                        )}
                                                         onClick={() =>
                                                             setRenamingPreset(
                                                                 saved.id,
@@ -8824,7 +8856,9 @@ function ModelPreview(): React.JSX.Element {
                                                     />
                                                     <IconButton
                                                         icon="copy"
-                                                        title="Copy as Lua - Set_Cinematic_Camera_Key, distance for the model on screen"
+                                                        title={l10n.t(
+                                                            "Copy as Lua - Set_Cinematic_Camera_Key, distance for the model on screen",
+                                                        )}
                                                         onClick={() => {
                                                             const viewport =
                                                                 viewportRef.current;
@@ -8853,7 +8887,10 @@ function ModelPreview(): React.JSX.Element {
                                                     />
                                                     <IconButton
                                                         icon="remove"
-                                                        title={`Delete ${saved.name}`}
+                                                        title={l10n.t(
+                                                            "Delete {0}",
+                                                            saved.name,
+                                                        )}
                                                         onClick={() =>
                                                             setCameraPresets(
                                                                 (current) =>
@@ -8896,12 +8933,12 @@ function ModelPreview(): React.JSX.Element {
                                                 }}
                                             >
                                                 <Icon name="add" />
-                                                New camera preset
+                                                {l10n.t("New camera preset")}
                                             </Button>
                                         </div>
 
                                         <Field
-                                            label="Opens with"
+                                            label={l10n.t("Opens with")}
                                             infoSeverity={
                                                 bindTargets.length === 0
                                                     ? "warning"
@@ -8910,11 +8947,12 @@ function ModelPreview(): React.JSX.Element {
                                             info={
                                                 <>
                                                     {bindTargets.length === 0
-                                                        ? "A model opened on its own has no object, type or category to bind to. Open " +
-                                                          "it through a game object to bind a preset to a whole roster."
-                                                        : "A bound preset is applied when the model opens, most specific rule first: " +
-                                                          "this object beats its type, and its type beats a category. Moving the " +
-                                                          "camera afterwards is always allowed."}
+                                                        ? l10n.t(
+                                                              "A model opened on its own has no object, type or category to bind to. Open it through a game object to bind a preset to a whole roster.",
+                                                          )
+                                                        : l10n.t(
+                                                              "A bound preset is applied when the model opens, most specific rule first: this object beats its type, and its type beats a category. Moving the camera afterwards is always allowed.",
+                                                          )}
                                                 </>
                                             }
                                             value={
@@ -8933,15 +8971,17 @@ function ModelPreview(): React.JSX.Element {
                                             {bindTargets.map((target) => (
                                                 <Button
                                                     key={target.kind}
-                                                    title={`Open every ${target.what} with ${
+                                                    title={l10n.t(
+                                                        "Open every {0} with {1}",
+                                                        target.what,
                                                         cameraPresets.length ===
-                                                        0
+                                                            0
                                                             ? "a camera preset"
                                                             : cameraPresets[
                                                                   cameraPresets.length -
                                                                       1
-                                                              ].name
-                                                    }`}
+                                                              ].name,
+                                                    )}
                                                     disabled={
                                                         cameraPresets.length ===
                                                         0
@@ -8984,14 +9024,15 @@ function ModelPreview(): React.JSX.Element {
 
                                             {boundRule !== null && (
                                                 <Button
-                                                    title={`Stop opening ${
+                                                    title={l10n.t(
+                                                        "Stop opening {0} with a camera preset",
                                                         boundRule.kind ===
-                                                        "object"
+                                                            "object"
                                                             ? "this object"
                                                             : `every ${
                                                                   boundRule.value
-                                                              }`
-                                                    } with a camera preset`}
+                                                              }`,
+                                                    )}
                                                     onClick={() =>
                                                         setCameraBindings(
                                                             (current) =>
@@ -9004,7 +9045,7 @@ function ModelPreview(): React.JSX.Element {
                                                     }
                                                 >
                                                     <Icon name="remove" />
-                                                    Unbind
+                                                    {l10n.t("Unbind")}
                                                 </Button>
                                             )}
                                         </Field>
@@ -9012,45 +9053,51 @@ function ModelPreview(): React.JSX.Element {
 
                                     <DockSection
                                         id="camera.view"
-                                        title="View"
+                                        title={l10n.t("View")}
                                         collapsed={folded.has("camera.view")}
                                         onToggle={toggleSection}
                                     >
                                         <Field
-                                            label="Draw distance"
+                                            label={l10n.t("Draw distance")}
                                             info={
                                                 <>
-                                                    The fit already reaches the
-                                                    end of the effects, not just
-                                                    the hull. A long trail needs
-                                                    more reach; a huge model may
-                                                    z-fight then.
+                                                    {l10n.t(
+                                                        "The fit already reaches the end of the effects, not just the hull. A long trail needs more reach; a huge model may z-fight then.",
+                                                    )}
                                                 </>
                                             }
                                         >
                                             <ModeSelector
-                                                label="Draw distance"
+                                                label={l10n.t("Draw distance")}
                                                 value={String(drawDistance)}
                                                 options={[
                                                     {
                                                         id: "1",
-                                                        label: "Fit",
-                                                        title: "Fit the model and its effects",
+                                                        label: l10n.t("Fit"),
+                                                        title: l10n.t(
+                                                            "Fit the model and its effects",
+                                                        ),
                                                     },
                                                     {
                                                         id: "2",
-                                                        label: "2x",
-                                                        title: "Twice the fitted distance",
+                                                        label: l10n.t("2x"),
+                                                        title: l10n.t(
+                                                            "Twice the fitted distance",
+                                                        ),
                                                     },
                                                     {
                                                         id: "4",
-                                                        label: "4x",
-                                                        title: "Four times",
+                                                        label: l10n.t("4x"),
+                                                        title: l10n.t(
+                                                            "Four times",
+                                                        ),
                                                     },
                                                     {
                                                         id: "8",
-                                                        label: "8x",
-                                                        title: "Eight times",
+                                                        label: l10n.t("8x"),
+                                                        title: l10n.t(
+                                                            "Eight times",
+                                                        ),
                                                     },
                                                 ]}
                                                 onSelect={(value) =>
@@ -9064,12 +9111,12 @@ function ModelPreview(): React.JSX.Element {
 
                                     <DockSection
                                         id="camera.capture"
-                                        title="Capture"
+                                        title={l10n.t("Capture")}
                                         collapsed={folded.has("camera.capture")}
                                         onToggle={toggleSection}
                                     >
                                         <Field
-                                            label="Capture"
+                                            label={l10n.t("Capture")}
                                             value={
                                                 captureDims
                                                     ? `${captureDims.width} x ${captureDims.height}`
@@ -9077,16 +9124,14 @@ function ModelPreview(): React.JSX.Element {
                                             }
                                             info={
                                                 <>
-                                                    Writes the framed area at
-                                                    the chosen size. Grid,
-                                                    floor, effects and
-                                                    annotations stay out unless
-                                                    kept.
+                                                    {l10n.t(
+                                                        "Writes the framed area at the chosen size. Grid, floor, effects and annotations stay out unless kept.",
+                                                    )}
                                                 </>
                                             }
                                         >
                                             <ModeSelector
-                                                label="Capture size"
+                                                label={l10n.t("Capture size")}
                                                 value={captureSizeId}
                                                 options={[
                                                     ...CAPTURE_SIZES.map(
@@ -9098,8 +9143,11 @@ function ModelPreview(): React.JSX.Element {
                                                     ),
                                                     {
                                                         id: "custom",
-                                                        label: "Custom",
-                                                        title: `Custom - up to ${MAX_SIDE}`,
+                                                        label: l10n.t("Custom"),
+                                                        title: l10n.t(
+                                                            "Custom - up to {0}",
+                                                            MAX_SIDE,
+                                                        ),
                                                     },
                                                 ]}
                                                 onSelect={setCaptureSizeId}
@@ -9123,7 +9171,7 @@ function ModelPreview(): React.JSX.Element {
                                                         )
                                                     }
                                                 />
-                                                x
+                                                {l10n.t("x")}
                                                 <IntegerField
                                                     value={customCapture.height}
                                                     ariaLabel="Height"
@@ -9153,7 +9201,9 @@ function ModelPreview(): React.JSX.Element {
                                                         )
                                                     }
                                                 />
-                                                Transparent background
+                                                {l10n.t(
+                                                    "Transparent background",
+                                                )}
                                             </label>
 
                                             <label className="check-row">
@@ -9166,8 +9216,9 @@ function ModelPreview(): React.JSX.Element {
                                                         )
                                                     }
                                                 />
-                                                Keep the grid, floor, effects
-                                                and markers
+                                                {l10n.t(
+                                                    "Keep the grid, floor, effects and markers",
+                                                )}
                                             </label>
 
                                             <Button
@@ -9235,7 +9286,7 @@ function ModelPreview(): React.JSX.Element {
                                                 }}
                                             >
                                                 <Icon name="capture" />
-                                                Save a picture
+                                                {l10n.t("Save a picture")}
                                             </Button>
                                         </Field>
                                     </DockSection>
@@ -9276,15 +9327,19 @@ function ModelPreview(): React.JSX.Element {
                                     <div
                                         className="stage-chrome subject-state"
                                         role="group"
-                                        aria-label="Model state"
+                                        aria-label={l10n.t("Model state")}
                                     >
                                         {levels.alt.length > 1 && (
                                             <label
                                                 className="stage-field"
                                                 title={
                                                     altDrivenByHull
-                                                        ? "Damage state follows the hull in Gameplay"
-                                                        : "Set damage state - 0 is undamaged"
+                                                        ? l10n.t(
+                                                              "Damage state follows the hull in Gameplay",
+                                                          )
+                                                        : l10n.t(
+                                                              "Set damage state - 0 is undamaged",
+                                                          )
                                                 }
                                             >
                                                 <Icon name="damage" />
@@ -9326,7 +9381,9 @@ function ModelPreview(): React.JSX.Element {
                                         {levels.lod.length > 1 && (
                                             <label
                                                 className="stage-field detail"
-                                                title="Set LOD - 0 is lowest detail in EaW"
+                                                title={l10n.t(
+                                                    "Set LOD - 0 is lowest detail in EaW",
+                                                )}
                                             >
                                                 <Icon name="detail" />
                                                 <input
@@ -9386,7 +9443,7 @@ function ModelPreview(): React.JSX.Element {
                                             <div
                                                 className="stage-chrome ability-bar"
                                                 role="group"
-                                                aria-label="Abilities"
+                                                aria-label={l10n.t("Abilities")}
                                             >
                                                 {abilities.map((ability) => (
                                                     <button
@@ -9455,7 +9512,9 @@ function ModelPreview(): React.JSX.Element {
                                                             : undefined
                                                     }
                                                     expanded={abilitiesOpen}
-                                                    title="Show abilities"
+                                                    title={l10n.t(
+                                                        "Show abilities",
+                                                    )}
                                                     onClick={() =>
                                                         setAbilitiesOpen(
                                                             (open) => !open,
@@ -9482,7 +9541,9 @@ function ModelPreview(): React.JSX.Element {
                                             <div
                                                 className="stage-chrome status-bars"
                                                 role="group"
-                                                aria-label="What the unit has left"
+                                                aria-label={l10n.t(
+                                                    "What the unit has left",
+                                                )}
                                             >
                                                 {poolRows(
                                                     scene?.defence,
@@ -9545,11 +9606,12 @@ function ModelPreview(): React.JSX.Element {
                                                     "as-action" +
                                                     (justFired ? " fired" : "")
                                                 }
-                                                title={`Fire at ${
+                                                title={l10n.t(
+                                                    "Fire at {0}",
                                                     fireTarget === "hull"
                                                         ? "the whole unit"
-                                                        : fireTarget
-                                                }`}
+                                                        : fireTarget,
+                                                )}
                                                 disabled={
                                                     fireTarget === "hull" &&
                                                     !shipTargetable
@@ -9560,7 +9622,9 @@ function ModelPreview(): React.JSX.Element {
                                             <IconButton
                                                 icon="repair"
                                                 className="as-action"
-                                                title="Repair the target"
+                                                title={l10n.t(
+                                                    "Repair the target",
+                                                )}
                                                 onClick={() => {
                                                     repairTarget();
                                                     destroyAll(false, false);
@@ -9585,7 +9649,9 @@ function ModelPreview(): React.JSX.Element {
                                                         : undefined
                                                 }
                                                 expanded={attackOpen}
-                                                title="Weapon settings"
+                                                title={l10n.t(
+                                                    "Weapon settings",
+                                                )}
                                                 onClick={() =>
                                                     setAttackOpen(
                                                         (open) => !open,
@@ -9605,7 +9671,7 @@ function ModelPreview(): React.JSX.Element {
                                                         : undefined
                                                 }
                                                 expanded={logOpen}
-                                                title="Damage log"
+                                                title={l10n.t("Damage log")}
                                                 disabled={
                                                     damageLog.length === 0
                                                 }
@@ -9634,7 +9700,7 @@ function ModelPreview(): React.JSX.Element {
                                 ref={abilitiesRef}
                             >
                                 <div className="stage-flyout-head">
-                                    Abilities
+                                    {l10n.t("Abilities")}
                                     {/* Pushed right, as every other count in the panel is. Beside
                                         the word it read as part of the title. */}
                                     <span className="section-count header-right">
@@ -9642,7 +9708,7 @@ function ModelPreview(): React.JSX.Element {
                                     </span>
                                     <IconButton
                                         icon="close"
-                                        title="Close"
+                                        title={l10n.t("Close")}
                                         onClick={() => setAbilitiesOpen(false)}
                                     />
                                 </div>
@@ -9730,7 +9796,7 @@ function ModelPreview(): React.JSX.Element {
                                                             infoAbility ===
                                                             ability.type
                                                         }
-                                                        title="Info"
+                                                        title={l10n.t("Info")}
                                                         disabled={
                                                             abilityFacts(
                                                                 ability,
@@ -9775,22 +9841,22 @@ function ModelPreview(): React.JSX.Element {
                             >
                                 <div
                                     className="resize-handle-n"
-                                    title="Drag to resize"
+                                    title={l10n.t("Drag to resize")}
                                     {...logResizeN}
                                 />
                                 <div
                                     className="resize-handle-w"
-                                    title="Drag to resize"
+                                    title={l10n.t("Drag to resize")}
                                     {...logResizeW}
                                 />
                                 <div className="stage-flyout-head">
-                                    Damage log
+                                    {l10n.t("Damage log")}
                                     <span className="section-count header-right">
                                         {damageLog.length}
                                     </span>
                                     <IconButton
                                         icon="close"
-                                        title="Close"
+                                        title={l10n.t("Close")}
                                         onClick={() => setLogOpen(false)}
                                     />
                                 </div>
@@ -9857,11 +9923,11 @@ function ModelPreview(): React.JSX.Element {
                                     <span className="view-row">
                                         <Button
                                             compact
-                                            title="Empty the log"
+                                            title={l10n.t("Empty the log")}
                                             onClick={() => setDamageLog([])}
                                         >
                                             <Icon name="remove" />
-                                            Clear
+                                            {l10n.t("Clear")}
                                         </Button>
                                     </span>
                                 </div>
@@ -9875,10 +9941,10 @@ function ModelPreview(): React.JSX.Element {
                                 ref={attackRef}
                             >
                                 <div className="stage-flyout-head">
-                                    Weapon
+                                    {l10n.t("Weapon")}
                                     <IconButton
                                         icon="close"
-                                        title="Close"
+                                        title={l10n.t("Close")}
                                         onClick={() => setAttackOpen(false)}
                                     />
                                 </div>
@@ -9887,7 +9953,7 @@ function ModelPreview(): React.JSX.Element {
                                         scene?.defence !== null &&
                                         scene?.defence !== undefined && (
                                             <DockSection
-                                                title="Attacker"
+                                                title={l10n.t("Attacker")}
                                                 count={
                                                     scene.defence.isShielded
                                                         ? "shielded"
@@ -9895,13 +9961,12 @@ function ModelPreview(): React.JSX.Element {
                                                 }
                                             >
                                                 <div className="field-note">
-                                                    The model on stage is the
-                                                    TARGET. Build a weapon here
-                                                    and fire it at the unit or
-                                                    at one hardpoint.
+                                                    {l10n.t(
+                                                        "The model on stage is the TARGET. Build a weapon here and fire it at the unit or at one hardpoint.",
+                                                    )}
                                                 </div>
 
-                                                <Field label="Damage">
+                                                <Field label={l10n.t("Damage")}>
                                                     <input
                                                         type="number"
                                                         min={0}
@@ -9921,7 +9986,9 @@ function ModelPreview(): React.JSX.Element {
                                                 </Field>
 
                                                 <Field
-                                                    label="Damage type"
+                                                    label={l10n.t(
+                                                        "Damage type",
+                                                    )}
                                                     valueTitle={
                                                         "What the damage table says against this " +
                                                         "target's armor. A pair the table does not name is " +
@@ -9934,18 +10001,20 @@ function ModelPreview(): React.JSX.Element {
                                             actually take is the hull's. Reading the scene's
                                             own copy showed the shield column beside a bar
                                             that had just gone flat. */}
-                                                            x
-                                                            {armorFactor(
-                                                                attacker.shield &&
-                                                                    liveDefence?.isShielded ===
-                                                                        true
-                                                                    ? scene
-                                                                          .defence
-                                                                          .shieldFactors
-                                                                    : scene
-                                                                          .defence
-                                                                          .hullFactors,
-                                                                attacker.damageType,
+                                                            {l10n.t(
+                                                                "x{0}",
+                                                                armorFactor(
+                                                                    attacker.shield &&
+                                                                        liveDefence?.isShielded ===
+                                                                            true
+                                                                        ? scene
+                                                                              .defence
+                                                                              .shieldFactors
+                                                                        : scene
+                                                                              .defence
+                                                                              .hullFactors,
+                                                                    attacker.damageType,
+                                                                ),
                                                             )}
                                                         </>
                                                     }
@@ -9964,7 +10033,9 @@ function ModelPreview(): React.JSX.Element {
                                                                 }),
                                                             )
                                                         }
-                                                        title="Which damage type the shot does"
+                                                        title={l10n.t(
+                                                            "Which damage type the shot does",
+                                                        )}
                                                     >
                                                         {/* The reader's own value first when the tree does not
                                             declare it - a preset saved against another mod must not
@@ -9977,11 +10048,11 @@ function ModelPreview(): React.JSX.Element {
                                                                     attacker.damageType
                                                                 }
                                                             >
-                                                                {
-                                                                    attacker.damageType
-                                                                }{" "}
-                                                                (not in this
-                                                                tree)
+                                                                {l10n.t(
+                                                                    "{0}{1}(not in this tree)",
+                                                                    attacker.damageType,
+                                                                    " ",
+                                                                )}
                                                             </option>
                                                         )}
                                                         {scene.defence.damageTypes.map(
@@ -10051,15 +10122,20 @@ function ModelPreview(): React.JSX.Element {
                                     range reaches nobody and the fields below it are moot - they
                                     disable rather than vanish, since a reader who has typed a
                                     damage and seen nothing happen needs to see the reason. */}
-                                                <Field label="Blast damage">
+                                                <Field
+                                                    label={l10n.t(
+                                                        "Blast damage",
+                                                    )}
+                                                >
                                                     <input
                                                         type="number"
                                                         min={0}
                                                         value={
                                                             attacker.blastDamage
                                                         }
-                                                        title="Projectile_Blast_Area_Damage - applied to the target
-                                            AND to everything inside the range below"
+                                                        title={l10n.t(
+                                                            "Projectile_Blast_Area_Damage - applied to the target AND to everything inside the range below",
+                                                        )}
                                                         onChange={(e) =>
                                                             setAttacker(
                                                                 (current) => ({
@@ -10076,15 +10152,20 @@ function ModelPreview(): React.JSX.Element {
                                                     />
                                                 </Field>
 
-                                                <Field label="Blast range">
+                                                <Field
+                                                    label={l10n.t(
+                                                        "Blast range",
+                                                    )}
+                                                >
                                                     <input
                                                         type="number"
                                                         min={0}
                                                         value={
                                                             attacker.blastRange
                                                         }
-                                                        title="Projectile_Blast_Area_Range, in engine units.
-                                            The target itself is always hit."
+                                                        title={l10n.t(
+                                                            "Projectile_Blast_Area_Range, in engine units. The target itself is always hit.",
+                                                        )}
                                                         onChange={(e) =>
                                                             setAttacker(
                                                                 (current) => ({
@@ -10104,8 +10185,9 @@ function ModelPreview(): React.JSX.Element {
                                                 <div className="view-row">
                                                     <label
                                                         className="field-label"
-                                                        title="Projectile_Blast_Area_Dropoff - the blast weakens
-                                            with distance instead of being flat"
+                                                        title={l10n.t(
+                                                            "Projectile_Blast_Area_Dropoff - the blast weakens with distance instead of being flat",
+                                                        )}
                                                     >
                                                         <input
                                                             type="checkbox"
@@ -10130,15 +10212,16 @@ function ModelPreview(): React.JSX.Element {
                                                                 )
                                                             }
                                                         />
-                                                        Falls off
+                                                        {l10n.t("Falls off")}
                                                     </label>
 
                                                     <label
                                                         className="field-label"
-                                                        title="Projectile_Blast_Area_Dropoff_Tiers - how many bands
-                                            it falls off in. Shipped values are 3, 4 or 5."
+                                                        title={l10n.t(
+                                                            "Projectile_Blast_Area_Dropoff_Tiers - how many bands it falls off in. Shipped values are 3, 4 or 5.",
+                                                        )}
                                                     >
-                                                        Tiers
+                                                        {l10n.t("Tiers")}
                                                         <input
                                                             type="number"
                                                             min={0}
@@ -10178,7 +10261,9 @@ function ModelPreview(): React.JSX.Element {
                                     armament is the wrong list. 105 of them, so the search is the
                                     way through rather than an optional extra. */}
                                                 <Field
-                                                    label="Fill from a projectile"
+                                                    label={l10n.t(
+                                                        "Fill from a projectile",
+                                                    )}
                                                     value={
                                                         <>
                                                             {scene
@@ -10189,7 +10274,9 @@ function ModelPreview(): React.JSX.Element {
                                                 >
                                                     <input
                                                         type="text"
-                                                        placeholder="Search projectiles"
+                                                        placeholder={l10n.t(
+                                                            "Search projectiles",
+                                                        )}
                                                         value={projectileSearch}
                                                         onChange={(e) =>
                                                             setProjectileSearch(
@@ -10280,7 +10367,9 @@ function ModelPreview(): React.JSX.Element {
                                     not this model, so they live in globalState beside the camera
                                     presets and survive opening a different ship. */}
                                                 <Field
-                                                    label="Saved weapons"
+                                                    label={l10n.t(
+                                                        "Saved weapons",
+                                                    )}
                                                     value={
                                                         <>
                                                             {
@@ -10321,12 +10410,18 @@ function ModelPreview(): React.JSX.Element {
                                                         title={
                                                             attackerPresets.length ===
                                                             0
-                                                                ? "Name a configuration below to save it here."
-                                                                : "Loads a saved weapon into the fields above."
+                                                                ? l10n.t(
+                                                                      "Name a configuration below to save it here.",
+                                                                  )
+                                                                : l10n.t(
+                                                                      "Loads a saved weapon into the fields above.",
+                                                                  )
                                                         }
                                                     >
                                                         <option value="">
-                                                            Recall a weapon...
+                                                            {l10n.t(
+                                                                "Recall a weapon...",
+                                                            )}
                                                         </option>
                                                         {attackerPresets.map(
                                                             (saved) => (
@@ -10348,7 +10443,9 @@ function ModelPreview(): React.JSX.Element {
                                                 <span className="view-row">
                                                     <input
                                                         type="text"
-                                                        placeholder="Name this weapon"
+                                                        placeholder={l10n.t(
+                                                            "Name this weapon",
+                                                        )}
                                                         value={presetName}
                                                         onChange={(e) =>
                                                             setPresetName(
@@ -10358,7 +10455,9 @@ function ModelPreview(): React.JSX.Element {
                                                     />
                                                     <Button
                                                         compact
-                                                        title="Saves these values under that name, for any model"
+                                                        title={l10n.t(
+                                                            "Saves these values under that name, for any model",
+                                                        )}
                                                         disabled={
                                                             presetName.trim() ===
                                                             ""
@@ -10389,11 +10488,13 @@ function ModelPreview(): React.JSX.Element {
                                                         }}
                                                     >
                                                         <Icon name="save" />
-                                                        Save
+                                                        {l10n.t("Save")}
                                                     </Button>
                                                     <Button
                                                         compact
-                                                        title="Remove every saved weapon"
+                                                        title={l10n.t(
+                                                            "Remove every saved weapon",
+                                                        )}
                                                         disabled={
                                                             attackerPresets.length ===
                                                             0
@@ -10406,7 +10507,7 @@ function ModelPreview(): React.JSX.Element {
                                                         }
                                                     >
                                                         <Icon name="remove" />
-                                                        Clear
+                                                        {l10n.t("Clear")}
                                                     </Button>
                                                 </span>
                                             </DockSection>
@@ -10421,7 +10522,7 @@ function ModelPreview(): React.JSX.Element {
                             className="preview-problems"
                             memoKey="modelPreview.problems"
                             defaultHeight={140}
-                            title={`Problems (${notices.length})`}
+                            title={l10n.t("Problems ({0})", notices.length)}
                             onClose={() => setProblemsOpen(false)}
                         >
                             {/* The scrolling part, and the reason the panel scrolls at all: the
@@ -10526,30 +10627,32 @@ function ModelPreview(): React.JSX.Element {
                                     </div>
                                     {stats === null ? (
                                         <div className="dock-hint">
-                                            Nothing loaded yet.
+                                            {l10n.t("Nothing loaded yet.")}
                                         </div>
                                     ) : (
                                         <>
                                             <div className="stat-row">
-                                                <span>Parts</span>
+                                                <span>{l10n.t("Parts")}</span>
                                                 <span className="value">
                                                     {stats.parts}
                                                 </span>
                                             </div>
                                             <div className="stat-row">
-                                                <span>Meshes</span>
+                                                <span>{l10n.t("Meshes")}</span>
                                                 <span className="value">
                                                     {stats.meshes}
                                                 </span>
                                             </div>
                                             <div className="stat-row">
-                                                <span>Triangles</span>
+                                                <span>
+                                                    {l10n.t("Triangles")}
+                                                </span>
                                                 <span className="value">
                                                     {stats.triangles.toLocaleString()}
                                                 </span>
                                             </div>
                                             <div className="stat-row">
-                                                <span>Bones</span>
+                                                <span>{l10n.t("Bones")}</span>
                                                 <span className="value">
                                                     {stats.bones}
                                                 </span>
@@ -10566,11 +10669,14 @@ function ModelPreview(): React.JSX.Element {
                                                 0 && (
                                                 <div
                                                     className="stat-row"
-                                                    title="The engine lights everything with the three scene
-                                                    directionals instead"
+                                                    title={l10n.t(
+                                                        "The engine lights everything with the three scene directionals instead",
+                                                    )}
                                                 >
                                                     <span>
-                                                        Lights (ignored)
+                                                        {l10n.t(
+                                                            "Lights (ignored)",
+                                                        )}
                                                     </span>
                                                     <span className="value">
                                                         {
@@ -10651,7 +10757,7 @@ function ModelPreview(): React.JSX.Element {
                                 // plain count cannot. The order within the group is still fixed, and
                                 // the group still takes the section's one auto margin.
                                 <DockSection
-                                    title="Model tree"
+                                    title={l10n.t("Model tree")}
                                     end={
                                         <>
                                             {/* The way OUT of a selection. Escape has always cleared
@@ -10662,10 +10768,15 @@ function ModelPreview(): React.JSX.Element {
                                             {selected.size > 0 && (
                                                 <button
                                                     className="section-count as-button"
-                                                    title="Clear the selection"
+                                                    title={l10n.t(
+                                                        "Clear the selection",
+                                                    )}
                                                     onClick={clearSelection}
                                                 >
-                                                    {selected.size} selected
+                                                    {l10n.t(
+                                                        "{0} selected",
+                                                        selected.size,
+                                                    )}
                                                     <Icon
                                                         name="close"
                                                         size={11}
@@ -10683,7 +10794,9 @@ function ModelPreview(): React.JSX.Element {
                                                 title={
                                                     filterSummary === null
                                                         ? undefined
-                                                        : "Some rows are filtered out"
+                                                        : l10n.t(
+                                                              "Some rows are filtered out",
+                                                          )
                                                 }
                                             >
                                                 {filterSummary ??
@@ -10699,7 +10812,9 @@ function ModelPreview(): React.JSX.Element {
                                                 icon="reset"
                                                 className="header-right"
                                                 size={13}
-                                                title="Put the model back the way it opened"
+                                                title={l10n.t(
+                                                    "Put the model back the way it opened",
+                                                )}
                                                 disabled={!touched}
                                                 disabledReason="The model is as it opened"
                                                 onClick={resetModel}
@@ -10934,7 +11049,10 @@ ${becauseText(node.because)}`
                                                                 detailsRow ===
                                                                 node.id
                                                             }
-                                                            title={`Inspect ${node.name}`}
+                                                            title={l10n.t(
+                                                                "Inspect {0}",
+                                                                node.name,
+                                                            )}
                                                             onClick={(
                                                                 event,
                                                             ) => {
@@ -10953,7 +11071,9 @@ ${becauseText(node.because)}`
                                         the height of the tree. */}
                                             {treeRows.length === 0 && (
                                                 <li className="dock-hint tree-empty">
-                                                    Nothing matches that filter.
+                                                    {l10n.t(
+                                                        "Nothing matches that filter.",
+                                                    )}
                                                 </li>
                                             )}
                                         </ul>
@@ -10994,7 +11114,9 @@ ${becauseText(node.because)}`
                                                     type="text"
                                                     autoFocus
                                                     value={boneFilter}
-                                                    placeholder="Filter the tree, e.g. HP_"
+                                                    placeholder={l10n.t(
+                                                        "Filter the tree, e.g. HP_",
+                                                    )}
                                                     onChange={(e) =>
                                                         setBoneFilter(
                                                             e.target.value,
@@ -11031,8 +11153,12 @@ ${becauseText(node.because)}`
                                                     expanded={searchOpen}
                                                     title={
                                                         searchOpen
-                                                            ? "Close the filter"
-                                                            : "Filter the tree by name"
+                                                            ? l10n.t(
+                                                                  "Close the filter",
+                                                              )
+                                                            : l10n.t(
+                                                                  "Filter the tree by name",
+                                                              )
                                                     }
                                                     onClick={() => {
                                                         // Closing clears. A pattern kept behind a closed box
@@ -11063,7 +11189,12 @@ ${becauseText(node.because)}`
                                                         pressed={kinds.has(
                                                             kind,
                                                         )}
-                                                        title={`Show ${KIND_LABELS[kind].toLowerCase()}`}
+                                                        title={l10n.t(
+                                                            "Show {0}",
+                                                            KIND_LABELS[
+                                                                kind
+                                                            ].toLowerCase(),
+                                                        )}
                                                         onClick={() =>
                                                             setKinds(
                                                                 (current) => {
@@ -11105,7 +11236,7 @@ ${becauseText(node.because)}`
                             `FAMILIES` in `particleScene.ts` for how a meaning is recognised. */}
                             {mode === "model" && groups.length > 0 && (
                                 <DockSection
-                                    title="Effect groups"
+                                    title={l10n.t("Effect groups")}
                                     count={groups.length}
                                 >
                                     <ul className="part-list">
@@ -11149,7 +11280,11 @@ ${becauseText(node.because)}`
                                                         />
                                                         {group.label}
                                                         <span className="section-count">
-                                                            x{group.ids.length}
+                                                            {l10n.t(
+                                                                "x{0}",
+                                                                group.ids
+                                                                    .length,
+                                                            )}
                                                         </span>
                                                     </label>
                                                 </li>
@@ -11161,7 +11296,7 @@ ${becauseText(node.because)}`
 
                             {emitters.length > 0 && (
                                 <DockSection
-                                    title="Emitters"
+                                    title={l10n.t("Emitters")}
                                     count={emitters.length}
                                 >
                                     <ul className="part-list">
@@ -11195,14 +11330,14 @@ ${becauseText(node.because)}`
 
                             {mode === "animation" && (
                                 <DockSection
-                                    title="Animations"
+                                    title={l10n.t("Animations")}
                                     count={animations.length}
                                 >
                                     {animations.length === 0 ? (
                                         <div className="field-note">
-                                            This model carries no animations. An
-                                            .ala beside it only counts when its
-                                            skeleton matches.
+                                            {l10n.t(
+                                                "This model carries no animations. An .ala beside it only counts when its skeleton matches.",
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="anim-list">
@@ -11217,14 +11352,16 @@ ${becauseText(node.because)}`
                                                         ? " active"
                                                         : "")
                                                 }
-                                                title="Stop - show the rest pose"
+                                                title={l10n.t(
+                                                    "Stop - show the rest pose",
+                                                )}
                                                 onClick={() =>
                                                     setAnimation(null)
                                                 }
                                             >
                                                 <Icon name="stop" />
                                                 <span className="anim-name">
-                                                    Rest pose
+                                                    {l10n.t("Rest pose")}
                                                 </span>
                                             </button>
 
@@ -11260,8 +11397,14 @@ ${becauseText(node.because)}`
                                                             }
                                                             title={
                                                                 folded
-                                                                    ? `Open ${group.label.toLowerCase()}`
-                                                                    : `Fold ${group.label.toLowerCase()} away`
+                                                                    ? l10n.t(
+                                                                          "Open {0}",
+                                                                          group.label.toLowerCase(),
+                                                                      )
+                                                                    : l10n.t(
+                                                                          "Fold {0} away",
+                                                                          group.label.toLowerCase(),
+                                                                      )
                                                             }
                                                             onClick={() =>
                                                                 toggleFamily(
@@ -11346,12 +11489,11 @@ ${becauseText(node.because)}`
                                 (scene?.hardpoints.length ?? 0) === 0 &&
                                 weapons.length === 0 &&
                                 abilities.length === 0 && (
-                                    <DockSection title="Gameplay">
+                                    <DockSection title={l10n.t("Gameplay")}>
                                         <div className="field-note">
-                                            This unit declares no weapons, no
-                                            hardpoints and no abilities, so
-                                            there is nothing to destroy and no
-                                            damage effects to drive.
+                                            {l10n.t(
+                                                "This unit declares no weapons, no hardpoints and no abilities, so there is nothing to destroy and no damage effects to drive.",
+                                            )}
                                         </div>
                                     </DockSection>
                                 )}
@@ -11361,7 +11503,7 @@ ${becauseText(node.because)}`
                             hardpoints at all, so this is not an edge case - it is every fighter. */}
                             {mode === "gameplay" && looseWeapons.length > 0 && (
                                 <DockSection
-                                    title="Unit weapons"
+                                    title={l10n.t("Unit weapons")}
                                     count={looseWeapons.length}
                                 >
                                     {/* The hardpoints' own card, which is what the user asked for -
@@ -11428,7 +11570,9 @@ ${becauseText(node.because)}`
                                                         pressed={sweeping.has(
                                                             row.id,
                                                         )}
-                                                        title="Move turret"
+                                                        title={l10n.t(
+                                                            "Move turret",
+                                                        )}
                                                         disabled={
                                                             !sweepable.some(
                                                                 (s) =>
@@ -11460,7 +11604,7 @@ ${becauseText(node.because)}`
                                                         expanded={
                                                             infoCard === row.id
                                                         }
-                                                        title="Info"
+                                                        title={l10n.t("Info")}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             setInfoCard(
@@ -11481,7 +11625,7 @@ ${becauseText(node.because)}`
 
                             {mode === "gameplay" && cards.length > 0 && (
                                 <DockSection
-                                    title="Hardpoints"
+                                    title={l10n.t("Hardpoints")}
                                     count={cards.length}
                                     end={
                                         <>
@@ -11489,7 +11633,9 @@ ${becauseText(node.because)}`
                                                 icon="effects"
                                                 className="header-right"
                                                 size={13}
-                                                title="Destroy all hardpoints"
+                                                title={l10n.t(
+                                                    "Destroy all hardpoints",
+                                                )}
                                                 disabled={
                                                     !cards.some(
                                                         (c) => c.isDestroyable,
@@ -11502,7 +11648,9 @@ ${becauseText(node.because)}`
                                                 icon="reset"
                                                 className="header-right"
                                                 size={13}
-                                                title="Repair all hardpoints"
+                                                title={l10n.t(
+                                                    "Repair all hardpoints",
+                                                )}
                                                 disabled={destroyed.size === 0}
                                                 disabledReason="Nothing is destroyed"
                                                 onClick={() =>
@@ -11513,9 +11661,9 @@ ${becauseText(node.because)}`
                                     }
                                 >
                                     <div className="field-note">
-                                        Hover a targeting mark to see its
-                                        tracked art; click one to aim the
-                                        attacker at that hardpoint.
+                                        {l10n.t(
+                                            "Hover a targeting mark to see its tracked art; click one to aim the attacker at that hardpoint.",
+                                        )}
                                     </div>
 
                                     {/* The tree's own search element, in the same shape: a magnifier
@@ -11536,7 +11684,9 @@ ${becauseText(node.because)}`
                                                 type="text"
                                                 autoFocus
                                                 value={hardpointFilter}
-                                                placeholder="Filter by type or name"
+                                                placeholder={l10n.t(
+                                                    "Filter by type or name",
+                                                )}
                                                 onChange={(e) =>
                                                     setHardpointFilter(
                                                         e.target.value,
@@ -11565,8 +11715,12 @@ ${becauseText(node.because)}`
                                                 expanded={hardpointSearchOpen}
                                                 title={
                                                     hardpointSearchOpen
-                                                        ? "Close the filter"
-                                                        : "Filter by type or name"
+                                                        ? l10n.t(
+                                                              "Close the filter",
+                                                          )
+                                                        : l10n.t(
+                                                              "Filter by type or name",
+                                                          )
                                                 }
                                                 onClick={() => {
                                                     if (hardpointSearchOpen) {
@@ -11582,7 +11736,9 @@ ${becauseText(node.because)}`
 
                                     {hardpointGroups.length === 0 && (
                                         <div className="field-note">
-                                            Nothing matches that filter.
+                                            {l10n.t(
+                                                "Nothing matches that filter.",
+                                            )}
                                         </div>
                                     )}
 
@@ -11598,8 +11754,14 @@ ${becauseText(node.because)}`
                                                 }
                                                 title={
                                                     foldedGroups.has(group.type)
-                                                        ? `Show the ${group.label.toLowerCase()} hardpoints`
-                                                        : `Hide the ${group.label.toLowerCase()} hardpoints`
+                                                        ? l10n.t(
+                                                              "Show the {0} hardpoints",
+                                                              group.label.toLowerCase(),
+                                                          )
+                                                        : l10n.t(
+                                                              "Hide the {0} hardpoints",
+                                                              group.label.toLowerCase(),
+                                                          )
                                                 }
                                                 onClick={() =>
                                                     setFoldedGroups((current) =>
@@ -11672,9 +11834,12 @@ ${becauseText(node.because)}`
                                                                         alt=""
                                                                         title={
                                                                             card.isTargetable
-                                                                                ? "The mark the game draws over this"
-                                                                                : "Is_Targetable is off, so the game " +
-                                                                                  "draws no mark over this"
+                                                                                ? l10n.t(
+                                                                                      "The mark the game draws over this",
+                                                                                  )
+                                                                                : l10n.t(
+                                                                                      "Is_Targetable is off, so the game draws no mark over this",
+                                                                                  )
                                                                         }
                                                                     />
                                                                 )}
@@ -11688,7 +11853,10 @@ ${becauseText(node.because)}`
                                                                 <button
                                                                     type="button"
                                                                     className="goto-definition"
-                                                                    title={`Go to where ${card.id} is defined`}
+                                                                    title={l10n.t(
+                                                                        "Go to where {0} is defined",
+                                                                        card.id,
+                                                                    )}
                                                                     onClick={(
                                                                         event,
                                                                     ) => {
@@ -11744,7 +11912,9 @@ ${becauseText(node.because)}`
                                                                     null && (
                                                                     <span
                                                                         className="detail card-type"
-                                                                        title="This key resolves to no text"
+                                                                        title={l10n.t(
+                                                                            "This key resolves to no text",
+                                                                        )}
                                                                     >
                                                                         {
                                                                             card.tooltipKey
@@ -11846,8 +12016,12 @@ ${becauseText(node.because)}`
                                                                     }
                                                                     title={
                                                                         card.destroyed
-                                                                            ? "Repair hardpoint"
-                                                                            : "Destroy hardpoint"
+                                                                            ? l10n.t(
+                                                                                  "Repair hardpoint",
+                                                                              )
+                                                                            : l10n.t(
+                                                                                  "Destroy hardpoint",
+                                                                              )
                                                                     }
                                                                     disabled={
                                                                         !card.isDestroyable
@@ -11886,7 +12060,9 @@ ${becauseText(node.because)}`
                                                                     pressed={sweeping.has(
                                                                         card.id,
                                                                     )}
-                                                                    title="Move turret"
+                                                                    title={l10n.t(
+                                                                        "Move turret",
+                                                                    )}
                                                                     disabled={
                                                                         !card.sweepable
                                                                     }
@@ -11923,7 +12099,9 @@ ${becauseText(node.because)}`
                                                                         infoCard ===
                                                                         card.id
                                                                     }
-                                                                    title="Info"
+                                                                    title={l10n.t(
+                                                                        "Info",
+                                                                    )}
                                                                     onClick={(
                                                                         event,
                                                                     ) => {
@@ -11952,7 +12130,7 @@ ${becauseText(node.because)}`
                                 ((scene?.deathClones?.length ?? 0) > 0 ||
                                     (scene?.spinAway ?? null) !== null) && (
                                     <DockSection
-                                        title="Death clone"
+                                        title={l10n.t("Death clone")}
                                         count={
                                             (scene?.deathClones?.length ?? 0) +
                                             (scene?.spinAway === null ||
@@ -11982,7 +12160,9 @@ ${becauseText(node.because)}`
                                                                 ? " selected"
                                                                 : "")
                                                         }
-                                                        title="Spin_Away_On_Death"
+                                                        title={l10n.t(
+                                                            "Spin_Away_On_Death",
+                                                        )}
                                                     >
                                                         <div className="card-head">
                                                             {(scene?.deathClones
@@ -11991,7 +12171,9 @@ ${becauseText(node.because)}`
                                                                 <Icon name="check" />
                                                             )}
                                                             <span className="part-name">
-                                                                Spins away
+                                                                {l10n.t(
+                                                                    "Spins away",
+                                                                )}
                                                             </span>
                                                         </div>
 
@@ -12047,7 +12229,10 @@ ${becauseText(node.because)}`
                                                         <button
                                                             type="button"
                                                             className="goto-definition"
-                                                            title={`Go to where ${row.objectId} is defined`}
+                                                            title={l10n.t(
+                                                                "Go to where {0} is defined",
+                                                                row.objectId,
+                                                            )}
                                                             onClick={() =>
                                                                 vscode.postMessage(
                                                                     {
@@ -12075,8 +12260,9 @@ ${becauseText(node.because)}`
                                                 no tactical model. */}
                                                     {!row.resolved && (
                                                         <span className="detail wraps card-unresolved">
-                                                            Not defined, or
-                                                            declares no model
+                                                            {l10n.t(
+                                                                "Not defined, or declares no model",
+                                                            )}
                                                         </span>
                                                     )}
                                                 </li>
@@ -12100,7 +12286,10 @@ ${becauseText(node.because)}`
                                 <Button
                                     key={chip.mode}
                                     compact
-                                    title={`Switch to ${chip.mode} mode`}
+                                    title={l10n.t(
+                                        "Switch to {0} mode",
+                                        chip.mode,
+                                    )}
                                     onClick={() => setMode(chip.mode)}
                                 >
                                     {chip.text}
@@ -12120,30 +12309,36 @@ ${becauseText(node.because)}`
                             {mode === "model" && (
                                 <div className="field skeleton-field">
                                     <span className="field-label">
-                                        Skeleton
+                                        {l10n.t("Skeleton")}
                                     </span>
                                     <ModeSelector
-                                        label="How the skeleton is drawn"
+                                        label={l10n.t(
+                                            "How the skeleton is drawn",
+                                        )}
                                         value={skeletonMode}
                                         options={[
                                             {
                                                 id: "off",
-                                                label: "Off",
-                                                title: "No skeleton",
+                                                label: l10n.t("Off"),
+                                                title: l10n.t("No skeleton"),
                                             },
                                             {
                                                 id: "selected",
-                                                label: "Selected",
-                                                title: "Name the picked bone only",
+                                                label: l10n.t("Selected"),
+                                                title: l10n.t(
+                                                    "Name the picked bone only",
+                                                ),
                                             },
                                             {
                                                 id: "always",
-                                                label: "Always",
+                                                label: l10n.t("Always"),
                                                 // The dropping rule is real and worth knowing, but it
                                                 // is a thing the reader SEES the moment they press
                                                 // this on a large hull. The tooltip's job is to get
                                                 // them there.
-                                                title: "Name every bone",
+                                                title: l10n.t(
+                                                    "Name every bone",
+                                                ),
                                             },
                                         ]}
                                         onSelect={setSkeletonMode}
@@ -12161,7 +12356,7 @@ ${becauseText(node.because)}`
                             {mode === "animation" && animations.length > 0 && (
                                 <div className="dock-section player-section">
                                     <div className="dock-section-title">
-                                        Playback
+                                        {l10n.t("Playback")}
                                         {/* The ACTION and the take, which is what the reader picked - the
                                     filename repeats the model's name back at them. A rouletting
                                     action says so, because the clip under the playhead is about to
@@ -12169,7 +12364,7 @@ ${becauseText(node.because)}`
                                     look like a bug. */}
                                         <span className="section-count">
                                             {animation === null
-                                                ? "no clip"
+                                                ? l10n.t("no clip")
                                                 : playheadLabel(
                                                       actionOfClip.get(
                                                           animation,
@@ -12198,7 +12393,7 @@ ${becauseText(node.because)}`
                                         is already this panel's way of saying the same state. */}
                                             <IconButton
                                                 icon="previousClip"
-                                                title="Previous clip"
+                                                title={l10n.t("Previous clip")}
                                                 disabled={
                                                     orderedClips.length < 2
                                                 }
@@ -12207,7 +12402,7 @@ ${becauseText(node.because)}`
                                             />
                                             <IconButton
                                                 icon="firstFrame"
-                                                title="First frame"
+                                                title={l10n.t("First frame")}
                                                 disabled={animation === null}
                                                 disabledReason="Pick a clip below to play it"
                                                 onClick={() => seek(0)}
@@ -12218,11 +12413,13 @@ ${becauseText(node.because)}`
                                                 }
                                                 title={
                                                     playing
-                                                        ? "Pause"
+                                                        ? l10n.t("Pause")
                                                         : atEnd &&
                                                             !animationLoop
-                                                          ? "Play again from the first frame"
-                                                          : "Play"
+                                                          ? l10n.t(
+                                                                "Play again from the first frame",
+                                                            )
+                                                          : l10n.t("Play")
                                                 }
                                                 disabled={animation === null}
                                                 disabledReason="Pick a clip below to play it"
@@ -12230,7 +12427,7 @@ ${becauseText(node.because)}`
                                             />
                                             <IconButton
                                                 icon="lastFrame"
-                                                title="Last frame"
+                                                title={l10n.t("Last frame")}
                                                 disabled={animation === null}
                                                 disabledReason="Pick a clip below to play it"
                                                 onClick={() =>
@@ -12239,7 +12436,7 @@ ${becauseText(node.because)}`
                                             />
                                             <IconButton
                                                 icon="nextClip"
-                                                title="Next clip"
+                                                title={l10n.t("Next clip")}
                                                 disabled={
                                                     orderedClips.length < 2
                                                 }
@@ -12256,10 +12453,12 @@ ${becauseText(node.because)}`
                                                 pressed={animationLoop}
                                                 title={
                                                     animationLoop
-                                                        ? "Looping. Press to play the clip once and hold " +
-                                                          "its last frame."
-                                                        : "Playing once and holding the last frame. Press " +
-                                                          "to loop."
+                                                        ? l10n.t(
+                                                              "Looping. Press to play the clip once and hold its last frame.",
+                                                          )
+                                                        : l10n.t(
+                                                              "Playing once and holding the last frame. Press to loop.",
+                                                          )
                                                 }
                                                 disabled={animation === null}
                                                 disabledReason="Pick a clip below to play it"
@@ -12271,9 +12470,14 @@ ${becauseText(node.because)}`
                                             />
 
                                             <span className="player-time">
-                                                {playhead.time.toFixed(2)}
-                                                {" / "}
-                                                {playhead.duration.toFixed(2)}s
+                                                {l10n.t(
+                                                    "{0}{1}{2}s",
+                                                    playhead.time.toFixed(2),
+                                                    " / ",
+                                                    playhead.duration.toFixed(
+                                                        2,
+                                                    ),
+                                                )}
                                             </span>
                                         </div>
 
@@ -12288,7 +12492,7 @@ ${becauseText(node.because)}`
                                             )}
                                             step={0.001}
                                             value={playhead.time}
-                                            title="Drag to a frame"
+                                            title={l10n.t("Drag to a frame")}
                                             onPointerDown={() => {
                                                 scrubbingRef.current = true;
                                             }}
@@ -12310,10 +12514,15 @@ ${becauseText(node.because)}`
                                         />
 
                                         <Field
-                                            label="Speed"
+                                            label={l10n.t("Speed")}
                                             value={
                                                 <>
-                                                    {animationSpeed.toFixed(2)}x
+                                                    {l10n.t(
+                                                        "{0}x",
+                                                        animationSpeed.toFixed(
+                                                            2,
+                                                        ),
+                                                    )}
                                                 </>
                                             }
                                         >
@@ -12324,7 +12533,7 @@ ${becauseText(node.because)}`
                                                 max={2}
                                                 step={0.05}
                                                 value={animationSpeed}
-                                                title="Playback speed"
+                                                title={l10n.t("Playback speed")}
                                                 onChange={(e) =>
                                                     setAnimationSpeed(
                                                         Number(e.target.value),
@@ -12368,7 +12577,7 @@ ${becauseText(node.because)}`
                             </span>
                             <IconButton
                                 icon="close"
-                                title="Close"
+                                title={l10n.t("Close")}
                                 onClick={() => setInfoAbility(null)}
                             />
                         </div>
@@ -12408,7 +12617,7 @@ ${becauseText(node.because)}`
                             <span className="details-title">{infoCard}</span>
                             <IconButton
                                 icon="close"
-                                title="Close"
+                                title={l10n.t("Close")}
                                 onClick={() => setInfoCard(null)}
                             />
                         </div>

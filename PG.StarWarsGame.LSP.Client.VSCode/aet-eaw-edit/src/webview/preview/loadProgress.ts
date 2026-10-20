@@ -14,6 +14,7 @@
 // So the fix is not to reorder the load - it is to stop showing it. The viewport is covered until
 // the model is dressed, and what the reader gets instead is a statement of what is being waited on.
 
+import * as l10n from "@vscode/l10n";
 /** What has been asked for and what has come back. */
 export interface LoadTally {
     /**
@@ -74,7 +75,7 @@ export function loadState(tally: LoadTally): LoadState {
     const ready: LoadState = {
         stage: "ready",
         covered: false,
-        label: "Ready",
+        label: l10n.t("Ready"),
         detail: null,
     };
 
@@ -86,7 +87,7 @@ export function loadState(tally: LoadTally): LoadState {
         return {
             stage: "scene",
             covered: true,
-            label: "Reading the scene",
+            label: l10n.t("Reading the scene"),
             detail: null,
         };
     }
@@ -102,8 +103,12 @@ export function loadState(tally: LoadTally): LoadState {
         return {
             stage: "geometry",
             covered: true,
-            label: "Loading geometry",
-            detail: `${tally.arrivedParts} of ${tally.expectedParts}`,
+            label: l10n.t("Loading geometry"),
+            detail: l10n.t(
+                "{0} of {1}",
+                tally.arrivedParts,
+                tally.expectedParts,
+            ),
         };
     }
 
@@ -111,8 +116,12 @@ export function loadState(tally: LoadTally): LoadState {
         return {
             stage: "materials",
             covered: true,
-            label: "Loading textures",
-            detail: `${tally.settledAssets} of ${tally.requestedAssets}`,
+            label: l10n.t("Loading textures"),
+            detail: l10n.t(
+                "{0} of {1}",
+                tally.settledAssets,
+                tally.requestedAssets,
+            ),
         };
     }
 

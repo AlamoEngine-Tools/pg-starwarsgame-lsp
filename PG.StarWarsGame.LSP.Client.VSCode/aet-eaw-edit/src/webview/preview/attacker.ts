@@ -11,6 +11,7 @@
 // The rules below are ENGINE BEHAVIOUR as the user gave it, not something measured out of the
 // files. Kept in one pure module so they can be read against that statement line by line.
 
+import * as l10n from "@vscode/l10n";
 import type {
     PreviewProjectile,
     PreviewTargetDefence,
@@ -505,24 +506,24 @@ export const DAMAGE_SWITCHES: readonly {
 }[] = [
     {
         id: "shield",
-        label: "Shield",
-        title:
-            "Projectile_Does_Shield_Damage - depletes the shield. On its own it never " +
-            "reaches the hull.",
+        label: l10n.t("Shield"),
+        title: l10n.t(
+            "Projectile_Does_Shield_Damage - depletes the shield. On its own it never reaches the hull.",
+        ),
     },
     {
         id: "energy",
-        label: "Energy",
-        title:
-            "Projectile_Does_Energy_Damage - drains the energy pool. Applies whether or " +
-            "not the shield is up.",
+        label: l10n.t("Energy"),
+        title: l10n.t(
+            "Projectile_Does_Energy_Damage - drains the energy pool. Applies whether or not the shield is up.",
+        ),
     },
     {
         id: "hitpoint",
-        label: "Hull",
-        title:
-            "Projectile_Does_Hitpoint_Damage - hits the hull. On its own it BYPASSES the " +
-            "shield.",
+        label: l10n.t("Hull"),
+        title: l10n.t(
+            "Projectile_Does_Hitpoint_Damage - hits the hull. On its own it BYPASSES the shield.",
+        ),
     },
 ];
 
@@ -608,20 +609,24 @@ export function poolRows(
     if ((defence.shieldPoints ?? 0) > 0) {
         rows.push({
             id: "shield",
-            label: "Shield",
+            label: l10n.t("Shield"),
             detail:
                 options.shieldsDown === true
-                    ? "down - every shield generator has been destroyed"
+                    ? l10n.t("down - every shield generator has been destroyed")
                     : defence.isShielded
-                      ? `${round(pools.shield)} of ${round(defence.shieldPoints ?? 0)}` +
-                        `${
+                      ? l10n.t(
+                            "{0} of {1}{2}",
+                            round(pools.shield),
+                            round(defence.shieldPoints ?? 0),
                             defence.shieldArmorType === null ||
-                            defence.shieldArmorType === undefined
+                                defence.shieldArmorType === undefined
                                 ? ""
-                                : ` - ${defence.shieldArmorType}`
-                        }`
-                      : "not in play - this object declares Shield_Points but not SHIELDED",
-            title: "Shield_Points, defended by Shield_Armor_Type",
+                                : ` - ${defence.shieldArmorType}`,
+                        )
+                      : l10n.t(
+                            "not in play - this object declares Shield_Points but not SHIELDED",
+                        ),
+            title: l10n.t("Shield_Points, defended by Shield_Armor_Type"),
             // Empty for either reason: a shield the object never raises protects nothing, and one
             // whose generators are gone has stopped protecting. The bar says what is between a
             // shot and the hull, and in both cases that is nothing.
@@ -655,15 +660,26 @@ export function poolRows(
 
         rows.push({
             id: "hull",
-            label: "Health",
+            label: l10n.t("Health"),
             detail: leashed
-                ? `${Math.round(shown * 100)}% - lower of hull and hardpoints${armor}`
-                : `${round(hullNow)} of ${round(hullMax)}${armor}`,
+                ? l10n.t(
+                      "{0}% - lower of hull and hardpoints{1}",
+                      Math.round(shown * 100),
+                      armor,
+                  )
+                : l10n.t(
+                      "{0} of {1}{2}",
+                      round(hullNow),
+                      round(hullMax),
+                      armor,
+                  ),
             title: leashed
-                ? "The lower of Tactical_Health and combined hardpoint health, as the game draws " +
-                  "it. The damage log holds both. The damage stage follows the hull alone."
-                : "Tactical_Health, defended by Armor_Type. The pool that dies, and the one the " +
-                  "damage stage follows.",
+                ? l10n.t(
+                      "The lower of Tactical_Health and combined hardpoint health, as the game draws it. The damage log holds both. The damage stage follows the hull alone.",
+                  )
+                : l10n.t(
+                      "Tactical_Health, defended by Armor_Type. The pool that dies, and the one the damage stage follows.",
+                  ),
             fraction: shown,
             // The hardpoints' own ramp, so a bar gone orange in here and a targeting mark gone
             // orange out there are saying the same thing.
@@ -676,9 +692,13 @@ export function poolRows(
     if (options.energy && (defence.energyCapacity ?? 0) > 0) {
         rows.push({
             id: "energy",
-            label: "Energy",
-            detail: `${round(pools.energy)} of ${round(defence.energyCapacity ?? 0)}`,
-            title: "Energy_Capacity - never scaled by an armor factor",
+            label: l10n.t("Energy"),
+            detail: l10n.t(
+                "{0} of {1}",
+                round(pools.energy),
+                round(defence.energyCapacity ?? 0),
+            ),
+            title: l10n.t("Energy_Capacity - never scaled by an armor factor"),
             fraction: fractionOf(pools.energy, defence.energyCapacity ?? 0),
             colour: ENERGY_COLOUR,
         });

@@ -14,6 +14,7 @@
 // canvas resolves it to a concrete colour through resolveColour, because a 2D context cannot take a
 // var(). Both start from the same name.
 
+import * as l10n from "@vscode/l10n";
 /** The lifecycles an event node can be in, in the order the colour key lists them. */
 export type Lifecycle = "Waiting" | "Armed" | "Fired" | "Disabled";
 
@@ -74,25 +75,25 @@ export const EDGE_KINDS: readonly EdgeKindStyle[] = [
         kind: "Prereq",
         token: "--colour-data-neutral",
         dash: "",
-        label: "Requires",
+        label: l10n.t("Requires"),
     },
     {
         kind: "Control",
         token: "--colour-data-orange",
         dash: "",
-        label: "Activates or suspends",
+        label: l10n.t("Activates or suspends"),
     },
     {
         kind: "Tactical",
         token: "--colour-data-yellow",
         dash: "8 4",
-        label: "Tactical battle",
+        label: l10n.t("Tactical battle"),
     },
     {
         kind: "Flag",
         token: "--colour-data-blue",
         dash: "2 4",
-        label: "Story flag",
+        label: l10n.t("Story flag"),
     },
     // The engine's own link from a reward to the listeners it reaches - a speech to its speech-done,
     // a battle to its outcome and summary listeners. Dash-dot so it reads as neither the dashed
@@ -101,13 +102,13 @@ export const EDGE_KINDS: readonly EdgeKindStyle[] = [
         kind: "Implicit",
         token: "--colour-data-neutral",
         dash: "8 3 2 3",
-        label: "Engine link",
+        label: l10n.t("Engine link"),
     },
     {
         kind: "LuaLink",
         token: "--colour-muted",
         dash: "",
-        label: "Lua script link",
+        label: l10n.t("Lua script link"),
     },
 ];
 

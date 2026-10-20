@@ -16,6 +16,8 @@
 // dock is the wrong home for them and LocProblemsBar already records why: it is narrow, so messages
 // are truncated, and a list that appears and disappears there shoves everything around it.
 
+import "./shared/l10nSetup";
+import * as l10n from "@vscode/l10n";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import styled from "styled-components";
@@ -352,7 +354,7 @@ function App(): React.JSX.Element {
 
     const stage =
         entry === null ? (
-            <p className="empty">Waiting for the editor...</p>
+            <p className="empty">{l10n.t("Waiting for the editor...")}</p>
         ) : entry.found ? (
             <EncyclopediaCard
                 entry={
@@ -365,7 +367,7 @@ function App(): React.JSX.Element {
             />
         ) : (
             <p className="empty">
-                No encyclopedia entry for &apos;{entry.objectId}&apos;.
+                {l10n.t("No encyclopedia entry for '{0}'.", entry.objectId)}
             </p>
         );
 
@@ -446,10 +448,12 @@ function App(): React.JSX.Element {
                             expanded={noticesOpen}
                             disabled={notices.length === 0}
                             disabledReason="Nothing to report about this card"
-                            title={
-                                `${notices.length} ${noticeWord} about this card. ` +
-                                `Press to ${noticesOpen ? "hide" : "read"} them.`
-                            }
+                            title={l10n.t(
+                                "{0} {1} about this card. Press to {2} them.",
+                                notices.length,
+                                noticeWord,
+                                noticesOpen ? "hide" : "read",
+                            )}
                             onClick={() => setNoticesOpen((open) => !open)}
                         />
                     </>
@@ -457,7 +461,7 @@ function App(): React.JSX.Element {
                 content={
                     <>
                         <DockSection
-                            title="Ship names"
+                            title={l10n.t("Ship names")}
                             count={entry?.shipNames?.names.length}
                         >
                             {/* Three cases, and the middle one is why this is not a ternary: a pool
@@ -479,7 +483,7 @@ function App(): React.JSX.Element {
                                                 <span>{name}</span>
                                                 {name === shipName && (
                                                     <span className="drawn-tag">
-                                                        on the card
+                                                        {l10n.t("on the card")}
                                                     </span>
                                                 )}
                                             </li>
@@ -489,17 +493,16 @@ function App(): React.JSX.Element {
                             {entry?.shipNames &&
                                 entry.shipNames.names.length === 0 && (
                                     <div className="dock-hint">
-                                        This object is wired up for individual
-                                        names, but none could be read. See the
-                                        notes for why.
+                                        {l10n.t(
+                                            "This object is wired up for individual names, but none could be read. See the notes for why.",
+                                        )}
                                     </div>
                                 )}
                             {entry !== null && !entry.shipNames && (
                                 <div className="dock-hint">
-                                    This object shows its class line. Only
-                                    objects registered in GameConstants under
-                                    ShipNameTextFiles draw an individual name
-                                    here.
+                                    {l10n.t(
+                                        "This object shows its class line. Only objects registered in GameConstants under ShipNameTextFiles draw an individual name here.",
+                                    )}
                                 </div>
                             )}
                         </DockSection>
@@ -507,7 +510,10 @@ function App(): React.JSX.Element {
                 }
                 overview={
                     <>
-                        <Field label={`Zoom ${zoom.toFixed(2)}x`} as="label">
+                        <Field
+                            label={l10n.t("Zoom {0}x", zoom.toFixed(2))}
+                            as="label"
+                        >
                             <input
                                 type="range"
                                 min={ZOOM_MIN}
@@ -517,7 +523,9 @@ function App(): React.JSX.Element {
                                 onChange={(e) =>
                                     setZoom(clampZoom(Number(e.target.value)))
                                 }
-                                title="Drag, or scroll over the preview"
+                                title={l10n.t(
+                                    "Drag, or scroll over the preview",
+                                )}
                             />
                         </Field>
 
@@ -526,9 +534,9 @@ function App(): React.JSX.Element {
                         one behind a click. The faction row stays VISIBLE when there is nothing to
                         switch to, disabled and saying why: that is the arrangement where a reader
                         most needs telling the choice exists at all. */}
-                        <Field label="Faction frame">
+                        <Field label={l10n.t("Faction frame")}>
                             <ModeSelector
-                                label="Faction frame"
+                                label={l10n.t("Faction frame")}
                                 value={String(factionSlot)}
                                 options={factionModes(factionFrames)}
                                 onSelect={(id) =>
@@ -537,9 +545,9 @@ function App(): React.JSX.Element {
                             />
                         </Field>
 
-                        <Field label="Body">
+                        <Field label={l10n.t("Body")}>
                             <ModeSelector
-                                label="Body text"
+                                label={l10n.t("Body text")}
                                 value={bodyModeOf(multiplayer)}
                                 options={BODY_MODES}
                                 onSelect={(id) =>

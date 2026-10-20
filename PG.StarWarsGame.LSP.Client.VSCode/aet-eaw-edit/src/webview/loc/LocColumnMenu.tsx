@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
 import { useEffect, useRef, useState } from "react";
 import { IconButton } from "../shared/Button";
 
@@ -85,8 +86,8 @@ export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
             <IconButton
                 ref={buttonRef}
                 icon="settings"
-                title="Choose which language columns to show"
-                label="Columns"
+                title={l10n.t("Choose which language columns to show")}
+                label={l10n.t("Columns")}
                 expanded={open}
                 onClick={toggle}
             />
@@ -98,9 +99,13 @@ export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
                     style={{ top: at.top, right: at.right }}
                 >
                     <div className="column-flyout-title">
-                        Columns
+                        {l10n.t("Columns")}
                         <span className="section-count">
-                            {shown.length} of {props.languages.length}
+                            {l10n.t(
+                                "{0} of {1}",
+                                shown.length,
+                                props.languages.length,
+                            )}
                         </span>
                     </div>
                     {props.languages.map((language) => (

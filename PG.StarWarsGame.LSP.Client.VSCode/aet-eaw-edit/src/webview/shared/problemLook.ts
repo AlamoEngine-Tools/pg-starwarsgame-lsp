@@ -9,6 +9,7 @@
 // the only thing on the row that answers it. The server emits six errors, twelve warnings and two
 // infos across the preview, so the demoted case was not a rare one.
 
+import * as l10n from "@vscode/l10n";
 /** What the row shows for one severity: a codicon and a colour band. */
 export interface ProblemLook {
     /** Codicon name, without the `codicon-` prefix. */
@@ -84,15 +85,19 @@ export function problemTag(
 
     if (id === "") {
         return {
-            text: "render-time",
-            title: "Found while rendering. Not in the files, so it has no position and no id.",
+            text: l10n.t("render-time"),
+            title: l10n.t(
+                "Found while rendering. Not in the files, so it has no position and no id.",
+            ),
             isDiagnostic: false,
         };
     }
 
     return {
         text: id,
-        title: "Diagnostic id. Name it in a suppression comment to silence this finding.",
+        title: l10n.t(
+            "Diagnostic id. Name it in a suppression comment to silence this finding.",
+        ),
         isDiagnostic: true,
     };
 }

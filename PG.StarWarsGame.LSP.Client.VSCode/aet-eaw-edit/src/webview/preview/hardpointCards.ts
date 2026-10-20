@@ -11,6 +11,7 @@
 // What is left over is the weapons without hardpoints - a fighter's guns are on the unit - and
 // those keep a list of their own, because putting them under Hardpoints would be a lie.
 
+import * as l10n from "@vscode/l10n";
 import {
     type PreviewHardpoint,
     type PreviewTurret,
@@ -223,7 +224,7 @@ export function healthBar(
 
     return {
         fraction,
-        label: `${Math.round(left)}/${Math.round(card.health)} HP`,
+        label: l10n.t("{0}/{1} HP", Math.round(left), Math.round(card.health)),
         colour: card.destroyed ? DESTROYED_COLOUR : healthColour(fraction),
         destroyed: card.destroyed,
     };

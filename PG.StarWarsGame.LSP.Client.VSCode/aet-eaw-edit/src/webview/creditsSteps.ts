@@ -7,6 +7,7 @@
 // `creditstext_english.dat` is nothing but them. Making them things you can pick up and place says
 // that far better than a menu item and a dropdown do.
 
+import * as l10n from "@vscode/l10n";
 import { BLANK_SENTINEL_VALUE, CREDITS_DIRECTIVES } from "./creditsCrawlModel";
 
 export interface CreditsStep {
@@ -53,7 +54,9 @@ export const CREDITS_STEPS: CreditsStep[] = [
     {
         id: "header",
         label: DIRECTIVE_LABELS[CREDITS_DIRECTIVES[1]],
-        description: "A role or section heading, set small above the name",
+        description: l10n.t(
+            "A role or section heading, set small above the name",
+        ),
         key: CREDITS_DIRECTIVES[1],
         value: "",
         token: CREDITS_DIRECTIVES[1],
@@ -62,7 +65,7 @@ export const CREDITS_STEPS: CreditsStep[] = [
     {
         id: "center",
         label: DIRECTIVE_LABELS[CREDITS_DIRECTIVES[0]],
-        description: "The larger line beneath a label",
+        description: l10n.t("The larger line beneath a label"),
         key: CREDITS_DIRECTIVES[0],
         value: "",
         token: CREDITS_DIRECTIVES[0],
@@ -70,8 +73,8 @@ export const CREDITS_STEPS: CreditsStep[] = [
     },
     {
         id: "blank",
-        label: "Blank line",
-        description: "The gap between one block and the next",
+        label: l10n.t("Blank line"),
+        description: l10n.t("The gap between one block and the next"),
         key: CREDITS_DIRECTIVES[0],
         value: BLANK_SENTINEL_VALUE,
         token: BLANK_SENTINEL_VALUE,

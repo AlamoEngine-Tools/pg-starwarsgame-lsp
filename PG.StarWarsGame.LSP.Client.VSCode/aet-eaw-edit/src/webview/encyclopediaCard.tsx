@@ -21,6 +21,7 @@
 //     They are calibration, not data, and they are the part to re-check when something looks off -
 //     preferably by sampling again rather than by eye, which got several of them wrong.
 
+import * as l10n from "@vscode/l10n";
 import {
     EncyclopediaImage,
     EncyclopediaLayout,
@@ -760,7 +761,7 @@ export function EncyclopediaCard({
                                         src={safeImageSource(
                                             chrome.credit.dataUri,
                                         )}
-                                        alt="credits"
+                                        alt={l10n.t("credits")}
                                         // Its own proportions at the row's height, so a reskinned
                                         // coin keeps its shape instead of being squared off.
                                         style={{
@@ -822,7 +823,10 @@ export function EncyclopediaCard({
                             fontSize: u(CHROME.blipSize * 0.62),
                             lineHeight: 1,
                         }}
-                        title={`Population_Value ${entry.populationValue}`}
+                        title={l10n.t(
+                            "Population_Value {0}",
+                            entry.populationValue ?? 0,
+                        )}
                     >
                         {entry.populationValue}
                     </div>
@@ -887,7 +891,7 @@ export function EncyclopediaCard({
                                 justifyContent: "center",
                             }}
                         >
-                            icon
+                            {l10n.t("icon")}
                         </div>
                     )}
                 </div>
@@ -1064,7 +1068,10 @@ export function EncyclopediaCard({
                                     ...textStyle(layout.body, layout, u),
                                     color: "#f04c4c",
                                 }}
-                                title={`No translation loaded for '${line.key}'`}
+                                title={l10n.t(
+                                    "No translation loaded for '{0}'",
+                                    line.key,
+                                )}
                             >
                                 {`<${line.key}>`}
                             </div>
@@ -1112,7 +1119,7 @@ export function EncyclopediaCard({
                     }}
                 >
                     <AgainstPanel
-                        label="Strong Against:"
+                        label={l10n.t("Strong Against:")}
                         refs={entry.goodAgainst}
                         layout={layout}
                         u={u}
@@ -1125,7 +1132,7 @@ export function EncyclopediaCard({
                         slotImage={chrome?.unitAgainst}
                     />
                     <AgainstPanel
-                        label="Weak Against:"
+                        label={l10n.t("Weak Against:")}
                         refs={entry.vulnerableTo}
                         layout={layout}
                         u={u}

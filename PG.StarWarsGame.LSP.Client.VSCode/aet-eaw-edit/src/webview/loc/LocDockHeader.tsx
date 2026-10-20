@@ -8,6 +8,7 @@
 // (how many edits are staged, how the last validation went) that must be phrased the same way in
 // both or the same situation looks like two different ones.
 
+import * as l10n from "@vscode/l10n";
 import { LocProblem, ValidationState } from "./useLocPanel";
 import { validateTitle } from "./validateState";
 import { IconButton } from "../shared/Button";
@@ -26,7 +27,7 @@ export function LocDockHeader(props: {
             <IconButton
                 icon="save"
                 className={`header-left${props.queue.length > 0 ? " active" : ""}`}
-                title="Save - write all staged changes to the file"
+                title={l10n.t("Save - write all staged changes to the file")}
                 badge={props.queue.length > 0 ? ` ${props.queue.length}` : ""}
                 disabled={props.queue.length === 0}
                 disabledReason="Save - nothing is staged"
