@@ -1937,6 +1937,87 @@ describe("the owning object Scale_Factor", () => {
 });
 
 /**
+ * Measured in the game: every particle group carries an "energy", 1.0 unless a weather phase,
+ * planet corruption, transport dust or a surface effect sets it. An ordinary emitter's spawn
+ * attempt fires only with that probability and its particle is born at that share of its speed;
+ * a weather field draws that share of its particles, the share clamped to 0..1.
+ */
+describe("particle energy", () => {
+    function stream(): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    speed: volume({
+                        shape: "Point",
+                        exactValue: { x: 0, y: 0, z: 10 },
+                    }),
+                    properties: properties({
+                        particlesPerSecond: 100,
+                        lifetime: 100,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    function field(): ParticleSystemInstance {
+        return new ParticleSystemInstance(
+            "test",
+            testSystem([
+                emitter({
+                    properties: properties({
+                        isWeatherParticle: true,
+                        weatherCubeSize: 100,
+                        particlesPerSecond: 10,
+                        lifetime: 1,
+                    }),
+                }),
+            ]),
+        );
+    }
+
+    const instances = (instance: ParticleSystemInstance) =>
+        (instance.emitterMesh(0)!.geometry as THREE.InstancedBufferGeometry)
+            .instanceCount;
+
+    it("spawns with the energy as its odds", () => {
+        const full = stream();
+        const half = stream();
+        half.setEnergy(0.5);
+        for (let i = 0; i < 10; i++) {
+            full.update(0.1);
+            half.update(0.1);
+        }
+        const born = half.emitterParticles(0).length;
+        assert.equal(full.emitterParticles(0).length, 100);
+        assert.ok(born > 30 && born < 70, `born ${born}`);
+    });
+
+    it("bears its particles at the energy's share of their speed", () => {
+        const instance = stream();
+        instance.setEnergy(0.5);
+        while (instance.emitterParticles(0).length === 0) {
+            instance.update(0.01);
+        }
+        const { x, y, z } = instance.emitterParticles(0)[0].velocity;
+        assert.ok(Math.abs(Math.hypot(x, y, z) - 5) < 1e-6);
+    });
+
+    it("draws the energy's share of a weather field, never more than all of it", () => {
+        const half = field();
+        half.setEnergy(0.5);
+        half.update(0.1);
+        assert.equal(instances(half), 5);
+
+        const over = field();
+        over.setEnergy(3);
+        over.update(0.1);
+        assert.equal(instances(over), 10);
+    });
+});
+
+/**
  * Measured in the game. A weather emitter is a field around the camera, not a stream from a point:
  * every particle it will ever have is born at once, uniformly inside a cube of the declared edge
  * around the emitter's origin, with a random age; none ever dies - an age past the lifetime wraps

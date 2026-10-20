@@ -163,6 +163,12 @@
 
 ### Fixes
 
+- **Particle energy** - a particle system carries the game's energy setting: an ordinary emitter spawns with
+  it as its odds and bears its particles at its share of their speed, a mesh-vertex emitter takes its share
+  of the count, and a weather field draws its share of its particles. It is 1.0 for every system the preview
+  shows, as in the game, where only weather phases, planet corruption, transport dust and surface effects
+  change it
+  ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
 - **Cube-shaped spawn and velocity volumes** - drawn at their full size: the file stores a cube's half-extent,
   and the preview halved it again
   ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))

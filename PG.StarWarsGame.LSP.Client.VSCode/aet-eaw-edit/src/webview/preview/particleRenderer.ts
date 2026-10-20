@@ -413,6 +413,13 @@ export interface EmitterFrame {
      * affected by it accelerates by half of it every frame; a weather field drifts at five times it.
      */
     wind: AlamoVector3;
+    /**
+     * The system's energy. Measured in the game: 1.0 unless a weather phase, planet corruption,
+     * transport dust or a surface effect sets it. An ordinary emitter spawns with it as its odds
+     * and bears its particles at its share of their speed; a weather field draws its share of
+     * its particles, the share clamped to 0..1.
+     */
+    energy: number;
 }
 
 /**
@@ -593,6 +600,7 @@ function stillFrame(): EmitterFrame {
         velocity: new THREE.Vector3(),
         groundY: 0,
         wind: { x: 0, y: 0, z: 0 },
+        energy: 1,
     };
 }
 
@@ -970,7 +978,8 @@ class EmitterRenderer {
         const upZ = e[7];
         const { positions, colours, uvs } = engine;
 
-        for (let i = 0; i < this.particles.length; i++) {
+        const count = this.drawnCount(frame);
+        for (let i = 0; i < count; i++) {
             const particle = this.particles[order === null ? i : order[i]];
             const look = appearanceOf(particle, this.emitter);
             const size = look.size * scale;
@@ -1015,7 +1024,22 @@ class EmitterRenderer {
             }
         }
 
-        engine.written(this.particles.length);
+        engine.written(count);
+    }
+
+    /**
+     * How many of this emitter's particles are drawn.
+     *
+     * Measured in the game: a weather field draws the energy's share of its particles, rounded,
+     * the share clamped to 0..1; every other emitter draws what it has.
+     */
+    private drawnCount(frame: EmitterFrame): number {
+        if (this.weatherHalf <= 0) {
+            return this.particles.length;
+        }
+
+        const share = Math.min(1, Math.max(0, frame.energy));
+        return Math.round(this.particles.length * share);
     }
 
     /**
@@ -1148,18 +1172,34 @@ class EmitterRenderer {
         // An emitter nobody is drawing does not spawn, and its clock is held with it - the same
         // rule the system as a whole follows, one level down. Unticking one emitter in the dock
         // otherwise let it fill its buffer unseen and hand the reader a burst that was over.
-        const wanted =
+        // Measured: an emitter born at every vertex of a mesh takes the energy's share of the
+        // count, rounded; every other emitter rolls the energy per attempt, below.
+        const energy = frame.energy;
+        const everyVertex =
+            mode === "EveryVertex" && this.emissionMesh !== null;
+        const attempts =
             dependent || !this.mesh.visible
                 ? 0
                 : this.clock.advance(dt) *
                   emissionMultiplier(mode, this.emissionMesh);
+        const wanted = everyVertex ? Math.round(attempts * energy) : attempts;
 
         for (let i = 0; i < wanted; i++) {
+            // Measured: each spawn attempt fires only with the energy as its odds. The roll is
+            // skipped at full energy, where it can never fail.
+            if (!everyVertex && energy < 1 && this.random() >= energy) {
+                continue;
+            }
+
             if (this.particles.length >= MAX_PARTICLES) {
                 this.particles.shift();
             }
 
             const particle = spawnParticle(this.emitter, this.random);
+            // Measured: born at the energy's share of its speed.
+            particle.velocity.x *= energy;
+            particle.velocity.y *= energy;
+            particle.velocity.z *= energy;
 
             // Born ON the mesh rather than inside the emitter's shape volume. The shape still
             // decides the VELOCITY; only the position moves.
@@ -1467,7 +1507,8 @@ class EmitterRenderer {
             return;
         }
 
-        for (let i = 0; i < this.particles.length; i++) {
+        const count = this.drawnCount(frame);
+        for (let i = 0; i < count; i++) {
             const particle = this.particles[order === null ? i : order[i]];
             const look = appearanceOf(particle, this.emitter);
 
@@ -1505,7 +1546,7 @@ class EmitterRenderer {
             }
         }
 
-        this.geometry.instanceCount = this.particles.length;
+        this.geometry.instanceCount = count;
 
         const written = [
             "iOffset",
@@ -1659,6 +1700,17 @@ export class ParticleSystemInstance {
     private readonly order: number[];
 
     private readonly frame: EmitterFrame = stillFrame();
+
+    /**
+     * Sets the system's energy.
+     *
+     * Measured in the game: every particle group starts at 1.0, which is what a model's effects
+     * and a system opened on its own play at. A weather phase's emitter intensity, a planet's
+     * corruption, transport dust and surface effects are what change it in play.
+     */
+    setEnergy(energy: number): void {
+        this.frame.energy = energy;
+    }
 
     constructor(
         readonly name: string,
