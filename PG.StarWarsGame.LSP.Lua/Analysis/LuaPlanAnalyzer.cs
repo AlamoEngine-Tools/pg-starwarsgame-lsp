@@ -5,6 +5,7 @@ using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticCode;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
@@ -27,8 +28,10 @@ internal static class LuaPlanAnalyzer
 {
     private const string ThreadSuffix = "_Thread";
 
-    public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree)
+    public static IReadOnlyList<LspDiagnostic> Analyze(string documentUri, SyntaxTree tree,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         // A library's Definitions runs inside the plan that requires it, where the thread
         // function lives; the library file alone cannot be judged.
         if (LuaFileClassifier.IsLibraryUri(documentUri)) return [];
@@ -56,7 +59,7 @@ internal static class LuaPlanAnalyzer
                 Code = new LspDiagnosticCode(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString()),
                 Severity = LspDiagnosticSeverity.Error,
                 Message =
-                    $"Task force '{name}' has no thread function: The engine starts '{expected}' when the plan loads and cannot run the force without it.",
+                    messages.Format("LuaPlan_NoThreadFunction", name, expected),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character + 1),
                     new LspPosition(start.Line, start.Character + 1 + name.Length)),

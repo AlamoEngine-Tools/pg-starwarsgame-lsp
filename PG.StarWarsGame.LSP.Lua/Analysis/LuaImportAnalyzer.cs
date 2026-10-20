@@ -6,6 +6,7 @@ using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
@@ -21,15 +22,18 @@ internal static class LuaImportAnalyzer
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
-        string documentUri, string text, IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper)
+        string documentUri, string text, IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper,
+        IMessageCatalog? messages = null)
     {
-        return Analyze(documentUri, LuaSyntaxTree.ParseText(text, s_parseOptions), documents, fileHelper);
+        return Analyze(documentUri, LuaSyntaxTree.ParseText(text, s_parseOptions), documents, fileHelper,
+            messages);
     }
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, SyntaxTree tree, IReadOnlyDictionary<string, DocumentIndex> documents,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 
@@ -44,7 +48,7 @@ internal static class LuaImportAnalyzer
             // Unresolved relative requires are silently skipped - target may be outside the workspace.
             // Unresolved absolute requires are a real error.
             if (resolved is null && !LuaRequireResolver.IsRelative(requireArg))
-                diagnostics.Add(BuildDiagnostic(call, requireArg));
+                diagnostics.Add(BuildDiagnostic(call, requireArg, messages));
         }
 
         return diagnostics;
@@ -62,7 +66,8 @@ internal static class LuaImportAnalyzer
         return null;
     }
 
-    private static LspDiagnostic BuildDiagnostic(FunctionCallExpressionSyntax call, string requireArg)
+    private static LspDiagnostic BuildDiagnostic(FunctionCallExpressionSyntax call, string requireArg,
+        IMessageCatalog messages)
     {
         var span = call.GetLocation().GetLineSpan();
         var start = span.StartLinePosition;
@@ -71,7 +76,7 @@ internal static class LuaImportAnalyzer
         {
             Code = new LspDiagnosticCode(DiagnosticIds.LuaUnresolvedModule.ToString()),
             Severity = LspDiagnosticSeverity.Error,
-            Message = $"Cannot find module '{requireArg}'. No matching '.lua' file found in workspace.",
+            Message = messages.Format("LuaImport_CannotFindModule", requireArg),
             Range = new LspRange(
                 new LspPosition(start.Line, start.Character),
                 new LspPosition(end.Line, end.Character)),

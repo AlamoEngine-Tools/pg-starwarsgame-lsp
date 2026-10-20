@@ -507,6 +507,45 @@
   <data name="LocalisationToTextureMap_IsNotAValidLocalisation" xml:space="preserve">
     <value>'{0}' is not a valid localisation texture map for &lt;{1}&gt;. Expected: LocalisationKey, TextureName.</value>
   </data>
+  <data name="LuaGlobalScope_CyclicRequire" xml:space="preserve">
+    <value>require("{0}") creates a cyclic dependency.</value>
+  </data>
+  <data name="LuaGlobalScope_DefinedInNotRequired" xml:space="preserve">
+    <value>Global '{0}' is defined in '{1}' which is not required.</value>
+  </data>
+  <data name="LuaGlobalScope_DuplicateRequire" xml:space="preserve">
+    <value>require("{0}") is a duplicate; already required on line {1}.</value>
+  </data>
+  <data name="LuaGlobalScope_OverridesRequired" xml:space="preserve">
+    <value>Global '{0}' overrides a symbol from a required file. Add ---@Override to suppress.</value>
+  </data>
+  <data name="LuaGlobalScope_RedundantRequire" xml:space="preserve">
+    <value>require("{0}") is redundant, it is already transitively included by require("{1}").</value>
+  </data>
+  <data name="LuaGlobalScope_UnusedRequire" xml:space="preserve">
+    <value>require("{0}") is unused - no exported globals are referenced.</value>
+  </data>
+  <data name="LuaImport_CannotFindModule" xml:space="preserve">
+    <value>Cannot find module '{0}'. No matching '.lua' file found in workspace.</value>
+  </data>
+  <data name="LuaPlan_NoThreadFunction" xml:space="preserve">
+    <value>Task force '{0}' has no thread function: The engine starts '{1}' when the plan loads and cannot run the force without it.</value>
+  </data>
+  <data name="LuaPooledState_BleedsBetweenInstances" xml:space="preserve">
+    <value>'{0}' is set at run time and read before it is set, and Definitions does not set it again: The game reuses this script's state, so its next instance reads the value left here.</value>
+  </data>
+  <data name="LuaPooledState_EventsNotReset" xml:space="preserve">
+    <value>This script's state is reused for its next instance, and nothing that runs on release calls GetEvent.Reset(): Task force events left in the queue reach the next instance.</value>
+  </data>
+  <data name="LuaPooledState_HostGlobalTooEarly" xml:space="preserve">
+    <value>'{0}' is read in {1}: The game sets it only after Base_Definitions returns, so it is nil here.</value>
+  </data>
+  <data name="LuaPooledState_NoFlushG" xml:space="preserve">
+    <value>This script's state is reused for its next instance, and nothing in it defines Flush_G: Every global, tables included, carries over.</value>
+  </data>
+  <data name="LuaPooledState_RunsAtDefinitionTime" xml:space="preserve">
+    <value>'{0}', which runs at definition time,</value>
+  </data>
   <data name="LuaScriptReference_LuaScriptCarriesItsExtension" xml:space="preserve">
     <value>Lua script '{0}' carries its extension. The game appends '.lua' itself and looks for '{1}.lua'.</value>
   </data>
@@ -524,6 +563,54 @@
   </data>
   <data name="LuaScriptReference_LuaScriptWasNotFound" xml:space="preserve">
     <value>Lua script '{0}' was not found: no '{1}.lua' or '{2}.lc' in any script directory. The object runs without a script.</value>
+  </data>
+  <data name="LuaStateMachine_AnonymousHandler" xml:space="preserve">
+    <value>function</value>
+  </data>
+  <data name="LuaStateMachine_HandlerNotFunction" xml:space="preserve">
+    <value>State '{0}' is registered with '{1}', which is not a function: The state machine logs Invalid State and stops when it reaches this state.</value>
+  </data>
+  <data name="LuaStateMachine_HandlerParameters" xml:space="preserve">
+    <value>State handler '{0}' takes {1} parameters: The state machine passes one, the message - OnEnter, OnUpdate or OnExit.</value>
+  </data>
+  <data name="LuaStateMachine_MessageComparison" xml:space="preserve">
+    <value>'{0}' compared with '{1}': The state machine passes only OnEnter, OnUpdate or OnExit.</value>
+  </data>
+  <data name="LuaStateMachine_NotRegistered" xml:space="preserve">
+    <value>State '{0}' is not registered: Set_Next_State ignores it and the state machine stays where it is.</value>
+  </data>
+  <data name="LuaStateMachine_RegisteredAgain" xml:space="preserve">
+    <value>State '{0}' is registered again: The later function replaces the earlier one and keeps its place in the order.</value>
+  </data>
+  <data name="LuaStateMachine_StoryEventNotFunction" xml:space="preserve">
+    <value>Story event '{0}' maps to '{1}', which is not a function: The story library skips the event with an Invalid function object message.</value>
+  </data>
+  <data name="LuaStateMachine_StoryEventUndefined" xml:space="preserve">
+    <value>Story event '{0}' names '{1}', which is not defined: The entry is nil, so the event is never registered and does nothing.</value>
+  </data>
+  <data name="LuaUpvalue_Captured" xml:space="preserve">
+    <value>File-level local '{0}' is captured as an upvalue by '{1}'. This persists across save/load cycles and may corrupt save games. Move the variable inside the function, or use a global.</value>
+  </data>
+  <data name="LuaUpvalue_FunctionDeclaration" xml:space="preserve">
+    <value>function declaration</value>
+  </data>
+  <data name="LuaUpvalue_LocalDeclaration" xml:space="preserve">
+    <value>local declaration</value>
+  </data>
+  <data name="LuaVersionSyntax_Length" xml:space="preserve">
+    <value>The length operator '#' is Lua 5.1: The game runs Lua 5.0 and does not load this script; use table.getn for a table, string.len for a string.</value>
+  </data>
+  <data name="LuaVersionSyntax_LongComment" xml:space="preserve">
+    <value>A long comment with '=' levels is Lua 5.1: Lua 5.0 reads '--[=[' as a line comment, so the game takes the lines after the first as code; Lua 5.0 nests --[[ ]] instead.</value>
+  </data>
+  <data name="LuaVersionSyntax_LongString" xml:space="preserve">
+    <value>A long string with '=' levels is Lua 5.1: The game runs Lua 5.0 and does not load this script; Lua 5.0 nests [[ ]] instead.</value>
+  </data>
+  <data name="LuaVersionSyntax_Modulo" xml:space="preserve">
+    <value>The modulo operator '%' is Lua 5.1: The game runs Lua 5.0 and does not load this script.</value>
+  </data>
+  <data name="LuaVersionSyntax_Vararg" xml:space="preserve">
+    <value>'...' as a value is Lua 5.1: The game runs Lua 5.0 and does not load this script; a Lua 5.0 vararg function reads its extra arguments from the table 'arg'.</value>
   </data>
   <data name="MapFileFormat_IsNotAValidMap" xml:space="preserve">
     <value>'{0}' is not a valid map filename for &lt;{1}&gt;. Expected a .ted file.</value>

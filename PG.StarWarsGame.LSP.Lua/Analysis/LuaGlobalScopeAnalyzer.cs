@@ -6,6 +6,7 @@ using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Schema;
@@ -23,16 +24,17 @@ internal static class LuaGlobalScopeAnalyzer
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, string text, GameIndex index, ILuaApiSchemaProvider schemaProvider,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper, IMessageCatalog? messages = null)
     {
         return Analyze(documentUri, LuaSyntaxTree.ParseText(text, s_parseOptions), index, schemaProvider,
-            fileHelper);
+            fileHelper, messages);
     }
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, SyntaxTree tree, GameIndex index, ILuaApiSchemaProvider schemaProvider,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper, IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 
@@ -59,23 +61,23 @@ internal static class LuaGlobalScopeAnalyzer
         // Phase 3: missing-require diagnostics (uses transitive set + locallyBound skip).
         EmitMissingRequireDiagnostics(
             root, documentUri, index, schemaProvider,
-            locallyBound, transitiveRequiredUris, sharedUris, diagnostics);
+            locallyBound, transitiveRequiredUris, sharedUris, diagnostics, messages);
 
         // Phase 4: unused-require diagnostics (transitive scope per required file).
         EmitUnusedRequireDiagnostics(
-            requireCalls, usedIdentifiers, index, fileHelper, diagnostics);
+            requireCalls, usedIdentifiers, index, fileHelper, diagnostics, messages);
 
         // Phase 5: cyclic-require diagnostics.
-        EmitCyclicRequireDiagnostics(documentUri, requireCalls, index, fileHelper, diagnostics);
+        EmitCyclicRequireDiagnostics(documentUri, requireCalls, index, fileHelper, diagnostics, messages);
 
         // Phase 6: global override diagnostics.
-        EmitGlobalOverrideDiagnostics(root, index, transitiveRequiredUris, sharedUris, diagnostics);
+        EmitGlobalOverrideDiagnostics(root, index, transitiveRequiredUris, sharedUris, diagnostics, messages);
 
         // Phase 7: redundant require diagnostics.
-        EmitRedundantRequireDiagnostics(requireCalls, index, fileHelper, diagnostics);
+        EmitRedundantRequireDiagnostics(requireCalls, index, fileHelper, diagnostics, messages);
 
         // Phase 8: duplicate require diagnostics.
-        EmitDuplicateRequireDiagnostics(requireCalls, diagnostics);
+        EmitDuplicateRequireDiagnostics(requireCalls, diagnostics, messages);
 
         return diagnostics;
     }
@@ -120,7 +122,7 @@ internal static class LuaGlobalScopeAnalyzer
         HashSet<string> locallyBound,
         IReadOnlySet<string> requiredUris,
         IReadOnlySet<string> sharedUris,
-        List<LspDiagnostic> diagnostics)
+        List<LspDiagnostic> diagnostics, IMessageCatalog messages)
     {
         // Build a map from LuaGlobal name → defining URIs (library/dependency files only).
         var luaGlobalsByName = BuildLuaGlobalsMap(index, documentUri, sharedUris);
@@ -150,7 +152,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Warning,
-                Message = $"Global '{name}' is defined in '{filename}' which is not required.",
+                Message = messages.Format("LuaGlobalScope_DefinedInNotRequired", name, filename),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
                     new LspPosition(end.Line, end.Character)),
@@ -190,7 +192,7 @@ internal static class LuaGlobalScopeAnalyzer
         HashSet<string> usedIdentifiers,
         GameIndex index,
         IFileHelper fileHelper,
-        List<LspDiagnostic> diagnostics)
+        List<LspDiagnostic> diagnostics, IMessageCatalog messages)
     {
         foreach (var (arg, resolvedUri, callNode) in requireCalls)
         {
@@ -216,7 +218,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Hint,
-                Message = $"require(\"{arg}\") is unused - no exported globals are referenced.",
+                Message = messages.Format("LuaGlobalScope_UnusedRequire", arg),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
                     new LspPosition(end.Line, end.Character)),
@@ -232,7 +234,7 @@ internal static class LuaGlobalScopeAnalyzer
         List<RequireCall> requireCalls,
         GameIndex index,
         IFileHelper fileHelper,
-        List<LspDiagnostic> diagnostics)
+        List<LspDiagnostic> diagnostics, IMessageCatalog messages)
     {
         foreach (var (arg, resolvedUri, callNode) in requireCalls)
         {
@@ -252,7 +254,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Error,
-                Message = $"require(\"{arg}\") creates a cyclic dependency.",
+                Message = messages.Format("LuaGlobalScope_CyclicRequire", arg),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
                     new LspPosition(end.Line, end.Character)),
@@ -268,7 +270,7 @@ internal static class LuaGlobalScopeAnalyzer
         GameIndex index,
         IReadOnlySet<string> transitiveRequiredUris,
         IReadOnlySet<string> sharedUris,
-        List<LspDiagnostic> diagnostics)
+        List<LspDiagnostic> diagnostics, IMessageCatalog messages)
     {
         var requiredGlobalNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var uri in transitiveRequiredUris)
@@ -298,8 +300,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Warning,
-                Message = $"Global '{name}' overrides a symbol from a required file. " +
-                          "Add ---@Override to suppress.",
+                Message = messages.Format("LuaGlobalScope_OverridesRequired", name),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
                     new LspPosition(end.Line, end.Character)),
@@ -314,7 +315,7 @@ internal static class LuaGlobalScopeAnalyzer
         List<RequireCall> requireCalls,
         GameIndex index,
         IFileHelper fileHelper,
-        List<LspDiagnostic> diagnostics)
+        List<LspDiagnostic> diagnostics, IMessageCatalog messages)
     {
         var resolved = requireCalls.Where(r => r.ResolvedUri is not null).ToList();
         if (resolved.Count < 2) return;
@@ -355,7 +356,7 @@ internal static class LuaGlobalScopeAnalyzer
                 Code = new LspDiagnosticCode(DiagnosticIds.LuaRedundantRequire.ToString()),
                 Severity = LspDiagnosticSeverity.Warning,
                 Message =
-                    $"require(\"{arg}\") is redundant, it is already transitively included by require(\"{coveringArg}\").",
+                    messages.Format("LuaGlobalScope_RedundantRequire", arg, coveringArg),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
                     new LspPosition(end.Line, end.Character)),
@@ -368,7 +369,7 @@ internal static class LuaGlobalScopeAnalyzer
 
     private static void EmitDuplicateRequireDiagnostics(
         List<RequireCall> requireCalls,
-        List<LspDiagnostic> diagnostics)
+        List<LspDiagnostic> diagnostics, IMessageCatalog messages)
     {
         // Key: resolved URI when available (case-insensitive), otherwise the raw arg.
         var seen = new Dictionary<string, RequireCall>(StringComparer.OrdinalIgnoreCase);
@@ -391,7 +392,7 @@ internal static class LuaGlobalScopeAnalyzer
             {
                 Code = new LspDiagnosticCode(DiagnosticIds.LuaDuplicateRequire.ToString()),
                 Severity = LspDiagnosticSeverity.Warning,
-                Message = $"require(\"{rc.Arg}\") is a duplicate; already required on line {firstLine}.",
+                Message = messages.Format("LuaGlobalScope_DuplicateRequire", rc.Arg, firstLine),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
                     new LspPosition(end.Line, end.Character)),

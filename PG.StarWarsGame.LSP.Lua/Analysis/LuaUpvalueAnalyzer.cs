@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Messages;
 using Location = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticCode;
@@ -21,13 +22,16 @@ internal static class LuaUpvalueAnalyzer
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
-    public static IReadOnlyList<LspDiagnostic> Analyze(string text, string? documentUri = null)
+    public static IReadOnlyList<LspDiagnostic> Analyze(string text, string? documentUri = null,
+        IMessageCatalog? messages = null)
     {
-        return Analyze(LuaSyntaxTree.ParseText(text, s_parseOptions), documentUri);
+        return Analyze(LuaSyntaxTree.ParseText(text, s_parseOptions), documentUri, messages);
     }
 
-    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree, string? documentUri = null)
+    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree, string? documentUri = null,
+        IMessageCatalog? messages = null)
     {
+        messages ??= ResxMessageCatalog.Server("en");
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 
@@ -42,7 +46,7 @@ internal static class LuaUpvalueAnalyzer
             var functionName = simpleName.Name.Text;
 
             var ownLocals = CollectOwnLocals(funcDecl);
-            EmitUpvalueWarnings(funcDecl, functionName, fileLevelLocals, ownLocals, diagnostics, documentUri);
+            EmitUpvalueWarnings(funcDecl, functionName, fileLevelLocals, ownLocals, diagnostics, documentUri, messages);
         }
 
         return diagnostics;
@@ -135,7 +139,8 @@ internal static class LuaUpvalueAnalyzer
         Dictionary<string, LocalInfo> fileLevelLocals,
         HashSet<string> ownLocals,
         List<LspDiagnostic> diagnostics,
-        string? documentUri)
+        string? documentUri,
+        IMessageCatalog messages)
     {
         var warned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var funcLine = funcDecl.GetLocation().GetLineSpan().StartLinePosition.Line;
@@ -164,7 +169,7 @@ internal static class LuaUpvalueAnalyzer
                             Uri = docUri,
                             Range = new LspRange(new LspPosition(info.Line, 0), new LspPosition(info.Line, 0))
                         },
-                        Message = "local declaration"
+                        Message = messages.Format("LuaUpvalue_LocalDeclaration")
                     },
                     new DiagnosticRelatedInformation
                     {
@@ -173,7 +178,7 @@ internal static class LuaUpvalueAnalyzer
                             Uri = docUri,
                             Range = new LspRange(new LspPosition(funcLine, 0), new LspPosition(funcLine, 0))
                         },
-                        Message = "function declaration"
+                        Message = messages.Format("LuaUpvalue_FunctionDeclaration")
                     });
             }
 
@@ -181,9 +186,7 @@ internal static class LuaUpvalueAnalyzer
             {
                 Code = new LspDiagnosticCode(DiagnosticIds.LuaEngineUpvalue.ToString()),
                 Severity = LspDiagnosticSeverity.Warning,
-                Message = $"File-level local '{name}' is captured as an upvalue by '{functionName}'. " +
-                          "This persists across save/load cycles and may corrupt save games. " +
-                          "Move the variable inside the function, or use a global.",
+                Message = messages.Format("LuaUpvalue_Captured", name, functionName),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
                     new LspPosition(end.Line, end.Character)),
