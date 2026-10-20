@@ -154,6 +154,10 @@
 
 ### Fixes
 
+- **Registry files reported as read by nothing** - `GameObjectFiles.xml`, `CampaignFiles.xml` and every other
+  registry the game opens by name are registered under their own name, so the "No registry names ..." warning
+  no longer appears on the registry itself; it still appears on a file nothing names
+  ([#269](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/269))
 - **Shader note on particle systems** - "No shader sources are reachable" is shown only for a scene that asked for
   an effect; a particle system asks for none and opened with a note about shaders it never needed
 - **Loading cover on a particle file** - a particle system opened on its own is a scene with one part, asked

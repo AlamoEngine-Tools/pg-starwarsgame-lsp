@@ -126,9 +126,18 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             // merged. Reading them too would type files the game never loads.
             var winner = copies[0];
             if (def.MetafileType == MetafileType.FileRegistry)
+            {
+                // The registry is read by the game too, by a name compiled into it, so it is
+                // registered under its own URI - with no types, because the schema does not model
+                // its contents. Registering only the files it names reported the registry itself as
+                // read by nothing.
+                _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(winner), []);
                 RegisterFromMetafile(winner, def, xmlRoots);
+            }
             else // DirectContent: the file itself carries the type
+            {
                 _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(winner), [.. def.Types]);
+            }
         }
 
         // Replace-all also clears stale problems when a rescan (or a disabled flag) yields none.
@@ -485,6 +494,14 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private void ScanStoryChain(MetafileDefinition def, IReadOnlyList<string> roots,
         IReadOnlyList<string> xmlRoots, BaselineIndex baseline, List<StoryChainProblem> problems)
     {
+        var copies = LocateInLayers(def.Path, roots, xmlRoots);
+
+        // Opened by the game by its compiled-in name, like every other registry, whether or not
+        // the chain behind it is followed here: registered under its own URI with no types. The
+        // chain types the files it reaches, not this one.
+        if (copies.Count > 0)
+            _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(copies[0]), []);
+
         if (!_configProvider.Current.Features.Story.Discovery)
         {
             if (_logger.IsEnabled(LogLevel.Information))
@@ -493,7 +510,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             return;
         }
 
-        var copies = LocateInLayers(def.Path, roots, xmlRoots);
         if (copies.Count == 0)
         {
             // No campaign registry anywhere - same degradation as file registries: the shipped

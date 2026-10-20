@@ -84,7 +84,9 @@ public sealed class WorkspaceIndexerTest
 
     /// <summary>
     ///     Its own builder rather than another optional parameter on
-    ///     <see cref="Build(MockFileSystem, IGameIndexService, IFileTypeRegistry, ISchemaProvider, IProjectIndexCache, IGameDocumentParser[])" />: that
+    ///     <see
+    ///         cref="Build(MockFileSystem, IGameIndexService, IFileTypeRegistry, ISchemaProvider, IProjectIndexCache, IGameDocumentParser[])" />
+    ///     : that
     ///     one ends in <c>params IGameDocumentParser[]</c>, so anything inserted before it is
     ///     bound positionally by every existing caller that passes a parser.
     /// </summary>
@@ -132,6 +134,34 @@ public sealed class WorkspaceIndexerTest
     }
 
     // ── PreScanMetafiles ─────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     The registry file is read by the game too - by a name compiled into it - so it is
+    ///     registered under its own URI, with no types because the schema does not model its
+    ///     contents. Only the files it listed used to be registered, and the registry itself was
+    ///     reported as read by nothing.
+    /// </summary>
+    [Fact]
+    public void PreScanMetafiles_RegistersTheRegistryFileItself_WithoutTypes()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var metafilePath = Path.Combine(xmlDir, "gameobjectfiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new(@"<Game_Object_Files><File>DATA\XML\HARDPOINTS.XML</File></Game_Object_Files>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
+
+        var ownKey = new FileHelper(fs).PathToFileUri(metafilePath);
+        Assert.True(((IFileTypeRegistry)registry).IsRegistered(ownKey));
+        Assert.Empty(registry.GetTypesForFile(ownKey));
+    }
 
     [Fact]
     public void PreScanMetafiles_RegistersFileTypes_FromMetafileOnDisk()
@@ -306,6 +336,27 @@ public sealed class WorkspaceIndexerTest
         };
     }
 
+    /// <summary>
+    ///     The campaign registry is opened by the game by its compiled-in name, like every other
+    ///     registry, so it is registered under its own URI with no types - the chain it starts
+    ///     types the files it reaches, not the registry.
+    /// </summary>
+    [Fact]
+    public void PreScanMetafiles_SpecialDef_RegistersTheRegistryFileItself_WithoutTypes()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var fs = new MockFileSystem(StoryChainFixture(xmlDir));
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, new FakeIndexService(), registry, new FakeSchemaProvider(StorySpecialDef()));
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
+
+        var ownKey = new FileHelper(fs).PathToFileUri(Path.Combine(xmlDir, "campaignfiles.xml"));
+        Assert.True(((IFileTypeRegistry)registry).IsRegistered(ownKey));
+        Assert.Empty(registry.GetTypesForFile(ownKey));
+    }
+
     [Fact]
     public void PreScanMetafiles_SpecialDef_TypesManifestsAndThreadsAlongTheChain()
     {
@@ -325,7 +376,7 @@ public sealed class WorkspaceIndexerTest
     }
 
     [Fact]
-    public void PreScanMetafiles_SpecialDef_StoryDiscoveryFlagOff_RegistersNothingAndClearsProblems()
+    public void PreScanMetafiles_SpecialDef_StoryDiscoveryFlagOff_RegistersOnlyTheRegistryFileAndClearsProblems()
     {
         var root = Root("ws");
         var xmlDir = Path.Combine(root, "data", "xml");
@@ -343,7 +394,11 @@ public sealed class WorkspaceIndexerTest
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
-        Assert.Empty(registry.All);
+        // The game opens the registry whether or not the chain is followed here, so it alone is
+        // registered - with no types - and nothing the chain would have reached is.
+        var ownKey = new FileHelper(fs).PathToFileUri(Path.Combine(xmlDir, "campaignfiles.xml"));
+        Assert.Equal([ownKey], registry.All.Keys.ToArray());
+        Assert.Empty(registry.GetTypesForFile(ownKey));
         Assert.Empty(store.GetForDocument("file:///stale"));
     }
 
