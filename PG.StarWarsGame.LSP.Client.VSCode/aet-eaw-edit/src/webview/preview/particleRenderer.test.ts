@@ -2129,4 +2129,24 @@ describe("weather emitters", () => {
 
         assert.equal(particle.position.x, before);
     });
+
+    /**
+     * Measured: a streak is pulled along the particle's EFFECTIVE velocity - the stored velocity
+     * plus the wind drift for a field - never the stored velocity alone. A uniform field shifted
+     * by the wind still looks uniform; the tilt of the streaks is what the eye reads.
+     */
+    it("tilts a wind-affected field's streaks along the wind", () => {
+        const calm = weather({ affectedByWind: true, hasTail: true });
+        const windy = weather({ affectedByWind: true, hasTail: true });
+        calm.update(0.1, viewFrom(100));
+        windy.update(0.1, viewFrom(100));
+
+        calm.update(0.1, viewFrom(100), { x: 0, y: 0, z: 0 });
+        windy.update(0.1, viewFrom(100), { x: 20, y: 0, z: 0 });
+
+        const turnsOf = (instance: ParticleSystemInstance) =>
+            instance.emitterMesh(0)!.geometry.getAttribute("iRotation")
+                .array[0];
+        assert.notEqual(turnsOf(windy), turnsOf(calm));
+    });
 });

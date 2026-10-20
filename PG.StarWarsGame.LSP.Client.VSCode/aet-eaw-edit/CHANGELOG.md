@@ -163,6 +163,7 @@
 
 ### Fixes
 
+- **Wind direction** - the viewer's wind control is named for what it sets, the heading the wind blows from
 - **Wind on ordinary emitters** - an emitter that declares itself affected by wind accelerates by half the
   viewer's wind every frame, as the game applies it; it used to be thrown by the whole wind once at birth, a
   rule taken from an editor's emulation rather than the engine
@@ -177,7 +178,7 @@
   system used to emit once at the origin and drift off
   ([#262](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/262))
   - A field that declares itself affected by wind drifts with the viewer's wind at five times its speed, every
-    step, as the game applies it; nothing is added at birth
+    step, as the game applies it; nothing is added at birth, and the streaks tilt along the drift
 - **Registry files reported as read by nothing** - `GameObjectFiles.xml`, `CampaignFiles.xml` and every other
   registry the game opens by name are registered under their own name, so the "No registry names ..." warning
   no longer appears on the registry itself; it still appears on a file nothing names

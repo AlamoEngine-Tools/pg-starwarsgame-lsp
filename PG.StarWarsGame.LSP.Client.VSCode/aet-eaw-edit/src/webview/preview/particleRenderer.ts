@@ -673,6 +673,14 @@ class EmitterRenderer {
     /** The rendered copy of the particle being written, reused so a field allocates nothing. */
     private readonly weatherDrawn = { x: 0, y: 0, z: 0 };
 
+    /**
+     * The wind drift a field's particles carry this frame, zero for every other kind.
+     *
+     * Measured: a streak is pulled along the particle's EFFECTIVE velocity - the stored velocity
+     * plus this drift - so the tilt of a field's streaks is where the wind shows.
+     */
+    private readonly weatherDrift = { x: 0, y: 0, z: 0 };
+
     constructor(
         private readonly emitter: AlamoEmitter,
         private readonly random: Random,
@@ -1397,6 +1405,13 @@ class EmitterRenderer {
         this.weatherCentre.y = camera.y + forward.y * offset;
         this.weatherCentre.z = camera.z + forward.z * offset;
         this.weatherPhase = cubePhase(this.weatherCentre, this.weatherHalf);
+
+        const blown = this.emitter.properties.affectedByWind
+            ? frame.wind
+            : ORIGIN;
+        this.weatherDrift.x = blown.x * WEATHER_WIND_FACTOR;
+        this.weatherDrift.y = blown.y * WEATHER_WIND_FACTOR;
+        this.weatherDrift.z = blown.z * WEATHER_WIND_FACTOR;
     }
 
     /**
@@ -1554,14 +1569,15 @@ class EmitterRenderer {
      * the camera is standing rather than about the particle.
      */
     private kiteFor(particle: Particle, frame: EmitterFrame): TailGeometry {
-        const speed = Math.hypot(
-            particle.velocity.x,
-            particle.velocity.y,
-            particle.velocity.z,
-        );
+        // The effective velocity: a field's wind drift rides on top of the stored one.
+        const drift = this.weatherDrift;
+        const vx = particle.velocity.x + drift.x;
+        const vy = particle.velocity.y + drift.y;
+        const vz = particle.velocity.z + drift.z;
+        const speed = Math.hypot(vx, vy, vz);
 
         this.viewVelocity
-            .set(particle.velocity.x, particle.velocity.y, particle.velocity.z)
+            .set(vx, vy, vz)
             .applyMatrix3(
                 this.emitter.properties.worldOriented
                     ? GROUND_BASIS

@@ -8373,8 +8373,11 @@ function ModelPreview(): React.JSX.Element {
                                         onToggle={toggleSection}
                                     >
                                         <Field
-                                            label="Wind from"
+                                            label="Wind direction"
                                             value={<>{wind.heading} deg</>}
+                                            info={
+                                                <>Heading the wind blows from</>
+                                            }
                                         >
                                             <input
                                                 type="range"
