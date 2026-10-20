@@ -29,14 +29,16 @@ public sealed class IconPackLoader
 {
     private readonly IFileHelper _fileHelper;
     private readonly HttpClient _httpClient;
+    private readonly BaselineLocationResolver _locations;
     private readonly ICrossProcessLock _lock;
     private readonly ILogger<IconPackLoader> _logger;
     private readonly ServerStatusRecorder? _status;
 
-    public IconPackLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<IconPackLoader> logger,
-        ServerStatusRecorder? status = null, ICrossProcessLock? processLock = null)
+    public IconPackLoader(HttpClient httpClient, BaselineLocationResolver locations, IFileHelper fileHelper,
+        ILogger<IconPackLoader> logger, ServerStatusRecorder? status = null, ICrossProcessLock? processLock = null)
     {
         _httpClient = httpClient;
+        _locations = locations;
         _fileHelper = fileHelper;
         _logger = logger;
         _status = status;
@@ -52,7 +54,7 @@ public sealed class IconPackLoader
         var (pack, source) = await (config.Type switch
         {
             BaselineSourceType.Local => LoadLocalAsync(config.LocalPath, ct),
-            BaselineSourceType.Http => LoadHttpAsync(config.Url, ct),
+            BaselineSourceType.Http => LoadHttpAsync(config, ct),
             _ => Task.FromResult((IconPack.Empty, StatusAssetSource.Empty))
         });
 
@@ -87,8 +89,11 @@ public sealed class IconPackLoader
         return (IconPack.Empty, StatusAssetSource.Empty);
     }
 
-    private async Task<(IconPack, StatusAssetSource)> LoadHttpAsync(string baselineUrl, CancellationToken ct)
+    private async Task<(IconPack, StatusAssetSource)> LoadHttpAsync(BaselineSourceConfig config, CancellationToken ct)
     {
+        // Beside the baseline, at the same release tag the baseline loader resolved - one lookup
+        // serves both.
+        var baselineUrl = (await _locations.ResolveAsync(config, ct)).Url;
         var url = IconPackSerializer.SidecarPathFor(baselineUrl);
         var cacheFile = _fileHelper.FileSystem.Path.Combine(
             CacheDir, _fileHelper.FileSystem.Path.GetFileName(url));

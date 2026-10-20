@@ -334,8 +334,12 @@ public sealed class GetServerStatusHandler(
 
     private static bool IsOfficialBaseline(BaselineSourceConfig source)
     {
+        // An empty URL is the newest release of the official repository; anything named outright
+        // is the author's own copy, wherever it points.
         return source.Type == BaselineSourceType.Http
-               && string.Equals(source.Url, new BaselineSourceConfig().Url, StringComparison.OrdinalIgnoreCase);
+               && string.IsNullOrWhiteSpace(source.Url)
+               && string.Equals(source.Repository, new BaselineSourceConfig().Repository,
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

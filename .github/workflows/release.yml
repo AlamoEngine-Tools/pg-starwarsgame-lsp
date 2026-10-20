@@ -113,6 +113,27 @@ jobs:
         }
         "Schema v$schema is released" | Add-Content $env:GITHUB_STEP_SUMMARY
 
+    # Servers read the newest baseline RELEASE inside the DTO version they read, never the baseline
+    # repository's main. A server shipped before a baseline of its DTO version is released would
+    # start with the branch fallback and an empty index on the first offline start.
+    - name: Check a baseline of this DTO version is released
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $source = Get-Content PG.StarWarsGame.LSP.Assets/Serialization/SerializedBaseline.cs -Raw
+        if ($source -notmatch 'CurrentSchemaVersion\s*=\s*(\d+)') {
+          Write-Output "::error::CurrentSchemaVersion not found in SerializedBaseline.cs"
+          exit 1
+        }
+        $dto = [int]$Matches[1]
+        $tags = gh release list -R AlamoEngine-Tools/eaw-baseline --exclude-drafts --exclude-pre-releases --limit 100 --json tagName -q '.[].tagName'
+        $match = @($tags | Where-Object { $_ -match "^v$dto\.\d+\.\d+$" })
+        if ($match.Count -eq 0) {
+          Write-Output "::error::No baseline release v$dto.*.* exists - run Prepare Release and Release in eaw-baseline first"
+          exit 1
+        }
+        "Baseline release(s) of DTO version ${dto}: $($match -join ', ')" | Add-Content $env:GITHUB_STEP_SUMMARY
+
     # The VSIX carries the server and the Lua analyzer; there is no separate server download.
     - name: Stage the bundled executables
       run: |

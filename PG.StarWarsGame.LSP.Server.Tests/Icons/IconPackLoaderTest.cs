@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Schema.Versioning;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Status;
 
@@ -37,7 +38,12 @@ public sealed class IconPackLoaderTest
     private static IconPackLoader Build(MockFileSystem fs, Func<HttpRequestMessage, HttpResponseMessage> respond,
         ServerStatusRecorder recorder)
     {
-        return new IconPackLoader(new HttpClient(new FakeHttpHandler(respond)), new FileHelper(fs),
+        var client = new HttpClient(new FakeHttpHandler(respond));
+        // The same fake answers the release listing; an explicit URL never asks for one.
+        var locations = new BaselineLocationResolver(
+            new SchemaReleaseResolver(client, NullLogger<SchemaReleaseResolver>.Instance),
+            NullLogger<BaselineLocationResolver>.Instance);
+        return new IconPackLoader(client, locations, new FileHelper(fs),
             NullLogger<IconPackLoader>.Instance, recorder);
     }
 

@@ -395,9 +395,14 @@ public static class ServerConfigurator
                 // startup step writes into it and the bug report reads it.
                 services.AddSingleton<ServerStatusRecorder>();
 
+                // One release lookup per start, shared by the baseline and its icon sidecar; the
+                // release listing goes through the schema resolver's client, which already carries
+                // the GitHub API headers.
+                services.AddSingleton<BaselineLocationResolver>();
                 services.AddSingleton<BaselineLoader>(sp =>
                     new BaselineLoader(
                         sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(BaselineLoader)),
+                        sp.GetRequiredService<BaselineLocationResolver>(),
                         sp.GetRequiredService<IFileHelper>(),
                         sp.GetRequiredService<ILogger<BaselineLoader>>(),
                         sp.GetRequiredService<ServerStatusRecorder>(),
@@ -416,6 +421,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IconPackLoader>(sp =>
                     new IconPackLoader(
                         sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IconPackLoader)),
+                        sp.GetRequiredService<BaselineLocationResolver>(),
                         sp.GetRequiredService<IFileHelper>(),
                         sp.GetRequiredService<ILogger<IconPackLoader>>(),
                         sp.GetRequiredService<ServerStatusRecorder>(),
