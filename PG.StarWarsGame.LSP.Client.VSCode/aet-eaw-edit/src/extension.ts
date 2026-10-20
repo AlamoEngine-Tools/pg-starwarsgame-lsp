@@ -16,6 +16,11 @@ import {
     Trace,
 } from "vscode-languageclient/node";
 import { CreditsPreviewPanel } from "./creditsPreviewPanel";
+import {
+    effectiveObjectPath,
+    effectiveObjectQuery,
+    parseEffectiveObjectQuery,
+} from "./effectiveObjectUri";
 import { EncyclopediaPanel } from "./encyclopediaPanel";
 import { PanelProject } from "./panelProject";
 import { WebviewPanelHost } from "./webviewPanelHost";
@@ -218,11 +223,6 @@ function effectiveObjectBanner(objectId: string): string {
 }
 
 /**
- * Serves the merged "effective" form of a variant GameObject as a read-only virtual XML document.
- * The object id is carried in the URI query; content is fetched from the server via
- * `aet/getEffectiveObject`. Read-only is implicit for TextDocumentContentProvider documents.
- */
-/**
  * Serves the proposed content of a project file so it can be the right-hand side of a diff.
  *
  * Held in memory and keyed by the project's path: the proposal is a one-off answer to one question,
@@ -252,28 +252,30 @@ class PgprojProposedContentProvider
     }
 }
 
+/**
+ * Serves the merged "effective" form of a variant GameObject as a read-only virtual XML document.
+ * The object id and the project travel in the URI query (#276); content is fetched from that
+ * project's server via `aet/getEffectiveObject`. Read-only is implicit for
+ * TextDocumentContentProvider documents.
+ */
 class EffectiveObjectContentProvider
     implements vscode.TextDocumentContentProvider
 {
     private readonly _onDidChange = new vscode.EventEmitter<vscode.Uri>();
     readonly onDidChange = this._onDidChange.event;
-    /** The project each document was opened for, so it re-reads from that project's server. */
-    private readonly _projects = new Map<string, string>();
 
     /** Signals VS Code to re-fetch content for an already-open virtual document. */
-    refresh(uri: vscode.Uri, projectKey = ""): void {
-        this._projects.set(uri.toString(), projectKey);
+    refresh(uri: vscode.Uri): void {
         this._onDidChange.fire(uri);
     }
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-        const objectId =
-            uri.query || uri.path.replace(/^\//, "").replace(/\.xml$/i, "");
+        const { objectId, projectKey } = parseEffectiveObjectQuery(uri.query);
 
         // The document IS the report here - it is read-only generated text, so a failure is written
         // into it as a comment rather than raised as a notification over the tab that just opened.
         const outcome = await gatewayFor(
-            this._projects.get(uri.toString()),
+            projectKey,
         ).request<GetEffectiveObjectResult>("aet/getEffectiveObject", {
             objectId,
         });
@@ -3248,13 +3250,22 @@ export async function activate(
 
                 // The tab label is derived from the URI's path basename, so bake the intent into it: this is a
                 // generated, read-only preview of the fully-merged object, not an editable source file. The real
-                // object id travels in the query, so the decorative basename doesn't affect content resolution.
+                // object id and its project travel in the query, so the decorative basename doesn't affect
+                // content resolution.
+                const project = panelProject(projectKey);
                 const uri = vscode.Uri.from({
                     scheme: EFFECTIVE_SCHEME,
-                    path: `/${objectId} (effective preview, read-only).xml`,
-                    query: objectId,
+                    path: effectiveObjectPath(
+                        objectId,
+                        project.name,
+                        clients.size,
+                    ),
+                    query: effectiveObjectQuery({
+                        objectId,
+                        projectKey: project.key,
+                    }),
                 });
-                effectiveObjectProvider?.refresh(uri, projectKey);
+                effectiveObjectProvider?.refresh(uri);
                 const doc = await vscode.workspace.openTextDocument(uri);
                 // Open beside the active editor so the preview sits next to the source it was generated from.
                 await vscode.window.showTextDocument(doc, {
