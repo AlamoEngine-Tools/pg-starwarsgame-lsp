@@ -918,86 +918,6 @@ function startProjectClient(
             },
             features: resolveFeatureFlags(),
         },
-        middleware: {
-            executeCommand: async (command, args, next) => {
-                if (command !== "aet-eaw-edit.lsp.createLocalisationKey") {
-                    return next(command, args);
-                }
-
-                const keyName = (args[0] as string | undefined) ?? "";
-                if (!keyName) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: No localisation key name provided.",
-                        ),
-                    );
-                    return;
-                }
-
-                // This client's own server: the code action that raised the command is its.
-                const fetched =
-                    await project.gateway.request<GetLocalisationProjectsResult>(
-                        "aet/getLocalisationProjects",
-                    );
-                if (!fetched.ok) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: Could not fetch localisation projects from server.",
-                        ),
-                    );
-                    return;
-                }
-                const projects = fetched.value.projects ?? [];
-
-                if (!projects.length) {
-                    vscode.window.showWarningMessage(
-                        vscode.l10n.t(
-                            "EaWEdit: No localisation projects found. Use 'EaWEdit: Initialise Localisation Project from Baseline' first.",
-                        ),
-                    );
-                    return;
-                }
-
-                const picked = await vscode.window.showQuickPick(
-                    projects.map((p) => ({
-                        label: p.label,
-                        description: p.filePath,
-                        detail: `${p.projectName} - ${p.resourceType}`,
-                        filePath: p.filePath,
-                    })),
-                    {
-                        title: vscode.l10n.t(
-                            "Create localisation key '{0}'",
-                            keyName,
-                        ),
-                        placeHolder: vscode.l10n.t(
-                            "Select localisation project",
-                        ),
-                    },
-                );
-                if (!picked) {
-                    return;
-                }
-
-                const english = await vscode.window.showInputBox({
-                    title: vscode.l10n.t("New key: {0}", keyName),
-                    prompt: vscode.l10n.t(
-                        "English translation text (required)",
-                    ),
-                    validateInput: (v) =>
-                        v?.trim() ? null : "Translation text is required",
-                });
-                if (english === undefined) {
-                    return;
-                }
-
-                await next(command, [
-                    keyName,
-                    picked.filePath,
-                    { ENGLISH: english },
-                ]);
-            },
-        },
     };
 
     // The client's name is its output channel's: one per project when there are several.
@@ -2551,6 +2471,140 @@ export async function activate(
                     "aet-eaw-edit.lsp.reloadProject",
                     [],
                     "could not reload the project",
+                );
+            },
+        ),
+    );
+
+    // The server's remaining commands, owned here like the rest. The language client would register
+    // them from the server's one `registerCapability` batch, but that batch also names commands this
+    // extension registers itself, collides, and is dropped whole - so a quick fix naming one of these
+    // found no command at all.
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "aet-eaw-edit.lsp.suppressDiagnosticGlobally",
+            async (...args: unknown[]) => {
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                await gatewayFor(projectKey).executeCommand(
+                    "aet-eaw-edit.lsp.suppressDiagnosticGlobally",
+                    args,
+                    "could not suppress the diagnostic",
+                );
+            },
+        ),
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "aet-eaw-edit.lsp.revalidateDocument",
+            async (uri?: string) => {
+                const target =
+                    uri ??
+                    vscode.window.activeTextEditor?.document.uri.toString();
+                if (target === undefined) {
+                    return;
+                }
+                const owner = ownerOf(vscode.Uri.parse(target).fsPath);
+                const projectKey =
+                    owner === undefined || clients.size <= 1
+                        ? await commandProjectKey()
+                        : owner.spec.key;
+                if (projectKey === null) {
+                    return;
+                }
+                await gatewayFor(projectKey).executeCommand(
+                    "aet-eaw-edit.lsp.revalidateDocument",
+                    [target],
+                    "could not revalidate the document",
+                );
+            },
+        ),
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "aet-eaw-edit.lsp.createLocalisationKey",
+            async (keyName?: string) => {
+                if (!keyName) {
+                    vscode.window.showWarningMessage(
+                        vscode.l10n.t(
+                            "EaWEdit: No localisation key name provided.",
+                        ),
+                    );
+                    return;
+                }
+
+                // The quick fix raising this belongs to the document in front of the reader.
+                const projectKey = await commandProjectKey();
+                if (projectKey === null) {
+                    return;
+                }
+                const lsp = gatewayFor(projectKey);
+                const fetched =
+                    await lsp.request<GetLocalisationProjectsResult>(
+                        "aet/getLocalisationProjects",
+                    );
+                if (!fetched.ok) {
+                    vscode.window.showWarningMessage(
+                        vscode.l10n.t(
+                            "EaWEdit: Could not fetch localisation projects from server.",
+                        ),
+                    );
+                    return;
+                }
+                const projects = fetched.value.projects ?? [];
+
+                if (!projects.length) {
+                    vscode.window.showWarningMessage(
+                        vscode.l10n.t(
+                            "EaWEdit: No localisation projects found. Use 'EaWEdit: Initialise Localisation Project from Baseline' first.",
+                        ),
+                    );
+                    return;
+                }
+
+                const picked = await vscode.window.showQuickPick(
+                    projects.map((p) => ({
+                        label: p.label,
+                        description: p.filePath,
+                        detail: `${p.projectName} - ${p.resourceType}`,
+                        filePath: p.filePath,
+                    })),
+                    {
+                        title: vscode.l10n.t(
+                            "Create localisation key '{0}'",
+                            keyName,
+                        ),
+                        placeHolder: vscode.l10n.t(
+                            "Select localisation project",
+                        ),
+                    },
+                );
+                if (!picked) {
+                    return;
+                }
+
+                const english = await vscode.window.showInputBox({
+                    title: vscode.l10n.t("New key: {0}", keyName),
+                    prompt: vscode.l10n.t(
+                        "English translation text (required)",
+                    ),
+                    validateInput: (v) =>
+                        v?.trim()
+                            ? null
+                            : vscode.l10n.t("Translation text is required"),
+                });
+                if (english === undefined) {
+                    return;
+                }
+
+                await lsp.executeCommand(
+                    "aet-eaw-edit.lsp.createLocalisationKey",
+                    [keyName, picked.filePath, { ENGLISH: english }],
+                    `could not create the localisation key '${keyName}'`,
                 );
             },
         ),

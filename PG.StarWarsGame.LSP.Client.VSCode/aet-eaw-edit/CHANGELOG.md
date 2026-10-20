@@ -209,6 +209,11 @@
 
 ### Fixes
 
+- **Command not found from a quick fix** - "Suppress across the project" and "Create localisation key"
+  failed with `command 'aet-eaw-edit.lsp...' not found`. The server announces its commands in one batch,
+  the batch collided with commands the extension registers itself and was dropped whole; the extension now
+  forwards every server command itself
+
 - **Particle energy** - a particle system carries the game's energy setting: an ordinary emitter spawns with
   it as its odds and bears its particles at its share of their speed, a mesh-vertex emitter takes its share
   of the count, and a weather field draws its share of its particles. It is 1.0 for every system the preview
