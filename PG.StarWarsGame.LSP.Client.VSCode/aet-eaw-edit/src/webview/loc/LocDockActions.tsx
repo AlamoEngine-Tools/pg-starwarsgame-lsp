@@ -251,7 +251,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                             ? "A new file is written beside this one, carrying every key from it, " +
                               "ready to translate."
                             : "The column is added to every row, and nothing reaches the file " +
-                              "until you save."
+                              "until it is saved."
                     }
                     title="Add a language"
                     confirmLabel="Add"
@@ -463,7 +463,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                               ? `There is nothing left to fill in for ${copyTo}.`
                               : props.fillsByAdding && fromGame
                                 ? `${copyCount} line(s) would be added, in the order the game ` +
-                                  "plays them. Edit or delete what you do not want afterwards."
+                                  "plays them. Unwanted lines can be edited or deleted afterwards."
                                 : `${copyCount} empty cell(s) would be filled. Anything ` +
                                   `${copyTo} already says is left alone.`}
                     </p>

@@ -7312,7 +7312,7 @@ function ModelPreview(): React.JSX.Element {
                 ? "Show targeting marks"
                 : targetable === 0
                   ? "Nothing here can be targeted"
-                  : "Reticle art unreadable - set your game directory",
+                  : "Reticle art unreadable - game directory not set",
         });
     }
 
@@ -7930,7 +7930,7 @@ function ModelPreview(): React.JSX.Element {
                                         icon="reset"
                                         title={
                                             "Put the backdrop, lights, wind and draw distance " +
-                                            "back to their defaults. The model`s own state is " +
+                                            "back to their defaults. The model's own state is " +
                                             "left as it is."
                                         }
                                         onClick={resetRoom}
@@ -7955,7 +7955,7 @@ function ModelPreview(): React.JSX.Element {
                                                     Never lit and never in the
                                                     depth buffer, so a backdrop
                                                     cannot be mistaken for part
-                                                    of the model.
+                                                    of the model
                                                 </>
                                             }
                                         >
@@ -8098,9 +8098,10 @@ function ModelPreview(): React.JSX.Element {
                                                     Turns round the model the
                                                     way the stage does, from the
                                                     same zero: at 0 the light
-                                                    stands where you stand in
-                                                    the Front view, and it moves
-                                                    clockwise seen from above.
+                                                    stands at the Front
+                                                    view&apos;s camera, and it
+                                                    moves clockwise seen from
+                                                    above.
                                                 </>
                                             }
                                         >
@@ -8295,16 +8296,16 @@ function ModelPreview(): React.JSX.Element {
                                             inline
                                             info={
                                                 <>
-                                                    Alamo`s one shadow colour,
-                                                    and it MULTIPLIES: 0.5 grey
-                                                    means half as bright. In
-                                                    Game mode it tints the
-                                                    stencil volume, so it
-                                                    reaches the hull`s own
-                                                    self-shadowing as well as
-                                                    the ground. In Default mode
-                                                    only the ground can catch
-                                                    it.
+                                                    Alamo&apos;s one shadow
+                                                    colour, and it MULTIPLIES:
+                                                    0.5 grey means half as
+                                                    bright. In Game mode it
+                                                    tints the stencil volume, so
+                                                    it reaches the hull&apos;s
+                                                    own self-shadowing as well
+                                                    as the ground. In Default
+                                                    mode only the ground can
+                                                    catch it.
                                                 </>
                                             }
                                         >
@@ -8397,10 +8398,9 @@ function ModelPreview(): React.JSX.Element {
                                             value={wind.speed.toFixed(1)}
                                             info={
                                                 <>
-                                                    Bends the trees, leans the
-                                                    grass, and carries the 484
-                                                    emitters that declare
-                                                    themselves affected by it.
+                                                    Bends foliage and carries
+                                                    the emitters and weather
+                                                    declared affected by wind
                                                 </>
                                             }
                                         >
@@ -8441,10 +8441,11 @@ function ModelPreview(): React.JSX.Element {
                                                     info={
                                                         <>
                                                             Default reads each
-                                                            sub-mesh`s shader
-                                                            NAME and draws the
-                                                            archetype it names -
-                                                            never wrong about
+                                                            sub-mesh&apos;s
+                                                            shader NAME and
+                                                            draws the archetype
+                                                            it names - never
+                                                            wrong about
                                                             geometry, only about
                                                             how a surface is
                                                             lit. Game draws the
@@ -8494,14 +8495,14 @@ function ModelPreview(): React.JSX.Element {
                                                                 // who stepped to Default unable to return to the mode
                                                                 // the panel opens in.
                                                                 title: anyShaderSource
-                                                                    ? "The model`s own effect shaders, translated, and " +
-                                                                      "the engine`s stencil shadows. " +
+                                                                    ? "The model's own effect shaders, translated, and " +
+                                                                      "the engine's stencil shadows. " +
                                                                       translatedCount.translated +
                                                                       " of " +
                                                                       translatedCount.total +
                                                                       " sub-meshes are " +
                                                                       "drawn this way."
-                                                                    : "The engine`s stencil shadows, which need no " +
+                                                                    : "The engine's stencil shadows, which need no " +
                                                                       "sources. For its effect shaders as well, " +
                                                                       "set the .fx sources up.",
                                                             },
@@ -8963,9 +8964,9 @@ function ModelPreview(): React.JSX.Element {
                                                 <>
                                                     The fit already reaches the
                                                     end of the effects, not just
-                                                    the hull. Reach further for
-                                                    a long trail; a huge model
-                                                    may z-fight then.
+                                                    the hull. A long trail needs
+                                                    more reach; a huge model may
+                                                    z-fight then.
                                                 </>
                                             }
                                         >
@@ -9865,7 +9866,7 @@ function ModelPreview(): React.JSX.Element {
                                                     label="Damage type"
                                                     valueTitle={
                                                         "What the damage table says against this " +
-                                                        "target`s armor. A pair the table does not name is " +
+                                                        "target's armor. A pair the table does not name is " +
                                                         "1.0, which is over half of them."
                                                     }
                                                     value={
