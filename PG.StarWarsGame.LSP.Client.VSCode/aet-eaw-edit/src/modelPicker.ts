@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
 // The "Preview Model" picker's items and its choice. Kept free of `vscode` so the unit harness can
 // run it; extension.ts owns the QuickPick itself.
 
@@ -18,7 +19,7 @@ export function modelPickItems(
 ): ModelPickItem[] {
     return models.map((m) => ({
         label: m.name,
-        description: m.baseGame ? "Base game" : "Project",
+        description: m.baseGame ? l10n.t("Base game") : l10n.t("Project"),
     }));
 }
 

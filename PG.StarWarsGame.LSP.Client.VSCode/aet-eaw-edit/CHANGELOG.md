@@ -10,6 +10,10 @@
   - The extension manifest's 178 texts - command titles, setting descriptions, enum labels, view names,
     debugger labels - come from `package.nls.json`; `npm run lint` fails on a text written into
     `package.json` itself or a key the catalogue does not carry
+  - The extension host's 180 texts - notifications and their buttons, prompts, quick picks, progress, tree
+    items and panel titles - go through `vscode.l10n.t` into `l10n/bundle.l10n.json`; the lint fails on a
+    text written in place or a bundle that no longer matches the code. Six texts in second person were
+    reworded on the way, and plural messages are whole sentences
 - **Weather intensity** - a control under Weather sets the share of a weather field drawn, as a weather
   phase's emitter intensity sets it in the game; it reaches weather systems only and is disabled with the
   reason when the scene has none

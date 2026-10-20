@@ -37,6 +37,7 @@
     "workspaceContains:**/*.pgproj"
   ],
   "main": "./out/extension.js",
+  "l10n": "./l10n",
   "contributes": {
     "languages": [
       {
@@ -1125,7 +1126,8 @@
     "rig:glcheck": "node scripts/shader-rig/translate.js > scripts/shader-rig/out/translate.txt && node scripts/shader-rig/glcheck.js",
     "rig:render": "node scripts/shader-rig/render.js",
     "pretest": "npm run compile && npm run lint",
-    "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && node scripts/manifest-strings.js && eslint src && prettier --check \"src/**/*.{ts,tsx}\"",
+    "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && node scripts/manifest-strings.js && node scripts/host-strings.js && eslint src && prettier --check \"src/**/*.{ts,tsx}\"",
+    "l10n:export": "vscode-l10n-dev export --outDir ./l10n ./src",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "test": "vscode-test",
     "package": "vsce package --no-dependencies"
@@ -1151,6 +1153,7 @@
     "@types/yauzl": "^3.4.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
+    "@vscode/l10n-dev": "0.0.35",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "^3.5.0",
@@ -1163,6 +1166,7 @@
     "@tabler/icons-react": "^3.46.0",
     "@tanstack/react-virtual": "^3.14.9",
     "@vscode/codicons": "^0.0.45",
+    "@vscode/l10n": "0.0.18",
     "elkjs": "^0.8.2",
     "jsonc-parser": "^3.3.1",
     "react": "^19.2.8",

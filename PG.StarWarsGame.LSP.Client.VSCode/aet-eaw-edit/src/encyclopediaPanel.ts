@@ -42,7 +42,7 @@ export class EncyclopediaPanel extends WebviewPanelHost {
     private constructor(extensionUri: vscode.Uri) {
         super(extensionUri, {
             viewType: "aetEncyclopediaPreview",
-            title: "Encyclopedia",
+            title: vscode.l10n.t("Encyclopedia"),
             column: vscode.ViewColumn.Beside,
             script: "encyclopediaPreview.js",
             bodyStyle:
@@ -74,8 +74,8 @@ export class EncyclopediaPanel extends WebviewPanelHost {
 
         panel._reload = reload;
         panel.panel.title = entry.displayName?.trim()
-            ? `Encyclopedia: ${entry.displayName}`
-            : `Encyclopedia: ${entry.objectId}`;
+            ? vscode.l10n.t("Encyclopedia: {0}", entry.displayName)
+            : vscode.l10n.t("Encyclopedia: {0}", entry.objectId);
         panel.reveal(true);
         panel._sendEntry(entry);
     }

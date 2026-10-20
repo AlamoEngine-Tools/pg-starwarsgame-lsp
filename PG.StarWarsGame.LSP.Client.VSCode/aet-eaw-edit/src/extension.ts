@@ -4,6 +4,7 @@
 import { ChildProcess, spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import * as l10n from "@vscode/l10n";
 import * as vscode from "vscode";
 import {
     ClientCapabilities,
@@ -197,10 +198,17 @@ function effectiveObjectBanner(objectId: string): string {
     return [
         "<!--",
         "  ============================================================",
-        "  GENERATED READ-ONLY PREVIEW",
-        `  Effective (fully-merged) form of variant object '${objectId}'.`,
-        "  This is not an editable source file - edits are discarded, and",
-        "  go-to-definition is not available here.",
+        "  " + vscode.l10n.t("GENERATED READ-ONLY PREVIEW"),
+        "  " +
+            vscode.l10n.t(
+                "Effective (fully-merged) form of variant object '{0}'.",
+                objectId,
+            ),
+        "  " +
+            vscode.l10n.t(
+                "This is not an editable source file - edits are discarded, and",
+            ),
+        "  " + vscode.l10n.t("go-to-definition is not available here."),
         "  ============================================================",
         "-->",
         "",
@@ -416,7 +424,10 @@ async function pickProject(): Promise<ProjectClient | undefined> {
             description: p.spec.projectPath,
             key: p.spec.key,
         })),
-        { title: "EaWEdit project", placeHolder: "Select a project" },
+        {
+            title: vscode.l10n.t("EaWEdit project"),
+            placeHolder: vscode.l10n.t("Select a project"),
+        },
     );
     if (picked === undefined) {
         return undefined;
@@ -705,8 +716,9 @@ function validateConfiguration(extensionPath: string): boolean {
         !cfg("lsp.source.baseline").get<string>("localPath")
     ) {
         vscode.window.showErrorMessage(
-            'EaWEdit: Baseline type is "local" but no path is configured. ' +
-                'Set "aet-eaw-edit.lsp.source.baseline.localPath".',
+            vscode.l10n.t(
+                'EaWEdit: Baseline type is "local" but no path is configured. Set "aet-eaw-edit.lsp.source.baseline.localPath".',
+            ),
         );
         valid = false;
     }
@@ -716,8 +728,9 @@ function validateConfiguration(extensionPath: string): boolean {
         !cfg("lsp.schema").get<string>("localPath")
     ) {
         vscode.window.showErrorMessage(
-            'EaWEdit: Schema source is "local" but no directory is configured. ' +
-                'Set "aet-eaw-edit.lsp.schema.localPath".',
+            vscode.l10n.t(
+                'EaWEdit: Schema source is "local" but no directory is configured. Set "aet-eaw-edit.lsp.schema.localPath".',
+            ),
         );
         valid = false;
     }
@@ -914,7 +927,9 @@ function startProjectClient(
                 const keyName = (args[0] as string | undefined) ?? "";
                 if (!keyName) {
                     vscode.window.showWarningMessage(
-                        "EaWEdit: No localisation key name provided.",
+                        vscode.l10n.t(
+                            "EaWEdit: No localisation key name provided.",
+                        ),
                     );
                     return;
                 }
@@ -926,7 +941,9 @@ function startProjectClient(
                     );
                 if (!fetched.ok) {
                     vscode.window.showWarningMessage(
-                        "EaWEdit: Could not fetch localisation projects from server.",
+                        vscode.l10n.t(
+                            "EaWEdit: Could not fetch localisation projects from server.",
+                        ),
                     );
                     return;
                 }
@@ -934,7 +951,9 @@ function startProjectClient(
 
                 if (!projects.length) {
                     vscode.window.showWarningMessage(
-                        "EaWEdit: No localisation projects found. Use 'EaWEdit: Initialise Localisation Project from Baseline' first.",
+                        vscode.l10n.t(
+                            "EaWEdit: No localisation projects found. Use 'EaWEdit: Initialise Localisation Project from Baseline' first.",
+                        ),
                     );
                     return;
                 }
@@ -947,8 +966,13 @@ function startProjectClient(
                         filePath: p.filePath,
                     })),
                     {
-                        title: `Create localisation key '${keyName}'`,
-                        placeHolder: "Select localisation project",
+                        title: vscode.l10n.t(
+                            "Create localisation key '{0}'",
+                            keyName,
+                        ),
+                        placeHolder: vscode.l10n.t(
+                            "Select localisation project",
+                        ),
                     },
                 );
                 if (!picked) {
@@ -956,8 +980,10 @@ function startProjectClient(
                 }
 
                 const english = await vscode.window.showInputBox({
-                    title: `New key: ${keyName}`,
-                    prompt: "English translation text (required)",
+                    title: vscode.l10n.t("New key: {0}", keyName),
+                    prompt: vscode.l10n.t(
+                        "English translation text (required)",
+                    ),
                     validateInput: (v) =>
                         v?.trim() ? null : "Translation text is required",
                 });
@@ -1036,8 +1062,14 @@ function startProjectClient(
             ) {
                 void vscode.window.showWarningMessage(
                     serverVersion
-                        ? `EaWEdit: Server version ${serverVersion} does not match the expected version ${REQUIRED_SERVER_VERSION}. Clear "aet-eaw-edit.lsp.executable" to use the bundled server`
-                        : `EaWEdit: The server did not report a version. Clear "aet-eaw-edit.lsp.executable" to use the bundled server`,
+                        ? vscode.l10n.t(
+                              'EaWEdit: Server version {0} does not match the expected version {1}. Clear "aet-eaw-edit.lsp.executable" to use the bundled server',
+                              serverVersion,
+                              REQUIRED_SERVER_VERSION,
+                          )
+                        : vscode.l10n.t(
+                              'EaWEdit: The server did not report a version. Clear "aet-eaw-edit.lsp.executable" to use the bundled server',
+                          ),
                 );
             }
 
@@ -1071,11 +1103,13 @@ function startProjectClient(
             updateStatus();
             void vscode.window
                 .showErrorMessage(
-                    "EaWEdit: LSP server failed to start. Check the EaWEdit output channel for details.",
-                    "Show Output",
+                    vscode.l10n.t(
+                        "EaWEdit: LSP server failed to start. Check the EaWEdit output channel for details.",
+                    ),
+                    vscode.l10n.t("Show Output"),
                 )
                 .then((choice) => {
-                    if (choice === "Show Output") {
+                    if (choice === vscode.l10n.t("Show Output")) {
                         log?.show(true);
                     }
                 });
@@ -1258,8 +1292,9 @@ function updateStatus(): void {
     if (running.length === 1) {
         const state = running[0].state;
         if (state === "indexing") {
-            statusItem.tooltip =
-                "The server is connected. Language features become complete when the scan finishes.";
+            statusItem.tooltip = vscode.l10n.t(
+                "The server is connected. Language features become complete when the scan finishes.",
+            );
         } else if (state === "ready") {
             statusItem.tooltip = undefined;
         }
@@ -1485,17 +1520,21 @@ async function pickReportTier(
     return vscode.window.showQuickPick(
         [
             {
-                label: "Basic info",
-                description: "Versions, sources and workspace checks",
+                label: vscode.l10n.t("Basic info"),
+                description: vscode.l10n.t(
+                    "Versions, sources and workspace checks",
+                ),
                 extended: false,
             },
             {
-                label: "Basic + extended stats",
-                description: "Adds dependency, index and asset counts",
+                label: vscode.l10n.t("Basic + extended stats"),
+                description: vscode.l10n.t(
+                    "Adds dependency, index and asset counts",
+                ),
                 extended: true,
             },
         ],
-        { title, placeHolder: "What to include" },
+        { title, placeHolder: vscode.l10n.t("What to include") },
     );
 }
 
@@ -1531,10 +1570,13 @@ async function reportDiagnosticOnGitHub(
 
     if (!issue.fits) {
         const choice = await vscode.window.showWarningMessage(
-            `EaWEdit: The report for ${report.id} is too long to prefill an issue`,
-            "Open report in editor",
+            vscode.l10n.t(
+                "EaWEdit: The report for {0} is too long to prefill an issue",
+                report.id,
+            ),
+            vscode.l10n.t("Open report in editor"),
         );
-        if (choice === "Open report in editor") {
+        if (choice === vscode.l10n.t("Open report in editor")) {
             await openDiagnosticReport(context, gateway, report, tier);
         }
         return;
@@ -1544,13 +1586,18 @@ async function reportDiagnosticOnGitHub(
 
     if (issue.trimmed.length > 0) {
         const left = issue.trimmed.map((t) =>
-            t === "extended" ? "extended stats" : "part of the basic info",
+            t === "extended"
+                ? vscode.l10n.t("extended stats")
+                : vscode.l10n.t("part of the basic info"),
         );
         const choice = await vscode.window.showInformationMessage(
-            `EaWEdit: Issue prefill shortened - ${left.join(" and ")} left out`,
-            "Open full report",
+            vscode.l10n.t(
+                "EaWEdit: Issue prefill shortened - {0} left out",
+                left.join(vscode.l10n.t(" and ")),
+            ),
+            vscode.l10n.t("Open full report"),
         );
-        if (choice === "Open full report") {
+        if (choice === vscode.l10n.t("Open full report")) {
             await openDiagnosticReport(context, gateway, report, tier);
         }
     }
@@ -1603,7 +1650,7 @@ async function pickModel(gateway: LspGateway): Promise<string | null> {
     }
 
     const pick = vscode.window.createQuickPick<ModelPickItem>();
-    pick.title = "Preview Model";
+    pick.title = vscode.l10n.t("Preview Model");
     pick.placeholder = "Model file name, e.g. EV_StarDestroyer.ALO";
     pick.matchOnDescription = true;
     pick.items = modelPickItems(result.models);
@@ -1624,6 +1671,12 @@ async function pickModel(gateway: LspGateway): Promise<string | null> {
 export async function activate(
     context: vscode.ExtensionContext,
 ): Promise<void> {
+    // The modules that cannot import `vscode` translate through `@vscode/l10n`; they read the same
+    // bundle VS Code loaded for the display language. English ships no bundle: the texts are the keys.
+    if (vscode.l10n.bundle !== undefined) {
+        l10n.config({ contents: vscode.l10n.bundle });
+    }
+
     // Per project, not per machine: where a dialog belongs depends on the mod being edited.
     initDialogGeometryStorage(context.workspaceState);
 
@@ -1703,16 +1756,24 @@ export async function activate(
                 const choice = await vscode.window.showQuickPick(
                     [
                         {
-                            label: "Initialise from the game baseline",
+                            label: vscode.l10n.t(
+                                "Initialise from the game baseline",
+                            ),
                             command: "aet-eaw-edit.lsp.initLocalisationProject",
                         },
                         {
-                            label: "Import existing localisation files",
+                            label: vscode.l10n.t(
+                                "Import existing localisation files",
+                            ),
                             command:
                                 "aet-eaw-edit.lsp.importLocalisationProject",
                         },
                     ],
-                    { placeHolder: "Create a localisation project" },
+                    {
+                        placeHolder: vscode.l10n.t(
+                            "Create a localisation project",
+                        ),
+                    },
                 );
                 if (choice) {
                     await vscode.commands.executeCommand(choice.command);
@@ -1742,8 +1803,9 @@ export async function activate(
                 // clicking a credits group ended up offering unrelated .dat translation files.
                 if (arg !== undefined && arg.project === undefined) {
                     vscode.window.showWarningMessage(
-                        "EaWEdit: That node groups several files rather than being one. " +
-                            "Open one of the files under it.",
+                        vscode.l10n.t(
+                            "EaWEdit: That node groups several files rather than being one. Open one of the files under it.",
+                        ),
                     );
                     return;
                 }
@@ -1761,7 +1823,13 @@ export async function activate(
                     }
                     if (result.error || !result.projects?.length) {
                         vscode.window.showWarningMessage(
-                            `EaWEdit: ${result.error ?? "no localisation files found in this workspace."}`,
+                            vscode.l10n.t(
+                                "EaWEdit: {0}",
+                                result.error ??
+                                    vscode.l10n.t(
+                                        "no localisation files found in this workspace.",
+                                    ),
+                            ),
                         );
                         return;
                     }
@@ -1778,12 +1846,16 @@ export async function activate(
                                 label: p.label,
                                 description:
                                     p.category === LOC_CATEGORY.credits
-                                        ? "Credits"
-                                        : "Text",
+                                        ? vscode.l10n.t("Credits")
+                                        : vscode.l10n.t("Text"),
                                 detail: p.filePath,
                                 project: p,
                             })),
-                        { placeHolder: "Open a localisation file" },
+                        {
+                            placeHolder: vscode.l10n.t(
+                                "Open a localisation file",
+                            ),
+                        },
                     );
                     if (!picked) {
                         return;
@@ -1825,7 +1897,9 @@ export async function activate(
                 const filePath = arg?.project?.filePath;
                 if (!filePath) {
                     vscode.window.showWarningMessage(
-                        "EaWEdit: No localisation file selected.",
+                        vscode.l10n.t(
+                            "EaWEdit: No localisation file selected.",
+                        ),
                     );
                     return;
                 }
@@ -1883,7 +1957,13 @@ export async function activate(
                     }
                     if (result.error || !result.projects?.length) {
                         vscode.window.showWarningMessage(
-                            `EaWEdit: ${result.error ?? "no localisation files found in this workspace."}`,
+                            vscode.l10n.t(
+                                "EaWEdit: {0}",
+                                result.error ??
+                                    vscode.l10n.t(
+                                        "no localisation files found in this workspace.",
+                                    ),
+                            ),
                         );
                         return;
                     }
@@ -1894,7 +1974,11 @@ export async function activate(
                             detail: p.filePath,
                             project: p,
                         })),
-                        { placeHolder: "Convert which localisation file?" },
+                        {
+                            placeHolder: vscode.l10n.t(
+                                "Convert which localisation file?",
+                            ),
+                        },
                     );
                     if (!picked) {
                         return;
@@ -1909,22 +1993,29 @@ export async function activate(
                     const picked = await vscode.window.showQuickPick(
                         [
                             {
-                                label: "CSV",
-                                description: "Comma-separated values (.csv)",
+                                label: vscode.l10n.t("CSV"),
+                                description: vscode.l10n.t(
+                                    "Comma-separated values (.csv)",
+                                ),
                             },
                             {
-                                label: "XML",
-                                description: "eaw-translation v1 XML (.xml)",
+                                label: vscode.l10n.t("XML"),
+                                description: vscode.l10n.t(
+                                    "eaw-translation v1 XML (.xml)",
+                                ),
                             },
                             {
-                                label: "NLS",
-                                description:
+                                label: vscode.l10n.t("NLS"),
+                                description: vscode.l10n.t(
                                     "Java-style properties (.properties)",
+                                ),
                             },
                         ],
                         {
-                            title: "Convert Localisation File",
-                            placeHolder: "Write it in which format?",
+                            title: vscode.l10n.t("Convert Localisation File"),
+                            placeHolder: vscode.l10n.t(
+                                "Write it in which format?",
+                            ),
                         },
                     );
                     if (!picked) {
@@ -1944,7 +2035,9 @@ export async function activate(
                 }
 
                 if (result.error) {
-                    vscode.window.showErrorMessage(`EaWEdit: ${result.error}`);
+                    vscode.window.showErrorMessage(
+                        vscode.l10n.t("EaWEdit: {0}", result.error),
+                    );
                     return;
                 }
 
@@ -1966,11 +2059,15 @@ export async function activate(
                         ? `wrote ${written.length} files, one per language: ${written.map((p) => path.basename(p)).join(", ")}`
                         : `wrote ${written[0]}`;
                 const choice = await vscode.window.showInformationMessage(
-                    `EaWEdit: ${wrote}. The original file was kept.${orphans}`,
-                    "Open",
+                    vscode.l10n.t(
+                        "EaWEdit: {0}. The original file was kept.{1}",
+                        wrote,
+                        orphans,
+                    ),
+                    vscode.l10n.t("Open"),
                 );
                 localisationNavigatorProvider?.refresh();
-                if (choice === "Open" && result.writtenPath) {
+                if (choice === vscode.l10n.t("Open") && result.writtenPath) {
                     LocalisationEditorPanel.show(
                         result.writtenPath,
                         path.basename(result.writtenPath),
@@ -2008,9 +2105,10 @@ export async function activate(
                 const picked = await vscode.window.showQuickPick(
                     formatChoices(current),
                     {
-                        title: "Set Localisation Project Format",
-                        placeHolder:
+                        title: vscode.l10n.t("Set Localisation Project Format"),
+                        placeHolder: vscode.l10n.t(
                             "Load the project's text from which format? No files are converted",
+                        ),
                     },
                 );
                 if (!picked) {
@@ -2048,7 +2146,9 @@ export async function activate(
                 const filePath = arg?.project?.filePath;
                 if (!filePath) {
                     vscode.window.showWarningMessage(
-                        "EaWEdit: No localisation file selected.",
+                        vscode.l10n.t(
+                            "EaWEdit: No localisation file selected.",
+                        ),
                     );
                     return;
                 }
@@ -2073,12 +2173,20 @@ export async function activate(
 
                 if (result.error) {
                     vscode.window.showErrorMessage(
-                        `EaWEdit: DAT export failed - ${result.error}`,
+                        vscode.l10n.t(
+                            "EaWEdit: DAT export failed - {0}",
+                            result.error,
+                        ),
                     );
                     return;
                 }
                 vscode.window.showInformationMessage(
-                    `EaWEdit: Exported ${result.writtenFiles.length} DAT ${result.writtenFiles.length === 1 ? "file" : "files"}.`,
+                    result.writtenFiles.length === 1
+                        ? vscode.l10n.t("EaWEdit: Exported 1 DAT file.")
+                        : vscode.l10n.t(
+                              "EaWEdit: Exported {0} DAT files.",
+                              result.writtenFiles.length,
+                          ),
                 );
             },
         ),
@@ -2160,7 +2268,7 @@ export async function activate(
                     }
                     if (result.error) {
                         vscode.window.showWarningMessage(
-                            `EaWEdit: ${result.error}`,
+                            vscode.l10n.t("EaWEdit: {0}", result.error),
                         );
                         return;
                     }
@@ -2168,14 +2276,17 @@ export async function activate(
                     const items = graphTargets(result.campaigns ?? []);
                     if (!items.length) {
                         vscode.window.showInformationMessage(
-                            "EaWEdit: No story campaigns found in this workspace.",
+                            vscode.l10n.t(
+                                "EaWEdit: No story campaigns found in this workspace.",
+                            ),
                         );
                         return;
                     }
                     const picked = await vscode.window.showQuickPick(items, {
-                        title: "Open Story Graph",
-                        placeHolder:
+                        title: vscode.l10n.t("Open Story Graph"),
+                        placeHolder: vscode.l10n.t(
                             "Select a campaign faction or one of its battles",
+                        ),
                     });
                     target = picked?.target;
                 }
@@ -2214,7 +2325,11 @@ export async function activate(
                     });
                 } catch (e) {
                     vscode.window.showWarningMessage(
-                        `EaWEdit: Cannot open '${String(item.label)}' - ${e}`,
+                        vscode.l10n.t(
+                            "EaWEdit: Cannot open '{0}' - {1}",
+                            String(item.label),
+                            String(e),
+                        ),
                     );
                 }
             },
@@ -2233,7 +2348,7 @@ export async function activate(
     // The one place every state of the server is shown, so it is where a report starts.
     statusItem.command = {
         command: "aet-eaw-edit.copyBugReportInfo",
-        title: "Copy bug report info",
+        title: vscode.l10n.t("Copy bug report info"),
     };
     context.subscriptions.push(statusItem);
 
@@ -2266,7 +2381,7 @@ export async function activate(
             async () => {
                 if (clients.size <= 1) {
                     void vscode.window.showInformationMessage(
-                        "EaWEdit: One project open",
+                        vscode.l10n.t("EaWEdit: One project open"),
                     );
                     return;
                 }
@@ -2388,8 +2503,8 @@ export async function activate(
                     return;
                 }
                 const name = await vscode.window.showInputBox({
-                    prompt: "Mod name",
-                    placeHolder: "My Awesome Mod",
+                    prompt: vscode.l10n.t("Mod name"),
+                    placeHolder: vscode.l10n.t("My Awesome Mod"),
                     validateInput: (v) =>
                         v?.trim() ? null : "Name is required",
                 });
@@ -2414,7 +2529,10 @@ export async function activate(
                 );
                 if (created) {
                     vscode.window.showInformationMessage(
-                        `Mod project '${name.trim()}' created.`,
+                        vscode.l10n.t(
+                            "Mod project '{0}' created.",
+                            name.trim(),
+                        ),
                     );
                 }
             },
@@ -2457,7 +2575,9 @@ export async function activate(
                     );
                 if (!config.ok) {
                     vscode.window.showWarningMessage(
-                        "EaWEdit LSP: Could not query the project's localisation config.",
+                        vscode.l10n.t(
+                            "EaWEdit LSP: Could not query the project's localisation config.",
+                        ),
                     );
                     return;
                 }
@@ -2467,11 +2587,15 @@ export async function activate(
                 if (rootConfig.configured) {
                     const confirmed =
                         await vscode.window.showInformationMessage(
-                            `Initialise the localisation project (${rootConfig.type} in "${rootConfig.directory}")?`,
+                            vscode.l10n.t(
+                                'Initialise the localisation project ({0} in "{1}")?',
+                                rootConfig.type ?? "",
+                                rootConfig.directory ?? "",
+                            ),
                             { modal: true },
-                            "Initialise",
+                            vscode.l10n.t("Initialise"),
                         );
-                    if (confirmed !== "Initialise") {
+                    if (confirmed !== vscode.l10n.t("Initialise")) {
                         return;
                     }
                     await lsp.executeCommand(
@@ -2485,16 +2609,22 @@ export async function activate(
                 // Not configured - the VS Code setting only pre-fills the picker here, as a last resort.
                 const formatOptions = [
                     {
-                        label: "CSV",
-                        description: "Comma-separated values (.csv)",
+                        label: vscode.l10n.t("CSV"),
+                        description: vscode.l10n.t(
+                            "Comma-separated values (.csv)",
+                        ),
                     },
                     {
-                        label: "XML",
-                        description: "eaw-translation v1 XML (.xml)",
+                        label: vscode.l10n.t("XML"),
+                        description: vscode.l10n.t(
+                            "eaw-translation v1 XML (.xml)",
+                        ),
                     },
                     {
-                        label: "NLS",
-                        description: "Java-style properties (.properties)",
+                        label: vscode.l10n.t("NLS"),
+                        description: vscode.l10n.t(
+                            "Java-style properties (.properties)",
+                        ),
                     },
                 ];
                 const defaultFormat = cfg("localisation")
@@ -2513,8 +2643,10 @@ export async function activate(
                 const formatItem = await vscode.window.showQuickPick(
                     formatOptions,
                     {
-                        title: "Initialise Localisation Project from Baseline",
-                        placeHolder: "Select output format",
+                        title: vscode.l10n.t(
+                            "Initialise Localisation Project from Baseline",
+                        ),
+                        placeHolder: vscode.l10n.t("Select output format"),
                     },
                 );
                 if (!formatItem) {
@@ -2522,9 +2654,13 @@ export async function activate(
                 }
 
                 const directory = await vscode.window.showInputBox({
-                    title: "Localisation directory (relative to the .pgproj)",
+                    title: vscode.l10n.t(
+                        "Localisation directory (relative to the .pgproj)",
+                    ),
                     value: "data/text",
-                    prompt: "Where the localisation project files will live",
+                    prompt: vscode.l10n.t(
+                        "Where the localisation project files will live",
+                    ),
                     validateInput: (v) =>
                         v?.trim() ? null : "A directory is required",
                 });
@@ -2556,35 +2692,48 @@ export async function activate(
 
                 const convertibleFormats = [
                     {
-                        label: "CSV",
-                        description: "Comma-separated values (.csv)",
+                        label: vscode.l10n.t("CSV"),
+                        description: vscode.l10n.t(
+                            "Comma-separated values (.csv)",
+                        ),
                     },
                     {
-                        label: "XML",
-                        description: "eaw-translation v1 XML (.xml)",
+                        label: vscode.l10n.t("XML"),
+                        description: vscode.l10n.t(
+                            "eaw-translation v1 XML (.xml)",
+                        ),
                     },
                     {
-                        label: "NLS",
-                        description: "Java-style properties (.properties)",
+                        label: vscode.l10n.t("NLS"),
+                        description: vscode.l10n.t(
+                            "Java-style properties (.properties)",
+                        ),
                     },
                 ];
                 const datFormat = {
-                    label: "DAT",
-                    description: "The game's proprietary binary format (.dat)",
+                    label: vscode.l10n.t("DAT"),
+                    description: vscode.l10n.t(
+                        "The game's proprietary binary format (.dat)",
+                    ),
                 };
                 const sourceFormatChoices = [...convertibleFormats, datFormat];
 
                 const sourceFormatItem = await vscode.window.showQuickPick(
                     sourceFormatChoices,
                     {
-                        title: "Import Existing Localisation Files",
-                        placeHolder: "What format are your existing files in?",
+                        title: vscode.l10n.t(
+                            "Import Existing Localisation Files",
+                        ),
+                        placeHolder: vscode.l10n.t(
+                            "Format of the existing files",
+                        ),
                     },
                 );
                 if (!sourceFormatItem) {
                     return;
                 }
-                const isDatSource = sourceFormatItem.label === "DAT";
+                const isDatSource =
+                    sourceFormatItem.label === vscode.l10n.t("DAT");
 
                 // DAT is one binary file per language (MasterTextFile_<LANGUAGE>.dat) - the user picks
                 // one file, the server discovers its siblings in the same folder. Every other format
@@ -2600,7 +2749,9 @@ export async function activate(
                         filters: { "DAT files": ["dat"] },
                         openLabel:
                             "Select a MasterTextFile_<LANGUAGE>.dat file",
-                        title: "Select one DAT file - its siblings in the same folder are imported too",
+                        title: vscode.l10n.t(
+                            "Select one DAT file - its siblings in the same folder are imported too",
+                        ),
                     });
                     if (!sourceFiles?.length) {
                         return;
@@ -2616,7 +2767,10 @@ export async function activate(
                         canSelectMany: false,
                         defaultUri,
                         openLabel: "Select folder with existing files",
-                        title: `Folder containing your ${sourceFormatItem.label} files`,
+                        title: vscode.l10n.t(
+                            "Folder containing the {0} files",
+                            sourceFormatItem.label,
+                        ),
                     });
                     if (!sourceFolders?.length) {
                         return;
@@ -2635,8 +2789,10 @@ export async function activate(
                     targetFormatItem = await vscode.window.showQuickPick(
                         [...convertibleFormats, datFormat],
                         {
-                            title: "Target Format",
-                            placeHolder: "Format to use going forward",
+                            title: vscode.l10n.t("Target Format"),
+                            placeHolder: vscode.l10n.t(
+                                "Format to use going forward",
+                            ),
                         },
                     );
                 } else {
@@ -2654,8 +2810,11 @@ export async function activate(
                     targetFormatItem = await vscode.window.showQuickPick(
                         targetChoices,
                         {
-                            title: "Target Format",
-                            placeHolder: `Format to use going forward (defaults to ${sourceFormatItem.label})`,
+                            title: vscode.l10n.t("Target Format"),
+                            placeHolder: vscode.l10n.t(
+                                "Format to use going forward (defaults to {0})",
+                                sourceFormatItem.label,
+                            ),
                         },
                     );
                 }
@@ -2666,9 +2825,15 @@ export async function activate(
                 let targetDirectory: string | undefined;
                 if (targetFormatItem.label !== sourceFormatItem.label) {
                     targetDirectory = await vscode.window.showInputBox({
-                        title: "Target directory (relative to the .pgproj)",
+                        title: vscode.l10n.t(
+                            "Target directory (relative to the .pgproj)",
+                        ),
                         value: "data/text",
-                        prompt: `Converting ${sourceFormatItem.label} to ${targetFormatItem.label} - where should the new file go?`,
+                        prompt: vscode.l10n.t(
+                            "Converting {0} to {1} - where should the new file go?",
+                            sourceFormatItem.label,
+                            targetFormatItem.label,
+                        ),
                         validateInput: (v) =>
                             v?.trim() ? null : "A directory is required",
                     });
@@ -2774,7 +2939,7 @@ export async function activate(
                 );
                 await vscode.env.clipboard.writeText(text);
                 void vscode.window.showInformationMessage(
-                    "EaWEdit: Bug report info copied",
+                    vscode.l10n.t("EaWEdit: Bug report info copied"),
                 );
             },
         ),
@@ -2851,8 +3016,10 @@ export async function activate(
                 let objectId = objectIdArg;
                 if (!objectId) {
                     objectId = await vscode.window.showInputBox({
-                        title: "Preview Assembled Unit",
-                        prompt: "Name of the GameObject to assemble, e.g. Generic_Star_Destroyer",
+                        title: vscode.l10n.t("Preview Assembled Unit"),
+                        prompt: vscode.l10n.t(
+                            "Name of the GameObject to assemble, e.g. Generic_Star_Destroyer",
+                        ),
                         validateInput: (v) =>
                             v?.trim() ? null : "Object name is required",
                     });
@@ -2889,8 +3056,10 @@ export async function activate(
                 let objectId = objectIdArg;
                 if (!objectId) {
                     objectId = await vscode.window.showInputBox({
-                        title: "Preview Encyclopedia Popup",
-                        prompt: "Name of the GameObject whose popup to preview",
+                        title: vscode.l10n.t("Preview Encyclopedia Popup"),
+                        prompt: vscode.l10n.t(
+                            "Name of the GameObject whose popup to preview",
+                        ),
                         validateInput: (v) =>
                             v?.trim() ? null : "Object name is required",
                     });
@@ -2952,8 +3121,10 @@ export async function activate(
                 let objectId = objectIdArg;
                 if (!objectId) {
                     objectId = await vscode.window.showInputBox({
-                        title: "Show Effective Object",
-                        prompt: "Name of the variant GameObject to resolve",
+                        title: vscode.l10n.t("Show Effective Object"),
+                        prompt: vscode.l10n.t(
+                            "Name of the variant GameObject to resolve",
+                        ),
                         validateInput: (v) =>
                             v?.trim() ? null : "Object name is required",
                     });

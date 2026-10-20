@@ -58,12 +58,12 @@ interface ExternalTool {
 
 const ALO_VIEWER: ExternalTool = {
     setting: "aet-eaw-edit.tools.aloViewerExecutable",
-    label: "AloViewer",
+    label: vscode.l10n.t("AloViewer"),
 };
 
 const PARTICLE_EDITOR: ExternalTool = {
     setting: "aet-eaw-edit.tools.particleEditorExecutable",
-    label: "Particle Editor",
+    label: vscode.l10n.t("Particle Editor"),
 };
 
 /**
@@ -403,7 +403,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
 
         if (!dataUrl.startsWith("data:image/png;base64,") || comma < 0) {
             void vscode.window.showErrorMessage(
-                "The preview produced no image to save.",
+                vscode.l10n.t("The preview produced no image to save."),
             );
             return;
         }
@@ -428,7 +428,10 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         // cannot see is a file they will look for in the wrong place.
         const open = "Open";
         const chosen = await vscode.window.showInformationMessage(
-            `Saved ${target.path.split("/").pop() ?? "the capture"}.`,
+            vscode.l10n.t(
+                "Saved {0}.",
+                target.path.split("/").pop() ?? vscode.l10n.t("the capture"),
+            ),
             open,
         );
 
@@ -473,7 +476,10 @@ export class ModelPreviewPanel extends WebviewPanelHost {
             // failed background re-read is not worth a modal over the top of it.
             if (!refresh) {
                 void vscode.window.showErrorMessage(
-                    `EaWEdit: Could not build the preview scene. ${result.message}`,
+                    vscode.l10n.t(
+                        "EaWEdit: Could not build the preview scene. {0}",
+                        result.message,
+                    ),
                 );
             }
             return;
@@ -666,11 +672,14 @@ export class ModelPreviewPanel extends WebviewPanelHost {
 
         if (executable === undefined || executable === "") {
             const choice = await vscode.window.showWarningMessage(
-                `EaWEdit: No path is configured for ${tool.label}.`,
-                "Open settings",
+                vscode.l10n.t(
+                    "EaWEdit: No path is configured for {0}.",
+                    tool.label,
+                ),
+                vscode.l10n.t("Open settings"),
             );
 
-            if (choice === "Open settings") {
+            if (choice === vscode.l10n.t("Open settings")) {
                 await vscode.commands.executeCommand(
                     "workbench.action.openSettings",
                     tool.setting,
@@ -687,7 +696,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
         );
         if (file === null) {
             void vscode.window.showWarningMessage(
-                `EaWEdit: No file to open in ${tool.label}`,
+                vscode.l10n.t("EaWEdit: No file to open in {0}", tool.label),
             );
             return;
         }
@@ -698,7 +707,11 @@ export class ModelPreviewPanel extends WebviewPanelHost {
             const reason =
                 error instanceof Error ? error.message : String(error);
             void vscode.window.showErrorMessage(
-                `EaWEdit: Could not start ${tool.label} - ${reason}`,
+                vscode.l10n.t(
+                    "EaWEdit: Could not start {0} - {1}",
+                    tool.label,
+                    reason,
+                ),
             );
         }
     }

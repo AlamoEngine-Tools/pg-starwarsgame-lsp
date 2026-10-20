@@ -284,9 +284,7 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
         item.iconPath = new vscode.ThemeIcon(ROLE_ICONS[role.kind]);
         item.description = roleText;
         item.contextValue = "aetStoryFaction";
-        item.tooltip =
-            (roleText ? `${faction.faction} - ${roleText}` : faction.faction) +
-            `\n${faction.manifestFile}`;
+        item.tooltip = `${roleText ? `${faction.faction} - ${roleText}` : faction.faction}\n${faction.manifestFile}`;
         return item;
     }
 
@@ -312,11 +310,13 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
         );
         item.iconPath = new vscode.ThemeIcon("target");
         item.contextValue = "aetStoryBattle";
-        item.description = `Battle ${index + 1} of ${count}`;
-        item.tooltip =
-            branch.battle.label +
-            `\nPlot files - ${branch.threads.length}` +
-            `\nScripts - ${branch.battle.luaScripts?.length ?? 0}`;
+        item.description = vscode.l10n.t("Battle {0} of {1}", index + 1, count);
+        item.tooltip = vscode.l10n.t(
+            "{0}\nPlot files - {1}\nScripts - {2}",
+            branch.battle.label,
+            branch.threads.length,
+            branch.battle.luaScripts?.length ?? 0,
+        );
         return item;
     }
 
@@ -332,7 +332,9 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
         item.iconPath = new vscode.ThemeIcon(
             thread.suspended ? "circle-slash" : "type-hierarchy-sub",
         );
-        item.description = thread.suspended ? "suspended" : undefined;
+        item.description = thread.suspended
+            ? vscode.l10n.t("suspended")
+            : undefined;
         this._fileNode(
             item,
             thread.file,
@@ -352,7 +354,7 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
             script.name,
         );
         item.iconPath = new vscode.ThemeIcon("file-code");
-        item.description = "Lua";
+        item.description = vscode.l10n.t("Lua");
         const file = script.name.toLowerCase().endsWith(".lua")
             ? script.name
             : `${script.name}.lua`;
@@ -378,7 +380,7 @@ export class StoryNavigatorViewProvider extends LspTreeDataProvider<
             ? state
                 ? `${file} - ${state}`
                 : file
-            : `${file} - not found`;
+            : vscode.l10n.t("{0} - not found", file);
     }
 
     private _infoItem(message: string): StoryTreeItem {

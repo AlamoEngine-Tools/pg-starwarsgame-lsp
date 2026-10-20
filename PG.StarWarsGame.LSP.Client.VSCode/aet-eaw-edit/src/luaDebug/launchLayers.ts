@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
 /**
  * The launch-layers answer from the server and the two things a debug configuration is built
  * from it: the script roots the adapter maps game paths with, and the mod chain the game is
@@ -60,7 +61,10 @@ export function buildModChain(
         if (withSpace !== undefined) {
             return {
                 ok: false,
-                message: `The mod path '${withSpace}' contains a space; the game's command line cannot carry a path with one`,
+                message: l10n.t(
+                    "The mod path '{0}' contains a space; the game's command line cannot carry a path with one",
+                    withSpace,
+                ),
             };
         }
         return { ok: true, args: override.map((p) => `MODPATH=${p}`) };
@@ -70,8 +74,9 @@ export function buildModChain(
     if (ordered.length === 0) {
         return {
             ok: false,
-            message:
+            message: l10n.t(
                 'No mod project is loaded, so there is nothing to launch the game with. Open a workspace with a .pgproj, or set "modPaths" in the launch configuration',
+            ),
         };
     }
 
@@ -80,9 +85,11 @@ export function buildModChain(
         if (layer.modPath === null) {
             return {
                 ok: false,
-                message:
-                    `Project layer '${layer.name}' cannot be launched as a mod: ${layer.notRunnableReason ?? "no reason given"}. ` +
-                    'Attach to a running game instead, or set "modPaths" in the launch configuration to a mod folder you maintain yourself',
+                message: l10n.t(
+                    "Project layer '{0}' cannot be launched as a mod: {1}. Attaching to a running game works instead, or \"modPaths\" in the launch configuration set to a maintained mod folder",
+                    layer.name,
+                    layer.notRunnableReason ?? l10n.t("no reason given"),
+                ),
             };
         }
         args.push(`MODPATH=${layer.modPath}`);

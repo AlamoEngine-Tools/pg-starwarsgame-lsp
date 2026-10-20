@@ -363,9 +363,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
             const choice = await vscode.window.showWarningMessage(
                 confirm,
                 { modal: true },
-                "Continue",
+                vscode.l10n.t("Continue"),
             );
-            if (choice !== "Continue") {
+            if (choice !== vscode.l10n.t("Continue")) {
                 return;
             }
         }
@@ -391,7 +391,10 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         if (!result.success) {
             void vscode.window.showErrorMessage(
-                `EaWEdit: ${result.error ?? "The story command failed."}`,
+                vscode.l10n.t(
+                    "EaWEdit: {0}",
+                    result.error ?? vscode.l10n.t("The story command failed."),
+                ),
             );
             this.post({ type: "invalidate" });
             return;
@@ -485,7 +488,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
                     ? ` (change ${result.failedIndex + 1})`
                     : "";
             void vscode.window.showErrorMessage(
-                `EaWEdit: ${result.error ?? "The save failed."}${where}`,
+                vscode.l10n.t(
+                    "EaWEdit: {0}{1}",
+                    result.error ?? vscode.l10n.t("The save failed."),
+                    where,
+                ),
             );
         }
         this.post({ type: "saveResult", success: result.success });
@@ -513,12 +520,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
             confirm,
             {
                 modal: true,
-                detail:
-                    "References to this event - prereqs and event-name params (TRIGGER_EVENT, " +
-                    "RESET_EVENT, and so on) in other events - are NOT removed and will become unresolved. " +
-                    "Run Validate afterwards to find them. Nothing is written until you Save.",
+                detail: vscode.l10n.t(
+                    "References to this event - prereqs and event-name params (TRIGGER_EVENT, RESET_EVENT, and so on) in other events - are NOT removed and will become unresolved. Validate afterwards finds them. Nothing is written until Save.",
+                ),
             },
-            "Delete",
+            vscode.l10n.t("Delete"),
             dontAskAgain,
         );
 
@@ -629,18 +635,23 @@ export class StoryGraphPanel extends WebviewPanelHost {
             return;
         }
         const choice = await vscode.window.showWarningMessage(
-            `The story graph for '${this._target.campaign}' was closed with ${this._pendingCommands.length} ` +
-                "unsaved change(s). Save them?",
-            "Save",
-            "Discard",
+            vscode.l10n.t(
+                "The story graph for '{0}' was closed with {1} unsaved change(s). Save them?",
+                this._target.campaign,
+                this._pendingCommands.length,
+            ),
+            vscode.l10n.t("Save"),
+            vscode.l10n.t("Discard"),
         );
-        if (choice !== "Save") {
+        if (choice !== vscode.l10n.t("Save")) {
             return;
         }
 
         if (!this._lsp.isRunning) {
             void vscode.window.showWarningMessage(
-                "EaWEdit LSP: Server is not running; changes were not saved.",
+                vscode.l10n.t(
+                    "EaWEdit LSP: Server is not running; changes were not saved.",
+                ),
             );
             return;
         }
@@ -664,7 +675,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 ? ` (change ${result.failedIndex + 1})`
                 : "";
         void vscode.window.showErrorMessage(
-            `EaWEdit: Could not save the closed story graph${where} - ${result.error ?? ""}`,
+            vscode.l10n.t(
+                "EaWEdit: Could not save the closed story graph{0} - {1}",
+                where,
+                result.error ?? "",
+            ),
         );
     }
 
@@ -675,15 +690,17 @@ export class StoryGraphPanel extends WebviewPanelHost {
      */
     private async _confirmDirtyExit(next: string): Promise<void> {
         const choice = await vscode.window.showWarningMessage(
-            "You have unsaved story changes. Save them before leaving Edit mode?",
+            vscode.l10n.t(
+                "Unsaved story changes. Save them before leaving Edit mode?",
+            ),
             { modal: true },
-            "Save",
-            "Don't Save",
+            vscode.l10n.t("Save"),
+            vscode.l10n.t("Don't Save"),
         );
         const resolved =
-            choice === "Save"
+            choice === vscode.l10n.t("Save")
                 ? "save"
-                : choice === "Don't Save"
+                : choice === vscode.l10n.t("Don't Save")
                   ? "discard"
                   : "cancel";
         this.post({ type: "dirtyExitChoice", choice: resolved, next });
@@ -714,7 +731,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
         }
 
         if (result.error) {
-            void vscode.window.showWarningMessage(`EaWEdit: ${result.error}`);
+            void vscode.window.showWarningMessage(
+                vscode.l10n.t("EaWEdit: {0}", result.error),
+            );
             return; // keep the current graph rather than blanking it
         }
 
@@ -751,7 +770,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
         }
 
         if (result.error) {
-            void vscode.window.showWarningMessage(`EaWEdit: ${result.error}`);
+            void vscode.window.showWarningMessage(
+                vscode.l10n.t("EaWEdit: {0}", result.error),
+            );
         }
         this.post({
             type: "diagnostics",
@@ -838,8 +859,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 type: "error",
                 message:
                     outcome.reason === "offline"
-                        ? "LSP server is not running."
-                        : `Cannot load story graph: ${outcome.message}`,
+                        ? vscode.l10n.t("LSP server is not running.")
+                        : vscode.l10n.t(
+                              "Cannot load story graph: {0}",
+                              outcome.message,
+                          ),
             });
             return;
         }
@@ -916,7 +940,11 @@ export class StoryGraphPanel extends WebviewPanelHost {
             });
         } catch (e) {
             void vscode.window.showErrorMessage(
-                `EaWEdit: Cannot open ${threadUri} - ${e}`,
+                vscode.l10n.t(
+                    "EaWEdit: Cannot open {0} - {1}",
+                    threadUri,
+                    String(e),
+                ),
             );
         }
     }

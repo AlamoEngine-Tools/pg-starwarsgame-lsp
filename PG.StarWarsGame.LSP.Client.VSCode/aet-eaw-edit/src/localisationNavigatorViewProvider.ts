@@ -154,16 +154,23 @@ export class LocalisationNavigatorViewProvider extends LspTreeDataProvider<
                 : "aetLocFileSet";
             item.description = node.languages.join(", ");
             item.tooltip = creditsSet
-                ? `${node.languages.length} credits files: ${node.languages.join(", ")}` +
-                  " - open one to edit it"
-                : `${node.languages.length} languages: ${node.languages.join(", ")}`;
+                ? vscode.l10n.t(
+                      "{0} credits files: {1} - open one to edit it",
+                      node.languages.length,
+                      node.languages.join(", "),
+                  )
+                : vscode.l10n.t(
+                      "{0} languages: {1}",
+                      node.languages.length,
+                      node.languages.join(", "),
+                  );
 
             // Opening the set is the point of grouping it: the whole project in one table, every
             // language beside its source.
             if (setFiles !== undefined && setFiles.length > 0) {
                 item.command = {
                     command: "aet-eaw-edit.lsp.openLocalisationEditor",
-                    title: "Open Localisation Editor",
+                    title: vscode.l10n.t("Open Localisation Editor"),
                     arguments: [item],
                 };
             }
@@ -179,7 +186,7 @@ export class LocalisationNavigatorViewProvider extends LspTreeDataProvider<
                     : "symbol-string",
             );
             item.contextValue = "aetLocGroup";
-            item.description = `${countFiles(node)} files`;
+            item.description = vscode.l10n.t("{0} files", countFiles(node));
         } else {
             item.iconPath = new vscode.ThemeIcon("folder-library");
             item.contextValue = "aetLocLayer";
@@ -227,7 +234,7 @@ function fileItem(
             : "aetLocFile";
     item.command = {
         command: "aet-eaw-edit.lsp.openLocalisationEditor",
-        title: "Open Localisation Editor",
+        title: vscode.l10n.t("Open Localisation Editor"),
         arguments: [item],
     };
 

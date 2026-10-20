@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
 // What a story graph is OF: one campaign faction, at the galactic level or inside one of its
 // battles.
 //
@@ -129,7 +130,11 @@ export function graphTargets(
                 },
                 ...battles.map((branch, index) => ({
                     label: `${chain} - ${branch.battle.label}`,
-                    description: `Battle ${index + 1} of ${battles.length}`,
+                    description: l10n.t(
+                        "Battle {0} of {1}",
+                        index + 1,
+                        battles.length,
+                    ),
                     target: {
                         campaign: campaign.name,
                         faction: faction.faction,

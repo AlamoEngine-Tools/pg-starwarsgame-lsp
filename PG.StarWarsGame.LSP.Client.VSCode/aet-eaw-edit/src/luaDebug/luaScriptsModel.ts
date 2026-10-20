@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
 // The scripts view without VS Code: the adapter's eawLua/* payloads and the rows they become.
 // Pure so it runs under the node test harness; luaScriptsViewProvider.ts turns rows into
 // TreeItems and talks to the debug session.
@@ -113,7 +114,7 @@ export function threadRows(script: ScriptNode): ThreadNode[] | undefined {
         kind: "thread",
         scriptId: script.scriptId,
         threadIndex: -1,
-        label: "main state",
+        label: l10n.t("main state"),
         description: undefined,
         icon: "symbol-event",
         contextValue: "aetLuaThread",

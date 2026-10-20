@@ -104,7 +104,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             viewType: isCredits(_category)
                 ? "aetCreditsEditor"
                 : "aetTranslationEditor",
-            title: `Loc: ${_label}`,
+            title: vscode.l10n.t("Loc: {0}", _label),
             column: vscode.ViewColumn.Active,
             script: isCredits(_category)
                 ? "creditsEditor.js"
@@ -352,8 +352,12 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
                     type: "error",
                     message:
                         outcome.reason === "offline"
-                            ? "LSP server is not running."
-                            : `Cannot read ${basename(filePath)}: ${outcome.message}`,
+                            ? vscode.l10n.t("LSP server is not running.")
+                            : vscode.l10n.t(
+                                  "Cannot read {0}: {1}",
+                                  basename(filePath),
+                                  outcome.message,
+                              ),
                 });
                 return;
             }
@@ -514,18 +518,24 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
         if (result.error || !result.writtenPath) {
             vscode.window.showErrorMessage(
-                `EaWEdit: ${result.error ?? "could not create the file."}`,
+                vscode.l10n.t(
+                    "EaWEdit: {0}",
+                    result.error ?? vscode.l10n.t("could not create the file."),
+                ),
             );
             return;
         }
 
         const writtenPath = result.writtenPath;
         const choice = await vscode.window.showInformationMessage(
-            `EaWEdit: Created ${writtenPath} with every key from this file, ready to translate.`,
-            "Open",
+            vscode.l10n.t(
+                "EaWEdit: Created {0} with every key from this file, ready to translate.",
+                writtenPath,
+            ),
+            vscode.l10n.t("Open"),
         );
 
-        if (choice === "Open") {
+        if (choice === vscode.l10n.t("Open")) {
             LocalisationEditorPanel.show(
                 writtenPath,
                 basename(writtenPath),
@@ -592,7 +602,9 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         // queue neither written nor released, which looks exactly like the button doing nothing.
         if (!this._lsp.isRunning) {
             void vscode.window.showWarningMessage(
-                "EaWEdit LSP: Server is not running; the edits are still staged.",
+                vscode.l10n.t(
+                    "EaWEdit LSP: Server is not running; the edits are still staged.",
+                ),
             );
             this.post({ type: "saveResult", success: false });
             return;
@@ -699,16 +711,19 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             .map(
                 (f) =>
                     `${f.member.languages.join("/") || basename(f.member.filePath)}: ` +
-                    `${f.result.error ?? "unknown error"}`,
+                    (f.result.error ?? vscode.l10n.t("unknown error")),
             )
             .join("; ");
 
         const choice = await vscode.window.showErrorMessage(
-            `EaWEdit: Could not save - ${named}. The edits are still staged.`,
-            "Reload",
+            vscode.l10n.t(
+                "EaWEdit: Could not save - {0}. The edits are still staged.",
+                named,
+            ),
+            vscode.l10n.t("Reload"),
         );
 
-        if (choice === "Reload") {
+        if (choice === vscode.l10n.t("Reload")) {
             await this._sendRows();
         }
     }
@@ -726,11 +741,15 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
                 ? ` (change ${failed + 1})`
                 : "";
         const choice = await vscode.window.showErrorMessage(
-            `EaWEdit: Could not save - ${result.error ?? "unknown error"}${where}`,
-            "Reload",
+            vscode.l10n.t(
+                "EaWEdit: Could not save - {0}{1}",
+                result.error ?? vscode.l10n.t("unknown error"),
+                where,
+            ),
+            vscode.l10n.t("Reload"),
         );
 
-        if (choice === "Reload") {
+        if (choice === vscode.l10n.t("Reload")) {
             await this._sendRows();
         }
     }
@@ -742,13 +761,21 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
         const count = this._state.pendingCount;
         const choice = await vscode.window.showWarningMessage(
-            `EaWEdit: ${count} unsaved localisation ${count === 1 ? "change" : "changes"} ` +
-                `in '${this._filePath}'.`,
+            count === 1
+                ? vscode.l10n.t(
+                      "EaWEdit: 1 unsaved localisation change in '{0}'.",
+                      this._filePath,
+                  )
+                : vscode.l10n.t(
+                      "EaWEdit: {0} unsaved localisation changes in '{1}'.",
+                      count,
+                      this._filePath,
+                  ),
             { modal: true },
-            "Save",
+            vscode.l10n.t("Save"),
         );
 
-        if (choice === "Save") {
+        if (choice === vscode.l10n.t("Save")) {
             await this._save(this._state.pending);
         }
     }

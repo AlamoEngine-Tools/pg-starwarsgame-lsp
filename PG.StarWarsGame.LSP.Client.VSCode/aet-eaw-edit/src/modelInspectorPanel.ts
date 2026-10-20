@@ -56,7 +56,7 @@ export class ModelInspectorPanel extends WebviewPanelHost {
     ) {
         super(extensionUri, {
             viewType: ModelInspectorPanel.viewType,
-            title: "Model inspector",
+            title: vscode.l10n.t("Model inspector"),
 
             // Beside, not Active: the whole reason this is a tab and not a page inside the preview
             // is that the two are read together.

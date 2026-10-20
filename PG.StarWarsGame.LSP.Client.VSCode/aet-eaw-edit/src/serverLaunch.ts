@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as l10n from "@vscode/l10n";
 // How the server process is started. Pure - no `vscode` import - so the decision is unit-tested.
 
 import * as path from "path";
@@ -62,7 +63,7 @@ export function chooseServerCommand(input: ServerChoiceInput): ServerChoice {
             bundled: false,
             devMode: true,
             requires: projectPath,
-            description: `Dev mode: dotnet ${args.join(" ")}`,
+            description: l10n.t("Dev mode: dotnet {0}", args.join(" ")),
         };
     }
 
@@ -75,7 +76,7 @@ export function chooseServerCommand(input: ServerChoiceInput): ServerChoice {
             bundled: true,
             devMode: false,
             requires: command,
-            description: `Bundled: ${command} ${args.join(" ")}`,
+            description: l10n.t("Bundled: {0} {1}", command, args.join(" ")),
         };
     }
 

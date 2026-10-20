@@ -26,7 +26,7 @@ export class CreditsPreviewPanel extends WebviewPanelHost {
     private constructor(label: string, extensionUri: vscode.Uri) {
         super(extensionUri, {
             viewType: "aetCreditsPreview",
-            title: `Preview: ${label}`,
+            title: vscode.l10n.t("Preview: {0}", label),
             column: vscode.ViewColumn.Beside,
             script: "creditsPreview.js",
             bodyStyle:
