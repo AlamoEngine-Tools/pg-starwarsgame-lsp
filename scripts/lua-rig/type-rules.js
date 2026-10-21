@@ -116,6 +116,7 @@ function logText() {
 }
 
 const FINDING = /Analyzer finding (\S*) (kept|dropped) at (\S+):(\d+) - (.*)$/;
+const REPORT = /Analyzer report (\S+) - \d+ findings$/;
 
 (async () => {
     const t0 = Date.now();
@@ -153,7 +154,7 @@ const FINDING = /Analyzer finding (\S*) (kept|dropped) at (\S+):(\d+) - (.*)$/;
     const opened = Date.now();
     while (Date.now() - opened < 600000) {
         await sleep(2000);
-        const count = (logText().match(/Analyzer finding /g) || []).length;
+        const count = (logText().match(/Analyzer (?:finding|report) /g) || []).length;
         if (count !== seen) {
             seen = count;
             quietSince = Date.now();
@@ -167,24 +168,26 @@ const FINDING = /Analyzer finding (\S*) (kept|dropped) at (\S+):(\d+) - (.*)$/;
     notify('exit', null);
     await sleep(2000);
 
-    // A document is reported again whenever the analyzer re-runs it; one finding is one
-    // (file, rule, line, message), however often it was logged.
-    const unique = new Map();
+    // A document is reported again whenever the analyzer re-runs it, and an early report (before the
+    // library is indexed) carries findings a later one withdraws: only each document's LAST report
+    // counts. A report line opens it; the finding lines that follow belong to it.
+    const lastReport = new Map(); // lower-cased uri -> findings of its latest report
     for (const line of logText().split(/\r?\n/)) {
+        const r = REPORT.exec(line);
+        if (r) {
+            lastReport.set(r[1].toLowerCase(), []);
+            continue;
+        }
         const m = FINDING.exec(line);
         if (!m) continue;
         const [, rule, fate, uri, lineNo, message] = m;
-        unique.set(`${uri.toLowerCase()}|${rule}|${lineNo}|${message}`, {
-            rule,
-            fate,
-            uri,
-            line: Number(lineNo),
-            message
-        });
+        const findings = lastReport.get(uri.toLowerCase());
+        if (!findings) continue;
+        findings.push({rule, fate, uri, line: Number(lineNo), message});
     }
 
     const byRule = new Map();
-    for (const f of unique.values()) {
+    for (const f of [...lastReport.values()].flat()) {
         const entry = byRule.get(f.rule) || {rule: f.rule, fate: f.fate, count: 0, files: new Set(), findings: []};
         entry.count++;
         entry.files.add(f.uri.toLowerCase());
@@ -219,7 +222,7 @@ const FINDING = /Analyzer finding (\S*) (kept|dropped) at (\S+):(\d+) - (.*)$/;
         label,
         project: path.join(folder, projectFile),
         scripts: files.length,
-        findings: unique.size,
+        findings: rules.reduce((sum, r) => sum + r.count, 0),
         rules,
     }, null, 2) + '\n');
     fs.rmSync(logDir, {recursive: true, force: true});

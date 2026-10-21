@@ -113,6 +113,27 @@ public sealed class LuaDiagnosticsPublisherTest
     }
 
     /// <summary>
+    ///     The analyzer re-reports a document as its library finishes indexing, and an early report
+    ///     carries findings a later one withdraws. A census keeps each document's LAST report, so
+    ///     every report is logged, an empty one included.
+    /// </summary>
+    [Fact]
+    public void AnAnalyzerReport_IsLoggedWithItsCount_EvenWhenEmpty()
+    {
+        var logger = new CapturingLogger();
+        var (_, host, analyzer, _) = BuildWithAnalyzer(logger: logger);
+        host.Set(LuaUri, "local x = 1");
+
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused"));
+        analyzer.Raise(LuaUri);
+
+        var reports = logger.Messages.Where(m => m.StartsWith("Analyzer report", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, reports.Count);
+        Assert.EndsWith(" - 1 findings", reports[0]);
+        Assert.EndsWith(" - 0 findings", reports[1]);
+    }
+
+    /// <summary>
     ///     The analyzer writes URIs its own way (case, escaping); the open document keeps the
     ///     editor's. Measured live: matched exactly, not one finding arrived.
     /// </summary>

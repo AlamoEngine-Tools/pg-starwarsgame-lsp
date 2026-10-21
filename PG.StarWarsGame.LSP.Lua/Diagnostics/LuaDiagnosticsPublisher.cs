@@ -110,13 +110,17 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         var uri = _workspaceHost.All.FirstOrDefault(d => DocumentUris.Same(d.Uri, analyzerUri))?.Uri ?? analyzerUri;
 
         // Every finding, kept or not, so the rules the policy drops can be counted (#278): in the
-        // editor a dropped finding leaves no trace.
+        // editor a dropped finding leaves no trace. The report line comes first, so a census keeps
+        // each document's last report - an early one carries findings a later one withdraws.
         if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Analyzer report {Uri} - {Count} findings", uri, p.Diagnostics.Count());
             foreach (var finding in p.Diagnostics)
                 _logger.LogDebug("Analyzer finding {Rule} {Fate} at {Uri}:{Line} - {Message}",
                     finding.Code?.String ?? finding.Code?.Long.ToString() ?? "",
                     LuaAnalyzerRulePolicy.Map(finding) is null ? "dropped" : "kept",
                     uri, finding.Range.Start.Line + 1, finding.Message);
+        }
 
         _analyzerFindings[uri] = p.Diagnostics
             .Select(LuaAnalyzerRulePolicy.Map)
