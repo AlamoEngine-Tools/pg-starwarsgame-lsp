@@ -86,16 +86,19 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             var hit = LuaPositionResolver.FindAtPosition(docIndex, line, character);
             if (hit is not null)
             {
-                var symbol = ResolveInState(index, hit.Value.Id, uri);
-                if (symbol is null || symbol.Origin is not FileOrigin fo)
+                var links = ResolveInStates(index, hit.Value.Id, uri)
+                    .Select(s => s.Origin)
+                    .OfType<FileOrigin>()
+                    .Select(fo => new LocationOrLocationLink(fo.ToLspLocationLink(hit.Value.Range)))
+                    .ToList();
+                if (links.Count == 0)
                 {
                     _logger.LogDebug("Go-to-def: {Id} resolved to non-navigable origin", hit.Value.Id);
                     return Task.FromResult<LocationOrLocationLinks?>(null);
                 }
 
-                _logger.LogDebug("Go-to-def: {Id} -> {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
-                return Task.FromResult<LocationOrLocationLinks?>(
-                    new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocationLink(hit.Value.Range))));
+                _logger.LogDebug("Go-to-def: {Id} -> {Count} definition(s)", hit.Value.Id, links.Count);
+                return Task.FromResult<LocationOrLocationLinks?>(new LocationOrLocationLinks(links));
             }
         }
 
@@ -152,16 +155,31 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     }
 
     // The index holds every script's globals; one in another script's state is a different global
-    // of the same name (#249). An XML file is in no state, so XML objects resolve as before.
-    private GameSymbol? ResolveInState(GameIndex index, string id, string uri)
+    // of the same name (#249). Every state holding the file gets its own definition, the highest layer
+    // first as before: a script has one state (1:1), a library one per script requiring it (1:n), so an
+    // entry point a library calls goes to every implementation. An XML file is in no state, so XML
+    // objects resolve as before.
+    private IReadOnlyList<GameSymbol> ResolveInStates(GameIndex index, string id, string uri)
     {
         if (_sandbox is null || !index.WorkspaceDefinitions.TryGetValue(id, out var definitions))
-            return index.Resolve(id);
+            return index.Resolve(id) is { } resolved ? [resolved] : [];
         var current = _sandbox.Current;
-        return definitions
-            .Where(s => s.Origin is not FileOrigin fo || current.ShareAState(uri, fo.Uri))
-            .OrderByDescending(index.LayerRankOf)
-            .FirstOrDefault();
+        var states = current.StatesHolding(uri);
+        if (states.Count == 0)
+            return definitions
+                .Where(s => s.Origin is not FileOrigin fo || current.ShareAState(uri, fo.Uri))
+                .OrderByDescending(index.LayerRankOf)
+                .Take(1)
+                .ToList();
+
+        return states
+            .Select(state => definitions
+                .Where(s => s.Origin is not FileOrigin fo || current.Holds(state, fo.Uri))
+                .OrderByDescending(index.LayerRankOf)
+                .FirstOrDefault())
+            .OfType<GameSymbol>()
+            .Distinct()
+            .ToList();
     }
 
     private static (string Target, LspRange Origin)? TryResolveRequireAtPosition(

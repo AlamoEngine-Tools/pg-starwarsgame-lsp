@@ -104,6 +104,22 @@ public sealed class LuaSandbox
     }
 
     /// <summary>
+    ///     The states holding the file, each named by its script: the file's own, and every script
+    ///     requiring it. Empty for a file the index does not hold.
+    /// </summary>
+    public IReadOnlyList<string> StatesHolding(string uri)
+    {
+        return _statesOf.TryGetValue(_fileHelper.NormalizeUri(uri), out var states) ? states : [];
+    }
+
+    /// <summary>Whether the state of <paramref name="state" /> holds <paramref name="file" />.</summary>
+    public bool Holds(string state, string file)
+    {
+        return _closures.TryGetValue(_fileHelper.NormalizeUri(state), out var closure) &&
+               closure.Contains(_fileHelper.NormalizeUri(file));
+    }
+
+    /// <summary>
     ///     The files a rename of a global from <paramref name="fromUri" /> may edit: the states holding
     ///     it, and every state holding a file of theirs that names the global - transitively. A library
     ///     defining or calling the global is one text in many states, so renaming it there renames it in
