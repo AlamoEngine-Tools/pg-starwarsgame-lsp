@@ -14,7 +14,16 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     through the baseline's catalog, which only a real server with a real baseline exercises.
 /// </remarks>
 [Trait("Category", "E2E")]
-public sealed class ListModelsSmokeTest(E2eModServerFixture fixture) : IClassFixture<E2eModServerFixture>
+public sealed class ListModelsSmokeTest(E2eModServerFixture fixture)
+    : ListModelsSmokeTestBase<E2eModServerFixture>(fixture);
+
+/// <summary>The mod over a base project (#280).</summary>
+[Trait("Category", "E2E")]
+public sealed class ListModelsMultiRootSmokeTest(E2eMultiRootServerFixture fixture)
+    : ListModelsSmokeTestBase<E2eMultiRootServerFixture>(fixture);
+
+public abstract class ListModelsSmokeTestBase<TFixture>(TFixture fixture) : IClassFixture<TFixture>
+    where TFixture : E2eWorkspaceServerFixture
 {
     [Fact]
     public async Task BaseGameModels_AreOfferedAndMarkedAsSuchAsync()

@@ -43,6 +43,15 @@ public static class LspTestEnvironment
         ExistingPath(Environment.GetEnvironmentVariable("LSP_E2E_WORKSPACE_PATH"))
         ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace") : null);
 
+    /// <summary>
+    ///     The authored base project the two-project window puts beneath the mod (#280). Prefers
+    ///     <c>LSP_E2E_MULTI_ROOT_WORKSPACE_PATH</c>; falls back to <c>e2e-workspace-multi-root/</c> in
+    ///     the repository. Tracked for the same reason as <c>e2e-workspace/</c>.
+    /// </summary>
+    public static string? E2eMultiRootWorkspacePath =>
+        ExistingPath(Environment.GetEnvironmentVariable("LSP_E2E_MULTI_ROOT_WORKSPACE_PATH"))
+        ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace-multi-root") : null);
+
     public static string? GamePath =>
         Environment.GetEnvironmentVariable("LSP_GAME_PATH");
 

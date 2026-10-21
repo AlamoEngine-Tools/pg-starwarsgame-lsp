@@ -24,7 +24,17 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     </para>
 /// </summary>
 [Trait("Category", "E2E")]
-public sealed class StoryCompareMethodSmokeTest : IClassFixture<E2eModServerFixture>
+public sealed class StoryCompareMethodSmokeTest(E2eModServerFixture fixture)
+    : StoryCompareMethodSmokeTestBase<E2eModServerFixture>(fixture);
+
+/// <summary>The mod over a base project (#280).</summary>
+[Trait("Category", "E2E")]
+public sealed class StoryCompareMethodMultiRootSmokeTest(E2eMultiRootServerFixture fixture)
+    : StoryCompareMethodSmokeTestBase<E2eMultiRootServerFixture>(fixture);
+
+// The open-once state below is static per closed type: each setup opens its own copy, on its own server.
+public abstract class StoryCompareMethodSmokeTestBase<TFixture> : IClassFixture<TFixture>
+    where TFixture : E2eWorkspaceServerFixture
 {
     private const string Fixture = "Story_E2E_Compare.xml";
 
@@ -36,9 +46,9 @@ public sealed class StoryCompareMethodSmokeTest : IClassFixture<E2eModServerFixt
     private static readonly SemaphoreSlim OpenOnce = new(1, 1);
     private static Task<IReadOnlyList<Diagnostic>>? _opened;
 
-    private readonly E2eModServerFixture _fixture;
+    private readonly TFixture _fixture;
 
-    public StoryCompareMethodSmokeTest(E2eModServerFixture fixture)
+    protected StoryCompareMethodSmokeTestBase(TFixture fixture)
     {
         _fixture = fixture;
     }
@@ -102,7 +112,7 @@ public sealed class StoryCompareMethodSmokeTest : IClassFixture<E2eModServerFixt
         if (completed != _fixture.ScanCompleted)
             throw new Exception("$XunitDynamicSkip$E2E workspace scan did not complete within 60 s.");
 
-        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath, "Data", "Xml", Fixture);
+        var filePath = Path.Combine(_fixture.ModPath!, "Data", "Xml", Fixture);
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var text = await File.ReadAllTextAsync(filePath);
 

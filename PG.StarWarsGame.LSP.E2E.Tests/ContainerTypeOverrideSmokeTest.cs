@@ -18,11 +18,20 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     vanilla <c>Presence_Induced_Animations</c> as naming an unknown faction.
 /// </remarks>
 [Trait("Category", "E2E")]
-public sealed class ContainerTypeOverrideSmokeTest : IClassFixture<E2eModServerFixture>
-{
-    private readonly E2eModServerFixture _fixture;
+public sealed class ContainerTypeOverrideSmokeTest(E2eModServerFixture fixture)
+    : ContainerTypeOverrideSmokeTestBase<E2eModServerFixture>(fixture);
 
-    public ContainerTypeOverrideSmokeTest(E2eModServerFixture fixture)
+/// <summary>The mod over a base project (#280).</summary>
+[Trait("Category", "E2E")]
+public sealed class ContainerTypeOverrideMultiRootSmokeTest(E2eMultiRootServerFixture fixture)
+    : ContainerTypeOverrideSmokeTestBase<E2eMultiRootServerFixture>(fixture);
+
+public abstract class ContainerTypeOverrideSmokeTestBase<TFixture> : IClassFixture<TFixture>
+    where TFixture : E2eWorkspaceServerFixture
+{
+    private readonly TFixture _fixture;
+
+    protected ContainerTypeOverrideSmokeTestBase(TFixture fixture)
     {
         _fixture = fixture;
     }
@@ -33,7 +42,7 @@ public sealed class ContainerTypeOverrideSmokeTest : IClassFixture<E2eModServerF
         if (LspTestEnvironment.E2eWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception("$XunitDynamicSkip$e2e-workspace/ not found; cannot run container override tests.");
 
-        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath, "Data", "Xml", "Groundinfantry.xml");
+        var filePath = Path.Combine(_fixture.ModPath!, "Data", "Xml", "Groundinfantry.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var received = _fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
 

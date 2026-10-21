@@ -17,7 +17,16 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     is the control: none of them may be warned.
 /// </remarks>
 [Trait("Category", "E2E")]
-public sealed class ObjectNameCrcCollisionSmokeTest(E2eModServerFixture fixture) : IClassFixture<E2eModServerFixture>
+public sealed class ObjectNameCrcCollisionSmokeTest(E2eModServerFixture fixture)
+    : ObjectNameCrcCollisionSmokeTestBase<E2eModServerFixture>(fixture);
+
+/// <summary>The mod over a base project (#280).</summary>
+[Trait("Category", "E2E")]
+public sealed class ObjectNameCrcCollisionMultiRootSmokeTest(E2eMultiRootServerFixture fixture)
+    : ObjectNameCrcCollisionSmokeTestBase<E2eMultiRootServerFixture>(fixture);
+
+public abstract class ObjectNameCrcCollisionSmokeTestBase<TFixture>(TFixture fixture) : IClassFixture<TFixture>
+    where TFixture : E2eWorkspaceServerFixture
 {
     [Fact]
     public async Task BothObjectsOfACollidingPair_AreWarned_AndNothingElseIsAsync()
@@ -25,7 +34,7 @@ public sealed class ObjectNameCrcCollisionSmokeTest(E2eModServerFixture fixture)
         if (LspTestEnvironment.E2eWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception("$XunitDynamicSkip$e2e-workspace/ not found; cannot run the name hash test.");
 
-        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath, "Data", "Xml", "Groundinfantry.xml");
+        var filePath = Path.Combine(fixture.ModPath!, "Data", "Xml", "Groundinfantry.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var text = await File.ReadAllTextAsync(filePath, TestContext.Current.CancellationToken);
         var received = fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));

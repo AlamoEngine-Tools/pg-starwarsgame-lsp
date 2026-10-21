@@ -17,7 +17,16 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     control: before the type was generic its first item was reported as an unknown faction.
 /// </remarks>
 [Trait("Category", "E2E")]
-public sealed class ListMapSmokeTest(E2eModServerFixture fixture) : IClassFixture<E2eModServerFixture>
+public sealed class ListMapSmokeTest(E2eModServerFixture fixture)
+    : ListMapSmokeTestBase<E2eModServerFixture>(fixture);
+
+/// <summary>The mod over a base project (#280).</summary>
+[Trait("Category", "E2E")]
+public sealed class ListMapMultiRootSmokeTest(E2eMultiRootServerFixture fixture)
+    : ListMapSmokeTestBase<E2eMultiRootServerFixture>(fixture);
+
+public abstract class ListMapSmokeTestBase<TFixture>(TFixture fixture) : IClassFixture<TFixture>
+    where TFixture : E2eWorkspaceServerFixture
 {
     [Fact]
     public async Task AValueThatDoesNotStartWithAnAnimationState_IsReported_TheShippedShapeIsNotAsync()
@@ -25,7 +34,7 @@ public sealed class ListMapSmokeTest(E2eModServerFixture fixture) : IClassFixtur
         if (LspTestEnvironment.E2eWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception("$XunitDynamicSkip$e2e-workspace/ not found; cannot run the ListMap test.");
 
-        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath, "Data", "Xml", "Groundinfantry.xml");
+        var filePath = Path.Combine(fixture.ModPath!, "Data", "Xml", "Groundinfantry.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var text = await File.ReadAllTextAsync(filePath, TestContext.Current.CancellationToken);
         var received = fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));

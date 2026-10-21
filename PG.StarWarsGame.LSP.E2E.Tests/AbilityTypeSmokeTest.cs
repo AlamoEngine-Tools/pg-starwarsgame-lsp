@@ -7,12 +7,22 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
+/// <summary>The mod alone.</summary>
 [Trait("Category", "E2E")]
-public sealed class AbilityTypeSmokeTest : IClassFixture<E2eModServerFixture>
-{
-    private readonly E2eModServerFixture _fixture;
+public sealed class AbilityTypeSmokeTest(E2eModServerFixture fixture)
+    : AbilityTypeSmokeTestBase<E2eModServerFixture>(fixture);
 
-    public AbilityTypeSmokeTest(E2eModServerFixture fixture)
+/// <summary>The mod over a base project (#280).</summary>
+[Trait("Category", "E2E")]
+public sealed class AbilityTypeMultiRootSmokeTest(E2eMultiRootServerFixture fixture)
+    : AbilityTypeSmokeTestBase<E2eMultiRootServerFixture>(fixture);
+
+public abstract class AbilityTypeSmokeTestBase<TFixture> : IClassFixture<TFixture>
+    where TFixture : E2eWorkspaceServerFixture
+{
+    private readonly TFixture _fixture;
+
+    protected AbilityTypeSmokeTestBase(TFixture fixture)
     {
         _fixture = fixture;
     }
@@ -22,7 +32,7 @@ public sealed class AbilityTypeSmokeTest : IClassFixture<E2eModServerFixture>
     {
         RequireE2eWorkspace();
 
-        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath!, "Data", "XML", "Spaceunitsfighters.xml");
+        var filePath = Path.Combine(_fixture.ModPath!, "Data", "XML", "Spaceunitsfighters.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var lines = await File.ReadAllLinesAsync(filePath);
 
@@ -50,7 +60,7 @@ public sealed class AbilityTypeSmokeTest : IClassFixture<E2eModServerFixture>
         RequireE2eWorkspace();
         await WaitForScanAsync();
 
-        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath!, "Data", "XML", "Spaceunitsfighters.xml");
+        var filePath = Path.Combine(_fixture.ModPath!, "Data", "XML", "Spaceunitsfighters.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var lines = await File.ReadAllLinesAsync(filePath);
 
