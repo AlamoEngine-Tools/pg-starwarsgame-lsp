@@ -5,6 +5,7 @@ using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Icons;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Icons;
 
@@ -46,6 +47,20 @@ public sealed class IconSourceGapTest
         var gaps = IconSourceGap.ProjectsWithoutIconSources(workspace, new MockFileSystem());
 
         Assert.Equal(["Revan's Revenge", "EaWX Core"], gaps);
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // Every shape (#280): with no project declaring an icons node, every one is named, the root first.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public void InEveryShape_EveryProjectWithoutSources_IsNamed_TheRootFirst(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+
+        var gaps = IconSourceGap.ProjectsWithoutIconSources(setup.Configuration(), setup.Disk());
+
+        Assert.Equal(setup.Projects.Reverse(), gaps);
     }
 
     /// <summary>

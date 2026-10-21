@@ -230,6 +230,8 @@
 
 ### Fixes
 
+- **Projects without icons** - the encyclopedia's notice names the project first and what it builds on after;
+  it listed the lowest dependency first ([#280](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/280))
 - **A library's hook** - a library calling a function a requiring script defines (`Definitions()` in
   PGBaseDefinitions) is no longer told the defining script is not required
   ([#279](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/279))
