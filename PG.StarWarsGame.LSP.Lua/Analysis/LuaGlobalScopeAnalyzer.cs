@@ -61,7 +61,8 @@ internal static class LuaGlobalScopeAnalyzer
         // Phase 3: missing-require diagnostics (uses transitive set + locallyBound skip).
         EmitMissingRequireDiagnostics(
             root, documentUri, index, schemaProvider,
-            locallyBound, transitiveRequiredUris, sharedUris, diagnostics, messages);
+            locallyBound, transitiveRequiredUris, sharedUris, new Requirers(index.Documents, fileHelper),
+            diagnostics, messages);
 
         // Phase 4: unused-require diagnostics (transitive scope per required file).
         EmitUnusedRequireDiagnostics(
@@ -122,10 +123,15 @@ internal static class LuaGlobalScopeAnalyzer
         HashSet<string> locallyBound,
         IReadOnlySet<string> requiredUris,
         IReadOnlySet<string> sharedUris,
+        Requirers requirers,
         List<LspDiagnostic> diagnostics, IMessageCatalog messages)
     {
         // Build a map from LuaGlobal name → defining URIs (library/dependency files only).
         var luaGlobalsByName = BuildLuaGlobalsMap(index, documentUri, sharedUris);
+        // A shared file runs in the state of every script requiring it, so a name one of those
+        // states holds - a hook such as Definitions, which the library calls and the script defines -
+        // is in scope there.
+        var holders = sharedUris.Contains(documentUri) ? requirers.OfOrSelf(documentUri) : null;
 
         // Track names already warned about to deduplicate across occurrences.
         var warned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -141,6 +147,7 @@ internal static class LuaGlobalScopeAnalyzer
             if (!luaGlobalsByName.TryGetValue(name, out var defUris)) continue;
             // No warning if at least one defining file is in the transitive require closure.
             if (defUris.Any(uri => requiredUris.Contains(uri))) continue;
+            if (holders is not null && defUris.Any(uri => holders.Overlaps(requirers.OfOrSelf(uri)))) continue;
 
             if (!warned.Add(name)) continue;
 
@@ -158,6 +165,48 @@ internal static class LuaGlobalScopeAnalyzer
                     new LspPosition(end.Line, end.Character)),
                 Source = AppProperties.LspServerId
             });
+        }
+    }
+
+    /// <summary>The files requiring a file, transitively: the states that hold it are theirs.</summary>
+    private sealed class Requirers(IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper)
+    {
+        private readonly Dictionary<string, HashSet<string>> _cache = new(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, List<string>>? _requiredBy;
+
+        /// <summary>The file and every file requiring it, transitively.</summary>
+        public HashSet<string> OfOrSelf(string uri)
+        {
+            if (_cache.TryGetValue(uri, out var cached)) return cached;
+            var requiredBy = _requiredBy ??= RequiredBy();
+            var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var pending = new Queue<string>([uri]);
+            while (pending.Count > 0)
+            {
+                var file = pending.Dequeue();
+                if (!found.Add(file) || !requiredBy.TryGetValue(file, out var callers)) continue;
+                foreach (var caller in callers) pending.Enqueue(caller);
+            }
+
+            return _cache[uri] = found;
+        }
+
+        private Dictionary<string, List<string>> RequiredBy()
+        {
+            var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (caller, doc) in documents)
+            {
+                if (doc.RequireArgs.IsDefaultOrEmpty) continue;
+                foreach (var arg in doc.RequireArgs)
+                {
+                    var resolved = LuaRequireResolver.Resolve(arg, documents, fileHelper, caller);
+                    if (resolved is null) continue;
+                    if (!map.TryGetValue(resolved, out var callers)) map[resolved] = callers = [];
+                    callers.Add(caller);
+                }
+            }
+
+            return map;
         }
     }
 
