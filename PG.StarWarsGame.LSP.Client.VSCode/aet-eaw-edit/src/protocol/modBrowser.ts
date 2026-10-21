@@ -95,7 +95,18 @@ export interface SymbolRow {
     page?: string | null;
 }
 
+/** A kind with how many entries of the list are of it. */
+export interface SymbolKindCount {
+    kind: string;
+    count: number;
+}
+
 export interface GetSymbolPageResult {
     rows: SymbolRow[];
     total: number;
+    /**
+     * Every kind a game object can be, counted over the name and origin filters - not the kind
+     * filter. Empty for a list without game objects.
+     */
+    kinds?: SymbolKindCount[];
 }

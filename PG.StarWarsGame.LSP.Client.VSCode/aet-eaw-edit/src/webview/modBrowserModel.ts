@@ -6,7 +6,7 @@
 
 import * as l10n from "@vscode/l10n";
 
-import type { SymbolLayer } from "../protocol/modBrowser";
+import type { SymbolKindCount, SymbolLayer } from "../protocol/modBrowser";
 
 const XML_PREFIX = "xml:";
 
@@ -127,9 +127,22 @@ export function originChoices(layers: readonly SymbolLayer[]): string[] {
     ];
 }
 
-/** The kinds the search form offers: those of the rows loaded so far, once each, by name. */
-export function kindChoices(rows: readonly { kinds: string[] }[]): string[] {
-    return [...new Set(rows.flatMap((r) => r.kinds))].sort((a, b) =>
-        a.localeCompare(b),
-    );
+/** One kind the search form offers. */
+export interface KindChoice {
+    kind: string;
+    label: string;
+    /** The list holds none of it; a picked kind stays enabled, so it can be unpicked. */
+    disabled: boolean;
+}
+
+/** The kinds the search form offers: every kind the server counted, in its order. */
+export function kindChoices(
+    kinds: readonly SymbolKindCount[],
+    picked: readonly string[],
+): KindChoice[] {
+    return kinds.map((k) => ({
+        kind: k.kind,
+        label: `${k.kind} (${k.count.toLocaleString()})`,
+        disabled: k.count === 0 && !picked.includes(k.kind),
+    }));
 }

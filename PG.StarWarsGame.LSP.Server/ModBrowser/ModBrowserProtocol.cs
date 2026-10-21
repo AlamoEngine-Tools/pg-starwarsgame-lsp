@@ -69,7 +69,19 @@ public sealed record SymbolRelation(string Relation, int? Count, string? Reason)
 
 /// <param name="Rows">The requested slice, sorted by name, prefix matches of the query first.</param>
 /// <param name="Total">How many entries match before paging.</param>
-public sealed record GetSymbolPageResult(IReadOnlyList<SymbolRow> Rows, int Total);
+/// <param name="Kinds">
+///     Every kind a game object can be, with how many entries of it match the name and origin
+///     filters - the kind filter left out, so picking one kind does not hide the others. None for a
+///     list without game objects.
+/// </param>
+public sealed record GetSymbolPageResult(IReadOnlyList<SymbolRow> Rows, int Total)
+{
+    public IReadOnlyList<SymbolKindCount> Kinds { get; init; } = [];
+}
+
+/// <param name="Kind">The kind's name.</param>
+/// <param name="Count">How many entries of the list are of it.</param>
+public sealed record SymbolKindCount(string Kind, int Count);
 
 /// <summary>One entry, as the definition the game uses.</summary>
 /// <param name="Id">What the entry is looked up by: an object's name, an asset's path, a script's URI.</param>

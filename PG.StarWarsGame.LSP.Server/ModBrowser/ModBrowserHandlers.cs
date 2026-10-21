@@ -51,7 +51,7 @@ public sealed class GetSymbolPageHandler(
 
         var rows = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets))
             .Rows(parent.Page, parent.Id, parent.Relation);
-        return Task.FromResult(SymbolCatalog.Filter(rows ?? [], request));
+        return Task.FromResult(catalog.Filter(rows ?? [], request));
     }
 }
 

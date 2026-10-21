@@ -164,6 +164,26 @@ public sealed class SymbolCatalogTest
     }
 
     [Fact]
+    public void AGameObjectPage_CountsEveryKind_OverTheNameAndOriginFilters_NotTheKindFilter()
+    {
+        Assert.Equal([new SymbolKindCount("Hero", 1), new SymbolKindCount("SpaceUnit", 2)],
+            Page("xml:GameObjectType").Kinds);
+        Assert.Equal([new SymbolKindCount("Hero", 0), new SymbolKindCount("SpaceUnit", 1)],
+            Page("xml:GameObjectType", "Star").Kinds);
+        Assert.Equal([new SymbolKindCount("Hero", 1), new SymbolKindCount("SpaceUnit", 2)],
+            Page("xml:GameObjectType", kinds: ["Hero"]).Kinds);
+        Assert.Equal([new SymbolKindCount("Hero", 1), new SymbolKindCount("SpaceUnit", 1)],
+            Page("xml:GameObjectType", origins: ["layer:1"]).Kinds);
+    }
+
+    [Fact]
+    public void APageWithoutGameObjects_HasNoKinds()
+    {
+        Assert.Empty(Page("xml:SFXEvent").Kinds);
+        Assert.Empty(Page("models").Kinds);
+    }
+
+    [Fact]
     public void ARow_NamesThePageItOpensOn()
     {
         Assert.All(Page("models").Rows, r => Assert.Equal("models", r.Page));

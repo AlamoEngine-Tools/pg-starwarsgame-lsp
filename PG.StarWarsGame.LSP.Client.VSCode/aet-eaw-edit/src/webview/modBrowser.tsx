@@ -22,12 +22,14 @@ import {
     GetSymbolOutlineResult,
     GetSymbolPageParams,
     GetSymbolPageResult,
+    SymbolKindCount,
     SymbolOutline,
     SymbolParent,
     SymbolRelation,
     SymbolRow,
 } from "../protocol/modBrowser";
 import {
+    KindChoice,
     kindChoices,
     originChoices,
     originLabel,
@@ -103,6 +105,7 @@ function App(): React.JSX.Element {
     const [entry, setEntry] = useState<EntryView | null>(null);
     const [rows, setRows] = useState<SymbolRow[]>([]);
     const [total, setTotal] = useState(0);
+    const [kinds, setKinds] = useState<SymbolKindCount[]>([]);
     const [loading, setLoading] = useState(false);
     const [draft, setDraft] = useState<Filter>(NO_FILTER);
     const [filter, setFilter] = useState<Filter>(NO_FILTER);
@@ -169,6 +172,7 @@ function App(): React.JSX.Element {
                     : [...current, ...(result?.rows ?? [])],
             );
             setTotal(result?.total ?? 0);
+            setKinds(result?.kinds ?? []);
             setLoading(false);
         },
         [],
@@ -441,7 +445,7 @@ function App(): React.JSX.Element {
                                     : pageLabel(list?.page ?? "")
                             }
                             draft={draft}
-                            kinds={kindChoices(rows)}
+                            kinds={kindChoices(kinds, draft.kinds)}
                             origins={originChoices(layers)}
                             layers={layers}
                             onChange={setDraft}
@@ -599,7 +603,7 @@ function SearchForm({
     onToggle: () => void;
     title: string;
     draft: Filter;
-    kinds: string[];
+    kinds: KindChoice[];
     origins: string[];
     layers: GetSymbolOutlineResult["layers"];
     onChange: (filter: Filter) => void;
@@ -642,20 +646,28 @@ function SearchForm({
                                 <span className="chips">
                                     {kinds.map((k) => (
                                         <button
-                                            key={k}
+                                            key={k.kind}
                                             type="button"
-                                            className={`chip${draft.kinds.includes(k) ? " on" : ""}`}
+                                            className={`chip${draft.kinds.includes(k.kind) ? " on" : ""}`}
+                                            disabled={k.disabled}
+                                            title={
+                                                k.disabled
+                                                    ? l10n.t(
+                                                          "None in this list",
+                                                      )
+                                                    : undefined
+                                            }
                                             onClick={() =>
                                                 onChange({
                                                     ...draft,
                                                     kinds: toggle(
                                                         draft.kinds,
-                                                        k,
+                                                        k.kind,
                                                     ),
                                                 })
                                             }
                                         >
-                                            {k}
+                                            {k.label}
                                         </button>
                                     ))}
                                 </span>
@@ -729,6 +741,11 @@ const Shell = styled.div`
     .chip.on {
         background: var(--vscode-button-background);
         color: var(--vscode-button-foreground);
+    }
+    .chip:disabled {
+        background: transparent;
+        color: var(--vscode-disabledForeground);
+        cursor: default;
     }
 
     .rail {

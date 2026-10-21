@@ -75,14 +75,29 @@ describe("originChoices", () => {
 });
 
 describe("kindChoices", () => {
-    it("offers the kinds the loaded rows are, once each, in name order", () => {
+    const kinds = [
+        { kind: "Hero", count: 0 },
+        { kind: "SpaceUnit", count: 412 },
+    ];
+
+    it("offers every kind the server counted, with its count", () => {
         assert.deepEqual(
-            kindChoices([
-                { kinds: ["SpaceUnit", "Capital"] },
-                { kinds: ["SpaceUnit"] },
-                { kinds: [] },
-            ]),
-            ["Capital", "SpaceUnit"],
+            kindChoices(kinds, []).map((c) => [c.kind, c.label]),
+            [
+                ["Hero", "Hero (0)"],
+                ["SpaceUnit", "SpaceUnit (412)"],
+            ],
+        );
+    });
+
+    it("disables a kind the list holds none of, unless it is picked", () => {
+        assert.deepEqual(
+            kindChoices(kinds, []).map((c) => c.disabled),
+            [true, false],
+        );
+        assert.deepEqual(
+            kindChoices(kinds, ["Hero"]).map((c) => c.disabled),
+            [false, false],
         );
     });
 });

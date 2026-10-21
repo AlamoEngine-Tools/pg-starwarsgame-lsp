@@ -31,11 +31,14 @@ public sealed class SymbolCatalog
     private readonly Dictionary<string, List<SymbolRow>> _pages;
     private readonly Dictionary<string, SymbolRow> _xmlById;
     private readonly Dictionary<string, Dictionary<string, SymbolRow>> _byName;
+    private readonly IReadOnlyList<string> _kinds;
 
-    private SymbolCatalog(Dictionary<string, List<SymbolRow>> pages, Dictionary<string, IReadOnlyList<string>> outlines)
+    private SymbolCatalog(Dictionary<string, List<SymbolRow>> pages, Dictionary<string, IReadOnlyList<string>> outlines,
+        IReadOnlyList<string> kinds)
     {
         _pages = pages;
         _outlines = outlines;
+        _kinds = kinds;
         _xmlById = new Dictionary<string, SymbolRow>(StringComparer.OrdinalIgnoreCase);
         _byName = new Dictionary<string, Dictionary<string, SymbolRow>>(StringComparer.Ordinal);
         foreach (var (page, rows) in pages)
@@ -85,7 +88,8 @@ public sealed class SymbolCatalog
             [SymbolOutlines.GameData] = xmlPages,
             [SymbolOutlines.Assets] = assetPages,
             [SymbolOutlines.Schema] = ["enums"]
-        });
+        }, kinds.Select(k => k.Kind).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase).ToList());
     }
 
     /// <summary>An outline's pages with their counts; none for an outline that does not exist.</summary>
@@ -128,14 +132,15 @@ public sealed class SymbolCatalog
     /// <summary>Every XML object's row, on every page.</summary>
     public IEnumerable<SymbolRow> Objects => _xmlById.Values;
 
-    /// <summary>Rows filtered by the request's query, kinds and origins, and paged.</summary>
-    public static GetSymbolPageResult Filter(IReadOnlyList<SymbolRow> rows, GetSymbolPageParams request)
+    /// <summary>
+    ///     Rows filtered by the request's query, kinds and origins, and paged; with every kind counted
+    ///     over the rows the query and origins leave, when the list holds a game object.
+    /// </summary>
+    public GetSymbolPageResult Filter(IReadOnlyList<SymbolRow> rows, GetSymbolPageParams request)
     {
         IEnumerable<SymbolRow> matching = rows;
         if (request.Origins is { Count: > 0 } origins)
             matching = matching.Where(r => origins.Contains(r.Origin, StringComparer.Ordinal));
-        if (request.Kinds is { Count: > 0 } kinds)
-            matching = matching.Where(r => r.Kinds.Any(k => kinds.Contains(k, StringComparer.OrdinalIgnoreCase)));
         if (!string.IsNullOrWhiteSpace(request.Query))
         {
             var query = request.Query.Trim();
@@ -144,12 +149,25 @@ public sealed class SymbolCatalog
                 .OrderBy(r => r.Name.StartsWith(query, StringComparison.OrdinalIgnoreCase) ? 0 : 1);
         }
 
-        var filtered = matching.ToList();
+        var unkinded = matching.ToList();
+        var filtered = request.Kinds is { Count: > 0 } kinds
+            ? [.. unkinded.Where(r => r.Kinds.Any(k => kinds.Contains(k, StringComparer.OrdinalIgnoreCase)))]
+            : unkinded;
         var slice = filtered
             .Skip(Math.Max(0, request.Offset))
             .Take(Math.Clamp(request.Limit, 1, MostPerPage))
             .ToList();
-        return new GetSymbolPageResult(slice, filtered.Count);
+        return new GetSymbolPageResult(slice, filtered.Count) { Kinds = KindCounts(rows, unkinded) };
+    }
+
+    private IReadOnlyList<SymbolKindCount> KindCounts(IReadOnlyList<SymbolRow> rows, List<SymbolRow> matching)
+    {
+        if (!rows.Any(r => string.Equals(r.Type, GameObjectType, StringComparison.OrdinalIgnoreCase))) return [];
+        var counts = matching
+            .SelectMany(r => r.Kinds)
+            .GroupBy(k => k, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+        return [.. _kinds.Select(k => new SymbolKindCount(k, counts.GetValueOrDefault(k)))];
     }
 
     private static void Add(Dictionary<string, List<SymbolRow>> pages, string page, SymbolRow row)
