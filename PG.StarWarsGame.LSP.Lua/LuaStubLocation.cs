@@ -11,4 +11,14 @@ namespace PG.StarWarsGame.LSP.Lua;
 public sealed class LuaStubLocation
 {
     public string? Directory { get; set; }
+
+    /// <summary>The stub files the manifest lists, in load order, relative to <see cref="Directory" />.</summary>
+    public IReadOnlyList<string> Files { get; set; } = [];
+
+    /// <summary>
+    ///     The stub standing in for each script library, by module name (case-insensitive). The other
+    ///     files describe the engine.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Libraries { get; set; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 }

@@ -16,9 +16,9 @@ namespace PG.StarWarsGame.LSP.Server;
 internal static class LuaAnalyzerRename
 {
     /// <summary>
-    ///     The edits within the rename's scope from <paramref name="from" />: the analyzer renames over
-    ///     one namespace, the game has one per script, joined where a shared file names the global
-    ///     (#249). The analyzer's edit is its list of files naming it.
+    ///     The edits within the rename's scope from <paramref name="from" />: the game has one state
+    ///     per script, joined where a shared file names the global (#249). The analyzer's edit is its
+    ///     list of files naming it.
     /// </summary>
     public static WorkspaceEdit KeepWithinState(WorkspaceEdit edit, LuaSandbox sandbox, string from)
     {

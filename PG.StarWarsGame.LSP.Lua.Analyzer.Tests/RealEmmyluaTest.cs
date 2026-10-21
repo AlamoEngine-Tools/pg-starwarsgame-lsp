@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Lua.Analyzer.Tests;
 
@@ -47,7 +46,7 @@ public sealed class RealEmmyluaTest
         };
 
         var stubs = Path.Combine(AppContext.BaseDirectory, "schema", "lua");
-        await host.StartAsync(EmmyrcWriter.Plan([new ProjectLayer(0, "Mod", [], [scripts], [], [], null)], stubs));
+        await host.StartAsync(new AnalyzerPlan([scripts], [stubs]));
         host.DidOpen(uri.ToString(), text, 1);
 
         var deadline = DateTime.UtcNow.AddSeconds(20);

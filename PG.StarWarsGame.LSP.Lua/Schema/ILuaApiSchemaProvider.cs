@@ -65,6 +65,12 @@ public interface ILuaApiSchemaProvider
     string? GetGlobalTypeName(string globalName);
 
     /// <summary>
+    ///     The type and description any stub - a library's included - gives a global value
+    ///     (<c>---@type number</c> above <c>OnEnter = 1</c>), or <c>null</c>. Lookup is case-insensitive.
+    /// </summary>
+    LuaGlobalAnnotation? GetGlobalAnnotation(string globalName);
+
+    /// <summary>
     ///     The entry point of that name - a function a script defines for the game or a library to
     ///     call - or <c>null</c>. Not a declared global. Lookup is case-insensitive.
     /// </summary>

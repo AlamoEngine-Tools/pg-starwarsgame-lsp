@@ -46,6 +46,25 @@ public sealed class StubOverrideAnnotations(ILuaApiSchemaProvider schema) : ILua
             if (schema.GetReturnTypeName(name) is { } returnType) lines.Add("---@return " + returnType);
             if (lines.Count > 0) yield return new LuaAnnotationInsertion(line, lines);
         }
+
+        // A global value a stub types, assigned at the top of the file - a library's own file, which
+        // the analyzer reads in place of the library's stub.
+        if (tree.GetRoot() is not CompilationUnitSyntax unit) yield break;
+        foreach (var assignment in unit.Statements.Statements.OfType<AssignmentStatementSyntax>())
+        {
+            if (assignment.Variables.Count != 1 || assignment.Variables[0] is not IdentifierNameSyntax target ||
+                schema.GetGlobalAnnotation(target.Name) is not { } global)
+                continue;
+
+            var line = assignment.GetLocation().GetLineSpan().StartLinePosition.Line;
+            if (LuaAnnotations.AuthorAnnotated(text, line)) continue;
+
+            var lines = new List<string>();
+            if (global.Description is { } description)
+                lines.AddRange(description.Split('\n').Select(l => "--- " + l.TrimEnd('\r')));
+            lines.Add("---@type " + global.TypeName);
+            yield return new LuaAnnotationInsertion(line, lines);
+        }
     }
 }
 

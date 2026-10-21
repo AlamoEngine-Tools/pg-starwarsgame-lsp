@@ -1,9 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Collections.Concurrent;
-using System.Text;
-using Loretta.CodeAnalysis.Lua;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -25,7 +22,6 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis.Generated;
 /// </remarks>
 public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
 {
-    private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
     private static readonly JsonSerializer s_json = new LspSerializer().JsonSerializer;
 
     // Answers that are edits: refused whole when any part lands on a generated line.
@@ -34,17 +30,23 @@ public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
         "textDocument/rename", "textDocument/formatting", "textDocument/rangeFormatting", "textDocument/codeAction"
     };
 
-    private readonly IFileHelper _fileHelper;
     private readonly ILuaAnalyzer _inner;
-    private readonly ConcurrentDictionary<string, LuaLineMap> _maps = new(DocumentUris.Comparer);
-    private readonly IReadOnlyList<ILuaAnnotationSource> _sources;
+    private readonly LuaGeneratedTexts _texts;
 
     public GeneratedAnalyzerDocuments(ILuaAnalyzer inner, IEnumerable<ILuaAnnotationSource> sources,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper) : this(inner, new LuaGeneratedTexts(sources, fileHelper))
+    {
+    }
+
+    /// <param name="inner">The analyzer behind.</param>
+    /// <param name="texts">
+    ///     The generated texts, shared with whatever sends the analyzer documents of its own - the files
+    ///     a script requires, read from disk.
+    /// </param>
+    public GeneratedAnalyzerDocuments(ILuaAnalyzer inner, LuaGeneratedTexts texts)
     {
         _inner = inner;
-        _sources = sources.ToList();
-        _fileHelper = fileHelper;
+        _texts = texts;
         _inner.DiagnosticsPublished += OnDiagnostics;
     }
 
@@ -54,23 +56,23 @@ public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
 
     public void DidOpen(string uri, string text, int version)
     {
-        _inner.DidOpen(uri, Generate(uri, text), version);
+        _inner.DidOpen(uri, _texts.Generate(uri, text), version);
     }
 
     public void DidChange(string uri, string text, int version)
     {
-        _inner.DidChange(uri, Generate(uri, text), version);
+        _inner.DidChange(uri, _texts.Generate(uri, text), version);
     }
 
     public void DidClose(string uri)
     {
-        _maps.TryRemove(_fileHelper.NormalizeUri(uri), out _);
+        _texts.Forget(uri);
         _inner.DidClose(uri);
     }
 
     public async Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
     {
-        if (_maps.IsEmpty) return await _inner.RequestAsync<T>(method, parameters, ct);
+        if (_texts.IsEmpty) return await _inner.RequestAsync<T>(method, parameters, ct);
 
         var request = JToken.FromObject(parameters, s_json);
         var origin = OriginOf(request);
@@ -91,45 +93,6 @@ public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
         return answer.ToObject<T>(s_json);
     }
 
-    // ── generation ───────────────────────────────────────────────────────────
-
-    private string Generate(string uri, string text)
-    {
-        var key = _fileHelper.NormalizeUri(uri);
-        IReadOnlyList<LuaAnnotationInsertion> insertions;
-        try
-        {
-            var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
-            insertions = _sources.SelectMany(s => s.For(tree, key)).ToList();
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            insertions = [];
-        }
-
-        if (insertions.Count == 0)
-        {
-            _maps.TryRemove(key, out _);
-            return text;
-        }
-
-        _maps[key] = new LuaLineMap(insertions);
-        var eol = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-        var byLine = insertions.GroupBy(i => i.BeforeLine).ToDictionary(g => g.Key, g => g.SelectMany(i => i.Lines));
-        var source = LuaSyntaxTree.ParseText(text, s_parseOptions).GetText();
-        var generated = new StringBuilder(text.Length + insertions.Count * 64);
-        for (var i = 0; i < source.Lines.Count; i++)
-        {
-            if (byLine.TryGetValue(i, out var lines))
-                foreach (var line in lines)
-                    generated.Append(line).Append(eol);
-            var span = source.Lines[i].SpanIncludingLineBreak;
-            generated.Append(text, span.Start, span.Length);
-        }
-
-        return generated.ToString();
-    }
-
     // ── mapping ──────────────────────────────────────────────────────────────
 
     private sealed class Hits
@@ -146,7 +109,7 @@ public sealed class GeneratedAnalyzerDocuments : ILuaAnalyzer
 
     private LuaLineMap? MapOf(string? uri)
     {
-        return uri is not null && _maps.TryGetValue(_fileHelper.NormalizeUri(uri), out var map) ? map : null;
+        return _texts.MapOf(uri);
     }
 
     // Maps every position under token in place. False when token itself rests on a generated line;

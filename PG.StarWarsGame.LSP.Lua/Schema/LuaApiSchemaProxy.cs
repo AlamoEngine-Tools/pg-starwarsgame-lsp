@@ -53,6 +53,11 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         return Inner.GetGlobalTypeName(globalName);
     }
 
+    public LuaGlobalAnnotation? GetGlobalAnnotation(string globalName)
+    {
+        return Inner.GetGlobalAnnotation(globalName);
+    }
+
     public LuaEntryPoint? GetEntryPoint(string functionName)
     {
         return Inner.GetEntryPoint(functionName);
@@ -94,6 +99,11 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         }
 
         public string? GetGlobalTypeName(string globalName)
+        {
+            return null;
+        }
+
+        public LuaGlobalAnnotation? GetGlobalAnnotation(string globalName)
         {
             return null;
         }

@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Lua.Analyzer.Tests;
 
@@ -59,10 +58,7 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
 
     private static AnalyzerPlan Plan()
     {
-        return EmmyrcWriter.Plan([
-            new ProjectLayer(0, "EaW", [], ["C:/Games/EaW/Data/Scripts"], [], [], null),
-            new ProjectLayer(1, "Mod", [], ["D:/Mods/MyMod/Data/Scripts"], [], [], null)
-        ], null);
+        return new AnalyzerPlan(["D:/Mods/MyMod/Data/Scripts"], ["D:/schema/lua/api.d.lua"]);
     }
 
     private async Task<string> MessageAsync(Func<string, bool> match, int timeoutMs = 15000)
@@ -206,7 +202,7 @@ public sealed class LuaAnalyzerHostTest : IAsyncDisposable
     {
         var host = Host();
 
-        await host.StartAsync(EmmyrcWriter.Plan([new ProjectLayer(0, "Mod", [], [], [], [], null)], null));
+        await host.StartAsync(new AnalyzerPlan([], []));
 
         Assert.False(host.IsRunning);
         Assert.Equal(0, host.Starts);

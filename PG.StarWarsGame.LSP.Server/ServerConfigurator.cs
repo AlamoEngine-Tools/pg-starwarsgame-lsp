@@ -29,6 +29,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Analysis.Generated;
+using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 using PG.StarWarsGame.LSP.Lua.Analyzer;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -342,30 +343,42 @@ public static class ServerConfigurator
                 services.AddSingleton<IProjectConfigurationResolver, ProjectConfigurationResolver>();
                 services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
 
-                // The Lua analyzer sidecar (emmylua_ls): one process per server, started by the
-                // project load once the layers are known, its configuration in a directory of this
-                // process's own. Absent executable or flag off: never started, every call a no-op.
+                // The Lua analyzer sidecar (emmylua_ls): one process per open script, holding that
+                // script's instance - itself and its require tree, as the game gives every script a
+                // Lua state of its own. Started once the project load knows the layers, each with its
+                // configuration in a directory of its own. Absent executable or flag off: never
+                // started, every call a no-op.
                 services.AddSingleton<LuaStubLocation>();
-                services.AddSingleton(sp => new LuaAnalyzerHost(new LuaAnalyzerOptions
-                {
-                    Command = ResolveLuaAnalyzer(sp) ?? "",
-                    ConfigDirectory = Path.Combine(Path.GetTempPath(), "aetswg-emmylua",
-                        Environment.ProcessId.ToString(CultureInfo.InvariantCulture))
-                }, sp.GetRequiredService<ILogger<LuaAnalyzerHost>>()));
-                // Every handler talks to the analyzer through generated documents: annotations this
-                // server knows, inserted above the script's functions in the text the analyzer reads.
-                services.AddSingleton<ILuaAnalyzer>(sp => new GeneratedAnalyzerDocuments(
-                    sp.GetRequiredService<LuaAnalyzerHost>(),
+                // The annotations this server knows, inserted above the functions in the text the
+                // analyzer reads - an open script's and every file of a script's require tree.
+                services.AddSingleton(sp => new LuaGeneratedTexts(
                     [
                         new StubOverrideAnnotations(sp.GetRequiredService<ILuaApiSchemaProvider>()),
                         new StateHandlerAnnotations(sp.GetRequiredService<IGameIndexService>(),
                             sp.GetRequiredService<ILuaParseCache>(), sp.GetRequiredService<IFileHelper>())
                     ],
                     sp.GetRequiredService<IFileHelper>()));
+                services.AddSingleton(sp =>
+                {
+                    var command = ResolveLuaAnalyzer(sp) ?? "";
+                    var logger = sp.GetRequiredService<ILogger<LuaAnalyzerHost>>();
+                    return new LuaAnalyzerInstances(
+                        directory => new LuaAnalyzerHost(
+                            new LuaAnalyzerOptions { Command = command, ConfigDirectory = directory }, logger),
+                        sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IFileHelper>(),
+                        sp.GetRequiredService<LuaStubLocation>(),
+                        sp.GetRequiredService<LuaGeneratedTexts>(),
+                        Path.Combine(Path.GetTempPath(), "aetswg-emmylua",
+                            Environment.ProcessId.ToString(CultureInfo.InvariantCulture)),
+                        sp.GetRequiredService<ILogger<LuaAnalyzerInstances>>());
+                });
+                // Every handler talks to the analyzer through generated documents.
+                services.AddSingleton<ILuaAnalyzer>(sp => new GeneratedAnalyzerDocuments(
+                    sp.GetRequiredService<LuaAnalyzerInstances>(), sp.GetRequiredService<LuaGeneratedTexts>()));
                 services.AddSingleton<ILuaAnalyzerStarter>(sp => new LuaAnalyzerStarter(
-                    sp.GetRequiredService<LuaAnalyzerHost>(),
+                    sp.GetRequiredService<LuaAnalyzerInstances>(),
                     sp.GetRequiredService<ILspConfigurationProvider>(),
-                    sp.GetRequiredService<LuaStubLocation>(),
                     ResolveLuaAnalyzer(sp) is not null,
                     sp.GetRequiredService<ILogger<LuaAnalyzerStarter>>()));
                 // One compacting collection after each workspace load: the parallel bulk parse

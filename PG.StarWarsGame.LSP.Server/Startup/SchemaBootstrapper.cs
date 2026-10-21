@@ -210,7 +210,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         }
 
         _luaProxy.Configure(LuaApiSchemaProvider.FromFiles(stubs, entryPoints));
-        if (_luaStubs is not null) _luaStubs.Directory = luaDir;
+        RecordStubs(luaDir, files, manifest);
         _logger.LogInformation("Lua schema loaded from {Dir}: {Count} of {Listed} files", luaDir, stubs.Count,
             files.Count);
     }
@@ -222,11 +222,13 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
 
         IReadOnlyList<string> files;
         string? entryPointsFile = null;
+        string? manifestText = null;
         try
         {
             var manifest = await http.GetStringAsync(luaBaseUrl + LuaManifestName, ct);
             files = ParseLuaManifest(manifest);
             entryPointsFile = ParseEntryPointsFile(manifest);
+            manifestText = manifest;
         }
         catch (Exception ex)
         {
@@ -283,8 +285,20 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         }
 
         // Downloaded stubs are kept in the cache, which is where the analyzer reads them from.
-        if (_luaStubs is not null && (cached.Count > 0 || loaded.Count > 0)) _luaStubs.Directory = _cache.PathOf("lua");
+        if (cached.Count > 0 || loaded.Count > 0) RecordStubs(_cache.PathOf("lua"), files, manifestText);
         _logger.LogInformation("Loading Lua schema completed.");
+    }
+
+    // Where the analyzer finds the stubs, and which of them stand in for a script library.
+    private void RecordStubs(string directory, IReadOnlyList<string> files, string? manifest)
+    {
+        if (_luaStubs is null) return;
+        var libraries = manifest is null
+            ? null
+            : JsonSerializer.Deserialize<LuaStubManifest>(manifest, LuaManifestJsonOptions)?.Libraries;
+        _luaStubs.Libraries = new Dictionary<string, string>(libraries ?? [], StringComparer.OrdinalIgnoreCase);
+        _luaStubs.Files = files;
+        _luaStubs.Directory = directory;
     }
 
     // The entry-point list from the release, else the cached copy, else none: documentation only,
@@ -334,5 +348,8 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         return new Uri(baseUri, "../lua/").ToString();
     }
 
-    private sealed record LuaStubManifest(List<string>? Files, string? EntryPoints);
+    private sealed record LuaStubManifest(
+        List<string>? Files,
+        string? EntryPoints,
+        Dictionary<string, string>? Libraries);
 }

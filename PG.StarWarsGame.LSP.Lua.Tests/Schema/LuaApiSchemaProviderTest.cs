@@ -108,6 +108,23 @@ public sealed class LuaApiSchemaProviderTest
         Assert.Null(provider.GetGlobalTypeName("Unknown"));
     }
 
+    // A library's typed globals too: the analyzer reads the library's own file, which carries no type.
+    [Fact]
+    public void GetGlobalAnnotation_ReadsTheTypeAndDescription_OfEveryStub_LibrariesIncluded()
+    {
+        var provider = LuaApiSchemaProvider.FromFiles([
+            new LuaStubFile("api.d.lua", "---@type Player\nPlayerObject = nil\n"),
+            new LuaStubFile("pgstatemachine.d.lua",
+                "--- The `OnEnter` message.\n--- Assigned `1` by the library.\n---@type number\nOnEnter = 1\nUntyped = 2\n")
+        ]);
+
+        Assert.Equal(new LuaGlobalAnnotation("number", "The `OnEnter` message.\nAssigned `1` by the library."),
+            provider.GetGlobalAnnotation("onenter"));
+        Assert.Equal("Player", provider.GetGlobalAnnotation("PlayerObject")!.TypeName);
+        Assert.Null(provider.GetGlobalAnnotation("Untyped"));
+        Assert.Null(provider.GetGlobalTypeName("OnEnter"));
+    }
+
     // ── GetXmlRefs ───────────────────────────────────────────────────────────
 
     [Fact]

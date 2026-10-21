@@ -25,8 +25,8 @@ internal static class LuaAnalyzerPassThrough
 }
 
 /// <summary>
-///     The analyzer's references, less those in a state the requesting script does not share: it
-///     sees one namespace, the game one per script (#249).
+///     The analyzer's references, less any in a state the requesting script does not share - the
+///     game runs one per script (#249).
 /// </summary>
 public sealed class LuaReferencesHandler(ILuaAnalyzer analyzer, ILuaSandboxProvider? sandbox = null)
     : ReferencesHandlerBase

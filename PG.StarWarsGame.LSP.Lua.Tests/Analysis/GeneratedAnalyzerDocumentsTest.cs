@@ -103,6 +103,26 @@ public sealed class GeneratedAnalyzerDocumentsTest
         Assert.Equal(annotated, inner.Texts[Uri]);
     }
 
+    // A library's typed global, assigned in the library's own file: the stub's type and words go
+    // above the assignment - top level only, and never above the author's own annotation or a local.
+    [Fact]
+    public void ATypedGlobal_AssignedAtTopLevel_GetsTheStubsTypeAndDescription()
+    {
+        var inner = new ScriptedLuaAnalyzer();
+        var stubs = LuaApiSchemaProvider.FromFiles([
+            new LuaStubFile("pgstatemachine.d.lua", "--- The `OnEnter` message.\n---@type number\nOnEnter = 1\n" +
+                                                    "---@type number\nOnExit = 3\n---@type number\nOnUpdate = 2\n")
+        ]);
+        var documents = new GeneratedAnalyzerDocuments(inner, [new StubOverrideAnnotations(stubs)],
+            new FileHelper(new MockFileSystem()));
+
+        documents.DidOpen(Other,
+            "OnEnter = 1\n---@type integer\nOnExit = 3\nlocal OnUpdate = 2\nfunction F()\n  OnUpdate = 2\nend\n", 1);
+
+        Assert.Equal("--- The `OnEnter` message.\n---@type number\nOnEnter = 1\n---@type integer\nOnExit = 3\n" +
+                     "local OnUpdate = 2\nfunction F()\n  OnUpdate = 2\nend\n", inner.Texts[Other]);
+    }
+
     // A state handler's message is one of the library's three values (#252).
     [Fact]
     public void AStateHandler_GetsItsMessageTyped()

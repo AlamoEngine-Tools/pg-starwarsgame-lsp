@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 
 namespace PG.StarWarsGame.LSP.Lua.Analyzer;
 
@@ -15,22 +16,21 @@ public interface ILuaAnalyzerStarter
 }
 
 /// <summary>
-///     Starts the analyzer when <c>features.lua.analyzer</c> is on and its executable was found,
-///     pointed at the leaf project's scripts with the lower layers and the engine stubs as library.
+///     Hands the layers to the analyzer when <c>features.lua.analyzer</c> is on and its executable was
+///     found: from then on every open script gets an analyzer of its own, resolved over them.
 /// </summary>
 public sealed class LuaAnalyzerStarter(
-    LuaAnalyzerHost host,
+    ILuaAnalyzerLayers analyzer,
     ILspConfigurationProvider config,
-    LuaStubLocation stubs,
     bool executableFound,
     ILogger<LuaAnalyzerStarter> logger) : ILuaAnalyzerStarter
 {
-    public async Task ConfigureAsync(IReadOnlyList<ProjectLayer> layers)
+    public Task ConfigureAsync(IReadOnlyList<ProjectLayer> layers)
     {
         if (!config.Current.Features.Lua.Analyzer)
         {
             logger.LogDebug("Lua analyzer off (features.lua.analyzer)");
-            return;
+            return Task.CompletedTask;
         }
 
         if (!executableFound)
@@ -38,14 +38,11 @@ public sealed class LuaAnalyzerStarter(
             logger.LogInformation(
                 "Lua analyzer not started: emmylua_ls not found (set {Variable}, or place it in the server's emmylua folder)",
                 LuaAnalyzerExecutable.Variable);
-            return;
+            return Task.CompletedTask;
         }
 
-        // In the file system's own spelling: the analyzer compares paths as written (measured live).
-        var plan = EmmyrcWriter.Plan(layers, stubs.Directory);
-        await host.StartAsync(new AnalyzerPlan(
-            plan.WorkspaceRoots.Select(PathCasing.OnDisk).ToList(),
-            plan.Library.Select(PathCasing.OnDisk).ToList()));
+        analyzer.Configure(layers);
+        return Task.CompletedTask;
     }
 }
 

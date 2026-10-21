@@ -59,7 +59,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         var theirs = await _analyzer.RequestAsync<LocationOrLocationLinks>("textDocument/definition", request, ct);
         if (theirs is null || _sandbox is null) return theirs ?? ours;
 
-        // The analyzer sees one namespace, the game one per script (#249).
+        // Only what the requesting script's own state holds: the game runs one per script (#249).
         var current = _sandbox.Current;
         var from = request.TextDocument.Uri.ToString();
         var kept = theirs.Where(l => current.ShareAState(from,

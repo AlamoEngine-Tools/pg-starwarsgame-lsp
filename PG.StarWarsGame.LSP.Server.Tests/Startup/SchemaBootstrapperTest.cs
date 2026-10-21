@@ -7,6 +7,7 @@ using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
@@ -337,6 +338,27 @@ public sealed class SchemaBootstrapperTest
         Assert.Contains("Find_Player", lua.AllFunctionNames);
     }
 
+    // The analyzer reads a library's stub only where no layer ships the library, so it needs to know
+    // which stub stands in for which module - and every other stub, the engine's, for every script.
+    [Fact]
+    public void LoadLuaSchemaFromDisk_RecordsTheStubFiles_AndWhichStandInForALibrary()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile(@"C:\schema\lua\_files.json", new MockFileData(
+            """{ "files": ["api.d.lua", "pgbase.d.lua"], "libraries": { "PGBase": "pgbase.d.lua" } }"""));
+        fs.AddFile(@"C:\schema\lua\api.d.lua", new MockFileData("function Find_Player(name) end\n"));
+        fs.AddFile(@"C:\schema\lua\pgbase.d.lua", new MockFileData("function TestValid(wrapper) end\n"));
+        var stubs = new LuaStubLocation();
+        var bootstrapper = Build(new FakeHttpClientFactory(StubServer(new Dictionary<string, string>())),
+            new RecordingUserNotifier(), out _, out _, fileSystem: fs, stubs: stubs);
+
+        bootstrapper.LoadLuaSchemaFromDisk(@"C:\schema\eaw");
+
+        Assert.Equal(@"C:\schema\lua", stubs.Directory);
+        Assert.Equal(["api.d.lua", "pgbase.d.lua"], stubs.Files);
+        Assert.Equal("pgbase.d.lua", stubs.Libraries["pgbase"]);
+    }
+
     private static SchemaBootstrapper Build(IHttpClientFactory factory)
     {
         return Build(factory, new RecordingUserNotifier(), out _);
@@ -353,7 +375,7 @@ public sealed class SchemaBootstrapperTest
         IHttpClientFactory factory, IUserNotifier notifier, out SchemaProviderProxy proxy,
         out LuaApiSchemaProxy luaProxy,
         string url = "https://example.com/eaw/", ServerStatusRecorder? recorder = null,
-        IFileSystem? fileSystem = null, SchemaSourceConfig? source = null)
+        IFileSystem? fileSystem = null, SchemaSourceConfig? source = null, LuaStubLocation? stubs = null)
     {
         IFileSystem fs = fileSystem ?? new MockFileSystem();
         var fileHelper = new FileHelper(fs);
@@ -387,7 +409,8 @@ public sealed class SchemaBootstrapperTest
             NullLogger<SchemaBootstrapper>.Instance,
             NullLogger<LocalFileSchemaProvider>.Instance,
             NullLogger<HttpSchemaProvider>.Instance,
-            recorder);
+            recorder,
+            stubs);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

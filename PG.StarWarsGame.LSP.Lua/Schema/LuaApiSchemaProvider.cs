@@ -24,6 +24,9 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     // `---@type Player` above `PlayerObject = nil`, engine stubs only.
     private readonly IReadOnlyDictionary<string, string> _globalTypes;
 
+    // The same for every stub, a library's included, with the description above it.
+    private readonly IReadOnlyDictionary<string, LuaGlobalAnnotation> _globalAnnotations;
+
     /// <summary>
     ///     The three stub files that describe what the ENGINE binds into every script. Everything
     ///     else the manifest lists documents a vanilla library - names a script gets only by
@@ -59,6 +62,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         var memberRefs = new Dictionary<string, List<XmlRefEntry>>(StringComparer.OrdinalIgnoreCase);
         var declaredGlobals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var globalTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var globalAnnotations = new Dictionary<string, LuaGlobalAnnotation>(StringComparer.OrdinalIgnoreCase);
         var engineFunctions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var stub in stubs)
         {
@@ -67,7 +71,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
             var isEngine = EngineStubFiles.Contains(stub.Name);
             var found = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
             ParseContent(stub.Content, found, memberRefs, isEngine ? declaredGlobals : [],
-                isEngine ? globalTypes : new Dictionary<string, string>());
+                isEngine ? globalTypes : new Dictionary<string, string>(), globalAnnotations);
             foreach (var (name, entry) in found)
             {
                 functions[name] = entry;
@@ -88,6 +92,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         declaredGlobals.UnionWith(engineFunctions);
         DeclaredGlobalNames = declaredGlobals;
         _globalTypes = globalTypes;
+        _globalAnnotations = globalAnnotations;
     }
 
     public IReadOnlySet<string> AllFunctionNames { get; }
@@ -127,6 +132,11 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         return _globalTypes.GetValueOrDefault(globalName);
     }
 
+    public LuaGlobalAnnotation? GetGlobalAnnotation(string globalName)
+    {
+        return _globalAnnotations.GetValueOrDefault(globalName);
+    }
+
     public LuaEntryPoint? GetEntryPoint(string functionName)
     {
         return _entryPoints.GetValueOrDefault(functionName);
@@ -137,7 +147,8 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         Dictionary<string, FunctionEntry> functions,
         Dictionary<string, List<XmlRefEntry>> memberRefs,
         HashSet<string> declaredGlobals,
-        Dictionary<string, string> globalTypes)
+        Dictionary<string, string> globalTypes,
+        Dictionary<string, LuaGlobalAnnotation> globalAnnotations)
     {
         // Accumulate comment lines (--- stripped) for EmmyLuaAnnotationParser.
         var commentLines = new List<string>();
@@ -232,7 +243,13 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
                 {
                     var name = assignment.Groups["name"].Value;
                     declaredGlobals.Add(name);
-                    if (typeName is not null) globalTypes[name] = typeName;
+                    if (typeName is not null)
+                    {
+                        globalTypes[name] = typeName;
+                        var description = EmmyLuaAnnotationParser.Parse(commentLines).Description;
+                        globalAnnotations[name] = new LuaGlobalAnnotation(typeName,
+                            string.IsNullOrEmpty(description) ? null : description);
+                    }
 
                     // An engine table (`---@class FogOfWar` ... `FogOfWar = {}`) is also callable: its
                     // @param and @aetref lines describe the call, as a function's would.
