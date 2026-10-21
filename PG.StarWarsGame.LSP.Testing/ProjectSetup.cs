@@ -2,6 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
+using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Testing;
@@ -83,6 +86,46 @@ public sealed class ProjectSetup
     public string Uri(int rank, string underData)
     {
         return "file:///" + PathOf(rank, underData).Replace('\\', '/').TrimStart('/');
+    }
+
+    /// <summary>A script's URI under the <c>Data/Scripts</c> folder of the project at a rank.</summary>
+    public string ScriptUri(int rank, string underScripts)
+    {
+        return Uri(rank, "Scripts/" + underScripts);
+    }
+
+    /// <summary>A Lua global the script at <paramref name="uri" /> defines.</summary>
+    public static GameSymbol LuaGlobal(string name, string uri)
+    {
+        return new GameSymbol(name, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, 0, null), null);
+    }
+
+    /// <summary>A use of a Lua global in the script at <paramref name="uri" />.</summary>
+    public static GameReference LuaGlobalUse(string name, string uri, int line, int character)
+    {
+        return new GameReference(name, GameSymbolKind.LuaGlobal, null, uri, line, character, name.Length);
+    }
+
+    /// <summary>
+    ///     A script of the project at a rank, indexed as the server indexes it: under the layer's rank
+    ///     and name, with the modules it requires.
+    /// </summary>
+    public DocumentIndex Script(int rank, string underScripts, IEnumerable<string>? requires = null,
+        IEnumerable<GameSymbol>? defines = null, IEnumerable<GameReference>? uses = null)
+    {
+        return new DocumentIndex(ScriptUri(rank, underScripts), 1, [.. defines ?? []], [.. uses ?? []],
+            [.. requires ?? []], LayerRank: rank, LayerName: Projects[rank]);
+    }
+
+    /// <summary>The index of these documents: each keyed by its URI, its symbols and uses collected by id.</summary>
+    public static GameIndex Index(params DocumentIndex[] documents)
+    {
+        return new GameIndex(GameIndex.Empty.Baseline,
+            documents.ToImmutableDictionary(d => d.DocumentUri, DocumentUris.Comparer),
+            documents.SelectMany(d => d.Symbols).GroupBy(s => s.Id)
+                .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray()),
+            documents.SelectMany(d => d.References).GroupBy(r => r.TargetId)
+                .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray()));
     }
 
     /// <summary>

@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
@@ -461,6 +462,51 @@ public sealed class LuaRenameHandlerTest
 
         Assert.Equal([library, mine], result!.Changes!.Keys.Select(k => k.ToString()).Order());
         Assert.Equal(2, result.Changes[DocumentUri.From(library)].Count());
+    }
+
+    public static TheoryData<string, int> SetupsAndLibraryRanks()
+    {
+        var data = new TheoryData<string, int>();
+        foreach (var setup in ProjectSetup.All)
+            for (var rank = 0; rank < setup.Layers.Count; rank++)
+                data.Add(setup.Name, rank);
+        return data;
+    }
+
+    // Every shape, every layer the library sits in (#280): the leaf's own library is renamed with the
+    // leaf; a lower layer's is a dependency, and the rename is refused whole.
+    [Theory]
+    [MemberData(nameof(SetupsAndLibraryRanks))]
+    public void HandleRename_LeafRedefiningALibraryGlobal_RenamesOnlyWhenTheLibraryIsTheLeafs(string name,
+        int libraryRank)
+    {
+        var setup = ProjectSetup.Named(name);
+        var mine = setup.ScriptUri(setup.LeafRank, "GameObject/Interdictor.lua");
+        var library = setup.ScriptUri(libraryRank, "Library/PGCommands.lua");
+        var index = ProjectSetup.Index(
+            setup.Script(setup.LeafRank, "GameObject/Interdictor.lua", ["PGCommands"],
+                [ProjectSetup.LuaGlobal("Fire_Weapons", mine)]),
+            setup.Script(libraryRank, "Library/PGCommands.lua",
+                defines: [ProjectSetup.LuaGlobal("Fire_Weapons", library)],
+                uses: [ProjectSetup.LuaGlobalUse("Fire_Weapons", library, 3, 1)]));
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(mine, "function Fire_Weapons()\nend", 1);
+        host.AddOrUpdate(library, "function Fire_Weapons()\nend\nfunction Go()\n Fire_Weapons()\nend", 1);
+        var fileHelper = new FileHelper(setup.Disk());
+        var sandbox = new FixedSandbox(LuaSandbox.Build(index.Documents, fileHelper));
+
+        var result = MakeHandler(host, sandbox: sandbox).HandleRename(mine, RenameAt(0, 10, "Fire", mine), index);
+
+        if (libraryRank != setup.LeafRank)
+        {
+            Assert.Null(result);
+            return;
+        }
+
+        Assert.Equal(new[] { library, mine }.Select(fileHelper.NormalizeUri).Order(StringComparer.OrdinalIgnoreCase),
+            result!.Changes!.Keys.Select(k => fileHelper.NormalizeUri(k.ToString()))
+                .Order(StringComparer.OrdinalIgnoreCase),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     // The game calls main by name: renamed, the script's thread never starts. Refused, and not the

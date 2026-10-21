@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Testing;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -151,6 +152,40 @@ public sealed class LuaDefinitionHandlerTest
 
         Assert.Equal([vader, interdictor], fromLibrary!.Select(l => l.LocationLink!.TargetUri.ToString()).Order());
         Assert.Equal(vader, Assert.Single(fromScript!).LocationLink!.TargetUri.ToString());
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // The same in every shape (#280): the library is the lowest layer's, the scripts the leaf's.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public async Task FromALowerLayersLibrary_EveryRequiringScriptsDefinition_FromAScript_ItsOwn(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var library = setup.ScriptUri(0, "Library/PGStateMachine.lua");
+        var interdictor = setup.ScriptUri(setup.LeafRank, "GameObject/Interdictor.lua");
+        var vader = setup.ScriptUri(setup.LeafRank, "GameObject/DarthVader.lua");
+        var index = ProjectSetup.Index(
+            setup.Script(0, "Library/PGStateMachine.lua",
+                uses: [ProjectSetup.LuaGlobalUse("Definitions", library, 0, 0)]),
+            setup.Script(setup.LeafRank, "GameObject/Interdictor.lua", ["PGStateMachine"],
+                [ProjectSetup.LuaGlobal("Definitions", interdictor)]),
+            setup.Script(setup.LeafRank, "GameObject/DarthVader.lua", ["PGStateMachine"],
+                [ProjectSetup.LuaGlobal("Definitions", vader)],
+                [ProjectSetup.LuaGlobalUse("Definitions", vader, 0, 0)]));
+        var fileHelper = new FileHelper(setup.Disk());
+        var handler = BuildHandler(index, sandbox: new FixedSandbox(LuaSandbox.Build(index.Documents, fileHelper)));
+
+        var fromLibrary = await handler.Handle(RequestAt(0, 3, library), CancellationToken.None);
+        var fromScript = await handler.Handle(RequestAt(0, 3, vader), CancellationToken.None);
+
+        Assert.Equal(
+            new[] { interdictor, vader }.Select(fileHelper.NormalizeUri).Order(StringComparer.OrdinalIgnoreCase),
+            fromLibrary!.Select(l => fileHelper.NormalizeUri(l.LocationLink!.TargetUri.ToString()))
+                .Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(fileHelper.NormalizeUri(vader),
+            fileHelper.NormalizeUri(Assert.Single(fromScript!).LocationLink!.TargetUri.ToString()),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     // A state name in Set_Next_State goes to the handler registered under it (#252).

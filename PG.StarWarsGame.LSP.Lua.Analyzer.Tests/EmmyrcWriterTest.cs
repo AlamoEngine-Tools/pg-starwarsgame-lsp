@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Lua.Analyzer.Tests;
 
@@ -28,6 +29,23 @@ public sealed class EmmyrcWriterTest
 
         Assert.Equal(["D:/Mods/MyMod/Data/Scripts"], plan.WorkspaceRoots);
         Assert.Equal(["C:/Games/FoC/Data/Scripts", "C:/Games/EaW/Data/Scripts", "D:/schema/lua"], plan.Library);
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // Every shape (#280): the leaf's scripts are the workspace; every lower layer, highest first, and
+    // the stubs are the library - a mod alone has the stubs only.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public void InEveryShape_TheLeafIsTheWorkspace_LowerLayersHighestFirst_ThenTheStubs(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+
+        var plan = EmmyrcWriter.Plan(setup.Layers, "D:/schema/lua");
+
+        Assert.Equal(setup.Leaf.ScriptRoots, plan.WorkspaceRoots);
+        Assert.Equal(setup.Layers.Take(setup.LeafRank).Reverse().SelectMany(l => l.ScriptRoots).Append("D:/schema/lua"),
+            plan.Library);
     }
 
     [Fact]
