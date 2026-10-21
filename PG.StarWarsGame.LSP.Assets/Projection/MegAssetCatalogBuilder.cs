@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
@@ -52,10 +53,10 @@ public static class MegAssetCatalogBuilder
     /// </param>
     /// <param name="logger">Logger for collision warnings.</param>
     /// <param name="extractTextures">
-    ///     Reads the texture names an open <c>.alo</c> carries inside itself. When
-    ///     <see langword="null" />, no texture catalog is built and the validator falls back to
-    ///     parsing each model on demand - which is what it did before, and what MEASURED as the
-    ///     entire cost of a workspace diagnostics sweep.
+    ///     Reads what an open <c>.alo</c> is and the texture names it carries inside itself. When
+    ///     <see langword="null" />, no texture catalog and no particle-system set is built, and the
+    ///     validator falls back to parsing each model on demand - which is what it did before, and
+    ///     what MEASURED as the entire cost of a workspace diagnostics sweep.
     ///     <para>
     ///         Opens the entry a SECOND time rather than sharing the bone pass's stream. That is
     ///         deliberate: the bone path hands the ALO loader the original entry stream because the
@@ -68,7 +69,8 @@ public static class MegAssetCatalogBuilder
     public static (
         ImmutableHashSet<string> assetFiles,
         ImmutableDictionary<string, ImmutableArray<string>> modelBones,
-        ImmutableDictionary<string, ImmutableArray<string>> modelTextures
+        ImmutableDictionary<string, ImmutableArray<string>> modelTextures,
+        ImmutableHashSet<string> particleSystems
         ) Build(
             IEnumerable<(string megName, IEnumerable<string> entryPaths)> megEntries,
             IFileSystem looseFileSystem,
@@ -77,13 +79,14 @@ public static class MegAssetCatalogBuilder
             Func<Stream, IReadOnlyList<string>> extractBones,
             Func<Stream, IEnumerable<string>>? extractMtdIcons,
             ILogger logger,
-            Func<Stream, IReadOnlyList<string>>? extractTextures = null)
+            Func<Stream, AloScan>? extractTextures = null)
     {
         // Track source MEG for each normalised path - used for collision detection.
         var pathSource = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var assetBuilder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
         var bonesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
         var texturesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+        var particleBuilder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (megName, entryPaths) in megEntries)
         foreach (var rawPath in entryPaths)
@@ -112,7 +115,7 @@ public static class MegAssetCatalogBuilder
 
             TryExtractBones(normalized, openEntry, extractBones, bonesBuilder);
             if (extractTextures is not null)
-                TryExtractTextures(normalized, openEntry, extractTextures, texturesBuilder);
+                TryExtractTextures(normalized, openEntry, extractTextures, texturesBuilder, particleBuilder);
         }
 
         // Merge loose files on top (workspace loose files may extend the MEG catalog).
@@ -127,7 +130,8 @@ public static class MegAssetCatalogBuilder
             bonesBuilder.ToImmutableDictionary(
                 kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase),
             texturesBuilder.ToImmutableDictionary(
-                kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase));
+                kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase),
+            particleBuilder.ToImmutable());
     }
 
     /// <summary>
@@ -233,8 +237,9 @@ public static class MegAssetCatalogBuilder
     private static void TryExtractTextures(
         string normalizedPath,
         Func<string, Stream?> openEntry,
-        Func<Stream, IReadOnlyList<string>> extractTextures,
-        Dictionary<string, ImmutableArray<string>> texturesBuilder)
+        Func<Stream, AloScan> extractTextures,
+        Dictionary<string, ImmutableArray<string>> texturesBuilder,
+        ImmutableHashSet<string>.Builder particleBuilder)
     {
         try
         {
@@ -242,7 +247,10 @@ public static class MegAssetCatalogBuilder
             if (stream is null) return;
             // Keyed by bare filename, like the bones: XML references models by name and the engine
             // resolves them by name across the VFS.
-            texturesBuilder[ModelBoneKey.From(normalizedPath)] = [.. extractTextures(stream)];
+            var key = ModelBoneKey.From(normalizedPath);
+            var scan = extractTextures(stream);
+            texturesBuilder[key] = [.. scan.Textures];
+            if (scan.Kind == AloFileKind.Particle) particleBuilder.Add(key);
         }
         catch
         {

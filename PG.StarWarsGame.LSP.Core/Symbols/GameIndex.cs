@@ -56,6 +56,7 @@ public sealed record GameIndex(
         AssetFiles = original.AssetFiles;
         ModelBones = original.ModelBones;
         ModelTextures = original.ModelTextures;
+        ParticleSystems = original.ParticleSystems;
         WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
         WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
     }
@@ -132,6 +133,15 @@ public sealed record GameIndex(
     /// </remarks>
     public ImmutableDictionary<string, ImmutableArray<string>> ModelTextures { get; init; } =
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     Merged (baseline ∪ workspace) set of the <c>.alo</c> files that are particle systems, keyed
+    ///     like <see cref="ModelBones" /> (#270). Models and particle systems share the extension; the
+    ///     catalog scan tells them apart from the root chunk. An <c>.alo</c> missing here is a model,
+    ///     or one no scan has seen.
+    /// </summary>
+    public ImmutableHashSet<string> ParticleSystems { get; init; } =
+        ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     ///     Dynamic enum values discovered by scanning the workspace XML enum files - values the mod has

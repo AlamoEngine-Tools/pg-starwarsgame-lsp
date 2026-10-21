@@ -24,6 +24,7 @@ public static class BaselineSerializer
             AssetFiles = baseline.AssetFiles.ToArray(),
             ModelBones = ToSerializedArray(baseline.ModelBones),
             ModelTextures = ToSerializedArray(baseline.ModelTextures),
+            ParticleSystems = baseline.ParticleSystems.ToArray(),
             ObjectTags = ToSerializedObjectTags(baseline.ObjectTags),
             SchemaVersion = SerializedBaseline.CurrentSchemaVersion
         };
@@ -74,6 +75,7 @@ public static class BaselineSerializer
             AssetFiles = assetFiles,
             ModelBones = modelBones,
             ModelTextures = modelTextures,
+            ParticleSystems = (dto.ParticleSystems ?? []).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
             ObjectTags = objectTags
         };
     }

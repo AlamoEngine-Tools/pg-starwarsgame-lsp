@@ -37,6 +37,22 @@ public sealed class BaselineSerializerTest
 
     // ── Behaviours ───────────────────────────────────────────────────────────
 
+    // Which shipped .alo files are particle systems (#270). A baseline written before the field
+    // has none, and lists every .alo as a model, as before - so the field needs no version.
+    [Fact]
+    public void RoundTrip_ParticleSystems()
+    {
+        var baseline = BaselineIndex.Empty with
+        {
+            ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_smoke.alo")
+        };
+
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(["p_smoke.alo"], result.ParticleSystems);
+        Assert.Contains("P_SMOKE.ALO", result.ParticleSystems);
+    }
+
     [Fact]
     public void RoundTrip_Behaviors()
     {

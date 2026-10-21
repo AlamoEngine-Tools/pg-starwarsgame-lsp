@@ -83,6 +83,14 @@ public sealed record BaselineIndex(
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    ///     The shipped <c>.alo</c> files that are particle systems, keyed like <see cref="ModelBones" />,
+    ///     from the same scan as <see cref="ModelTextures" /> (#270). Empty in a baseline built before
+    ///     it, which lists every <c>.alo</c> as a model, as before.
+    /// </summary>
+    public ImmutableHashSet<string> ParticleSystems { get; init; } =
+        ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     ///     Full child-tag tree of each shipped GameObject, keyed case-insensitively by object id. Built
     ///     offline by the BaselineBuilder; consumed by the effective-object merge engine so that variants
     ///     (<c>Variant_Of_Existing_Type</c>) whose base is a shipped object can be resolved. Empty for

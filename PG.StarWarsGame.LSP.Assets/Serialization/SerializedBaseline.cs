@@ -40,4 +40,12 @@ public sealed class SerializedBaseline
     /// <summary>Texture names inside each shipped model, keyed like <see cref="ModelBones" />.</summary>
     [Key(11)]
     public SerializedEnumValues[] ModelTextures { get; set; } = [];
+
+    /// <summary>
+    ///     The shipped <c>.alo</c> files that are particle systems, keyed like <see cref="ModelBones" />
+    ///     (#270). Needs no new <see cref="CurrentSchemaVersion" />: a baseline written before it reads
+    ///     as none, which lists every <c>.alo</c> as a model - the behaviour before the field.
+    /// </summary>
+    [Key(12)]
+    public string[] ParticleSystems { get; set; } = [];
 }

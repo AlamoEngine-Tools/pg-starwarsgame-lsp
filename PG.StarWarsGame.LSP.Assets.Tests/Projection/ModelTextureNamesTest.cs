@@ -40,4 +40,19 @@ public sealed class ModelTextureNamesTest
         Assert.Equal(AloFileKind.Unknown, AloFile.Classify([0, 0, 0, 0]));
         Assert.Empty(ModelTextureNames.Read([0, 0, 0, 0]));
     }
+
+    // The kind comes off the root chunk alone (#270): a particle system is known as one even when
+    // its emitters cannot be read, so the model list can leave it out without parsing anything.
+    [Theory]
+    [InlineData(new byte[] { 0x00, 0x09, 0x00, 0x00 }, AloFileKind.Particle)]
+    [InlineData(new byte[] { 0x00, 0x15, 0x00, 0x00 }, AloFileKind.Particle)]
+    [InlineData(new byte[] { 0x00, 0x02, 0x00, 0x00 }, AloFileKind.Model)]
+    [InlineData(new byte[] { 1, 2, 3, 4 }, AloFileKind.Unknown)]
+    public void Scan_KnowsTheKind_EvenWhenTheTexturesCannotBeRead(byte[] bytes, AloFileKind kind)
+    {
+        var scan = ModelTextureNames.Scan(bytes);
+
+        Assert.Equal(kind, scan.Kind);
+        Assert.Empty(scan.Textures);
+    }
 }

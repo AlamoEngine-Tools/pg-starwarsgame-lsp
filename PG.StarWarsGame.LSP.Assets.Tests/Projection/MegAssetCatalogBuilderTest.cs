@@ -55,7 +55,7 @@ public sealed class MegAssetCatalogBuilderTest
     public void Build_EmptyMegsAndNoLooseFiles_ReturnsEmpty()
     {
         var fs = new MockFileSystem();
-        var (assets, bones, _) = MegAssetCatalogBuilder.Build(
+        var (assets, bones, _, _) = MegAssetCatalogBuilder.Build(
             [], fs, "C:/game", _ => null, _ => [], null, NullLogger.Instance);
 
         Assert.Empty(assets);
@@ -128,7 +128,7 @@ public sealed class MegAssetCatalogBuilderTest
         var fs = new MockFileSystem();
         var bones = new[] { "Bone_Root", "Bone_Head" };
 
-        var (_, modelBones, _) = MegAssetCatalogBuilder.Build(
+        var (_, modelBones, _, _) = MegAssetCatalogBuilder.Build(
             megs, fs, "C:/game",
             path => path == "data/art/models/unit_at_at.alo" ? new MemoryStream() : null,
             _ => bones,
@@ -158,7 +158,7 @@ public sealed class MegAssetCatalogBuilderTest
         var megs = OneMeg("test.meg", [@"DATA\ART\MODELS\UNIT.ALO"]);
         var fs = new MockFileSystem();
 
-        var (_, modelBones, _) = MegAssetCatalogBuilder.Build(
+        var (_, modelBones, _, _) = MegAssetCatalogBuilder.Build(
             megs, fs, "C:/game",
             _ => new MemoryStream(),
             _ => [],
@@ -166,6 +166,33 @@ public sealed class MegAssetCatalogBuilderTest
             NullLogger.Instance);
 
         Assert.Empty(modelBones);
+    }
+
+    // The shipped .alo files that are particle systems, from the scan that reads their textures (#270).
+    [Fact]
+    public void Build_RecordsWhichAloEntriesAreParticleSystems()
+    {
+        var megs = OneMeg("models.meg", [@"DATA\ART\MODELS\P_SMOKE.ALO", @"DATA\ART\MODELS\EV_TIE.ALO"]);
+        var bytes = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["data/art/models/p_smoke.alo"] = [0x00, 0x09, 0x00, 0x00],
+            ["data/art/models/ev_tie.alo"] = [0x00, 0x02, 0x00, 0x00]
+        };
+
+        var (_, _, _, particleSystems) = MegAssetCatalogBuilder.Build(
+            megs, new MockFileSystem(), "C:/game",
+            path => new MemoryStream(bytes[path]),
+            _ => [],
+            null,
+            NullLogger.Instance,
+            stream =>
+            {
+                using var buffer = new MemoryStream();
+                stream.CopyTo(buffer);
+                return ModelTextureNames.Scan(buffer.ToArray());
+            });
+
+        Assert.Equal(["p_smoke.alo"], particleSystems);
     }
 
     // ── SFX path conventions ──────────────────────────────────────────────────
@@ -361,9 +388,9 @@ public sealed class MegAssetCatalogBuilderTest
             Func<string, Stream?>? openEntry = null,
             Func<Stream, IReadOnlyList<string>>? extractBones = null,
             Func<Stream, IEnumerable<string>>? extractMtdIcons = null,
-            Func<Stream, IReadOnlyList<string>>? extractTextures = null)
+            Func<Stream, AloScan>? extractTextures = null)
     {
-        var (assetFiles, modelBones, _) = MegAssetCatalogBuilder.Build(
+        var (assetFiles, modelBones, _, _) = MegAssetCatalogBuilder.Build(
             megs, fs, gameRoot,
             openEntry ?? (_ => null),
             extractBones ?? (_ => []),

@@ -873,6 +873,35 @@ public sealed class WorkspaceIndexerTest
         Assert.Equal(["root", "muzzle_bone"], svc.AppliedModelBones!["data/art/models/shipped.alo"].ToArray());
     }
 
+    // Models and particle systems share the extension (#270): the scan that reads every .alo records
+    // which are particle systems, merged over the baseline's - a mod's model replaces a shipped
+    // particle system of the same name, as every other model catalog entry does.
+    [Fact]
+    public void ApplyModelBoneCatalog_PublishesTheParticleSystems_TheModsOverTheBaselines()
+    {
+        var root = Root("ws");
+        var models = Path.Combine(root, "Data", "Art", "Models");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(models, "P_Smoke.alo")] = new([0x00, 0x09, 0x00, 0x00]),
+            [Path.Combine(models, "My_Frigate.alo")] = new([0x00, 0x02, 0x00, 0x00])
+        });
+        var baseline = BaselineIndex.Empty with
+        {
+            ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_shipped.alo",
+                "my_frigate.alo")
+        };
+        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider());
+
+        indexer.ApplyModelBoneCatalog(WorkspaceConfiguration.Empty with
+        {
+            AssetRoots = [Path.Combine(root, "Data", "Art")]
+        });
+
+        Assert.Equal(["p_shipped.alo", "p_smoke.alo"], svc.AppliedParticleSystems!.Order());
+    }
+
     /// <summary>
     ///     A workspace that resolved no projects - a heuristic scan - still has to produce a
     ///     catalog. It cannot be cached (there is no .pgproj to keep a snapshot beside), so the
@@ -2249,6 +2278,8 @@ public sealed class WorkspaceIndexerTest
 
         public ImmutableDictionary<string, ImmutableArray<string>>? AppliedModelBones { get; private set; }
 
+        public ImmutableHashSet<string>? AppliedParticleSystems { get; private set; }
+
         public ImmutableDictionary<string, ImmutableArray<string>>? AppliedWorkspaceDynamicEnumValues
         {
             get;
@@ -2321,6 +2352,11 @@ public sealed class WorkspaceIndexerTest
         public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
             AppliedModelBones = bones;
+        }
+
+        public void ApplyParticleSystems(ImmutableHashSet<string> particleSystems)
+        {
+            AppliedParticleSystems = particleSystems;
         }
 
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)

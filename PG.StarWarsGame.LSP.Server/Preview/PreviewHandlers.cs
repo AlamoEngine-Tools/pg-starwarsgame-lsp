@@ -69,9 +69,9 @@ public sealed class GetProjectileHandler(
 /// <remarks>
 ///     Read off the merged asset catalog - the project's layers and the baseline together - so a
 ///     model that sits in a dependency or inside a shipped MEG is offered as readily as one in the
-///     project's own folder. Particle systems are listed too: they share the <c>.alo</c> extension
-///     and the folder, and telling them apart means reading every file, which the scene does anyway
-///     once one is picked.
+///     project's own folder. Particle systems share the <c>.alo</c> extension and the folder; the
+///     catalog scan that already reads every file records which they are, and those are left out
+///     (#270). One no scan has seen is offered.
 /// </remarks>
 public sealed class ListModelsHandler(IGameIndexService indexService, ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<ListModelsParams, ListModelsResult>
@@ -84,8 +84,10 @@ public sealed class ListModelsHandler(IGameIndexService indexService, ILspConfig
             return Task.FromResult(new ListModelsResult([]));
 
         var assets = indexService.Current.AssetFiles;
+        var particleSystems = indexService.Current.ParticleSystems;
         var models = assets.GetByExtension(".alo")
             .Where(p => p.StartsWith(ModelFolder, StringComparison.OrdinalIgnoreCase))
+            .Where(p => !particleSystems.Contains(ModelBoneKey.From(p)))
             .Select(p => new PreviewModelEntry(MergedAssetFileIndex.FileNameOf(p), assets.IsPackedAsset(p)))
             // A name in two subfolders is one entry: the scene resolves by name, so a second row
             // would open the same model. The project's copy is the one kept, as it is the one the

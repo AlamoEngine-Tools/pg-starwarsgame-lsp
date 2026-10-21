@@ -55,6 +55,23 @@ public sealed class ModelBoneCatalogCacheTest
         Assert.Empty(loaded["uv_walker.alo"].Textures);
     }
 
+    // A reused snapshot keeps which files are particle systems (#270), or the model list would
+    // offer them again after a restart.
+    [Fact]
+    public void Save_ThenTryLoad_KeepsWhichFilesAreParticleSystems()
+    {
+        var cache = Build(new MockFileSystem());
+        cache.Save(PgprojPath, "fp-1", new Dictionary<string, ModelCatalogEntry>
+        {
+            ["p_smoke.alo"] = new([], ["smoke.tga"], true), ["ev_speeder.alo"] = new(["root"], [])
+        });
+
+        var loaded = cache.TryLoad(PgprojPath, "fp-1")!;
+
+        Assert.True(loaded["p_smoke.alo"].ParticleSystem);
+        Assert.False(loaded["ev_speeder.alo"].ParticleSystem);
+    }
+
     [Fact]
     public void TryLoad_KeysAreCaseInsensitive_LikeTheModelBoneKey()
     {

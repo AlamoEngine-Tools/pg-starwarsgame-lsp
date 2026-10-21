@@ -56,6 +56,15 @@ public interface IGameIndexService
     {
     }
 
+    /// <summary>
+    ///     Publishes the merged set of <c>.alo</c> files that are particle systems (#270). Defaulted
+    ///     to a no-op for the test doubles, like <see cref="ApplyModelTextures" />; one that ignores it
+    ///     lists every <c>.alo</c> as a model.
+    /// </summary>
+    void ApplyParticleSystems(ImmutableHashSet<string> particleSystems)
+    {
+    }
+
     void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values);
 
     void ApplyWorkspaceEnumValueDefinitions(

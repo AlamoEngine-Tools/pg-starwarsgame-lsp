@@ -32,24 +32,35 @@ public static class ModelTextureNames
     /// </summary>
     public static IReadOnlyList<string> Read(byte[] bytes)
     {
-        if (bytes.Length == 0) return [];
+        return Scan(bytes).Textures;
+    }
+
+    /// <summary>
+    ///     What the file is and the textures it names. The kind comes off the root chunk alone, so
+    ///     a particle system is known as one even when its emitters cannot be read (#270).
+    /// </summary>
+    public static AloScan Scan(byte[] bytes)
+    {
+        if (bytes.Length == 0) return AloScan.Unreadable;
+
+        var kind = AloFile.Classify(bytes);
 
         try
         {
             // A particle system and a model are both .alo and are told apart by their first chunk,
             // exactly as the preview does it. Reading one as the other throws rather than lying.
-            return AloFile.Classify(bytes) switch
+            return new AloScan(kind, kind switch
             {
                 AloFileKind.Particle => ParticleTextures(bytes),
                 AloFileKind.Model => ModelTextures(bytes),
                 _ => []
-            };
+            });
         }
         catch
         {
             // Corrupt, unsupported, or not a model at all. ModelFileFormat is the diagnostic that
             // owns "this .alo is not readable"; one bad file must never abort the scan.
-            return [];
+            return new AloScan(kind, []);
         }
     }
 

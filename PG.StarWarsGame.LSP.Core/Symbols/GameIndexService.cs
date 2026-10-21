@@ -212,6 +212,18 @@ public sealed class GameIndexService : IGameIndexService
         RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
+    public void ApplyParticleSystems(ImmutableHashSet<string> particleSystems)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { ParticleSystems = particleSystems };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
     public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
     {
         GameIndex snapshot, updated;
