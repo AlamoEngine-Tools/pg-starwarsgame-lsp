@@ -8,6 +8,7 @@ using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -142,6 +143,37 @@ public sealed class LocalisationLayerMergeTest
     private static ProjectLayer Layer(int rank, string name)
     {
         return new ProjectLayer(rank, name, [], [], [], [], "Csv");
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // Every shape (#280): what the leaf builds on is the baseline and every layer below it, the
+    // nearest layer's value winning; the leaf's own keys are not merged in.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public void MergeBelowTheLeaf_InEveryShape_TakesEveryLowerLayer_TheNearestWinning(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var (factory, langService) = BuildFactory();
+        var english = langService.Default;
+        var baseline = factory.CreateKeyed([english]);
+        baseline.SetTranslation("TEXT_SHARED", english, "Baseline");
+        var layers = setup.Layers.Select(layer =>
+        {
+            var database = factory.CreateKeyed([english]);
+            database.SetTranslation("TEXT_SHARED", english, layer.Name);
+            database.SetTranslation("TEXT_OF_" + layer.Name.ToUpperInvariant(), english, layer.Name);
+            return new LocalisationLayerEntry(layer, database);
+        }).ToArray();
+
+        var target = factory.CreateKeyed([english]);
+        LocalisationLayerMerge.MergeBaselineAndLowerLayers(target, [baseline], layers, setup.LeafRank);
+
+        Assert.True(target.TryGetEntry("TEXT_SHARED", out var shared));
+        Assert.Equal(setup.LeafRank == 0 ? "Baseline" : setup.Projects[setup.LeafRank - 1],
+            shared!.Translations[english]);
+        foreach (var layer in setup.Layers)
+            Assert.Equal(layer.Rank < setup.LeafRank, target.ContainsKey("TEXT_OF_" + layer.Name.ToUpperInvariant()));
     }
 
     private static (ITranslationDatabaseFactory Factory, ILanguageService LangService) BuildFactory()

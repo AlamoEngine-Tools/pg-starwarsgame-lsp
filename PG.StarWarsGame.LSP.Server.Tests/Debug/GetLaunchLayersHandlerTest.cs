@@ -6,6 +6,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Debug;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Debug;
 
@@ -59,6 +60,29 @@ public sealed class GetLaunchLayersHandlerTest
         Assert.Equal(["D:/Mods/Mod/Data/Scripts", "D:/Mods/Mod/Data/Scripts/Story"], result.Layers[0].ScriptRoots);
         Assert.Equal("D:/Mods/Mod/Mod.pgproj", result.Layers[0].ProjectPath);
         Assert.Equal("D:/Mods/Mod", result.Layers[0].ProjectDirectory);
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // Every shape (#280): every layer is listed, the root project first, each runnable from its own
+    // project folder since every declared directory sits under its Data folder.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public async Task Handle_InEveryShape_EveryLayerHighestFirst_EachRunnableFromItsFolder(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var map = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
+        map.SetLayers(setup.Layers);
+
+        var result = await Handler(map).Handle(new GetLaunchLayersParams(), CancellationToken.None);
+
+        Assert.Equal(setup.Projects.Reverse(), result.Layers.Select(l => l.Name));
+        foreach (var layer in result.Layers)
+        {
+            var rank = setup.Projects.ToList().IndexOf(layer.Name);
+            Assert.Null(layer.NotRunnableReason);
+            Assert.Equal(setup.FolderOf(rank).Replace('\\', '/'), layer.ModPath, StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]

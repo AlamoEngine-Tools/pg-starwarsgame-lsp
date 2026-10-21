@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Messages;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Story;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
@@ -23,42 +24,45 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 /// </remarks>
 public sealed class DependencyOwnershipTest
 {
-    private const string LeafDir = "C:/mods/rev";
-    private const string CoreDir = "C:/mods/core";
-
     private static WorkspaceConfiguration Layered()
     {
-        ProjectLayer[] layers =
-        [
-            new(1, "Revan's Revenge", [LeafDir + "/data/xml"], [], [], [], null,
-                LeafDir + "/rev.pgproj"),
-            new(0, "EaWX Core", [CoreDir + "/data/xml"], [], [], [], null, CoreDir + "/core.pgproj")
-        ];
-        return WorkspaceConfiguration.Empty with { Layers = layers };
+        return ProjectSetup.ModOverVanilla.Configuration();
     }
 
-    [Fact]
-    public void ADocumentInTheRootProjectIsEditable()
+    public static TheoryData<string, int> SetupsAndRanks()
     {
-        Assert.Null(DependencyOwnership.Rejection(Layered(), LeafDir + "/data/xml/story.xml"));
+        var data = new TheoryData<string, int>();
+        foreach (var (name, rank) in ProjectSetup.NamesAndRanks) data.Add(name, rank);
+        return data;
     }
 
-    /// <summary>The refusal names the project that owns it, so the reason is actionable.</summary>
-    [Fact]
-    public void ADocumentInAReferencedProjectIsRefusedByName()
+    /// <summary>
+    ///     Every shape, a story file in every layer, as a path and as the URI the client sends (#280):
+    ///     the root project's is editable, any lower layer's is refused naming its owner - which is
+    ///     why the ordinary mod alone never notices the guard. The refusal names the owner so the
+    ///     reason is actionable, and a disabled control can say why it is disabled.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(SetupsAndRanks))]
+    public void InEveryShape_OnlyTheRootProjectsDocumentIsEditable_AnyOtherNamesItsOwner(string name, int rank)
     {
-        var rejection = DependencyOwnership.Rejection(Layered(), CoreDir + "/data/xml/core_story.xml");
+        var setup = ProjectSetup.Named(name);
+        var configuration = setup.Configuration();
 
-        Assert.NotNull(rejection);
-        Assert.Contains("EaWX Core", ResxMessageCatalog.Server("en").Format(rejection!));
-    }
+        foreach (var document in new[] { setup.PathOf(rank, "Xml/Story.xml"), setup.Uri(rank, "Xml/Story.xml") })
+        {
+            var rejection = DependencyOwnership.Rejection(configuration, document);
+            var owner = DependencyOwnership.ReadOnlyOwner(configuration, document);
+            if (rank == setup.LeafRank)
+            {
+                Assert.Null(rejection);
+                Assert.Null(owner);
+                continue;
+            }
 
-    /// <summary>A file URI is the shape the client actually sends.</summary>
-    [Fact]
-    public void ItUnderstandsAFileUri()
-    {
-        Assert.NotNull(DependencyOwnership.Rejection(
-            Layered(), "file:///c:/mods/core/data/xml/core_story.xml"));
+            Assert.Contains(setup.Projects[rank], ResxMessageCatalog.Server("en").Format(rejection!));
+            Assert.Equal(setup.Projects[rank], owner);
+        }
     }
 
     /// <summary>
@@ -69,25 +73,6 @@ public sealed class DependencyOwnershipTest
     public void NoTargetIsNotRefusedHere()
     {
         Assert.Null(DependencyOwnership.Rejection(Layered(), null));
-    }
-
-    /// <summary>
-    ///     A single-project workspace has no dependency, so nothing is ever refused - the ordinary
-    ///     mod must not notice this exists.
-    /// </summary>
-    [Fact]
-    public void ASingleProjectWorkspaceIsNeverRefused()
-    {
-        var single = WorkspaceConfiguration.Empty with
-        {
-            Layers =
-            [
-                new ProjectLayer(0, "Mod", [LeafDir + "/data/xml"], [], [], [], null,
-                    LeafDir + "/rev.pgproj")
-            ]
-        };
-
-        Assert.Null(DependencyOwnership.Rejection(single, LeafDir + "/data/xml/story.xml"));
     }
 
     /// <summary>
@@ -104,25 +89,6 @@ public sealed class DependencyOwnershipTest
     [Fact]
     public void NoWorkspaceIsNotRefused()
     {
-        Assert.Null(DependencyOwnership.Rejection(null, LeafDir + "/data/xml/story.xml"));
-    }
-
-    /// <summary>
-    ///     The graph carries the owner's NAME rather than a bare flag: a disabled control has to say
-    ///     why it is disabled, and in a layered setup "which project owns this thread" is the
-    ///     author's actual question.
-    /// </summary>
-    [Fact]
-    public void TheOwnerOfAReferencedDocumentIsNamed()
-    {
-        Assert.Equal("EaWX Core",
-            DependencyOwnership.ReadOnlyOwner(Layered(), CoreDir + "/data/xml/core_story.xml"));
-    }
-
-    /// <summary>No owner means editable - the same answer the command boundary gives.</summary>
-    [Fact]
-    public void TheOwnerOfAnEditableDocumentIsNull()
-    {
-        Assert.Null(DependencyOwnership.ReadOnlyOwner(Layered(), LeafDir + "/data/xml/story.xml"));
+        Assert.Null(DependencyOwnership.Rejection(null, ProjectSetup.ModOverVanilla.PathOf(1, "Xml/Story.xml")));
     }
 }

@@ -5,6 +5,7 @@ using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Workspace;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Workspace;
 
@@ -48,25 +49,22 @@ public sealed class GetWatchDirectoriesHandlerTest
     ///     also being watched. Asserting the literal paths would contradict the minimisation below,
     ///     and coverage is the property the client actually needs.
     /// </summary>
-    [Fact]
-    public void EveryLayersContentIsCovered()
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public void EveryLayersContentIsCovered(string name)
     {
-        var dirs = Resolve(
-            Layer(1, "leaf", "c:/mods/rev",
-                ["c:/mods/rev/data/xml"], ["c:/mods/rev/data/scripts"], ["c:/mods/rev/data/text"]),
-            Layer(0, "core", "c:/mods/data",
-                ["c:/mods/data/xml"], ["c:/mods/data/scripts"], ["c:/mods/data/text"]));
+        var setup = ProjectSetup.Named(name);
+        var dirs = Resolve([.. setup.Layers]);
 
-        string[] content =
-        [
-            "c:/mods/rev/data/xml", "c:/mods/rev/data/scripts", "c:/mods/rev/data/text",
-            "c:/mods/data/xml", "c:/mods/data/scripts", "c:/mods/data/text"
-        ];
+        var content = setup.Layers.SelectMany(l =>
+            l.XmlDirectories.Concat(l.ScriptRoots).Concat(l.TextRoots).Concat(l.AssetRoots).Append(l.ProjectPath!));
         foreach (var path in content)
             Assert.True(dirs.Any(d => path.Equals(d, StringComparison.OrdinalIgnoreCase)
                                       || path.StartsWith(d + "/", StringComparison.OrdinalIgnoreCase)),
                 $"'{path}' is watched by none of: {string.Join(", ", dirs)}");
     }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
 
     /// <summary>
     ///     A content directory outside every project directory is reported in its own right - the
