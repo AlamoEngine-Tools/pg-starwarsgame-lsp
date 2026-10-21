@@ -157,8 +157,8 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     // The index holds every script's globals; one in another script's state is a different global
     // of the same name (#249). Every state holding the file gets its own definition, the highest layer
     // first as before: a script has one state (1:1), a library one per script requiring it (1:n), so an
-    // entry point a library calls goes to every implementation. An XML file is in no state, so XML
-    // objects resolve as before.
+    // entry point a library calls goes to every implementation. A definition in a file no state holds -
+    // an XML object's - is the game's, reachable from every state.
     private IReadOnlyList<GameSymbol> ResolveInStates(GameIndex index, string id, string uri)
     {
         if (_sandbox is null || !index.WorkspaceDefinitions.TryGetValue(id, out var definitions))
@@ -174,7 +174,8 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 
         return states
             .Select(state => definitions
-                .Where(s => s.Origin is not FileOrigin fo || current.Holds(state, fo.Uri))
+                .Where(s => s.Origin is not FileOrigin fo || current.Holds(state, fo.Uri) ||
+                            current.StatesHolding(fo.Uri).Count == 0)
                 .OrderByDescending(index.LayerRankOf)
                 .FirstOrDefault())
             .OfType<GameSymbol>()

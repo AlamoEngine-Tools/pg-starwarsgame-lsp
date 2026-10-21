@@ -355,6 +355,26 @@ public sealed class LuaDefinitionHandlerTest
         Assert.Equal(0, loc.TargetRange.Start.Character);
     }
 
+    // The script is in a state of its own; the XML file is in none, and an object it defines is the
+    // game's, reachable from every state (measured E2E: Find_Object_Type("Marauder_Missile_Cruiser")
+    // in EaW's Interdictor.lua went nowhere once states were in play).
+    [Fact]
+    public async Task Handle_CursorOnXmlObjectStringLiteral_FromAScriptInAState_ReturnsXmlDefinitionLocation()
+    {
+        const string xmlUri = "file:///units.xml";
+        var reference = new GameReference("UNIT_A", GameSymbolKind.XmlObject, "Unit", LuaUri, 0, 10, 6);
+        var xmlSymbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit", new FileOrigin(xmlUri, 5, 0), null);
+        var index = MakeIndex(
+            [("UNIT_A", ImmutableArray.Create(xmlSymbol))],
+            (LuaUri, new DocumentIndex(LuaUri, 1, [], [reference])),
+            (xmlUri, new DocumentIndex(xmlUri, 1, [xmlSymbol], [])));
+        var sandbox = new FixedSandbox(LuaSandbox.Build(index.Documents, new FileHelper(new MockFileSystem())));
+
+        var result = await BuildHandler(index, sandbox: sandbox).Handle(RequestAt(0, 12), CancellationToken.None);
+
+        Assert.Equal(xmlUri, Assert.Single(result!.Select(l => l.LocationLink!)).TargetUri.ToString());
+    }
+
     [Fact]
     public async Task Handle_CursorOnXmlObjectStringLiteral_MegArchiveOrigin_ReturnsNull()
     {
