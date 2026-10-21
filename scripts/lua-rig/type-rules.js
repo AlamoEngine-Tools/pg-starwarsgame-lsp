@@ -16,7 +16,10 @@
 //   AET_SCHEMA_DIR   local schema directory (default: <repo>/schema/eaw)
 //   AET_BASELINE     local baseline file (default: <repo>/baseline/foc/aet-pg-swg-lsp-foc-baseline.aet)
 //   AET_SAMPLE       findings sampled per rule (default: 10)
-//   AET_QUIET_MS     how long the log must stay quiet before the census ends (default: 20000)
+//   AET_BATCH        scripts open at once, each with an analyzer of its own (default: 8)
+//   AET_SETTLE_MS    how long a batch must go without a report before it is closed (default: 8000)
+//   AET_BATCH_MS     the longest a batch stays open (default: 120000)
+//   AET_QUIET_MS     how long the census waits after the last batch (default: 5000)
 'use strict';
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
@@ -32,7 +35,10 @@ const ANALYZER = process.env.AET_EMMYLUA_LS
 const SCHEMA = process.env.AET_SCHEMA_DIR || path.join(REPO, 'schema', 'eaw');
 const BASELINE = process.env.AET_BASELINE || path.join(REPO, 'baseline', 'foc', 'aet-pg-swg-lsp-foc-baseline.aet');
 const SAMPLE = Number(process.env.AET_SAMPLE || 10);
-const QUIET_MS = Number(process.env.AET_QUIET_MS || 20000);
+const QUIET_MS = Number(process.env.AET_QUIET_MS || 5000);
+const BATCH = Number(process.env.AET_BATCH || 8);
+const SETTLE_MS = Number(process.env.AET_SETTLE_MS || 8000);
+const BATCH_MS = Number(process.env.AET_BATCH_MS || 120000);
 
 const [label, folder, projectFile] = process.argv.slice(2);
 if (!label || !folder || !projectFile) {
@@ -115,6 +121,31 @@ function logText() {
         .join('\n');
 }
 
+// The scripts that have reported so far, read off the log as it grows.
+const reports = {count: 0, files: new Set()};
+const logOffsets = new Map();
+const pathKey = (p) => decodeURIComponent(p).replace(/^file:\/\/\//i, '').replace(/\\/g, '/').toLowerCase();
+
+function readNewReports() {
+    for (const name of fs.readdirSync(logDir).filter((n) => n.endsWith('.log'))) {
+        const full = path.join(logDir, name);
+        const from = logOffsets.get(full) || 0;
+        const size = fs.statSync(full).size;
+        if (size <= from) continue;
+        const fd = fs.openSync(full, 'r');
+        const chunk = Buffer.alloc(size - from);
+        fs.readSync(fd, chunk, 0, chunk.length, from);
+        fs.closeSync(fd);
+        const text = chunk.toString('utf8');
+        const complete = text.lastIndexOf('\n') + 1;
+        logOffsets.set(full, from + Buffer.byteLength(text.slice(0, complete)));
+        for (const m of text.slice(0, complete).matchAll(/Analyzer report (\S+) - \d+ findings/g)) {
+            reports.count++;
+            reports.files.add(pathKey(m[1]));
+        }
+    }
+}
+
 const FINDING = /Analyzer finding (\S*) (kept|dropped) at (\S+):(\d+) - (.*)$/;
 const REPORT = /Analyzer report (\S+) - \d+ findings$/;
 
@@ -142,27 +173,37 @@ const REPORT = /Analyzer report (\S+) - \d+ findings$/;
     while (!scanDone && Date.now() - t0 < 300000) await sleep(1000);
     console.error(`[rig] scan complete=${scanDone} after ${Date.now() - t0}ms; opening ${files.length} scripts`);
 
-    for (const file of files) {
-        notify('textDocument/didOpen', {
-            textDocument: {uri: toUri(file), languageId: 'lua', version: 1, text: fs.readFileSync(file, 'utf8')},
-        });
-    }
-
-    // Done when the log has not grown by a finding for QUIET_MS, or after ten minutes.
-    let seen = -1;
-    let quietSince = Date.now();
+    // Every open script runs an analyzer of its own, so the scripts are opened BATCH at a time: a
+    // batch is closed once each of its scripts has reported and no report has come for SETTLE_MS,
+    // or after BATCH_MS. A script that never reports is listed.
     const opened = Date.now();
-    while (Date.now() - opened < 600000) {
-        await sleep(2000);
-        const count = (logText().match(/Analyzer (?:finding|report) /g) || []).length;
-        if (count !== seen) {
-            seen = count;
-            quietSince = Date.now();
-        } else if (Date.now() - quietSince >= QUIET_MS) {
-            break;
+    const silent = [];
+    for (let i = 0; i < files.length; i += BATCH) {
+        const batch = files.slice(i, i + BATCH);
+        for (const file of batch) {
+            notify('textDocument/didOpen', {
+                textDocument: {uri: toUri(file), languageId: 'lua', version: 1, text: fs.readFileSync(file, 'utf8')},
+            });
         }
+        const started = Date.now();
+        let lastReport = Date.now();
+        let reportCount = reports.count;
+        while (Date.now() - started < BATCH_MS) {
+            await sleep(500);
+            readNewReports();
+            if (reports.count !== reportCount) {
+                reportCount = reports.count;
+                lastReport = Date.now();
+            }
+            const all = batch.every((f) => reports.files.has(pathKey(f)));
+            if (all && Date.now() - lastReport >= SETTLE_MS) break;
+        }
+        silent.push(...batch.filter((f) => !reports.files.has(pathKey(f))));
+        for (const file of batch) notify('textDocument/didClose', {textDocument: {uri: toUri(file)}});
+        console.error(`[rig] ${Math.min(i + BATCH, files.length)}/${files.length} after ${Date.now() - opened}ms`);
     }
-    console.error(`[rig] ${seen} finding lines logged; quiet after ${Date.now() - opened}ms`);
+    await sleep(QUIET_MS);
+    console.error(`[rig] done after ${Date.now() - opened}ms; ${silent.length} scripts never reported`);
 
     await request('shutdown', null).catch(() => undefined);
     notify('exit', null);
@@ -222,6 +263,7 @@ const REPORT = /Analyzer report (\S+) - \d+ findings$/;
         label,
         project: path.join(folder, projectFile),
         scripts: files.length,
+        neverReported: silent.map((f) => path.relative(folder, f)),
         findings: rules.reduce((sum, r) => sum + r.count, 0),
         rules,
     }, null, 2) + '\n');

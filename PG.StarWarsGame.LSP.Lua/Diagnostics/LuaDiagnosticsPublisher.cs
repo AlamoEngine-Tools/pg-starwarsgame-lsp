@@ -143,7 +143,8 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         if (_analyzer is { IsRunning: true })
         {
             if (_analyzerFindings.TryGetValue(_fileHelper.NormalizeUri(uri), out var found))
-                diagnostics.AddRange(found);
+                diagnostics.AddRange(found.Where(f =>
+                    LuaAnalyzerRulePolicy.Holds(f, parsed.Tree, _schemaProvider.DeclaredGlobalNames)));
         }
         else
         {

@@ -1079,4 +1079,7 @@ public static class DiagnosticIds
 
     /// <summary>A <c>---@field</c> declared twice on one class.</summary>
     public static readonly DiagnosticId LuaAnalyzerDuplicateDocField = new(DiagnosticGroup.LuaAnalyzer, 10);
+
+    /// <summary>An argument past the parameters of the Lua function called, which Lua drops.</summary>
+    public static readonly DiagnosticId LuaAnalyzerRedundantParameter = new(DiagnosticGroup.LuaAnalyzer, 11);
 }

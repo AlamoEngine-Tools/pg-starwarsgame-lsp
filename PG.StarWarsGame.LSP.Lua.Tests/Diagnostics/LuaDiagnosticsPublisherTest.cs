@@ -53,14 +53,14 @@ public sealed class LuaDiagnosticsPublisherTest
 
     private static (List<PublishDiagnosticsParams> published, FakeGameWorkspaceHost host, FakeAnalyzer analyzer,
         FakeGameIndexService index) BuildWithAnalyzer(bool running = true,
-            ILogger<LuaDiagnosticsPublisher>? logger = null)
+            ILogger<LuaDiagnosticsPublisher>? logger = null, ILuaApiSchemaProvider? schema = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var index = new FakeGameIndexService();
         var host = new FakeGameWorkspaceHost();
         var analyzer = new FakeAnalyzer { IsRunning = running };
         _ = new LuaDiagnosticsPublisher(p => published.Add(p), index, host, new FileHelper(new MockFileSystem()),
-            new LuaApiSchemaProvider([]), logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance,
+            schema ?? new LuaApiSchemaProvider([]), logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance,
             analyzer: analyzer);
         return (published, host, analyzer, index);
     }
@@ -218,6 +218,23 @@ public sealed class LuaDiagnosticsPublisherTest
         analyzer.Raise(LuaUri, AnalyzerFinding("unused", 1));
 
         Assert.DoesNotContain(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(published.Last()));
+    }
+
+    // An engine function's surplus arguments are the call-form check's; a Lua function's are kept.
+    [Fact]
+    public void ASurplusArgument_ReachesTheEditor_OnlyOnACallOfALuaFunction()
+    {
+        var (published, host, analyzer, _) = BuildWithAnalyzer(
+            schema: new LuaApiSchemaProvider(["---@param name string\nfunction Find_First_Object(name) end\n"]));
+        host.Set(LuaUri, "Find_First_Object(\"X\", p)\nSpawnList(a, b, c)");
+
+        analyzer.Raise(LuaUri,
+            AnalyzerFinding("redundant-parameter") with { Range = new Range(0, 23, 0, 24) },
+            AnalyzerFinding("redundant-parameter") with { Range = new Range(1, 16, 1, 17) });
+
+        var kept = published.Last().Diagnostics
+            .Where(d => d.Code?.String == DiagnosticIds.LuaAnalyzerRedundantParameter.ToString()).ToList();
+        Assert.Equal(1, Assert.Single(kept).Range.Start.Line);
     }
 
     // ── feature flag ─────────────────────────────────────────────────────────
