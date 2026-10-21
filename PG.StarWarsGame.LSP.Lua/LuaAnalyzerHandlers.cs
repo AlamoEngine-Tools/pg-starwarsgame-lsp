@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using Newtonsoft.Json.Linq;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -22,24 +23,47 @@ internal static class LuaAnalyzerPassThrough
     {
         return document.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    ///     Whether a location the analyzer answered is a usage: in the requesting script's state, and not
+    ///     in the stubs, which are its library and describe a function rather than use it.
+    /// </summary>
+    public static bool IsUsage(string from, string uri, LuaSandbox? sandbox, LuaStubLocation? stubs)
+    {
+        if (stubs?.Directory is { } directory && IsUnder(uri, directory)) return false;
+        return sandbox is null || sandbox.ShareAState(from, uri);
+    }
+
+    private static bool IsUnder(string uri, string directory)
+    {
+        var path = DocumentUri.GetFileSystemPath(DocumentUri.From(uri));
+        if (path is null) return false;
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
+        return Path.GetFullPath(path).StartsWith(root,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
 }
 
 /// <summary>
 ///     The analyzer's references, less any in a state the requesting script does not share - the
-///     game runs one per script (#249).
+///     game runs one per script (#249) - and any in the stubs.
 /// </summary>
-public sealed class LuaReferencesHandler(ILuaAnalyzer analyzer, ILuaSandboxProvider? sandbox = null)
+public sealed class LuaReferencesHandler(
+    ILuaAnalyzer analyzer,
+    ILuaSandboxProvider? sandbox = null,
+    LuaStubLocation? stubs = null)
     : ReferencesHandlerBase
 {
     public override async Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken ct)
     {
         if (!LuaAnalyzerPassThrough.IsLua(request.TextDocument)) return null;
         var theirs = await analyzer.RequestAsync<LocationContainer>("textDocument/references", request, ct);
-        if (theirs is null || sandbox is null) return theirs;
+        if (theirs is null || (sandbox is null && stubs is null)) return theirs;
 
-        var current = sandbox.Current;
+        var current = sandbox?.Current;
         var from = request.TextDocument.Uri.ToString();
-        return new LocationContainer(theirs.Where(l => current.ShareAState(from, l.Uri.ToString())));
+        return new LocationContainer(theirs.Where(l =>
+            LuaAnalyzerPassThrough.IsUsage(from, l.Uri.ToString(), current, stubs)));
     }
 
     protected override ReferenceRegistrationOptions CreateRegistrationOptions(
@@ -129,7 +153,10 @@ public sealed class LuaInlayHintHandler(ILuaAnalyzer analyzer) : InlayHintsHandl
 }
 
 /// <summary>The analyzer's lenses: sent without a command, which its resolve fills (measured, 0.25.1).</summary>
-public sealed class LuaCodeLensHandler(ILuaAnalyzer analyzer, ILuaSandboxProvider? sandbox = null)
+public sealed class LuaCodeLensHandler(
+    ILuaAnalyzer analyzer,
+    ILuaSandboxProvider? sandbox = null,
+    LuaStubLocation? stubs = null)
     : CodeLensHandlerBase
 {
     // The router's own key rides in the lens data, and with it present the analyzer resolves
@@ -157,17 +184,18 @@ public sealed class LuaCodeLensHandler(ILuaAnalyzer analyzer, ILuaSandboxProvide
     }
 
     // The arguments are (document, position, locations), measured; the count in the title is the
-    // number of locations. Recounted over the document's own state (#249).
+    // number of locations. Recounted over the document's own state (#249), less the stubs.
     private Command InOwnState(Command command)
     {
-        if (sandbox is null || command.Arguments is not { Count: 3 } arguments
-                            || arguments[0] is not { Type: JTokenType.String } document
-                            || arguments[2] is not JArray locations)
+        if ((sandbox is null && stubs is null) || command.Arguments is not { Count: 3 } arguments
+                                               || arguments[0] is not { Type: JTokenType.String } document
+                                               || arguments[2] is not JArray locations)
             return command;
 
-        var current = sandbox.Current;
+        var current = sandbox?.Current;
         var kept = new JArray(locations.Where(l =>
-            l["uri"]?.Value<string>() is not { } uri || current.ShareAState(document.Value<string>()!, uri)));
+            l["uri"]?.Value<string>() is not { } uri ||
+            LuaAnalyzerPassThrough.IsUsage(document.Value<string>()!, uri, current, stubs)));
         var title = kept.Count == 1 ? "1 usage" : $"{kept.Count} usages";
         return command with { Title = title, Arguments = new JArray(document, arguments[1], kept) };
     }
