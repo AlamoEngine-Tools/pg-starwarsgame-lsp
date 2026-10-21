@@ -17,7 +17,7 @@ namespace PG.StarWarsGame.LSP.Server.Tests;
 /// </summary>
 internal class NullSchemaProvider : ISchemaProvider
 {
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
+    public virtual IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<EnumDefinition> AllEnums => [];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];

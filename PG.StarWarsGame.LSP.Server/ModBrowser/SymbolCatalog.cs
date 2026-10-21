@@ -119,6 +119,15 @@ public sealed class SymbolCatalog
         return _xmlById.GetValueOrDefault(id);
     }
 
+    /// <summary>Every row of a page, sorted by name; none for a page that does not exist.</summary>
+    public IReadOnlyList<SymbolRow> Rows(string page)
+    {
+        return _pages.GetValueOrDefault(page) ?? [];
+    }
+
+    /// <summary>Every XML object's row, on every page.</summary>
+    public IEnumerable<SymbolRow> Objects => _xmlById.Values;
+
     /// <summary>Rows filtered by the request's query, kinds and origins, and paged.</summary>
     public static GetSymbolPageResult Filter(IReadOnlyList<SymbolRow> rows, GetSymbolPageParams request)
     {

@@ -63,9 +63,9 @@ public sealed record GetSymbolNodeParams(string Page, string Id) : IRequest<GetS
 public sealed record GetSymbolNodeResult(SymbolRow? Entry, IReadOnlyList<SymbolRelation> Relations);
 
 /// <param name="Relation">The relation's key.</param>
-/// <param name="Count">How many entries it lists.</param>
+/// <param name="Count">How many entries it lists; null until counted, for one that needs every object's tags.</param>
 /// <param name="Reason">Why it lists none: <c>none</c>, or <c>notInModFiles</c> when the entry's tags are not known.</param>
-public sealed record SymbolRelation(string Relation, int Count, string? Reason);
+public sealed record SymbolRelation(string Relation, int? Count, string? Reason);
 
 /// <param name="Rows">The requested slice, sorted by name, prefix matches of the query first.</param>
 /// <param name="Total">How many entries match before paging.</param>

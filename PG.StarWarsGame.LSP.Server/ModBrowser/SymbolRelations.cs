@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Runtime.CompilerServices;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -24,7 +26,24 @@ public sealed class SymbolRelations(
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
     private const string Definitions = "definitions";
+    private const string UsedBy = "usedBy";
     private static readonly char[] s_separators = [',', ' ', '\t', '\n', '\r'];
+
+    // Which objects name each asset: every object's tags, read once per index on the first request
+    // that needs it, never on open (about 830 ms on the EaW tree - measured in code comments).
+    private static readonly ConditionalWeakTable<GameIndex, Dictionary<string, SortedSet<string>>> s_users = new();
+
+    /// <summary>The relations an asset, a script or an enum opens into, by page.</summary>
+    private static readonly Dictionary<string, string[]> s_assetRelations = new(StringComparer.Ordinal)
+    {
+        ["models"] = ["animations", "textures", UsedBy],
+        ["particleSystems"] = ["textures", UsedBy],
+        ["animations"] = ["model"],
+        ["textures"] = [UsedBy],
+        ["audio"] = [UsedBy],
+        ["luaScripts"] = ["loadedBy", "requires"],
+        ["enums"] = [UsedBy]
+    };
 
     /// <summary>The relations a game object always shows, empty ones disabled with their reason.</summary>
     private static readonly string[] s_objectRelations =
@@ -36,7 +55,12 @@ public sealed class SymbolRelations(
     public GetSymbolNodeResult Node(string page, string id)
     {
         if (catalog.Find(page, id) is not { } entry) return new GetSymbolNodeResult(null, []);
-        if (!page.StartsWith("xml:", StringComparison.Ordinal)) return new GetSymbolNodeResult(entry, []);
+        if (!page.StartsWith("xml:", StringComparison.Ordinal))
+            return new GetSymbolNodeResult(entry, (s_assetRelations.GetValueOrDefault(page) ?? [])
+                .Select(r => NeedsEveryObject(page, r) && !s_users.TryGetValue(index, out _)
+                    ? new SymbolRelation(r, null, null)
+                    : Counted(r, AssetRows(page, entry, r).Count, "none"))
+                .ToList());
 
         var (named, known) = TagRelations(entry);
         var keys = page == GameObjects
@@ -53,8 +77,11 @@ public sealed class SymbolRelations(
     /// <summary>The rows of one relation of an entry; null for an entry or relation there is not.</summary>
     public IReadOnlyList<SymbolRow>? Rows(string page, string id, string relation)
     {
-        if (catalog.Find(page, id) is not { } entry || !page.StartsWith("xml:", StringComparison.Ordinal))
-            return null;
+        if (catalog.Find(page, id) is not { } entry) return null;
+        if (!page.StartsWith("xml:", StringComparison.Ordinal))
+            return s_assetRelations.TryGetValue(page, out var relations) && relations.Contains(relation)
+                ? AssetRows(page, entry, relation)
+                : null;
 
         switch (relation)
         {
@@ -67,6 +94,94 @@ public sealed class SymbolRelations(
         var (named, _) = TagRelations(entry);
         if (!named.TryGetValue(relation, out var targets) && !s_objectRelations.Contains(relation)) return null;
         return (targets ?? []).Select(t => RowOf(relation, t.Name, t.Type)).ToList();
+    }
+
+    private static bool NeedsEveryObject(string page, string relation)
+    {
+        return relation == UsedBy && page is "models" or "particleSystems" or "textures" or "audio";
+    }
+
+    private List<SymbolRow> AssetRows(string page, SymbolRow entry, string relation)
+    {
+        IEnumerable<SymbolRow> rows = (page, relation) switch
+        {
+            ("models", "animations") => ModelAnimationClips.For(index, entry.Name)
+                .Select(c => catalog.Find("animations", c) ?? Missing(c, ".ala")),
+            (_, "textures") => index.ModelTextures.GetValueOrDefault(ModelBoneKey.From(entry.Name), [])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(t => catalog.Find("textures", t) ?? Missing(t, null)),
+            ("animations", "model") => ModelOf(entry.Name),
+            ("enums", UsedBy) => schema.AllTags
+                .Where(t => string.Equals(t.Enum?.Name, entry.Name, StringComparison.OrdinalIgnoreCase))
+                .Select(t => new SymbolRow(t.Tag, t.Tag, "tag", [], "schema", null, [])),
+            ("luaScripts", "loadedBy") => ObjectsReferencing(WorkspaceFileKey.Create(WorkspaceFileKey.LuaScriptType,
+                entry.Name)),
+            ("luaScripts", "requires") => (index.Documents.GetValueOrDefault(entry.Id)?.RequireArgs ?? [])
+                .Select(a => catalog.Find("luaScripts", WithExtension(a, ".lua")) ?? Missing(a, ".lua")),
+            ("textures", UsedBy) => ModelsNaming(entry.Name).Concat(Users(entry.Name)),
+            (_, UsedBy) => Users(entry.Name),
+            _ => []
+        };
+        return rows.DistinctBy(r => r.Id).ToList();
+    }
+
+    // The model an animation belongs to: the longest model name its own name starts with.
+    private IEnumerable<SymbolRow> ModelOf(string animation)
+    {
+        var stem = Path.GetFileNameWithoutExtension(animation);
+        var model = catalog.Rows("models")
+            .Where(m => stem.StartsWith(Path.GetFileNameWithoutExtension(m.Name) + "_",
+                StringComparison.OrdinalIgnoreCase))
+            .MaxBy(m => m.Name.Length);
+        return model is null ? [] : [model];
+    }
+
+    private IEnumerable<SymbolRow> ModelsNaming(string texture)
+    {
+        return index.ModelTextures
+            .Where(m => m.Value.Contains(texture, StringComparer.OrdinalIgnoreCase))
+            .Select(m => catalog.Find("models", m.Key) ?? catalog.Find("particleSystems", m.Key))
+            .OfType<SymbolRow>()
+            .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private IEnumerable<SymbolRow> Users(string asset)
+    {
+        var users = s_users.GetValue(index, _ => AllUsers());
+        return users.TryGetValue(asset, out var objects)
+            ? objects.Select(o => catalog.FindObject(o) ?? Missing(o, null))
+            : [];
+    }
+
+    private Dictionary<string, SortedSet<string>> AllUsers()
+    {
+        var users = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in catalog.Objects)
+        {
+            var (named, _) = TagRelations(row);
+            foreach (var (relation, targets) in named)
+            {
+                if (relation is not ("models" or "particleSystems" or "textures" or "samples")) continue;
+                foreach (var (name, _) in targets)
+                {
+                    var asset = relation is "models" or "particleSystems" ? WithExtension(name, ".alo") : name;
+                    if (!users.TryGetValue(asset, out var objects))
+                        users[asset] = objects = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                    objects.Add(row.Id);
+                }
+            }
+        }
+
+        return users;
+    }
+
+    private IEnumerable<SymbolRow> ObjectsReferencing(string key)
+    {
+        return index.WorkspaceReferences.TryGetValue(key, out var references)
+            ? references.Select(ContainingObject).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .Select(o => catalog.FindObject(o) ?? Missing(o, null))
+            : [];
     }
 
     private static SymbolRelation Counted(string relation, int count, string emptyReason)

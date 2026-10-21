@@ -29,7 +29,8 @@ export interface GetSymbolNodeParams {
 /** One relation of an opened entry; a reason says why it lists none. */
 export interface SymbolRelation {
     relation: string;
-    count: number;
+    /** Null until counted, for a relation that needs every object's tags. */
+    count?: number | null;
     /** `none`, or `notInModFiles` when the entry's tags are not known. */
     reason?: string | null;
 }
