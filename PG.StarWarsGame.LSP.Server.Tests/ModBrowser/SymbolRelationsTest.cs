@@ -184,6 +184,17 @@ public sealed class SymbolRelationsTest
     }
 
     [Fact]
+    public void ARelationsRow_OpensOnItsOwnPage_AMissingOrADefinitionOnNone()
+    {
+        var relations = Relations();
+
+        Assert.Equal("models", relations.Rows(Page, "Star_Destroyer", "models")!.Single().Page);
+        Assert.Equal(["xml:HardPoint", null],
+            relations.Rows(Page, "Star_Destroyer", "hardpoints")!.Select(r => r.Page));
+        Assert.All(relations.Rows(Page, "Star_Destroyer", "definitions")!, r => Assert.Null(r.Page));
+    }
+
+    [Fact]
     public void AnUnknownEntryOrRelation_HasNothing()
     {
         Assert.Null(Relations().Node(Page, "No_Such_Object").Entry);

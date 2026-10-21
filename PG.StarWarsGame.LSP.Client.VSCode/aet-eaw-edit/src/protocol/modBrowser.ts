@@ -13,6 +13,13 @@ export const GET_SYMBOL_OUTLINE = "aet/getSymbolOutline";
 export const GET_SYMBOL_PAGE = "aet/getSymbolPage";
 export const GET_SYMBOL_NODE = "aet/getSymbolNode";
 
+/** The requests the panel's webview may have relayed to its server, and no other. */
+export const SYMBOL_METHODS: readonly string[] = [
+    GET_SYMBOL_OUTLINE,
+    GET_SYMBOL_PAGE,
+    GET_SYMBOL_NODE,
+];
+
 /** The entry whose relation a page lists, in place of the page's own entries. */
 export interface SymbolParent {
     page: string;
@@ -84,6 +91,8 @@ export interface SymbolRow {
     origin: string;
     originName?: string | null;
     overrides: string[];
+    /** The page the entry opens on; none for a missing name, a tag or a definition's place. */
+    page?: string | null;
 }
 
 export interface GetSymbolPageResult {

@@ -22,6 +22,12 @@ import {
     parseEffectiveObjectQuery,
 } from "./effectiveObjectUri";
 import { EncyclopediaPanel } from "./encyclopediaPanel";
+import { ModBrowserPanel } from "./modBrowserPanel";
+import {
+    ModBrowserOutlineItem,
+    ModBrowserViewProvider,
+    OPEN_MOD_BROWSER,
+} from "./modBrowserViewProvider";
 import { PanelProject } from "./panelProject";
 import { WebviewPanelHost } from "./webviewPanelHost";
 import { ModelPreviewEditorProvider } from "./modelPreviewEditor";
@@ -512,6 +518,7 @@ let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
 let pgprojProposedProvider: PgprojProposedContentProvider | undefined;
 let localisationNavigatorProvider: ProjectGroupedTree<LocTreeItem> | undefined;
 let storyNavigatorProvider: ProjectGroupedTree<StoryTreeItem> | undefined;
+let modBrowserProvider: ProjectGroupedTree<ModBrowserOutlineItem> | undefined;
 
 /**
  * The projects the navigators show: one per running server, or the window's one tree - under the
@@ -732,6 +739,7 @@ function resolveFeatureFlags() {
             variants: flag("tools.variants", true),
             encyclopedia: flag("tools.encyclopedia", true),
             modelPreview: flag("tools.modelPreview", true),
+            modBrowser: flag("tools.modBrowser", true),
         },
         story: {
             discovery: flag("story.discovery", false),
@@ -1162,6 +1170,8 @@ function startProjectClient(
         // that answer: measured on EaWX, the popup width came back as vanilla's 262 before the scan
         // and the mod's own 340 after it. Nothing re-asked, so the card stayed vanilla all session.
         EncyclopediaPanel.refresh(project.spec.key);
+        // A browser opened during the scan listed the baseline alone.
+        ModBrowserPanel.refresh(project.spec.key);
     });
 
     lspClient.onNotification("aet/localisationIndexUpdated", () => {
@@ -1356,6 +1366,7 @@ async function reconcileNow(context: vscode.ExtensionContext): Promise<void> {
     WebviewPanelHost.setProjectCount(clients.size);
     storyNavigatorProvider?.projectsChanged();
     localisationNavigatorProvider?.projectsChanged();
+    modBrowserProvider?.projectsChanged();
     updateStatus();
 }
 
@@ -2180,6 +2191,38 @@ export async function activate(
         vscode.workspace.registerTextDocumentContentProvider(
             PGPROJ_PROPOSED_SCHEME,
             pgprojProposedProvider,
+        ),
+    );
+
+    modBrowserProvider = new ProjectGroupedTree<ModBrowserOutlineItem>(
+        navigatorProjects,
+        () => new ModBrowserViewProvider(),
+    );
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(
+            ModBrowserViewProvider.viewId,
+            modBrowserProvider,
+        ),
+        // From an outline row, or from the palette, which opens the game data.
+        vscode.commands.registerCommand(
+            OPEN_MOD_BROWSER,
+            async (arg?: ModBrowserOutlineItem) => {
+                const projectKey =
+                    (arg && modBrowserProvider?.projectOf(arg)) ??
+                    (await commandProjectKey());
+                if (projectKey === null) {
+                    return;
+                }
+                const project = panelProject(projectKey);
+                if (!project.gateway.requireRunning()) {
+                    return;
+                }
+                ModBrowserPanel.show(
+                    context.extensionUri,
+                    project,
+                    arg?.outline ?? "gameData",
+                );
+            },
         ),
     );
 
@@ -3301,6 +3344,7 @@ export async function deactivate(): Promise<void> {
     LocalisationEditorPanel.disposeAll();
     CreditsPreviewPanel.disposeAll();
     EncyclopediaPanel.disposeAll();
+    ModBrowserPanel.disposeAll();
     ModelPreviewPanel.disposeAll();
     ModelInspectorPanel.disposeAll();
     await stopAllClients();

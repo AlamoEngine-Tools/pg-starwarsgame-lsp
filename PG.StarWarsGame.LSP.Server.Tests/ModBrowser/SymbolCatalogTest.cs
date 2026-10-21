@@ -164,6 +164,14 @@ public sealed class SymbolCatalogTest
     }
 
     [Fact]
+    public void ARow_NamesThePageItOpensOn()
+    {
+        Assert.All(Page("models").Rows, r => Assert.Equal("models", r.Page));
+        Assert.All(Page("particleSystems").Rows, r => Assert.Equal("particleSystems", r.Page));
+        Assert.All(Page("xml:SFXEvent").Rows, r => Assert.Equal("xml:SFXEvent", r.Page));
+    }
+
+    [Fact]
     public void AnUnknownPage_IsEmpty()
     {
         Assert.Equal(0, Page("xml:NoSuchType").Total);

@@ -141,6 +141,12 @@ public record ToolsFeatureFlags
     public bool Encyclopedia { get; init; } = true;
 
     /// <summary>
+    ///     Gates <c>aet/getSymbolOutline</c>, <c>aet/getSymbolPage</c>, <c>aet/getSymbolNode</c> and the
+    ///     Mod Browser built on them (#270). Reads the index only.
+    /// </summary>
+    public bool ModBrowser { get; init; } = true;
+
+    /// <summary>
     ///     Gates <c>aet/getPreviewScene</c>, <c>aet/getModelGlb</c>, <c>aet/getModelTexture</c> and the
     ///     3D model preview built on them. Independent of everything else: the preview reads model and
     ///     texture files and writes nothing.

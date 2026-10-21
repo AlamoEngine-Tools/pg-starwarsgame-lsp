@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -12,12 +13,20 @@ using PG.StarWarsGame.LSP.Server.Assets;
 
 namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 
-/// <summary>Serves an outline's pages with their counts, and the project's layers (#270).</summary>
-public sealed class GetSymbolOutlineHandler(IGameIndexService index, ISchemaProvider schema, IProjectLayerMap layers)
+/// <summary>
+///     Serves an outline's pages with their counts, and the project's layers (#270). Gated on
+///     <c>features.tools.modBrowser</c>, like the two requests below: off, each answers empty.
+/// </summary>
+public sealed class GetSymbolOutlineHandler(
+    IGameIndexService index,
+    ISchemaProvider schema,
+    IProjectLayerMap layers,
+    ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetSymbolOutlineParams, GetSymbolOutlineResult>
 {
     public Task<GetSymbolOutlineResult> Handle(GetSymbolOutlineParams request, CancellationToken cancellationToken)
     {
+        if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolOutlineResult([], []));
         var catalog = SymbolCatalog.For(index.Current, schema.AllKinds, schema.AllEnums);
         return Task.FromResult(new GetSymbolOutlineResult(catalog.Outline(request.Outline),
             layers.Layers.Select(l => new SymbolLayer(l.Rank, l.Name)).ToList()));
@@ -29,11 +38,13 @@ public sealed class GetSymbolPageHandler(
     IGameIndexService index,
     ISchemaProvider schema,
     IVariantTagSource tags,
-    IGameAssetResolver assets)
+    IGameAssetResolver assets,
+    ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetSymbolPageParams, GetSymbolPageResult>
 {
     public Task<GetSymbolPageResult> Handle(GetSymbolPageParams request, CancellationToken cancellationToken)
     {
+        if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolPageResult([], 0));
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
         if (request.Parent is not { } parent) return Task.FromResult(catalog.Page(request));
@@ -49,11 +60,13 @@ public sealed class GetSymbolNodeHandler(
     IGameIndexService index,
     ISchemaProvider schema,
     IVariantTagSource tags,
-    IGameAssetResolver assets)
+    IGameAssetResolver assets,
+    ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetSymbolNodeParams, GetSymbolNodeResult>
 {
     public Task<GetSymbolNodeResult> Handle(GetSymbolNodeParams request, CancellationToken cancellationToken)
     {
+        if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolNodeResult(null, []));
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
         return Task.FromResult(new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets))

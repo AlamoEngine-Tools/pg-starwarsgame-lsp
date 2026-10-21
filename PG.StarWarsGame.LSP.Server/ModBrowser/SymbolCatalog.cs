@@ -74,7 +74,7 @@ public sealed class SymbolCatalog
         foreach (var row in ScriptRows(index)) Add(pages, "luaScripts", row);
 
         pages["enums"] = enums
-            .Select(e => new SymbolRow(e.Name, e.Name, null, [], "game", null, []))
+            .Select(e => new SymbolRow(e.Name, e.Name, null, [], "game", null, [], "enums"))
             .ToList();
 
         foreach (var rows in pages.Values)
@@ -155,7 +155,7 @@ public sealed class SymbolCatalog
     private static void Add(Dictionary<string, List<SymbolRow>> pages, string page, SymbolRow row)
     {
         if (!pages.TryGetValue(page, out var rows)) pages[page] = rows = [];
-        rows.Add(row);
+        rows.Add(row with { Page = page });
     }
 
     // One row per object name: the highest layer's definition, else the game's.

@@ -72,6 +72,7 @@ async function main() {
             'src/webview/encyclopediaPreview.tsx',
             'src/webview/modelPreview.tsx',
             'src/webview/modelInspector.tsx',
+            'src/webview/modBrowser.tsx',
         ],
         bundle: true,
         format: 'iife',

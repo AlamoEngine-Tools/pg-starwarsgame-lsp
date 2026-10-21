@@ -79,6 +79,7 @@ public sealed record GetSymbolPageResult(IReadOnlyList<SymbolRow> Rows, int Tota
 /// <param name="Origin">Where the definition comes from: <c>game</c>, <c>project</c>, or <c>layer:N</c>.</param>
 /// <param name="OriginName">The layer's name, for a <c>layer:N</c> origin.</param>
 /// <param name="Overrides">The origins of the definitions it replaces, highest first.</param>
+/// <param name="Page">The page the entry opens on; none for a missing name, a tag or a definition's place.</param>
 public sealed record SymbolRow(
     string Id,
     string Name,
@@ -86,4 +87,5 @@ public sealed record SymbolRow(
     IReadOnlyList<string> Kinds,
     string Origin,
     string? OriginName,
-    IReadOnlyList<string> Overrides);
+    IReadOnlyList<string> Overrides,
+    string? Page = null);
