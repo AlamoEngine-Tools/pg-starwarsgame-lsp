@@ -1,10 +1,14 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Assets;
 
 namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 
@@ -21,7 +25,11 @@ public sealed class GetSymbolOutlineHandler(IGameIndexService index, ISchemaProv
 }
 
 /// <summary>Serves one page of entries, or one relation of an entry, filtered and paged (#270).</summary>
-public sealed class GetSymbolPageHandler(IGameIndexService index, ISchemaProvider schema, IVariantTagSource tags)
+public sealed class GetSymbolPageHandler(
+    IGameIndexService index,
+    ISchemaProvider schema,
+    IVariantTagSource tags,
+    IGameAssetResolver assets)
     : IJsonRpcRequestHandler<GetSymbolPageParams, GetSymbolPageResult>
 {
     public Task<GetSymbolPageResult> Handle(GetSymbolPageParams request, CancellationToken cancellationToken)
@@ -30,19 +38,57 @@ public sealed class GetSymbolPageHandler(IGameIndexService index, ISchemaProvide
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
         if (request.Parent is not { } parent) return Task.FromResult(catalog.Page(request));
 
-        var rows = new SymbolRelations(current, schema, tags, catalog).Rows(parent.Page, parent.Id, parent.Relation);
+        var rows = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets))
+            .Rows(parent.Page, parent.Id, parent.Relation);
         return Task.FromResult(SymbolCatalog.Filter(rows ?? [], request));
     }
 }
 
 /// <summary>Serves one entry, opened: its row and its relations, counted (#270).</summary>
-public sealed class GetSymbolNodeHandler(IGameIndexService index, ISchemaProvider schema, IVariantTagSource tags)
+public sealed class GetSymbolNodeHandler(
+    IGameIndexService index,
+    ISchemaProvider schema,
+    IVariantTagSource tags,
+    IGameAssetResolver assets)
     : IJsonRpcRequestHandler<GetSymbolNodeParams, GetSymbolNodeResult>
 {
     public Task<GetSymbolNodeResult> Handle(GetSymbolNodeParams request, CancellationToken cancellationToken)
     {
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
-        return Task.FromResult(new SymbolRelations(current, schema, tags, catalog).Node(request.Page, request.Id));
+        return Task.FromResult(new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets))
+            .Node(request.Page, request.Id));
+    }
+}
+
+/// <summary>
+///     The proxy names inside a model file, read once per model and index: the catalog scan does not
+///     read proxies, so a model's particle systems cost one file read when it is first opened.
+/// </summary>
+internal static class ModelProxies
+{
+    private static readonly ConditionalWeakTable<GameIndex, ConcurrentDictionary<string, IReadOnlyList<string>>>
+        s_read = new();
+
+    public static Func<string, IReadOnlyList<string>> For(GameIndex index, IGameAssetResolver assets)
+    {
+        var read = s_read.GetValue(index, _ => new ConcurrentDictionary<string, IReadOnlyList<string>>(
+            StringComparer.OrdinalIgnoreCase));
+        return path => read.GetOrAdd(path, p => Proxies(assets.Read(p)));
+    }
+
+    private static IReadOnlyList<string> Proxies(byte[]? bytes)
+    {
+        if (bytes is null || AloFile.Classify(bytes) != AloFileKind.Model) return [];
+        try
+        {
+            return AloModelReader.Read(bytes).Proxies.Select(p => p.Name).ToList();
+        }
+        catch
+        {
+            // A model that cannot be read names no particle systems that can be shown;
+            // ModelFileFormat is the diagnostic that owns "this .alo is not readable".
+            return [];
+        }
     }
 }

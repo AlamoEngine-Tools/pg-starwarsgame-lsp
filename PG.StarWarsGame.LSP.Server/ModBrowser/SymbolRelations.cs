@@ -17,11 +17,16 @@ namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 ///     names; one object is one cached document parse. A tag is put in a relation by what its schema
 ///     definition says it references, slot by slot for a tuple.
 /// </remarks>
+/// <param name="proxiesOf">
+///     The proxy names a model file carries, by its game-relative path; a model's particle systems
+///     are read from it, one file, when the model is opened.
+/// </param>
 public sealed class SymbolRelations(
     GameIndex index,
     ISchemaProvider schema,
     IVariantTagSource tags,
-    SymbolCatalog catalog)
+    SymbolCatalog catalog,
+    Func<string, IReadOnlyList<string>>? proxiesOf = null)
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
@@ -36,7 +41,7 @@ public sealed class SymbolRelations(
     /// <summary>The relations an asset, a script or an enum opens into, by page.</summary>
     private static readonly Dictionary<string, string[]> s_assetRelations = new(StringComparer.Ordinal)
     {
-        ["models"] = ["animations", "textures", UsedBy],
+        ["models"] = ["animations", "particleSystems", "textures", UsedBy],
         ["particleSystems"] = ["textures", UsedBy],
         ["animations"] = ["model"],
         ["textures"] = [UsedBy],
@@ -107,6 +112,11 @@ public sealed class SymbolRelations(
         {
             ("models", "animations") => ModelAnimationClips.For(index, entry.Name)
                 .Select(c => catalog.Find("animations", c) ?? Missing(c, ".ala")),
+            // A proxy names its particle system with the level tags the engine strips before loading.
+            ("models", "particleSystems") => (proxiesOf?.Invoke(entry.Id) ?? [])
+                .Select(p => ModelLevelTag.Strip(p) + ".alo")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(p => catalog.Find("particleSystems", p) ?? Missing(p.ToLowerInvariant(), ".alo")),
             (_, "textures") => index.ModelTextures.GetValueOrDefault(ModelBoneKey.From(entry.Name), [])
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(t => catalog.Find("textures", t) ?? Missing(t, null)),

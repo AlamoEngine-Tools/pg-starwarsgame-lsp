@@ -91,7 +91,11 @@ public sealed class AssetRelationsTest
                 .WithComparers(StringComparer.OrdinalIgnoreCase)
                 .Add("ev_tie.alo", ["Tie.tga"]).Add("p_smoke.alo", ["Smoke.tga"])
         };
-        return new SymbolRelations(index, new Schema(), _tags, SymbolCatalog.Build(index, [], [s_animationType]));
+        // The model carries two effects; one names a particle system no layer ships.
+        return new SymbolRelations(index, new Schema(), _tags, SymbolCatalog.Build(index, [], [s_animationType]),
+            path => path.EndsWith("ev_tie.alo", StringComparison.OrdinalIgnoreCase)
+                ? ["P_Smoke_ALT2", "P_Missing_LOD0"]
+                : []);
     }
 
     private static Dictionary<string, SymbolRelation> RelationsOf(SymbolRelations relations, string page, string id)
@@ -111,8 +115,9 @@ public sealed class AssetRelationsTest
 
         var node = RelationsOf(relations, "models", "ev_tie.alo");
 
-        Assert.Equal(["animations", "textures", "usedBy"], node.Keys);
+        Assert.Equal(["animations", "particleSystems", "textures", "usedBy"], node.Keys);
         Assert.Equal(2, node["animations"].Count);
+        Assert.Equal(2, node["particleSystems"].Count);
         Assert.Equal(1, node["textures"].Count);
         Assert.Null(node["usedBy"].Count);
         Assert.Equal(0, _tags.Asked);
@@ -120,6 +125,16 @@ public sealed class AssetRelationsTest
             Names(relations.Rows("models", "ev_tie.alo", "animations")));
         Assert.Equal(["tie.tga"], Names(relations.Rows("models", "ev_tie.alo", "textures")));
         Assert.Equal(["Tie_Fighter"], Names(relations.Rows("models", "ev_tie.alo", "usedBy")));
+    }
+
+    // A proxy names its particle system with the level tags the engine strips before loading it.
+    [Fact]
+    public void AModel_OpensIntoTheParticleSystemsItsProxiesName()
+    {
+        var rows = Relations().Rows("models", "ev_tie.alo", "particleSystems")!;
+
+        Assert.Equal([("p_missing.alo", "missing"), ("p_smoke.alo", "game")], rows.Select(r => (r.Name, r.Origin))
+            .OrderBy(r => r.Item1));
     }
 
     [Fact]
