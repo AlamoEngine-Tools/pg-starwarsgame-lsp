@@ -18,6 +18,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -326,33 +327,27 @@ public sealed class LocalisationLoaderTest
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_DEP_KEY"));
     }
 
-    [Fact]
-    public async Task LoadAsync_LayeredProjects_HigherLayerTranslationWins()
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // Every shape (#280): every layer's text is loaded through its lower-cased text root, and the
+    // highest layer's translation of a shared key wins.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public async Task LoadAsync_InEveryShape_EveryLayersTextLoads_TheHighestLayerWins(string name)
     {
-        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-        {
-            ["/dep/text/core.csv"] = new("key,ENGLISH\nTEXT_SHARED,From Core"),
-            ["/rev/text/rev.csv"] = new("key,ENGLISH\nTEXT_SHARED,From Rev")
-        });
-
-        var config = new LspConfiguration
-        {
-            Localisation = new LocalisationConfig { ResourceType = "Csv" }
-        };
-
-        var workspaceConfig = WorkspaceConfiguration.Empty with
-        {
-            Layers =
-            [
-                new ProjectLayer(0, "Core", [], [], ["/dep/text"], [], "Csv"),
-                new ProjectLayer(1, "Root", [], [], ["/rev/text"], [], "Csv")
-            ]
-        };
+        var setup = ProjectSetup.Named(name);
+        var fs = setup.Disk();
+        foreach (var layer in setup.Layers)
+            fs.AddFile(setup.PathOf(layer.Rank, "Text/MasterTextFile_English.csv"), new MockFileData(
+                $"key,ENGLISH\nTEXT_SHARED,{layer.Name}\nTEXT_OF_{layer.Name.ToUpperInvariant()},{layer.Name}"));
+        var config = new LspConfiguration { Localisation = new LocalisationConfig { ResourceType = "Csv" } };
 
         var (loader, indexService, _, _) = BuildLoader(fs, config);
-        await loader.LoadAsync(workspaceConfig, CancellationToken.None);
+        await loader.LoadAsync(setup.Configuration(), CancellationToken.None);
 
-        Assert.Equal("From Rev", indexService.Current.Localisation.GetValue("TEXT_SHARED"));
+        Assert.Equal("Mod", indexService.Current.Localisation.GetValue("TEXT_SHARED"));
+        foreach (var layer in setup.Layers)
+            Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_OF_" + layer.Name.ToUpperInvariant()));
     }
 
     // ── DAT resource type ─────────────────────────────────────────────────────

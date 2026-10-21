@@ -18,7 +18,16 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     <c>Groundinfantry.xml</c> - see its header comment.
 /// </remarks>
 [Trait("Category", "E2E")]
-public sealed class DiagnosticReportActionSmokeTest(E2eModServerFixture fixture) : IClassFixture<E2eModServerFixture>
+public sealed class DiagnosticReportActionSmokeTest(E2eModServerFixture fixture)
+    : DiagnosticReportActionSmokeTestBase<E2eModServerFixture>(fixture);
+
+/// <summary>The mod over a base project (#280).</summary>
+[Trait("Category", "E2E")]
+public sealed class DiagnosticReportActionMultiRootSmokeTest(E2eMultiRootServerFixture fixture)
+    : DiagnosticReportActionSmokeTestBase<E2eMultiRootServerFixture>(fixture);
+
+public abstract class DiagnosticReportActionSmokeTestBase<TFixture>(TFixture fixture) : IClassFixture<TFixture>
+    where TFixture : E2eWorkspaceServerFixture
 {
     [Fact]
     public async Task ADiagnostic_OffersBothReportActions_WithItsSourceAsync()
@@ -26,7 +35,7 @@ public sealed class DiagnosticReportActionSmokeTest(E2eModServerFixture fixture)
         if (LspTestEnvironment.E2eWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception("$XunitDynamicSkip$e2e-workspace/ not found; cannot run the report action test.");
 
-        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath, "Data", "Xml", "Groundinfantry.xml");
+        var filePath = Path.Combine(fixture.ModPath!, "Data", "Xml", "Groundinfantry.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var received = fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
 

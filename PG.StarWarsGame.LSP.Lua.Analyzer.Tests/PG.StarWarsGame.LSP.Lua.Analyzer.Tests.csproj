@@ -31,6 +31,7 @@
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua.Analyzer\PG.StarWarsGame.LSP.Lua.Analyzer.csproj"/>
         <!-- Built and copied beside the tests, which start it as 'dotnet <dll>'. -->
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua.Analyzer.Fake\PG.StarWarsGame.LSP.Lua.Analyzer.Fake.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Testing\PG.StarWarsGame.LSP.Testing.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

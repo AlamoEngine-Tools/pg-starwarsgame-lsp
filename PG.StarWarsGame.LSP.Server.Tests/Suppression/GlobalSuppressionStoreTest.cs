@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Suppression;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Suppression;
 
@@ -56,6 +57,26 @@ public sealed class GlobalSuppressionStoreTest
         var (store, _) = Build();
 
         Assert.Equal([CommentInsideValue], store.GetAll());
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // Every shape (#280): the suppressions are the project's own, kept beside the root project's
+    // file - never in a dependency it builds on.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public void Add_InEveryShape_WritesBesideTheRootProject_NotADependency(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var fs = setup.Disk();
+        var store = new GlobalSuppressionStore(new StubReloadService(setup.Configuration()), new FileHelper(fs),
+            NullLogger<GlobalSuppressionStore>.Instance, new RecordingUserNotifier());
+
+        store.Add(SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol), "intentional in this mod");
+
+        foreach (var layer in setup.Layers)
+            Assert.Equal(layer.Rank == setup.LeafRank,
+                fs.File.Exists(Path.Combine(setup.FolderOf(layer.Rank), ".aetswg", "suppressions.json")));
     }
 
     [Fact]

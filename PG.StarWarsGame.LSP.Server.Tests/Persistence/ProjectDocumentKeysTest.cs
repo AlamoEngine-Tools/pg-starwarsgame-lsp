@@ -7,6 +7,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Persistence;
 using PG.StarWarsGame.LSP.Server.Tests.Story;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Persistence;
 
@@ -187,6 +188,27 @@ public sealed class ProjectDocumentKeysTest
         Assert.Equal(
             DocumentKey.Composite("data/xml/story_main.xml", "Start"),
             BuildLayered().NodeKey(ProjectDir + "/data/xml/story_main.xml", "Start"));
+    }
+
+    public static TheoryData<string, int> SetupsAndRanks()
+    {
+        var data = new TheoryData<string, int>();
+        foreach (var (name, rank) in ProjectSetup.NamesAndRanks) data.Add(name, rank);
+        return data;
+    }
+
+    // Every shape, a story in every layer (#280): keyed relative to the project it lives in, so the
+    // same thread keys the same whichever leaf is open.
+    [Theory]
+    [MemberData(nameof(SetupsAndRanks))]
+    public void NodeKey_InEveryShape_IsRelativeToTheLayerTheDocumentLivesIn(string name, int rank)
+    {
+        var setup = ProjectSetup.Named(name);
+        var keys = new ProjectDocumentKeys(new StoryCommandTestFixtures.StubReloadService(setup.Configuration()),
+            new FileHelper(setup.Disk()));
+
+        Assert.Equal(DocumentKey.Composite("data/xml/story.xml", "Start"),
+            keys.NodeKey(setup.Layers[rank].XmlDirectories[0] + "/story.xml", "Start"));
     }
 
     /// <summary>

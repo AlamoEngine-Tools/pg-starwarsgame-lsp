@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Testing;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -151,6 +152,40 @@ public sealed class LuaDefinitionHandlerTest
 
         Assert.Equal([vader, interdictor], fromLibrary!.Select(l => l.LocationLink!.TargetUri.ToString()).Order());
         Assert.Equal(vader, Assert.Single(fromScript!).LocationLink!.TargetUri.ToString());
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // The same in every shape (#280): the library is the lowest layer's, the scripts the leaf's.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public async Task FromALowerLayersLibrary_EveryRequiringScriptsDefinition_FromAScript_ItsOwn(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var library = setup.ScriptUri(0, "Library/PGStateMachine.lua");
+        var interdictor = setup.ScriptUri(setup.LeafRank, "GameObject/Interdictor.lua");
+        var vader = setup.ScriptUri(setup.LeafRank, "GameObject/DarthVader.lua");
+        var index = ProjectSetup.Index(
+            setup.Script(0, "Library/PGStateMachine.lua",
+                uses: [ProjectSetup.LuaGlobalUse("Definitions", library, 0, 0)]),
+            setup.Script(setup.LeafRank, "GameObject/Interdictor.lua", ["PGStateMachine"],
+                [ProjectSetup.LuaGlobal("Definitions", interdictor)]),
+            setup.Script(setup.LeafRank, "GameObject/DarthVader.lua", ["PGStateMachine"],
+                [ProjectSetup.LuaGlobal("Definitions", vader)],
+                [ProjectSetup.LuaGlobalUse("Definitions", vader, 0, 0)]));
+        var fileHelper = new FileHelper(setup.Disk());
+        var handler = BuildHandler(index, sandbox: new FixedSandbox(LuaSandbox.Build(index.Documents, fileHelper)));
+
+        var fromLibrary = await handler.Handle(RequestAt(0, 3, library), CancellationToken.None);
+        var fromScript = await handler.Handle(RequestAt(0, 3, vader), CancellationToken.None);
+
+        Assert.Equal(
+            new[] { interdictor, vader }.Select(fileHelper.NormalizeUri).Order(StringComparer.OrdinalIgnoreCase),
+            fromLibrary!.Select(l => fileHelper.NormalizeUri(l.LocationLink!.TargetUri.ToString()))
+                .Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(fileHelper.NormalizeUri(vader),
+            fileHelper.NormalizeUri(Assert.Single(fromScript!).LocationLink!.TargetUri.ToString()),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     // A state name in Set_Next_State goes to the handler registered under it (#252).
@@ -318,6 +353,26 @@ public sealed class LuaDefinitionHandlerTest
         Assert.Equal(xmlUri, loc.TargetUri.ToString());
         Assert.Equal(5, loc.TargetRange.Start.Line);
         Assert.Equal(0, loc.TargetRange.Start.Character);
+    }
+
+    // The script is in a state of its own; the XML file is in none, and an object it defines is the
+    // game's, reachable from every state (measured E2E: Find_Object_Type("Marauder_Missile_Cruiser")
+    // in EaW's Interdictor.lua went nowhere once states were in play).
+    [Fact]
+    public async Task Handle_CursorOnXmlObjectStringLiteral_FromAScriptInAState_ReturnsXmlDefinitionLocation()
+    {
+        const string xmlUri = "file:///units.xml";
+        var reference = new GameReference("UNIT_A", GameSymbolKind.XmlObject, "Unit", LuaUri, 0, 10, 6);
+        var xmlSymbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit", new FileOrigin(xmlUri, 5, 0), null);
+        var index = MakeIndex(
+            [("UNIT_A", ImmutableArray.Create(xmlSymbol))],
+            (LuaUri, new DocumentIndex(LuaUri, 1, [], [reference])),
+            (xmlUri, new DocumentIndex(xmlUri, 1, [xmlSymbol], [])));
+        var sandbox = new FixedSandbox(LuaSandbox.Build(index.Documents, new FileHelper(new MockFileSystem())));
+
+        var result = await BuildHandler(index, sandbox: sandbox).Handle(RequestAt(0, 12), CancellationToken.None);
+
+        Assert.Equal(xmlUri, Assert.Single(result!.Select(l => l.LocationLink!)).TargetUri.ToString());
     }
 
     [Fact]

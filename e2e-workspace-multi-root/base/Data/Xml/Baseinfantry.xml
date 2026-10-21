@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- E2E fixture: the lower project of the two-project window (#280).
+
+     E2eMultiRootServerFixture places a copy of e2e-workspace beside this folder as the mod and makes
+     it reference base.pgproj, so every e2e-workspace smoke test also runs with a project beneath it.
+
+       E2E_BASE_INFANTRY    Defined here only, never by the mod: MultiRootSmokeTest finds it from the
+                            mod's server, owned by this project. Valid on purpose - nothing here may
+                            add a finding to a test written against the mod alone. -->
+
+<GameObjectFiles>
+
+    <GroundInfantry Name="E2E_BASE_INFANTRY">
+    </GroundInfantry>
+
+</GameObjectFiles>

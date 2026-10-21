@@ -87,6 +87,12 @@ public class LspServerFixture : IAsyncLifetime
     }
 
     /// <summary>
+    ///     The project file the server starts on, when the window holds several and the server must
+    ///     not choose one itself; null lets it find the one project under the workspace root.
+    /// </summary>
+    protected virtual string? ProjectPath => null;
+
+    /// <summary>
     ///     Fired on every <c>publishDiagnostics</c> notification received from the server.
     ///     Use this instead of <c>client.Register(r => r.OnPublishDiagnostics(...))</c>,
     ///     which does not reliably receive server-push notifications in OmniSharp 0.19.x.
@@ -363,7 +369,8 @@ public class LspServerFixture : IAsyncLifetime
             schemaLocalPath = LspTestEnvironment.SchemaLocalPath,
             gamePath = LspTestEnvironment.GamePath,
             baselineLocalPath = LspTestEnvironment.BaselineLocalPath,
-            locale = LspTestEnvironment.Locale
+            locale = LspTestEnvironment.Locale,
+            projectPath = ProjectPath
         };
     }
 }

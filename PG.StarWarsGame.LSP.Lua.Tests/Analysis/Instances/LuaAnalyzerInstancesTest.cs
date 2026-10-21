@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis.Generated;
 using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
+using PG.StarWarsGame.LSP.Testing;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis.Instances;
@@ -112,6 +113,47 @@ public sealed class LuaAnalyzerInstancesTest
         Assert.Equal("function TestValid(wrapper) end\n", process.Texts[PlaceIn(process, Base)]);
         Assert.All(process.Texts.Keys,
             k => Assert.StartsWith("file:///" + process.Plan!.Root.Replace('\\', '/') + "/", k));
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // In every shape (#280): the leaf's script and a library only the lowest layer ships, each placed
+    // as a script path under the instance's root - the layers keep their roots lower-cased, the editor
+    // sends the case on disk, and a file no root matched would land outside the script tree.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public void AnOpenScript_HoldsALowerLayersLibrary_AtItsScriptPath(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var disk = setup.Disk();
+        var script = setup.ScriptUri(setup.LeafRank, "GameObject/Interdictor.lua");
+        disk.AddFile(setup.PathOf(0, "Scripts/Library/PGStateMachine.lua"),
+            new MockFileData("function Definitions() end\n"));
+        var index = new FakeIndexService
+        {
+            Current = ProjectSetup.Index(setup.Script(0, "Library/PGStateMachine.lua"),
+                setup.Script(setup.LeafRank, "GameObject/Interdictor.lua", ["PGStateMachine"]))
+        };
+        var processes = new List<FakeProcess>();
+        var fileHelper = new FileHelper(disk);
+        var instances = new LuaAnalyzerInstances(_ =>
+            {
+                var process = new FakeProcess();
+                processes.Add(process);
+                return process;
+            }, index, fileHelper, _stubs, new LuaGeneratedTexts([], fileHelper), Directory,
+            NullLogger<LuaAnalyzerInstances>.Instance);
+        instances.Configure(setup.Layers);
+
+        instances.DidOpen(script, "Definitions()\n", 1);
+
+        var texts = Assert.Single(processes).Texts;
+        Assert.Equal(2, texts.Count);
+        Assert.Contains(texts, t => t.Key.EndsWith("/gameobject/interdictor.lua", StringComparison.OrdinalIgnoreCase)
+                                    && t.Value == "Definitions()\n");
+        Assert.Contains(texts, t => t.Key.EndsWith("/library/pgstatemachine.lua", StringComparison.OrdinalIgnoreCase)
+                                    && t.Value == "function Definitions() end\n");
+        Assert.DoesNotContain(texts.Keys, k => k.Contains("/_outside/", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

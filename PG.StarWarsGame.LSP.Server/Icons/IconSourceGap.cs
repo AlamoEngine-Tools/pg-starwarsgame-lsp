@@ -41,9 +41,11 @@ public static class IconSourceGap
 
         if (workspace is null) return [];
 
+        // The root project first: it is the author's own, and the layers arrive dependencies first.
         return workspace.Layers
             .Where(layer => layer.ProjectDirectory is not null)
             .Where(layer => !Supplies(layer, fs))
+            .OrderByDescending(layer => layer.Rank)
             .Select(layer => layer.Name)
             .ToList();
     }

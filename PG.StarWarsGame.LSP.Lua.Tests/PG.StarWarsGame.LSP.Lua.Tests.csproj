@@ -34,6 +34,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua\PG.StarWarsGame.LSP.Lua.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Testing\PG.StarWarsGame.LSP.Testing.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

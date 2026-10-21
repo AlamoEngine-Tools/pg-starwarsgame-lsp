@@ -10,7 +10,16 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     different startup step, and only a real server runs all of them in order.
 /// </summary>
 [Trait("Category", "E2E")]
-public sealed class ServerStatusSmokeTest(E2eModServerFixture fixture) : IClassFixture<E2eModServerFixture>
+public sealed class ServerStatusSmokeTest(E2eModServerFixture fixture)
+    : ServerStatusSmokeTestBase<E2eModServerFixture>(fixture);
+
+/// <summary>The mod over a base project (#280).</summary>
+[Trait("Category", "E2E")]
+public sealed class ServerStatusMultiRootSmokeTest(E2eMultiRootServerFixture fixture)
+    : ServerStatusSmokeTestBase<E2eMultiRootServerFixture>(fixture);
+
+public abstract class ServerStatusSmokeTestBase<TFixture>(TFixture fixture) : IClassFixture<TFixture>
+    where TFixture : E2eWorkspaceServerFixture
 {
     [Fact]
     public async Task AHealthyStartup_ReportsItselfAsHealthyAsync()
@@ -60,7 +69,10 @@ public sealed class ServerStatusSmokeTest(E2eModServerFixture fixture) : IClassF
         Assert.True(extended.Files.ProjectFiles > 0, "The authored workspace's own XML was not counted");
         Assert.True(extended.Symbols.Baseline > 1000, $"Only {extended.Symbols.Baseline} baseline symbols");
         Assert.Contains(extended.Assets, a => a is { Extension: ".alo", BaseGame: > 500 });
-        Assert.Equal(1, extended.Dependencies.Layers);
+        // The mod, and in the two-project window the base beneath it, whose own XML counts apart.
+        Assert.Equal(fixture.Layers, extended.Dependencies.Layers);
+        if (fixture.Layers > 1)
+            Assert.True(extended.Files.DependencyFiles > 0, "The base project's XML was not counted");
         Assert.NotNull(extended.IndexDurationMs);
         Assert.Equal(extended.Files.ProjectFiles + extended.Files.DependencyFiles,
             extended.Caches.FilesReused + extended.Caches.FilesParsed);
