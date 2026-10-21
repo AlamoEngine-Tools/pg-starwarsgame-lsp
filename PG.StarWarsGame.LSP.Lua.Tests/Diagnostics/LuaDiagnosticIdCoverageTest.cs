@@ -23,7 +23,11 @@ public sealed class LuaDiagnosticIdCoverageTest
         Path.Combine("Diagnostics", "LuaDiagnosticsPublisher.cs"),
         Path.Combine("Analysis", "LuaGlobalScopeAnalyzer.cs"),
         Path.Combine("Analysis", "LuaUpvalueAnalyzer.cs"),
-        Path.Combine("Analysis", "LuaImportAnalyzer.cs")
+        Path.Combine("Analysis", "LuaImportAnalyzer.cs"),
+        Path.Combine("Analysis", "LuaPlanAnalyzer.cs"),
+        Path.Combine("Analysis", "LuaStateMachineAnalyzer.cs"),
+        Path.Combine("Analysis", "LuaPooledStateAnalyzer.cs"),
+        Path.Combine("Analysis", "LuaCallFormAnalyzer.cs")
     ];
 
     private static string LuaProjectDirectory()

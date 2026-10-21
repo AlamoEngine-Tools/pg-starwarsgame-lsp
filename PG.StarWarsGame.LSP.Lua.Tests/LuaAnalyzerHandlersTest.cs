@@ -98,6 +98,47 @@ public sealed class LuaAnalyzerHandlersTest
         Assert.Equal(2, ((JArray)result.Command.Arguments![2]).Count);
     }
 
+    private const string Stub = "file:///C:/schema/lua/pgstatemachine.d.lua";
+    private static readonly LuaStubLocation s_stubs = new() { Directory = "C:/schema/lua" };
+
+    // The stubs are the analyzer's library: their declarations describe a function, they never use it.
+    [Fact]
+    public async Task References_InTheStubs_AreDropped()
+    {
+        var analyzer = new ScriptedLuaAnalyzer().Answer("textDocument/references",
+            new LocationContainer(At(Interdictor, 44), At(Stub, 12), At(StateMachine, 172)));
+
+        var result = await new LuaReferencesHandler(analyzer, TwoObjectScripts(), s_stubs).Handle(new ReferenceParams
+        {
+            TextDocument = new TextDocumentIdentifier(DocumentUri.From(Interdictor)), Position = new Position(44, 12),
+            Context = new ReferenceContext { IncludeDeclaration = true }
+        }, CancellationToken.None);
+
+        Assert.Equal([Interdictor, StateMachine], result!.Select(l => l.Uri.ToString()));
+    }
+
+    [Fact]
+    public async Task ACodeLens_DoesNotCountTheStubs()
+    {
+        var locations = JArray.FromObject(new[] { At(Interdictor, 44), At(Stub, 12) },
+            JsonSerializer.Create(new JsonSerializerSettings
+                { ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver() }));
+        var analyzer = new ScriptedLuaAnalyzer().Answer("codeLens/resolve", new CodeLens
+        {
+            Range = new Range(44, 9, 44, 20),
+            Command = new Command
+            {
+                Name = "emmy.showReferences", Title = "2 usages",
+                Arguments = new JArray(Interdictor, JObject.FromObject(new { line = 44, character = 9 }), locations)
+            }
+        });
+
+        var result = await new LuaCodeLensHandler(analyzer, TwoObjectScripts(), s_stubs)
+            .Handle(new CodeLens { Range = new Range(44, 9, 44, 20) }, CancellationToken.None);
+
+        Assert.Equal("1 usage", result.Command!.Title);
+    }
+
     [Fact]
     public async Task DocumentSymbols_AreTheAnalyzers()
     {

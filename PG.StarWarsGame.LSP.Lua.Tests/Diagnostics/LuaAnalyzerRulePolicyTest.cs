@@ -50,7 +50,6 @@ public sealed class LuaAnalyzerRulePolicyTest
     [Theory]
     [InlineData("param-type-mismatch")]
     [InlineData("missing-parameter")]
-    [InlineData("redundant-parameter")]
     [InlineData("undefined-field")]
     [InlineData("need-check-nil")]
     [InlineData("call-non-callable")]
@@ -62,6 +61,52 @@ public sealed class LuaAnalyzerRulePolicyTest
     public void StubDependent_OursAndStyle_AreDropped(string rule)
     {
         Assert.Null(LuaAnalyzerRulePolicy.Map(Finding(rule)));
+    }
+
+    // Census (#279, every script in an analyzer of its own): vanilla passes a callback SpawnList
+    // never takes - Lua drops a surplus argument without a word.
+    [Fact]
+    public void ASurplusArgument_IsKept()
+    {
+        var mapped = LuaAnalyzerRulePolicy.Map(Finding("redundant-parameter"));
+
+        Assert.Equal(DiagnosticIds.LuaAnalyzerRedundantParameter.ToString(), mapped!.Code!.Value.String);
+    }
+
+    private static readonly IReadOnlySet<string> s_engine =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Find_First_Object", "collectgarbage" };
+
+    private static bool Holds(string text, int line, int character)
+    {
+        var tree = Loretta.CodeAnalysis.Lua.LuaSyntaxTree.ParseText(text);
+        var finding = LuaAnalyzerRulePolicy.Map(Finding("redundant-parameter") with
+        {
+            Range = new Range(line, character, line, character + 1)
+        })!;
+        return LuaAnalyzerRulePolicy.Holds(finding, tree, s_engine);
+    }
+
+    // The analyzer marks each surplus argument (measured, 0.25.1); the call is the one whose
+    // argument list holds it. An engine function's call forms are this server's own check.
+    [Theory]
+    [InlineData("SpawnList(a, b, Extra)", 0, 16, true)] // a Lua function
+    [InlineData("SpawnList(a, b, Extra(1))", 0, 16, true)] // the surplus argument is itself a call
+    [InlineData("SpawnList(a, Extra(1, 2))", 0, 22, true)] // the surplus is inside the inner call
+    [InlineData("Find_First_Object(\"X\", p)", 0, 23, false)] // the engine's
+    [InlineData("collectgarbage(256)", 0, 15, false)] // the standard library's
+    [InlineData("unit.Attack_Move(a, b)", 0, 20, false)] // a member: an engine object's, as often as not
+    public void ASurplusArgument_IsKept_OnlyOnACallOfALuaFunction(string text, int line, int character,
+        bool kept)
+    {
+        Assert.Equal(kept, Holds(text, line, character));
+    }
+
+    [Fact]
+    public void AFindingOfAnotherRule_AlwaysHolds()
+    {
+        var tree = Loretta.CodeAnalysis.Lua.LuaSyntaxTree.ParseText("Find_First_Object(\"X\", p)");
+
+        Assert.True(LuaAnalyzerRulePolicy.Holds(LuaAnalyzerRulePolicy.Map(Finding("unused"))!, tree, s_engine));
     }
 
     [Fact]

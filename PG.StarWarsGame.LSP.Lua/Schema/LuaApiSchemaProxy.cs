@@ -43,6 +43,21 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         return Inner.GetFunctionParams(functionName);
     }
 
+    public IReadOnlyList<IReadOnlyList<LuaParamAnnotation>> GetCallForms(string functionName)
+    {
+        return Inner.GetCallForms(functionName);
+    }
+
+    public string? GetGlobalTypeName(string globalName)
+    {
+        return Inner.GetGlobalTypeName(globalName);
+    }
+
+    public LuaGlobalAnnotation? GetGlobalAnnotation(string globalName)
+    {
+        return Inner.GetGlobalAnnotation(globalName);
+    }
+
     public LuaEntryPoint? GetEntryPoint(string functionName)
     {
         return Inner.GetEntryPoint(functionName);
@@ -76,6 +91,21 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName)
         {
             return [];
+        }
+
+        public IReadOnlyList<IReadOnlyList<LuaParamAnnotation>> GetCallForms(string functionName)
+        {
+            return [];
+        }
+
+        public string? GetGlobalTypeName(string globalName)
+        {
+            return null;
+        }
+
+        public LuaGlobalAnnotation? GetGlobalAnnotation(string globalName)
+        {
+            return null;
         }
 
         public LuaEntryPoint? GetEntryPoint(string functionName)

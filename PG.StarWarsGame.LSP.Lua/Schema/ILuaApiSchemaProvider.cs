@@ -52,6 +52,25 @@ public interface ILuaApiSchemaProvider
     IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName);
 
     /// <summary>
+    ///     The call forms of a global function (its <c>---@overload fun(...)</c> lines, in order):
+    ///     the argument lists a binding tells apart by count and by the type it finds at a position.
+    ///     Empty when the function has none. Lookup is case-insensitive.
+    /// </summary>
+    IReadOnlyList<IReadOnlyList<LuaParamAnnotation>> GetCallForms(string functionName);
+
+    /// <summary>
+    ///     The type an engine stub declares for a global value (<c>---@type Player</c> above
+    ///     <c>PlayerObject = nil</c>), or <c>null</c>. Lookup is case-insensitive.
+    /// </summary>
+    string? GetGlobalTypeName(string globalName);
+
+    /// <summary>
+    ///     The type and description any stub - a library's included - gives a global value
+    ///     (<c>---@type number</c> above <c>OnEnter = 1</c>), or <c>null</c>. Lookup is case-insensitive.
+    /// </summary>
+    LuaGlobalAnnotation? GetGlobalAnnotation(string globalName);
+
+    /// <summary>
     ///     The entry point of that name - a function a script defines for the game or a library to
     ///     call - or <c>null</c>. Not a declared global. Lookup is case-insensitive.
     /// </summary>

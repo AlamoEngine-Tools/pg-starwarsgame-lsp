@@ -45,9 +45,9 @@ public sealed class LuaSandboxProvider(IGameIndexService index, IFileHelper file
 ///     holds both (#249).
 /// </summary>
 /// <remarks>
-///     The analyzer sees one global namespace over the whole workspace; its locations are filtered
-///     through this. A file the index does not hold - a lower layer the analyzer reads as a library,
-///     the game's own scripts - is kept, since nothing here can judge it.
+///     The analyzer is given one script instance at a time (<see cref="Instances.LuaAnalyzerInstances" />),
+///     so its locations lie in one state already; they still pass through this, which keeps them so.
+///     A file the index does not hold is kept, since nothing here can judge it.
 /// </remarks>
 public sealed class LuaSandbox
 {
@@ -73,22 +73,11 @@ public sealed class LuaSandbox
     public static LuaSandbox Build(IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper)
     {
         var closures = new Dictionary<string, HashSet<string>>(DocumentUris.Comparer);
-        foreach (var (uri, doc) in documents)
+        foreach (var uri in documents.Keys)
         {
             if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;
-            var closure = new HashSet<string>(DocumentUris.Comparer) { uri };
-            var queue = new Queue<DocumentIndex>([doc]);
-            while (queue.Count > 0)
-            {
-                var current = queue.Dequeue();
-                if (current.RequireArgs.IsDefaultOrEmpty) continue;
-                foreach (var arg in current.RequireArgs)
-                    if (LuaRequireResolver.Resolve(arg, documents, fileHelper, current.DocumentUri) is { } required
-                        && closure.Add(required) && documents.TryGetValue(required, out var next))
-                        queue.Enqueue(next);
-            }
-
-            closures[uri] = closure;
+            closures[uri] = new HashSet<string>(LuaRequireTree.Of(uri, documents, fileHelper).Files,
+                DocumentUris.Comparer);
         }
 
         return new LuaSandbox(closures, fileHelper);
@@ -101,6 +90,33 @@ public sealed class LuaSandbox
         var other = _fileHelper.NormalizeUri(otherUri);
         if (!_statesOf.ContainsKey(from) || !_statesOf.ContainsKey(other)) return true;
         return SharedWith(from).Contains(other);
+    }
+
+    /// <summary>
+    ///     True when a state other than the file's own holds it: a library some script requires, whose
+    ///     use is downstream. A script nobody requires lives in its own state alone.
+    /// </summary>
+    public bool IsShared(string uri)
+    {
+        var file = _fileHelper.NormalizeUri(uri);
+        return _statesOf.TryGetValue(file, out var states) &&
+               states.Any(state => !DocumentUris.Same(state, file));
+    }
+
+    /// <summary>
+    ///     The states holding the file, each named by its script: the file's own, and every script
+    ///     requiring it. Empty for a file the index does not hold.
+    /// </summary>
+    public IReadOnlyList<string> StatesHolding(string uri)
+    {
+        return _statesOf.TryGetValue(_fileHelper.NormalizeUri(uri), out var states) ? states : [];
+    }
+
+    /// <summary>Whether the state of <paramref name="state" /> holds <paramref name="file" />.</summary>
+    public bool Holds(string state, string file)
+    {
+        return _closures.TryGetValue(_fileHelper.NormalizeUri(state), out var closure) &&
+               closure.Contains(_fileHelper.NormalizeUri(file));
     }
 
     /// <summary>

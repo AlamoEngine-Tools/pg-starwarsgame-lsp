@@ -117,6 +117,42 @@ public sealed class LuaDefinitionHandlerTest
         Assert.Equal(mine, Assert.Single(result!).LocationLink!.TargetUri.ToString());
     }
 
+    // A library runs in every state that requires it: a global it calls and each script defines is
+    // one definition per state - Definitions from PGStateMachine is every object script's (1:n).
+    // From one of those scripts its own state is the only one, so the answer stays its own (1:1).
+    [Fact]
+    public async Task FromALibrary_EveryRequiringScriptsDefinition_FromAScript_ItsOwn()
+    {
+        const string library = "file:///game/data/scripts/library/pgstatemachine.lua";
+        const string interdictor = "file:///mod/data/scripts/gameobject/interdictor.lua";
+        const string vader = "file:///mod/data/scripts/gameobject/darthvader.lua";
+        const string loose = "file:///mod/data/scripts/gameobject/loose.lua";
+        var interdictorDef = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(interdictor, 4, 9), null);
+        var vaderDef = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null, new FileOrigin(vader, 7, 9),
+            null);
+        var looseDef = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null, new FileOrigin(loose, 1, 9),
+            null);
+        var libraryCall = new GameReference("Definitions", GameSymbolKind.LuaGlobal, null, library, 0, 0, 11);
+        var vaderCall = new GameReference("Definitions", GameSymbolKind.LuaGlobal, null, vader, 0, 0, 11);
+        var documents = ImmutableDictionary<string, DocumentIndex>.Empty
+            .Add(library, new DocumentIndex(library, 1, [], [libraryCall], LayerRank: 0))
+            .Add(interdictor, new DocumentIndex(interdictor, 1, [interdictorDef], [], ["PGStateMachine"], LayerRank: 1))
+            .Add(vader, new DocumentIndex(vader, 1, [vaderDef], [vaderCall], ["PGStateMachine"], LayerRank: 1))
+            .Add(loose, new DocumentIndex(loose, 1, [looseDef], [], LayerRank: 1));
+        var index = MakeIndex([("Definitions", ImmutableArray.Create(interdictorDef, vaderDef, looseDef))],
+            (library, documents[library]), (interdictor, documents[interdictor]), (vader, documents[vader]),
+            (loose, documents[loose]));
+        var sandbox = new FixedSandbox(LuaSandbox.Build(documents, new FileHelper(new MockFileSystem())));
+        var handler = BuildHandler(index, sandbox: sandbox);
+
+        var fromLibrary = await handler.Handle(RequestAt(0, 3, library), CancellationToken.None);
+        var fromScript = await handler.Handle(RequestAt(0, 3, vader), CancellationToken.None);
+
+        Assert.Equal([vader, interdictor], fromLibrary!.Select(l => l.LocationLink!.TargetUri.ToString()).Order());
+        Assert.Equal(vader, Assert.Single(fromScript!).LocationLink!.TargetUri.ToString());
+    }
+
     // A state name in Set_Next_State goes to the handler registered under it (#252).
     [Fact]
     public async Task AStateName_GoesToItsHandler()

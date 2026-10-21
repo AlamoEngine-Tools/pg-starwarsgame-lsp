@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -51,14 +52,16 @@ public sealed class LuaDiagnosticsPublisherTest
     // ── the analyzer's findings, folded in (#153) ───────────────────────────
 
     private static (List<PublishDiagnosticsParams> published, FakeGameWorkspaceHost host, FakeAnalyzer analyzer,
-        FakeGameIndexService index) BuildWithAnalyzer(bool running = true)
+        FakeGameIndexService index) BuildWithAnalyzer(bool running = true,
+            ILogger<LuaDiagnosticsPublisher>? logger = null, ILuaApiSchemaProvider? schema = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var index = new FakeGameIndexService();
         var host = new FakeGameWorkspaceHost();
         var analyzer = new FakeAnalyzer { IsRunning = running };
         _ = new LuaDiagnosticsPublisher(p => published.Add(p), index, host, new FileHelper(new MockFileSystem()),
-            new LuaApiSchemaProvider([]), NullLogger<LuaDiagnosticsPublisher>.Instance, analyzer: analyzer);
+            schema ?? new LuaApiSchemaProvider([]), logger ?? NullLogger<LuaDiagnosticsPublisher>.Instance,
+            analyzer: analyzer);
         return (published, host, analyzer, index);
     }
 
@@ -88,6 +91,46 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Contains(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(last));
         Assert.DoesNotContain("param-type-mismatch", Codes(last));
         Assert.DoesNotContain("unused", Codes(last));
+    }
+
+    /// <summary>
+    ///     Every finding the analyzer makes reaches the debug log with its rule and whether it was
+    ///     kept, so the dropped rules can be counted (#278) - in the editor they leave no trace.
+    /// </summary>
+    [Fact]
+    public void AnAnalyzerFinding_IsLoggedWithItsRule_KeptOrDropped()
+    {
+        var logger = new CapturingLogger();
+        var (_, host, analyzer, _) = BuildWithAnalyzer(logger: logger);
+        host.Set(LuaUri, "local x = 1");
+
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused"), AnalyzerFinding("param-type-mismatch", 4));
+
+        var dropped = Assert.Single(logger.Messages, m => m.Contains("param-type-mismatch"));
+        Assert.Contains("dropped", dropped);
+        Assert.Contains(":5", dropped);
+        Assert.Contains(logger.Messages, m => m.Contains("unused") && m.Contains("kept"));
+    }
+
+    /// <summary>
+    ///     The analyzer re-reports a document as its library finishes indexing, and an early report
+    ///     carries findings a later one withdraws. A census keeps each document's LAST report, so
+    ///     every report is logged, an empty one included.
+    /// </summary>
+    [Fact]
+    public void AnAnalyzerReport_IsLoggedWithItsCount_EvenWhenEmpty()
+    {
+        var logger = new CapturingLogger();
+        var (_, host, analyzer, _) = BuildWithAnalyzer(logger: logger);
+        host.Set(LuaUri, "local x = 1");
+
+        analyzer.Raise(LuaUri, AnalyzerFinding("unused"));
+        analyzer.Raise(LuaUri);
+
+        var reports = logger.Messages.Where(m => m.StartsWith("Analyzer report", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, reports.Count);
+        Assert.EndsWith(" - 1 findings", reports[0]);
+        Assert.EndsWith(" - 0 findings", reports[1]);
     }
 
     /// <summary>
@@ -177,6 +220,23 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.DoesNotContain(DiagnosticIds.LuaAnalyzerUnused.ToString(), Codes(published.Last()));
     }
 
+    // An engine function's surplus arguments are the call-form check's; a Lua function's are kept.
+    [Fact]
+    public void ASurplusArgument_ReachesTheEditor_OnlyOnACallOfALuaFunction()
+    {
+        var (published, host, analyzer, _) = BuildWithAnalyzer(
+            schema: new LuaApiSchemaProvider(["---@param name string\nfunction Find_First_Object(name) end\n"]));
+        host.Set(LuaUri, "Find_First_Object(\"X\", p)\nSpawnList(a, b, c)");
+
+        analyzer.Raise(LuaUri,
+            AnalyzerFinding("redundant-parameter") with { Range = new Range(0, 23, 0, 24) },
+            AnalyzerFinding("redundant-parameter") with { Range = new Range(1, 16, 1, 17) });
+
+        var kept = published.Last().Diagnostics
+            .Where(d => d.Code?.String == DiagnosticIds.LuaAnalyzerRedundantParameter.ToString()).ToList();
+        Assert.Equal(1, Assert.Single(kept).Range.Start.Line);
+    }
+
     // ── feature flag ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -255,6 +315,26 @@ public sealed class LuaDiagnosticsPublisherTest
 
         var diagnostic = Assert.Single(Assert.Single(published).Diagnostics!);
         Assert.Equal(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString(), diagnostic.Code?.String);
+    }
+
+    [Fact]
+    public void OnIndexChanged_CallThatFitsNoForm_PublishesTheCallFormDiagnostic()
+    {
+        var schema = new LuaApiSchemaProvider([
+            """
+            ---@overload fun(origin: GameObject): GameObject
+            ---@overload fun(origin: GameObject, player: Player, match_allegiance: boolean): GameObject
+            function Find_Nearest(origin, player, match_allegiance) end
+            ---@type Player
+            PlayerObject = nil
+            """
+        ]);
+        var (_, published, indexService, workspaceHost) = Build(schema);
+        workspaceHost.Set(LuaUri, "local origin = nil\nFind_Nearest(origin, PlayerObject)\n");
+        indexService.Fire(GameIndex.Empty);
+
+        Assert.Contains(Assert.Single(published).Diagnostics!,
+            d => d.Code?.String == DiagnosticIds.LuaNoCallFormFits.ToString());
     }
 
     // The state machine rules hold where the script's state loads a library with the contract (#252).
@@ -666,6 +746,27 @@ public sealed class LuaDiagnosticsPublisherTest
         var clear = Assert.Single(published);
         Assert.Equal(LuaUri, clear.Uri.ToString());
         Assert.Empty(clear.Diagnostics!);
+    }
+
+    private sealed class CapturingLogger : ILogger<LuaDiagnosticsPublisher>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
     }
 
     private sealed class FakeAnalyzer : ILuaAnalyzer

@@ -98,6 +98,26 @@
   - Entry points on hover: the functions the game or a library calls by name, per kind of script
   - Hover on a script's own definition of an engine function: the engine's documentation
   - An entry point the game calls is not renamed
+- **Lua types per script** - every open script is analyzed in a Lua state of its own, as the game runs it: the
+  script, the files it requires and the engine's stubs. A global another script assigns no longer types this one
+  ([#278](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/278),
+  [#279](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/279))
+  - Hover and completion show the stubs' types where they showed `unknown`, also in a mod that ships the
+    vanilla libraries: the stub's annotations are written into the analyzer's copy of the library, and a library
+    no layer ships is read from its stub
+  - Go to definition from a library lists one definition per script requiring it; references and code lenses
+    there reach every script requiring it. From a script they stay in the script's state
+  - Rename is unchanged: a whole-project analyzer answers it, and nothing else
+  - A call that fits none of an engine function's call forms is a warning: `Find_Nearest(obj, player)` searches
+    without the player
+  - An argument past the parameters of a function defined in Lua is a warning, since Lua drops it. Vanilla: 6
+    per game, `SpawnList` handed a callback or a flag it never takes
+  - The analyzer's other type rules stay off. Counted over vanilla with every script in a state of its own (FoC
+    2692 findings, EaW 1062), they describe the stubs or the analyzer's inference, not the scripts
+  - Stubs: `GlobalValue` and `ThreadValue` are called and carry `Get`, `Set` and `Reset`; `Find_All_Objects_Of_Type`
+    takes a player as any filter; `Reinforce_Unit` takes three arguments; animation names match without regard
+    to case; `collectgarbage` takes its limit; the libraries' optional parameters and returns as their source
+    has them
 - **Engine types in a script's own definition of an engine function** - its parameters and return value typed
   from the engine's documentation, in the definition and at its calls
   ([#251](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/251))
@@ -209,6 +229,11 @@
 
 ### Fixes
 
+- **A library's hook** - a library calling a function a requiring script defines (`Definitions()` in
+  PGBaseDefinitions) is no longer told the defining script is not required
+  ([#279](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/279))
+- **Usages of a Lua function** - references and code lens counts leave out the stubs, which declare a function
+  and never use it ([#279](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/279))
 - **Panels in a window of several projects** - every panel belongs to one project for its whole life
   ([#276](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/276))
   - A panel opened while one project ran kept following the editor in front once a second project
@@ -326,6 +351,8 @@
   `LuaAnalyzer10` (one per analyzer rule kept)
 - **New, state machine** - `Engine8` to `Engine13` (`aetswg-011-0008` to `aetswg-011-0013`)
 - **New, reused script state** - `Engine14` to `Engine17` (`aetswg-011-0014` to `aetswg-011-0017`)
+- **New, Lua calls** - `Engine18` (`aetswg-011-0018`, a call fitting none of an engine function's call forms) and
+  `LuaAnalyzer11` (`aetswg-016-0011`, an argument past a Lua function's parameters)
 - **New, Lua 5.1 syntax** - `Syntax3011` (`aetswg-012-3011`)
 - **New, particle files** - `Preview22` (`aetswg-014-0022`, data the game's reader has no case for) and
   `Preview23` (`aetswg-014-0023`, editor data the game leaves unapplied)

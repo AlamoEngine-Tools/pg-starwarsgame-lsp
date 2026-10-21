@@ -11,6 +11,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 
 namespace PG.StarWarsGame.LSP.Lua.Analyzer;
 
@@ -30,7 +31,7 @@ namespace PG.StarWarsGame.LSP.Lua.Analyzer;
 ///         <see cref="LuaAnalyzerOptions.MaxConsecutiveCrashes" /> in a row it stays off.
 ///     </para>
 /// </remarks>
-public sealed class LuaAnalyzerHost : ILuaAnalyzer, IAsyncDisposable, IDisposable
+public sealed class LuaAnalyzerHost : ILuaAnalyzerProcess, IDisposable
 {
     private const string ConfigFileName = "emmyrc.json";
 
@@ -132,6 +133,12 @@ public sealed class LuaAnalyzerHost : ILuaAnalyzer, IAsyncDisposable, IDisposabl
     public Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
     {
         return RequestAsync((client, token) => client.SendRequest(method, parameters).Returning<T>(token), ct: ct);
+    }
+
+    /// <summary>One script instance: its folder is the workspace, the stubs it reads the library.</summary>
+    public Task StartAsync(LuaAnalyzerInstancePlan plan)
+    {
+        return StartAsync(new AnalyzerPlan([plan.Root], plan.Library));
     }
 
     private void DeleteConfigDirectory()

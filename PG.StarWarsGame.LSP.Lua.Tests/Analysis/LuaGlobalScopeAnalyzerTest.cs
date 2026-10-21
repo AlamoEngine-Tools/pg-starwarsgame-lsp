@@ -1156,4 +1156,36 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
         Assert.Empty(result);
     }
+
+    // A library runs in the state of each script requiring it, so a hook it calls is in scope
+    // wherever a requiring state defines it (measured on FoC: PGBaseDefinitions calls Definitions(),
+    // which GalacticHeroFreeStore defines - itself required by GalacticFreeStore, hence shared).
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Analyze_ALibrarysHook_IsInScopeWhereARequiringStateDefinesIt(bool definerRequiresLibrary,
+        bool warns)
+    {
+        const string library = "file:///scripts/library/pgbasedefinitions.lua";
+        const string definer = "file:///scripts/freestore/galacticherofreestore.lua";
+        const string requirer = "file:///scripts/freestore/galacticfreestore.lua";
+        const string elsewhere = "file:///scripts/ai/plan_x.lua";
+        var sym = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null, new FileOrigin(definer, 0, null),
+            null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(library, new DocumentIndex(library, 1, [], []))
+                .Add(definer, new DocumentIndex(definer, 1, [sym], [],
+                    definerRequiresLibrary ? ImmutableArray.Create("pgbasedefinitions") : []))
+                .Add(requirer, new DocumentIndex(requirer, 1, [], [], ImmutableArray.Create("galacticherofreestore")))
+                .Add(elsewhere, new DocumentIndex(elsewhere, 1, [], [], ImmutableArray.Create("pgbasedefinitions"))),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Definitions", [sym])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(library, "if Definitions then Definitions() end", index,
+            EmptySchema, s_fileHelper);
+
+        Assert.Equal(warns, result.Any(d => d.Message.Contains("Definitions")));
+    }
 }

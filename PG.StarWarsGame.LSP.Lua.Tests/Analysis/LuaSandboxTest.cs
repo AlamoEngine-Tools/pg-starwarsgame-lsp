@@ -37,6 +37,19 @@ public sealed class LuaSandboxTest
         Assert.False(sandbox.ShareAState(Interdictor, Vader));
     }
 
+    // A library is held by every state that requires it; a script only by its own.
+    [Fact]
+    public void AFileAnotherScriptRequires_IsShared_AScriptNobodyRequires_IsNot()
+    {
+        var sandbox = Sandbox((Interdictor, ["PGStateMachine"]), (Library, ["PGBase"]), (Base, []), (Vader, []));
+
+        Assert.True(sandbox.IsShared(Library));
+        Assert.True(sandbox.IsShared(Base));
+        Assert.False(sandbox.IsShared(Interdictor));
+        Assert.False(sandbox.IsShared(Vader));
+        Assert.False(sandbox.IsShared("file:///mod/data/scripts/unknown.lua"));
+    }
+
     [Fact]
     public void AScriptAndTheLibraryItRequires_ShareAState_EitherWay()
     {

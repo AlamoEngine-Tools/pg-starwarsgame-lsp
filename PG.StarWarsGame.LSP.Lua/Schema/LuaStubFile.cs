@@ -15,3 +15,6 @@ namespace PG.StarWarsGame.LSP.Lua.Schema;
 /// <param name="Name">The file name, as listed in <c>lua/_files.json</c>.</param>
 /// <param name="Content">The file's text.</param>
 public sealed record LuaStubFile(string Name, string Content);
+
+/// <summary>What a stub says about a global value: its type, and its description when it has one.</summary>
+public sealed record LuaGlobalAnnotation(string TypeName, string? Description);

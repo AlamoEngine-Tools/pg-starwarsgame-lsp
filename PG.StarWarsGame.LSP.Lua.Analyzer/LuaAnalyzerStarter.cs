@@ -4,6 +4,7 @@
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 
 namespace PG.StarWarsGame.LSP.Lua.Analyzer;
 
@@ -15,11 +16,14 @@ public interface ILuaAnalyzerStarter
 }
 
 /// <summary>
-///     Starts the analyzer when <c>features.lua.analyzer</c> is on and its executable was found,
-///     pointed at the leaf project's scripts with the lower layers and the engine stubs as library.
+///     When <c>features.lua.analyzer</c> is on and its executable was found: hands the layers to the
+///     per-script analyzers - from then on every open script gets one of its own, resolved over them -
+///     and starts the whole-project analyzer, the leaf's scripts with the lower layers and every stub as
+///     its library, which answers renames and where a library is used (<see cref="LuaAnalyzerRoutes" />).
 /// </summary>
 public sealed class LuaAnalyzerStarter(
-    LuaAnalyzerHost host,
+    ILuaAnalyzerLayers instances,
+    LuaAnalyzerHost project,
     ILspConfigurationProvider config,
     LuaStubLocation stubs,
     bool executableFound,
@@ -41,11 +45,14 @@ public sealed class LuaAnalyzerStarter(
             return;
         }
 
+        instances.Configure(layers);
         // In the file system's own spelling: the analyzer compares paths as written (measured live).
         var plan = EmmyrcWriter.Plan(layers, stubs.Directory);
-        await host.StartAsync(new AnalyzerPlan(
-            plan.WorkspaceRoots.Select(PathCasing.OnDisk).ToList(),
-            plan.Library.Select(PathCasing.OnDisk).ToList()));
+        await project.StartAsync(plan with
+        {
+            WorkspaceRoots = plan.WorkspaceRoots.Select(PathCasing.OnDisk).ToList(),
+            Library = plan.Library.Select(PathCasing.OnDisk).ToList()
+        });
     }
 }
 
