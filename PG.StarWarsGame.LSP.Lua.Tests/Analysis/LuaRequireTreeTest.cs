@@ -20,7 +20,8 @@ public sealed class LuaRequireTreeTest
     private const string Base = "file:///mod/data/scripts/library/pgbase.lua";
     private const string Other = "file:///mod/data/scripts/gameobject/darthvader.lua";
 
-    private static ImmutableDictionary<string, DocumentIndex> Documents(params (string Uri, string[] Requires)[] scripts)
+    private static ImmutableDictionary<string, DocumentIndex> Documents(
+        params (string Uri, string[] Requires)[] scripts)
     {
         return scripts.ToImmutableDictionary(s => s.Uri, s => new DocumentIndex(s.Uri, 1, [], [], [.. s.Requires]));
     }

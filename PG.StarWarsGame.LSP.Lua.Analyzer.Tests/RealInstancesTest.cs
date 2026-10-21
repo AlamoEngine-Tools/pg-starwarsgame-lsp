@@ -104,7 +104,8 @@ public sealed class RealInstancesTest
         {
             var hover = await analyzer.RequestAsync<Hover>("textDocument/hover", new HoverParams
             {
-                TextDocument = new TextDocumentIdentifier(DocumentUri.From(uri)), Position = new Position(line, character)
+                TextDocument = new TextDocumentIdentifier(DocumentUri.From(uri)),
+                Position = new Position(line, character)
             }, CancellationToken.None);
             text = hover?.Contents.MarkupContent?.Value ?? "";
             if (text.Length > 0 && ready(text)) return text;

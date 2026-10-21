@@ -92,8 +92,9 @@ public sealed class LuaAnalyzerInstancesTest
 
     private static string PlaceIn(FakeProcess process, string real)
     {
-        return process.Texts.Keys.Single(k => k.EndsWith(real[real.IndexOf("/Data/Scripts/", StringComparison.Ordinal)..]
-            ["/Data/Scripts".Length..], StringComparison.OrdinalIgnoreCase));
+        return process.Texts.Keys.Single(k =>
+            k.EndsWith(real[real.IndexOf("/Data/Scripts/", StringComparison.Ordinal)..]
+                ["/Data/Scripts".Length..], StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -109,7 +110,8 @@ public sealed class LuaAnalyzerInstancesTest
         Assert.Equal("Definitions()\n", process.Texts[PlaceIn(process, Script)]);
         Assert.Equal("function Definitions() end\n", process.Texts[PlaceIn(process, Machine)]);
         Assert.Equal("function TestValid(wrapper) end\n", process.Texts[PlaceIn(process, Base)]);
-        Assert.All(process.Texts.Keys, k => Assert.StartsWith("file:///" + process.Plan!.Root.Replace('\\', '/') + "/", k));
+        Assert.All(process.Texts.Keys,
+            k => Assert.StartsWith("file:///" + process.Plan!.Root.Replace('\\', '/') + "/", k));
     }
 
     [Fact]
@@ -190,8 +192,16 @@ public sealed class LuaAnalyzerInstancesTest
         var process = _processes[0];
         process.Answer = (_, _) => JToken.FromObject(new[]
         {
-            new { uri = PlaceIn(process, Base), range = new { start = new { line = 0, character = 9 }, end = new { line = 0, character = 18 } } },
-            new { uri = "file:///C:/schema/lua/api.d.lua", range = new { start = new { line = 3, character = 0 }, end = new { line = 3, character = 1 } } }
+            new
+            {
+                uri = PlaceIn(process, Base),
+                range = new { start = new { line = 0, character = 9 }, end = new { line = 0, character = 18 } }
+            },
+            new
+            {
+                uri = "file:///C:/schema/lua/api.d.lua",
+                range = new { start = new { line = 3, character = 0 }, end = new { line = 3, character = 1 } }
+            }
         });
 
         var answer = await instances.RequestAsync<JArray>("textDocument/definition",
@@ -201,7 +211,8 @@ public sealed class LuaAnalyzerInstancesTest
                 Position = new Position(0, 2)
             }, CancellationToken.None);
 
-        Assert.Equal(PlaceIn(process, Script), process.Requests.Single().Parameters["textDocument"]!["uri"]!.Value<string>());
+        Assert.Equal(PlaceIn(process, Script),
+            process.Requests.Single().Parameters["textDocument"]!["uri"]!.Value<string>());
         Assert.Empty(_processes[1].Requests);
         Assert.Equal([Base, "file:///C:/schema/lua/api.d.lua"], answer!.Select(l => l["uri"]!.Value<string>()));
     }

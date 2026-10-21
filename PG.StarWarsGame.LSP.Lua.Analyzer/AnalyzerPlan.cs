@@ -36,7 +36,9 @@ public sealed record AnalyzerPlan(
         return JsonSerializer.Serialize(new
         {
             runtime = new { version = "Lua5.1" }, // the engine is 5.0.2, which nothing models; 5.1 plus stubs
-            workspace = Encoding is null ? (object)new { library = Library } : new { library = Library, encoding = Encoding },
+            workspace = Encoding is null
+                ? (object)new { library = Library }
+                : new { library = Library, encoding = Encoding },
             diagnostics = new { disable = DisabledRules }
         }, new JsonSerializerOptions { WriteIndented = true });
     }
