@@ -187,6 +187,7 @@ public static class ServerConfigurator
             .WithHandler<ListModelsHandler>()
             .WithHandler<GetSymbolOutlineHandler>()
             .WithHandler<GetSymbolPageHandler>()
+            .WithHandler<GetSymbolNodeHandler>()
             .WithHandler<GetServerStatusHandler>()
             .WithHandler<GetModelGlbHandler>()
             .WithHandler<GetModelDetailHandler>()

@@ -11,6 +11,33 @@ export type SymbolOutline = "gameData" | "assets" | "schema";
 
 export const GET_SYMBOL_OUTLINE = "aet/getSymbolOutline";
 export const GET_SYMBOL_PAGE = "aet/getSymbolPage";
+export const GET_SYMBOL_NODE = "aet/getSymbolNode";
+
+/** The entry whose relation a page lists, in place of the page's own entries. */
+export interface SymbolParent {
+    page: string;
+    id: string;
+    /** `models`, `referencedBy`, `definitions` and the rest. */
+    relation: string;
+}
+
+export interface GetSymbolNodeParams {
+    page: string;
+    id: string;
+}
+
+/** One relation of an opened entry; a reason says why it lists none. */
+export interface SymbolRelation {
+    relation: string;
+    count: number;
+    /** `none`, or `notInModFiles` when the entry's tags are not known. */
+    reason?: string | null;
+}
+
+export interface GetSymbolNodeResult {
+    entry?: SymbolRow | null;
+    relations: SymbolRelation[];
+}
 
 export interface GetSymbolOutlineParams {
     outline: SymbolOutline;
@@ -43,6 +70,8 @@ export interface GetSymbolPageParams {
     origins?: string[];
     offset?: number;
     limit?: number;
+    /** When set, the page lists this entry's relation. */
+    parent?: SymbolParent;
 }
 
 /** One entry, as the definition the game uses. */

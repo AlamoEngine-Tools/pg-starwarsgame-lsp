@@ -29,11 +29,24 @@ public sealed class SymbolCatalog
 
     private readonly Dictionary<string, IReadOnlyList<string>> _outlines;
     private readonly Dictionary<string, List<SymbolRow>> _pages;
+    private readonly Dictionary<string, SymbolRow> _xmlById;
+    private readonly Dictionary<string, Dictionary<string, SymbolRow>> _byName;
 
     private SymbolCatalog(Dictionary<string, List<SymbolRow>> pages, Dictionary<string, IReadOnlyList<string>> outlines)
     {
         _pages = pages;
         _outlines = outlines;
+        _xmlById = new Dictionary<string, SymbolRow>(StringComparer.OrdinalIgnoreCase);
+        _byName = new Dictionary<string, Dictionary<string, SymbolRow>>(StringComparer.Ordinal);
+        foreach (var (page, rows) in pages)
+        {
+            var byName = _byName[page] = new Dictionary<string, SymbolRow>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows)
+            {
+                byName.TryAdd(row.Name, row);
+                if (page.StartsWith("xml:", StringComparison.Ordinal)) _xmlById.TryAdd(row.Id, row);
+            }
+        }
     }
 
     /// <summary>The catalog of an index, built on first use and kept as long as the index is.</summary>
@@ -87,7 +100,28 @@ public sealed class SymbolCatalog
     public GetSymbolPageResult Page(GetSymbolPageParams request)
     {
         if (!_pages.TryGetValue(request.Page, out var rows)) return new GetSymbolPageResult([], 0);
+        return Filter(rows, request);
+    }
 
+    /// <summary>The row an entry of a page is listed as, by its id or name; null when there is none.</summary>
+    public SymbolRow? Find(string page, string idOrName)
+    {
+        if (page.StartsWith("xml:", StringComparison.Ordinal))
+            return _xmlById.GetValueOrDefault(idOrName);
+        return _byName.TryGetValue(page, out var byName)
+            ? byName.GetValueOrDefault(idOrName) ?? _pages[page].FirstOrDefault(r => r.Id == idOrName)
+            : null;
+    }
+
+    /// <summary>The row of an XML object, on whatever page its type puts it; null when none defines it.</summary>
+    public SymbolRow? FindObject(string id)
+    {
+        return _xmlById.GetValueOrDefault(id);
+    }
+
+    /// <summary>Rows filtered by the request's query, kinds and origins, and paged.</summary>
+    public static GetSymbolPageResult Filter(IReadOnlyList<SymbolRow> rows, GetSymbolPageParams request)
+    {
         IEnumerable<SymbolRow> matching = rows;
         if (request.Origins is { Count: > 0 } origins)
             matching = matching.Where(r => origins.Contains(r.Origin, StringComparer.Ordinal));

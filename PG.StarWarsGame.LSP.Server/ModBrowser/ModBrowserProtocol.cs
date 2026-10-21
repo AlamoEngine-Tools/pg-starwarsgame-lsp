@@ -44,7 +44,28 @@ public sealed record GetSymbolPageParams(string Page) : IRequest<GetSymbolPageRe
     public int Offset { get; init; }
 
     public int Limit { get; init; } = 200;
+
+    /// <summary>When set, the page lists one relation of this entry rather than the page's own entries.</summary>
+    public SymbolParent? Parent { get; init; }
 }
+
+/// <param name="Page">The page the entry is listed on.</param>
+/// <param name="Id">The entry's id.</param>
+/// <param name="Relation">The relation to list: <c>models</c>, <c>referencedBy</c>, <c>definitions</c> and the rest.</param>
+public sealed record SymbolParent(string Page, string Id, string Relation);
+
+/// <summary>One entry, opened: its row and what it relates to, each relation counted.</summary>
+[Method("aet/getSymbolNode", Direction.ClientToServer)]
+public sealed record GetSymbolNodeParams(string Page, string Id) : IRequest<GetSymbolNodeResult>;
+
+/// <param name="Entry">The entry's row; null when the page lists no such entry.</param>
+/// <param name="Relations">Its relations, in the order the panel shows them.</param>
+public sealed record GetSymbolNodeResult(SymbolRow? Entry, IReadOnlyList<SymbolRelation> Relations);
+
+/// <param name="Relation">The relation's key.</param>
+/// <param name="Count">How many entries it lists.</param>
+/// <param name="Reason">Why it lists none: <c>none</c>, or <c>notInModFiles</c> when the entry's tags are not known.</param>
+public sealed record SymbolRelation(string Relation, int Count, string? Reason);
 
 /// <param name="Rows">The requested slice, sorted by name, prefix matches of the query first.</param>
 /// <param name="Total">How many entries match before paging.</param>
