@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Testing;
 using PG.StarWarsGame.LSP.Xml;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -119,6 +120,38 @@ public sealed class GameRenameHandlerTest
             handler.Handle(RenameAt(ModScript), CancellationToken.None));
 
         Assert.StartsWith("Rename refused: ", refusal.Message, StringComparison.Ordinal);
+    }
+
+    public static TheoryData<string, int> SetupsAndRanks()
+    {
+        var data = new TheoryData<string, int>();
+        foreach (var (name, rank) in ProjectSetup.NamesAndRanks) data.Add(name, rank);
+        return data;
+    }
+
+    // Every shape, the second edit in every layer (#280): within the leaf the rename goes through;
+    // an edit to any lower layer's file refuses it whole.
+    [Theory]
+    [MemberData(nameof(SetupsAndRanks))]
+    public async Task TheAnalyzersRename_InEveryShape_GoesThroughOnlyInsideTheLeaf(string name, int rank)
+    {
+        var setup = ProjectSetup.Named(name);
+        var layers = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
+        layers.SetLayers(setup.Layers);
+        var mine = setup.ScriptUri(setup.LeafRank, "Story/A.lua");
+        var other = setup.ScriptUri(rank, "Library/PGBase.lua");
+        var handler = BuildHandler(luaProvider: new ClaimsNothing(),
+            analyzer: new AnswerOnce("textDocument/rename", EditOf(mine, other)), layers: layers);
+
+        if (rank != setup.LeafRank)
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                handler.Handle(RenameAt(mine), CancellationToken.None));
+            return;
+        }
+
+        var result = await handler.Handle(RenameAt(mine), CancellationToken.None);
+        Assert.Equal(2, result!.Changes!.Count);
     }
 
     /// <summary>Two story scripts are two states: renaming a global in one leaves the other alone (#249).</summary>

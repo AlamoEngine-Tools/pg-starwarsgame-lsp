@@ -47,6 +47,10 @@ public sealed class ProjectSetup
     /// <summary>The shapes' names, for theory data: a name serializes, a setup does not.</summary>
     public static IReadOnlyList<string> Names { get; } = All.Select(s => s.Name).ToList();
 
+    /// <summary>Every shape with every rank in it, for a test that puts a file in each layer in turn.</summary>
+    public static IReadOnlyList<(string Name, int Rank)> NamesAndRanks { get; } =
+        All.SelectMany(s => s.Layers.Select(l => (s.Name, l.Rank))).ToList();
+
     public string Name { get; }
 
     /// <summary>The projects' names, lowest layer first.</summary>
@@ -58,6 +62,21 @@ public sealed class ProjectSetup
     public ProjectLayer Leaf => Layers[^1];
 
     public int LeafRank => Layers.Count - 1;
+
+    /// <summary>
+    ///     The configuration the server is started with: the layers, and their directories merged
+    ///     dependencies first, as <c>ModProjectResolver</c> merges them.
+    /// </summary>
+    public WorkspaceConfiguration Configuration()
+    {
+        return new WorkspaceConfiguration(
+            [.. Layers.SelectMany(l => l.XmlDirectories)], [.. Layers.SelectMany(l => l.ScriptRoots)],
+            [.. Layers.SelectMany(l => l.TextRoots)], [.. Layers.SelectMany(l => l.AssetRoots)], "CSV")
+        {
+            Layers = Layers,
+            StoryDialogRoots = [.. Layers.SelectMany(l => l.StoryDialogRoots)]
+        };
+    }
 
     public static ProjectSetup Named(string name)
     {

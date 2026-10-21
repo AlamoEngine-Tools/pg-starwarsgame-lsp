@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Testing;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
@@ -62,6 +63,36 @@ public sealed class DiagnosticsPublisherBaseTest
             new ProjectLayer(1, "My Mod", [modXml], [], [], [], null, "/mod/mod.pgproj")
         ]);
         return (map, depXml, modXml);
+    }
+
+    public static TheoryData<string, int> SetupsAndRanks()
+    {
+        var data = new TheoryData<string, int>();
+        foreach (var (name, rank) in ProjectSetup.NamesAndRanks) data.Add(name, rank);
+        return data;
+    }
+
+    // Every shape, a file in every layer (#280): the project the server runs for raises it, and a
+    // file of a lower layer names that layer.
+    [Theory]
+    [MemberData(nameof(SetupsAndRanks))]
+    public void Publish_InEveryShape_StampsTheLeaf_AndNamesALowerLayer(string name, int rank)
+    {
+        var setup = ProjectSetup.Named(name);
+        var map = new ProjectLayerMap(new FileHelper(new MockFileSystem()));
+        map.SetLayers(setup.Layers);
+        var uri = setup.Uri(rank, "Xml/Units.xml");
+        var (published, indexService, host) = BuildWithOrigin(map, Problem());
+        host.Add(uri, "<Root/>");
+
+        indexService.Fire(IndexWithDoc(uri));
+
+        var diagnostic = Assert.Single(Assert.Single(published).Diagnostics);
+        Assert.Equal("aetswg (Mod)", diagnostic.Source);
+        if (rank == setup.LeafRank)
+            Assert.Null(diagnostic.RelatedInformation);
+        else
+            Assert.Equal("Layer - " + setup.Projects[rank], Assert.Single(diagnostic.RelatedInformation!).Message);
     }
 
     private static Diagnostic Problem(string? source = null)

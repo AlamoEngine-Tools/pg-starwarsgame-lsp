@@ -17,6 +17,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -1542,6 +1543,29 @@ public sealed class WorkspaceIndexerTest
     ///     starts, one shared disk: alone, under a leaf, alone again. The third start parses
     ///     nothing, and the leaf start did not replace the dependency's snapshot.
     /// </summary>
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // Every shape (#280): the layers' roots are lower-cased, the disk keeps its case, and every layer's
+    // file is indexed once.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public async Task IndexDocumentsAsync_InEveryShape_IndexesEveryLayersFiles(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var fs = setup.Disk();
+        foreach (var layer in setup.Layers)
+            fs.AddFile(setup.PathOf(layer.Rank, "Xml/Units.xml"), new MockFileData("<Root/>"));
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), new FakeParser());
+        var configuration = setup.Configuration();
+
+        indexer.PreScanMetafiles(configuration, [.. setup.Layers.Select(l => setup.FolderOf(l.Rank))]);
+        await indexer.IndexDocumentsAsync(configuration, CancellationToken.None);
+
+        foreach (var layer in setup.Layers)
+            Assert.Single(svc.Calls, c => DocumentUris.Same(c.Uri, setup.Uri(layer.Rank, "Xml/Units.xml")));
+    }
+
     [Fact]
     public async Task IndexDocumentsAsync_ADependencyOpenedAloneThenUnderALeaf_KeepsItsSnapshot()
     {

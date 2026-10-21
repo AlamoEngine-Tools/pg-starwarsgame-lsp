@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 
@@ -636,6 +637,35 @@ public sealed class GameIndexServiceTest
 
         var winner = svc.Current.Resolve("UNIT_A");
         Assert.Equal("file:///rev/u.xml", ((FileOrigin)winner!.Origin).Uri);
+    }
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
+
+    // Every shape (#280): each layer defines the object, each file is stamped with its layer, and the
+    // leaf's definition wins - through the real layer map and the URI as the editor sends it.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public async Task UpdateDocument_InEveryShape_StampsEachLayer_AndTheLeafWins(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var fileHelper = new FileHelper(new MockFileSystem());
+        var layerMap = new ProjectLayerMap(fileHelper);
+        layerMap.SetLayers(setup.Layers);
+        var svc = new GameIndexService(fileHelper, [new PerUriParser("UNIT_A")], NullLogger<GameIndexService>.Instance,
+            layerMap);
+
+        foreach (var layer in setup.Layers)
+            await svc.UpdateDocumentAsync(setup.Uri(layer.Rank, "Xml/Units.xml"), "<X/>", 1, default);
+
+        foreach (var layer in setup.Layers)
+        {
+            var document = svc.Current.Documents[fileHelper.NormalizeUri(setup.Uri(layer.Rank, "Xml/Units.xml"))];
+            Assert.Equal(layer.Rank, document.LayerRank);
+            Assert.Equal(layer.Name, document.LayerName);
+        }
+
+        var winner = (FileOrigin)svc.Current.Resolve("UNIT_A")!.Origin;
+        Assert.True(DocumentUris.Same(setup.Uri(setup.LeafRank, "Xml/Units.xml"), winner.Uri));
     }
 
     [Fact]

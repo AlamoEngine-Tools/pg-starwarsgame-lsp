@@ -28,8 +28,16 @@ public sealed class ProjectSetupTest
             NullLogger<ModProjectResolver>.Instance);
         var leaf = setup.ProjectFileOf(setup.LeafRank);
 
-        var resolved = resolver.Resolve(leaf, loader.Load(leaf)).Layers;
+        var configuration = resolver.Resolve(leaf, loader.Load(leaf));
+        var resolved = configuration.Layers;
+        var expectedConfiguration = setup.Configuration();
 
+        Assert.Equal(expectedConfiguration.XmlDirectories, configuration.XmlDirectories);
+        Assert.Equal(expectedConfiguration.ScriptRoots, configuration.ScriptRoots);
+        Assert.Equal(expectedConfiguration.TextRoots, configuration.TextRoots);
+        Assert.Equal(expectedConfiguration.AssetRoots, configuration.AssetRoots);
+        Assert.Equal(expectedConfiguration.StoryDialogRoots, configuration.StoryDialogRoots);
+        Assert.Equal(expectedConfiguration.TextResourceType, configuration.TextResourceType);
         Assert.Equal(setup.Layers.Count, resolved.Count);
         for (var rank = 0; rank < resolved.Count; rank++)
         {
