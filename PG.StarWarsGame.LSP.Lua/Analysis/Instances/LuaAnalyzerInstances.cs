@@ -42,6 +42,10 @@ namespace PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAsyncDisposable, IDisposable
 {
     private const string RootFolder = "root";
+    private const string Lenses = "textDocument/codeLens";
+    private const string LensResolve = "codeLens/resolve";
+    private const string LensScript = "aet.script";
+    private const string LensData = "data";
     private static readonly JsonSerializer s_json = new LspSerializer().JsonSerializer;
 
     private readonly string _directory;
@@ -166,7 +170,11 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
     public async Task<T?> RequestAsync<T>(string method, object parameters, CancellationToken ct) where T : class
     {
         var request = JToken.FromObject(parameters, s_json);
-        var origin = request["textDocument"]?["uri"]?.Value<string>() ?? request["data"]?["uri"]?.Value<string>();
+        // A lens names its declaration alone (measured, 0.25.1), so each carries the script whose
+        // analyzer made it, and its resolve goes back there with the lens as made.
+        var lens = method == LensResolve ? request["data"] as JObject : null;
+        if (lens?[LensScript] is not null) request["data"] = lens[LensData];
+        var origin = request["textDocument"]?["uri"]?.Value<string>() ?? lens?[LensScript]?.Value<string>();
         Instance? instance;
         lock (_gate)
         {
@@ -180,6 +188,11 @@ public sealed class LuaAnalyzerInstances : ILuaAnalyzer, ILuaAnalyzerLayers, IAs
         {
             instance.Mirror.ToReal(answer);
         }
+
+        if (method == LensResolve && answer is JObject resolved) resolved["data"] = lens;
+        if (method == Lenses && answer is JArray made)
+            foreach (var item in made.OfType<JObject>())
+                item["data"] = new JObject { [LensScript] = origin, [LensData] = item["data"] ?? JValue.CreateNull() };
 
         return answer.ToObject<T>(s_json);
     }

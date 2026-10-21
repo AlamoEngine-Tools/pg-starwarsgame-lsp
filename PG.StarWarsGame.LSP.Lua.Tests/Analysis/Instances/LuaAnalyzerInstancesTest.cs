@@ -206,6 +206,38 @@ public sealed class LuaAnalyzerInstancesTest
         Assert.Equal([Base, "file:///C:/schema/lua/api.d.lua"], answer!.Select(l => l["uri"]!.Value<string>()));
     }
 
+    // A lens names its declaration alone - {"DeclId": "0|2074"}, measured on FoC - so its resolve
+    // carries no document and would reach no analyzer.
+    [Fact]
+    public async Task ALensResolve_GoesToTheAnalyzerThatMadeTheLens_WithTheLensItMade()
+    {
+        var instances = Instances();
+        instances.Configure(Layers);
+        instances.DidOpen(Script, "", 1);
+        instances.DidOpen(Other, "", 1);
+        var process = _processes[0];
+        var range = new { start = new { line = 0, character = 9 }, end = new { line = 0, character = 18 } };
+        process.Answer = (method, request) => method == "textDocument/codeLens"
+            ? JToken.FromObject(new[] { new { range, data = new { DeclId = "0|2074" } } })
+            : new JObject
+            {
+                ["range"] = request["range"], ["data"] = request["data"],
+                ["command"] = new JObject { ["title"] = "1 usage", ["command"] = "editor.action.showReferences" }
+            };
+
+        var lenses = await instances.RequestAsync<JArray>("textDocument/codeLens",
+            new CodeLensParams { TextDocument = new TextDocumentIdentifier(DocumentUri.From(Script)) },
+            CancellationToken.None);
+        var resolved = await instances.RequestAsync<JObject>("codeLens/resolve", lenses!.Single(),
+            CancellationToken.None);
+
+        var (method, sent) = process.Requests[^1];
+        Assert.Equal("codeLens/resolve", method);
+        Assert.True(JToken.DeepEquals(new JObject { ["DeclId"] = "0|2074" }, sent["data"]));
+        Assert.Empty(_processes[1].Requests);
+        Assert.Equal("1 usage", resolved!["command"]!["title"]!.Value<string>());
+    }
+
     [Fact]
     public void TheScriptsFindings_ReachOutUnderItsOwnUri_FindingsOnTheFilesItRequiresDoNot()
     {
