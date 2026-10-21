@@ -21,6 +21,9 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     // (nothing an index records depends on them).
     private readonly IReadOnlyDictionary<string, LuaEntryPoint> _entryPoints;
 
+    // `---@type Player` above `PlayerObject = nil`, engine stubs only.
+    private readonly IReadOnlyDictionary<string, string> _globalTypes;
+
     /// <summary>
     ///     The three stub files that describe what the ENGINE binds into every script. Everything
     ///     else the manifest lists documents a vanilla library - names a script gets only by
@@ -55,6 +58,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         var functions = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
         var memberRefs = new Dictionary<string, List<XmlRefEntry>>(StringComparer.OrdinalIgnoreCase);
         var declaredGlobals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var globalTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var engineFunctions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var stub in stubs)
         {
@@ -62,7 +66,8 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
             // own files declare what every script can call.
             var isEngine = EngineStubFiles.Contains(stub.Name);
             var found = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
-            ParseContent(stub.Content, found, memberRefs, isEngine ? declaredGlobals : []);
+            ParseContent(stub.Content, found, memberRefs, isEngine ? declaredGlobals : [],
+                isEngine ? globalTypes : new Dictionary<string, string>());
             foreach (var (name, entry) in found)
             {
                 functions[name] = entry;
@@ -82,6 +87,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         AllFunctionNames = new HashSet<string>(functions.Keys, StringComparer.OrdinalIgnoreCase);
         declaredGlobals.UnionWith(engineFunctions);
         DeclaredGlobalNames = declaredGlobals;
+        _globalTypes = globalTypes;
     }
 
     public IReadOnlySet<string> AllFunctionNames { get; }
@@ -111,6 +117,16 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         return _functions.TryGetValue(functionName, out var entry) ? entry.Params : [];
     }
 
+    public IReadOnlyList<IReadOnlyList<LuaParamAnnotation>> GetCallForms(string functionName)
+    {
+        return _functions.TryGetValue(functionName, out var entry) ? entry.Forms : [];
+    }
+
+    public string? GetGlobalTypeName(string globalName)
+    {
+        return _globalTypes.GetValueOrDefault(globalName);
+    }
+
     public LuaEntryPoint? GetEntryPoint(string functionName)
     {
         return _entryPoints.GetValueOrDefault(functionName);
@@ -120,7 +136,8 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         string content,
         Dictionary<string, FunctionEntry> functions,
         Dictionary<string, List<XmlRefEntry>> memberRefs,
-        HashSet<string> declaredGlobals)
+        HashSet<string> declaredGlobals,
+        Dictionary<string, string> globalTypes)
     {
         // Accumulate comment lines (--- stripped) for EmmyLuaAnnotationParser.
         var commentLines = new List<string>();
@@ -129,6 +146,11 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         var refs = new List<XmlRefEntry>();
         var paramCount = 0;
         IReadOnlyList<string> paramLiterals = [];
+        // A function's call forms (`---@overload fun(...)`); an engine table's class (`---@class X`
+        // above `X = {}`), whose overload is the table's own call and no form; a value's `---@type`.
+        var overloads = new List<IReadOnlyList<LuaParamAnnotation>>();
+        string? className = null;
+        string? typeName = null;
 
         foreach (var rawLine in content.Split('\n'))
         {
@@ -144,6 +166,19 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
             {
                 if (paramCount > 0 && TryParseReferenceTag(line, paramCount - 1, paramLiterals) is { } entry)
                     refs.Add(entry);
+            }
+            else if (line.StartsWith("---@overload", StringComparison.Ordinal))
+            {
+                if (OverloadRegex().Match(line) is { Success: true } overload)
+                    overloads.Add(ParseFormParams(overload.Groups["params"].Value));
+            }
+            else if (line.StartsWith("---@class", StringComparison.Ordinal))
+            {
+                className = line[9..].Trim().Split(' ', ':')[0];
+            }
+            else if (line.StartsWith("---@type", StringComparison.Ordinal))
+            {
+                typeName = line[8..].Trim().Split(' ')[0];
             }
             else if (line.StartsWith("---", StringComparison.Ordinal))
             {
@@ -181,13 +216,12 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
                         var @params = annotations.Params.IsDefaultOrEmpty
                             ? (IReadOnlyList<LuaParamAnnotation>)[]
                             : [.. annotations.Params];
-                        functions[name] = new FunctionEntry([.. refs], annotations.Description, retType, @params);
+                        functions[name] = new FunctionEntry([.. refs], annotations.Description, retType, @params,
+                            [.. overloads]);
                     }
                 }
 
-                commentLines.Clear();
-                refs.Clear();
-                paramCount = 0;
+                Reset();
             }
             else
             {
@@ -195,17 +229,59 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
                 // Stub files have no nesting, so every assignment line is top level.
                 var assignment = GlobalAssignmentRegex().Match(line);
                 if (assignment.Success)
-                    declaredGlobals.Add(assignment.Groups["name"].Value);
+                {
+                    var name = assignment.Groups["name"].Value;
+                    declaredGlobals.Add(name);
+                    if (typeName is not null) globalTypes[name] = typeName;
+
+                    // An engine table (`---@class FogOfWar` ... `FogOfWar = {}`) is also callable: its
+                    // @param and @aetref lines describe the call, as a function's would.
+                    if (string.Equals(className, name, StringComparison.Ordinal))
+                    {
+                        var annotations = EmmyLuaAnnotationParser.Parse(commentLines);
+                        functions[name] = new FunctionEntry([.. refs], annotations.Description,
+                            annotations.Returns.IsDefaultOrEmpty ? null : annotations.Returns[0].Type.Raw,
+                            annotations.Params.IsDefaultOrEmpty ? [] : [.. annotations.Params], []);
+                    }
+                }
 
                 if (line.Length == 0 || !line.StartsWith("---", StringComparison.Ordinal))
-                {
-                    commentLines.Clear();
-                    refs.Clear();
-                    paramCount = 0;
-                }
+                    Reset();
             }
         }
+
+        return;
+
+        void Reset()
+        {
+            commentLines.Clear();
+            refs.Clear();
+            paramCount = 0;
+            overloads.Clear();
+            className = null;
+            typeName = null;
+        }
     }
+
+    // `name: Type, other?: Type, ...: Type` -> parameters. A name and its type are split at the first
+    // `: `; types themselves hold no top-level comma in the stubs (no `fun(...)` or table types here).
+    private static IReadOnlyList<LuaParamAnnotation> ParseFormParams(string text)
+    {
+        return
+        [
+            .. text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(p =>
+                {
+                    var colon = p.IndexOf(':', StringComparison.Ordinal);
+                    var name = colon < 0 ? p : p[..colon].Trim();
+                    var type = colon < 0 ? "any" : p[(colon + 1)..].Trim();
+                    return new LuaParamAnnotation(name.TrimEnd('?'), name.EndsWith('?'), new LuaTypeRef(type), null);
+                })
+        ];
+    }
+
+    [GeneratedRegex(@"^---@overload\s+fun\((?<params>[^)]*)\)")]
+    private static partial Regex OverloadRegex();
 
     // `---@aetref <ReferenceKind>[:<referenceType>]`. An unknown kind drops the tag rather than guessing.
     private static XmlRefEntry? TryParseReferenceTag(string line, int paramIndex, IReadOnlyList<string> literals)
@@ -260,5 +336,6 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         IReadOnlyList<XmlRefEntry> XmlRefs,
         string? Description,
         string? ReturnTypeName,
-        IReadOnlyList<LuaParamAnnotation> Params);
+        IReadOnlyList<LuaParamAnnotation> Params,
+        IReadOnlyList<IReadOnlyList<LuaParamAnnotation>> Forms);
 }

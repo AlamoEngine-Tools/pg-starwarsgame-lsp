@@ -791,6 +791,14 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId LuaPooledScriptEventsNotReset = new(DiagnosticGroup.Engine, 17);
 
+    /// <summary>
+    ///     A call to an engine function that tells its call forms apart - by the argument count and by
+    ///     the type it finds at a position - fits none of them. The engine then reads the arguments
+    ///     as another form or rejects the call: <c>Find_Nearest(obj, player)</c> searches without
+    ///     the player.
+    /// </summary>
+    public static readonly DiagnosticId LuaNoCallFormFits = new(DiagnosticGroup.Engine, 18);
+
     // ── Syntax ──
     // Lua's parse errors come from Loretta already numbered and are mapped across by
     // LorettaDiagnosticIds, which owns 1-2999 of this group. Anything declared here must start at

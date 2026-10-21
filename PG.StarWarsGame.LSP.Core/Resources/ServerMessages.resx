@@ -1210,6 +1210,9 @@ Called with `OnEnter` once, `OnUpdate` every service tick until the state change
   <data name="LuaPooledState_EventsNotReset" xml:space="preserve">
     <value>This script's state is reused for its next instance, and nothing that runs on release calls GetEvent.Reset(): Task force events left in the queue reach the next instance.</value>
   </data>
+  <data name="LuaCallForm_NoFormFits" xml:space="preserve">
+    <value>No call form of {0} takes {1}: The engine reads the arguments as another form or rejects the call.</value>
+  </data>
   <data name="LuaPooledState_HostGlobalTooEarly" xml:space="preserve">
     <value>'{0}' is read in {1}: The game sets it only after Base_Definitions returns, so it is nil here.</value>
   </data>

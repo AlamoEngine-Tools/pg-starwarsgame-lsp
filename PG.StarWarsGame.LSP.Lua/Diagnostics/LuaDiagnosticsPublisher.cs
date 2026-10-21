@@ -159,6 +159,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
             messages));
         diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(parsed.Tree, uri, messages));
         diagnostics.AddRange(LuaPlanAnalyzer.Analyze(uri, parsed.Tree, messages));
+        diagnostics.AddRange(LuaCallFormAnalyzer.Analyze(uri, parsed.Tree, _schemaProvider, messages));
         diagnostics.AddRange(LuaStateMachineAnalyzer.Analyze(uri, parsed.Tree,
             LuaStateMachineContract.For(_fileHelper.NormalizeUri(uri), index.Documents, _parseCache, _fileHelper),
             messages));

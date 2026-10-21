@@ -300,6 +300,26 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Equal(DiagnosticIds.LuaPlanThreadFunctionMissing.ToString(), diagnostic.Code?.String);
     }
 
+    [Fact]
+    public void OnIndexChanged_CallThatFitsNoForm_PublishesTheCallFormDiagnostic()
+    {
+        var schema = new LuaApiSchemaProvider([
+            """
+            ---@overload fun(origin: GameObject): GameObject
+            ---@overload fun(origin: GameObject, player: Player, match_allegiance: boolean): GameObject
+            function Find_Nearest(origin, player, match_allegiance) end
+            ---@type Player
+            PlayerObject = nil
+            """
+        ]);
+        var (_, published, indexService, workspaceHost) = Build(schema);
+        workspaceHost.Set(LuaUri, "local origin = nil\nFind_Nearest(origin, PlayerObject)\n");
+        indexService.Fire(GameIndex.Empty);
+
+        Assert.Contains(Assert.Single(published).Diagnostics!,
+            d => d.Code?.String == DiagnosticIds.LuaNoCallFormFits.ToString());
+    }
+
     // The state machine rules hold where the script's state loads a library with the contract (#252).
     [Fact]
     public void OnIndexChanged_TransitionToAnUnregisteredState_PublishesTheStateMachineDiagnostic()

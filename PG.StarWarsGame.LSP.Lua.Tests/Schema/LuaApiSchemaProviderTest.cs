@@ -45,6 +45,69 @@ public sealed class LuaApiSchemaProviderTest
         Assert.Contains("find_first_object", provider.AllFunctionNames, StringComparer.OrdinalIgnoreCase);
     }
 
+    // ── GetCallForms ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetCallForms_ReadsEachOverloadOfAGlobalFunction_InOrder()
+    {
+        var provider = Build("""
+                             ---@param origin GameObject
+                             ---@param filter? string|Player
+                             ---@overload fun(origin: GameObject): GameObject
+                             ---@overload fun(origin: GameObject, player: Player, match_allegiance: boolean): GameObject
+                             function Find_Nearest(origin, filter) end
+                             """);
+
+        var forms = provider.GetCallForms("find_nearest");
+
+        Assert.Equal(2, forms.Count);
+        Assert.Equal(["origin"], forms[0].Select(p => p.Name));
+        Assert.Equal(["origin", "player", "match_allegiance"], forms[1].Select(p => p.Name));
+        Assert.Equal(["GameObject", "Player", "boolean"], forms[1].Select(p => p.Type.Raw));
+    }
+
+    /// <summary>
+    ///     An engine table's overload is the table's own call (<c>---@class FogOfWar</c> /
+    ///     <c>---@overload fun(...)</c> / <c>FogOfWar = {}</c>), not a form of the function that follows.
+    /// </summary>
+    [Fact]
+    public void GetCallForms_IgnoresAnEngineTablesOwnOverload()
+    {
+        var provider = Build("""
+                             ---@class FogOfWar
+                             ---@overload fun(): FogOfWar
+                             FogOfWar = {}
+
+                             function FogOfWar.Reveal(p1) end
+                             function Other() end
+                             """);
+
+        Assert.Empty(provider.GetCallForms("FogOfWar"));
+        Assert.Empty(provider.GetCallForms("Other"));
+    }
+
+    [Fact]
+    public void GetCallForms_NoOverload_ReturnsEmpty()
+    {
+        Assert.Empty(Build("function Foo(x) end").GetCallForms("Foo"));
+    }
+
+    // ── GetGlobalTypeName ────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetGlobalTypeName_ReadsTheTypeDeclaredAboveAGlobalValue()
+    {
+        var provider = Build("""
+                             ---@type Player
+                             PlayerObject = nil
+                             Untyped = nil
+                             """);
+
+        Assert.Equal("Player", provider.GetGlobalTypeName("playerobject"));
+        Assert.Null(provider.GetGlobalTypeName("Untyped"));
+        Assert.Null(provider.GetGlobalTypeName("Unknown"));
+    }
+
     // ── GetXmlRefs ───────────────────────────────────────────────────────────
 
     [Fact]
