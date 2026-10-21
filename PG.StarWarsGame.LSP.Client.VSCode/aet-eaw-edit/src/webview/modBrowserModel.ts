@@ -7,6 +7,7 @@
 import * as l10n from "@vscode/l10n";
 
 import type {
+    SymbolAction,
     SymbolKindCount,
     SymbolLayer,
     SymbolLocation,
@@ -155,4 +156,112 @@ export function kindChoices(
         label: `${k.kind} (${k.count.toLocaleString()})`,
         disabled: k.count === 0 && !picked.includes(k.kind),
     }));
+}
+
+/** One item of an entry's menu. */
+export interface ActionChoice {
+    action: string;
+    label: string;
+    disabled: boolean;
+    /** Why it is disabled. */
+    reason?: string;
+    /** The key that does the same. */
+    keys?: string;
+}
+
+/**
+ * An entry's menu, in groups: open and go to definition, then what the server says the entry offers,
+ * then copying its name. Before the server has answered, go to definition waits for it; a row that
+ * is no entry of its own - a missing name, a definition place - offers only its name.
+ */
+export function actionChoices(
+    canOpen: boolean,
+    actions: readonly SymbolAction[] | undefined,
+): ActionChoice[][] {
+    const choice = (
+        action: string,
+        reason: string | null | undefined,
+        keys?: string,
+    ): ActionChoice => ({
+        action,
+        label: actionLabel(action),
+        disabled: !!reason,
+        reason: reason ? actionReasonLabel(reason) : undefined,
+        keys,
+    });
+    const disabled = (item: ActionChoice, reason: string): ActionChoice => ({
+        ...item,
+        disabled: true,
+        reason,
+    });
+    if (!canOpen) {
+        const none = l10n.t("Not an entry of its own");
+        return [
+            [
+                disabled(choice("open", null, "Enter"), none),
+                disabled(choice("definition", null, "F12"), none),
+            ],
+            [choice("copyName", null)],
+        ];
+    }
+    const definition = actions?.find((a) => a.action === "definition");
+    const offered = (actions ?? []).filter((a) => a.action !== "definition");
+    return [
+        [
+            choice("open", null, "Enter"),
+            definition
+                ? choice("definition", definition.reason, "F12")
+                : disabled(
+                      choice("definition", null, "F12"),
+                      l10n.t("Loading..."),
+                  ),
+        ],
+        ...(offered.length
+            ? [offered.map((a) => choice(a.action, a.reason))]
+            : []),
+        [choice("copyName", null)],
+    ];
+}
+
+function actionLabel(action: string): string {
+    switch (action) {
+        case "open":
+            return l10n.t("Open");
+        case "definition":
+            return l10n.t("Go to definition");
+        case "previewUnit":
+            return l10n.t("Preview unit");
+        case "encyclopedia":
+            return l10n.t("Show encyclopedia card");
+        case "effectiveObject":
+            return l10n.t("Show effective object");
+        case "previewModel":
+            return l10n.t("Preview model");
+        case "copyName":
+            return l10n.t("Copy name");
+        default:
+            return action;
+    }
+}
+
+/** Why an action is unavailable. */
+function actionReasonLabel(reason: string): string {
+    switch (reason) {
+        case "shipped":
+            return l10n.t("Only the game defines it");
+        case "binary":
+            return l10n.t("Not a text file");
+        case "schema":
+            return l10n.t("Defined by the schema");
+        case "noModel":
+            return l10n.t("Names no model");
+        case "noEncyclopedia":
+            return l10n.t("No encyclopedia text");
+        case "notAVariant":
+            return l10n.t("Not a variant");
+        case "off":
+            return l10n.t("Turned off in the settings");
+        default:
+            return reason;
+    }
 }

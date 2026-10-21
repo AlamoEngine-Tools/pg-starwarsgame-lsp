@@ -41,6 +41,7 @@ import {
     IconCrosshair,
     IconCube,
     IconDeviceFloppy,
+    IconDots,
     IconExternalLink,
     IconEye,
     IconEyeClosed,
@@ -54,7 +55,9 @@ import {
     IconHeartBroken,
     IconHierarchy,
     IconHistory,
+    IconId,
     IconInfoCircle,
+    IconLayersUnion,
     IconLayoutGrid,
     IconLetterCase,
     IconListTree,
@@ -97,6 +100,7 @@ import {
     IconTool,
     IconTrash,
     IconUsers,
+    IconView360,
     IconWind,
     IconWorld,
     IconX,
@@ -219,6 +223,13 @@ const ICONS = {
     check: IconCheck,
     download: IconCloudDownload,
     open: IconExternalLink,
+    moreActions: IconDots,
+
+    // What an entry of the Mod Browser opens in: the assembled unit or a model in the 3D preview,
+    // the object's encyclopedia card, the object with its variant chain merged.
+    preview3d: IconView360,
+    encyclopediaCard: IconId,
+    effectiveObject: IconLayersUnion,
 
     // Jumping to where a name is DECLARED, which is not the same as `open` - that one is an
     // external link and means "hand this to another application". Drawn as the EDITOR's own

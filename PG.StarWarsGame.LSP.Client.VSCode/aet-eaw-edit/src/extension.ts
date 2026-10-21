@@ -3119,8 +3119,8 @@ export async function activate(
     context.subscriptions.push(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.previewModel",
-            async (referenceArg?: string) => {
-                const projectKey = await commandProjectKey();
+            async (referenceArg?: string, projectKeyArg?: string) => {
+                const projectKey = projectKeyArg ?? (await commandProjectKey());
                 if (projectKey === null) {
                     return;
                 }
@@ -3158,8 +3158,8 @@ export async function activate(
     context.subscriptions.push(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.previewAssembledUnit",
-            async (objectIdArg?: string) => {
-                const projectKey = await commandProjectKey();
+            async (objectIdArg?: string, projectKeyArg?: string) => {
+                const projectKey = projectKeyArg ?? (await commandProjectKey());
                 if (projectKey === null) {
                     return;
                 }
@@ -3197,8 +3197,8 @@ export async function activate(
     context.subscriptions.push(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.showEncyclopedia",
-            async (objectIdArg?: string) => {
-                const projectKey = await commandProjectKey();
+            async (objectIdArg?: string, projectKeyArg?: string) => {
+                const projectKey = projectKeyArg ?? (await commandProjectKey());
                 if (projectKey === null) {
                     return;
                 }
@@ -3271,8 +3271,8 @@ export async function activate(
     context.subscriptions.push(
         vscode.commands.registerCommand(
             "aet-eaw-edit.lsp.showEffectiveObject",
-            async (objectIdArg?: string) => {
-                const projectKey = await commandProjectKey();
+            async (objectIdArg?: string, projectKeyArg?: string) => {
+                const projectKey = projectKeyArg ?? (await commandProjectKey());
                 if (projectKey === null) {
                     return;
                 }

@@ -62,16 +62,26 @@ public sealed record GetSymbolNodeParams(string Page, string Id) : IRequest<GetS
 /// <param name="Relations">Its relations, in the order the panel shows them.</param>
 public sealed record GetSymbolNodeResult(SymbolRow? Entry, IReadOnlyList<SymbolRelation> Relations)
 {
-    /// <summary>Where the definition the game uses is; null for one only the game defines.</summary>
+    /// <summary>Where the definition the game uses is; null for one no text file of the project defines.</summary>
     public SymbolLocation? Location { get; init; }
 
     /// <summary>The object this one is a variant of, from <c>Variant_Of_Existing_Type</c>.</summary>
     public string? VariantOf { get; init; }
+
+    /// <summary>What can be done with the entry - the code lens set - each with why when it cannot.</summary>
+    public IReadOnlyList<SymbolAction> Actions { get; init; } = [];
 }
 
 /// <param name="Uri">The defining document.</param>
 /// <param name="Line">The zero-based line the definition starts on.</param>
 public sealed record SymbolLocation(string Uri, int Line);
+
+/// <param name="Action">
+///     <c>definition</c>, <c>previewUnit</c>, <c>encyclopedia</c>, <c>effectiveObject</c> or
+///     <c>previewModel</c>.
+/// </param>
+/// <param name="Reason">Why it is unavailable; null when it is available.</param>
+public sealed record SymbolAction(string Action, string? Reason);
 
 /// <param name="Relation">The relation's key.</param>
 /// <param name="Count">How many entries it lists; null until counted, for one that needs every object's tags.</param>

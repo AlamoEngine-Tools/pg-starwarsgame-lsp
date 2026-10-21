@@ -227,6 +227,24 @@
     shadows where there is one
   - A forward-slash sub-path such as `Heroes/Boba_Fett` resolves, as in the game
   - Vanilla and a large total-conversion mod: every reference resolves inside `Data/Scripts/GameObject`
+- **Mod Browser** - everything a project indexes, by what it is: game objects and every other XML type, models,
+  particle systems, animations, textures, audio, Lua scripts and the schema's enums, each once, as the definition
+  the game uses ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
+  - A **Mod Browser** view with the outlines Game Data, Assets and Schema; one panel per project
+  - A rail of lists, their entries and each entry's relations, whose path is the breadcrumb; a table paged on the
+    server, with a search form - name, kind with its count, origin
+  - An object's relations by what each is - models, particle systems, particles, SFX and speech events,
+    hardpoints, textures, its Lua script - with what names it and every layer defining it; an empty one counted
+    zero, with the reason
+  - An asset's relations - a model's animations, particle systems and textures, an animation's model, a script's
+    loaders and requires, an enum's tags, the objects using an asset
+  - An object's page: where the definition the game uses is, what it overrides and is a variant of, and its
+    encyclopedia card with the faction switch
+  - A click or `Enter` opens an entry, a double click or `F12` goes to its definition; the context menu and a
+    row's hover icons carry the code lens set - preview unit, encyclopedia card, effective object, preview model -
+    an unavailable one disabled with the reason
+  - The Preview Model picker lists models only, without particle systems
+  - Flag `aet-eaw-edit.features.tools.modBrowser`, on by default
 
 ### Fixes
 

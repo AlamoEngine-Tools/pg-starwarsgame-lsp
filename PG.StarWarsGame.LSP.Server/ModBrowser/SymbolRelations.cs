@@ -3,8 +3,10 @@
 
 using System.Runtime.CompilerServices;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 
@@ -21,18 +23,23 @@ namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 ///     The proxy names a model file carries, by its game-relative path; a model's particle systems
 ///     are read from it, one file, when the model is opened.
 /// </param>
+/// <param name="tools">The tool features on; an action whose feature is off is offered disabled.</param>
 public sealed class SymbolRelations(
     GameIndex index,
     ISchemaProvider schema,
     IVariantTagSource tags,
     SymbolCatalog catalog,
-    Func<string, IReadOnlyList<string>>? proxiesOf = null)
+    Func<string, IReadOnlyList<string>>? proxiesOf = null,
+    ToolsFeatureFlags? tools = null)
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
     private const string Definitions = "definitions";
     private const string UsedBy = "usedBy";
+    private const string Off = "off";
     private static readonly char[] s_separators = [',', ' ', '\t', '\n', '\r'];
+
+    private readonly ToolsFeatureFlags _tools = tools ?? new ToolsFeatureFlags();
 
     // Which objects name each asset: every object's tags, read once per index on the first request
     // that needs it, never on open (about 830 ms on the EaW tree - measured in code comments).
@@ -65,7 +72,11 @@ public sealed class SymbolRelations(
                 .Select(r => NeedsEveryObject(page, r) && !s_users.TryGetValue(index, out _)
                     ? new SymbolRelation(r, null, null)
                     : Counted(r, AssetRows(page, entry, r).Count, "none"))
-                .ToList());
+                .ToList())
+            {
+                Location = page == "luaScripts" ? new SymbolLocation(entry.Id, 0) : null,
+                Actions = AssetActions(page)
+            };
 
         var (named, known) = TagRelations(entry);
         var keys = page == GameObjects
@@ -76,23 +87,65 @@ public sealed class SymbolRelations(
             .Append(Counted(ReferencedBy, ReferencingObjects(entry.Id).Count(), "none"))
             .Append(Counted(Definitions, DefinitionRows(entry.Id).Count, "none"))
             .ToList();
-        var winner = WinningDefinition(entry.Id);
+        var defined = WorkspaceDefinition(entry.Id);
+        var winner = defined ?? index.Baseline.Symbols.GetValueOrDefault(entry.Id);
+        // Only a workspace definition is a document to go to: the baseline's origin is the game's own
+        // path of the file, inside its packed data.
+        var location = defined?.Origin is FileOrigin origin ? new SymbolLocation(origin.Uri, origin.Line) : null;
         return new GetSymbolNodeResult(entry, relations)
         {
-            Location = winner?.Origin is FileOrigin origin ? new SymbolLocation(origin.Uri, origin.Line) : null,
-            VariantOf = winner?.VariantBaseId
+            Location = location,
+            VariantOf = winner?.VariantBaseId,
+            Actions = ObjectActions(winner, location)
         };
     }
 
-    // The highest layer's definition, else the game's - the one the catalog lists.
-    private GameSymbol? WinningDefinition(string id)
+    // A script is a text file of the project; an asset is a file the game reads, an enum the schema's.
+    private List<SymbolAction> AssetActions(string page)
     {
-        var workspace = index.WorkspaceDefinitions.TryGetValue(id, out var definitions)
-            ? definitions.Where(s => s.Kind == GameSymbolKind.XmlObject && s.Origin is FileOrigin)
+        var definition = new SymbolAction("definition", page switch
+        {
+            "luaScripts" => null,
+            "enums" => "schema",
+            _ => "binary"
+        });
+        return page is "models" or "particleSystems"
+            ? [definition, new SymbolAction("previewModel", _tools.ModelPreview ? null : Off)]
+            : [definition];
+    }
+
+    // The code lens set, on the lenses' own rules.
+    private List<SymbolAction> ObjectActions(GameSymbol? winner, SymbolLocation? location)
+    {
+        return
+        [
+            new SymbolAction("definition", location is null ? "shipped" : null),
+            new SymbolAction("previewUnit", !_tools.ModelPreview
+                ? Off
+                : winner is not null && TacticalModels.Declared(index, tags, winner)
+                    ? null
+                    : "noModel"),
+            new SymbolAction("encyclopedia", !_tools.Encyclopedia
+                ? Off
+                : winner is not null && EncyclopediaTags.DefinesBody(index, tags, winner)
+                    ? null
+                    : "noEncyclopedia"),
+            new SymbolAction("effectiveObject", !_tools.Variants
+                ? Off
+                : string.IsNullOrEmpty(winner?.VariantBaseId)
+                    ? "notAVariant"
+                    : null)
+        ];
+    }
+
+    // The highest layer's definition - with the game's, the one the catalog lists.
+    private GameSymbol? WorkspaceDefinition(string id)
+    {
+        return index.WorkspaceDefinitions.TryGetValue(id, out var definitions)
+            ? definitions.Where(s => s is { Kind: GameSymbolKind.XmlObject, Origin: FileOrigin })
                 .OrderByDescending(index.LayerRankOf)
                 .FirstOrDefault()
             : null;
-        return workspace ?? (index.Baseline.Symbols.TryGetValue(id, out var shipped) ? shipped : null);
     }
 
     /// <summary>The rows of one relation of an entry; null for an entry or relation there is not.</summary>

@@ -108,6 +108,34 @@ public sealed class AssetRelationsTest
         return rows!.Select(r => r.Name);
     }
 
+    private List<(string Action, string? Reason)> ActionsOf(string page, string id)
+    {
+        return Relations().Node(page, id).Actions.Select(a => (a.Action, a.Reason)).ToList();
+    }
+
+    [Fact]
+    public void AModel_OpensInThePreview_AndHasNoTextToGoTo()
+    {
+        Assert.Equal([("definition", "binary"), ("previewModel", null)], ActionsOf("models", "ev_tie.alo"));
+        Assert.Equal([("definition", "binary"), ("previewModel", null)], ActionsOf("particleSystems", "p_smoke.alo"));
+        Assert.Equal([("definition", "binary")], ActionsOf("textures", "tie.tga"));
+    }
+
+    [Fact]
+    public void ALuaScript_GoesToItsFile()
+    {
+        var node = Relations().Node("luaScripts", "tiescript.lua");
+
+        Assert.Equal(new SymbolLocation(TieScript, 0), node.Location);
+        Assert.Equal([("definition", null)], node.Actions.Select(a => (a.Action, a.Reason)));
+    }
+
+    [Fact]
+    public void AnEnum_IsTheSchemas_NotAFileToGoTo()
+    {
+        Assert.Equal([("definition", "schema")], ActionsOf("enums", "AnimationType"));
+    }
+
     [Fact]
     public void AModel_OpensIntoItsAnimationsAndTextures_ItsUsersUncountedUntilAskedFor()
     {

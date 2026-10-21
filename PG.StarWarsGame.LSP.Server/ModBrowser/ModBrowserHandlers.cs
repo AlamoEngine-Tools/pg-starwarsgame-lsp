@@ -69,7 +69,8 @@ public sealed class GetSymbolNodeHandler(
         if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolNodeResult(null, []));
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
-        return Task.FromResult(new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets))
+        return Task.FromResult(new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
+                config.Current.Features.Tools)
             .Node(request.Page, request.Id));
     }
 }

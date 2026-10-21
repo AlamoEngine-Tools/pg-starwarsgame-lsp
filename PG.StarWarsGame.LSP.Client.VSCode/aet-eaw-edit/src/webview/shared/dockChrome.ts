@@ -568,6 +568,55 @@ ${tokensCss}
     }
     .choice-label { font-weight: 600; }
     .choice-detail { opacity: 0.75; font-size: var(--font-size-smaller); }
+
+    /* A row's right-click menu (RowMenuFrame): the localisation grids' and the Mod Browser's. An
+       item names the key that does the same at its far end; a disabled one says why in its title. */
+    .row-menu {
+        position: fixed;
+        z-index: 20;
+        min-width: 200px;
+        display: flex;
+        flex-direction: column;
+        padding: var(--space-4) 0;
+        background: var(
+            --vscode-menu-background,
+            var(--vscode-editorWidget-background, #252526)
+        );
+        color: var(--vscode-menu-foreground, #ccc);
+        border: var(--space-1) solid
+            var(--vscode-menu-border, var(--vscode-panel-border, #454545));
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+    .row-menu button {
+        display: flex;
+        gap: var(--space-16);
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        padding: var(--space-4) var(--space-12);
+        border: none;
+    }
+    .row-menu button:hover:not(:disabled),
+    .row-menu button:focus-visible {
+        background: var(--vscode-menu-selectionBackground, #04395e);
+        color: var(--vscode-menu-selectionForeground, #fff);
+        outline: none;
+    }
+    .row-menu button.danger:hover:not(:disabled) {
+        background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+    }
+    .row-menu button:disabled {
+        color: var(--vscode-disabledForeground);
+    }
+    .row-menu .keys {
+        margin-left: auto;
+        color: var(--vscode-descriptionForeground);
+    }
+    .row-menu .sep {
+        height: 1px;
+        margin: var(--space-4) 0;
+        background: var(--vscode-menu-separatorBackground, #454545);
+    }
 `;
 
 /**

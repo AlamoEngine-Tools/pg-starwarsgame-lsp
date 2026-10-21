@@ -58,10 +58,20 @@ export interface SymbolLocation {
 export interface GetSymbolNodeResult {
     entry?: SymbolRow | null;
     relations: SymbolRelation[];
-    /** Where the definition the game uses is; null for one only the game defines. */
+    /** Where the definition the game uses is; null for one no text file of the project defines. */
     location?: SymbolLocation | null;
     /** The object this one is a variant of. */
     variantOf?: string | null;
+    /** What can be done with the entry - the code lens set - each with why when it cannot. */
+    actions?: SymbolAction[];
+}
+
+/** One thing that can be done with an entry. */
+export interface SymbolAction {
+    /** `definition`, `previewUnit`, `encyclopedia`, `effectiveObject` or `previewModel`. */
+    action: string;
+    /** Why it is unavailable; null when it is available. */
+    reason?: string | null;
 }
 
 export interface GetSymbolOutlineParams {

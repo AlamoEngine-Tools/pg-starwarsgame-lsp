@@ -8,9 +8,11 @@
 //
 // A scenario is `[{"click": "<exact text>"}, {"type": "<text>"}, {"wait": <ms>}, ...]`; a click
 // presses the first button, row or cell whose text is exactly that, a type fills the search form's
-// name, and either takes `"in": "<selector>"` to look only there. Writes `out/<scenario>.png`, prints what the
-// page shows - the rail, the breadcrumb, the open page - and lists every request it had no answer
-// for in `out/misses.json`, a requests file for record.js.
+// name, and either takes `"in": "<selector>"` to look only there. `dblclick`, `menu` (a right
+// click) and `hover` find their target the same way; `{"key": "F12", "on": "<text>"}` presses a key
+// on it. Writes `out/<scenario>.png`, prints what the page shows - the rail, the breadcrumb, the
+// open page, an open menu and what the page asked the host to do - and lists every request it had
+// no answer for in `out/misses.json`, a requests file for record.js.
 const fs = require("node:fs");
 const path = require("node:path");
 const {execFileSync} = require("node:child_process");
@@ -43,10 +45,14 @@ const SCENARIO = ${JSON.stringify(scenario)};
 const OUTLINE = ${JSON.stringify(outline)};
 const key = ${answerKey.toString()};
 window.__MISSES__ = [];
+window.__POSTED__ = [];
 window.acquireVsCodeApi = () => ({
     postMessage(message) {
         if (message.type === "ready") {
             setTimeout(() => window.postMessage({type: "outline", outline: OUTLINE}, "*"), 0);
+        }
+        if (message.type === "run" || message.type === "openLocation" || message.type === "copy") {
+            window.__POSTED__.push(message);
         }
         if (message.type === "request") {
             const k = key(message.method, message.params);
@@ -55,11 +61,34 @@ window.acquireVsCodeApi = () => ({
         }
     },
 });
-function press(text, scope) {
+function find(text, scope) {
     const root = scope ? document.querySelector(scope) : document;
     const hit = [...(root?.querySelectorAll("button, tr, td, b") ?? [])].find((el) => el.textContent.trim() === text);
-    if (!hit) { window.__MISSES__.push(["click", text]); return; }
-    (hit.closest("button, tr") ?? hit).click();
+    if (!hit) { window.__MISSES__.push(["click", text]); return null; }
+    return hit.closest("button, tr") ?? hit;
+}
+function press(text, scope) {
+    find(text, scope)?.click();
+}
+// A pointer event at the middle of the target, as the browser would send it.
+function point(type, text, scope) {
+    const el = find(text, scope);
+    if (!el) return;
+    const box = el.getBoundingClientRect();
+    const at = {bubbles: true, cancelable: true, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2};
+    if (type === "hover") {
+        el.dispatchEvent(new MouseEvent("mouseover", {...at, relatedTarget: null}));
+    } else if (type === "dblclick") {
+        el.dispatchEvent(new MouseEvent("dblclick", {...at, detail: 2}));
+    } else {
+        el.dispatchEvent(new MouseEvent("contextmenu", {...at, button: 2}));
+    }
+}
+function pressKey(name, text, scope) {
+    const el = find(text, scope);
+    if (!el) return;
+    el.focus();
+    el.dispatchEvent(new KeyboardEvent("keydown", {key: name, bubbles: true, cancelable: true}));
 }
 // React tracks an input's value itself, so the native setter and an input event are what it hears.
 function type(text, scope) {
@@ -80,6 +109,27 @@ function report() {
     lines.push("--- page:");
     for (const el of page?.querySelectorAll("h1, p, tr") ?? []) lines.push("  " + el.textContent.trim().replace(/\\s+/g, " "));
     lines.push("--- card: " + (document.querySelector(".entry .card") ? "drawn" : "none"));
+    const actions = [...document.querySelectorAll(".entry .actions button")];
+    if (actions.length) {
+        lines.push("--- page actions: " + actions.map((b) => b.textContent.trim() + (b.disabled ? " [" + b.title + "]" : "")).join(" | "));
+    }
+    for (const icons of document.querySelectorAll(".grid .row-actions")) {
+        const row = icons.closest("tr")?.querySelector("td")?.textContent.trim();
+        lines.push("--- hover icons on " + row + ": " + [...icons.querySelectorAll("button")]
+            .map((b) => (b.getAttribute("aria-label") ?? b.title) + (b.disabled ? " [" + b.title + "]" : "")).join(" | "));
+    }
+    const menu = document.querySelector(".row-menu");
+    if (menu) {
+        lines.push("--- menu:");
+        for (const item of menu.querySelectorAll("button, .sep")) {
+            if (item.classList.contains("sep")) { lines.push("  ----"); continue; }
+            const keys = item.querySelector(".keys")?.textContent ?? "";
+            const label = item.textContent.slice(0, item.textContent.length - keys.length);
+            lines.push("  " + (item.disabled ? "(off) " : "") + label + (keys ? "  [" + keys + "]" : "")
+                + (item === document.activeElement ? "  <- focus" : ""));
+        }
+    }
+    lines.push("--- posted: " + JSON.stringify(window.__POSTED__));
     const pre = document.createElement("pre");
     pre.id = "rig-report";
     pre.textContent = lines.join("\\n");
@@ -93,7 +143,13 @@ let at = 300;
 for (const step of SCENARIO) {
     if (step.wait) { at += step.wait; continue; }
     const t = at;
-    setTimeout(() => (step.type !== undefined ? type(step.type, step.in) : press(step.click, step.in)), t);
+    const run = step.type !== undefined ? () => type(step.type, step.in)
+        : step.key !== undefined ? () => pressKey(step.key, step.on, step.in)
+        : step.dblclick !== undefined ? () => point("dblclick", step.dblclick, step.in)
+        : step.menu !== undefined ? () => point("menu", step.menu, step.in)
+        : step.hover !== undefined ? () => point("hover", step.hover, step.in)
+        : () => press(step.click, step.in);
+    setTimeout(run, t);
     at += 300;
 }
 setTimeout(report, at + 300);
@@ -119,7 +175,9 @@ html, body { margin: 0; padding: 0; height: 100%; background: #1f1f1f; color: #c
 `;
 
 const page = path.join(OUT, `${name}.html`);
-fs.writeFileSync(page, `<!doctype html><html><head><meta charset="utf-8"><style>${palette}</style></head><body>
+// The codicon stylesheet every panel host links, for the meanings drawn as codicons.
+const codicons = "file:///" + path.join(CLIENT, "out", "codicons", "codicon.css").replace(/\\/g, "/");
+fs.writeFileSync(page, `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${codicons}"><style>${palette}</style></head><body>
 <div id="root" data-l10n="${escapeAttr(l10n)}"></div>
 <script>${stub}</script>
 <script src="${"file:///" + BUNDLE.replace(/\\/g, "/")}"></script>

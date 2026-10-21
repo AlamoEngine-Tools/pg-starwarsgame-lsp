@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.ModBrowser;
@@ -62,7 +63,7 @@ public sealed class SymbolRelationsTest
         }
     }
 
-    private static SymbolRelations Relations()
+    private static SymbolRelations Relations(ToolsFeatureFlags? tools = null)
     {
         GameSymbol[] symbols =
         [
@@ -73,13 +74,15 @@ public sealed class SymbolRelationsTest
             Object("Unit_Select_SD", 50, "SFXEvent"), Object("HP_Laser_1", 60, "HardPoint"),
             Object("Star_Destroyer_Mk2", 70) with { VariantBaseId = "Star_Destroyer" }
         ];
+        // The baseline records where the game defines a symbol by its game-relative path (measured
+        // on FoC: DATA\XML\SPACEUNITSCAPITAL.XML), which is no document of the project.
         var baseline = BaselineIndex.Empty with
         {
             Symbols = ImmutableDictionary<string, GameSymbol>.Empty
                 .Add("Star_Destroyer", new GameSymbol("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType",
-                    new UnknownOrigin("baseline"), null))
+                    new FileOrigin(@"DATA\XML\UNITS.XML", 3, 4), null))
                 .Add("Shipped_Only", new GameSymbol("Shipped_Only", GameSymbolKind.XmlObject, "GameObjectType",
-                    new UnknownOrigin("baseline"), null))
+                    new FileOrigin(@"DATA\XML\UNITS.XML", 12, 4), null))
         };
         var tieUsesSd =
             new GameReference("Star_Destroyer", GameSymbolKind.XmlObject, "GameObjectType", Units, 25, 8, 14);
@@ -112,12 +115,56 @@ public sealed class SymbolRelationsTest
             ["Tie_Fighter"] = [("Space_Model_Name", "EV_Missing.alo")]
         });
         var schema = new Schema();
-        return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []));
+        return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []), tools: tools);
     }
 
     private static Dictionary<string, SymbolRelation> RelationsOf(string id)
     {
         return Relations().Node(Page, id).Relations.ToDictionary(r => r.Relation);
+    }
+
+    private static List<(string Action, string? Reason)> ActionsOf(SymbolRelations relations, string id)
+    {
+        return relations.Node(Page, id).Actions.Select(a => (a.Action, a.Reason)).ToList();
+    }
+
+    [Fact]
+    public void AnOpenedObject_OffersTheCodeLensActions_TheOnesItHasNothingFor_WithTheReason()
+    {
+        Assert.Equal(
+            [
+                ("definition", null), ("previewUnit", null), ("encyclopedia", "noEncyclopedia"),
+                ("effectiveObject", "notAVariant")
+            ],
+            ActionsOf(Relations(), "Star_Destroyer"));
+    }
+
+    [Fact]
+    public void AVariant_ShowsItsEffectiveObject_AndPreviewsTheModelItInherits()
+    {
+        var actions = ActionsOf(Relations(), "Star_Destroyer_Mk2");
+
+        Assert.Contains(("previewUnit", null), actions);
+        Assert.Contains(("effectiveObject", null), actions);
+    }
+
+    [Fact]
+    public void AShippedObject_HasNoDefinitionToGoTo()
+    {
+        var relations = Relations();
+
+        Assert.Null(relations.Node(Page, "Shipped_Only").Location);
+        Assert.Contains(("definition", "shipped"), ActionsOf(relations, "Shipped_Only"));
+    }
+
+    [Fact]
+    public void AnActionWhoseFeatureIsOff_IsOffered_Disabled()
+    {
+        var actions = ActionsOf(Relations(new ToolsFeatureFlags { ModelPreview = false, Variants = false }),
+            "Star_Destroyer_Mk2");
+
+        Assert.Contains(("previewUnit", "off"), actions);
+        Assert.Contains(("effectiveObject", "off"), actions);
     }
 
     [Fact]

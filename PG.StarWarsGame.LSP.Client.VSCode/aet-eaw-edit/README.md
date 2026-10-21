@@ -596,6 +596,28 @@ Flag: `aet-eaw-edit.features.tools.encyclopedia` (on by default). Read-only.
 
 ---
 
+## Mod Browser
+
+Flag: `aet-eaw-edit.features.tools.modBrowser` (on by default). Read-only.
+
+- **Mod Browser view** - the outlines Game Data, Assets and Schema; one panel per project
+- **Rail** - lists, their loaded entries and each entry's relations; the path to the open one is the breadcrumb
+- **Lists** - each entry once, as the definition the game uses, with its origin and what it overrides
+  - Paged on the server, 200 at a time
+  - Search form: name, kind with its count, origin
+- **Relations** - computed for one entry, when it opens; an empty one counted zero, with the reason
+  - Game objects: models, particle systems, particles, SFX and speech events, hardpoints, other references,
+    textures, Lua script, referenced by, definitions
+  - Objects only the game defines: no relations from their tags (`Not in the mod's files`)
+  - Models: animations, particle systems, textures, used by. Animations: model. Textures and audio: used by. Lua
+    scripts: loaded by, requires. Enums: used by
+- **Object page** - defined in, overrides, variant of; the encyclopedia card with its faction switch
+- **Actions** - click or `Enter` opens, double click or `F12` goes to the definition; the context menu and a row's
+  hover icons offer Preview unit, Show encyclopedia card, Show effective object and Preview model, an unavailable
+  one disabled with the reason
+
+---
+
 ## Localisation editor
 
 Flag: `aet-eaw-edit.features.tools.localisation`. **Localisation Editor** activity bar view, files grouped into **Text
@@ -663,6 +685,7 @@ Command Palette (`Ctrl+Shift+P`). Commands of a flagged feature are greyed out u
 | EaWEdit: Preview Assembled Unit                        | Opens the GameObject under the cursor, assembled from the XML    | `tools.modelPreview`                   |
 | EaWEdit: Set Up Base Shader Sources                    | Fetches the shader sources into `aet-eaw-edit.shaders.directory` | `tools.modelPreview`                   |
 | EaWEdit: Preview Encyclopedia Popup                    | The encyclopedia card of the GameObject under the cursor         | `tools.encyclopedia`                   |
+| EaWEdit: Open Mod Browser                              | Lists what the project indexes, by type                          | `tools.modBrowser`                     |
 | EaWEdit: Open Story Graph                              | A faction's story graph                                          | `tools.storyEditor`, `story.discovery` |
 | EaWEdit: Refresh Story Navigator                       | Rebuilds the campaign tree                                       | `tools.storyEditor`, `story.discovery` |
 | EaWEdit: New Localisation Project                      | Initialise from baseline, or import                              | `tools.localisation`                   |
@@ -852,6 +875,7 @@ Tools:
 | `aet-eaw-edit.features.tools.variants`       | `true`  | Show Effective Object and its code lens                                                                      |
 | `aet-eaw-edit.features.tools.modelPreview`   | `true`  | Model preview; game models need `aet-eaw-edit.lsp.source.baseGameDirectory`                                  |
 | `aet-eaw-edit.features.tools.encyclopedia`   | `true`  | Encyclopedia popup preview and its code lens                                                                 |
+| `aet-eaw-edit.features.tools.modBrowser`     | `true`  | Mod Browser view and panel                                                                                   |
 | `aet-eaw-edit.features.preview.energyPool`   | `false` | Energy pool in the preview (editor-side, no restart). Off on purpose: the shipped game disables the mechanic |
 
 ---

@@ -12,6 +12,17 @@ import {
 } from "./webviewPanelHost";
 
 /**
+ * The commands an entry's actions run, each with the entry's id - a model preview with its name -
+ * and this panel's project, so none of them asks which project is meant.
+ */
+const ACTION_COMMANDS: Record<string, { command: string; byName?: true }> = {
+    previewUnit: { command: "aet-eaw-edit.lsp.previewAssembledUnit" },
+    encyclopedia: { command: "aet-eaw-edit.lsp.showEncyclopedia" },
+    effectiveObject: { command: "aet-eaw-edit.lsp.showEffectiveObject" },
+    previewModel: { command: "aet-eaw-edit.lsp.previewModel", byName: true },
+};
+
+/**
  * The Mod Browser (#270): one panel per project, showing whichever outline was picked last.
  *
  * The webview asks for its lists and entries itself, one page at a time, and the panel passes each
@@ -81,6 +92,38 @@ export class ModBrowserPanel extends WebviewPanelHost {
         }
         if (msg.type === "request") {
             await this._relay(msg);
+        }
+        if (msg.type === "run") {
+            await this._run(msg);
+        }
+        if (
+            msg.type === "openLocation" &&
+            typeof msg.uri === "string" &&
+            typeof msg.line === "number"
+        ) {
+            const position = new vscode.Position(msg.line, 0);
+            await vscode.window.showTextDocument(vscode.Uri.parse(msg.uri), {
+                selection: new vscode.Range(position, position),
+            });
+        }
+        if (msg.type === "copy" && typeof msg.text === "string") {
+            await vscode.env.clipboard.writeText(msg.text);
+        }
+    }
+
+    /** Runs one of an entry's actions; anything not in the set is ignored. */
+    private async _run(msg: WebviewMessage): Promise<void> {
+        const run =
+            typeof msg.action === "string"
+                ? ACTION_COMMANDS[msg.action]
+                : undefined;
+        const subject = run?.byName ? msg.name : msg.id;
+        if (run && typeof subject === "string" && subject) {
+            await vscode.commands.executeCommand(
+                run.command,
+                subject,
+                this.project.key,
+            );
         }
     }
 

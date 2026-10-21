@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+    actionChoices,
     kindChoices,
     locationLabel,
     originChoices,
@@ -119,5 +120,81 @@ describe("kindChoices", () => {
             kindChoices(kinds, ["Hero"]).map((c) => c.disabled),
             [false, false],
         );
+    });
+});
+
+describe("actionChoices", () => {
+    const summary = (groups: ReturnType<typeof actionChoices>) =>
+        groups.map((g) =>
+            g.map((c) => [c.action, c.label, c.disabled ? c.reason : null]),
+        );
+
+    it("puts open and go to definition first, the entry's actions next, copying its name last", () => {
+        assert.deepEqual(
+            summary(
+                actionChoices(true, [
+                    { action: "definition", reason: null },
+                    { action: "previewUnit", reason: null },
+                    { action: "encyclopedia", reason: "noEncyclopedia" },
+                    { action: "effectiveObject", reason: "notAVariant" },
+                ]),
+            ),
+            [
+                [
+                    ["open", "Open", null],
+                    ["definition", "Go to definition", null],
+                ],
+                [
+                    ["previewUnit", "Preview unit", null],
+                    [
+                        "encyclopedia",
+                        "Show encyclopedia card",
+                        "No encyclopedia text",
+                    ],
+                    [
+                        "effectiveObject",
+                        "Show effective object",
+                        "Not a variant",
+                    ],
+                ],
+                [["copyName", "Copy name", null]],
+            ],
+        );
+    });
+
+    it("names the keys that do the same", () => {
+        const [first] = actionChoices(true, []);
+        assert.deepEqual(
+            first.map((c) => c.keys),
+            ["Enter", "F12"],
+        );
+    });
+
+    it("waits for the server before going to a definition", () => {
+        assert.deepEqual(summary(actionChoices(true, undefined))[0][1], [
+            "definition",
+            "Go to definition",
+            "Loading...",
+        ]);
+    });
+
+    it("offers only copying the name of a row that is no entry of its own", () => {
+        assert.deepEqual(summary(actionChoices(false, undefined)), [
+            [
+                ["open", "Open", "Not an entry of its own"],
+                ["definition", "Go to definition", "Not an entry of its own"],
+            ],
+            [["copyName", "Copy name", null]],
+        ]);
+    });
+
+    it("says why there is no definition to go to", () => {
+        const reasonOf = (reason: string) =>
+            actionChoices(true, [{ action: "definition", reason }])[0][1]
+                .reason;
+        assert.equal(reasonOf("shipped"), "Only the game defines it");
+        assert.equal(reasonOf("binary"), "Not a text file");
+        assert.equal(reasonOf("schema"), "Defined by the schema");
+        assert.equal(reasonOf("off"), "Turned off in the settings");
     });
 });

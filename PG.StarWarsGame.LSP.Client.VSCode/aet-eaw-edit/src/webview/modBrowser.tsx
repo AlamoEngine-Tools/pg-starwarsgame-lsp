@@ -7,11 +7,15 @@
 // relation is a list again; the path to the open node is the breadcrumb. A list carries its search
 // form at the bottom; an entry shows its header and, for a game object, its encyclopedia card.
 //
+// A click on a row opens it, a double click goes to its definition; Enter and F12 do the same from
+// the keyboard, and the twisty only expands. What else an entry offers - the code lens set - is on
+// its context menu, on the row's hover icons and on its page.
+//
 // Every request goes through the host, which sends it to this panel's own project's server.
 
 import "./shared/l10nSetup";
 import * as l10n from "@vscode/l10n";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import styled from "styled-components";
 
@@ -34,7 +38,10 @@ import {
 import { pickShipName } from "../shipNamePick";
 import { EncyclopediaCard } from "./encyclopediaCard";
 import { factionModes, factionSlotOf } from "./encyclopediaModes";
+import { menuAction, RowMenuFrame } from "./loc/LocCells";
 import {
+    ActionChoice,
+    actionChoices,
     KindChoice,
     kindChoices,
     locationLabel,
@@ -45,9 +52,10 @@ import {
     relationLabel,
 } from "./modBrowserModel";
 import { Button } from "./shared/Button";
-import { dockChromeCss } from "./shared/dockChrome";
+import { IconButton } from "./shared/Button";
+import { dockChromeCss, dockHeaderCss } from "./shared/dockChrome";
 import { Field } from "./shared/Field";
-import { Icon } from "./shared/Icon";
+import { Icon, IconName } from "./shared/Icon";
 import { ModeSelector } from "./shared/ModeSelector";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -58,6 +66,17 @@ const PAGE_SIZE = 200;
 const GAME_OBJECT_TYPE = "GameObjectType";
 /** The card at twice the game's size: legible, and still small enough to sit beside the header. */
 const CARD_ZOOM = 2;
+/** How long the pointer rests on a row before its actions are asked for. */
+const HOVER_DELAY_MS = 250;
+
+/** The icon an action shows on a row. */
+const ACTION_ICONS: Record<string, IconName> = {
+    definition: "definition",
+    previewUnit: "preview3d",
+    previewModel: "preview3d",
+    encyclopedia: "encyclopediaCard",
+    effectiveObject: "effectiveObject",
+};
 
 // ── the request relay ──────────────────────────────────────────────────────
 
@@ -144,6 +163,15 @@ function nodeName(node: RailNode): string {
     return node.kind === "entry" ? node.row.name : node.label;
 }
 
+/** An open context menu: where, and on which entry. */
+interface Menu {
+    x: number;
+    y: number;
+    node: EntryNode;
+    /** The table row it was opened on, followed so the menu closes when it scrolls away; -1 in the rail. */
+    anchor: number;
+}
+
 // ── state ──────────────────────────────────────────────────────────────────
 
 interface Filter {
@@ -180,6 +208,8 @@ function App(): React.JSX.Element {
     const [filter, setFilter] = useState<Filter>(NO_FILTER);
     const [formOpen, setFormOpen] = useState(true);
     const [refreshed, setRefreshed] = useState(0);
+    const [menu, setMenu] = useState<Menu | null>(null);
+    const closeMenu = useCallback(() => setMenu(null), []);
 
     useEffect(() => {
         const handle = (event: MessageEvent) => {
@@ -305,9 +335,16 @@ function App(): React.JSX.Element {
         return Math.max(0, shown.total - shown.rows.length);
     };
 
-    const fetchNode = async (node: EntryNode): Promise<void> => {
-        if (nodes[node.key]) {
-            return;
+    /** The entry opened on the server - its relations and actions - asked for once per path. */
+    const fetchNode = async (
+        node: EntryNode,
+    ): Promise<GetSymbolNodeResult | null> => {
+        if (!node.row.page) {
+            return null;
+        }
+        const known = nodes[node.key];
+        if (known) {
+            return known;
         }
         const result = await request<GetSymbolNodeResult>(GET_SYMBOL_NODE, {
             page: node.page,
@@ -316,6 +353,7 @@ function App(): React.JSX.Element {
         if (result) {
             setNodes((known) => ({ ...known, [node.key]: result }));
         }
+        return result;
     };
 
     const fetchList = async (node: ListNode): Promise<void> => {
@@ -367,6 +405,46 @@ function App(): React.JSX.Element {
         setCurrent(node);
     };
 
+    /** Does one item of an entry's menu. */
+    const act = async (action: string, node: EntryNode): Promise<void> => {
+        if (action === "copyName") {
+            vscode.postMessage({ type: "copy", text: node.row.name });
+            return;
+        }
+        if (!node.row.page) {
+            return;
+        }
+        if (action === "open") {
+            select(node);
+        } else if (action === "definition") {
+            const location = (await fetchNode(node))?.location;
+            if (location) {
+                vscode.postMessage({
+                    type: "openLocation",
+                    uri: location.uri,
+                    line: location.line,
+                });
+            }
+        } else {
+            vscode.postMessage({
+                type: "run",
+                action,
+                id: node.row.id,
+                name: node.row.name,
+            });
+        }
+    };
+
+    const openMenu = (
+        x: number,
+        y: number,
+        node: EntryNode,
+        anchor: number,
+    ) => {
+        setMenu({ x, y, node, anchor });
+        void fetchNode(node);
+    };
+
     const layers = summary?.layers ?? [];
 
     if (outline === null || summary === null || current === null) {
@@ -386,6 +464,12 @@ function App(): React.JSX.Element {
                 <div
                     className={`node${current.key === node.key ? " selected" : ""}`}
                     style={{ "--depth": depth } as React.CSSProperties}
+                    onContextMenu={(e) => {
+                        if (node.kind === "entry") {
+                            e.preventDefault();
+                            openMenu(e.clientX, e.clientY, node, -1);
+                        }
+                    }}
                 >
                     <button
                         type="button"
@@ -413,6 +497,16 @@ function App(): React.JSX.Element {
                         disabled={inert}
                         title={inert ? inertReason(node) : undefined}
                         onClick={() => select(node)}
+                        onDoubleClick={() =>
+                            node.kind === "entry" &&
+                            void act("definition", node)
+                        }
+                        onKeyDown={(e) => {
+                            if (node.kind === "entry" && e.key === "F12") {
+                                e.preventDefault();
+                                void act("definition", node);
+                            }
+                        }}
                     >
                         {nodeName(node)}
                         {node.kind === "list" && node.count === 0 && (
@@ -505,6 +599,7 @@ function App(): React.JSX.Element {
                                 trail: [...current.trail, current],
                             })
                         }
+                        onAct={(action) => void act(action, current)}
                     />
                 ) : (
                     <ListPage
@@ -513,7 +608,14 @@ function App(): React.JSX.Element {
                         total={total}
                         loading={loading}
                         layers={layers}
-                        onOpen={(row) => select(entryOf(current, row))}
+                        nodeOf={(row) => nodes[entryOf(current, row).key]}
+                        onHover={(row) => void fetchNode(entryOf(current, row))}
+                        onAct={(action, row) =>
+                            void act(action, entryOf(current, row))
+                        }
+                        onMenu={(x, y, row, index) =>
+                            openMenu(x, y, entryOf(current, row), index)
+                        }
                         onMore={() => void load(current, filter, rows.length)}
                     />
                 )}
@@ -547,7 +649,90 @@ function App(): React.JSX.Element {
                     />
                 )}
             </main>
+            {menu && (
+                <EntryMenu
+                    menu={menu}
+                    choices={actionChoices(
+                        !!menu.node.row.page,
+                        nodes[menu.node.key]?.actions,
+                    )}
+                    onAct={(action) => void act(action, menu.node)}
+                    onClose={closeMenu}
+                />
+            )}
         </Shell>
+    );
+}
+
+/** An entry's context menu: each item with the key that does the same, a disabled one with why. */
+function EntryMenu({
+    menu,
+    choices,
+    onAct,
+    onClose,
+}: {
+    menu: Menu;
+    choices: ActionChoice[][];
+    onAct: (action: string) => void;
+    onClose: () => void;
+}): React.JSX.Element {
+    const first = useRef<HTMLButtonElement>(null);
+    useEffect(() => first.current?.focus(), []);
+    // Up and down walk the enabled items, as in the editor's own menus.
+    const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") {
+            return;
+        }
+        e.preventDefault();
+        const items = [
+            ...e.currentTarget.querySelectorAll<HTMLButtonElement>(
+                "button:not(:disabled)",
+            ),
+        ];
+        const at = items.indexOf(document.activeElement as HTMLButtonElement);
+        const step = e.key === "ArrowDown" ? 1 : -1;
+        items[(at + step + items.length) % items.length]?.focus();
+    };
+    let firstEnabled = true;
+    return (
+        <RowMenuFrame
+            x={menu.x}
+            y={menu.y}
+            anchorIndex={menu.anchor}
+            onClose={onClose}
+        >
+            <div className="menu-items" onKeyDown={onKeyDown}>
+                {choices.map((group, g) => (
+                    <div key={g} className="menu-group">
+                        {g > 0 && <div className="sep" />}
+                        {group.map((c) => {
+                            const focus = !c.disabled && firstEnabled;
+                            if (focus) {
+                                firstEnabled = false;
+                            }
+                            return (
+                                <button
+                                    key={c.action}
+                                    ref={focus ? first : undefined}
+                                    type="button"
+                                    role="menuitem"
+                                    disabled={c.disabled}
+                                    onClick={menuAction(
+                                        () => onAct(c.action),
+                                        onClose,
+                                    )}
+                                >
+                                    {c.label}
+                                    <span className="keys">
+                                        {c.disabled ? c.reason : c.keys}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ))}
+            </div>
+        </RowMenuFrame>
     );
 }
 
@@ -574,7 +759,10 @@ function ListPage({
     total,
     loading,
     layers,
-    onOpen,
+    nodeOf,
+    onHover,
+    onAct,
+    onMenu,
     onMore,
 }: {
     node: ListNode;
@@ -582,9 +770,49 @@ function ListPage({
     total: number;
     loading: boolean;
     layers: GetSymbolOutlineResult["layers"];
-    onOpen: (row: SymbolRow) => void;
+    /** The row's entry as the server opened it, once it has. */
+    nodeOf: (row: SymbolRow) => GetSymbolNodeResult | undefined;
+    onHover: (row: SymbolRow) => void;
+    onAct: (action: string, row: SymbolRow) => void;
+    onMenu: (x: number, y: number, row: SymbolRow, index: number) => void;
     onMore: () => void;
 }): React.JSX.Element {
+    const hover = useRef<number | undefined>(undefined);
+    const rest = (row: SymbolRow) => {
+        window.clearTimeout(hover.current);
+        if (row.page) {
+            hover.current = window.setTimeout(
+                () => onHover(row),
+                HOVER_DELAY_MS,
+            );
+        }
+    };
+    useEffect(() => () => window.clearTimeout(hover.current), []);
+
+    const onRowKey = (
+        e: React.KeyboardEvent<HTMLTableRowElement>,
+        row: SymbolRow,
+        index: number,
+    ) => {
+        const step =
+            e.key === "ArrowDown"
+                ? e.currentTarget.nextElementSibling
+                : e.key === "ArrowUp"
+                  ? e.currentTarget.previousElementSibling
+                  : undefined;
+        if (step !== undefined) {
+            e.preventDefault();
+            (step as HTMLElement | null)?.focus();
+        } else if (e.key === "Enter" || e.key === "F12") {
+            e.preventDefault();
+            onAct(e.key === "Enter" ? "open" : "definition", row);
+        } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+            e.preventDefault();
+            const box = e.currentTarget.getBoundingClientRect();
+            onMenu(box.left + 16, box.bottom, row, index);
+        }
+    };
+
     return (
         <>
             <div className="grid">
@@ -595,12 +823,15 @@ function ListPage({
                             <th>{l10n.t("Type")}</th>
                             <th>{l10n.t("Kinds")}</th>
                             <th>{l10n.t("Origin")}</th>
+                            <th aria-label={l10n.t("Actions")} />
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map((row) => (
+                        {rows.map((row, index) => (
                             <tr
                                 key={row.id}
+                                data-row-index={index}
+                                tabIndex={0}
                                 className={row.page ? undefined : "inert"}
                                 title={
                                     row.page
@@ -609,7 +840,15 @@ function ListPage({
                                           ? l10n.t("Nothing defines this name")
                                           : l10n.t("Not an entry of its own")
                                 }
-                                onClick={() => row.page && onOpen(row)}
+                                onClick={() => onAct("open", row)}
+                                onDoubleClick={() => onAct("definition", row)}
+                                onKeyDown={(e) => onRowKey(e, row, index)}
+                                onMouseEnter={() => rest(row)}
+                                onFocus={() => rest(row)}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    onMenu(e.clientX, e.clientY, row, index);
+                                }}
                             >
                                 <td>{row.name}</td>
                                 <td className="dim">{row.type ?? ""}</td>
@@ -632,6 +871,16 @@ function ListPage({
                                             )}
                                         </span>
                                     )}
+                                </td>
+                                <td className="acts">
+                                    <RowActions
+                                        row={row}
+                                        result={nodeOf(row)}
+                                        onAct={(action) => onAct(action, row)}
+                                        onMore={(x, y) =>
+                                            onMenu(x, y, row, index)
+                                        }
+                                    />
                                 </td>
                             </tr>
                         ))}
@@ -667,6 +916,56 @@ function ListPage({
 }
 
 /**
+ * A row's hover icons: go to definition and what the entry offers, disabled ones saying why, then
+ * the whole menu. Drawn once the server has opened the entry, which resting on the row asks for.
+ */
+function RowActions({
+    row,
+    result,
+    onAct,
+    onMore,
+}: {
+    row: SymbolRow;
+    result: GetSymbolNodeResult | undefined;
+    onAct: (action: string) => void;
+    onMore: (x: number, y: number) => void;
+}): React.JSX.Element | null {
+    if (!row.page || !result) {
+        return null;
+    }
+    const [[, definition], offered = []] = actionChoices(true, result.actions);
+    return (
+        <span className="row-actions">
+            {[
+                definition,
+                ...offered.filter((c) => c.action !== "copyName"),
+            ].map((c) => (
+                <IconButton
+                    key={c.action}
+                    icon={ACTION_ICONS[c.action] ?? "open"}
+                    title={c.label}
+                    disabled={c.disabled}
+                    disabledReason={`${c.label} - ${c.reason ?? ""}`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onAct(c.action);
+                    }}
+                />
+            ))}
+            <IconButton
+                icon="moreActions"
+                title={l10n.t("More actions")}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    const box = e.currentTarget.getBoundingClientRect();
+                    onMore(box.left, box.bottom);
+                }}
+            />
+        </span>
+    );
+}
+
+/**
  * An opened entry: what it is and where the game takes it from, and for a game object its
  * encyclopedia card - the same component the encyclopedia panel draws. Its relations are its
  * children in the rail, not a column here.
@@ -676,15 +975,18 @@ function EntryPage({
     result,
     layers,
     onOpenBase,
+    onAct,
 }: {
     node: EntryNode;
     result: GetSymbolNodeResult | null;
     layers: GetSymbolOutlineResult["layers"];
     onOpenBase: (base: string) => void;
+    onAct: (action: string) => void;
 }): React.JSX.Element {
     const row = result?.entry ?? node.row;
     const location = result?.location;
     const definedIn = originLabel(row.origin, row.originName, layers);
+    const [[, definition], offered = []] = actionChoices(true, result?.actions);
     return (
         <section className="entry">
             <h1>{row.name}</h1>
@@ -724,6 +1026,26 @@ function EntryPage({
                     </button>
                 </p>
             )}
+            <p className="actions">
+                {[
+                    definition,
+                    ...offered.filter((c) => c.action !== "copyName"),
+                ].map((c) => (
+                    <Button
+                        key={c.action}
+                        compact
+                        disabled={c.disabled}
+                        disabledReason={c.reason ?? ""}
+                        onClick={() => onAct(c.action)}
+                    >
+                        <Icon
+                            name={ACTION_ICONS[c.action] ?? "open"}
+                            size={14}
+                        />
+                        {c.label}
+                    </Button>
+                ))}
+            </p>
             {row.type === GAME_OBJECT_TYPE && <CardSection objectId={row.id} />}
         </section>
     );
@@ -909,6 +1231,7 @@ function SearchForm({
 // rail and the page are a fixed grid; the table and the rail scroll in place.
 const Shell = styled.div`
     ${dockChromeCss}
+    ${dockHeaderCss}
 
     display: grid;
     grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
@@ -1084,6 +1407,43 @@ const Shell = styled.div`
     tbody tr.inert {
         cursor: default;
         color: var(--vscode-disabledForeground);
+    }
+    tbody tr:focus-visible {
+        outline: 1px solid var(--vscode-focusBorder);
+        outline-offset: -1px;
+    }
+    /* The hover icons overlay the row's end, as the editor's own lists do: the cell takes no width,
+       so the table is as wide with them as without. */
+    td.acts {
+        position: sticky;
+        right: 0;
+        width: 0;
+        padding: 0;
+    }
+    .row-actions {
+        position: absolute;
+        right: var(--space-8);
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        visibility: hidden;
+        background: var(--vscode-editor-background);
+        border-radius: var(--radius-6);
+    }
+    tbody tr:hover .row-actions,
+    tbody tr:focus-within .row-actions {
+        visibility: visible;
+    }
+    .entry .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-6);
+        margin-top: var(--space-12);
+    }
+    .entry .actions .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
     }
 
     .pager {
