@@ -60,7 +60,18 @@ public sealed record GetSymbolNodeParams(string Page, string Id) : IRequest<GetS
 
 /// <param name="Entry">The entry's row; null when the page lists no such entry.</param>
 /// <param name="Relations">Its relations, in the order the panel shows them.</param>
-public sealed record GetSymbolNodeResult(SymbolRow? Entry, IReadOnlyList<SymbolRelation> Relations);
+public sealed record GetSymbolNodeResult(SymbolRow? Entry, IReadOnlyList<SymbolRelation> Relations)
+{
+    /// <summary>Where the definition the game uses is; null for one only the game defines.</summary>
+    public SymbolLocation? Location { get; init; }
+
+    /// <summary>The object this one is a variant of, from <c>Variant_Of_Existing_Type</c>.</summary>
+    public string? VariantOf { get; init; }
+}
+
+/// <param name="Uri">The defining document.</param>
+/// <param name="Line">The zero-based line the definition starts on.</param>
+public sealed record SymbolLocation(string Uri, int Line);
 
 /// <param name="Relation">The relation's key.</param>
 /// <param name="Count">How many entries it lists; null until counted, for one that needs every object's tags.</param>

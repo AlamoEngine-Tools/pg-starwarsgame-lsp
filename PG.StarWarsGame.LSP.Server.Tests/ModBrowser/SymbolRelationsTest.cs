@@ -70,7 +70,8 @@ public sealed class SymbolRelationsTest
             // reference; the reference is still the TIE fighter's (measured on FoC: Piet's bonus).
             Object("Star_Destroyer", 3), Object("Tie_Fighter", 20), Object("Tie_Fighter$Tractor_Beam", 22),
             Object("Proton_Explosion", 40, "Particle"),
-            Object("Unit_Select_SD", 50, "SFXEvent"), Object("HP_Laser_1", 60, "HardPoint")
+            Object("Unit_Select_SD", 50, "SFXEvent"), Object("HP_Laser_1", 60, "HardPoint"),
+            Object("Star_Destroyer_Mk2", 70) with { VariantBaseId = "Star_Destroyer" }
         ];
         var baseline = BaselineIndex.Empty with
         {
@@ -181,6 +182,21 @@ public sealed class SymbolRelationsTest
         var definitions = Relations().Rows(Page, "Star_Destroyer", "definitions")!;
 
         Assert.Equal(["layer:0", "game"], definitions.Select(r => r.Origin));
+    }
+
+    [Fact]
+    public void AnOpenedObject_SaysWhereTheDefinitionTheGameUsesIs_AndWhatItIsAVariantOf()
+    {
+        var relations = Relations();
+
+        var destroyer = relations.Node(Page, "Star_Destroyer");
+        var variant = relations.Node(Page, "Star_Destroyer_Mk2");
+        var shipped = relations.Node(Page, "Shipped_Only");
+
+        Assert.Equal(new SymbolLocation(Units, 3), destroyer.Location);
+        Assert.Null(destroyer.VariantOf);
+        Assert.Equal("Star_Destroyer", variant.VariantOf);
+        Assert.Null(shipped.Location);
     }
 
     [Fact]

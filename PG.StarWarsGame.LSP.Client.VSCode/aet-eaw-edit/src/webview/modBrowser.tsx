@@ -2,18 +2,21 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The Mod Browser (#270): everything a project indexes, by what it is. Modelled on Eclipse Scout's
-// outline - a rail on the left that is the recursive tree of the lists and of the rows a list has
-// loaded, and the open list or entry on the right, with its search form at the bottom. A row's
-// relations are asked for when it is opened, never for a whole list.
+// outline - a rail on the left that is the recursive tree of lists and entries, and the open list or
+// entry on the right. A list's children are its loaded rows, an entry's are its relations, and a
+// relation is a list again; the path to the open node is the breadcrumb. A list carries its search
+// form at the bottom; an entry shows its header and, for a game object, its encyclopedia card.
 //
 // Every request goes through the host, which sends it to this panel's own project's server.
 
 import "./shared/l10nSetup";
 import * as l10n from "@vscode/l10n";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import styled from "styled-components";
 
+import { GET_ENCYCLOPEDIA_ENTRY } from "../protocol/encyclopedia";
+import type { GetEncyclopediaEntryResult } from "../protocol/encyclopedia";
 import {
     GET_SYMBOL_NODE,
     GET_SYMBOL_OUTLINE,
@@ -28,9 +31,13 @@ import {
     SymbolRelation,
     SymbolRow,
 } from "../protocol/modBrowser";
+import { pickShipName } from "../shipNamePick";
+import { EncyclopediaCard } from "./encyclopediaCard";
+import { factionModes, factionSlotOf } from "./encyclopediaModes";
 import {
     KindChoice,
     kindChoices,
+    locationLabel,
     originChoices,
     originLabel,
     pageLabel,
@@ -38,14 +45,19 @@ import {
     relationLabel,
 } from "./modBrowserModel";
 import { Button } from "./shared/Button";
+import { dockChromeCss } from "./shared/dockChrome";
+import { Field } from "./shared/Field";
 import { Icon } from "./shared/Icon";
-import { tokensCss } from "./shared/tokens";
+import { ModeSelector } from "./shared/ModeSelector";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
 const vscode = acquireVsCodeApi();
 
 const PAGE_SIZE = 200;
+const GAME_OBJECT_TYPE = "GameObjectType";
+/** The card at twice the game's size: legible, and still small enough to sit beside the header. */
+const CARD_ZOOM = 2;
 
 // ── the request relay ──────────────────────────────────────────────────────
 
@@ -69,22 +81,70 @@ function request<T>(method: string, params: unknown): Promise<T | null> {
     });
 }
 
-// ── state ──────────────────────────────────────────────────────────────────
+// ── the tree ───────────────────────────────────────────────────────────────
 
-/** A list on the right: one of the outline's, or one relation of an entry. */
-interface ListView {
+/** A list: one of the outline's, or one relation of an entry. */
+interface ListNode {
+    kind: "list";
+    /** The node's path in the rail, unique even when one entry is reached by two paths. */
+    key: string;
     page: string;
     parent?: SymbolParent;
-    /** The entry's name, when the list is one of its relations. */
-    parentName?: string;
+    label: string;
+    count?: number | null;
+    reason?: string | null;
+    trail: RailNode[];
 }
 
-/** An entry open on the right. */
-interface EntryView {
+/** An entry of a list. */
+interface EntryNode {
+    kind: "entry";
+    key: string;
     page: string;
     row: SymbolRow;
-    relations: SymbolRelation[];
+    trail: RailNode[];
 }
+
+type RailNode = ListNode | EntryNode;
+
+/** One list's loaded rows, as the rail shows them. */
+interface Loaded {
+    rows: SymbolRow[];
+    total: number;
+}
+
+function entryOf(list: ListNode, row: SymbolRow): EntryNode {
+    return {
+        kind: "entry",
+        key: `${list.key}\n${row.id}`,
+        page: row.page ?? list.page,
+        row,
+        trail: [...list.trail, list],
+    };
+}
+
+function relationOf(entry: EntryNode, relation: SymbolRelation): ListNode {
+    return {
+        kind: "list",
+        key: `${entry.key}\n${relation.relation}`,
+        page: entry.page,
+        parent: {
+            page: entry.page,
+            id: entry.row.id,
+            relation: relation.relation,
+        },
+        label: relationLabel(relation.relation),
+        count: relation.count,
+        reason: relation.reason,
+        trail: [...entry.trail, entry],
+    };
+}
+
+function nodeName(node: RailNode): string {
+    return node.kind === "entry" ? node.row.name : node.label;
+}
+
+// ── state ──────────────────────────────────────────────────────────────────
 
 interface Filter {
     query: string;
@@ -94,23 +154,31 @@ interface Filter {
 
 const NO_FILTER: Filter = { query: "", kinds: [], origins: [] };
 
-function rowKey(page: string, id: string): string {
-    return `${page}|${id}`;
-}
+/**
+ * The ship name drawn for each object, kept for the panel's life - the encyclopedia panel's rule:
+ * the engine picks at random, and re-picking on every open would reshuffle the card.
+ */
+const shipNames = new Map<string, string | null>();
 
 function App(): React.JSX.Element {
     const [outline, setOutline] = useState<SymbolOutline | null>(null);
     const [summary, setSummary] = useState<GetSymbolOutlineResult | null>(null);
-    const [list, setList] = useState<ListView | null>(null);
-    const [entry, setEntry] = useState<EntryView | null>(null);
-    const [rows, setRows] = useState<SymbolRow[]>([]);
-    const [total, setTotal] = useState(0);
+    const [current, setCurrent] = useState<RailNode | null>(null);
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    /**
+     * Every list's loaded rows, the table's among them. The rail draws a list's children from here,
+     * so a list keeps its rows - searched and paged as the table left them - after the table moves
+     * on to one of its entries or their relations.
+     */
+    const [loaded, setLoaded] = useState<Record<string, Loaded>>({});
+    const [nodes, setNodes] = useState<Record<string, GetSymbolNodeResult>>({});
+    /** The list the table last showed, whose search form the panel holds. */
+    const [tableKey, setTableKey] = useState<string | null>(null);
     const [kinds, setKinds] = useState<SymbolKindCount[]>([]);
     const [loading, setLoading] = useState(false);
     const [draft, setDraft] = useState<Filter>(NO_FILTER);
     const [filter, setFilter] = useState<Filter>(NO_FILTER);
     const [formOpen, setFormOpen] = useState(true);
-    const [opened, setOpened] = useState<Record<string, SymbolRelation[]>>({});
     const [refreshed, setRefreshed] = useState(0);
 
     useEffect(() => {
@@ -121,11 +189,15 @@ function App(): React.JSX.Element {
             };
             if (msg.type === "outline" && msg.outline) {
                 setOutline(msg.outline);
-                setList(null);
-                setEntry(null);
-                setOpened({});
+                setCurrent(null);
+                setExpanded(new Set());
+                setLoaded({});
+                setNodes({});
             }
+            // The index changed: what was loaded may be stale, so it is asked again.
             if (msg.type === "refresh") {
+                setLoaded({});
+                setNodes({});
                 setRefreshed((n) => n + 1);
             }
         };
@@ -133,6 +205,20 @@ function App(): React.JSX.Element {
         vscode.postMessage({ type: "ready" });
         return () => window.removeEventListener("message", handle);
     }, []);
+
+    const tops = useMemo<ListNode[]>(
+        () =>
+            (summary?.pages ?? []).map((p) => ({
+                kind: "list",
+                key: p.page,
+                page: p.page,
+                label: pageLabel(p.page),
+                count: p.count,
+                reason: p.count === 0 ? "none" : null,
+                trail: [],
+            })),
+        [summary],
+    );
 
     useEffect(() => {
         if (outline === null) {
@@ -142,20 +228,32 @@ function App(): React.JSX.Element {
             outline,
         }).then((result) => {
             setSummary(result);
-            setList(
-                (current) =>
-                    current ??
-                    (result?.pages[0] ? { page: result.pages[0].page } : null),
-            );
+            const first = result?.pages[0];
+            if (first) {
+                setCurrent(
+                    (open) =>
+                        open ?? {
+                            kind: "list",
+                            key: first.page,
+                            page: first.page,
+                            label: pageLabel(first.page),
+                            count: first.count,
+                            trail: [],
+                        },
+                );
+                setExpanded((open) => new Set(open).add(first.page));
+            }
         });
     }, [outline, refreshed]);
 
+    const list = current?.kind === "list" ? current : null;
+
     const load = useCallback(
-        async (view: ListView, applied: Filter, offset: number) => {
+        async (node: ListNode, applied: Filter, offset: number) => {
             setLoading(true);
             const params: GetSymbolPageParams = {
-                page: view.page,
-                parent: view.parent,
+                page: node.page,
+                parent: node.parent,
                 query: applied.query || undefined,
                 kinds: applied.kinds.length ? applied.kinds : undefined,
                 origins: applied.origins.length ? applied.origins : undefined,
@@ -166,12 +264,20 @@ function App(): React.JSX.Element {
                 GET_SYMBOL_PAGE,
                 params,
             );
-            setRows((current) =>
-                offset === 0
-                    ? (result?.rows ?? [])
-                    : [...current, ...(result?.rows ?? [])],
-            );
-            setTotal(result?.total ?? 0);
+            setTableKey(node.key);
+            setLoaded((known) => ({
+                ...known,
+                [node.key]: {
+                    rows:
+                        offset === 0
+                            ? (result?.rows ?? [])
+                            : [
+                                  ...(known[node.key]?.rows ?? []),
+                                  ...(result?.rows ?? []),
+                              ],
+                    total: result?.total ?? 0,
+                },
+            }));
             setKinds(result?.kinds ?? []);
             setLoading(false);
         },
@@ -182,57 +288,88 @@ function App(): React.JSX.Element {
         if (list !== null) {
             void load(list, filter, 0);
         }
-    }, [list, filter, refreshed, load]);
+        // The list is followed by its key: a new object for the same list must not reload it.
+    }, [list?.key, filter, refreshed, load]);
 
-    const openList = (view: ListView) => {
-        setEntry(null);
-        setDraft(NO_FILTER);
-        setFilter(NO_FILTER);
-        setList(view);
+    const shownOf = (node: ListNode): Loaded =>
+        loaded[node.key] ?? { rows: [], total: 0 };
+    const { rows, total } = list ? shownOf(list) : { rows: [], total: 0 };
+
+    const childrenOf = (node: RailNode): RailNode[] =>
+        node.kind === "entry"
+            ? (nodes[node.key]?.relations ?? []).map((r) => relationOf(node, r))
+            : shownOf(node).rows.map((row) => entryOf(node, row));
+
+    const moreOf = (node: ListNode): number => {
+        const shown = shownOf(node);
+        return Math.max(0, shown.total - shown.rows.length);
     };
 
-    const openEntry = async (page: string, row: SymbolRow) => {
-        const node = await request<GetSymbolNodeResult>(GET_SYMBOL_NODE, {
-            page,
-            id: row.id,
-        });
-        const relations = node?.relations ?? [];
-        setOpened((current) => ({
-            ...current,
-            [rowKey(page, row.id)]: relations,
-        }));
-        setEntry({ page, row: node?.entry ?? row, relations });
-    };
-
-    const toggleRow = async (page: string, row: SymbolRow) => {
-        const key = rowKey(page, row.id);
-        if (opened[key]) {
-            setOpened(({ [key]: _, ...rest }) => rest);
+    const fetchNode = async (node: EntryNode): Promise<void> => {
+        if (nodes[node.key]) {
             return;
         }
-        const node = await request<GetSymbolNodeResult>(GET_SYMBOL_NODE, {
-            page,
-            id: row.id,
+        const result = await request<GetSymbolNodeResult>(GET_SYMBOL_NODE, {
+            page: node.page,
+            id: node.row.id,
         });
-        setOpened((current) => ({ ...current, [key]: node?.relations ?? [] }));
+        if (result) {
+            setNodes((known) => ({ ...known, [node.key]: result }));
+        }
     };
 
-    const openRelation = (
-        page: string,
-        row: SymbolRow,
-        relation: SymbolRelation,
-    ) => {
-        openList({
-            page,
-            parent: { page, id: row.id, relation: relation.relation },
-            parentName: row.name,
+    const fetchList = async (node: ListNode): Promise<void> => {
+        if (loaded[node.key]) {
+            return;
+        }
+        const result = await request<GetSymbolPageResult>(GET_SYMBOL_PAGE, {
+            page: node.page,
+            parent: node.parent,
+            limit: PAGE_SIZE,
         });
+        setLoaded((known) => ({
+            ...known,
+            [node.key]: {
+                rows: result?.rows ?? [],
+                total: result?.total ?? 0,
+            },
+        }));
+    };
+
+    const expand = (node: RailNode, open: boolean) =>
+        setExpanded((keys) => {
+            const next = new Set(keys);
+            if (open) {
+                next.add(node.key);
+            } else {
+                next.delete(node.key);
+            }
+            return next;
+        });
+
+    const toggle = (node: RailNode) => {
+        const open = !expanded.has(node.key);
+        expand(node, open);
+        if (open) {
+            void (node.kind === "entry" ? fetchNode(node) : fetchList(node));
+        }
+    };
+
+    const select = (node: RailNode) => {
+        // Back to the list the table holds keeps its search; another list starts unfiltered.
+        if (node.kind === "list" && node.key !== tableKey) {
+            setDraft(NO_FILTER);
+            setFilter(NO_FILTER);
+        } else if (node.kind === "entry") {
+            void fetchNode(node);
+        }
+        expand(node, true);
+        setCurrent(node);
     };
 
     const layers = summary?.layers ?? [];
-    const listPage = list?.parent ? list.parent.page : list?.page;
 
-    if (outline === null || summary === null) {
+    if (outline === null || summary === null || current === null) {
         return (
             <Shell>
                 <p className="empty">{l10n.t("Loading...")}</p>
@@ -240,92 +377,103 @@ function App(): React.JSX.Element {
         );
     }
 
+    const renderNode = (node: RailNode, depth: number): React.JSX.Element => {
+        const open = expanded.has(node.key);
+        const inert = node.kind === "entry" ? !node.row.page : node.count === 0;
+        const more = node.kind === "list" && open ? moreOf(node) : 0;
+        return (
+            <div key={node.key}>
+                <div
+                    className={`node${current.key === node.key ? " selected" : ""}`}
+                    style={{ "--depth": depth } as React.CSSProperties}
+                >
+                    <button
+                        type="button"
+                        className="twisty"
+                        disabled={inert}
+                        title={
+                            inert
+                                ? undefined
+                                : open
+                                  ? l10n.t("Collapse")
+                                  : l10n.t("Expand")
+                        }
+                        onClick={() => toggle(node)}
+                    >
+                        {!inert && (
+                            <Icon
+                                name={open ? "expanded" : "collapsed"}
+                                size={12}
+                            />
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        className="label"
+                        disabled={inert}
+                        title={inert ? inertReason(node) : undefined}
+                        onClick={() => select(node)}
+                    >
+                        {nodeName(node)}
+                        {node.kind === "list" && node.count === 0 && (
+                            <em className="why">
+                                {" "}
+                                - {reasonLabel(node.reason)}
+                            </em>
+                        )}
+                    </button>
+                    {node.kind === "list" && (
+                        <span className="count">
+                            {node.count?.toLocaleString() ?? ""}
+                        </span>
+                    )}
+                </div>
+                {open &&
+                    !inert &&
+                    childrenOf(node).map((c) => renderNode(c, depth + 1))}
+                {more > 0 && node.kind === "list" && (
+                    <button
+                        type="button"
+                        className="node more"
+                        style={{ "--depth": depth + 1 } as React.CSSProperties}
+                        onClick={() => select(node)}
+                    >
+                        <span />
+                        <span className="label">
+                            {l10n.t("{0} more", more.toLocaleString())}
+                        </span>
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    const crumbs = [...current.trail, current];
+
     return (
         <Shell>
             <nav className="rail" aria-label={l10n.t("Lists")}>
-                {summary.pages.map((p) => {
-                    const current = list?.page === p.page && !list.parent;
-                    return (
-                        <div key={p.page}>
-                            <button
-                                type="button"
-                                className={`node depth0${current && entry === null ? " selected" : ""}`}
-                                disabled={p.count === 0}
-                                title={
-                                    p.count === 0
-                                        ? l10n.t("Nothing of this kind")
-                                        : undefined
-                                }
-                                onClick={() => openList({ page: p.page })}
-                            >
-                                <span className="twisty">
-                                    <Icon
-                                        name={
-                                            current ? "expanded" : "collapsed"
-                                        }
-                                        size={12}
-                                    />
-                                </span>
-                                <span className="label">
-                                    {pageLabel(p.page)}
-                                </span>
-                                <span className="count">
-                                    {p.count.toLocaleString()}
-                                </span>
-                            </button>
-                            {current &&
-                                rows.map((row) => (
-                                    <RailRow
-                                        key={row.id}
-                                        page={p.page}
-                                        row={row}
-                                        relations={
-                                            opened[rowKey(p.page, row.id)]
-                                        }
-                                        selected={entry?.row.id === row.id}
-                                        onToggle={() =>
-                                            void toggleRow(p.page, row)
-                                        }
-                                        onOpen={() =>
-                                            void openEntry(p.page, row)
-                                        }
-                                        onRelation={(r) =>
-                                            openRelation(p.page, row, r)
-                                        }
-                                    />
-                                ))}
-                        </div>
-                    );
-                })}
+                {tops.map((top) => renderNode(top, 0))}
             </nav>
             <main className="page">
                 <header className="crumbs">
+                    {crumbs.map((node, i) => (
+                        <span key={node.key} className="crumb-step">
+                            {i > 0 && <Separator />}
+                            {i < crumbs.length - 1 ? (
+                                <button
+                                    type="button"
+                                    className="crumb"
+                                    onClick={() => select(node)}
+                                >
+                                    {nodeName(node)}
+                                </button>
+                            ) : (
+                                <b>{nodeName(node)}</b>
+                            )}
+                        </span>
+                    ))}
                     {list && (
-                        <button
-                            type="button"
-                            className="crumb"
-                            onClick={() =>
-                                openList({ page: listPage ?? list.page })
-                            }
-                        >
-                            {pageLabel(listPage ?? list.page)}
-                        </button>
-                    )}
-                    {list?.parentName && entry === null && (
-                        <>
-                            <Separator />
-                            <span className="crumb">{list.parentName}</span>
-                            <Separator />
-                            <b>{relationLabel(list.parent!.relation)}</b>
-                        </>
-                    )}
-                    {entry && (
-                        <>
-                            <Separator />
-                            <b>{entry.row.name}</b>
-                        </>
-                    )}
-                    {entry === null && (
                         <span className="end">
                             {l10n.t(
                                 "{0} of {1}",
@@ -335,127 +483,68 @@ function App(): React.JSX.Element {
                         </span>
                     )}
                 </header>
-                {entry ? (
+                {current.kind === "entry" ? (
                     <EntryPage
-                        entry={entry}
+                        node={current}
+                        result={nodes[current.key] ?? null}
                         layers={layers}
-                        onRelation={(r) =>
-                            openRelation(entry.page, entry.row, r)
+                        onOpenBase={(base) =>
+                            select({
+                                kind: "entry",
+                                key: `${current.key}\n${base}`,
+                                page: current.page,
+                                row: {
+                                    id: base,
+                                    name: base,
+                                    kinds: [],
+                                    origin: "",
+                                    overrides: [],
+                                    page: current.page,
+                                },
+                                // Reached from the variant, so the way back is the variant.
+                                trail: [...current.trail, current],
+                            })
                         }
                     />
                 ) : (
-                    <>
-                        <div className="grid">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>{l10n.t("Name")}</th>
-                                        <th>{l10n.t("Type")}</th>
-                                        <th>{l10n.t("Kinds")}</th>
-                                        <th>{l10n.t("Origin")}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rows.map((row) => (
-                                        <tr
-                                            key={row.id}
-                                            className={
-                                                row.page ? undefined : "inert"
-                                            }
-                                            title={
-                                                row.page
-                                                    ? undefined
-                                                    : inertReason(row)
-                                            }
-                                            onClick={() =>
-                                                row.page &&
-                                                void openEntry(row.page, row)
-                                            }
-                                        >
-                                            <td>{row.name}</td>
-                                            <td className="dim">
-                                                {row.type ?? ""}
-                                            </td>
-                                            <td className="dim">
-                                                {row.kinds.join(", ")}
-                                            </td>
-                                            <td>
-                                                {originLabel(
-                                                    row.origin,
-                                                    row.originName,
-                                                    layers,
-                                                )}
-                                                {row.overrides.length > 0 && (
-                                                    <span className="chip">
-                                                        {l10n.t(
-                                                            "Overrides - {0}",
-                                                            originLabel(
-                                                                row
-                                                                    .overrides[0],
-                                                                null,
-                                                                layers,
-                                                            ),
-                                                        )}
-                                                    </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            {rows.length === 0 && !loading && (
-                                <p className="empty">
-                                    {l10n.t("Nothing matches")}
-                                </p>
-                            )}
-                        </div>
-                        <footer className="pager">
-                            <span>
-                                {l10n.t(
-                                    "Showing {0} of {1}",
-                                    rows.length.toLocaleString(),
-                                    total.toLocaleString(),
-                                )}
-                            </span>
-                            <Button
-                                compact
-                                disabled={rows.length >= total || loading}
-                                disabledReason={
-                                    loading
-                                        ? l10n.t("Loading...")
-                                        : l10n.t("Everything is loaded")
-                                }
-                                onClick={() =>
-                                    list && void load(list, filter, rows.length)
-                                }
-                            >
-                                {l10n.t("Load more")}
-                            </Button>
-                        </footer>
-                        <SearchForm
-                            open={formOpen}
-                            onToggle={() => setFormOpen((o) => !o)}
-                            title={
-                                list?.parentName
-                                    ? l10n.t(
-                                          "{0} of {1}",
-                                          relationLabel(list.parent!.relation),
-                                          list.parentName,
-                                      )
-                                    : pageLabel(list?.page ?? "")
-                            }
-                            draft={draft}
-                            kinds={kindChoices(kinds, draft.kinds)}
-                            origins={originChoices(layers)}
-                            layers={layers}
-                            onChange={setDraft}
-                            onSearch={() => setFilter(draft)}
-                            onReset={() => {
-                                setDraft(NO_FILTER);
-                                setFilter(NO_FILTER);
-                            }}
-                        />
-                    </>
+                    <ListPage
+                        node={current}
+                        rows={rows}
+                        total={total}
+                        loading={loading}
+                        layers={layers}
+                        onOpen={(row) => select(entryOf(current, row))}
+                        onMore={() => void load(current, filter, rows.length)}
+                    />
+                )}
+                {current.kind === "list" && (
+                    <SearchForm
+                        open={formOpen}
+                        onToggle={() => setFormOpen((o) => !o)}
+                        title={
+                            current.parent
+                                ? l10n.t(
+                                      "{0} of {1}",
+                                      current.label,
+                                      nodeName(
+                                          current.trail[
+                                              current.trail.length - 1
+                                          ],
+                                      ),
+                                  )
+                                : current.label
+                        }
+                        draft={draft}
+                        kinds={kindChoices(kinds, draft.kinds)}
+                        origins={originChoices(layers)}
+                        layers={layers}
+                        onChange={setDraft}
+                        onSearch={() => setFilter(draft)}
+                        onReset={() => {
+                            setDraft(NO_FILTER);
+                            setFilter(NO_FILTER);
+                        }}
+                    />
                 )}
             </main>
         </Shell>
@@ -470,80 +559,132 @@ function Separator(): React.JSX.Element {
     );
 }
 
-/** Why a row opens nothing: a name nothing defines, or a place rather than an entry. */
-function inertReason(row: SymbolRow): string {
-    return row.origin === "missing"
+/** Why a node opens nothing: a name nothing defines, a place rather than an entry, or an empty list. */
+function inertReason(node: RailNode): string {
+    if (node.kind === "list") {
+        return reasonLabel(node.reason);
+    }
+    return node.row.origin === "missing"
         ? l10n.t("Nothing defines this name")
         : l10n.t("Not an entry of its own");
 }
 
-function RailRow({
-    row,
-    relations,
-    selected,
-    onToggle,
+function ListPage({
+    rows,
+    total,
+    loading,
+    layers,
     onOpen,
-    onRelation,
+    onMore,
 }: {
-    page: string;
-    row: SymbolRow;
-    relations: SymbolRelation[] | undefined;
-    selected: boolean;
-    onToggle: () => void;
-    onOpen: () => void;
-    onRelation: (relation: SymbolRelation) => void;
+    node: ListNode;
+    rows: SymbolRow[];
+    total: number;
+    loading: boolean;
+    layers: GetSymbolOutlineResult["layers"];
+    onOpen: (row: SymbolRow) => void;
+    onMore: () => void;
 }): React.JSX.Element {
     return (
         <>
-            <div className={`node depth1${selected ? " selected" : ""}`}>
-                <button
-                    type="button"
-                    className="twisty"
-                    title={l10n.t("Show relations")}
-                    onClick={onToggle}
-                >
-                    <Icon
-                        name={relations ? "expanded" : "collapsed"}
-                        size={12}
-                    />
-                </button>
-                <button type="button" className="label" onClick={onOpen}>
-                    {row.name}
-                </button>
+            <div className="grid">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>{l10n.t("Name")}</th>
+                            <th>{l10n.t("Type")}</th>
+                            <th>{l10n.t("Kinds")}</th>
+                            <th>{l10n.t("Origin")}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((row) => (
+                            <tr
+                                key={row.id}
+                                className={row.page ? undefined : "inert"}
+                                title={
+                                    row.page
+                                        ? undefined
+                                        : row.origin === "missing"
+                                          ? l10n.t("Nothing defines this name")
+                                          : l10n.t("Not an entry of its own")
+                                }
+                                onClick={() => row.page && onOpen(row)}
+                            >
+                                <td>{row.name}</td>
+                                <td className="dim">{row.type ?? ""}</td>
+                                <td className="dim">{row.kinds.join(", ")}</td>
+                                <td>
+                                    {originLabel(
+                                        row.origin,
+                                        row.originName,
+                                        layers,
+                                    )}
+                                    {row.overrides.length > 0 && (
+                                        <span className="chip">
+                                            {l10n.t(
+                                                "Overrides - {0}",
+                                                originLabel(
+                                                    row.overrides[0],
+                                                    null,
+                                                    layers,
+                                                ),
+                                            )}
+                                        </span>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {rows.length === 0 && !loading && (
+                    <p className="empty">{l10n.t("Nothing matches")}</p>
+                )}
             </div>
-            {relations?.map((r) => (
-                <button
-                    key={r.relation}
-                    type="button"
-                    className="node depth2"
-                    disabled={r.count === 0}
-                    title={r.count === 0 ? reasonLabel(r.reason) : undefined}
-                    onClick={() => onRelation(r)}
+            <footer className="pager">
+                <span>
+                    {l10n.t(
+                        "Showing {0} of {1}",
+                        rows.length.toLocaleString(),
+                        total.toLocaleString(),
+                    )}
+                </span>
+                <Button
+                    compact
+                    disabled={rows.length >= total || loading}
+                    disabledReason={
+                        loading
+                            ? l10n.t("Loading...")
+                            : l10n.t("Everything is loaded")
+                    }
+                    onClick={onMore}
                 >
-                    <span className="twisty" />
-                    <span className="label">
-                        {relationLabel(r.relation)}
-                        {r.count === 0 && (
-                            <em className="why"> - {reasonLabel(r.reason)}</em>
-                        )}
-                    </span>
-                    <span className="count">{r.count ?? ""}</span>
-                </button>
-            ))}
+                    {l10n.t("Load more")}
+                </Button>
+            </footer>
         </>
     );
 }
 
+/**
+ * An opened entry: what it is and where the game takes it from, and for a game object its
+ * encyclopedia card - the same component the encyclopedia panel draws. Its relations are its
+ * children in the rail, not a column here.
+ */
 function EntryPage({
-    entry,
+    node,
+    result,
     layers,
-    onRelation,
+    onOpenBase,
 }: {
-    entry: EntryView;
+    node: EntryNode;
+    result: GetSymbolNodeResult | null;
     layers: GetSymbolOutlineResult["layers"];
-    onRelation: (relation: SymbolRelation) => void;
+    onOpenBase: (base: string) => void;
 }): React.JSX.Element {
-    const { row } = entry;
+    const row = result?.entry ?? node.row;
+    const location = result?.location;
+    const definedIn = originLabel(row.origin, row.originName, layers);
     return (
         <section className="entry">
             <h1>{row.name}</h1>
@@ -555,35 +696,93 @@ function EntryPage({
                     </span>
                 ))}
             </p>
-            <p className="dim">
-                {l10n.t(
-                    "Defined in - {0}",
-                    originLabel(row.origin, row.originName, layers),
-                )}
-            </p>
+            {row.origin && (
+                <p className="dim">
+                    {location
+                        ? l10n.t(
+                              "Defined in - {0} - {1}",
+                              definedIn,
+                              locationLabel(location),
+                          )
+                        : l10n.t("Defined in - {0}", definedIn)}
+                </p>
+            )}
             {row.overrides.map((o) => (
                 <p key={o} className="dim">
                     {l10n.t("Overrides - {0}", originLabel(o, null, layers))}
                 </p>
             ))}
-            <ul className="relations">
-                {entry.relations.map((r) => (
-                    <li key={r.relation}>
-                        <Button
-                            compact
-                            disabled={r.count === 0}
-                            disabledReason={reasonLabel(r.reason)}
-                            onClick={() => onRelation(r)}
-                        >
-                            {relationLabel(r.relation)}
-                            {r.count !== null &&
-                                r.count !== undefined &&
-                                ` (${r.count})`}
-                        </Button>
-                    </li>
-                ))}
-            </ul>
+            {result?.variantOf && (
+                <p className="dim">
+                    {l10n.t("Variant of - ")}
+                    <button
+                        type="button"
+                        className="link"
+                        onClick={() => onOpenBase(result.variantOf!)}
+                    >
+                        {result.variantOf}
+                    </button>
+                </p>
+            )}
+            {row.type === GAME_OBJECT_TYPE && <CardSection objectId={row.id} />}
         </section>
+    );
+}
+
+/** The object's encyclopedia card with its faction switch, asked for when the entry opens. */
+function CardSection({ objectId }: { objectId: string }): React.JSX.Element {
+    const [card, setCard] = useState<GetEncyclopediaEntryResult | null>(null);
+    const [factionSlot, setFactionSlot] = useState(0);
+
+    useEffect(() => {
+        let live = true;
+        setCard(null);
+        void request<GetEncyclopediaEntryResult>(GET_ENCYCLOPEDIA_ENTRY, {
+            objectId,
+        }).then((result) => {
+            if (live) {
+                setCard(result);
+            }
+        });
+        return () => {
+            live = false;
+        };
+    }, [objectId]);
+
+    if (card === null) {
+        return <p className="empty">{l10n.t("Loading...")}</p>;
+    }
+    if (!card.found) {
+        return (
+            <p className="empty">
+                {l10n.t("No encyclopedia entry for '{0}'.", objectId)}
+            </p>
+        );
+    }
+
+    if (!shipNames.has(objectId)) {
+        shipNames.set(objectId, pickShipName(card.shipNames?.names ?? []));
+    }
+    const shipName = shipNames.get(objectId) ?? null;
+
+    return (
+        <div className="card">
+            <EncyclopediaCard
+                entry={
+                    shipName === null ? card : { ...card, unitClass: shipName }
+                }
+                zoom={CARD_ZOOM}
+                factionSlot={factionSlot}
+            />
+            <Field label={l10n.t("Faction frame")}>
+                <ModeSelector
+                    label={l10n.t("Faction frame")}
+                    value={String(factionSlot)}
+                    options={factionModes(card.chrome?.factionFrames ?? [])}
+                    onSelect={(id) => setFactionSlot(factionSlotOf(id))}
+                />
+            </Field>
+        </div>
     );
 }
 
@@ -706,16 +905,17 @@ function SearchForm({
     );
 }
 
-// VS Code's own colours, so the panel follows the theme. The rail and the page are a fixed grid;
-// the table and the rail scroll in place.
+// VS Code's own colours, so the panel follows the theme, on the chrome the other panels share. The
+// rail and the page are a fixed grid; the table and the rail scroll in place.
 const Shell = styled.div`
+    ${dockChromeCss}
+
     display: grid;
     grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
     height: 100vh;
     color: var(--vscode-foreground);
     background: var(--vscode-editor-background);
     font: var(--vscode-font-size) / 1.4 var(--vscode-font-family);
-    ${tokensCss}
 
     button {
         font: inherit;
@@ -758,13 +958,14 @@ const Shell = styled.div`
         grid-template-columns: var(--icon-size-16) minmax(0, 1fr) auto;
         align-items: center;
         gap: var(--space-4);
+        box-sizing: border-box;
         width: 100%;
         height: 22px;
-        padding: 0 var(--space-8) 0 0;
+        padding: 0 var(--space-8) 0
+            calc(var(--space-8) + var(--depth, 0) * var(--space-16));
         border: 0;
         background: none;
         text-align: left;
-        cursor: pointer;
         content-visibility: auto;
         contain-intrinsic-size: 22px;
     }
@@ -775,18 +976,9 @@ const Shell = styled.div`
         background: var(--vscode-list-activeSelectionBackground);
         color: var(--vscode-list-activeSelectionForeground);
     }
-    .node:disabled {
-        color: var(--vscode-disabledForeground);
-        cursor: default;
-    }
-    .node.depth0 {
-        padding-left: var(--space-8);
-    }
-    .node.depth1 {
-        padding-left: calc(var(--space-8) + var(--space-16));
-    }
-    .node.depth2 {
-        padding-left: calc(var(--space-8) + 2 * var(--space-16));
+    .node.more {
+        cursor: pointer;
+        color: var(--vscode-textLink-foreground);
     }
     .node .twisty {
         display: grid;
@@ -797,6 +989,9 @@ const Shell = styled.div`
         background: none;
         cursor: pointer;
     }
+    .node .twisty:disabled {
+        cursor: default;
+    }
     .node .label {
         overflow: hidden;
         text-overflow: ellipsis;
@@ -806,6 +1001,10 @@ const Shell = styled.div`
         background: none;
         text-align: left;
         cursor: pointer;
+    }
+    .node .label:disabled {
+        color: var(--vscode-disabledForeground);
+        cursor: default;
     }
     .node .count {
         color: var(--vscode-descriptionForeground);
@@ -825,12 +1024,19 @@ const Shell = styled.div`
     }
     .crumbs {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: var(--space-6);
         padding: var(--space-8) var(--space-16);
         border-bottom: 1px solid var(--vscode-panel-border);
     }
-    .crumbs .crumb {
+    .crumb-step {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-6);
+    }
+    .crumbs .crumb,
+    .link {
         border: 0;
         background: none;
         padding: 0;
@@ -838,6 +1044,7 @@ const Shell = styled.div`
         color: var(--vscode-textLink-foreground);
     }
     .crumbs .sep {
+        display: inline-flex;
         color: var(--vscode-descriptionForeground);
     }
     .crumbs .end {
@@ -942,16 +1149,16 @@ const Shell = styled.div`
         margin: 0 0 var(--space-6);
         font-size: var(--font-size-16);
     }
+    .entry p {
+        margin: var(--space-4) 0;
+    }
     .entry .line .chip:first-child {
         margin-left: 0;
     }
-    .entry .relations {
-        list-style: none;
-        padding: 0;
-        margin: var(--space-12) 0 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-6);
+    .entry .card {
+        display: inline-grid;
+        gap: var(--space-8);
+        margin-top: var(--space-16);
     }
 
     @media (max-width: 700px) {

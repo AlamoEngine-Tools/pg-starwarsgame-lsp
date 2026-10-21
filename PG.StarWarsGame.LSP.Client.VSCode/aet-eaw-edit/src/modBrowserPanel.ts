@@ -4,7 +4,7 @@
 import * as vscode from "vscode";
 
 import { PanelProject } from "./panelProject";
-import { SYMBOL_METHODS, SymbolOutline } from "./protocol/modBrowser";
+import { MOD_BROWSER_METHODS, SymbolOutline } from "./protocol/modBrowser";
 import {
     PanelRegistry,
     WebviewMessage,
@@ -93,7 +93,7 @@ export class ModBrowserPanel extends WebviewPanelHost {
     /** Passes one of the browser's requests to the server; anything else is answered with nothing. */
     private async _relay(msg: WebviewMessage): Promise<void> {
         const method = typeof msg.method === "string" ? msg.method : "";
-        const outcome = SYMBOL_METHODS.includes(method)
+        const outcome = MOD_BROWSER_METHODS.includes(method)
             ? await this.project.gateway.request<unknown>(method, msg.params)
             : undefined;
         this.post({

@@ -6,7 +6,11 @@
 
 import * as l10n from "@vscode/l10n";
 
-import type { SymbolKindCount, SymbolLayer } from "../protocol/modBrowser";
+import type {
+    SymbolKindCount,
+    SymbolLayer,
+    SymbolLocation,
+} from "../protocol/modBrowser";
 
 const XML_PREFIX = "xml:";
 
@@ -103,6 +107,12 @@ export function originLabel(
         return l10n.t("This mod");
     }
     return originName ?? layers.find((l) => l.rank === rank)?.name ?? origin;
+}
+
+/** Where a definition is, as the header names it: the file and the one-based line. */
+export function locationLabel(location: SymbolLocation): string {
+    const name = location.uri.slice(location.uri.lastIndexOf("/") + 1);
+    return `${decodeURIComponent(name)}:${location.line + 1}`;
 }
 
 /** Why a relation lists nothing. */

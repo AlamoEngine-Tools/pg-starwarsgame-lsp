@@ -103,6 +103,7 @@ import { serverProblem } from "./serverLaunch";
 import {
     ConvertLocalisationFormatResult,
     ExportLocalisationToDatResult,
+    GET_ENCYCLOPEDIA_ENTRY,
     GetEffectiveObjectResult,
     GetEncyclopediaEntryResult,
     GetLocalisationProjectsResult,
@@ -3230,7 +3231,7 @@ export async function activate(
                 ): Promise<void> => {
                     const entry =
                         await lsp.requestOrReport<GetEncyclopediaEntryResult>(
-                            "aet/getEncyclopediaEntry",
+                            GET_ENCYCLOPEDIA_ENTRY,
                             { objectId: id, multiplayer },
                             "load the encyclopedia entry",
                         );

@@ -6,6 +6,8 @@
  * filtered and paged on the server. Mirrors `ModBrowserProtocol.cs`.
  */
 
+import { GET_ENCYCLOPEDIA_ENTRY } from "./encyclopedia";
+
 /** The outlines the sidebar picks between. */
 export type SymbolOutline = "gameData" | "assets" | "schema";
 
@@ -13,11 +15,15 @@ export const GET_SYMBOL_OUTLINE = "aet/getSymbolOutline";
 export const GET_SYMBOL_PAGE = "aet/getSymbolPage";
 export const GET_SYMBOL_NODE = "aet/getSymbolNode";
 
-/** The requests the panel's webview may have relayed to its server, and no other. */
-export const SYMBOL_METHODS: readonly string[] = [
+/**
+ * The requests the panel's webview may have relayed to its server, and no other: its own three,
+ * and the encyclopedia card an object page embeds.
+ */
+export const MOD_BROWSER_METHODS: readonly string[] = [
     GET_SYMBOL_OUTLINE,
     GET_SYMBOL_PAGE,
     GET_SYMBOL_NODE,
+    GET_ENCYCLOPEDIA_ENTRY,
 ];
 
 /** The entry whose relation a page lists, in place of the page's own entries. */
@@ -42,9 +48,20 @@ export interface SymbolRelation {
     reason?: string | null;
 }
 
+/** Where a definition starts. */
+export interface SymbolLocation {
+    uri: string;
+    /** Zero-based. */
+    line: number;
+}
+
 export interface GetSymbolNodeResult {
     entry?: SymbolRow | null;
     relations: SymbolRelation[];
+    /** Where the definition the game uses is; null for one only the game defines. */
+    location?: SymbolLocation | null;
+    /** The object this one is a variant of. */
+    variantOf?: string | null;
 }
 
 export interface GetSymbolOutlineParams {

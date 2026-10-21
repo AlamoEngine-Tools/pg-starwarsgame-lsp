@@ -76,7 +76,23 @@ public sealed class SymbolRelations(
             .Append(Counted(ReferencedBy, ReferencingObjects(entry.Id).Count(), "none"))
             .Append(Counted(Definitions, DefinitionRows(entry.Id).Count, "none"))
             .ToList();
-        return new GetSymbolNodeResult(entry, relations);
+        var winner = WinningDefinition(entry.Id);
+        return new GetSymbolNodeResult(entry, relations)
+        {
+            Location = winner?.Origin is FileOrigin origin ? new SymbolLocation(origin.Uri, origin.Line) : null,
+            VariantOf = winner?.VariantBaseId
+        };
+    }
+
+    // The highest layer's definition, else the game's - the one the catalog lists.
+    private GameSymbol? WinningDefinition(string id)
+    {
+        var workspace = index.WorkspaceDefinitions.TryGetValue(id, out var definitions)
+            ? definitions.Where(s => s.Kind == GameSymbolKind.XmlObject && s.Origin is FileOrigin)
+                .OrderByDescending(index.LayerRankOf)
+                .FirstOrDefault()
+            : null;
+        return workspace ?? (index.Baseline.Symbols.TryGetValue(id, out var shipped) ? shipped : null);
     }
 
     /// <summary>The rows of one relation of an entry; null for an entry or relation there is not.</summary>

@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 
 import {
     kindChoices,
+    locationLabel,
     originChoices,
     originLabel,
     pageLabel,
@@ -70,6 +71,25 @@ describe("originChoices", () => {
                 { rank: 1, name: "Mod" },
             ]),
             ["layer:1", "layer:0", "game"],
+        );
+    });
+});
+
+describe("locationLabel", () => {
+    it("names the file and the one-based line", () => {
+        assert.equal(
+            locationLabel({
+                uri: "file:///c:/mod/data/xml/Units_Space_Empire.xml",
+                line: 211,
+            }),
+            "Units_Space_Empire.xml:212",
+        );
+    });
+
+    it("decodes an escaped file name", () => {
+        assert.equal(
+            locationLabel({ uri: "file:///c:/mod/My%20Units.xml", line: 0 }),
+            "My Units.xml:1",
         );
     });
 });
