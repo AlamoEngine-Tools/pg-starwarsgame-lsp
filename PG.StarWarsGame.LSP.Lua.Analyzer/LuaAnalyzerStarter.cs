@@ -16,21 +16,25 @@ public interface ILuaAnalyzerStarter
 }
 
 /// <summary>
-///     Hands the layers to the analyzer when <c>features.lua.analyzer</c> is on and its executable was
-///     found: from then on every open script gets an analyzer of its own, resolved over them.
+///     When <c>features.lua.analyzer</c> is on and its executable was found: hands the layers to the
+///     per-script analyzers - from then on every open script gets one of its own, resolved over them -
+///     and starts the whole-project analyzer, the leaf's scripts with the lower layers and every stub as
+///     its library, which answers renames and where a library is used (<see cref="LuaAnalyzerRoutes" />).
 /// </summary>
 public sealed class LuaAnalyzerStarter(
-    ILuaAnalyzerLayers analyzer,
+    ILuaAnalyzerLayers instances,
+    LuaAnalyzerHost project,
     ILspConfigurationProvider config,
+    LuaStubLocation stubs,
     bool executableFound,
     ILogger<LuaAnalyzerStarter> logger) : ILuaAnalyzerStarter
 {
-    public Task ConfigureAsync(IReadOnlyList<ProjectLayer> layers)
+    public async Task ConfigureAsync(IReadOnlyList<ProjectLayer> layers)
     {
         if (!config.Current.Features.Lua.Analyzer)
         {
             logger.LogDebug("Lua analyzer off (features.lua.analyzer)");
-            return Task.CompletedTask;
+            return;
         }
 
         if (!executableFound)
@@ -38,11 +42,17 @@ public sealed class LuaAnalyzerStarter(
             logger.LogInformation(
                 "Lua analyzer not started: emmylua_ls not found (set {Variable}, or place it in the server's emmylua folder)",
                 LuaAnalyzerExecutable.Variable);
-            return Task.CompletedTask;
+            return;
         }
 
-        analyzer.Configure(layers);
-        return Task.CompletedTask;
+        instances.Configure(layers);
+        // In the file system's own spelling: the analyzer compares paths as written (measured live).
+        var plan = EmmyrcWriter.Plan(layers, stubs.Directory);
+        await project.StartAsync(plan with
+        {
+            WorkspaceRoots = plan.WorkspaceRoots.Select(PathCasing.OnDisk).ToList(),
+            Library = plan.Library.Select(PathCasing.OnDisk).ToList()
+        });
     }
 }
 

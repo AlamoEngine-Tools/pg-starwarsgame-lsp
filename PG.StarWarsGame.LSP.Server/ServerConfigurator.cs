@@ -28,6 +28,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Generated;
 using PG.StarWarsGame.LSP.Lua.Analysis.Instances;
 using PG.StarWarsGame.LSP.Lua.Analyzer;
@@ -345,9 +346,10 @@ public static class ServerConfigurator
 
                 // The Lua analyzer sidecar (emmylua_ls): one process per open script, holding that
                 // script's instance - itself and its require tree, as the game gives every script a
-                // Lua state of its own. Started once the project load knows the layers, each with its
-                // configuration in a directory of its own. Absent executable or flag off: never
-                // started, every call a no-op.
+                // Lua state of its own - and one whole-project process that answers renames and where
+                // a library is used, nothing else. Started once the project load knows the layers,
+                // each with its configuration in a directory of its own. Absent executable or flag
+                // off: never started, every call a no-op.
                 services.AddSingleton<LuaStubLocation>();
                 // The annotations this server knows, inserted above the functions in the text the
                 // analyzer reads - an open script's and every file of a script's require tree.
@@ -369,16 +371,26 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IFileHelper>(),
                         sp.GetRequiredService<LuaStubLocation>(),
                         sp.GetRequiredService<LuaGeneratedTexts>(),
-                        Path.Combine(Path.GetTempPath(), "aetswg-emmylua",
-                            Environment.ProcessId.ToString(CultureInfo.InvariantCulture)),
+                        LuaAnalyzerDirectory,
                         sp.GetRequiredService<ILogger<LuaAnalyzerInstances>>());
                 });
-                // Every handler talks to the analyzer through generated documents.
+                services.AddSingleton(sp => new LuaAnalyzerHost(new LuaAnalyzerOptions
+                {
+                    Command = ResolveLuaAnalyzer(sp) ?? "",
+                    ConfigDirectory = Path.Combine(LuaAnalyzerDirectory, "project")
+                }, sp.GetRequiredService<ILogger<LuaAnalyzerHost>>()));
+                // Every handler talks to the analyzers through generated documents, each request
+                // routed to the one whose states hold the file it is about.
                 services.AddSingleton<ILuaAnalyzer>(sp => new GeneratedAnalyzerDocuments(
-                    sp.GetRequiredService<LuaAnalyzerInstances>(), sp.GetRequiredService<LuaGeneratedTexts>()));
+                    new LuaAnalyzerRoutes(sp.GetRequiredService<LuaAnalyzerInstances>(),
+                        sp.GetRequiredService<LuaAnalyzerHost>(),
+                        uri => sp.GetRequiredService<ILuaSandboxProvider>().Current.IsShared(uri)),
+                    sp.GetRequiredService<LuaGeneratedTexts>()));
                 services.AddSingleton<ILuaAnalyzerStarter>(sp => new LuaAnalyzerStarter(
                     sp.GetRequiredService<LuaAnalyzerInstances>(),
+                    sp.GetRequiredService<LuaAnalyzerHost>(),
                     sp.GetRequiredService<ILspConfigurationProvider>(),
+                    sp.GetRequiredService<LuaStubLocation>(),
                     ResolveLuaAnalyzer(sp) is not null,
                     sp.GetRequiredService<ILogger<LuaAnalyzerStarter>>()));
                 // One compacting collection after each workspace load: the parallel bulk parse
@@ -670,6 +682,10 @@ public static class ServerConfigurator
             if (range) r.AddHandler<XmlDocumentRangeFormattingHandler>();
         });
     }
+
+    // This process's own directory for the analyzers' configurations and instance folders.
+    private static readonly string LuaAnalyzerDirectory = Path.Combine(Path.GetTempPath(), "aetswg-emmylua",
+        Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
 
     private static string? ResolveLuaAnalyzer(IServiceProvider sp)
     {

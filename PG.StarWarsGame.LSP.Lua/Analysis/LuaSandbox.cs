@@ -93,6 +93,17 @@ public sealed class LuaSandbox
     }
 
     /// <summary>
+    ///     True when a state other than the file's own holds it: a library some script requires, whose
+    ///     use is downstream. A script nobody requires lives in its own state alone.
+    /// </summary>
+    public bool IsShared(string uri)
+    {
+        var file = _fileHelper.NormalizeUri(uri);
+        return _statesOf.TryGetValue(file, out var states) &&
+               states.Any(state => !DocumentUris.Same(state, file));
+    }
+
+    /// <summary>
     ///     The files a rename of a global from <paramref name="fromUri" /> may edit: the states holding
     ///     it, and every state holding a file of theirs that names the global - transitively. A library
     ///     defining or calling the global is one text in many states, so renaming it there renames it in

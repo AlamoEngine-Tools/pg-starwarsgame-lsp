@@ -18,6 +18,8 @@ public sealed class AnalyzerPlanTest
 
         var library = root.GetProperty("workspace").GetProperty("library").EnumerateArray().Select(e => e.GetString());
         Assert.Equal(["D:/schema/lua/api.d.lua", "D:/schema/lua/pgdebug.d.lua"], library);
+        // Its files are the server's to send and write; nothing is decoded from a vanilla disk.
+        Assert.False(root.GetProperty("workspace").TryGetProperty("encoding", out _));
         var disabled = root.GetProperty("diagnostics").GetProperty("disable").EnumerateArray()
             .Select(e => e.GetString()).ToList();
         Assert.Contains("undefined-global", disabled);
