@@ -13,6 +13,7 @@
     <Project Path="PG.StarWarsGame.LSP.Schema/PG.StarWarsGame.LSP.Schema.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Story/PG.StarWarsGame.LSP.Story.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.BaselineBuilder/PG.StarWarsGame.LSP.BaselineBuilder.csproj"/>
+    <Project Path="PG.StarWarsGame.LSP.Testing/PG.StarWarsGame.LSP.Testing.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Assets.Tests/PG.StarWarsGame.LSP.Assets.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Core.Tests/PG.StarWarsGame.LSP.Core.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Lua.Tests/PG.StarWarsGame.LSP.Lua.Tests.csproj"/>

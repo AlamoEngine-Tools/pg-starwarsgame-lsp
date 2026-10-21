@@ -4,12 +4,15 @@
 using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Testing;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Workspace;
 
 public sealed class ProjectLayerMapTest
 {
     private static readonly FileHelper Helper = new(new MockFileSystem());
+
+    public static TheoryData<string> Setups => new(ProjectSetup.Names);
 
     private static string Root(string sub)
     {
@@ -32,6 +35,26 @@ public sealed class ProjectLayerMapTest
         var map = new ProjectLayerMap(Helper);
 
         Assert.Equal(0, map.GetRank(Uri(Root("eawx"), "data", "xml", "foo.xml")));
+    }
+
+    // The editor sends a URI in its case on disk; the layers keep their roots lower-cased.
+    [Theory]
+    [MemberData(nameof(Setups))]
+    public void GetRank_EveryLayersFiles_RankAsThatLayer_InTheCaseTheEditorSends(string name)
+    {
+        var setup = ProjectSetup.Named(name);
+        var map = new ProjectLayerMap(Helper);
+        map.SetLayers(setup.Layers);
+
+        for (var rank = 0; rank < setup.Layers.Count; rank++)
+        {
+            Assert.Equal(rank, map.GetRank(setup.Uri(rank, "Xml/Units.xml")));
+            Assert.Equal(rank, map.GetRank(setup.Uri(rank, "Scripts/Library/PGBase.lua")));
+            Assert.Equal(rank, map.GetRank(setup.Uri(rank, "Text/MasterTextFile_English.csv")));
+            Assert.Equal(rank, map.GetRank(setup.Uri(rank, "Art/Models/Unit.alo")));
+        }
+
+        Assert.Equal(setup.Projects, setup.Layers.Select(l => map.GetLayerName(l.Rank)));
     }
 
     [Fact]
