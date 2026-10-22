@@ -84,10 +84,15 @@ let nextRequest = 1;
 const waiting = new Map<number, (result: unknown) => void>();
 
 window.addEventListener("message", (event: MessageEvent) => {
-    const msg = event.data as { type?: string; id?: number; result?: unknown };
-    if (msg.type === "response" && msg.id !== undefined) {
-        waiting.get(msg.id)?.(msg.result ?? null);
+    const msg = event.data as { type?: string; id?: unknown; result?: unknown };
+    if (msg.type !== "response" || typeof msg.id !== "number") {
+        return;
+    }
+    // Only an answer to a request this page made has a callback to call.
+    const answer = waiting.get(msg.id);
+    if (typeof answer === "function") {
         waiting.delete(msg.id);
+        answer(msg.result ?? null);
     }
 });
 
