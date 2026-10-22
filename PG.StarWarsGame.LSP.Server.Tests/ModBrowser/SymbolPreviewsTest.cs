@@ -94,8 +94,8 @@ public sealed class SymbolPreviewsTest
         {
             return
             [
-                Problem(4, "Max_Speed is out of range"),
-                Problem(11, "Missing sample: U_Select_1.wav"),
+                Problem(4, "Max_Speed is out of range", DiagnosticSeverity.Error),
+                Problem(11, "Missing sample: U_Select_1.wav", DiagnosticSeverity.Warning),
                 new Diagnostic
                 {
                     Range = new LspRange(new Position(3, 4), new Position(3, 10)),
@@ -104,12 +104,12 @@ public sealed class SymbolPreviewsTest
             ];
         }
 
-        private static Diagnostic Problem(int line, string message)
+        private static Diagnostic Problem(int line, string message, DiagnosticSeverity severity)
         {
             return new Diagnostic
             {
                 Range = new LspRange(new Position(line, 4), new Position(line, 12)),
-                Severity = DiagnosticSeverity.Error, Message = message
+                Severity = severity, Message = message
             };
         }
     }
@@ -151,9 +151,10 @@ public sealed class SymbolPreviewsTest
             tools ?? new ToolsFeatureFlags());
     }
 
-    private static List<(string Kind, int Width, int Height)> Layout(GetSymbolPreviewResult preview)
+    // Every tile as (kind, x, y, width, height) on the preview's grid.
+    private static List<(string Kind, int X, int Y, int Width, int Height)> Layout(GetSymbolPreviewResult preview)
     {
-        return preview.Tiles.Select(t => (t.Kind, t.Width, t.Height)).ToList();
+        return preview.Tiles.Select(t => (t.Kind, t.X, t.Y, t.Width, t.Height)).ToList();
     }
 
     [Fact]
@@ -162,14 +163,34 @@ public sealed class SymbolPreviewsTest
         var preview = Previews().Preview(Page, "Star_Destroyer");
 
         Assert.Equal("gameObject", preview.Adapter);
+        Assert.Equal((6, 6), (preview.Columns, preview.Rows));
         Assert.Equal(
             [
-                ("identity", 2, 2), ("problems", 1, 1), ("encyclopedia", 2, 3), ("definition", 2, 2),
-                ("entries", 1, 2)
+                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("encyclopedia", 0, 2, 2, 4),
+                ("definition", 2, 2, 2, 4), ("entries", 4, 0, 2, 6)
             ],
             Layout(preview));
         Assert.Equal("referencedBy", preview.Tiles[^1].Relation);
         Assert.Equal("Star_Destroyer", preview.Tiles.Single(t => t.Kind == "encyclopedia").ObjectId);
+    }
+
+    // Every tile has its fixed place: one that is not there leaves its cells empty, and no other tile
+    // grows into them (maintainer, 2026-10-22: as Scout, a fixed tile only ever takes its own space).
+    [Fact]
+    public void AnAbsentTile_LeavesItsCellsEmpty()
+    {
+        Assert.Equal(
+            [
+                ("identity", 0, 0, 2, 2), ("encyclopedia", 0, 2, 2, 4), ("definition", 2, 2, 2, 4),
+                ("entries", 4, 0, 2, 6)
+            ],
+            Layout(Previews().Preview(Page, "Star_Destroyer_Mk2")));
+        Assert.Equal(
+            [
+                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("definition", 2, 2, 2, 4),
+                ("entries", 4, 0, 2, 6)
+            ],
+            Layout(Previews(new ToolsFeatureFlags { Encyclopedia = false }).Preview(Page, "Star_Destroyer")));
     }
 
     [Fact]
@@ -209,13 +230,28 @@ public sealed class SymbolPreviewsTest
     }
 
     [Fact]
+    public void AProblem_CarriesItsSeverity_SoItIsDrawnAsTheProblemsViewDrawsIt()
+    {
+        var previews = Previews();
+
+        var error = previews.Preview(Page, "Star_Destroyer").Tiles.Single(t => t.Kind == "problems");
+        var warning = previews.Preview("xml:SFXEvent", "Unit_Select_SD").Tiles.Single(t => t.Kind == "problems");
+
+        Assert.Equal("error", error.Entries.Single().Severity);
+        Assert.Equal("warning", warning.Entries.Single().Severity);
+    }
+
+    [Fact]
     public void AnotherXmlObject_ShowsItsOwnRelations_AndNoEncyclopedia()
     {
         var preview = Previews().Preview("xml:SFXEvent", "Unit_Select_SD");
 
         Assert.Equal("xmlObject", preview.Adapter);
         Assert.Equal(
-            [("identity", 2, 2), ("problems", 1, 1), ("entries", 1, 2), ("definition", 2, 2), ("entries", 1, 2)],
+            [
+                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("definition", 0, 2, 4, 4),
+                ("entries", 4, 0, 2, 3), ("entries", 4, 3, 2, 3)
+            ],
             Layout(preview));
         Assert.Equal(["samples", "referencedBy"],
             preview.Tiles.Where(t => t.Kind == "entries").Select(t => t.Relation));
@@ -226,7 +262,7 @@ public sealed class SymbolPreviewsTest
     {
         var preview = Previews().Preview(Page, "Shipped_Only");
 
-        Assert.Equal([("identity", 2, 2), ("entries", 1, 2)], Layout(preview));
+        Assert.Equal([("identity", 0, 0, 2, 2), ("entries", 4, 0, 2, 6)], Layout(preview));
     }
 
     [Fact]

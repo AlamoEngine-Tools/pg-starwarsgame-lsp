@@ -8,15 +8,7 @@
 // counting are both meaningless in a file whose order is content and whose keys repeat by design.
 
 import { LocRow } from "./loc/locRow";
-
-/** 'key', or a language identifier. */
-export type SortColumn = string;
-export type SortDirection = "asc" | "desc";
-
-export interface SortState {
-    column: SortColumn;
-    direction: SortDirection;
-}
+import { SortColumn, SortState } from "./shared/tableSort";
 
 /**
  * Orders rows for display.
@@ -42,25 +34,6 @@ export function sortRows(rows: LocRow[], sort: SortState | null): LocRow[] {
         // rows that look alike should not shuffle between renders.
         return a.index - b.index;
     });
-}
-
-/**
- * The sort a header click produces: ascending, then descending, then back to document order.
- *
- * The third state is not cycling back to ascending because document order is the order on disk,
- * and without it there would be no way to return to the view the file actually has.
- */
-export function nextSort(
-    current: SortState | null,
-    column: SortColumn,
-): SortState | null {
-    if (current === null || current.column !== column) {
-        return { column, direction: "asc" };
-    }
-    if (current.direction === "asc") {
-        return { column, direction: "desc" };
-    }
-    return null;
 }
 
 /**

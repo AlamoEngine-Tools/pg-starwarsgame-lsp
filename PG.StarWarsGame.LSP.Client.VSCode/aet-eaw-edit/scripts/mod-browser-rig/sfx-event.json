@@ -4,6 +4,6 @@
   {"type": "Unit_Select_Star_Destroyer"},
   {"click": "Search", "in": ".search-foot"},
   {"wait": 300},
-  {"dblclick": "Unit_Select_Star_Destroyer", "in": ".grid"},
+  {"dblclick": "Unit_Select_Star_Destroyer", "in": ".data-table"},
   {"wait": 600}
 ]

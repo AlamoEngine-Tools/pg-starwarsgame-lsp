@@ -29,7 +29,8 @@ import {
     dropTargetAt,
     stepById,
 } from "./creditsSteps";
-import { CellInput, menuAction, RowMenuFrame } from "./loc/LocCells";
+import { CellInput } from "./loc/LocCells";
+import { menuAction, RowMenuFrame } from "./shared/RowMenu";
 import { gridFooterLabel } from "./loc/gridFooter";
 import { ConvertibleFormat, LocDockActions } from "./loc/LocDockActions";
 import { LocGridMessage, LocGridShell } from "./loc/LocGridShell";

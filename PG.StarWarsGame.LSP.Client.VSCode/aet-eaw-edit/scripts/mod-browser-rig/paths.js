@@ -9,7 +9,10 @@ const RIG = __dirname;
 const CLIENT = path.resolve(RIG, "..", "..");
 const REPO = path.resolve(CLIENT, "..", "..");
 const OUT = path.join(RIG, "out");
-const SERVER_EXE = path.join(REPO, "PG.StarWarsGame.LSP.Server", "bin", "Debug", "net10.0", "PG.StarWarsGame.LSP.Server.exe");
+// AET_SERVER_EXE runs a server built elsewhere - while an F5 session holds the Debug exe, a build
+// to another output folder is the only one that carries the change under test.
+const SERVER_EXE = process.env.AET_SERVER_EXE
+    ?? path.join(REPO, "PG.StarWarsGame.LSP.Server", "bin", "Debug", "net10.0", "PG.StarWarsGame.LSP.Server.exe");
 const BUNDLE = path.join(CLIENT, "out", "webview", "modBrowser.js");
 
 /**

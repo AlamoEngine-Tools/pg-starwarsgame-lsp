@@ -13,7 +13,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { BaselineSuggestion, suggestBaselineKeys } from "./baselineSuggestions";
-import { CellInput, menuAction, RowMenuFrame } from "./loc/LocCells";
+import { CellInput } from "./loc/LocCells";
+import { menuAction, RowMenuFrame } from "./shared/RowMenu";
 import { gridFooterLabel } from "./loc/gridFooter";
 import { ConvertibleFormat, LocDockActions } from "./loc/LocDockActions";
 import { languageCopyValues } from "./loc/languageCopy";
@@ -57,12 +58,8 @@ import {
     coalesce,
     TranslationCommand,
 } from "./translationStaging";
-import {
-    countDuplicateKeys,
-    nextSort,
-    sortRows,
-    SortState,
-} from "./translationView";
+import { countDuplicateKeys, sortRows } from "./translationView";
+import { nextSort, SortState } from "./shared/tableSort";
 import { Button } from "./shared/Button";
 import { Field } from "./shared/Field";
 

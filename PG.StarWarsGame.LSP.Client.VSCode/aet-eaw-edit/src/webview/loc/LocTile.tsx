@@ -3,6 +3,8 @@
 
 import { ReactNode } from "react";
 
+import { DockTile, DockTileGrid } from "../shared/DockTile";
+
 export interface LocTileProps {
     /** Codicon name, without the `codicon-` prefix. */
     icon: string;
@@ -22,37 +24,22 @@ export interface LocTileProps {
 }
 
 /**
- * One tile in a {@link LocTileGrid}.
+ * One tile in a {@link LocTileGrid}: the shared DockTile with the codicon the loc docks still name.
  *
  * Both docks are built from these: the file-level actions in either editor, and the credits step
  * library. They were two different shapes - a centred icon-over-label cell beside a full-width row
  * with a description - which read as two unrelated control sets stacked in the same dock.
  */
-export function LocTile(props: LocTileProps): React.JSX.Element {
+export function LocTile({ icon, ...tile }: LocTileProps): React.JSX.Element {
     return (
-        <button
-            // A badge makes the tile three rows tall; the class is what keeps the label to one
-            // line so all tiles stay the same height whatever they carry.
-            className={`dock-tile${props.badge !== undefined ? " with-badge" : ""}`}
-            title={props.title}
-            onClick={props.onClick}
-            draggable={props.draggable}
-            onDragStart={props.onDragStart}
-            onDragEnd={props.onDragEnd}
-        >
-            <span className={`codicon codicon-${props.icon}`} />
-            <span className="tile-label">{props.label}</span>
-            {props.badge !== undefined && (
-                <span className="tile-badge">{props.badge}</span>
-            )}
-        </button>
+        <DockTile
+            glyph={<span className={`codicon codicon-${icon}`} />}
+            {...tile}
+        />
     );
 }
 
-/**
- * The grid the tiles sit in: as many columns as the dock has room for, two at its default width.
- * One rule for every tile group, so the docks cannot drift apart again.
- */
+/** The grid the tiles sit in - the shared DockTileGrid. */
 export function LocTileGrid(props: { children: ReactNode }): React.JSX.Element {
-    return <div className="tile-grid">{props.children}</div>;
+    return <DockTileGrid>{props.children}</DockTileGrid>;
 }

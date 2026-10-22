@@ -32,6 +32,14 @@ public sealed class SymbolPreviews(
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
 
+    /// <summary>The grid every XML preview is laid out on; the webview stretches it over the tab.</summary>
+    private const int Columns = 6;
+
+    private const int Rows = 6;
+
+    /// <summary>The column the lists stack down, on the right of every XML preview.</summary>
+    private const int ListColumn = 4;
+
     /// <summary>How many entries a relation's tile lists; the rest is one click away in the rail.</summary>
     private const int ListedEntries = 20;
 
@@ -46,27 +54,67 @@ public sealed class SymbolPreviews(
 
         var gameObject = page == GameObjects;
         var element = ElementOf(node.Location);
-        var tiles = new List<PreviewTile>
+        var identity = Tile("identity") with { Entry = entry, Location = node.Location, VariantOf = node.VariantOf };
+        var problems = element is null ? null : Problems(element);
+        var card = gameObject ? Encyclopedia(entry.Id) : null;
+        var definition = element is null ? null : Definition(element, entry.Id, node.VariantOf);
+        // An object of another type shows what its own tags name; a game object's are in the rail.
+        var lists = (gameObject
+                ? []
+                : node.Relations
+                    .Where(r => r.Relation is not (ReferencedBy or "definitions") && r.Count > 0)
+                    .Select(r => Entries(page, entry.Id, r.Relation)))
+            .Append(Entries(page, entry.Id, ReferencedBy))
+            .ToList();
+        return new GetSymbolPreviewResult(gameObject ? "gameObject" : "xmlObject",
+            Place(gameObject, identity, problems, card, definition, lists))
         {
-            // Two rows: the name, its tags and up to three key/value lines do not fit one.
-            new("identity", 2, 2) { Entry = entry, Location = node.Location, VariantOf = node.VariantOf }
+            Columns = Columns,
+            Rows = Rows
         };
-        if (element is not null && Problems(element) is { } problems) tiles.Add(problems);
-        if (gameObject)
-        {
-            if (Encyclopedia(entry.Id) is { } encyclopedia) tiles.Add(encyclopedia);
-        }
-        else
-        {
-            // An object of another type shows what its own tags name; a game object's are in the rail.
-            tiles.AddRange(node.Relations
-                .Where(r => r.Relation is not (ReferencedBy or "definitions") && r.Count > 0)
-                .Select(r => Entries(page, entry.Id, r.Relation)));
-        }
+    }
 
-        if (element is not null) tiles.Add(Definition(element, entry.Id, node.VariantOf));
-        tiles.Add(Entries(page, entry.Id, ReferencedBy));
-        return new GetSymbolPreviewResult(gameObject ? "gameObject" : "xmlObject", tiles);
+    /// <summary>
+    ///     Places the tiles in their fixed cells: the identity and the problems across the top left, the
+    ///     card and the definition below them, the lists down the right. A tile that is not there leaves
+    ///     its cells empty and no other tile grows into them - a fixed tile only ever takes its own space,
+    ///     as in Scout (maintainer, 2026-10-22).
+    /// </summary>
+    /// <remarks>
+    ///     The lists are the one region that divides itself: how many relations an object of another type
+    ///     has varies from object to object, so its lists share the column's six rows between them.
+    /// </remarks>
+    private static List<PreviewTile> Place(bool gameObject, PreviewTile identity, PreviewTile? problems,
+        PreviewTile? card, PreviewTile? definition, IReadOnlyList<PreviewTile> lists)
+    {
+        var tiles = new List<PreviewTile> { identity with { X = 0, Y = 0, Width = 2, Height = 2 } };
+        if (problems is not null) tiles.Add(problems with { X = 2, Y = 0, Width = 2, Height = 2 });
+        if (card is not null) tiles.Add(card with { X = 0, Y = 2, Width = 2, Height = 4 });
+        if (definition is not null)
+            // A game object's definition shares the rows with its card; another type has no card.
+            tiles.Add(gameObject
+                ? definition with { X = 2, Y = 2, Width = 2, Height = 4 }
+                : definition with { X = 0, Y = 2, Width = 4, Height = 4 });
+
+        var stacked = lists.Take(Rows).ToList();
+        tiles.AddRange(stacked.Select((list, i) => list with
+        {
+            X = ListColumn, Y = Share(Rows, stacked.Count, i), Width = Columns - ListColumn,
+            Height = Share(Rows, stacked.Count, i + 1) - Share(Rows, stacked.Count, i)
+        }));
+        return tiles;
+    }
+
+    // Where the i-th of n equal parts of a run of cells starts; part i ends where part i + 1 starts.
+    private static int Share(int cells, int parts, int i)
+    {
+        return i * cells / parts;
+    }
+
+    // A tile of a kind, placed later by Place.
+    private static PreviewTile Tile(string kind)
+    {
+        return new PreviewTile(kind, 0, 0, 0, 0);
     }
 
     /// <summary>The definition the game uses, as its element in its file; null for one no file holds.</summary>
@@ -89,18 +137,18 @@ public sealed class SymbolPreviews(
             .Where(d => d.Range.Start.Line >= element.StartLine && d.Range.Start.Line <= element.EndLine)
             .Select(d => new PreviewEntry(d.Message, d.Code?.String)
             {
-                Location = new SymbolLocation(element.Uri, d.Range.Start.Line)
+                Location = new SymbolLocation(element.Uri, d.Range.Start.Line),
+                Severity = d.Severity == DiagnosticSeverity.Error ? "error" : "warning"
             })
             .ToList();
-        return found.Count == 0 ? null : new PreviewTile("problems", 1, 1) { Count = found.Count, Entries = found };
+        return found.Count == 0 ? null : Tile("problems") with { Count = found.Count, Entries = found };
     }
 
-    // The card is drawn at the game's own width, scaled into two cells; one would make it unreadable.
     private PreviewTile? Encyclopedia(string id)
     {
         return tools.Encyclopedia && index.Resolve(id) is { } symbol &&
                EncyclopediaTags.DefinesBody(index, tags, symbol)
-            ? new PreviewTile("encyclopedia", 2, 3) { ObjectId = id }
+            ? Tile("encyclopedia") with { ObjectId = id }
             : null;
     }
 
@@ -113,13 +161,13 @@ public sealed class SymbolPreviews(
             if (resolved.Found) effective = EffectiveObjectXmlRenderer.Render(resolved);
         }
 
-        return new PreviewTile("definition", 2, 2) { Text = element.Text, Effective = effective };
+        return Tile("definition") with { Text = element.Text, Effective = effective };
     }
 
     private PreviewTile Entries(string page, string id, string relation)
     {
         var rows = relations.Rows(page, id, relation) ?? [];
-        return new PreviewTile("entries", 1, 2)
+        return Tile("entries") with
         {
             Relation = relation,
             Count = rows.Count,

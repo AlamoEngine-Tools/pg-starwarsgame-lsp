@@ -129,11 +129,14 @@ ${tokensCss}
         min-width: 0;
         overflow: hidden;
     }
-    .dock-tile:hover {
+    .dock-tile:hover:not(:disabled) {
         background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
         border-color: var(--vscode-focusBorder, #007fd4);
     }
     .dock-tile:focus-visible { outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4); }
+    /* An action that does not apply here stays, greyed, with its reason under the label. */
+    .dock-tile:disabled { cursor: default; color: var(--colour-faint); background: transparent; border-color: var(--colour-line); }
+    .dock-tile:disabled .tile-badge { font-family: inherit; border: 0; padding: 0; }
     .dock-tile[draggable="true"] { cursor: grab; }
     .dock-tile[draggable="true"]:active { cursor: grabbing; }
     .dock-tile .codicon, .dock-tile .tile-glyph { font-size: var(--icon-size-18); line-height: 1; opacity: 0.85; }
@@ -617,6 +620,273 @@ ${tokensCss}
         margin: var(--space-4) 0;
         background: var(--vscode-menu-separatorBackground, #454545);
     }
+
+    /* ── Key/value lines ───────────────────────────────────────────────── */
+    /* What a thing IS, as label/value pairs: the inspector's rows, a Mod Browser entry's origin.
+
+       A definition list rather than a table: the rows are label/value pairs of wildly different
+       lengths - a shader name runs past the column a triangle count needs - and a table would set
+       one column width for both. The label column is fixed and the value takes the rest, so the
+       labels line up while a long value wraps under itself instead of widening the panel. dt and dd
+       must be DIRECT children: a wrapper around a pair would become the grid item. */
+    .kv-rows {
+        display: grid;
+        grid-template-columns: minmax(0, 8.5em) minmax(0, 1fr);
+        gap: var(--space-2) var(--space-8);
+        margin: 0;
+    }
+
+    .kv-rows dt {
+        color: var(--colour-muted);
+        /* A label is a fixed vocabulary; truncating one loses nothing the reader cannot guess. */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Values are the author's own data, so they wrap rather than truncate - a texture name that
+       ends in "...", or a vector missing its last component, is exactly the detail being looked up. */
+    .kv-rows dd {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Numbers and vectors line up digit for digit; names read as text. */
+    .kv-rows dd.number, .kv-rows dd.vector, .kv-rows dd.colour {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .kv-rows dd.texture { font-family: var(--vscode-editor-font-family, monospace); }
+
+    /* Four rows of four, laid out as the author authored them. Preformatted rather than line-break
+       elements, so a narrow dock cannot re-wrap the rows into something that is no longer a matrix. */
+    .kv-rows dd.matrix {
+        white-space: pre;
+        overflow-x: auto;
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: var(--font-size-smaller);
+        line-height: 1.35;
+    }
+
+    /* ── Tags and chips ────────────────────────────────────────────────── */
+    /* One pill for what classifies a thing (a static span) and for a filter that can be switched
+       (a button, aria-pressed). An outlined tag is a quieter fact beside the others, as an origin
+       beside a type. A chip with nothing to filter stays, disabled, with its reason as its title. */
+    .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+    }
+    .tag {
+        display: inline-flex;
+        align-items: center;
+        padding: var(--space-1) var(--space-6);
+        border: var(--space-1) solid transparent;
+        border-radius: var(--radius-pill);
+        background: var(--colour-badge);
+        color: var(--colour-badge-ink);
+        font: inherit;
+        font-size: var(--font-size-11);
+        line-height: 1.3;
+        white-space: nowrap;
+    }
+    .tag.outline {
+        background: transparent;
+        border-color: var(--colour-line-strong);
+        color: var(--colour-muted);
+    }
+    button.tag { cursor: pointer; }
+    button.tag[aria-pressed="true"] {
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+    }
+    button.tag:disabled {
+        background: transparent;
+        border-color: var(--colour-line-strong);
+        color: var(--colour-faint);
+        cursor: default;
+    }
+
+    /* ── Links ─────────────────────────────────────────────────────────── */
+    /* A button that reads as a link: it goes somewhere - a file, a base object, a breadcrumb. */
+    .link {
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--colour-link);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    .link:hover { color: var(--colour-link-hover); text-decoration: underline; }
+
+    /* ── Content panels ────────────────────────────────────────────────── */
+    /* A titled box of content - a list, a code block, a card - as opposed to a .dock-tile, which is
+       an ACTION. Its heading is the dock section heading, so .title-end keeps the ONE auto margin
+       for whatever sits at its end (a count, a switch). The body scrolls rather than cutting off;
+       a list or a table in it sits flush with the panel's edges. */
+    .panel {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-6);
+        background: var(--colour-panel);
+        overflow: hidden;
+    }
+    .panel > .dock-section-title { padding: var(--space-8) var(--space-12) var(--space-6); }
+    .panel-body {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 0 var(--space-12) var(--space-8);
+    }
+    .panel-body.flush { padding: 0; }
+    .panel-foot {
+        padding: var(--space-4) var(--space-12) var(--space-6);
+        border-top: var(--space-1) solid var(--colour-line-strong);
+        color: var(--colour-muted);
+        font-size: var(--font-size-11);
+    }
+
+    /* ── Entry lists ───────────────────────────────────────────────────── */
+    /* Entries a thing relates to: a name that opens it, and a quieter line saying what it is or
+       where. The editor's own list colours; one with nothing to open is greyed and does nothing. */
+    .entry-list { margin: 0; padding: 0; list-style: none; }
+    .entry-row {
+        display: grid;
+        width: 100%;
+        padding: var(--space-2) var(--space-12);
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    .entry-row:hover:not(:disabled) { background: var(--colour-hover); }
+    .entry-row:focus-visible { outline: var(--space-1) solid var(--colour-focus); outline-offset: -1px; }
+    .entry-row:disabled { cursor: default; }
+    .entry-name, .entry-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .entry-name { color: var(--colour-link); }
+    .entry-row:disabled .entry-name { color: var(--colour-faint); }
+    .entry-detail { color: var(--colour-muted); font-size: var(--font-size-11); }
+
+    /* ── Editor tabs ───────────────────────────────────────────────────── */
+    /* Tabs inside a panel, read as the editor's own: the active one on the editor background with
+       the focus colour along its top, an unpinned preview tab in italics. */
+    .editor-tabs {
+        display: flex;
+        overflow-x: auto;
+        background: var(--colour-tabs);
+        border-bottom: var(--space-1) solid var(--colour-tabs-line);
+    }
+    .editor-tab {
+        display: inline-flex;
+        align-items: center;
+        flex: none;
+        max-width: 260px;
+        border: 0;
+        border-right: var(--space-1) solid var(--colour-tab-line);
+        background: var(--colour-tab);
+        color: var(--colour-tab-ink);
+    }
+    .editor-tab.on {
+        background: var(--colour-tab-active);
+        color: var(--colour-tab-active-ink);
+        box-shadow: inset 0 var(--space-1) 0 var(--colour-tab-active-edge);
+    }
+    .editor-tab-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: var(--space-6) var(--space-4) var(--space-6) var(--space-12);
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+    }
+    .editor-tab.only-name .editor-tab-name { padding-right: var(--space-12); }
+    .editor-tab.unpinned .editor-tab-name { font-style: italic; }
+
+    /* ── Data tables ───────────────────────────────────────────────────── */
+    /* Every table of rows, read as the editor's own Keyboard Shortcuts table: a sticky header, the
+       list's hover and selection colours, a focus outline on the row the keys move, the row's
+       actions at its end. An inert row is greyed, and says why; a row with a finding carries the
+       loc grids' severity bar. */
+    .data-table-frame { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+    .data-table-scroll { flex: 1; overflow: auto; min-height: 0; }
+    .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .data-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: var(--space-4) var(--space-12);
+        border-bottom: var(--space-1) solid var(--colour-line);
+        background: var(--colour-editor-ground);
+        color: var(--colour-muted);
+        font-size: var(--font-size-11);
+        font-weight: 600;
+        text-align: left;
+        white-space: nowrap;
+    }
+    .data-table th.sortable { cursor: pointer; }
+    .data-table th.sortable:hover { color: var(--colour-ink); }
+    .data-table th svg { vertical-align: middle; margin-left: var(--space-4); }
+    .data-table td {
+        padding: var(--space-2) var(--space-12);
+        white-space: nowrap;
+    }
+    .data-table td.dim { color: var(--colour-muted); }
+    .data-table tbody tr:hover td { background: var(--colour-hover); }
+    .data-table tbody tr.selected td {
+        background: var(--colour-selected);
+        color: var(--colour-selected-ink);
+    }
+    .data-table tbody tr:focus-visible { outline: var(--space-1) solid var(--colour-focus); outline-offset: -1px; }
+    .data-table tbody tr.inert td { color: var(--colour-faint); }
+    .data-table tbody tr.row-sev-error td:first-child { box-shadow: inset var(--severity-stripe) 0 0 var(--colour-critical); }
+    .data-table tbody tr.row-sev-warning td:first-child { box-shadow: inset var(--severity-stripe) 0 0 var(--colour-data-yellow); }
+    .data-table tbody tr.row-sev-info td:first-child { box-shadow: inset var(--severity-stripe) 0 0 var(--colour-data-blue); }
+    /* The row's actions sit at its end without widening the table, over whatever is there, as the
+       editor's own lists draw them: on the row under the pointer, the focused row and the selected
+       one. Always drawn, they would cover the last column of every row; the same actions are on
+       the row's context menu. Their ground is opaque in the row's own colour, so the cell under
+       them does not show through - and a list colour can be translucent, so it is layered over
+       the editor's ground rather than used alone. */
+    .data-table td.row-actions-cell { position: sticky; right: 0; width: 0; padding: 0; }
+    .data-table .row-actions {
+        position: absolute;
+        right: var(--space-8);
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        visibility: hidden;
+        background: var(--colour-editor-ground);
+        border-radius: var(--radius-6);
+    }
+    .data-table tbody tr:hover .row-actions,
+    .data-table tbody tr:focus-within .row-actions,
+    .data-table tbody tr.selected .row-actions { visibility: visible; }
+    .data-table tbody tr:hover .row-actions {
+        background: linear-gradient(var(--colour-hover), var(--colour-hover)), var(--colour-editor-ground);
+    }
+    .data-table tbody tr.selected .row-actions {
+        background: linear-gradient(var(--colour-selected), var(--colour-selected)), var(--colour-editor-ground);
+    }
+    .data-table-empty { padding: var(--space-12) var(--space-16); color: var(--colour-muted); }
+    .data-table-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-8);
+        padding: var(--space-4) var(--space-12);
+        border-top: var(--space-1) solid var(--colour-line);
+        color: var(--colour-muted);
+    }
 `;
 
 /**
@@ -647,14 +917,14 @@ export const rightDockCss = `
         display: flex;
         flex-direction: column;
         min-height: 0;
-        border-left: var(--space-1) solid var(--vscode-panel-border);
-        background: var(--vscode-sideBar-background);
+        border-left: var(--space-1) solid var(--colour-line);
+        background: var(--colour-sidebar);
     }
     /* The gutter is set in dockBodyCss, which is interpolated after this one and would win anyway.
        One owner: this rule declaring it too was how it came to be set twice with different values,
        and the losing declaration was the one carrying the fix. */
     .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8); }
-    .dock-hint { font-size: var(--font-size-12); color: var(--vscode-descriptionForeground); padding: var(--space-8) var(--space-4); }
+    .dock-hint { font-size: var(--font-size-12); color: var(--colour-muted); padding: var(--space-8) var(--space-4); }
     /* Sits just outside the dock's left edge, so the grab area is not stolen from its content. */
     .resize-handle-w {
         position: absolute;
@@ -692,7 +962,7 @@ export const dockHeaderCss = `
         justify-content: center;
         gap: var(--space-6);
         padding: var(--space-6) var(--space-8);
-        border-bottom: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-bottom: var(--space-1) solid var(--colour-line);
     }
     .dock-header .header-left { position: absolute; left: 8px; }
     .dock-header .header-right { position: absolute; right: 8px; }
@@ -708,7 +978,7 @@ export const dockHeaderCss = `
         background: transparent;
         border: none;
         border-radius: var(--radius-6);
-        color: var(--vscode-foreground, #ccc);
+        color: var(--colour-ink);
         opacity: 0.72;
         font-size: var(--icon-size-14);
         line-height: 1;
@@ -726,24 +996,24 @@ export const dockHeaderCss = `
        A resting border is what says press me. */
     .icon-btn.as-action {
         background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.14));
-        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--colour-line-strong);
         opacity: 1;
     }
     .icon-btn.as-action:hover:not(:disabled) {
         background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.28));
-        border-color: var(--vscode-focusBorder, #007fd4);
+        border-color: var(--colour-focus);
     }
     .icon-btn:disabled { opacity: 0.35; cursor: default; }
     .icon-btn.active {
-        background: var(--vscode-button-background, #0e639c);
-        color: var(--vscode-button-foreground, #fff);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
         opacity: 1;
     }
-    .icon-btn.sev-unvalidated { color: var(--vscode-foreground, #ccc); opacity: 1; }
+    .icon-btn.sev-unvalidated { color: var(--colour-ink); opacity: 1; }
     .icon-btn.sev-ok { color: var(--vscode-charts-green, #89d185); opacity: 1; }
-    .icon-btn.sev-info { color: var(--vscode-charts-blue, #3794ff); opacity: 1; }
-    .icon-btn.sev-warning { color: var(--vscode-charts-yellow, #cca700); opacity: 1; }
-    .icon-btn.sev-error { color: var(--vscode-errorForeground, #f14c4c); opacity: 1; }
+    .icon-btn.sev-info { color: var(--colour-data-blue); opacity: 1; }
+    .icon-btn.sev-warning { color: var(--colour-data-yellow); opacity: 1; }
+    .icon-btn.sev-error { color: var(--colour-critical); opacity: 1; }
     /* Header controls read out at roughly VS Code activity-bar icon scale. */
     .dock-header .icon-btn { font-size: var(--icon-size-18); padding: var(--space-6) var(--space-8); }
     .dock-header .icon-btn .codicon { font-size: var(--icon-size-18); }
@@ -752,19 +1022,19 @@ export const dockHeaderCss = `
        Must stay after .icon-btn: same specificity, so order is what lets it win. */
     .validate-btn { border-radius: var(--radius-pill); font-weight: 600; }
     .validate-btn.sev-unvalidated {
-        background: color-mix(in srgb, var(--vscode-foreground, #ccc) 15%, transparent);
+        background: color-mix(in srgb, var(--colour-ink) 15%, transparent);
     }
     .validate-btn.sev-ok {
         background: color-mix(in srgb, var(--vscode-charts-green, #89d185) 14%, transparent);
     }
     .validate-btn.sev-info {
-        background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 14%, transparent);
+        background: color-mix(in srgb, var(--colour-data-blue) 14%, transparent);
     }
     .validate-btn.sev-warning {
-        background: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 16%, transparent);
+        background: color-mix(in srgb, var(--colour-data-yellow) 16%, transparent);
     }
     .validate-btn.sev-error {
-        background: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 16%, transparent);
+        background: color-mix(in srgb, var(--colour-critical) 16%, transparent);
     }
     .validate-btn:hover { filter: brightness(1.2); }
     .validate-btn:disabled:hover { filter: none; }
@@ -806,11 +1076,11 @@ export const problemsPanelCss = `
         justify-content: space-between;
         padding: var(--space-2) var(--space-4);
     }
-    .panel-title { font-weight: bold; font-size: var(--font-size-11); color: var(--vscode-descriptionForeground, #999); }
+    .panel-title { font-weight: bold; font-size: var(--font-size-11); color: var(--colour-muted); }
     .panel-close {
         background: transparent;
         border: none;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
         cursor: pointer;
         padding: 0 var(--space-4);
         flex-shrink: 0;
@@ -825,7 +1095,7 @@ export const problemsPanelCss = `
     .panel-filter {
         background: transparent;
         border: none;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-muted);
         cursor: pointer;
         padding: 0 var(--space-6);
         margin-left: var(--space-8);
@@ -841,7 +1111,7 @@ export const problemsPanelCss = `
     }
     /* On, and therefore hiding something. Coloured because this is the state a reader has to be
        able to notice without going looking - it is why the table is shorter than they expect. */
-    .panel-filter.active { color: var(--vscode-charts-blue, #3794ff); }
+    .panel-filter.active { color: var(--colour-data-blue); }
     /* Nothing to act on. Kept, not removed - see the panel's own note. */
     .panel-filter:disabled { opacity: 0.4; cursor: default; }
 
@@ -856,10 +1126,10 @@ export const problemsPanelCss = `
     /* Only where the row actually goes somewhere - a row that names nothing navigable must not
        advertise a click, which is the same rule the ship-name list follows. */
     .problem-row.clickable { cursor: pointer; }
-    .problem-row:hover { background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15)); }
-    .problem-row .codicon.sev-error { color: var(--vscode-errorForeground, #f14c4c); }
-    .problem-row .codicon.sev-warning { color: var(--vscode-charts-yellow, #cca700); }
-    .problem-row .codicon.sev-info { color: var(--vscode-charts-blue, #3794ff); }
+    .problem-row:hover { background: var(--colour-hover); }
+    .problem-row .codicon.sev-error { color: var(--colour-critical); }
+    .problem-row .codicon.sev-warning { color: var(--colour-data-yellow); }
+    .problem-row .codicon.sev-info { color: var(--colour-data-blue); }
     /* The message takes the room the target label leaves, clamped to the row so a long one cannot
        reflow the list - these are short and each row carries the full text as its tooltip. An
        editor whose messages are prose rather than labels overrides white-space in its own sheet. */
@@ -869,6 +1139,71 @@ export const problemsPanelCss = `
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    /* A row that goes to its finding's line is a button, reset to read as the row it is. */
+    button.problem-row {
+        width: 100%;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    button.problem-row:disabled { cursor: default; }
+
+    /* At the end of the row and out of the way: an id is what you look up AFTER reading the
+       finding, so it must not compete with the sentence for the reader's eye. Monospaced because
+       it is a literal string to be copied, and tabular so a column of them lines up. */
+    .problem-row .problem-id {
+        flex: 0 0 auto;
+        margin-left: auto;
+        padding-left: var(--space-8);
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: var(--font-size-smaller);
+        font-variant-numeric: tabular-nums;
+        opacity: 0.55;
+        white-space: nowrap;
+    }
+
+    /* Dimmer still, and italic: not an identifier, so it must not look like one that could be
+       copied into a suppression comment. */
+    .problem-row .problem-id.render-time {
+        font-family: inherit;
+        font-style: italic;
+        opacity: 0.4;
+    }
+
+    /* The problems band along the bottom of an editor, as the model preview and the encyclopedia
+       dock it. */
+    .problems-band {
+        position: relative;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        border-top: var(--space-1) solid var(--colour-line);
+        background: var(--colour-sidebar);
+        font-size: var(--font-size-12);
+    }
+
+    /* Findings written as PROSE - the model preview's, the encyclopedia's, a Mod Browser entry's -
+       wrap instead of being clamped to one line: the one-line ellipsis above suits the loc grids'
+       short entry labels and would hide most of every sentence. A file, bone or path name has no
+       break opportunity in it, so without overflow-wrap it runs off the edge. */
+    .prose-problems .problem-row {
+        align-items: flex-start;
+        padding: var(--space-2) var(--space-6);
+    }
+    .prose-problems .problem-msg {
+        white-space: normal;
+        overflow: visible;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .prose-problems .problem-row .codicon {
+        margin-top: var(--space-2);
     }
 `;
 
@@ -1194,46 +1529,6 @@ export const inspectorCss = `
         letter-spacing: 0.04em;
         opacity: 0.75;
         margin-bottom: var(--space-4);
-    }
-
-    .inspect-rows {
-        display: grid;
-        grid-template-columns: minmax(0, 8.5em) minmax(0, 1fr);
-        gap: var(--space-2) var(--space-8);
-        margin: 0;
-    }
-
-    .inspect-rows dt {
-        opacity: 0.75;
-        /* A label is a fixed vocabulary; truncating one loses nothing the reader cannot guess. */
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    /* Values are the author's own data, so they wrap rather than truncate - a texture name that
-       ends in "...", or a vector missing its last component, is exactly the detail being looked up. */
-    .inspect-rows dd {
-        margin: 0;
-        min-width: 0;
-        overflow-wrap: anywhere;
-    }
-
-    /* Numbers and vectors line up digit for digit; names read as text. */
-    .inspect-rows dd.number, .inspect-rows dd.vector, .inspect-rows dd.colour {
-        font-variant-numeric: tabular-nums;
-    }
-
-    .inspect-rows dd.texture { font-family: var(--vscode-editor-font-family, monospace); }
-
-    /* Four rows of four, laid out as the author authored them. Preformatted rather than line-break
-       elements, so a narrow dock cannot re-wrap the rows into something that is no longer a matrix. */
-    .inspect-rows dd.matrix {
-        white-space: pre;
-        overflow-x: auto;
-        font-family: var(--vscode-editor-font-family, monospace);
-        font-size: var(--font-size-smaller);
-        line-height: 1.35;
     }
 
     /* The bulk tables, as a tabbed box: a strip of tabs sitting ON the panel they open, which is

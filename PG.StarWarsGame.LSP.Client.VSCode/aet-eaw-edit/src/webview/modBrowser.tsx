@@ -42,21 +42,28 @@ import {
 import { pickShipName } from "../shipNamePick";
 import { EncyclopediaCard } from "./encyclopediaCard";
 import { factionModes, factionSlotOf } from "./encyclopediaModes";
-import { menuAction, RowMenuFrame } from "./loc/LocCells";
+import { DataTable } from "./shared/DataTable";
+import { menuAction, RowMenuFrame } from "./shared/RowMenu";
+import { TabStrip } from "./shared/TabStrip";
 import {
     ActionChoice,
     actionChoices,
     KindChoice,
     kindChoices,
-    locationLabel,
     menuChoices,
     originChoices,
     originLabel,
     pageLabel,
     reasonLabel,
     relationLabel,
+    PREVIEW_ACTIONS,
 } from "./modBrowserModel";
-import { ACTION_ICONS, PreviewPage } from "./modBrowserPreview";
+import {
+    ACTION_ICONS,
+    Actions,
+    EntryHead,
+    PreviewPage,
+} from "./modBrowserPreview";
 import {
     closeTab,
     NO_TABS,
@@ -64,12 +71,16 @@ import {
     pinTab,
     showTable,
     Tabs,
-} from "./modBrowserTabs";
+} from "./shared/editorTabs";
 import { Button } from "./shared/Button";
 import { IconButton } from "./shared/Button";
-import { dockChromeCss, dockHeaderCss } from "./shared/dockChrome";
+import {
+    dockChromeCss,
+    dockHeaderCss,
+    problemsPanelCss,
+} from "./shared/dockChrome";
 import { Field } from "./shared/Field";
-import { Icon, IconName } from "./shared/Icon";
+import { Icon } from "./shared/Icon";
 import { ModeSelector } from "./shared/ModeSelector";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -622,10 +633,16 @@ function App(): React.JSX.Element {
             </nav>
             <main className="page">
                 <TabStrip
-                    table={list.label}
-                    tabs={tabs}
-                    onTable={() => setTabs((known) => showTable(known))}
-                    onTab={(key) =>
+                    label={l10n.t("Open entries")}
+                    home={list.label}
+                    tabs={tabs.previews.map((t) => ({
+                        key: t.key,
+                        label: t.item.row.name,
+                        pinned: t.pinned,
+                    }))}
+                    active={tabs.active}
+                    onHome={() => setTabs((known) => showTable(known))}
+                    onSelect={(key) =>
                         setTabs((known) => ({ ...known, active: key }))
                     }
                     onPin={(key) => setTabs((known) => pinTab(known, key))}
@@ -673,7 +690,7 @@ function App(): React.JSX.Element {
                     />
                 ) : (
                     <ListPage
-                        node={list}
+                        label={list.label}
                         rows={rows}
                         total={total}
                         loading={loading}
@@ -736,78 +753,6 @@ function App(): React.JSX.Element {
     );
 }
 
-/**
- * The tabs above the page: the table's own, then the previews opened from it. The unpinned one is
- * in italics and the next entry opened takes it over; pinning it, or a double click on it, keeps it.
- */
-function TabStrip({
-    table,
-    tabs,
-    onTable,
-    onTab,
-    onPin,
-    onClose,
-}: {
-    table: string;
-    tabs: Tabs<EntryNode>;
-    onTable: () => void;
-    onTab: (key: string) => void;
-    onPin: (key: string) => void;
-    onClose: (key: string) => void;
-}): React.JSX.Element {
-    return (
-        <div
-            className="tabs"
-            role="tablist"
-            aria-label={l10n.t("Open entries")}
-        >
-            <button
-                type="button"
-                role="tab"
-                aria-selected={tabs.active === null}
-                className={`tab table-tab${tabs.active === null ? " on" : ""}`}
-                onClick={onTable}
-            >
-                {table}
-            </button>
-            {tabs.previews.map((tab) => (
-                <div
-                    key={tab.key}
-                    className={`tab${tabs.active === tab.key ? " on" : ""}${tab.pinned ? "" : " unpinned"}`}
-                >
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected={tabs.active === tab.key}
-                        className="tab-name"
-                        title={
-                            tab.pinned
-                                ? undefined
-                                : l10n.t("Preview - double click to keep it")
-                        }
-                        onClick={() => onTab(tab.key)}
-                        onDoubleClick={() => onPin(tab.key)}
-                    >
-                        {tab.item.row.name}
-                    </button>
-                    {!tab.pinned && (
-                        <IconButton
-                            icon="pin"
-                            title={l10n.t("Keep open")}
-                            onClick={() => onPin(tab.key)}
-                        />
-                    )}
-                    <IconButton
-                        icon="close"
-                        title={l10n.t("Close")}
-                        onClick={() => onClose(tab.key)}
-                    />
-                </div>
-            ))}
-        </div>
-    );
-}
-
 /** An entry's context menu: each item with the key that does the same, a disabled one with why. */
 function EntryMenu({
     menu,
@@ -820,62 +765,33 @@ function EntryMenu({
     onAct: (action: string) => void;
     onClose: () => void;
 }): React.JSX.Element {
-    const first = useRef<HTMLButtonElement>(null);
-    useEffect(() => first.current?.focus(), []);
-    // Up and down walk the enabled items, as in the editor's own menus.
-    const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") {
-            return;
-        }
-        e.preventDefault();
-        const items = [
-            ...e.currentTarget.querySelectorAll<HTMLButtonElement>(
-                "button:not(:disabled)",
-            ),
-        ];
-        const at = items.indexOf(document.activeElement as HTMLButtonElement);
-        const step = e.key === "ArrowDown" ? 1 : -1;
-        items[(at + step + items.length) % items.length]?.focus();
-    };
-    let firstEnabled = true;
     return (
         <RowMenuFrame
             x={menu.x}
             y={menu.y}
             anchorIndex={menu.anchor}
             onClose={onClose}
+            focusFirst
         >
-            <div className="menu-items" onKeyDown={onKeyDown}>
-                {choices.map((group, g) => (
-                    <div key={g} className="menu-group">
-                        {g > 0 && <div className="sep" />}
-                        {group.map((c) => {
-                            const focus = !c.disabled && firstEnabled;
-                            if (focus) {
-                                firstEnabled = false;
-                            }
-                            return (
-                                <button
-                                    key={c.action}
-                                    ref={focus ? first : undefined}
-                                    type="button"
-                                    role="menuitem"
-                                    disabled={c.disabled}
-                                    onClick={menuAction(
-                                        () => onAct(c.action),
-                                        onClose,
-                                    )}
-                                >
-                                    {c.label}
-                                    <span className="keys">
-                                        {c.disabled ? c.reason : c.keys}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                ))}
-            </div>
+            {choices.map((group, g) => (
+                <div key={g} className="menu-group">
+                    {g > 0 && <div className="sep" />}
+                    {group.map((c) => (
+                        <button
+                            key={c.action}
+                            type="button"
+                            role="menuitem"
+                            disabled={c.disabled}
+                            onClick={menuAction(() => onAct(c.action), onClose)}
+                        >
+                            {c.label}
+                            <span className="keys">
+                                {c.disabled ? c.reason : c.keys}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            ))}
         </RowMenuFrame>
     );
 }
@@ -898,7 +814,9 @@ function inertReason(node: RailNode): string {
         : l10n.t("Not an entry of its own");
 }
 
+/** A list's rows as the shared table: a click selects, a double click or Enter opens, F12 goes to the definition. */
 function ListPage({
+    label,
     rows,
     total,
     loading,
@@ -911,7 +829,7 @@ function ListPage({
     onMenu,
     onMore,
 }: {
-    node: ListNode;
+    label: string;
     rows: SymbolRow[];
     total: number;
     loading: boolean;
@@ -938,144 +856,105 @@ function ListPage({
     };
     useEffect(() => () => window.clearTimeout(hover.current), []);
 
-    const onRowKey = (
-        e: React.KeyboardEvent<HTMLTableRowElement>,
-        row: SymbolRow,
-        index: number,
-    ) => {
-        const step =
-            e.key === "ArrowDown"
-                ? e.currentTarget.nextElementSibling
-                : e.key === "ArrowUp"
-                  ? e.currentTarget.previousElementSibling
-                  : undefined;
-        if (step !== undefined) {
-            e.preventDefault();
-            (step as HTMLElement | null)?.focus();
-        } else if (e.key === "Enter" || e.key === "F12") {
-            e.preventDefault();
-            onAct(e.key === "Enter" ? "open" : "definition", row);
-        } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
-            e.preventDefault();
-            const box = e.currentTarget.getBoundingClientRect();
-            onMenu(box.left + 16, box.bottom, row, index);
-        }
-    };
-
     return (
-        <>
-            <div className="grid">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{l10n.t("Name")}</th>
-                            <th>{l10n.t("Type")}</th>
-                            <th>{l10n.t("Behaves like")}</th>
-                            <th>{l10n.t("Origin")}</th>
-                            <th aria-label={l10n.t("Actions")} />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows.map((row, index) => (
-                            <tr
-                                key={row.id}
-                                data-row-index={index}
-                                tabIndex={0}
-                                className={
-                                    [
-                                        row.page ? null : "inert",
-                                        row.id === selectedId
-                                            ? "selected"
-                                            : null,
-                                    ]
-                                        .filter(Boolean)
-                                        .join(" ") || undefined
-                                }
-                                title={
-                                    row.page
-                                        ? undefined
-                                        : row.origin === "missing"
-                                          ? l10n.t("Nothing defines this name")
-                                          : l10n.t("Not an entry of its own")
-                                }
-                                onClick={() => row.page && onSelect(row)}
-                                onDoubleClick={() => onAct("open", row)}
-                                onKeyDown={(e) => onRowKey(e, row, index)}
-                                onMouseEnter={() => rest(row)}
-                                onFocus={() => rest(row)}
-                                onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    onMenu(e.clientX, e.clientY, row, index);
-                                }}
-                            >
-                                <td>{row.name}</td>
-                                <td className="dim">{row.type ?? ""}</td>
-                                <td className="dim">{row.kinds.join(", ")}</td>
-                                <td>
-                                    {originLabel(
-                                        row.origin,
-                                        row.originName,
-                                        layers,
+        <DataTable<SymbolRow>
+            label={label}
+            columns={[
+                { key: "name", label: l10n.t("Name"), cell: (r) => r.name },
+                {
+                    key: "type",
+                    label: l10n.t("Type"),
+                    cell: (r) => r.type ?? "",
+                    dim: true,
+                },
+                {
+                    key: "kinds",
+                    label: l10n.t("Behaves like"),
+                    cell: (r) => r.kinds.join(", "),
+                    dim: true,
+                },
+                {
+                    key: "origin",
+                    label: l10n.t("Origin"),
+                    cell: (r) => (
+                        <>
+                            {originLabel(r.origin, r.originName, layers)}
+                            {r.overrides.length > 0 && (
+                                <span className="tag outline">
+                                    {l10n.t(
+                                        "Overrides - {0}",
+                                        originLabel(
+                                            r.overrides[0],
+                                            null,
+                                            layers,
+                                        ),
                                     )}
-                                    {row.overrides.length > 0 && (
-                                        <span className="chip">
-                                            {l10n.t(
-                                                "Overrides - {0}",
-                                                originLabel(
-                                                    row.overrides[0],
-                                                    null,
-                                                    layers,
-                                                ),
-                                            )}
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="acts">
-                                    <RowActions
-                                        row={row}
-                                        result={nodeOf(row)}
-                                        onAct={(action) => onAct(action, row)}
-                                        onMore={(x, y) =>
-                                            onMenu(x, y, row, index)
-                                        }
-                                    />
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {rows.length === 0 && !loading && (
-                    <p className="empty">{l10n.t("Nothing matches")}</p>
-                )}
-            </div>
-            <footer className="pager">
-                <span>
-                    {l10n.t(
-                        "Showing {0} of {1}",
-                        rows.length.toLocaleString(),
-                        total.toLocaleString(),
-                    )}
-                </span>
-                <Button
-                    compact
-                    disabled={rows.length >= total || loading}
-                    disabledReason={
-                        loading
-                            ? l10n.t("Loading...")
-                            : l10n.t("Everything is loaded")
-                    }
-                    onClick={onMore}
-                >
-                    {l10n.t("Load more")}
-                </Button>
-            </footer>
-        </>
+                                </span>
+                            )}
+                        </>
+                    ),
+                },
+            ]}
+            rows={rows}
+            rowKey={(r) => r.id}
+            selected={selectedId}
+            inert={(r) =>
+                r.page
+                    ? undefined
+                    : r.origin === "missing"
+                      ? l10n.t("Nothing defines this name")
+                      : l10n.t("Not an entry of its own")
+            }
+            onSelect={onSelect}
+            onOpen={(r) => onAct("open", r)}
+            onKey={(key, r) => {
+                if (key !== "F12" || !r.page) {
+                    return false;
+                }
+                onAct("definition", r);
+                return true;
+            }}
+            onMenu={onMenu}
+            onRest={rest}
+            actions={(r, index) => (
+                <RowActions
+                    row={r}
+                    result={nodeOf(r)}
+                    onAct={(action) => onAct(action, r)}
+                    onMore={(x, y) => onMenu(x, y, r, index)}
+                />
+            )}
+            empty={loading ? l10n.t("Loading...") : l10n.t("Nothing matches")}
+            foot={
+                <>
+                    <span>
+                        {l10n.t(
+                            "Showing {0} of {1}",
+                            rows.length.toLocaleString(),
+                            total.toLocaleString(),
+                        )}
+                    </span>
+                    <Button
+                        compact
+                        disabled={rows.length >= total || loading}
+                        disabledReason={
+                            loading
+                                ? l10n.t("Loading...")
+                                : l10n.t("Everything is loaded")
+                        }
+                        onClick={onMore}
+                    >
+                        {l10n.t("Load more")}
+                    </Button>
+                </>
+            }
+        />
     );
 }
 
 /**
- * A row's hover icons: go to definition and what the entry offers, disabled ones saying why, then
- * the whole menu. Drawn once the server has opened the entry, which resting on the row asks for.
+ * A row's icons: go to definition and what the entry offers, disabled ones saying why, then the
+ * whole menu. Drawn once the server has opened the entry, which resting on the row asks for.
  */
 function RowActions({
     row,
@@ -1093,7 +972,7 @@ function RowActions({
     }
     const [[, definition], offered = []] = actionChoices(true, result.actions);
     return (
-        <span className="row-actions">
+        <>
             {[
                 definition,
                 ...offered.filter((c) => c.action !== "copyName"),
@@ -1119,14 +998,14 @@ function RowActions({
                     onMore(box.left, box.bottom);
                 }}
             />
-        </span>
+        </>
     );
 }
 
 /**
- * An opened entry: what it is and where the game takes it from, and for a game object its
- * encyclopedia card - the same component the encyclopedia panel draws. Its relations are its
- * children in the rail, not a column here.
+ * An opened entry whose type has no preview adapter yet: the preview's header and actions, and for a
+ * game object its encyclopedia card - the same component the encyclopedia panel draws. Its relations
+ * are its children in the rail.
  */
 function EntryPage({
     node,
@@ -1142,69 +1021,40 @@ function EntryPage({
     onAct: (action: string) => void;
 }): React.JSX.Element {
     const row = result?.entry ?? node.row;
-    const location = result?.location;
-    const definedIn = originLabel(row.origin, row.originName, layers);
-    const [[, definition], offered = []] = actionChoices(true, result?.actions);
     return (
         <section className="entry">
-            <h1>{row.name}</h1>
-            <p className="line">
-                {row.type && <span className="chip">{row.type}</span>}
-                {row.kinds.map((k) => (
-                    <span key={k} className="chip">
-                        {k}
-                    </span>
-                ))}
-            </p>
-            {row.origin && (
-                <p className="dim">
-                    {location
-                        ? l10n.t(
-                              "Defined in - {0} - {1}",
-                              definedIn,
-                              locationLabel(location),
-                          )
-                        : l10n.t("Defined in - {0}", definedIn)}
-                </p>
-            )}
-            {row.overrides.map((o) => (
-                <p key={o} className="dim">
-                    {l10n.t("Overrides - {0}", originLabel(o, null, layers))}
-                </p>
-            ))}
-            {result?.variantOf && (
-                <p className="dim">
-                    {l10n.t("Variant of - ")}
-                    <button
-                        type="button"
-                        className="link"
-                        onClick={() => onOpenBase(result.variantOf!)}
-                    >
-                        {result.variantOf}
-                    </button>
-                </p>
-            )}
-            <p className="actions">
-                {[
-                    definition,
-                    ...offered.filter((c) => c.action !== "copyName"),
-                ].map((c) => (
-                    <Button
-                        key={c.action}
-                        compact
-                        disabled={c.disabled}
-                        disabledReason={c.reason ?? ""}
-                        onClick={() => onAct(c.action)}
-                    >
-                        <Icon
-                            name={ACTION_ICONS[c.action] ?? "open"}
-                            size={14}
-                        />
-                        {c.label}
-                    </Button>
-                ))}
-            </p>
-            {row.type === GAME_OBJECT_TYPE && <CardSection objectId={row.id} />}
+            <div className="entry-main">
+                <EntryHead
+                    tile={{
+                        kind: "identity",
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                        entry: row,
+                        location: result?.location,
+                        variantOf: result?.variantOf,
+                    }}
+                    layers={layers}
+                    handlers={{
+                        onOpenBase,
+                        onOpenLocation: (location) =>
+                            vscode.postMessage({
+                                type: "openLocation",
+                                uri: location.uri,
+                                line: location.line,
+                            }),
+                    }}
+                />
+                {row.type === GAME_OBJECT_TYPE && (
+                    <CardSection objectId={row.id} />
+                )}
+            </div>
+            <Actions
+                actions={result?.actions}
+                onAct={onAct}
+                width={PREVIEW_ACTIONS}
+            />
         </section>
     );
 }
@@ -1265,6 +1115,8 @@ function TabContent({
     return (
         <PreviewPage
             tiles={preview.tiles}
+            columns={preview.columns ?? 6}
+            rows={preview.rows ?? 6}
             actions={result?.actions}
             layers={layers}
             handlers={{
@@ -1410,12 +1262,15 @@ function SearchForm({
                         {kinds.length > 0 && (
                             <>
                                 <span>{l10n.t("Behaves like")}</span>
-                                <span className="chips">
+                                <span className="tag-row">
                                     {kinds.map((k) => (
                                         <button
                                             key={k.kind}
                                             type="button"
-                                            className={`chip${draft.kinds.includes(k.kind) ? " on" : ""}`}
+                                            className="tag"
+                                            aria-pressed={draft.kinds.includes(
+                                                k.kind,
+                                            )}
                                             disabled={k.disabled}
                                             title={
                                                 k.disabled
@@ -1441,12 +1296,13 @@ function SearchForm({
                             </>
                         )}
                         <span>{l10n.t("Origin")}</span>
-                        <span className="chips">
+                        <span className="tag-row">
                             {origins.map((o) => (
                                 <button
                                     key={o}
                                     type="button"
-                                    className={`chip${draft.origins.includes(o) ? " on" : ""}`}
+                                    className="tag"
+                                    aria-pressed={draft.origins.includes(o)}
                                     onClick={() =>
                                         onChange({
                                             ...draft,
@@ -1478,13 +1334,14 @@ function SearchForm({
 const Shell = styled.div`
     ${dockChromeCss}
     ${dockHeaderCss}
+    ${problemsPanelCss}
 
     display: grid;
     grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
     height: 100vh;
-    color: var(--vscode-foreground);
-    background: var(--vscode-editor-background);
-    font: var(--vscode-font-size) / 1.4 var(--vscode-font-family);
+    color: var(--colour-ink);
+    background: var(--colour-editor-ground);
+    font: var(--font-size-body) / 1.4 var(--vscode-font-family, sans-serif);
 
     button {
         font: inherit;
@@ -1492,35 +1349,15 @@ const Shell = styled.div`
     }
     .empty {
         padding: var(--space-12) var(--space-16);
-        color: var(--vscode-descriptionForeground);
-    }
-    .dim {
-        color: var(--vscode-descriptionForeground);
-    }
-    .chip {
-        display: inline-flex;
-        padding: var(--space-1) var(--space-6);
-        margin-left: var(--space-6);
-        border-radius: var(--radius-pill);
-        border: 0;
-        background: var(--vscode-badge-background);
-        color: var(--vscode-badge-foreground);
-        font-size: var(--font-size-11);
-    }
-    .chip.on {
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
-    }
-    .chip:disabled {
-        background: transparent;
-        color: var(--vscode-disabledForeground);
-        cursor: default;
+        color: var(--colour-muted);
     }
 
+    /* The rail: the editor's own tree, one row per node, indented by depth. */
     .rail {
         overflow: auto;
-        border-right: 1px solid var(--vscode-panel-border);
+        border-right: var(--space-1) solid var(--colour-line);
         padding: var(--space-6) 0;
+        background: var(--colour-sidebar);
     }
     .node {
         display: grid;
@@ -1539,15 +1376,15 @@ const Shell = styled.div`
         contain-intrinsic-size: 22px;
     }
     .node:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--colour-hover);
     }
     .node.selected {
-        background: var(--vscode-list-activeSelectionBackground);
-        color: var(--vscode-list-activeSelectionForeground);
+        background: var(--colour-selected);
+        color: var(--colour-selected-ink);
     }
     .node.more {
         cursor: pointer;
-        color: var(--vscode-textLink-foreground);
+        color: var(--colour-link);
     }
     .node .twisty {
         display: grid;
@@ -1572,189 +1409,61 @@ const Shell = styled.div`
         cursor: pointer;
     }
     .node .label:disabled {
-        color: var(--vscode-disabledForeground);
+        color: var(--colour-faint);
         cursor: default;
     }
     .node .count {
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
         font-size: var(--font-size-11);
         font-variant-numeric: tabular-nums;
     }
     .node .why {
-        color: var(--vscode-disabledForeground);
+        color: var(--colour-faint);
         font-style: normal;
     }
 
+    /* The page: its tabs, the breadcrumb, what the active tab shows, and the open list's search. */
     .page {
         display: grid;
-        grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
         min-width: 0;
         min-height: 0;
-    }
-    /* The tabs read as the editor's own: the active one on the editor background with an accent
-       line on top, the unpinned preview in italics. */
-    .tabs {
-        display: flex;
-        overflow-x: auto;
-        background: var(
-            --vscode-editorGroupHeader-tabsBackground,
-            var(--vscode-sideBar-background)
-        );
-        border-bottom: 1px solid var(--vscode-panel-border);
-    }
-    .tab {
-        display: inline-flex;
-        align-items: center;
-        flex: none;
-        max-width: 260px;
-        border: 0;
-        border-right: 1px solid var(--vscode-panel-border);
-        background: var(--vscode-tab-inactiveBackground, transparent);
-        color: var(
-            --vscode-tab-inactiveForeground,
-            var(--vscode-descriptionForeground)
-        );
-    }
-    .tab.table-tab {
-        padding: var(--space-6) var(--space-12);
-        cursor: pointer;
-    }
-    .tab.on {
-        background: var(
-            --vscode-tab-activeBackground,
-            var(--vscode-editor-background)
-        );
-        color: var(--vscode-tab-activeForeground, var(--vscode-foreground));
-        box-shadow: inset 0 1px 0 var(--vscode-focusBorder);
-    }
-    .tab .tab-name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        padding: var(--space-6) var(--space-4) var(--space-6) var(--space-12);
-        border: 0;
-        background: none;
-        cursor: pointer;
-    }
-    .tab.unpinned .tab-name {
-        font-style: italic;
     }
     .crumbs {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: var(--space-6);
-        padding: var(--space-8) var(--space-16);
-        border-bottom: 1px solid var(--vscode-panel-border);
+        padding: var(--space-6) var(--space-16);
+        border-bottom: var(--space-1) solid var(--colour-line);
     }
     .crumb-step {
         display: inline-flex;
         align-items: center;
         gap: var(--space-6);
     }
-    .crumbs .crumb,
-    .link {
+    .crumbs .crumb {
         border: 0;
         background: none;
         padding: 0;
         cursor: pointer;
-        color: var(--vscode-textLink-foreground);
+        color: var(--colour-link);
     }
     .crumbs .sep {
         display: inline-flex;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
     .crumbs .end {
         margin-left: auto;
-        color: var(--vscode-descriptionForeground);
+        color: var(--colour-muted);
     }
-
-    .grid {
-        overflow: auto;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    th {
-        position: sticky;
-        top: 0;
-        text-align: left;
-        padding: var(--space-6) var(--space-16);
-        font-weight: 600;
-        font-size: var(--font-size-11);
-        background: var(--vscode-editor-background);
-        border-bottom: 1px solid var(--vscode-panel-border);
-        color: var(--vscode-descriptionForeground);
-    }
-    td {
-        padding: var(--space-4) var(--space-16);
-        border-bottom: 1px solid var(--vscode-panel-border);
-        white-space: nowrap;
-    }
-    tbody tr {
-        cursor: pointer;
-    }
-    tbody tr:hover td {
-        background: var(--vscode-list-hoverBackground);
-    }
-    tbody tr.selected td {
-        background: var(--vscode-list-activeSelectionBackground);
-        color: var(--vscode-list-activeSelectionForeground);
-    }
-    tbody tr.inert {
-        cursor: default;
-        color: var(--vscode-disabledForeground);
-    }
-    tbody tr:focus-visible {
-        outline: 1px solid var(--vscode-focusBorder);
-        outline-offset: -1px;
-    }
-    /* The hover icons overlay the row's end, as the editor's own lists do: the cell takes no width,
-       so the table is as wide with them as without. */
-    td.acts {
-        position: sticky;
-        right: 0;
-        width: 0;
-        padding: 0;
-    }
-    .row-actions {
-        position: absolute;
-        right: var(--space-8);
-        top: 50%;
-        transform: translateY(-50%);
-        display: inline-flex;
-        visibility: hidden;
-        background: var(--vscode-editor-background);
-        border-radius: var(--radius-6);
-    }
-    tbody tr:hover .row-actions,
-    tbody tr:focus-within .row-actions {
-        visibility: visible;
-    }
-    .entry .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-6);
-        margin-top: var(--space-12);
-    }
-    .entry .actions .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-4);
-    }
-
-    .pager {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: var(--space-6) var(--space-16);
-        border-top: 1px solid var(--vscode-panel-border);
-        color: var(--vscode-descriptionForeground);
+    .data-table .tag {
+        margin-left: var(--space-6);
     }
 
     .search {
-        border-top: 1px solid var(--vscode-panel-border);
+        border-top: var(--space-1) solid var(--colour-line);
+        background: var(--colour-sidebar);
     }
     .search-head {
         display: flex;
@@ -1763,12 +1472,15 @@ const Shell = styled.div`
         width: 100%;
         padding: var(--space-6) var(--space-16);
         border: 0;
-        background: var(--vscode-sideBar-background);
+        background: none;
         text-align: left;
         cursor: pointer;
     }
     .search-head .end {
         margin-left: auto;
+    }
+    .search-head .dim {
+        color: var(--colour-muted);
     }
     .search-grid {
         display: grid;
@@ -1778,19 +1490,10 @@ const Shell = styled.div`
         align-items: center;
     }
     .search-grid input {
-        background: var(--vscode-input-background);
-        color: var(--vscode-input-foreground);
-        border: 1px solid var(--vscode-input-border, transparent);
+        background: var(--colour-input);
+        color: var(--colour-input-ink);
+        border: var(--space-1) solid var(--colour-input-line);
         padding: var(--space-2) var(--space-6);
-    }
-    .search-grid .chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-4);
-    }
-    .search-grid .chip {
-        margin-left: 0;
-        cursor: pointer;
     }
     .search-foot {
         display: flex;
@@ -1799,238 +1502,74 @@ const Shell = styled.div`
         padding: 0 var(--space-16) var(--space-8);
     }
 
-    .entry {
-        padding: var(--space-16) var(--space-24);
-        overflow: auto;
-    }
-    .entry h1 {
-        margin: 0 0 var(--space-6);
-        font-size: var(--font-size-16);
-    }
-    .entry p {
-        margin: var(--space-4) 0;
-    }
-    .entry .line .chip:first-child {
-        margin-left: 0;
-    }
-    .entry .card {
-        display: inline-grid;
-        gap: var(--space-8);
-        margin-top: var(--space-16);
-    }
-
-    /* An entry's preview: the tile grid and the action column beside it - or above it, as one row,
-       when the panel is too narrow. Cell sizes come in as inline styles from PREVIEW_CELL. One form
-       per concept: tags, key/value, entry list, problems, code. */
+    /* An entry's preview: the tile grid and the action tiles beside it - or above it, as one row,
+       when the panel is too narrow. Cell sizes come in as inline styles from PREVIEW_CELL. */
     .preview {
-        display: flex;
-        flex-wrap: wrap;
-        align-content: flex-start;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
         gap: var(--space-16);
         padding: var(--space-16);
         overflow: auto;
         min-height: 0;
     }
+    .preview:not(.beside) .preview-actions {
+        order: -1;
+    }
     .preview.beside {
-        flex-wrap: nowrap;
-        align-items: flex-start;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: minmax(0, 1fr);
     }
     .preview-grid {
         display: grid;
-        flex: 1;
         min-width: 0;
-    }
-    /* A tile's heading stays put; what it holds scrolls inside it rather than being cut off. */
-    .tile-body {
-        flex: 1;
         min-height: 0;
-        overflow: auto;
     }
-    .tile {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-6);
-        min-width: 0;
-        overflow: hidden;
-        padding: var(--space-12) var(--space-16);
-        border: 1px solid var(--vscode-panel-border);
-        border-radius: var(--radius-6);
-        background: var(--vscode-sideBar-background);
+    .preview-actions .tile-grid {
+        justify-content: start;
     }
-    .tile-identity {
+
+    /* The entry's header is the one bold thing on the page, set on the editor's ground rather than
+       in a box of its own: the name, then what classifies it, then where it comes from. */
+    .entry-head {
         border-color: transparent;
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
+        background: none;
     }
-    .tile-problems {
-        border-color: var(--vscode-errorForeground);
-    }
-    .tile-head {
-        display: flex;
-        align-items: center;
+    .entry-head .panel-body {
+        display: grid;
+        align-content: start;
         gap: var(--space-8);
-        margin: 0;
-        font-size: var(--font-size-11);
-        font-weight: 600;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
+        padding: 0;
     }
-    .tile-count {
-        margin-left: auto;
-        font-variant-numeric: tabular-nums;
-    }
-    .tile-foot {
-        margin-top: auto;
-        font-size: var(--font-size-11);
-        color: var(--vscode-descriptionForeground);
-    }
-    .identity-name {
+    .entry-title {
         margin: 0;
         font-size: var(--font-size-16);
-        overflow-wrap: anywhere;
-    }
-    .tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-4);
-    }
-    .tg {
-        padding: var(--space-1) var(--space-8);
-        border-radius: var(--radius-pill);
-        background: var(--vscode-badge-background);
-        color: var(--vscode-badge-foreground);
-        font-size: var(--font-size-11);
-    }
-    .tile-identity .tg {
-        background: transparent;
-        border: 1px solid currentColor;
-        color: inherit;
-    }
-    .tg.origin {
-        font-style: italic;
-    }
-    .kv {
-        display: grid;
-        grid-template-columns: max-content minmax(0, 1fr);
-        gap: var(--space-2) var(--space-12);
-        margin: 0;
-        font-size: var(--font-size-12);
-    }
-    .kv dt {
         font-weight: 600;
-    }
-    .kv dd {
-        margin: 0;
-        min-width: 0;
         overflow-wrap: anywhere;
-    }
-    .tile-identity .link {
-        color: inherit;
-        text-decoration: underline;
-    }
-    .lst {
-        display: grid;
-        gap: var(--space-4);
-        margin: 0;
-        padding: 0;
-        list-style: none;
-    }
-    .li button {
-        display: grid;
-        width: 100%;
-        padding: var(--space-1) var(--space-8);
-        border: 0;
-        border-left: 2px solid var(--vscode-focusBorder);
-        background: none;
-        text-align: left;
-        cursor: pointer;
-    }
-    .li b,
-    .li span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .li b {
-        font-weight: 500;
-        color: var(--vscode-textLink-foreground);
-    }
-    .li span {
-        font-size: var(--font-size-11);
-        color: var(--vscode-descriptionForeground);
-    }
-    .li.off button {
-        border-left-color: var(--vscode-panel-border);
-        cursor: default;
-    }
-    .li.off b {
-        color: var(--vscode-disabledForeground);
-    }
-    .li.err button {
-        border-left-color: var(--vscode-errorForeground);
-    }
-    .li.err b {
-        color: var(--vscode-errorForeground);
-        white-space: normal;
     }
     .code {
         margin: 0;
-        font-family: var(--vscode-editor-font-family);
+        font-family: var(--vscode-editor-font-family, monospace);
         font-size: var(--font-size-11);
         white-space: pre;
     }
-    .seg {
-        display: inline-flex;
-        margin-left: auto;
-        border: 1px solid var(--vscode-panel-border);
-        border-radius: var(--radius-3);
-        overflow: hidden;
-        font-weight: 400;
-        letter-spacing: 0;
-        text-transform: none;
-    }
-    .seg button {
-        padding: 0 var(--space-6);
-        border: 0;
-        background: none;
-        color: var(--vscode-descriptionForeground);
-        cursor: pointer;
-    }
-    .seg button.on {
-        background: var(--vscode-list-activeSelectionBackground);
-        color: var(--vscode-list-activeSelectionForeground);
-    }
-    .preview-actions {
+
+    /* An entry without a preview adapter: its header and card, the action tiles beside them. */
+    .entry {
         display: grid;
-        flex: none;
-        align-content: start;
-        gap: var(--space-12);
-    }
-    .preview-actions.inline {
-        display: flex;
-        flex-wrap: wrap;
-        width: 100%;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
         gap: var(--space-16);
+        padding: var(--space-16);
+        overflow: auto;
     }
-    .act {
-        display: flex;
-        align-items: flex-start;
+    .entry-main {
+        display: grid;
+        gap: var(--space-16);
+        min-width: 0;
+    }
+    .card {
+        display: inline-grid;
         gap: var(--space-8);
-        padding: 0;
-        border: 0;
-        background: none;
-        text-align: left;
-        color: var(--vscode-textLink-foreground);
-        cursor: pointer;
-    }
-    .act:disabled {
-        color: var(--vscode-disabledForeground);
-        cursor: default;
-    }
-    .act small {
-        display: block;
-        font-size: var(--font-size-11);
     }
 
     @media (max-width: 700px) {
@@ -2038,7 +1577,7 @@ const Shell = styled.div`
         grid-template-rows: 40vh minmax(0, 1fr);
         .rail {
             border-right: 0;
-            border-bottom: 1px solid var(--vscode-panel-border);
+            border-bottom: var(--space-1) solid var(--colour-line);
         }
     }
 `;

@@ -230,35 +230,24 @@ describe("menuChoices", () => {
 });
 
 /**
- * The preview's grid, after Scout's tile grid: a column is dropped at a time, never below one. Unlike
- * Scout's, the grid uses the full width - its columns stretch - so a wide panel takes more of them.
+ * The preview's grid is fixed - the adapter's columns and rows, each tile in its own cells - and only
+ * stretches over the tab. What the width decides is where the actions go and how wide a cell is.
  */
 describe("previewLayout", () => {
-    const at = (width: number) => {
-        const layout = previewLayout(width);
-        return [layout.columns, layout.actionsBeside];
-    };
-
-    it("keeps the actions beside the grid while two columns fit beside them", () => {
-        assert.deepEqual(at(1082), [4, true]);
-        assert.deepEqual(at(1081), [3, true]);
-        assert.deepEqual(at(866), [3, true]);
-        assert.deepEqual(at(865), [2, true]);
-        assert.deepEqual(at(650), [2, true]);
+    it("keeps the actions beside the grid while the whole grid fits beside them at its least cell", () => {
+        // Six least cells and five gaps are 800; padding, the gap and the action column add 228.
+        assert.equal(previewLayout(1028, 6).actionsBeside, true);
+        assert.equal(previewLayout(1027, 6).actionsBeside, false);
     });
 
-    it("takes every column that fits the full width, with no upper limit", () => {
-        assert.deepEqual(at(1298), [5, true]);
-        assert.deepEqual(at(1920), [7, true]);
+    it("stretches the cells over what is left of the width", () => {
+        // 1228 less the padding, the gap and the action column leaves 1000 for six cells and five gaps.
+        assert.equal(previewLayout(1228, 6).cellWidth, (1000 - 5 * 16) / 6);
+        // Above the grid, the actions leave it the full width less the padding.
+        assert.equal(previewLayout(900, 6).cellWidth, (900 - 32 - 5 * 16) / 6);
     });
 
-    it("moves the actions above the grid when they no longer fit beside two columns", () => {
-        assert.deepEqual(at(649), [2, false]);
-        assert.deepEqual(at(452), [2, false]);
-        assert.deepEqual(at(451), [1, false]);
-    });
-
-    it("never drops below one column, however narrow", () => {
-        assert.deepEqual(at(100), [1, false]);
+    it("never shrinks a cell below its least width; the grid scrolls instead", () => {
+        assert.equal(previewLayout(300, 6).cellWidth, 120);
     });
 });

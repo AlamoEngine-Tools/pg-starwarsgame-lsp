@@ -1,4 +1,4 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import assert from "node:assert/strict";
@@ -11,7 +11,7 @@ import {
     pinTab,
     showTable,
     Tabs,
-} from "./modBrowserTabs";
+} from "./editorTabs";
 
 /** The Mod Browser's tabs (#270): the table's own tab, and the previews opened from it. */
 describe("tabs", () => {

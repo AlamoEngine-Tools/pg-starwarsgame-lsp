@@ -76,17 +76,23 @@ export interface SymbolAction {
     reason?: string | null;
 }
 
-/** An entry's preview: the tiles its type's adapter lists, in the order the grid places them. */
+/** An entry's preview: its adapter's fixed grid, and every tile placed on it. */
 export interface GetSymbolPreviewResult {
     /** `gameObject`, `xmlObject`; null when the entry's type has no adapter. */
     adapter?: string | null;
     tiles: PreviewTile[];
+    /** The grid's columns and rows; the webview stretches them over the tab. */
+    columns?: number;
+    rows?: number;
 }
 
-/** One tile, sized in grid cells; which members it fills depends on its kind. */
+/** One tile, placed and sized in grid cells; which members it fills depends on its kind. */
 export interface PreviewTile {
     /** `identity`, `problems`, `encyclopedia`, `definition` or `entries`. */
     kind: string;
+    /** Its first column and row, from 0. */
+    x: number;
+    y: number;
     width: number;
     height: number;
     relation?: string | null;
@@ -108,6 +114,8 @@ export interface PreviewEntry {
     row?: SymbolRow | null;
     /** Where a problem is. */
     location?: SymbolLocation | null;
+    /** A problem's severity, "error" or "warning". */
+    severity?: string | null;
 }
 
 export interface GetSymbolOutlineParams {

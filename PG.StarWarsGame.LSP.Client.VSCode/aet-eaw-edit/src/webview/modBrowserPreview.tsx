@@ -2,10 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // An entry's preview in the Mod Browser (#270): the tiles the server's adapter lists, laid out on a
-// grid after Scout's tile grid, with the entry's actions in a column of their own. One form per
-// concept, whatever the entry: tags for what classifies it, key/value lines for where it comes
-// from, one entry list for every relation, problems in the error colour, code for the definition.
-// The server decides which tiles an entry gets and their size in cells; this file only draws them.
+// grid after Scout's tile grid, with the entry's actions in a column of their own. Every tile is a
+// shared piece the other panels draw too: the entry's header with tags and key/value lines, a Panel
+// per list, problems as the problems band's rows, the definition with a ModeSelector, and the
+// actions as dock tiles. The server decides which tiles an entry gets and their cells; this file
+// only draws them.
 
 import * as l10n from "@vscode/l10n";
 import { ReactNode, useLayoutEffect, useRef, useState } from "react";
@@ -27,7 +28,11 @@ import {
     previewLayout,
     relationLabel,
 } from "./modBrowserModel";
+import { DockTile, DockTileGrid } from "./shared/DockTile";
 import { Icon, IconName } from "./shared/Icon";
+import { ModeSelector } from "./shared/ModeSelector";
+import { Panel } from "./shared/Panel";
+import { problemLook, problemTag } from "./shared/problemLook";
 
 /** What the preview asks of the panel around it. */
 export interface PreviewHandlers {
@@ -52,18 +57,23 @@ export const ACTION_ICONS: Record<string, IconName> = {
 };
 
 /**
- * What a tile's own padding and a scrollbar take off its width: content sized to fit the tile, as
- * the encyclopedia card is, is sized to what is left.
+ * What a panel's own padding and a scrollbar take off its width: content sized to fit the panel,
+ * as the encyclopedia card is, is sized to what is left.
  */
-const TILE_INSET = 48;
+const PANEL_INSET = 40;
 
 export function PreviewPage({
     tiles,
+    columns,
+    rows,
     actions,
     layers,
     handlers,
 }: {
     tiles: PreviewTile[];
+    /** The adapter's grid. */
+    columns: number;
+    rows: number;
     /** The entry's actions, once the server has opened it. */
     actions: SymbolAction[] | undefined;
     layers: GetSymbolOutlineResult["layers"];
@@ -81,55 +91,44 @@ export function PreviewPage({
         watch.observe(element);
         return () => watch.disconnect();
     }, []);
-    const layout = previewLayout(width);
-    const span = (cells: number) => Math.min(cells, layout.columns);
+    const layout = previewLayout(width, columns);
     const across = (cells: number) =>
-        span(cells) * layout.columnWidth + (span(cells) - 1) * PREVIEW_CELL.gap;
+        cells * layout.cellWidth + (cells - 1) * PREVIEW_CELL.gap;
 
     return (
         <section
             ref={page}
             className={`preview${layout.actionsBeside ? " beside" : ""}`}
         >
-            {!layout.actionsBeside && (
-                <Actions actions={actions} onAct={handlers.onAct} inline />
-            )}
             <div
                 className="preview-grid"
                 style={{
-                    // At least the cell's width, then stretched across the full width.
-                    gridTemplateColumns: `repeat(${layout.columns}, minmax(${PREVIEW_CELL.width}px, 1fr))`,
-                    gridAutoRows: `${PREVIEW_CELL.height}px`,
+                    // The adapter's fixed grid, stretched over the tab from each cell's least size.
+                    gridTemplateColumns: `repeat(${columns}, minmax(${PREVIEW_CELL.width}px, 1fr))`,
+                    gridTemplateRows: `repeat(${rows}, minmax(${PREVIEW_CELL.height}px, 1fr))`,
                     gap: `${PREVIEW_CELL.gap}px`,
-                    // A later tile may fill a hole an earlier, wider one left, so the grid flows.
-                    gridAutoFlow: "row dense",
                 }}
             >
                 {tiles.map((tile, i) => (
-                    <div
+                    <Tile
                         key={`${tile.kind}-${tile.relation ?? ""}-${i}`}
-                        className={`tile tile-${tile.kind}`}
-                        style={{
-                            gridColumn: `span ${span(tile.width)}`,
-                            gridRow: `span ${tile.height}`,
+                        tile={tile}
+                        layers={layers}
+                        handlers={handlers}
+                        width={across(tile.width)}
+                        // Its own cells and no others: an absent neighbour leaves its cells empty.
+                        place={{
+                            gridColumn: `${tile.x + 1} / span ${tile.width}`,
+                            gridRow: `${tile.y + 1} / span ${tile.height}`,
                         }}
-                    >
-                        <Tile
-                            tile={tile}
-                            layers={layers}
-                            handlers={handlers}
-                            width={across(tile.width)}
-                        />
-                    </div>
+                    />
                 ))}
             </div>
-            {layout.actionsBeside && (
-                <Actions
-                    actions={actions}
-                    onAct={handlers.onAct}
-                    width={PREVIEW_ACTIONS}
-                />
-            )}
+            <Actions
+                actions={actions}
+                onAct={handlers.onAct}
+                width={layout.actionsBeside ? PREVIEW_ACTIONS : undefined}
+            />
         </section>
     );
 }
@@ -139,67 +138,69 @@ function Tile({
     layers,
     handlers,
     width,
+    place,
 }: {
     tile: PreviewTile;
     layers: GetSymbolOutlineResult["layers"];
     handlers: PreviewHandlers;
     /** The tile's width in pixels, for what has to fit it. */
     width: number;
+    place: React.CSSProperties;
 }): React.JSX.Element | null {
     switch (tile.kind) {
         case "identity":
             return (
-                <IdentityTile tile={tile} layers={layers} handlers={handlers} />
+                <EntryHead
+                    tile={tile}
+                    layers={layers}
+                    handlers={handlers}
+                    place={place}
+                />
             );
         case "problems":
             return (
-                <>
-                    <TileHead title={l10n.t("Problems")} count={tile.count} />
-                    <div className="tile-body">
-                        <EntryList
-                            entries={tile.entries ?? []}
-                            error
-                            onOpen={(e) =>
-                                e.location &&
-                                handlers.onOpenLocation(e.location)
-                            }
-                        />
-                    </div>
-                </>
+                <Panel
+                    title={l10n.t("Problems")}
+                    count={tile.count ?? undefined}
+                    flush
+                    className="prose-problems"
+                    style={place}
+                >
+                    <Problems
+                        entries={tile.entries ?? []}
+                        onOpen={handlers.onOpenLocation}
+                    />
+                </Panel>
             );
         case "encyclopedia":
             return (
-                <>
-                    <TileHead title={l10n.t("Encyclopedia")} />
-                    <div className="tile-body">
-                        {tile.objectId &&
-                            handlers.card(tile.objectId, width - TILE_INSET)}
-                    </div>
-                </>
+                <Panel title={l10n.t("Encyclopedia")} style={place}>
+                    {tile.objectId &&
+                        handlers.card(tile.objectId, width - PANEL_INSET)}
+                </Panel>
             );
         case "definition":
-            return <DefinitionTile tile={tile} />;
+            return <DefinitionPanel tile={tile} place={place} />;
         case "entries": {
             const entries = tile.entries ?? [];
             const more = (tile.count ?? entries.length) - entries.length;
             return (
-                <>
-                    <TileHead
-                        title={relationLabel(tile.relation ?? "")}
-                        count={tile.count}
+                <Panel
+                    title={relationLabel(tile.relation ?? "")}
+                    count={tile.count?.toLocaleString()}
+                    flush
+                    style={place}
+                    foot={
+                        more > 0
+                            ? l10n.t("{0} more", more.toLocaleString())
+                            : undefined
+                    }
+                >
+                    <EntryList
+                        entries={entries}
+                        onOpen={(row) => handlers.onOpenRow(row)}
                     />
-                    <div className="tile-body">
-                        <EntryList
-                            entries={entries}
-                            onOpen={(e) => e.row && handlers.onOpenRow(e.row)}
-                        />
-                    </div>
-                    {more > 0 && (
-                        <span className="tile-foot">
-                            {l10n.t("{0} more", more.toLocaleString())}
-                        </span>
-                    )}
-                </>
+                </Panel>
             );
         }
         default:
@@ -207,220 +208,244 @@ function Tile({
     }
 }
 
-function TileHead({
-    title,
-    count,
-    children,
-}: {
-    title: string;
-    count?: number | null;
-    children?: ReactNode;
-}): React.JSX.Element {
-    return (
-        <h3 className="tile-head">
-            <span>{title}</span>
-            {children}
-            {count !== undefined && count !== null && (
-                <span className="tile-count">{count.toLocaleString()}</span>
-            )}
-        </h3>
-    );
-}
-
-/** Name, tags for what classifies it, and where the definition the game uses comes from. */
-function IdentityTile({
+/**
+ * The entry's header, the one bold thing on the page: its name, tags for what classifies it, and
+ * where the definition the game uses comes from.
+ */
+export function EntryHead({
     tile,
     layers,
     handlers,
+    place,
 }: {
     tile: PreviewTile;
     layers: GetSymbolOutlineResult["layers"];
-    handlers: PreviewHandlers;
+    handlers: Pick<PreviewHandlers, "onOpenBase" | "onOpenLocation">;
+    /** Its cells, on the preview grid; absent on an entry page. */
+    place?: React.CSSProperties;
 }): React.JSX.Element | null {
     const entry = tile.entry;
     if (!entry) {
         return null;
     }
     return (
-        <div className="tile-body">
-            <h2 className="identity-name">{entry.name}</h2>
-            <div className="tags">
-                {entry.type && <span className="tg">{entry.type}</span>}
-                {entry.kinds.map((k) => (
-                    <span key={k} className="tg">
-                        {k}
+        <section className="panel entry-head" style={place}>
+            <div className="panel-body">
+                <h2 className="entry-title">{entry.name}</h2>
+                <div className="tag-row">
+                    {entry.type && <span className="tag">{entry.type}</span>}
+                    {entry.kinds.map((k) => (
+                        <span key={k} className="tag">
+                            {k}
+                        </span>
+                    ))}
+                    <span className="tag outline">
+                        {originLabel(entry.origin, entry.originName, layers)}
                     </span>
-                ))}
-                <span className="tg origin">
-                    {originLabel(entry.origin, entry.originName, layers)}
-                </span>
+                </div>
+                <dl className="kv-rows">
+                    {tile.location && (
+                        <>
+                            <dt>{l10n.t("Defined in")}</dt>
+                            <dd>
+                                <button
+                                    type="button"
+                                    className="link"
+                                    onClick={() =>
+                                        handlers.onOpenLocation(tile.location!)
+                                    }
+                                >
+                                    {locationLabel(tile.location)}
+                                </button>
+                            </dd>
+                        </>
+                    )}
+                    {entry.overrides.length > 0 && (
+                        <>
+                            <dt>{l10n.t("Overrides")}</dt>
+                            <dd>
+                                {entry.overrides
+                                    .map((o) => originLabel(o, null, layers))
+                                    .join(", ")}
+                            </dd>
+                        </>
+                    )}
+                    {tile.variantOf && (
+                        <>
+                            <dt>{l10n.t("Variant of")}</dt>
+                            <dd>
+                                <button
+                                    type="button"
+                                    className="link"
+                                    onClick={() =>
+                                        handlers.onOpenBase(tile.variantOf!)
+                                    }
+                                >
+                                    {tile.variantOf}
+                                </button>
+                            </dd>
+                        </>
+                    )}
+                </dl>
             </div>
-            <dl className="kv">
-                {tile.location && (
-                    <>
-                        <dt>{l10n.t("Defined in")}</dt>
-                        <dd>
-                            <button
-                                type="button"
-                                className="link"
-                                onClick={() =>
-                                    handlers.onOpenLocation(tile.location!)
-                                }
-                            >
-                                {locationLabel(tile.location)}
-                            </button>
-                        </dd>
-                    </>
-                )}
-                {entry.overrides.length > 0 && (
-                    <>
-                        <dt>{l10n.t("Overrides")}</dt>
-                        <dd>
-                            {entry.overrides
-                                .map((o) => originLabel(o, null, layers))
-                                .join(", ")}
-                        </dd>
-                    </>
-                )}
-                {tile.variantOf && (
-                    <>
-                        <dt>{l10n.t("Variant of")}</dt>
-                        <dd>
-                            <button
-                                type="button"
-                                className="link"
-                                onClick={() =>
-                                    handlers.onOpenBase(tile.variantOf!)
-                                }
-                            >
-                                {tile.variantOf}
-                            </button>
-                        </dd>
-                    </>
-                )}
-            </dl>
-        </div>
+        </section>
     );
 }
 
+type DefinitionView = "written" | "effective";
+
 /** The definition as written in its file, with the merged effective object one switch away. */
-function DefinitionTile({ tile }: { tile: PreviewTile }): React.JSX.Element {
-    const [effective, setEffective] = useState(false);
-    const text = (effective ? tile.effective : tile.text) ?? "";
+function DefinitionPanel({
+    tile,
+    place,
+}: {
+    tile: PreviewTile;
+    place: React.CSSProperties;
+}): React.JSX.Element {
+    const [view, setView] = useState<DefinitionView>("written");
+    const text = (view === "effective" ? tile.effective : tile.text) ?? "";
     const lines = text.split("\n").length;
     return (
-        <>
-            <TileHead title={l10n.t("Definition")}>
-                {tile.effective && (
-                    <span className="seg" role="group">
-                        <button
-                            type="button"
-                            className={effective ? undefined : "on"}
-                            aria-pressed={!effective}
-                            onClick={() => setEffective(false)}
-                        >
-                            {l10n.t("As written")}
-                        </button>
-                        <button
-                            type="button"
-                            className={effective ? "on" : undefined}
-                            aria-pressed={effective}
-                            onClick={() => setEffective(true)}
-                        >
-                            {l10n.t("Effective")}
-                        </button>
-                    </span>
-                )}
-            </TileHead>
-            <div className="tile-body">
-                <pre className="code">{text}</pre>
-            </div>
-            <span className="tile-foot">
-                {l10n.t("{0} lines", lines.toLocaleString())}
-            </span>
-        </>
+        <Panel
+            title={l10n.t("Definition")}
+            style={place}
+            end={
+                <ModeSelector<DefinitionView>
+                    label={l10n.t("Definition")}
+                    value={view}
+                    options={[
+                        { id: "written", label: l10n.t("As written") },
+                        tile.effective
+                            ? { id: "effective", label: l10n.t("Effective") }
+                            : {
+                                  id: "effective",
+                                  label: l10n.t("Effective"),
+                                  disabled: true,
+                                  disabledReason: `${l10n.t("Effective")} - ${l10n.t("Not a variant")}`,
+                              },
+                    ]}
+                    onSelect={setView}
+                />
+            }
+            foot={l10n.t("{0} lines", lines.toLocaleString())}
+        >
+            <pre className="code">{text}</pre>
+        </Panel>
     );
 }
 
 /**
- * Every list in a preview: a name that opens what it names, and a quieter line saying what it is
- * or where. An entry with nothing to open is greyed, as in the table.
+ * The problems inside the definition, drawn as the problems band draws them: the severity's mark,
+ * the message as prose, the diagnostic id last and dim. A click goes to the line.
  */
-function EntryList({
+function Problems({
     entries,
-    error,
     onOpen,
 }: {
     entries: PreviewEntry[];
-    error?: boolean;
-    onOpen: (entry: PreviewEntry) => void;
+    onOpen: (location: SymbolLocation) => void;
 }): React.JSX.Element {
     return (
-        <ul className="lst">
+        <div className="problem-list">
             {entries.map((e, i) => {
-                const opens = error ? !!e.location : !!e.row?.page;
+                const look = problemLook(e.severity ?? "warning");
+                const tag = problemTag(e.detail);
                 return (
-                    <li
+                    <button
                         key={`${e.name}-${i}`}
-                        className={`li${error ? " err" : ""}${opens ? "" : " off"}`}
+                        type="button"
+                        className="problem-row"
+                        disabled={!e.location}
+                        onClick={() => e.location && onOpen(e.location)}
                     >
-                        <button
-                            type="button"
-                            disabled={!opens}
-                            onClick={() => onOpen(e)}
-                        >
-                            <b>{e.name}</b>
-                            {e.detail && <span>{e.detail}</span>}
-                        </button>
-                    </li>
+                        <span
+                            className={`codicon codicon-${look.icon} sev-${look.tone}`}
+                            aria-hidden="true"
+                        />
+                        <span className="problem-msg">{e.name}</span>
+                        <span className="problem-id" title={tag.title}>
+                            {tag.text}
+                        </span>
+                    </button>
                 );
             })}
+        </div>
+    );
+}
+
+/**
+ * Every relation in a preview: a name that opens what it names, and a quieter line saying what it
+ * is or where. An entry with nothing to open is greyed, as in the table.
+ */
+function EntryList({
+    entries,
+    onOpen,
+}: {
+    entries: PreviewEntry[];
+    onOpen: (row: SymbolRow) => void;
+}): React.JSX.Element {
+    return (
+        <ul className="entry-list">
+            {entries.map((e, i) => (
+                <li key={`${e.name}-${i}`}>
+                    <button
+                        type="button"
+                        className="entry-row"
+                        disabled={!e.row?.page}
+                        title={
+                            e.row?.page
+                                ? undefined
+                                : l10n.t("Nothing defines this name")
+                        }
+                        onClick={() => e.row && onOpen(e.row)}
+                    >
+                        <span className="entry-name">{e.name}</span>
+                        {e.detail && (
+                            <span className="entry-detail">{e.detail}</span>
+                        )}
+                    </button>
+                </li>
+            ))}
         </ul>
     );
 }
 
 /**
- * The entry's actions in a column of their own, in one order everywhere: go to definition first,
- * the type's own next, copying the name last. One that does not apply stays, disabled, with why.
+ * The entry's actions as dock tiles, in one order everywhere: go to definition first, the type's
+ * own next, copying the name last. One that does not apply stays, disabled, with why. A column
+ * beside the grid when there is room for one, a row above it when there is not.
  */
-function Actions({
+export function Actions({
     actions,
     onAct,
-    inline,
     width,
 }: {
     actions: SymbolAction[] | undefined;
     onAct: (action: string) => void;
-    /** Above the grid as one row, when the panel is too narrow for a column beside it. */
-    inline?: boolean;
-    /** The column's width, beside the grid. */
+    /** The column's width, beside the grid; absent when the actions run across above it. */
     width?: number;
 }): React.JSX.Element {
-    const [, ...groups] = actionChoices(true, actions);
-    const [[, definition]] = actionChoices(true, actions);
+    const [[, definition], ...groups] = actionChoices(true, actions);
     const items = [definition, ...groups.flat()];
     return (
         <nav
-            className={`preview-actions${inline ? " inline" : ""}`}
+            className="preview-actions"
             aria-label={l10n.t("Actions")}
             style={width ? { width: `${width}px` } : undefined}
         >
-            {!inline && <h3 className="tile-head">{l10n.t("Actions")}</h3>}
-            {items.map((c) => (
-                <button
-                    key={c.action}
-                    type="button"
-                    className="act"
-                    disabled={c.disabled}
-                    onClick={() => onAct(c.action)}
-                >
-                    <Icon name={ACTION_ICONS[c.action] ?? "open"} size={16} />
-                    <span>
-                        {c.label}
-                        {c.disabled && c.reason && <small>{c.reason}</small>}
-                    </span>
-                </button>
-            ))}
+            <DockTileGrid>
+                {items.map((c) => (
+                    <DockTile
+                        key={c.action}
+                        glyph={<Icon name={ACTION_ICONS[c.action] ?? "open"} />}
+                        label={c.label}
+                        title={c.label}
+                        disabled={c.disabled ?? false}
+                        disabledReason={c.reason ?? ""}
+                        onClick={() => onAct(c.action)}
+                    />
+                ))}
+            </DockTileGrid>
         </nav>
     );
 }

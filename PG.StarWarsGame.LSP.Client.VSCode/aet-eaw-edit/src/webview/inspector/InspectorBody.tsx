@@ -91,10 +91,10 @@ export function InspectorBody({
                             <div className="field-note">{section.note}</div>
                         )}
 
-                        {/* dt and dd stay DIRECT children of the list: `.inspect-rows` is a
+                        {/* dt and dd stay DIRECT children of the list: `.kv-rows` is a
                             two-column grid and a wrapper element around each pair would become the
                             grid item instead, collapsing both into one column. */}
-                        <dl className="inspect-rows">
+                        <dl className="kv-rows">
                             {section.rows.map((row, at) => (
                                 <Fragment key={`${section.title}:${at}`}>
                                     <dt title={row.hint ?? row.label}>

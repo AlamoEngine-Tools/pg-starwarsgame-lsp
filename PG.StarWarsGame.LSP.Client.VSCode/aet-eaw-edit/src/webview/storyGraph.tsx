@@ -6052,20 +6052,7 @@ const Shell = styled.div`
         overflow-y: auto;
     }
 
-    .link {
-        border: none;
-        background: transparent;
-        color: var(--vscode-textLink-foreground);
-        padding: 0;
-        font: inherit;
-        cursor: pointer;
-        text-align: left;
-    }
-
-    .link:hover {
-        text-decoration: underline;
-    }
-
+    /* A link is dockChromeCss's .link; a fired one takes the lifecycle colour. */
     .link.fired {
         color: var(--lifecycle-fired, #73c991);
     }

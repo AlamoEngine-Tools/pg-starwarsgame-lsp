@@ -91,16 +91,25 @@ public sealed record GetSymbolPreviewParams(string Page, string Id) : IRequest<G
 ///     Which adapter answered - <c>gameObject</c>, <c>xmlObject</c>; null when the entry's type has
 ///     none, and a click on it only selects.
 /// </param>
-/// <param name="Tiles">The tiles in the order the grid places them.</param>
-public sealed record GetSymbolPreviewResult(string? Adapter, IReadOnlyList<PreviewTile> Tiles);
+/// <param name="Tiles">The tiles, each placed on the grid by its adapter.</param>
+public sealed record GetSymbolPreviewResult(string? Adapter, IReadOnlyList<PreviewTile> Tiles)
+{
+    /// <summary>The grid's columns; the webview stretches them across the width.</summary>
+    public int Columns { get; init; }
 
-/// <summary>One tile of a preview, sized in grid cells; which members it fills depends on its kind.</summary>
+    /// <summary>The grid's rows; the webview stretches them down the height.</summary>
+    public int Rows { get; init; }
+}
+
+/// <summary>One tile of a preview, placed and sized in grid cells; which members it fills depends on its kind.</summary>
 /// <param name="Kind">
 ///     <c>identity</c>, <c>problems</c>, <c>encyclopedia</c>, <c>definition</c> or <c>entries</c>.
 /// </param>
-/// <param name="Width">Columns it spans; the grid caps it at the columns it has.</param>
+/// <param name="X">Its first column, from 0.</param>
+/// <param name="Y">Its first row, from 0.</param>
+/// <param name="Width">Columns it spans.</param>
 /// <param name="Height">Rows it spans.</param>
-public sealed record PreviewTile(string Kind, int Width, int Height)
+public sealed record PreviewTile(string Kind, int X, int Y, int Width, int Height)
 {
     /// <summary>An entries tile's relation key, which also names the tile.</summary>
     public string? Relation { get; init; }
@@ -139,6 +148,9 @@ public sealed record PreviewEntry(string Name, string? Detail)
 
     /// <summary>Where a problem is.</summary>
     public SymbolLocation? Location { get; init; }
+
+    /// <summary>A problem's severity, <c>error</c> or <c>warning</c>, as the preview's problems carry it.</summary>
+    public string? Severity { get; init; }
 }
 
 /// <param name="Relation">The relation's key.</param>

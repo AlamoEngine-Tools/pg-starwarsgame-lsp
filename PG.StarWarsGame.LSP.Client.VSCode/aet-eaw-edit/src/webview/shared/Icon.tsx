@@ -23,6 +23,8 @@ import {
     IconAdjustments,
     IconAlertTriangle,
     IconArrowBackUp,
+    IconArrowDown,
+    IconArrowUp,
     IconAsterisk,
     IconAxisX,
     IconBone,
@@ -227,6 +229,9 @@ const ICONS = {
     moreActions: IconDots,
     /** Keeps a preview tab open, so the next entry opened gets a tab of its own. */
     pin: IconPin,
+    /** The column a table is sorted by, and which way. */
+    sortAscending: IconArrowUp,
+    sortDescending: IconArrowDown,
 
     // What an entry of the Mod Browser opens in: the assembled unit or a model in the 3D preview,
     // the object's encyclopedia card, the object with its variant chain merged.

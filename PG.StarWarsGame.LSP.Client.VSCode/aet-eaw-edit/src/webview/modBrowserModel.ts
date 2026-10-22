@@ -235,43 +235,39 @@ export function menuChoices(groups: ActionChoice[][]): ActionChoice[][] {
         .filter((group) => group.length > 0);
 }
 
-/** The preview grid's cell: a column's least width and a row's height, in pixels, and the gap between. */
-export const PREVIEW_CELL = { width: 200, height: 120, gap: 16 };
+/** The preview grid's cell: its least width and height, in pixels, and the gap between cells. */
+export const PREVIEW_CELL = { width: 120, height: 80, gap: 16 };
 /** The action column, flush right beside the grid, and what surrounds the two. */
 export const PREVIEW_ACTIONS = 180;
-const PREVIEW_PADDING = 18;
+/** The preview's padding and the gap before the action column - the stylesheet's --space-16. */
+const PREVIEW_PADDING = 16;
 
 /** How the preview lays out at a width. */
 export interface PreviewLayout {
-    columns: number;
-    /** A column's width once the columns stretch to fill the grid. */
-    columnWidth: number;
     actionsBeside: boolean;
+    /** A cell's width once the grid stretches over what the width leaves it. */
+    cellWidth: number;
 }
 
 /**
- * The preview's grid at a given width, after Scout's tile grid: as many columns as fit at their least
- * width, dropped one at a time as the panel narrows, never below one. Unlike Scout's, the columns
- * then stretch to use the full width, so tiles flow across all of it. The actions keep their own
- * column, flush right, while two grid columns still fit beside them, and go above the grid when not.
+ * The preview at a given width. Its grid is fixed - the adapter's columns and rows, each tile in its
+ * own cells, as Scout's logical grid - and stretches over the tab; below its least cell size it
+ * scrolls rather than reflowing. The actions keep their own column, flush right, while the whole grid
+ * fits beside them at its least cell, and go above the grid as one row when not.
  */
-export function previewLayout(width: number): PreviewLayout {
-    const fit = (room: number) =>
-        Math.floor(
-            (room + PREVIEW_CELL.gap) / (PREVIEW_CELL.width + PREVIEW_CELL.gap),
-        );
+export function previewLayout(width: number, columns: number): PreviewLayout {
+    const least =
+        columns * PREVIEW_CELL.width + (columns - 1) * PREVIEW_CELL.gap;
     const besideRoom =
         width - 2 * PREVIEW_PADDING - PREVIEW_ACTIONS - PREVIEW_PADDING;
-    const actionsBeside = fit(besideRoom) >= 2;
+    const actionsBeside = besideRoom >= least;
     const room = actionsBeside ? besideRoom : width - 2 * PREVIEW_PADDING;
-    const columns = Math.max(1, fit(room));
     return {
-        columns,
-        columnWidth: Math.max(
+        actionsBeside,
+        cellWidth: Math.max(
             PREVIEW_CELL.width,
             (room - (columns - 1) * PREVIEW_CELL.gap) / columns,
         ),
-        actionsBeside,
     };
 }
 

@@ -286,7 +286,8 @@ export const Shell = styled.div`
             var(--vscode-errorForeground, #f48771) 13%,
             transparent
         );
-        box-shadow: inset 3px 0 0 var(--vscode-errorForeground, #f48771);
+        box-shadow: inset var(--severity-stripe) 0 0
+            var(--vscode-errorForeground, #f48771);
     }
 
     .data-row.row-sev-warning {
@@ -295,7 +296,8 @@ export const Shell = styled.div`
             var(--vscode-charts-yellow, #cca700) 13%,
             transparent
         );
-        box-shadow: inset 3px 0 0 var(--vscode-charts-yellow, #cca700);
+        box-shadow: inset var(--severity-stripe) 0 0
+            var(--vscode-charts-yellow, #cca700);
     }
 
     .data-row.row-sev-info {
@@ -304,7 +306,8 @@ export const Shell = styled.div`
             var(--vscode-charts-blue, #3794ff) 11%,
             transparent
         );
-        box-shadow: inset 3px 0 0 var(--vscode-charts-blue, #3794ff);
+        box-shadow: inset var(--severity-stripe) 0 0
+            var(--vscode-charts-blue, #3794ff);
     }
 
     .data-row.selected {

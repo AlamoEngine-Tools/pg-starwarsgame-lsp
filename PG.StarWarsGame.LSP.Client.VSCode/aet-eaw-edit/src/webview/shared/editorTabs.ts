@@ -1,10 +1,10 @@
-﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The Mod Browser's tabs (#270): the table keeps a tab of its own, and every entry opened from it
-// gets a preview tab beside it, so going back to the table finds it as it was left. One preview tab
-// is unpinned and reused, as VS Code's italic preview tab; pinning keeps a tab. Pure, so it is
-// testable without a webview.
+// Tabs inside a panel, as the editor's own (#270): a table keeps a tab of its own, and every entry
+// opened from it gets a preview tab beside it, so going back to the table finds it as it was left.
+// One preview tab is unpinned and reused, as VS Code's italic preview tab; pinning keeps a tab. The
+// strip that draws them is TabStrip. Pure, so it is testable without a webview.
 
 /** One preview tab: the entry it shows, keyed so one entry never has two tabs. */
 export interface PreviewTab<T> {

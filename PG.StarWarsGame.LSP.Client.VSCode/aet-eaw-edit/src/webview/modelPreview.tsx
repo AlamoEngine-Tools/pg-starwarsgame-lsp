@@ -2140,61 +2140,10 @@ const Shell = styled.div`
        panel renders its drag handle absolutely positioned, so without it the handle anchors to
        some ancestor and the panel cannot be resized at all. */
 
-    .preview-problems {
-        position: relative;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
-        background: var(--vscode-sideBar-background, #252526);
-        font-size: var(--font-size-12);
-    }
+    /* The band and its prose rows are problemsPanelCss's .problems-band and .prose-problems: this
+       editor's findings are prose, not the short entry labels the loc grids report. */
 
-    /* This editor's findings are PROSE, not the short entry labels the loc grids report, so they
-       wrap instead of being clamped to one line - the shared rule's ellipsis would hide most of
-       every message. The same override the encyclopedia already makes, for the same reason. */
-
-    .preview-problems .problem-row {
-        align-items: flex-start;
-        padding: var(--space-2) var(--space-6);
-    }
-
-    .preview-problems .problem-msg {
-        white-space: normal;
-        overflow: visible;
-        line-height: 1.35;
-        /* A bone or file name has no break opportunity in it, so without this it runs off. */
-        overflow-wrap: anywhere;
-    }
-
-    .preview-problems .problem-row .codicon {
-        margin-top: var(--space-2);
-    }
-
-    /* At the end of the row and out of the way: an id is what you look up AFTER reading the
-       finding, so it must not compete with the sentence for the reader's eye. Monospaced because
-       it is a literal string to be copied, and tabular so a column of them lines up. */
-
-    .preview-problems .problem-id {
-        flex: 0 0 auto;
-        margin-left: auto;
-        padding-left: var(--space-8);
-        font-family: var(--vscode-editor-font-family, monospace);
-        font-size: var(--font-size-smaller);
-        font-variant-numeric: tabular-nums;
-        opacity: 0.55;
-        white-space: nowrap;
-    }
-
-    /* Dimmer still, and italic: not an identifier, so it must not look like one that could be
-       copied into a suppression comment. */
-
-    .preview-problems .problem-id.render-time {
-        font-family: inherit;
-        font-style: italic;
-        opacity: 0.4;
-    }
+    /* A row's diagnostic id is problemsPanelCss's .problem-id. */
 
     /* Which hardpoint, when the sentence does not already say so - see problemWhere. */
 
@@ -10519,7 +10468,7 @@ function ModelPreview(): React.JSX.Element {
 
                     {problemsOpen && notices.length > 0 && (
                         <ProblemsPanel
-                            className="preview-problems"
+                            className="preview-problems problems-band prose-problems"
                             memoKey="modelPreview.problems"
                             defaultHeight={140}
                             title={l10n.t("Problems ({0})", notices.length)}
