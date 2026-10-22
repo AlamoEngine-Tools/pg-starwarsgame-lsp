@@ -20,7 +20,7 @@ public sealed class ModProjectResolverTest
 
     private static string Normalize(string p)
     {
-        return p.Replace('\\', '/').ToLowerInvariant();
+        return p.Replace('\\', '/');
     }
 
     private static string Abs(string projectDir, string rel)
@@ -50,6 +50,32 @@ public sealed class ModProjectResolverTest
 
         Assert.Contains(Abs(RootDir, "data/xml"), config.XmlDirectories);
         Assert.Contains(Abs(RootDir, "data/scripts"), config.ScriptRoots);
+    }
+
+    [Fact]
+    public void Resolve_KeepsTheSpellingOfTheProjectAndItsDirectories()
+    {
+        // Every file under a root is handed out by a URI built from it; a folded root names a file
+        // the host does not have, and a case-sensitive file system none at all.
+        var dir = Path.Combine(DriveRoot, "Mods", "Root");
+        var path = Path.Combine(dir, "Root.pgproj");
+        const string json = """
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": { "xml": ["Data/Xml"] }
+                            }
+                            """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [path] = new(json) });
+        var fileHelper = new FileHelper(fs);
+        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
+        var resolver = new ModProjectResolver(fileHelper, loader,
+            new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
+            NullLogger<ModProjectResolver>.Instance);
+
+        var config = resolver.Resolve(path, loader.Load(path));
+
+        Assert.Equal([Normalize(Path.Combine(dir, "Data", "Xml"))], config.XmlDirectories);
+        Assert.Equal(Normalize(path), config.Layers.Single().ProjectPath);
     }
 
     [Fact]

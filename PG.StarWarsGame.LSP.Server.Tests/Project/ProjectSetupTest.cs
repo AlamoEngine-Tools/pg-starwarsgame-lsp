@@ -61,17 +61,17 @@ public sealed class ProjectSetupTest
         Assert.All(ProjectSetup.All, s => Assert.Equal("Mod", s.Leaf.Name));
     }
 
-    // A document URI as the editor sends it keeps the case on disk; the layers keep their roots
-    // lower-cased. The analyzer once compared the two as written and found nothing.
+    // A document URI as the editor sends it and the layer roots both keep the case on disk; every
+    // URI the server builds under a root is built from it (#291).
     [Theory]
     [MemberData(nameof(Setups))]
-    public void AUri_KeepsTheCaseOnDisk_WhileTheLayerRootsAreLowerCased(string name)
+    public void AUri_AndTheLayerRoots_KeepTheCaseOnDisk(string name)
     {
         var setup = ProjectSetup.Named(name);
 
         var uri = setup.Uri(setup.LeafRank, "Scripts/GameObject/Interdictor.lua");
 
         Assert.Contains("/Work/Mod/Data/Scripts/GameObject/Interdictor.lua", uri, StringComparison.Ordinal);
-        Assert.All(setup.Leaf.ScriptRoots, r => Assert.Equal(r.ToLowerInvariant(), r));
+        Assert.All(setup.Leaf.ScriptRoots, r => Assert.EndsWith("/Work/Mod/Data/Scripts", r, StringComparison.Ordinal));
     }
 }

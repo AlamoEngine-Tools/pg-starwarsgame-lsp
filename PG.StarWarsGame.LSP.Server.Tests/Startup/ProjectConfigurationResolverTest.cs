@@ -17,9 +17,9 @@ public sealed class ProjectConfigurationResolverTest
     private static readonly string WorkspaceRoot = Path.Combine(DriveRoot, "mods", "mymod");
     private static readonly string ProjectPath = Path.Combine(WorkspaceRoot, "mymod.pgproj");
 
-    private static string AbsLower(string rel)
+    private static string Abs(string rel)
     {
-        return Path.GetFullPath(Path.Combine(WorkspaceRoot, rel)).Replace('\\', '/').ToLowerInvariant();
+        return Path.GetFullPath(Path.Combine(WorkspaceRoot, rel)).Replace('\\', '/');
     }
 
     private static ProjectConfigurationResolver Build(MockFileSystem fs)
@@ -94,7 +94,7 @@ public sealed class ProjectConfigurationResolverTest
         var config = Build(fs, out var notifier, status).Resolve([WorkspaceRoot]);
 
         Assert.NotNull(config);
-        Assert.Equal(AbsLower("mymod.pgproj"), config.Layers.Single().ProjectPath);
+        Assert.Equal(Abs("mymod.pgproj"), config.Layers.Single().ProjectPath);
         Assert.True(status.ProjectDetected);
         Assert.Equal(ProjectProblem.None, status.ProjectProblem);
         Assert.Equal(1, status.OtherProjectFiles);
@@ -117,7 +117,7 @@ public sealed class ProjectConfigurationResolverTest
             .Resolve([WorkspaceRoot]);
 
         Assert.NotNull(config);
-        Assert.Equal(AbsLower(Path.Combine("sub", "other.pgproj")), config.Layers.Single().ProjectPath);
+        Assert.Equal(Abs(Path.Combine("sub", "other.pgproj")), config.Layers.Single().ProjectPath);
         // Named explicitly, so the sibling is not "another project file" worth a warning.
         Assert.Equal(0, status.OtherProjectFiles);
         Assert.Empty(notifier.Warnings);
@@ -181,8 +181,8 @@ public sealed class ProjectConfigurationResolverTest
         var config = Build(fs).Resolve([WorkspaceRoot]);
 
         Assert.NotNull(config);
-        Assert.Contains(AbsLower("data/xml"), config!.XmlDirectories);
-        Assert.Contains(AbsLower("data/scripts"), config.ScriptRoots);
+        Assert.Contains(Abs("data/xml"), config!.XmlDirectories);
+        Assert.Contains(Abs("data/scripts"), config.ScriptRoots);
     }
 
     [Fact]
@@ -210,7 +210,7 @@ public sealed class ProjectConfigurationResolverTest
         var config = Build(fs, out var notifier).Resolve([WorkspaceRoot]);
 
         Assert.NotNull(config);
-        Assert.Equal(AbsLower("a.pgproj"), config.Layers.Single().ProjectPath);
+        Assert.Equal(Abs("a.pgproj"), config.Layers.Single().ProjectPath);
         Assert.Empty(notifier.Errors);
         var message = Assert.Single(notifier.Warnings);
         Assert.Contains("a.pgproj", message);
