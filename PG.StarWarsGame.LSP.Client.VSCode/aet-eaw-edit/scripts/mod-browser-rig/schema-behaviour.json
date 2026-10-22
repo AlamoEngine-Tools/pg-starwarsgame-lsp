@@ -1,0 +1,9 @@
+﻿[
+  {"click": "Behaviours", "in": ".rail"},
+  {"wait": 600},
+  {"type": "SpaceUnit"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"dblclick": "SpaceUnit", "in": ".data-table"},
+  {"wait": 600}
+]

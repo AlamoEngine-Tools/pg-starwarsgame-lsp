@@ -39,6 +39,8 @@ import {
     relationLabel,
     factLabel,
     fileSize,
+    noteLabel,
+    propertyLabel,
 } from "./modBrowserModel";
 import { treeItemsFromDetail } from "./preview/modelTreeItems";
 import {
@@ -227,9 +229,79 @@ function Tile({
                     />
                 </Panel>
             );
+        case "documentation":
+            return (
+                <Panel title={l10n.t("Documentation")} style={place}>
+                    <Documentation tile={tile} />
+                </Panel>
+            );
+        case "values":
+            // An enum's values, said rather than opened: a value is not an entry of its own.
+            return (
+                <Panel
+                    title={relationLabel("values")}
+                    count={tile.count?.toLocaleString()}
+                    flush
+                    style={place}
+                >
+                    <ul className="entry-list">
+                        {(tile.entries ?? []).map((e) => (
+                            <li key={e.name} className="entry-row plain">
+                                <span className="entry-name">{e.name}</span>
+                                {e.detail && (
+                                    <span className="entry-detail">
+                                        {e.detail}
+                                    </span>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </Panel>
+            );
         default:
             return null;
     }
+}
+
+/**
+ * A schema element's documentation, as its hover says it: its properties, its description and its
+ * notes, each note led by what sort of note it is.
+ */
+function Documentation({ tile }: { tile: PreviewTile }): React.JSX.Element {
+    const properties = tile.properties ?? [];
+    const notes = tile.notes ?? [];
+    if (properties.length === 0 && !tile.text && notes.length === 0) {
+        return <p className="empty">{l10n.t("Not documented")}</p>;
+    }
+    return (
+        <div className="documentation">
+            {properties.length > 0 && (
+                <dl className="kv-rows">
+                    {properties.map((p) => (
+                        <Fragment key={p.key}>
+                            <dt>{propertyLabel(p.key)}</dt>
+                            <dd>{p.value || l10n.t("Yes")}</dd>
+                        </Fragment>
+                    ))}
+                </dl>
+            )}
+            {tile.text && <p className="doc-text">{tile.text}</p>}
+            {notes.length > 0 && (
+                <ul className="doc-notes">
+                    {notes.map((n, i) => (
+                        <li key={`${n.kind}-${i}`}>
+                            <b>
+                                {n.value
+                                    ? `${noteLabel(n.kind)} ${n.value}`
+                                    : noteLabel(n.kind)}
+                            </b>
+                            {n.text && <span> - {n.text}</span>}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
 }
 
 /**

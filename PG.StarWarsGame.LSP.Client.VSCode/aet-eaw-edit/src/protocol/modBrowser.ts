@@ -116,6 +116,26 @@ export interface PreviewTile {
     facts?: PreviewFact[] | null;
     /** The identity tile's file on disk, for an asset or a script that has one. */
     file?: PreviewFile | null;
+    /** A documentation tile's properties, in the order shown, each by a key the panel names. */
+    properties?: PreviewProperty[] | null;
+    /** A documentation tile's description, in the language the server documents in. */
+    text?: string | null;
+    /** A documentation tile's notes, ranked as the hovers rank them. */
+    notes?: PreviewNote[] | null;
+}
+
+/** One property of a schema element: `valueType`, `references`, `enum` and the rest. */
+export interface PreviewProperty {
+    key: string;
+    /** As the schema names it; empty for a property that is only there or not. */
+    value: string;
+}
+
+/** One note on a schema element: its kind, what it says and what the kind carries. */
+export interface PreviewNote {
+    kind: string;
+    text?: string | null;
+    value?: string | null;
 }
 
 /** A file on disk, as its header describes it. */

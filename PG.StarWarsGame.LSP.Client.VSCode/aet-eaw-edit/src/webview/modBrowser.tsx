@@ -2010,6 +2010,31 @@ const Shell = styled.div`
         gap: var(--space-8);
     }
 
+    /* A schema element's documentation: its properties, then its description and its notes, which
+       wrap. An enum value is said, not opened, so it reads as text rather than as a link. */
+    .documentation {
+        display: grid;
+        gap: var(--space-8);
+        align-content: start;
+    }
+    .documentation .doc-text {
+        margin: 0;
+        white-space: pre-line;
+    }
+    .documentation .doc-notes {
+        display: grid;
+        gap: var(--space-4);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .entry-row.plain {
+        cursor: default;
+    }
+    .entry-row.plain .entry-name {
+        color: var(--colour-ink);
+    }
+
     @media (max-width: 700px) {
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: 40vh minmax(0, 1fr);

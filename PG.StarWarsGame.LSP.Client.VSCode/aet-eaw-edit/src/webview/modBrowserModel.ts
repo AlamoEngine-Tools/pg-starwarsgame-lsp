@@ -37,6 +37,12 @@ export function pageLabel(page: string): string {
             return l10n.t("Lua Scripts");
         case "enums":
             return l10n.t("Enums");
+        case "schemaTypes":
+            return l10n.t("Types");
+        case "schemaTags":
+            return l10n.t("Tags");
+        case "behaviours":
+            return l10n.t("Behaviours");
         default:
             return page.startsWith(XML_PREFIX)
                 ? page.slice(XML_PREFIX.length)
@@ -63,6 +69,12 @@ export function pageIcon(page: string): IconName {
             return "script";
         case "enums":
             return "enumeration";
+        case "schemaTypes":
+            return "schemaType";
+        case "schemaTags":
+            return "tag";
+        case "behaviours":
+            return "behaviour";
         default:
             return page.startsWith(SCRIPTS_PREFIX) ? "script" : "gameObject";
     }
@@ -98,6 +110,10 @@ export function relationIcon(relation: string): IconName {
             return "references";
         case "definitions":
             return "definition";
+        case "tags":
+            return "tag";
+        case "objects":
+            return "gameObject";
         default:
             return "tag";
     }
@@ -141,6 +157,12 @@ export function relationLabel(relation: string): string {
             return l10n.t("Loaded by");
         case "requires":
             return l10n.t("Requires");
+        case "tags":
+            return l10n.t("Tags");
+        case "objects":
+            return l10n.t("Game objects");
+        case "values":
+            return l10n.t("Values");
         default:
             return relation;
     }
@@ -325,6 +347,50 @@ export function factLabel(key: string): string {
             return l10n.t("Animations");
         default:
             return key;
+    }
+}
+
+/** A schema element's property, as its documentation tile names it. */
+export function propertyLabel(key: string): string {
+    switch (key) {
+        case "valueType":
+            return l10n.t("Value type");
+        case "type":
+            return l10n.t("Tag of");
+        case "references":
+            return l10n.t("References");
+        case "enum":
+            return l10n.t("Enum");
+        case "repeats":
+            return l10n.t("Repeats");
+        case "nameTag":
+            return l10n.t("Name tag");
+        case "behaviours":
+            return l10n.t("Behaviours");
+        case "flags":
+            return l10n.t("Flags");
+        case "memberOf":
+            return l10n.t("Member of");
+        default:
+            return key;
+    }
+}
+
+/** What sort of note a schema element carries, as the hovers say it. */
+export function noteLabel(kind: string): string {
+    switch (kind) {
+        case "BuggedInEngine":
+            return l10n.t("Bugged in the engine");
+        case "Deprecated":
+            return l10n.t("Deprecated");
+        case "Untested":
+            return l10n.t("Untested");
+        case "Remark":
+            return l10n.t("Remark");
+        case "Since":
+            return l10n.t("Since");
+        default:
+            return kind;
     }
 }
 

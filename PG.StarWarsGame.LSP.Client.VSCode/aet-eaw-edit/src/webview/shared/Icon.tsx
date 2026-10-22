@@ -20,6 +20,7 @@
 // the webview's content-security policy to allow. Tree-shaken, so only what this table names ships.
 
 import {
+    IconActivity,
     IconAdjustments,
     IconAlertTriangle,
     IconArrowBackUp,
@@ -94,6 +95,7 @@ import {
     IconRepeat,
     IconRoute,
     IconRuler,
+    IconSchema,
     IconScript,
     IconSearch,
     IconSettings,
@@ -319,6 +321,9 @@ const ICONS = {
     enumeration: IconListDetails,
     references: IconLink,
     tag: IconTag,
+    // The Schema outline's types and behaviours.
+    schemaType: IconSchema,
+    behaviour: IconActivity,
 } satisfies Record<string, ComponentType<IconProps>>;
 
 export type IconName = keyof typeof ICONS;

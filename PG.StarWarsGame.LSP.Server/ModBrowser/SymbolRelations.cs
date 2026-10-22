@@ -60,8 +60,17 @@ public sealed class SymbolRelations(
         ["textures"] = [UsedBy],
         ["audio"] = [UsedBy],
         ["luaScripts"] = ["loadedBy", "requires"],
-        ["enums"] = [UsedBy]
+        ["enums"] = [UsedBy],
+        ["schemaTypes"] = ["tags"],
+        ["schemaTags"] = [],
+        ["behaviours"] = ["objects"]
     };
+
+    /// <summary>Whether a page lists the schema's own elements: no file of their own, nothing to reveal.</summary>
+    private static bool IsSchema(string page)
+    {
+        return page is "enums" or "schemaTypes" or "schemaTags" or "behaviours";
+    }
 
     /// <summary>The relations a game object always shows, empty ones disabled with their reason.</summary>
     private static readonly string[] s_objectRelations =
@@ -75,8 +84,8 @@ public sealed class SymbolRelations(
         if (catalog.Find(page, id) is not { } entry) return new GetSymbolNodeResult(null, []);
         if (!page.StartsWith("xml:", StringComparison.Ordinal))
         {
-            // An enum is the schema's, no file of its own.
-            var file = page == "enums" ? null : fileOf?.Invoke(entry.Id);
+            // An enum, a type, a tag and a behaviour are the schema's, no file of their own.
+            var file = IsSchema(page) ? null : fileOf?.Invoke(entry.Id);
             return new GetSymbolNodeResult(entry, (s_assetRelations.GetValueOrDefault(page) ?? [])
                 .Select(r => NeedsEveryObject(page, r) && !s_users.TryGetValue(index, out _)
                     ? new SymbolRelation(r, null, null)
@@ -120,10 +129,10 @@ public sealed class SymbolRelations(
         var definition = new SymbolAction("definition", page switch
         {
             "luaScripts" => null,
-            "enums" => "schema",
+            _ when IsSchema(page) => "schema",
             _ => "binary"
         });
-        if (page == "enums") return [definition];
+        if (IsSchema(page)) return [definition];
         List<SymbolAction> actions = page switch
         {
             "models" or "particleSystems" =>
@@ -238,6 +247,10 @@ public sealed class SymbolRelations(
             ("luaScripts", "requires") => (index.Documents.GetValueOrDefault(entry.Id)?.RequireArgs ?? [])
                 .Select(a => catalog.Find("luaScripts", WithExtension(a, ".lua")) ?? Missing(a, ".lua")),
             ("textures", UsedBy) => ModelsNaming(entry.Name).Concat(Users(entry.Name)),
+            ("schemaTypes", "tags") => catalog.Rows("schemaTags")
+                .Where(r => r.Id.StartsWith(entry.Id + "/", StringComparison.Ordinal)),
+            ("behaviours", "objects") => catalog.Rows(GameObjects)
+                .Where(r => r.Kinds.Contains(entry.Name, StringComparer.OrdinalIgnoreCase)),
             ("particleSystems", UsedBy) => ModelsCarrying(entry.Name).Concat(Users(entry.Name)),
             (_, UsedBy) => Users(entry.Name),
             _ => []

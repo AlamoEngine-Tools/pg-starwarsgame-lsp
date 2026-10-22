@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml;
@@ -28,13 +29,17 @@ namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 ///         entries have no preview until they have something to show.
 ///     </para>
 /// </remarks>
+/// <param name="schema">The schema the Schema outline's entries document.</param>
+/// <param name="locale">The language the server documents in, as the hovers do.</param>
 public sealed class SymbolPreviews(
     GameIndex index,
     SymbolRelations relations,
     IDocumentTextSource texts,
     IXmlDiagnosticsCollector diagnostics,
     IFileSystem files,
-    Func<string, int?>? bonesOf = null)
+    Func<string, int?>? bonesOf = null,
+    ISchemaProvider? schema = null,
+    string locale = "en")
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
@@ -43,7 +48,7 @@ public sealed class SymbolPreviews(
     /// <summary>The pages whose entries have a preview.</summary>
     private static readonly HashSet<string> s_assetPages = new(StringComparer.Ordinal)
     {
-        "models", "particleSystems", "luaScripts"
+        "models", "particleSystems", "luaScripts", "schemaTypes", "schemaTags", "behaviours"
     };
 
     private static readonly GetSymbolPreviewResult s_none = new(null, []);
@@ -67,6 +72,9 @@ public sealed class SymbolPreviews(
             "models" => Model(layout, page, entry, node),
             "particleSystems" => ParticleSystem(layout, page, entry, node),
             "luaScripts" => LuaScript(layout, page, entry, node),
+            "schemaTypes" => SchemaType(layout, page, entry, node),
+            "schemaTags" => SchemaTag(layout, entry, node),
+            "behaviours" => Behaviour(layout, page, entry, node),
             _ => XmlObject(layout, page, entry, node)
         };
         return layout.Tiles.Count < 2
@@ -143,6 +151,99 @@ public sealed class SymbolPreviews(
         layout.Put(Entries(page, entry.Id, "textures"), 0, 2, 4, 4);
         layout.Put(Entries(page, entry.Id, UsedBy), 4, 0, 2, 6);
         return "particleSystem";
+    }
+
+    /// <summary>A schema type: its header and its documentation on top, its tags under them.</summary>
+    private string SchemaType(Layout layout, string page, SymbolRow entry, GetSymbolNodeResult node)
+    {
+        var type = schema?.AllObjectTypes.FirstOrDefault(t => t.TypeName == entry.Id);
+        layout.Grid(6, 4);
+        layout.Put(Header(entry, node), 0, 0, 2, 2);
+        layout.Put(Documentation(
+            type?.NameTag is { } nameTag ? [new PreviewProperty("nameTag", nameTag)] : [],
+            type?.Description, type?.Notes), 2, 0, 4, 2);
+        layout.Put(Entries(page, entry.Id, "tags"), 0, 2, 6, 2);
+        return "schemaType";
+    }
+
+    /// <summary>
+    ///     A tag: its header and its documentation - what it takes, what it references, whether it
+    ///     repeats, its description and notes - and, for one that takes an enum, the enum's values.
+    /// </summary>
+    private string SchemaTag(Layout layout, SymbolRow entry, GetSymbolNodeResult node)
+    {
+        var slash = entry.Id.IndexOf('/');
+        var typeName = entry.Id[..slash];
+        var tag = schema?.GetTagsForType(typeName).FirstOrDefault(t => t.Tag == entry.Name);
+        List<PreviewProperty> properties = [];
+        if (tag is not null)
+        {
+            properties.Add(new PreviewProperty("valueType", tag.ValueType.ToString()));
+            properties.Add(new PreviewProperty("type", typeName));
+            // A tag that takes an enum references it; the enum's own row says so.
+            if (tag.ReferenceKind != ReferenceKind.None && tag.Enum is null)
+                properties.Add(new PreviewProperty("references",
+                    tag.ReferenceTypeName ?? tag.ObjectType?.TypeName ?? tag.ReferenceKind.ToString()));
+            if (tag.Enum is { } takes) properties.Add(new PreviewProperty("enum", takes.Name));
+            if (tag.MultipleAllowed) properties.Add(new PreviewProperty("repeats", ""));
+        }
+
+        var values = tag?.Enum?.Values ?? [];
+        layout.Grid(6, 2);
+        layout.Put(Header(entry, node), 0, 0, 2, 2);
+        layout.Put(Documentation(properties, tag?.Description, tag?.Notes), 2, 0, values.Count > 0 ? 2 : 4, 2);
+        if (values.Count > 0)
+            layout.Put(Tile("values") with
+            {
+                Count = values.Count,
+                Entries = [.. values.Select(v => new PreviewEntry(v.Name, Describe(v.Description)))]
+            }, 4, 0, 2, 2);
+        return "schemaTag";
+    }
+
+    /// <summary>A behaviour: what decides it, and the game objects that have it.</summary>
+    private string Behaviour(Layout layout, string page, SymbolRow entry, GetSymbolNodeResult node)
+    {
+        var kind = schema?.AllKinds.FirstOrDefault(k =>
+            string.Equals(k.Kind, entry.Id, StringComparison.OrdinalIgnoreCase));
+        List<PreviewProperty> properties = [];
+        if (kind is not null)
+        {
+            if (kind.Behaviors.Count > 0)
+                properties.Add(new PreviewProperty("behaviours", string.Join(", ", kind.Behaviors)));
+            if (kind.Flags.Count > 0) properties.Add(new PreviewProperty("flags", string.Join(", ", kind.Flags)));
+            if (kind.MemberOf.Count > 0)
+                properties.Add(new PreviewProperty("memberOf", string.Join(", ", kind.MemberOf)));
+        }
+
+        layout.Grid(6, 4);
+        layout.Put(Header(entry, node), 0, 0, 2, 2);
+        layout.Put(Documentation(properties, kind?.Description, kind?.Notes), 2, 0, 4, 2);
+        layout.Put(Entries(page, entry.Id, "objects"), 0, 2, 6, 2);
+        return "behaviour";
+    }
+
+    // A schema element's documentation: its properties, its description and its notes, ranked as
+    // the hovers rank them.
+    private PreviewTile Documentation(IReadOnlyList<PreviewProperty> properties,
+        IReadOnlyDictionary<string, string>? description, IReadOnlyList<SchemaNote>? notes)
+    {
+        return Tile("documentation") with
+        {
+            Properties = properties,
+            Text = Describe(description),
+            Notes =
+            [
+                .. SchemaNote.Ranked(notes ?? [])
+                    .Select(n => new PreviewNote(n.Kind.ToString(), Describe(n.Text), n.Value))
+            ]
+        };
+    }
+
+    // A description in the language the server documents in, else English; none for an empty one.
+    private string? Describe(IReadOnlyDictionary<string, string>? text)
+    {
+        return text?.GetValueOrDefault(locale) ?? text?.GetValueOrDefault("en");
     }
 
     /// <summary>A Lua script: its header, what loads it and what it requires, in one row.</summary>

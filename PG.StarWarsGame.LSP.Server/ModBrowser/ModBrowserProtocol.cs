@@ -155,7 +155,28 @@ public sealed record PreviewTile(string Kind, int X, int Y, int Width, int Heigh
 
     /// <summary>The identity tile's file on disk, for an asset or a script that has one.</summary>
     public PreviewFile? File { get; init; }
+
+    /// <summary>
+    ///     A documentation tile's properties, in the order shown: a schema element's value type, what
+    ///     it references and the rest, each by a key the panel names.
+    /// </summary>
+    public IReadOnlyList<PreviewProperty>? Properties { get; init; }
+
+    /// <summary>A documentation tile's description, in the language the server documents in.</summary>
+    public string? Text { get; init; }
+
+    /// <summary>A documentation tile's notes, in the order the hovers rank them.</summary>
+    public IReadOnlyList<PreviewNote>? Notes { get; init; }
 }
+
+/// <param name="Key">What the property is: <c>valueType</c>, <c>references</c>, <c>enum</c> and the rest.</param>
+/// <param name="Value">Its value, as the schema names it; empty for a property that is only there or not.</param>
+public sealed record PreviewProperty(string Key, string Value);
+
+/// <param name="Kind">The note's kind, as the schema names it: <c>Deprecated</c>, <c>Since</c> and the rest.</param>
+/// <param name="Text">What it says, in the language the server documents in.</param>
+/// <param name="Value">What a kind carries besides prose - a version for <c>Since</c>.</param>
+public sealed record PreviewNote(string Kind, string? Text, string? Value);
 
 /// <summary>A file on disk, as its header describes it.</summary>
 /// <param name="Size">Its size in bytes.</param>

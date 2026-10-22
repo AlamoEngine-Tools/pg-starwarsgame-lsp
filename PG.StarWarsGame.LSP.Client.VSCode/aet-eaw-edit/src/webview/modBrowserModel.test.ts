@@ -17,10 +17,38 @@ import {
     pageIcon,
     pageLabel,
     previewLayout,
+    noteLabel,
+    propertyLabel,
     reasonLabel,
     relationIcon,
     relationLabel,
 } from "./modBrowserModel";
+
+/** The Schema outline's words and pictures (#270). */
+describe("the Schema outline", () => {
+    it("names its lists and relations", () => {
+        assert.equal(pageLabel("schemaTypes"), "Types");
+        assert.equal(pageLabel("schemaTags"), "Tags");
+        assert.equal(pageLabel("behaviours"), "Behaviours");
+        assert.equal(relationLabel("tags"), "Tags");
+        assert.equal(relationLabel("objects"), "Game objects");
+    });
+
+    it("pictures a type, a tag and a behaviour", () => {
+        assert.equal(pageIcon("schemaTypes"), "schemaType");
+        assert.equal(pageIcon("schemaTags"), "tag");
+        assert.equal(pageIcon("behaviours"), "behaviour");
+        assert.equal(relationIcon("objects"), "gameObject");
+    });
+
+    it("names a tag's properties and its notes' kinds", () => {
+        assert.equal(propertyLabel("valueType"), "Value type");
+        assert.equal(propertyLabel("references"), "References");
+        assert.equal(propertyLabel("repeats"), "Repeats");
+        assert.equal(noteLabel("BuggedInEngine"), "Bugged in the engine");
+        assert.equal(noteLabel("Since"), "Since");
+    });
+});
 
 /** The rail's picture of each list and entry, by what it is (#270). */
 describe("pageIcon", () => {

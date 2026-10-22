@@ -29,7 +29,7 @@ public sealed class GetSymbolOutlineHandler(
     public Task<GetSymbolOutlineResult> Handle(GetSymbolOutlineParams request, CancellationToken cancellationToken)
     {
         if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolOutlineResult([], []));
-        var catalog = SymbolCatalog.For(index.Current, schema.AllKinds, schema.AllEnums);
+        var catalog = SymbolCatalog.For(index.Current, schema);
         return Task.FromResult(new GetSymbolOutlineResult(catalog.Outline(request.Outline),
             layers.Layers.Select(l => new SymbolLayer(l.Rank, l.Name)).ToList()));
     }
@@ -48,7 +48,7 @@ public sealed class GetSymbolPageHandler(
     {
         if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolPageResult([], 0));
         var current = index.Current;
-        var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
+        var catalog = SymbolCatalog.For(current, schema);
         if (request.Parent is not { } parent) return Task.FromResult(catalog.Page(request));
 
         var rows = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets))
@@ -71,7 +71,7 @@ public sealed class GetSymbolNodeHandler(
     {
         if (!config.Current.Features.Tools.ModBrowser) return Task.FromResult(new GetSymbolNodeResult(null, []));
         var current = index.Current;
-        var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
+        var catalog = SymbolCatalog.For(current, schema);
         return Task.FromResult(new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
                 config.Current.Features.Tools, EntryFiles.For(assets, fileHelper))
             .Node(request.Page, request.Id));
@@ -95,11 +95,11 @@ public sealed class GetSymbolPreviewHandler(
         var features = config.Current.Features.Tools;
         if (!features.ModBrowser) return Task.FromResult(new GetSymbolPreviewResult(null, []));
         var current = index.Current;
-        var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
+        var catalog = SymbolCatalog.For(current, schema);
         var relations = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
             features, EntryFiles.For(assets, fileHelper));
         return Task.FromResult(new SymbolPreviews(current, relations, texts, diagnostics, fileHelper.FileSystem,
-                ModelProxies.BonesFor(current, assets))
+                ModelProxies.BonesFor(current, assets), schema, config.Current.Locale)
             .Preview(request.Page, request.Id));
     }
 }

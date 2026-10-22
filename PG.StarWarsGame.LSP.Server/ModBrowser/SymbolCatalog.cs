@@ -53,14 +53,14 @@ public sealed class SymbolCatalog
     }
 
     /// <summary>The catalog of an index, built on first use and kept as long as the index is.</summary>
-    public static SymbolCatalog For(GameIndex index, IReadOnlyList<ObjectKindDefinition> kinds,
-        IReadOnlyList<EnumDefinition> enums)
+    public static SymbolCatalog For(GameIndex index, ISchemaProvider schema)
     {
-        return s_built.GetValue(index, i => Build(i, kinds, enums));
+        return s_built.GetValue(index, i => Build(i, schema.AllKinds, schema.AllEnums, schema));
     }
 
+    /// <param name="schema">The schema whose types and tags the Schema outline lists; none lists none.</param>
     public static SymbolCatalog Build(GameIndex index, IReadOnlyList<ObjectKindDefinition> kinds,
-        IReadOnlyList<EnumDefinition> enums)
+        IReadOnlyList<EnumDefinition> enums, ISchemaProvider? schema = null)
     {
         var pages = new Dictionary<string, List<SymbolRow>>(StringComparer.Ordinal);
 
@@ -88,6 +88,20 @@ public sealed class SymbolCatalog
         pages["enums"] = enums
             .Select(e => new SymbolRow(e.Name, e.Name, null, [], "game", null, [], "enums"))
             .ToList();
+        // The schema's types, each tag of each type - a tag by its type and name, as a tag name means
+        // something else on another type - and the behaviours.
+        var types = schema?.AllObjectTypes ?? [];
+        pages["schemaTypes"] = types
+            .Select(t => new SymbolRow(t.TypeName, t.TypeName, null, [], "game", null, [], "schemaTypes"))
+            .ToList();
+        pages["schemaTags"] = types
+            .SelectMany(t => schema!.GetTagsForType(t.TypeName).Select(tag => new SymbolRow(
+                t.TypeName + "/" + tag.Tag, tag.Tag, tag.ValueType.ToString(), [], "game", null, [], "schemaTags")))
+            .ToList();
+        pages["behaviours"] = kinds
+            .DistinctBy(k => k.Kind, StringComparer.OrdinalIgnoreCase)
+            .Select(k => new SymbolRow(k.Kind, k.Kind, null, [], "game", null, [], "behaviours"))
+            .ToList();
 
         foreach (var rows in pages.Values)
             rows.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
@@ -97,7 +111,7 @@ public sealed class SymbolCatalog
             [SymbolOutlines.GameData] = xmlPages,
             [SymbolOutlines.Assets] = assetPages,
             [SymbolOutlines.Scripts] = scriptPages,
-            [SymbolOutlines.Schema] = ["enums"]
+            [SymbolOutlines.Schema] = ["schemaTypes", "enums", "behaviours"]
         }, kinds.Select(k => k.Kind).Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase).ToList());
     }
