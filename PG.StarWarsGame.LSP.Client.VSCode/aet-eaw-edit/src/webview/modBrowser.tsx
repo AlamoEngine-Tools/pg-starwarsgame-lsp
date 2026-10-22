@@ -234,12 +234,15 @@ function App(): React.JSX.Element {
     const [previews, setPreviews] = useState<
         Record<string, GetSymbolPreviewResult>
     >({});
-    /** The list the table last showed, whose search form the panel holds. */
-    const [tableKey, setTableKey] = useState<string | null>(null);
     const [kinds, setKinds] = useState<SymbolKindCount[]>([]);
     const [loading, setLoading] = useState(false);
+    /** The search form as typed, for the list the table shows. */
     const [draft, setDraft] = useState<Filter>(NO_FILTER);
-    const [filter, setFilter] = useState<Filter>(NO_FILTER);
+    /**
+     * Each list's search, by its key: going back to a list finds it as it was left, with the same
+     * rows the rail draws for it.
+     */
+    const [filters, setFilters] = useState<Record<string, Filter>>({});
     const [formOpen, setFormOpen] = useState(true);
     const [refreshed, setRefreshed] = useState(0);
     const [menu, setMenu] = useState<Menu | null>(null);
@@ -260,6 +263,8 @@ function App(): React.JSX.Element {
                 setLoaded({});
                 setNodes({});
                 setPreviews({});
+                setFilters({});
+                setDraft(NO_FILTER);
             }
             // The index changed: what was loaded may be stale, so it is asked again.
             if (msg.type === "refresh") {
@@ -314,6 +319,7 @@ function App(): React.JSX.Element {
     }, [outline, refreshed]);
 
     const list = tableList;
+    const filter = (list && filters[list.key]) ?? NO_FILTER;
 
     const load = useCallback(
         async (node: ListNode, applied: Filter, offset: number) => {
@@ -331,7 +337,6 @@ function App(): React.JSX.Element {
                 GET_SYMBOL_PAGE,
                 params,
             );
-            setTableKey(node.key);
             setLoaded((known) => ({
                 ...known,
                 [node.key]: {
@@ -430,17 +435,26 @@ function App(): React.JSX.Element {
         }
     };
 
+    /** The table's tab shows a list, with the search that list was left with. */
+    const showList = (list: ListNode) => {
+        if (list.key !== tableList?.key) {
+            setDraft(filters[list.key] ?? NO_FILTER);
+        }
+        setTableList(list);
+        setTabs((open) => showTable(open));
+    };
+
     const select = (node: RailNode) => {
         if (node.kind === "list") {
-            // Back to the list the table holds keeps its search; another list starts unfiltered.
-            if (node.key !== tableKey) {
-                setDraft(NO_FILTER);
-                setFilter(NO_FILTER);
-            }
-            setTableList(node);
-            setTabs((open) => showTable(open));
+            showList(node);
             expand(node, true);
         } else {
+            // An entry is selected in the list it is a row of: selecting it again after one of its
+            // own relations brings that list back, the entry's row selected.
+            const home = node.trail[node.trail.length - 1];
+            if (home?.kind === "list") {
+                showList(home);
+            }
             void fetchNode(node);
         }
         setCurrent(node);
@@ -584,12 +598,6 @@ function App(): React.JSX.Element {
                         }}
                     >
                         {nodeName(node)}
-                        {node.kind === "list" && node.count === 0 && (
-                            <em className="why">
-                                {" "}
-                                - {reasonLabel(node.reason)}
-                            </em>
-                        )}
                     </button>
                     {node.kind === "list" && (
                         <span className="count">
@@ -728,10 +736,18 @@ function App(): React.JSX.Element {
                         origins={originChoices(layers)}
                         layers={layers}
                         onChange={setDraft}
-                        onSearch={() => setFilter(draft)}
+                        onSearch={() =>
+                            setFilters((known) => ({
+                                ...known,
+                                [list.key]: draft,
+                            }))
+                        }
                         onReset={() => {
                             setDraft(NO_FILTER);
-                            setFilter(NO_FILTER);
+                            setFilters((known) => ({
+                                ...known,
+                                [list.key]: NO_FILTER,
+                            }));
                         }}
                     />
                 )}
@@ -1416,10 +1432,6 @@ const Shell = styled.div`
         color: var(--colour-muted);
         font-size: var(--font-size-11);
         font-variant-numeric: tabular-nums;
-    }
-    .node .why {
-        color: var(--colour-faint);
-        font-style: normal;
     }
 
     /* The page: its tabs, the breadcrumb, what the active tab shows, and the open list's search. */
