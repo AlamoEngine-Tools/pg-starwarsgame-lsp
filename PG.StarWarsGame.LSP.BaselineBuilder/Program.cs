@@ -32,10 +32,19 @@ using Tag = PG.StarWarsGame.LSP.Core.Symbols.BaselineTag;
 
 // ── Shared options ────────────────────────────────────────────────────────────
 
-var outputOption = new Option<FileInfo>("--output", "-o")
+// Both verbs name a game folder the same way, and each folder can come from the environment, so one
+// run configuration serves every machine.
+const string EawPathVariable = "AET_EAW_PATH";
+const string FocPathVariable = "AET_FOC_PATH";
+
+var eawOption = new Option<DirectoryInfo?>("--eaw", "-e")
 {
-    Description = "Output .baseline file path",
-    Required = true
+    Description = $"EaW game data directory (GameData), the base asset layer; {EawPathVariable} if omitted",
+    DefaultValueFactory = _ => FromEnvironment(EawPathVariable)
+};
+var outputOption = new Option<FileInfo?>("--output", "-o")
+{
+    Description = "Output .aet file path (the repository's baseline/<game>/ file if omitted)"
 };
 var schemaOption = new Option<DirectoryInfo?>("--schema", "-s")
 {
@@ -44,51 +53,42 @@ var schemaOption = new Option<DirectoryInfo?>("--schema", "-s")
 
 // ── eaw verb ──────────────────────────────────────────────────────────────────
 
-var eawPathOption = new Option<DirectoryInfo>("--path", "-p")
-{
-    Description = "EaW game data directory",
-    Required = true
-};
-
 var eawCommand = new Command("eaw",
     "Build an Empire at War baseline. " +
     "Full EaW engine support is not implemented - game-object and SFX projection runs in FoC mode against the EaW path.")
 {
-    eawPathOption, outputOption, schemaOption
+    eawOption, outputOption, schemaOption
 };
 eawCommand.SetAction((parseResult, _) =>
 {
-    var eawPath = parseResult.GetValue(eawPathOption)!.FullName;
-    var output = parseResult.GetValue(outputOption)!.FullName;
-    var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindSchemaPath();
-    return RunAsync(eawPath, null, output, schema);
+    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", EawPathVariable);
+    var output = Output(parseResult.GetValue(outputOption), "eaw");
+    var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindInRepository("schema", "eaw");
+    return eawPath is null || output is null ? Task.FromResult(1) : RunAsync(eawPath, null, output, schema);
 });
 
 // ── foc verb ──────────────────────────────────────────────────────────────────
 
-var focEawOption = new Option<DirectoryInfo>("--eaw", "-e")
+var focOption = new Option<DirectoryInfo?>("--foc", "-f")
 {
-    Description = "EaW game data directory - loaded first as the base asset layer",
-    Required = true
-};
-var focFocOption = new Option<DirectoryInfo>("--foc", "-f")
-{
-    Description = "FoC game data directory",
-    Required = true
+    Description = $"FoC game data directory (corruption); {FocPathVariable} if omitted",
+    DefaultValueFactory = _ => FromEnvironment(FocPathVariable)
 };
 
 var focCommand = new Command("foc",
     "Build a Forces of Corruption baseline. EaW assets are loaded first; FoC assets override them.")
 {
-    focEawOption, focFocOption, outputOption, schemaOption
+    eawOption, focOption, outputOption, schemaOption
 };
 focCommand.SetAction((parseResult, _) =>
 {
-    var eawPath = parseResult.GetValue(focEawOption)!.FullName;
-    var focPath = parseResult.GetValue(focFocOption)!.FullName;
-    var output = parseResult.GetValue(outputOption)!.FullName;
-    var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindSchemaPath();
-    return RunAsync(focPath, eawPath, output, schema);
+    var eawPath = Folder(parseResult.GetValue(eawOption), "--eaw", EawPathVariable);
+    var focPath = Folder(parseResult.GetValue(focOption), "--foc", FocPathVariable);
+    var output = Output(parseResult.GetValue(outputOption), "foc");
+    var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindInRepository("schema", "eaw");
+    return eawPath is null || focPath is null || output is null
+        ? Task.FromResult(1)
+        : RunAsync(focPath, eawPath, output, schema);
 });
 
 // ── Root command ──────────────────────────────────────────────────────────────
@@ -668,12 +668,13 @@ static string NormalizeChainPath(string xmlRelativePath)
 }
 
 // Walk up from the binary's directory until we find schema/eaw
-static string? FindSchemaPath()
+// A folder of the repository the builder runs from, found upwards from the binary.
+static string? FindInRepository(params string[] relative)
 {
     var dir = AppContext.BaseDirectory;
     for (var i = 0; i < 8; i++)
     {
-        var candidate = Path.Combine(dir, "schema", "eaw");
+        var candidate = Path.Combine([dir, .. relative]);
         if (Directory.Exists(candidate))
             return candidate;
         var parent = Directory.GetParent(dir)?.FullName;
@@ -681,6 +682,31 @@ static string? FindSchemaPath()
         dir = parent;
     }
 
+    return null;
+}
+
+static DirectoryInfo? FromEnvironment(string variable)
+{
+    return Environment.GetEnvironmentVariable(variable) is { Length: > 0 } path ? new DirectoryInfo(path) : null;
+}
+
+// A game folder from its option or its variable; a missing or absent one is an error naming both.
+static string? Folder(DirectoryInfo? folder, string option, string variable)
+{
+    if (folder is { Exists: true }) return folder.FullName;
+    Console.Error.WriteLine(folder is null
+        ? $"No game folder: pass {option} or set {variable}."
+        : $"Game folder not found: {folder.FullName}");
+    return null;
+}
+
+// The output file from its option, or the repository's baseline/<game>/ file.
+static string? Output(FileInfo? output, string game)
+{
+    if (output is not null) return output.FullName;
+    if (FindInRepository("baseline", game) is { } folder)
+        return Path.Combine(folder, $"aet-pg-swg-lsp-{game}-baseline.aet");
+    Console.Error.WriteLine($"No output: pass --output, or run from a repository with baseline/{game}/.");
     return null;
 }
 
