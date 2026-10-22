@@ -134,6 +134,30 @@ public sealed class ProjectIndexSerializerTest
     }
 
     [Fact]
+    public void FromEntry_PutsTheDocumentsOwnSymbolsAndReferences_UnderTheUriItIsFoundAtNow()
+    {
+        // A snapshot outlives the spelling it was written under - a project folder moved, or a
+        // directory first indexed as "data/xml" and now as the disk's "Data/Xml" (#291). Its file
+        // matches by relative path and hash, so it is reused; what it says about where its symbols
+        // are has to come along, or a definition is handed out under a path that is not the file's.
+        const string written = "file:///d:/mods/foc/data/xml/Units.xml";
+        const string now = "file:///D:/Mods/FoC/Data/Xml/Units.xml";
+        var own = new GameSymbol("Star_Destroyer", GameSymbolKind.XmlObject, "SpaceUnit",
+            new FileOrigin(written, 4, 2), null);
+        var elsewhere = new GameSymbol("Other", GameSymbolKind.XmlObject, "SpaceUnit",
+            new FileOrigin("file:///d:/mods/foc/data/xml/Other.xml", 1, 2), null);
+        var reference = new GameReference("Tie_Fighter", null, null, written, 6, 4, 11);
+        var doc = new DocumentIndex(written, 3, [own, elsewhere], [reference], [], [], 0, "FoC");
+
+        var restored = ProjectIndexSerializer.FromEntry(
+            ProjectIndexSerializer.ToEntry("data/xml/units.xml", "h", doc), now);
+
+        Assert.Equal(new FileOrigin(now, 4, 2), restored.Symbols[0].Origin);
+        Assert.Equal(elsewhere.Origin, restored.Symbols[1].Origin);
+        Assert.Equal(now, restored.References.Single().DocumentUri);
+    }
+
+    [Fact]
     public void Deserialize_WrongSchemaVersion_ReturnsNull()
     {
         var snapshot = new ProjectIndexSnapshot

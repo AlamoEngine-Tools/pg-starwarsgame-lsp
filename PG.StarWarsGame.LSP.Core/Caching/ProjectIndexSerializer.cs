@@ -61,14 +61,33 @@ public static class ProjectIndexSerializer
         };
     }
 
+    /// <remarks>
+    ///     The entry is matched by relative path and hash, so it outlives the absolute path it was
+    ///     written under - a moved project, or a directory now spelled as the disk spells it (#291).
+    ///     Its own symbols and references are put under <paramref name="absoluteUri" />: a URI that
+    ///     names the entry's relative path, in any case, is this document's. A symbol from another
+    ///     file keeps its origin.
+    /// </remarks>
     public static DocumentIndex FromEntry(ProjectFileEntry entry, string absoluteUri)
     {
         var d = entry.Document;
+        var suffix = "/" + entry.RelativePath.Replace('\\', '/').TrimStart('/');
+
+        string Here(string uri)
+        {
+            return uri.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) ? absoluteUri : uri;
+        }
+
         return new DocumentIndex(
             absoluteUri,
             0,
-            d.Symbols.ToImmutableArray(),
-            d.References.Select(r => r.ToRuntime()).ToImmutableArray(),
+            d.Symbols
+                .Select(s => s.Origin is FileOrigin origin && Here(origin.Uri) is var uri && uri != origin.Uri
+                    ? s with { Origin = origin with { Uri = uri } }
+                    : s)
+                .ToImmutableArray(),
+            d.References.Select(r => r.ToRuntime()).Select(r => r with { DocumentUri = Here(r.DocumentUri) })
+                .ToImmutableArray(),
             d.RequireArgs.ToImmutableArray(),
             d.GroupMemberships.Select(gm => gm.ToRuntime()).ToImmutableArray(),
             d.LayerRank,

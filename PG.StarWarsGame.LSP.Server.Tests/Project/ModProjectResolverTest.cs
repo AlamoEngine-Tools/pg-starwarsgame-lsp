@@ -79,6 +79,34 @@ public sealed class ModProjectResolverTest
     }
 
     [Fact]
+    public void Resolve_SpellsADirectoryAsTheDiskDoes_WhereTheProjectFileSpellsItOtherwise()
+    {
+        // The vanilla projects say "data/xml" of a folder the game ships as "Data/XML" (#291): the
+        // host knows the file by the disk's name, so a URI under the other spelling is a second
+        // document to it. A directory that does not exist keeps the project file's spelling.
+        var dir = Path.Combine(DriveRoot, "Mods", "Root");
+        var path = Path.Combine(dir, "Root.pgproj");
+        const string json = """
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": { "xml": ["data/xml"], "scripts": ["data/Scripts"] }
+                            }
+                            """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [path] = new(json) });
+        fs.AddDirectory(Path.Combine(dir, "Data", "XML"));
+        var fileHelper = new FileHelper(fs);
+        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
+        var resolver = new ModProjectResolver(fileHelper, loader,
+            new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance),
+            NullLogger<ModProjectResolver>.Instance);
+
+        var config = resolver.Resolve(path, loader.Load(path));
+
+        Assert.Equal([Normalize(Path.Combine(dir, "Data", "XML"))], config.XmlDirectories);
+        Assert.Equal([Normalize(Path.Combine(dir, "Data", "Scripts"))], config.ScriptRoots);
+    }
+
+    [Fact]
     public void Resolve_DependencyDirectories_MergedDependencyFirst()
     {
         const string depJson = """

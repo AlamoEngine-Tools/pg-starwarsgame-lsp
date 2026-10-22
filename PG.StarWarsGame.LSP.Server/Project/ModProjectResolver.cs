@@ -45,7 +45,8 @@ public sealed class ModProjectResolver
         // (dependencies low, root project highest).
         for (var rank = 0; rank < ordered.Count; rank++)
         {
-            var (path, file) = ordered[rank];
+            var (written, file) = ordered[rank];
+            var path = OnDisk(written);
             var projectDir = GetDirectory(path);
 
             var layerXml = file.Directories.Xml.Select(d => Combine(projectDir, d)).ToList();
@@ -108,16 +109,50 @@ public sealed class ModProjectResolver
     }
 
     /// <summary>
-    ///     Resolves a project directory as the <c>.pgproj</c> spells it.
+    ///     Resolves a project directory, spelled as the disk spells it.
     /// </summary>
     /// <remarks>
     ///     Never folded: every URI under the directory is built from it, and a folded one names a
     ///     file the host does not have. Case folds where paths are compared, in
     ///     <see cref="DocumentUris" />.
     /// </remarks>
-    private static string Combine(string directory, string relative)
+    private string Combine(string directory, string relative)
     {
         var candidate = relative.Replace('\\', '/');
-        return ProjectPathResolution.Resolve(directory, candidate);
+        return OnDisk(ProjectPathResolution.Resolve(directory, candidate));
+    }
+
+    /// <summary>
+    ///     A forward-slashed absolute path with each segment spelled as the disk spells it, up to the
+    ///     first segment that does not exist; from there on, as given (#291).
+    /// </summary>
+    /// <remarks>
+    ///     A project file may spell a folder in any case - the vanilla ones say <c>data/xml</c> of a
+    ///     folder the game ships as <c>Data/XML</c> - and the game does not mind. The host does: it
+    ///     knows a file by the disk's name, so a URI under another spelling is a second document.
+    /// </remarks>
+    private string OnDisk(string path)
+    {
+        var fs = FileHelper.FileSystem;
+        var parts = path.Split('/');
+        var spelled = new List<string>(parts.Length) { parts[0] };
+        for (var i = 1; i < parts.Length; i++)
+        {
+            var parent = spelled.Count == 1 ? spelled[0] + "/" : string.Join('/', spelled);
+            var match = parts[i].Length == 0 || !fs.Directory.Exists(parent)
+                ? null
+                : fs.Directory.EnumerateFileSystemEntries(parent)
+                    .Select(fs.Path.GetFileName)
+                    .FirstOrDefault(name => string.Equals(name, parts[i], StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+            {
+                spelled.AddRange(parts[i..]);
+                break;
+            }
+
+            spelled.Add(match);
+        }
+
+        return string.Join('/', spelled);
     }
 }
