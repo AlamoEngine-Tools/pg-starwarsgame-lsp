@@ -237,7 +237,20 @@ export function menuChoices(groups: ActionChoice[][]): ActionChoice[][] {
         .filter((group) => group.length > 0);
 }
 
-/** What a model's facts tile counts. */
+/** A file's size in the unit it is closest to: bytes, then KB and MB, one decimal at most. */
+export function fileSize(bytes: number): string {
+    const units = ["B", "KB", "MB", "GB"];
+    let size = bytes;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+        size /= 1024;
+        unit++;
+    }
+    const shown = unit === 0 ? size : Math.round(size * 10) / 10;
+    return `${shown.toLocaleString("en-US")} ${units[unit]}`;
+}
+
+/** What a model's header counts. */
 export function factLabel(key: string): string {
     switch (key) {
         case "bones":
@@ -326,6 +339,8 @@ function actionLabel(action: string): string {
             return l10n.t("Preview model");
         case "copyName":
             return l10n.t("Copy name");
+        case "reveal":
+            return l10n.t("Reveal in File Explorer");
         default:
             return action;
     }
@@ -346,6 +361,10 @@ function actionReasonLabel(reason: string): string {
             return l10n.t("No encyclopedia text");
         case "planet":
             return l10n.t("Not for a planet");
+        case "packed":
+            return l10n.t("Packed in the game's archives");
+        case "notFound":
+            return l10n.t("No file on disk");
         case "notAVariant":
             return l10n.t("Not a variant");
         case "noPreview":

@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import {
     actionChoices,
     factLabel,
+    fileSize,
     kindChoices,
     problemMessage,
     locationLabel,
@@ -307,5 +308,31 @@ describe("problemMessage", () => {
             problemMessage({ name: "Max_Speed is out of range" }),
             "Max_Speed is out of range",
         );
+    });
+});
+
+describe("the reveal action", () => {
+    const reveal = (reason: string | null) =>
+        actionChoices(true, [
+            { action: "definition", reason: "binary" },
+            { action: "reveal", reason },
+        ])[1][0];
+
+    it("shows the file in the file manager", () => {
+        assert.equal(reveal(null).label, "Reveal in File Explorer");
+        assert.equal(reveal(null).disabled, false);
+    });
+
+    it("says why there is no file to show", () => {
+        assert.equal(reveal("packed").reason, "Packed in the game's archives");
+        assert.equal(reveal("notFound").reason, "No file on disk");
+    });
+});
+
+describe("fileSize", () => {
+    it("reads a size in the unit it is closest to", () => {
+        assert.equal(fileSize(512), "512 B");
+        assert.equal(fileSize(1536), "1.5 KB");
+        assert.equal(fileSize(5 * 1024 * 1024), "5 MB");
     });
 });

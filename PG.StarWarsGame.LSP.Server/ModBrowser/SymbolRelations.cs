@@ -24,13 +24,18 @@ namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 ///     are read from it, one file, when the model is opened.
 /// </param>
 /// <param name="tools">The tool features on; an action whose feature is off is offered disabled.</param>
+/// <param name="fileOf">
+///     The file on disk an asset or a script is, by its entry id - a game-relative path or a document
+///     URI; null where none is, as for one that only ships inside the game's archives.
+/// </param>
 public sealed class SymbolRelations(
     GameIndex index,
     ISchemaProvider schema,
     IVariantTagSource tags,
     SymbolCatalog catalog,
     Func<string, IReadOnlyList<string>>? proxiesOf = null,
-    ToolsFeatureFlags? tools = null)
+    ToolsFeatureFlags? tools = null,
+    Func<string, string?>? fileOf = null)
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
@@ -69,6 +74,9 @@ public sealed class SymbolRelations(
     {
         if (catalog.Find(page, id) is not { } entry) return new GetSymbolNodeResult(null, []);
         if (!page.StartsWith("xml:", StringComparison.Ordinal))
+        {
+            // An enum is the schema's, no file of its own.
+            var file = page == "enums" ? null : fileOf?.Invoke(entry.Id);
             return new GetSymbolNodeResult(entry, (s_assetRelations.GetValueOrDefault(page) ?? [])
                 .Select(r => NeedsEveryObject(page, r) && !s_users.TryGetValue(index, out _)
                     ? new SymbolRelation(r, null, null)
@@ -76,9 +84,11 @@ public sealed class SymbolRelations(
                 .ToList())
             {
                 Location = page == "luaScripts" ? new SymbolLocation(entry.Id, 0) : null,
-                Actions = AssetActions(page),
-                Open = new SymbolAction("open", SymbolPreviews.HasPreview(page) ? null : "noPreview")
+                Actions = AssetActions(page, entry, file),
+                Open = new SymbolAction("open", SymbolPreviews.HasPreview(page) ? null : "noPreview"),
+                File = file
             };
+        }
 
         var (named, known) = TagRelations(entry);
         var keys = page == GameObjects
@@ -103,7 +113,9 @@ public sealed class SymbolRelations(
     }
 
     // A script is a text file of the project; an asset is a file the game reads, an enum the schema's.
-    private List<SymbolAction> AssetActions(string page)
+    // Revealing a file in the file manager is every file's last action: one that ships only inside
+    // the game's archives has no file to show, and one listed but not found says so.
+    private List<SymbolAction> AssetActions(string page, SymbolRow entry, string? file)
     {
         var definition = new SymbolAction("definition", page switch
         {
@@ -111,9 +123,16 @@ public sealed class SymbolRelations(
             "enums" => "schema",
             _ => "binary"
         });
-        return page is "models" or "particleSystems"
+        if (page == "enums") return [definition];
+        List<SymbolAction> actions = page is "models" or "particleSystems"
             ? [definition, new SymbolAction("previewModel", _tools.ModelPreview ? null : Off)]
             : [definition];
+        actions.Add(new SymbolAction("reveal", file is not null
+            ? null
+            : entry.Origin == "game"
+                ? "packed"
+                : "notFound"));
+        return actions;
     }
 
     // The code lens set, on the lenses' own rules. Assembling a unit and drawing its encyclopedia

@@ -57,7 +57,8 @@ public sealed class ModBrowserHandlersTest
             .Handle(new GetSymbolOutlineParams(SymbolOutlines.GameData), CancellationToken.None);
         var page = await new GetSymbolPageHandler(index, schema, new NoTags(), assets, config)
             .Handle(new GetSymbolPageParams("xml:GameObjectType"), CancellationToken.None);
-        var node = await new GetSymbolNodeHandler(index, schema, new NoTags(), assets, config)
+        var node = await new GetSymbolNodeHandler(index, schema, new NoTags(), assets,
+                new FileHelper(new MockFileSystem()), config)
             .Handle(new GetSymbolNodeParams("xml:GameObjectType", "Star_Destroyer"), CancellationToken.None);
 
         Assert.Equal(expected, outline.Pages.Count);

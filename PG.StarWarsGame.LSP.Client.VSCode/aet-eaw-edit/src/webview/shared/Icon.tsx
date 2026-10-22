@@ -49,6 +49,7 @@ import {
     IconEyeClosed,
     IconEyeDotted,
     IconFileCode,
+    IconFolderOpen,
     IconFilterOff,
     IconFlag,
     IconFlame,
@@ -244,6 +245,8 @@ const ICONS = {
     // go-to-file, because the story graph already draws it that way and one action must not look
     // like two. `iconSource` routes it; the entry stays here so the meaning is still listed.
     definition: IconFileCode,
+    /** Shows a file in the operating system's file manager. */
+    reveal: IconFolderOpen,
     expanded: IconChevronDown,
     collapsed: IconChevronRight,
 

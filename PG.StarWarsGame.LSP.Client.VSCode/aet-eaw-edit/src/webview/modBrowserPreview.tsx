@@ -29,6 +29,7 @@ import {
     problemMessage,
     relationLabel,
     factLabel,
+    fileSize,
 } from "./modBrowserModel";
 import { DockTile, DockTileGrid } from "./shared/DockTile";
 import { Icon, IconName } from "./shared/Icon";
@@ -55,6 +56,7 @@ export const ACTION_ICONS: Record<string, IconName> = {
     encyclopedia: "encyclopediaCard",
     effectiveObject: "effectiveObject",
     copyName: "copy",
+    reveal: "reveal",
 };
 
 /**
@@ -287,6 +289,31 @@ function EntryHead({
                             </dd>
                         </Fragment>
                     ))}
+                    {/* The file on disk, for an asset or a script that has one. */}
+                    {tile.file && (
+                        <>
+                            <dt>{l10n.t("Size")}</dt>
+                            <dd className="number">
+                                {fileSize(tile.file.size)}
+                            </dd>
+                            {tile.file.lines != null && (
+                                <>
+                                    <dt>{l10n.t("Lines")}</dt>
+                                    <dd className="number">
+                                        {tile.file.lines.toLocaleString()}
+                                    </dd>
+                                </>
+                            )}
+                            <dt>{l10n.t("Modified")}</dt>
+                            <dd>
+                                {new Date(tile.file.modified).toLocaleString()}
+                            </dd>
+                            <dt>{l10n.t("Created")}</dt>
+                            <dd>
+                                {new Date(tile.file.created).toLocaleString()}
+                            </dd>
+                        </>
+                    )}
                 </dl>
             </div>
         </section>

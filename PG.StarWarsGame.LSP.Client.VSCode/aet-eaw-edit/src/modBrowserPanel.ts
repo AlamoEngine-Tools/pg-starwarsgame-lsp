@@ -109,6 +109,13 @@ export class ModBrowserPanel extends WebviewPanelHost {
         if (msg.type === "copy" && typeof msg.text === "string") {
             await vscode.env.clipboard.writeText(msg.text);
         }
+        // An entry's file, as its project's server found it on disk, shown in the file manager.
+        if (msg.type === "reveal" && typeof msg.path === "string" && msg.path) {
+            await vscode.commands.executeCommand(
+                "revealFileInOS",
+                vscode.Uri.file(msg.path),
+            );
+        }
     }
 
     /** Runs one of an entry's actions; anything not in the set is ignored. */

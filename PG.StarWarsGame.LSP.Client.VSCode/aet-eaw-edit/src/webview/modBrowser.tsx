@@ -498,6 +498,11 @@ function App(): React.JSX.Element {
         }
         if (action === "open") {
             await openEntry(node);
+        } else if (action === "reveal") {
+            const file = (await fetchNode(node))?.file;
+            if (file) {
+                vscode.postMessage({ type: "reveal", path: file });
+            }
         } else if (action === "definition") {
             const location = (await fetchNode(node))?.location;
             if (location) {

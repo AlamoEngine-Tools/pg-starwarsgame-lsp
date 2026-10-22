@@ -68,6 +68,8 @@ export interface GetSymbolNodeResult {
     actions?: SymbolAction[];
     /** Opening the entry into its preview; its reason is `noPreview` where its type has none. */
     open?: SymbolAction | null;
+    /** The entry's file on disk, for an asset or a script that has one. */
+    file?: string | null;
 }
 
 /** One thing that can be done with an entry. */
@@ -106,6 +108,19 @@ export interface PreviewTile {
     objectId?: string | null;
     /** The identity tile's counts, in the order shown - a model's bones, textures and the rest. */
     facts?: PreviewFact[] | null;
+    /** The identity tile's file on disk, for an asset or a script that has one. */
+    file?: PreviewFile | null;
+}
+
+/** A file on disk, as its header describes it. */
+export interface PreviewFile {
+    /** Its size in bytes. */
+    size: number;
+    /** When it was created and last changed, as ISO 8601 UTC timestamps. */
+    created: string;
+    modified: string;
+    /** A script's line count. */
+    lines?: number | null;
 }
 
 /** One count in an identity tile: `bones`, `textures`, `particleSystems` or `animations`. */

@@ -52,7 +52,7 @@ window.acquireVsCodeApi = () => ({
         if (message.type === "ready") {
             setTimeout(() => window.postMessage({type: "outline", outline: OUTLINE}, "*"), 0);
         }
-        if (message.type === "run" || message.type === "openLocation" || message.type === "copy") {
+        if (["run", "openLocation", "copy", "reveal"].includes(message.type)) {
             window.__POSTED__.push(message);
         }
         if (message.type === "request") {

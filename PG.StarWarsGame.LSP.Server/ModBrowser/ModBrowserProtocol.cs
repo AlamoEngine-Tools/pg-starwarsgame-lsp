@@ -76,6 +76,9 @@ public sealed record GetSymbolNodeResult(SymbolRow? Entry, IReadOnlyList<SymbolR
     ///     where its preview would be its header alone.
     /// </summary>
     public SymbolAction Open { get; init; } = new("open", null);
+
+    /// <summary>The entry's file on disk, for an asset or a script that has one; null otherwise.</summary>
+    public string? File { get; init; }
 }
 
 /// <param name="Uri">The defining document.</param>
@@ -140,6 +143,19 @@ public sealed record PreviewTile(string Kind, int X, int Y, int Width, int Heigh
 
     /// <summary>The identity tile's counts, in the order shown - a model's bones, textures and the rest.</summary>
     public IReadOnlyList<PreviewFact>? Facts { get; init; }
+
+    /// <summary>The identity tile's file on disk, for an asset or a script that has one.</summary>
+    public PreviewFile? File { get; init; }
+}
+
+/// <summary>A file on disk, as its header describes it.</summary>
+/// <param name="Size">Its size in bytes.</param>
+/// <param name="Created">When it was created, in UTC.</param>
+/// <param name="Modified">When it was last changed, in UTC.</param>
+public sealed record PreviewFile(long Size, DateTime Created, DateTime Modified)
+{
+    /// <summary>A script's line count; null for any other file.</summary>
+    public int? Lines { get; init; }
 }
 
 /// <param name="Key">What is counted: <c>bones</c>, <c>textures</c>, <c>particleSystems</c>, <c>animations</c>.</param>

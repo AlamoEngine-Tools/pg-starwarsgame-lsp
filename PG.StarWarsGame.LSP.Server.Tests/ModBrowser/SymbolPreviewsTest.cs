@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -191,9 +192,35 @@ public sealed class SymbolPreviewsTest
         var tags = new Tags();
         var catalog = SymbolCatalog.Build(index, [], []);
         // The model's proxies name the engine effect and one no file holds.
+        // The model and the script are files of the project on disk; the engine effect ships packed.
         var relations = new SymbolRelations(index, schema, tags, catalog,
-            id => id == Model ? ["P_Engine", "P_Missing"] : [], tools);
-        return new SymbolPreviews(index, relations, new Texts(), new Diagnostics());
+            id => id == Model ? ["P_Engine", "P_Missing"] : [], tools,
+            id => id switch
+            {
+                Model => ModelFile,
+                Script => ScriptFile,
+                _ => null
+            });
+        return new SymbolPreviews(index, relations, new Texts(), new Diagnostics(), Disk());
+    }
+
+    private const string ModelFile = @"C:\work\mod\Data\Art\Models\EV_StarDestroyer.alo";
+    private const string ScriptFile = @"C:\work\mod\Data\Scripts\GameObject\MyHero.lua";
+    private static readonly DateTime s_created = new(2026, 3, 1, 9, 30, 0, DateTimeKind.Utc);
+    private static readonly DateTime s_changed = new(2026, 10, 20, 17, 5, 0, DateTimeKind.Utc);
+
+    private static MockFileSystem Disk()
+    {
+        MockFileData File(byte[] bytes)
+        {
+            return new MockFileData(bytes) { CreationTime = s_created, LastWriteTime = s_changed };
+        }
+
+        return new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ModelFile] = File(new byte[1536]),
+            [ScriptFile] = File(System.Text.Encoding.UTF8.GetBytes(s_script))
+        });
     }
 
     // Every tile as (kind, x, y, width, height) on the preview's grid.
@@ -368,6 +395,29 @@ public sealed class SymbolPreviewsTest
                 new PreviewFact("animations", 1)
             ],
             identity.Facts);
+    }
+
+    [Fact]
+    public void AFilesHeader_SaysHowLargeItIs_AndWhenItWasCreatedAndLastChanged()
+    {
+        var file = Previews().Preview("models", Model).Tiles.Single(t => t.Kind == "identity").File;
+
+        Assert.Equal(new PreviewFile(1536, s_created, s_changed), file);
+    }
+
+    [Fact]
+    public void AScriptsHeader_AlsoCountsItsLines()
+    {
+        var file = Previews().Preview("luaScripts", Script).Tiles.Single(t => t.Kind == "identity").File;
+
+        Assert.Equal(8, file?.Lines);
+    }
+
+    // A file only the game's archives hold has nothing on disk to describe.
+    [Fact]
+    public void APackedAssetsHeader_HasNoFileFacts()
+    {
+        Assert.Null(Previews().Preview("particleSystems", Engine).Tiles.Single(t => t.Kind == "identity").File);
     }
 
     [Fact]

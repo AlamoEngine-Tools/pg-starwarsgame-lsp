@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Xml;
@@ -62,6 +63,7 @@ public sealed class GetSymbolNodeHandler(
     ISchemaProvider schema,
     IVariantTagSource tags,
     IGameAssetResolver assets,
+    IFileHelper fileHelper,
     ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetSymbolNodeParams, GetSymbolNodeResult>
 {
@@ -71,7 +73,7 @@ public sealed class GetSymbolNodeHandler(
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
         return Task.FromResult(new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
-                config.Current.Features.Tools)
+                config.Current.Features.Tools, EntryFiles.For(assets, fileHelper))
             .Node(request.Page, request.Id));
     }
 }
@@ -82,6 +84,7 @@ public sealed class GetSymbolPreviewHandler(
     ISchemaProvider schema,
     IVariantTagSource tags,
     IGameAssetResolver assets,
+    IFileHelper fileHelper,
     IDocumentTextSource texts,
     IXmlDiagnosticsCollector diagnostics,
     ILspConfigurationProvider config)
@@ -94,9 +97,28 @@ public sealed class GetSymbolPreviewHandler(
         var current = index.Current;
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
         var relations = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
-            features);
-        return Task.FromResult(new SymbolPreviews(current, relations, texts, diagnostics)
+            features, EntryFiles.For(assets, fileHelper));
+        return Task.FromResult(new SymbolPreviews(current, relations, texts, diagnostics, fileHelper.FileSystem)
             .Preview(request.Page, request.Id));
+    }
+}
+
+/// <summary>
+///     The file on disk an entry is: a script's document, or an asset where the asset resolver finds
+///     it loose - in the project, or in the game's folder. One the resolver finds only inside an
+///     archive has no file of its own.
+/// </summary>
+internal static class EntryFiles
+{
+    public static Func<string, string?> For(IGameAssetResolver assets, IFileHelper fileHelper)
+    {
+        // The resolver joins its roots and their contents with either separator; the path is handed
+        // to the host's file manager, so it is made one clean path of the file system's own.
+        return id => id.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
+            ? fileHelper.FileUriToPath(id)
+            : assets.Locate(id) is { Tier: not GameAssetTier.Archive } location
+                ? fileHelper.FileSystem.Path.GetFullPath(location.ResolvedPath)
+                : null;
     }
 }
 

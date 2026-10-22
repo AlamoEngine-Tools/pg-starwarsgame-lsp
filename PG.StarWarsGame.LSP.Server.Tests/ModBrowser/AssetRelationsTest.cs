@@ -85,7 +85,7 @@ public sealed class AssetRelationsTest
                 "data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala", "data/art/models/ev_tie_die.ala",
                 "data/art/models/p_smoke.alo", "data/art/textures/tie.tga", "data/art/textures/smoke.tga",
                 "data/art/textures/i_tie.tga", "data/art/textures/glow.dds"
-            ], []),
+            ], ["data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala"]),
             ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_smoke.alo"),
             ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .WithComparers(StringComparer.OrdinalIgnoreCase)
@@ -93,11 +93,22 @@ public sealed class AssetRelationsTest
                 .Add("ev_tie.alo", ["Tie.tga"]).Add("p_smoke.alo", ["Smoke.tga", "Glow.tga"])
         };
         // The model carries two effects; one names a particle system no layer ships.
+        // The mod's model and its script are files on disk; its idle clip is listed but not found, and
+        // everything else ships packed with the game.
         return new SymbolRelations(index, new Schema(), _tags, SymbolCatalog.Build(index, [], [s_animationType]),
             path => path.EndsWith("ev_tie.alo", StringComparison.OrdinalIgnoreCase)
                 ? ["P_Smoke_ALT2", "P_Missing_LOD0"]
-                : []);
+                : [],
+            fileOf: id => id switch
+            {
+                "data/art/models/ev_tie.alo" => TieModelFile,
+                TieScript => TieScriptFile,
+                _ => null
+            });
     }
+
+    private const string TieModelFile = @"C:\work\mod\Data\Art\Models\EV_Tie.alo";
+    private const string TieScriptFile = @"C:\work\mod\Data\Scripts\GameObject\TieScript.lua";
 
     private static Dictionary<string, SymbolRelation> RelationsOf(SymbolRelations relations, string page, string id)
     {
@@ -117,9 +128,26 @@ public sealed class AssetRelationsTest
     [Fact]
     public void AModel_OpensInThePreview_AndHasNoTextToGoTo()
     {
-        Assert.Equal([("definition", "binary"), ("previewModel", null)], ActionsOf("models", "ev_tie.alo"));
-        Assert.Equal([("definition", "binary"), ("previewModel", null)], ActionsOf("particleSystems", "p_smoke.alo"));
-        Assert.Equal([("definition", "binary")], ActionsOf("textures", "tie.tga"));
+        Assert.Equal([("definition", "binary"), ("previewModel", null), ("reveal", null)],
+            ActionsOf("models", "ev_tie.alo"));
+        Assert.Equal([("definition", "binary"), ("previewModel", null), ("reveal", "packed")],
+            ActionsOf("particleSystems", "p_smoke.alo"));
+        Assert.Equal([("definition", "binary"), ("reveal", "packed")], ActionsOf("textures", "tie.tga"));
+    }
+
+    // Every file can be shown in the file manager where there is one on disk; one that only ships
+    // inside the game's archives, or that is listed but not found, says which.
+    [Fact]
+    public void AFile_IsRevealedWhereItIsOnDisk()
+    {
+        var relations = Relations();
+
+        Assert.Equal(TieModelFile, relations.Node("models", "ev_tie.alo").File);
+        Assert.Equal(TieScriptFile, relations.Node("luaScripts", "tiescript.lua").File);
+        Assert.Null(relations.Node("textures", "tie.tga").File);
+        Assert.Contains(("reveal", null), ActionsOf("luaScripts", "tiescript.lua"));
+        Assert.Contains(("reveal", "notFound"), ActionsOf("animations", "ev_tie_idle.ala"));
+        Assert.DoesNotContain(ActionsOf("enums", "AnimationType"), a => a.Action == "reveal");
     }
 
     // An entry opens into its preview; one whose preview would be its header alone has none, and
@@ -143,7 +171,7 @@ public sealed class AssetRelationsTest
         var node = Relations().Node("luaScripts", "tiescript.lua");
 
         Assert.Equal(new SymbolLocation(TieScript, 0), node.Location);
-        Assert.Equal([("definition", null)], node.Actions.Select(a => (a.Action, a.Reason)));
+        Assert.Equal([("definition", null), ("reveal", null)], node.Actions.Select(a => (a.Action, a.Reason)));
     }
 
     [Fact]

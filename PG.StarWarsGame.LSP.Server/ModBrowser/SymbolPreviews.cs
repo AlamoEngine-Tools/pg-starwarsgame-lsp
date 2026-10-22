@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -31,7 +32,8 @@ public sealed class SymbolPreviews(
     GameIndex index,
     SymbolRelations relations,
     IDocumentTextSource texts,
-    IXmlDiagnosticsCollector diagnostics)
+    IXmlDiagnosticsCollector diagnostics,
+    IFileSystem files)
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
@@ -147,9 +149,24 @@ public sealed class SymbolPreviews(
         return "luaScript";
     }
 
-    private static PreviewTile Header(SymbolRow entry, GetSymbolNodeResult node)
+    private PreviewTile Header(SymbolRow entry, GetSymbolNodeResult node)
     {
-        return Tile("identity") with { Entry = entry, Location = node.Location, VariantOf = node.VariantOf };
+        return Tile("identity") with
+        {
+            Entry = entry, Location = node.Location, VariantOf = node.VariantOf, File = FileOf(node)
+        };
+    }
+
+    // The entry's file on disk as its header describes it: size and dates, a script's lines besides.
+    // Nothing for one with no file, or one that has gone since it was indexed.
+    private PreviewFile? FileOf(GetSymbolNodeResult node)
+    {
+        if (node.File is not { } path || !files.File.Exists(path)) return null;
+        var info = files.FileInfo.New(path);
+        var lines = node.Entry is { } entry && path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)
+            ? texts.GetText(entry.Id)?.Text.Split('\n').Length
+            : null;
+        return new PreviewFile(info.Length, info.CreationTimeUtc, info.LastWriteTimeUtc) { Lines = lines };
     }
 
     // A model's counts, for its header: its bones from the model catalog, and how many of each
