@@ -45,11 +45,23 @@ public sealed class SymbolRelationsTest
         };
     }
 
-    private sealed class Schema : NullSchemaProvider
+    private sealed class Schema : NullSchemaProvider, ISchemaProvider
     {
+        private static readonly ObjectKindDefinition s_planet = new()
+        {
+            Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"]
+        };
+
         public override XmlTagDefinition? GetTag(string tagName)
         {
             return s_tags.GetValueOrDefault(tagName);
+        }
+
+        public ObjectKindDefinition? GetKind(string kindName)
+        {
+            return string.Equals(kindName, ObjectKindNames.Planet, StringComparison.OrdinalIgnoreCase)
+                ? s_planet
+                : null;
         }
     }
 
@@ -72,7 +84,10 @@ public sealed class SymbolRelationsTest
             Object("Star_Destroyer", 3), Object("Tie_Fighter", 20), Object("Tie_Fighter$Tractor_Beam", 22),
             Object("Proton_Explosion", 40, "Particle"),
             Object("Unit_Select_SD", 50, "SFXEvent"), Object("HP_Laser_1", 60, "HardPoint"),
-            Object("Star_Destroyer_Mk2", 70) with { VariantBaseId = "Star_Destroyer" }
+            Object("Star_Destroyer_Mk2", 70) with { VariantBaseId = "Star_Destroyer" },
+            // A planet whose text defines a body, as the vanilla planets' do.
+            new GameSymbol("Coruscant", GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin(Units, 80, 4),
+                null, null, ["PLANET"])
         ];
         // The baseline records where the game defines a symbol by its game-relative path (measured
         // on FoC: DATA\XML\SPACEUNITSCAPITAL.XML), which is no document of the project.
@@ -112,7 +127,8 @@ public sealed class SymbolRelationsTest
                 ("HardPoints", "HP_Laser_1, HP_Missing"), ("Icon_Name", "I_Button_SD.tga"),
                 ("Lua_Script", "StarDestroyer"), ("Max_Speed", "2.0")
             ],
-            ["Tie_Fighter"] = [("Space_Model_Name", "EV_Missing.alo")]
+            ["Tie_Fighter"] = [("Space_Model_Name", "EV_Missing.alo"), ("Encyclopedia_Text", "TEXT_TIE")],
+            ["Coruscant"] = [("Encyclopedia_Text", "TEXT_CORUSCANT")]
         });
         var schema = new Schema();
         return new SymbolRelations(index, schema, tags, SymbolCatalog.Build(index, [], []), tools: tools);
@@ -137,6 +153,17 @@ public sealed class SymbolRelationsTest
                 ("effectiveObject", "notAVariant")
             ],
             ActionsOf(Relations(), "Star_Destroyer"));
+    }
+
+    // A planet's popup is a preview of its own, not the unit card (maintainer, 2026-10-22): the card
+    // is not offered for one, though its text defines a body.
+    [Fact]
+    public void APlanet_HasNoEncyclopediaCard_AnObjectWithBodyTextHasOne()
+    {
+        var relations = Relations();
+
+        Assert.Contains(("encyclopedia", "planet"), ActionsOf(relations, "Coruscant"));
+        Assert.Contains(("encyclopedia", null), ActionsOf(relations, "Tie_Fighter"));
     }
 
     [Fact]

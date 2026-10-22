@@ -130,9 +130,11 @@ public sealed class SymbolRelations(
                     : "noModel"),
             new SymbolAction("encyclopedia", !_tools.Encyclopedia
                 ? Off
-                : winner is not null && EncyclopediaTags.DefinesBody(index, tags, winner)
-                    ? null
-                    : "noEncyclopedia"),
+                : winner is null || !EncyclopediaTags.DefinesBody(index, tags, winner)
+                    ? "noEncyclopedia"
+                    : EncyclopediaTags.HasCard(index, tags, winner, schema.GetKind(ObjectKindNames.Planet))
+                        ? null
+                        : "planet"),
             new SymbolAction("effectiveObject", !_tools.Variants
                 ? Off
                 : string.IsNullOrEmpty(winner?.VariantBaseId)

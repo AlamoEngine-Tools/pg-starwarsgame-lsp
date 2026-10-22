@@ -344,6 +344,8 @@ function actionReasonLabel(reason: string): string {
             return l10n.t("Names no model");
         case "noEncyclopedia":
             return l10n.t("No encyclopedia text");
+        case "planet":
+            return l10n.t("Not for a planet");
         case "notAVariant":
             return l10n.t("Not a variant");
         case "noPreview":

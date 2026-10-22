@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml;
@@ -30,11 +29,9 @@ namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 /// </remarks>
 public sealed class SymbolPreviews(
     GameIndex index,
-    IVariantTagSource tags,
     SymbolRelations relations,
     IDocumentTextSource texts,
-    IXmlDiagnosticsCollector diagnostics,
-    ToolsFeatureFlags tools)
+    IXmlDiagnosticsCollector diagnostics)
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
@@ -83,7 +80,7 @@ public sealed class SymbolPreviews(
         layout.Grid(6, 6);
         layout.Put(Header(entry, node), 0, 0, 2, 2);
         layout.Put(XmlProblems(node.Location), 2, 0, 2, 2);
-        layout.Put(Encyclopedia(entry.Id), 4, 0, 2, 6);
+        layout.Put(Encyclopedia(entry.Id, node), 4, 0, 2, 6);
         layout.Put(Entries(page, entry.Id, ReferencedBy), 0, 2, 4, 4);
         return "gameObject";
     }
@@ -214,10 +211,11 @@ public sealed class SymbolPreviews(
         return found.Count == 0 ? null : Tile("problems") with { Count = found.Count, Entries = found };
     }
 
-    private PreviewTile? Encyclopedia(string id)
+    // The card the encyclopedia action shows: there exactly when the action is offered, a planet's
+    // and an object without body text left out alike.
+    private static PreviewTile? Encyclopedia(string id, GetSymbolNodeResult node)
     {
-        return tools.Encyclopedia && index.Resolve(id) is { } symbol &&
-               EncyclopediaTags.DefinesBody(index, tags, symbol)
+        return node.Actions.Any(a => a is { Action: "encyclopedia", Reason: null })
             ? Tile("encyclopedia") with { ObjectId = id }
             : null;
     }

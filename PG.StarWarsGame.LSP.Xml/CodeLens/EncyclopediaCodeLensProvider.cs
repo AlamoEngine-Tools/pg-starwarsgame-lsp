@@ -4,6 +4,7 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -23,12 +24,15 @@ internal sealed class EncyclopediaCodeLensProvider : IXmlCodeLensProvider
     public const string ShowEncyclopediaCommand = "aet-eaw-edit.lsp.showEncyclopedia";
 
     private readonly ILspConfigurationProvider _config;
+    private readonly ISchemaProvider _schema;
     private readonly IVariantTagSource _tagSource;
 
-    public EncyclopediaCodeLensProvider(IVariantTagSource tagSource, ILspConfigurationProvider config)
+    public EncyclopediaCodeLensProvider(IVariantTagSource tagSource, ILspConfigurationProvider config,
+        ISchemaProvider schema)
     {
         _tagSource = tagSource;
         _config = config;
+        _schema = schema;
     }
 
     public LspCodeLens? Handle(CodeLensSymbolContext ctx)
@@ -36,7 +40,8 @@ internal sealed class EncyclopediaCodeLensProvider : IXmlCodeLensProvider
         if (!_config.Current.Features.Tools.Encyclopedia)
             return null;
 
-        if (!EncyclopediaTags.DefinesBody(ctx.Index, _tagSource, ctx.Symbol))
+        // A planet's popup is a preview of its own, not the unit card.
+        if (!EncyclopediaTags.HasCard(ctx.Index, _tagSource, ctx.Symbol, _schema.GetKind(ObjectKindNames.Planet)))
             return null;
 
         return new LspCodeLens

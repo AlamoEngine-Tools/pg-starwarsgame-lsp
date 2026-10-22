@@ -67,11 +67,18 @@ public sealed class SymbolPreviewsTest
         return new XmlTagDefinition { Tag = name, ValueType = XmlValueType.NameReference, ReferenceKind = kind };
     }
 
-    private sealed class Schema : NullSchemaProvider
+    private sealed class Schema : NullSchemaProvider, ISchemaProvider
     {
         public override XmlTagDefinition? GetTag(string tagName)
         {
             return s_tags.GetValueOrDefault(tagName);
+        }
+
+        public ObjectKindDefinition? GetKind(string kindName)
+        {
+            return string.Equals(kindName, ObjectKindNames.Planet, StringComparison.OrdinalIgnoreCase)
+                ? new ObjectKindDefinition { Kind = ObjectKindNames.Planet, Behaviors = ["PLANET"] }
+                : null;
         }
     }
 
@@ -84,7 +91,8 @@ public sealed class SymbolPreviewsTest
                 ("Space_Model_Name", "EV_StarDestroyer.alo"), ("Encyclopedia_Text", "TEXT_SD"), ("Max_Speed", "2.0")
             ],
             ["Star_Destroyer_Mk2"] = [("Variant_Of_Existing_Type", "Star_Destroyer"), ("Max_Speed", "3.0")],
-            ["Unit_Select_SD"] = [("Samples", "U_Select_1.wav")]
+            ["Unit_Select_SD"] = [("Samples", "U_Select_1.wav")],
+            ["Coruscant"] = [("Encyclopedia_Text", "TEXT_CORUSCANT")]
         };
 
         public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
@@ -149,7 +157,10 @@ public sealed class SymbolPreviewsTest
         [
             Object("Star_Destroyer", 1, "GameObjectType"),
             Object("Star_Destroyer_Mk2", 6, "GameObjectType", "Star_Destroyer"),
-            Object("Unit_Select_SD", 10, "SFXEvent")
+            Object("Unit_Select_SD", 10, "SFXEvent"),
+            // A planet whose text defines a body, as the vanilla planets' do.
+            new GameSymbol("Coruscant", GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin(Units, 13, 2), null,
+                null, ["PLANET"])
         ];
         var shipped = new GameSymbol("Shipped_Only", GameSymbolKind.XmlObject, "GameObjectType",
             new FileOrigin(@"DATA\XML\UNITS.XML", 12, 4), null);
@@ -182,8 +193,7 @@ public sealed class SymbolPreviewsTest
         // The model's proxies name the engine effect and one no file holds.
         var relations = new SymbolRelations(index, schema, tags, catalog,
             id => id == Model ? ["P_Engine", "P_Missing"] : [], tools);
-        return new SymbolPreviews(index, tags, relations, new Texts(), new Diagnostics(),
-            tools ?? new ToolsFeatureFlags());
+        return new SymbolPreviews(index, relations, new Texts(), new Diagnostics());
     }
 
     // Every tile as (kind, x, y, width, height) on the preview's grid.
@@ -295,6 +305,13 @@ public sealed class SymbolPreviewsTest
         var preview = Previews().Preview(Page, "Shipped_Only");
 
         Assert.Equal([("identity", 0, 0, 2, 2), ("entries", 0, 2, 4, 4)], Layout(preview));
+    }
+
+    // The tile is the card the action shows, so it is there exactly when the action is offered.
+    [Fact]
+    public void APlanet_HasNoEncyclopediaTile_ThoughItsTextDefinesABody()
+    {
+        Assert.DoesNotContain(Previews().Preview(Page, "Coruscant").Tiles, t => t.Kind == "encyclopedia");
     }
 
     [Fact]

@@ -208,6 +208,14 @@ describe("actionChoices", () => {
         );
     });
 
+    it("says why a planet offers no encyclopedia card", () => {
+        const [, offered] = actionChoices(true, [
+            { action: "definition", reason: null },
+            { action: "encyclopedia", reason: "planet" },
+        ]);
+        assert.equal(offered[0].reason, "Not for a planet");
+    });
+
     it("says why there is no definition to go to", () => {
         const reasonOf = (reason: string) =>
             actionChoices(true, [{ action: "definition", reason }])[0][1]
