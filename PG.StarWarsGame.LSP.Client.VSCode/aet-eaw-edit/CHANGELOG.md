@@ -234,10 +234,10 @@
   - A rail of lists, their entries and each entry's relations, whose path is the breadcrumb; a table paged on the
     server, with a search form - name, kind with its count, origin
   - An object's relations by what each is - models, particle systems, particles, SFX and speech events,
-    hardpoints, textures, its Lua script - with what names it and every layer defining it; an empty one counted
-    zero, with the reason
+    hardpoints, textures, its Lua script - with its references and every layer defining it; an empty one
+    counted zero, with the reason
   - An asset's relations - a model's animations, particle systems and textures, an animation's model, a script's
-    loaders and requires, an enum's tags, the objects using an asset
+    loaders and requires, an enum's tags, the objects referencing an asset
   - An object's page: where the definition the game uses is, what it overrides and is a variant of, and its
     encyclopedia card with the faction switch
   - A click or `Enter` opens an entry, a double click or `F12` goes to its definition; the context menu and a

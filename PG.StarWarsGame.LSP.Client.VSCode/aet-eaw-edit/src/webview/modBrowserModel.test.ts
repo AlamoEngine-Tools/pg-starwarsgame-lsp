@@ -31,9 +31,12 @@ describe("pageLabel", () => {
 
 describe("relationLabel", () => {
     it("names each relation", () => {
-        assert.equal(relationLabel("referencedBy"), "Referenced by");
         assert.equal(relationLabel("sfxEvents"), "SFX Events");
-        assert.equal(relationLabel("usedBy"), "Used by");
+    });
+
+    it("calls what names an entry its references, as the code lens does, for an object and an asset alike", () => {
+        assert.equal(relationLabel("referencedBy"), "References");
+        assert.equal(relationLabel("usedBy"), "References");
     });
 });
 

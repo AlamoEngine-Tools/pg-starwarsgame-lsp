@@ -607,10 +607,10 @@ Flag: `aet-eaw-edit.features.tools.modBrowser` (on by default). Read-only.
   - Search form: name, kind with its count, origin
 - **Relations** - computed for one entry, when it opens; an empty one counted zero, with the reason
   - Game objects: models, particle systems, particles, SFX and speech events, hardpoints, other references,
-    textures, Lua script, referenced by, definitions
+    textures, Lua script, references, definitions
   - Objects only the game defines: no relations from their tags (`Not in the mod's files`)
-  - Models: animations, particle systems, textures, used by. Animations: model. Textures and audio: used by. Lua
-    scripts: loaded by, requires. Enums: used by
+  - Models: animations, particle systems, textures, references. Animations: model. Textures and audio:
+    references. Lua scripts: loaded by, requires. Enums: references
 - **Object page** - defined in, overrides, variant of; the encyclopedia card with its faction switch
 - **Actions** - click or `Enter` opens, double click or `F12` goes to the definition; the context menu and a row's
   hover icons offer Preview unit, Show encyclopedia card, Show effective object and Preview model, an unavailable

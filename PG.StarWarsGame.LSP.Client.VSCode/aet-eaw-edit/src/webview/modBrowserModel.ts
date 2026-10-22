@@ -64,16 +64,17 @@ export function relationLabel(relation: string): string {
             return l10n.t("Samples");
         case "luaScript":
             return l10n.t("Lua Script");
+        // What names an entry is its references, as the code lens counts them; an asset's are
+        // the objects whose tags name it, an object's those the reference index holds.
         case "referencedBy":
-            return l10n.t("Referenced by");
+        case "usedBy":
+            return l10n.t("References");
         case "definitions":
             return l10n.t("Definitions");
         case "animations":
             return l10n.t("Animations");
         case "model":
             return l10n.t("Model");
-        case "usedBy":
-            return l10n.t("Used by");
         case "loadedBy":
             return l10n.t("Loaded by");
         case "requires":
