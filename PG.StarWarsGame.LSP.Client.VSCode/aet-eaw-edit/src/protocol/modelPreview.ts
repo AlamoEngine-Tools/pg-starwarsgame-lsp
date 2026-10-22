@@ -863,6 +863,8 @@ export interface GetModelGlbResult {
 // exporter rotates the model Z-up to Y-up and splits doubled-up bone/mesh nodes apart, so a matrix
 // taken from the client's scene graph is one the author has never seen.
 
+export const GET_MODEL_DETAIL = "aet/getModelDetail";
+
 export interface GetModelDetailParams {
     modelReference: string;
 }

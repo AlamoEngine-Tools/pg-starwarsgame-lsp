@@ -9,7 +9,15 @@
 // only draws them.
 
 import * as l10n from "@vscode/l10n";
-import { Fragment, ReactNode, useLayoutEffect, useRef, useState } from "react";
+import {
+    Fragment,
+    ReactNode,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 
 import type {
     GetSymbolOutlineResult,
@@ -19,6 +27,7 @@ import type {
     SymbolLocation,
     SymbolRow,
 } from "../protocol/modBrowser";
+import type { GetModelDetailResult } from "../protocol/modelPreview";
 import {
     actionChoices,
     locationLabel,
@@ -31,10 +40,17 @@ import {
     factLabel,
     fileSize,
 } from "./modBrowserModel";
+import { treeItemsFromDetail } from "./preview/modelTreeItems";
+import {
+    buildTree,
+    defaultCollapsed,
+    visibleTreeRows,
+} from "./preview/previewTree";
 import { DockTile, DockTileGrid } from "./shared/DockTile";
 import { Icon, IconName } from "./shared/Icon";
 import { Panel } from "./shared/Panel";
 import { problemLook, problemTag } from "./shared/problemLook";
+import { TreeRow } from "./shared/TreeRow";
 
 /** What the preview asks of the panel around it. */
 export interface PreviewHandlers {
@@ -46,6 +62,8 @@ export interface PreviewHandlers {
     onAct: (action: string) => void;
     /** The encyclopedia card, drawn to fit a width. */
     card: (objectId: string, width: number) => ReactNode;
+    /** A model's detail - its bones, meshes and proxies - from its project's server. */
+    modelDetail: (model: string) => Promise<GetModelDetailResult | null>;
 }
 
 /** The icon each action shows. */
@@ -182,6 +200,14 @@ function Tile({
                         handlers.card(tile.objectId, width - PANEL_INSET)}
                 </Panel>
             );
+        case "hierarchy":
+            return tile.objectId ? (
+                <ModelTreePanel
+                    model={tile.objectId}
+                    place={place}
+                    load={handlers.modelDetail}
+                />
+            ) : null;
         case "entries":
             // Every entry of the relation: the tile scrolls, so none is held back.
             return (
@@ -296,7 +322,7 @@ function EntryHead({
                             <dd className="number">
                                 {fileSize(tile.file.size)}
                             </dd>
-                            {tile.file.lines != null && (
+                            {typeof tile.file.lines === "number" && (
                                 <>
                                     <dt>{l10n.t("Lines")}</dt>
                                     <dd className="number">
@@ -304,13 +330,26 @@ function EntryHead({
                                     </dd>
                                 </>
                             )}
+                            {/* The day, which fits the header's column; the time is on its tooltip. */}
                             <dt>{l10n.t("Modified")}</dt>
-                            <dd>
-                                {new Date(tile.file.modified).toLocaleString()}
+                            <dd
+                                title={new Date(
+                                    tile.file.modified,
+                                ).toLocaleString()}
+                            >
+                                {new Date(
+                                    tile.file.modified,
+                                ).toLocaleDateString()}
                             </dd>
                             <dt>{l10n.t("Created")}</dt>
-                            <dd>
-                                {new Date(tile.file.created).toLocaleString()}
+                            <dd
+                                title={new Date(
+                                    tile.file.created,
+                                ).toLocaleString()}
+                            >
+                                {new Date(
+                                    tile.file.created,
+                                ).toLocaleDateString()}
                             </dd>
                         </>
                     )}
@@ -359,6 +398,88 @@ function Problems({
                 );
             })}
         </div>
+    );
+}
+
+/**
+ * A model's bones, meshes and effects as the model preview's tree draws them - the same rows, the
+ * same nesting and the same subtrees folded at first - read from the model by its project's server.
+ * To look, not to act: the eyes and the inspector are the model preview's, a click away.
+ */
+function ModelTreePanel({
+    model,
+    place,
+    load,
+}: {
+    model: string;
+    place: React.CSSProperties;
+    load: (model: string) => Promise<GetModelDetailResult | null>;
+}): React.JSX.Element {
+    const [answer, setAnswer] = useState<GetModelDetailResult | null>(null);
+    const [collapsed, setCollapsed] = useState<Set<string> | null>(null);
+    useEffect(() => {
+        let live = true;
+        setAnswer(null);
+        setCollapsed(null);
+        void load(model).then((result) => {
+            if (live) {
+                setAnswer(result ?? { detail: null, error: null });
+            }
+        });
+        return () => {
+            live = false;
+        };
+    }, [model, load]);
+
+    const roots = useMemo(
+        () =>
+            answer?.detail ? buildTree(treeItemsFromDetail(answer.detail)) : [],
+        [answer],
+    );
+    const folded = collapsed ?? defaultCollapsed(roots);
+    const rows = visibleTreeRows(roots, folded);
+    const toggle = (id: string) => {
+        const next = new Set(folded);
+        if (!next.delete(id)) {
+            next.add(id);
+        }
+        setCollapsed(next);
+    };
+
+    return (
+        <Panel
+            title={l10n.t("Model tree")}
+            count={
+                answer?.detail
+                    ? answer.detail.bones.length.toLocaleString()
+                    : undefined
+            }
+            flush
+            style={place}
+        >
+            {answer === null ? (
+                <p className="empty">{l10n.t("Loading...")}</p>
+            ) : !answer.detail ? (
+                <p className="empty">
+                    {answer.error ?? l10n.t("The model could not be read")}
+                </p>
+            ) : (
+                <ul className="tree-list">
+                    {rows.map(({ node, expandable, expanded }) => (
+                        <TreeRow
+                            key={node.id}
+                            id={node.id}
+                            kind={node.kind}
+                            name={node.name}
+                            depth={node.depth}
+                            expandable={expandable}
+                            expanded={expanded}
+                            onToggle={() => toggle(node.id)}
+                        />
+                    ))}
+                </ul>
+            )}
+        </Panel>
     );
 }
 

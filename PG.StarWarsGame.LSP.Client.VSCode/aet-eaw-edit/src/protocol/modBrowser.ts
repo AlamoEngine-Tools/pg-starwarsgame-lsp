@@ -7,6 +7,7 @@
  */
 
 import { GET_ENCYCLOPEDIA_ENTRY } from "./encyclopedia";
+import { GET_MODEL_DETAIL } from "./modelPreview";
 
 /** The outlines the sidebar picks between. */
 export type SymbolOutline = "gameData" | "assets" | "schema";
@@ -26,6 +27,8 @@ export const MOD_BROWSER_METHODS: readonly string[] = [
     GET_SYMBOL_NODE,
     GET_SYMBOL_PREVIEW,
     GET_ENCYCLOPEDIA_ENTRY,
+    // A model's tree in its preview, read as the model preview reads it.
+    GET_MODEL_DETAIL,
 ];
 
 /** The entry whose relation a page lists, in place of the page's own entries. */

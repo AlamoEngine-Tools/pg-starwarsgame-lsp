@@ -33,7 +33,8 @@ public sealed class SymbolPreviews(
     SymbolRelations relations,
     IDocumentTextSource texts,
     IXmlDiagnosticsCollector diagnostics,
-    IFileSystem files)
+    IFileSystem files,
+    Func<string, int?>? bonesOf = null)
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
@@ -109,8 +110,9 @@ public sealed class SymbolPreviews(
     }
 
     /// <summary>
-    ///     A model, on a grid of four tiles across: its header with its counts and its problems on top,
-    ///     its textures, particle systems and animations below, its references down the fourth column.
+    ///     A model, on a grid of four tiles across: its header with its counts, its problems and its tree
+    ///     of bones, meshes and effects on top, its textures, particle systems and animations below, its
+    ///     references down the fourth column.
     /// </summary>
     /// <remarks>
     ///     One cell per tile: four columns at their least width fit beside the action column, where
@@ -121,6 +123,9 @@ public sealed class SymbolPreviews(
         layout.Grid(4, 2);
         layout.Put(Header(entry, node) with { Facts = ModelFacts(entry, node) }, 0, 0, 1, 1);
         layout.Put(AssetProblems(page, entry.Id), 1, 0, 1, 1);
+        // Its bones, meshes and effects as the model preview's tree, which the webview reads from
+        // the model itself by name.
+        layout.Put(Tile("hierarchy") with { ObjectId = entry.Name }, 2, 0, 1, 1);
         layout.Put(Entries(page, entry.Id, "textures"), 0, 1, 1, 1);
         layout.Put(Entries(page, entry.Id, "particleSystems"), 1, 1, 1, 1);
         layout.Put(Entries(page, entry.Id, "animations"), 2, 1, 1, 1);
@@ -169,8 +174,10 @@ public sealed class SymbolPreviews(
         return new PreviewFile(info.Length, info.CreationTimeUtc, info.LastWriteTimeUtc) { Lines = lines };
     }
 
-    // A model's counts, for its header: its bones from the model catalog, and how many of each
-    // relation it has.
+    // A model's counts, for its header: its bones from the model file's own skeleton, and how many of
+    // each relation it has. Not the model catalog's names, which a mesh named apart from any bone
+    // adds to (measured on FoC: the Star Destroyer's 71 bones against 74 names); a model that cannot
+    // be read has no bone count to give.
     private List<PreviewFact> ModelFacts(SymbolRow entry, GetSymbolNodeResult node)
     {
         int Counted(string relation)
@@ -178,13 +185,14 @@ public sealed class SymbolPreviews(
             return node.Relations.FirstOrDefault(r => r.Relation == relation)?.Count ?? 0;
         }
 
-        var bones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(entry.Name), []).Length;
-        return
+        List<PreviewFact> facts = bonesOf?.Invoke(entry.Id) is { } bones ? [new PreviewFact("bones", bones)] : [];
+        facts.AddRange(
         [
-            new PreviewFact("bones", bones), new PreviewFact("textures", Counted("textures")),
+            new PreviewFact("textures", Counted("textures")),
             new PreviewFact("particleSystems", Counted("particleSystems")),
             new PreviewFact("animations", Counted("animations"))
-        ];
+        ]);
+        return facts;
     }
 
     // What an asset names that no file holds: a texture, or a particle system a proxy names.

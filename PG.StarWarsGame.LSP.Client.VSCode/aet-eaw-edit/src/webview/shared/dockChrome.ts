@@ -774,6 +774,53 @@ ${tokensCss}
     .entry-row:disabled .entry-name { color: var(--colour-faint); }
     .entry-detail { color: var(--colour-muted); font-size: var(--font-size-11); }
 
+    /* ── Model trees ───────────────────────────────────────────────────── */
+    /* A model's bones, meshes and effects, one row each - the model preview's tree and the Mod
+       Browser's alike (TreeRow). The list scrolls down only: rows are nowrap so a name never breaks
+       in half, and the name gives up its tail instead; the whole of it is on the row's tooltip. */
+    .tree-list { list-style: none; margin: 0; padding: var(--space-2) 0; }
+    .tree-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        padding: var(--space-2) var(--space-6);
+        white-space: nowrap;
+        /* Load-bearing: without it a flex item refuses to shrink below its content, so the row
+           stays as wide as its longest name and the list scrolls sideways anyway. */
+        min-width: 0;
+    }
+    .tree-row:hover { background: var(--colour-hover); }
+    .tree-row .tree-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    /* A real box, not one the glyph gives it: sized by its icon alone the one control that folds a
+       subtree is a hairline to aim at, and nothing at all if the icon has not loaded. */
+    .tree-row .twisty {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 16px;
+        flex-shrink: 0;
+        cursor: pointer;
+        opacity: 0.7;
+    }
+    .tree-row .twisty:hover { opacity: 1; }
+    .tree-row .twisty.leaf { visibility: hidden; }
+    /* A row's kind as a small picture, sized as a BOX so an icon that fails to load still leaves
+       the columns lined up; a colour per kind, so a filtered tree does not read as one kind with
+       grey text among it. */
+    .tree-row .row-kind {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 15px;
+        height: 15px;
+        opacity: 0.85;
+    }
+    .tree-row .row-kind.kind-bone { color: var(--colour-data-blue); }
+    .tree-row .row-kind.kind-mesh { color: var(--colour-data-green); }
+    .tree-row .row-kind.kind-particle { color: var(--colour-data-orange); }
+
     /* ── Editor tabs ───────────────────────────────────────────────────── */
     /* Tabs inside a panel, read as the editor's own: the active one on the editor background with
        the focus colour along its top, an unpinned preview tab in italics. */

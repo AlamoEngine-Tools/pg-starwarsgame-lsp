@@ -98,7 +98,8 @@ public sealed class GetSymbolPreviewHandler(
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
         var relations = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
             features, EntryFiles.For(assets, fileHelper));
-        return Task.FromResult(new SymbolPreviews(current, relations, texts, diagnostics, fileHelper.FileSystem)
+        return Task.FromResult(new SymbolPreviews(current, relations, texts, diagnostics, fileHelper.FileSystem,
+                ModelProxies.BonesFor(current, assets))
             .Preview(request.Page, request.Id));
     }
 }
@@ -128,28 +129,47 @@ internal static class EntryFiles
 /// </summary>
 internal static class ModelProxies
 {
-    private static readonly ConditionalWeakTable<GameIndex, ConcurrentDictionary<string, IReadOnlyList<string>>>
+    private static readonly ConditionalWeakTable<GameIndex, ConcurrentDictionary<string, ModelRead>>
         s_read = new();
 
     public static Func<string, IReadOnlyList<string>> For(GameIndex index, IGameAssetResolver assets)
     {
-        var read = s_read.GetValue(index, _ => new ConcurrentDictionary<string, IReadOnlyList<string>>(
-            StringComparer.OrdinalIgnoreCase));
-        return path => read.GetOrAdd(path, p => Proxies(assets.Read(p)));
+        var read = Reads(index, assets);
+        return path => read(path).Proxies;
     }
 
-    private static IReadOnlyList<string> Proxies(byte[]? bytes)
+    /// <summary>
+    ///     The bones of a model's own skeleton, from the same one read as its proxies; null for a
+    ///     model that cannot be read.
+    /// </summary>
+    public static Func<string, int?> BonesFor(GameIndex index, IGameAssetResolver assets)
     {
-        if (bytes is null || AloFile.Classify(bytes) != AloFileKind.Model) return [];
+        var read = Reads(index, assets);
+        return path => read(path).Bones;
+    }
+
+    private static Func<string, ModelRead> Reads(GameIndex index, IGameAssetResolver assets)
+    {
+        var read = s_read.GetValue(index, _ => new ConcurrentDictionary<string, ModelRead>(
+            StringComparer.OrdinalIgnoreCase));
+        return path => read.GetOrAdd(path, p => Read(assets.Read(p)));
+    }
+
+    private static ModelRead Read(byte[]? bytes)
+    {
+        if (bytes is null || AloFile.Classify(bytes) != AloFileKind.Model) return new ModelRead([], null);
         try
         {
-            return AloModelReader.Read(bytes).Proxies.Select(p => p.Name).ToList();
+            var model = AloModelReader.Read(bytes);
+            return new ModelRead(model.Proxies.Select(p => p.Name).ToList(), model.Bones.Count);
         }
         catch
         {
             // A model that cannot be read names no particle systems that can be shown;
             // ModelFileFormat is the diagnostic that owns "this .alo is not readable".
-            return [];
+            return new ModelRead([], null);
         }
     }
+
+    private sealed record ModelRead(IReadOnlyList<string> Proxies, int? Bones);
 }

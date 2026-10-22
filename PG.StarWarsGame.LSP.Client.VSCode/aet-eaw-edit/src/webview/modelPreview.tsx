@@ -73,6 +73,7 @@ import { DockSection } from "./shared/DockSection";
 import { safeImageSource } from "./shared/safeImage";
 import { Field } from "./shared/Field";
 import { Icon, type IconName } from "./shared/Icon";
+import { TREE_KIND_ICONS, TREE_KIND_LABELS, TreeRow } from "./shared/TreeRow";
 import { addressingFor } from "./preview/textures";
 import {
     ancestorsOf,
@@ -389,12 +390,8 @@ type HostMessage =
     // so it pushes - on open and again whenever the setting changes.
     | { type: "previewFeatures"; features: unknown };
 
-/** What each kind is called in the filter row. */
-const KIND_LABELS: Record<TreeKind, string> = {
-    bone: "Bones",
-    mesh: "Meshes",
-    particle: "Effects",
-};
+/** What each kind is called in the filter row - the shared tree row's names for them. */
+const KIND_LABELS = TREE_KIND_LABELS;
 
 /**
  * What a group's switch will DO, which differs by the state it is in.
@@ -408,17 +405,8 @@ const GROUP_STATE_TITLES: Record<GroupState, string> = {
     some: "Switch the rest on",
 };
 
-/**
- * What a row IS, as a picture.
- *
- * A one-letter tag - B, M, P - was quicker to draw and needed the filter strip's legend to decode,
- * on every row of a hundred-row tree. A bone, a mesh and a flame need no legend.
- */
-const KIND_ICONS: Record<TreeKind, IconName> = {
-    bone: "skeleton",
-    mesh: "mesh",
-    particle: "effects",
-};
+/** What a row IS, as a picture - the shared tree row's, so the filter chips match the rows. */
+const KIND_ICONS = TREE_KIND_ICONS;
 
 /** The eye a row's state draws. Blender's three - see `preview/rowEye.ts`. */
 const EYE_ICONS: Record<EyeState, IconName> = {
@@ -1878,36 +1866,8 @@ const Shell = styled.div`
         border-radius: var(--radius-6);
     }
 
-    /* A small picture, so a row's kind reads at a glance without widening every line in a deep
-       tree. Sized as a BOX rather than by its contents - an icon that fails to load must still
-       leave the row's columns lined up. */
-
-    .row-kind {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        width: 15px;
-        height: 15px;
-        opacity: 0.85;
-    }
-
-    .row-kind.kind-bone {
-        color: var(--vscode-charts-blue);
-    }
-
-    .row-kind.kind-mesh {
-        color: var(--vscode-charts-green);
-    }
-
-    /* kind-particle, which is what TreeKind calls it and what the row actually writes. This rule
-       said kind-emitter and so had never matched anything: every effect row drew its icon in the
-       body colour while the bones around it were blue, which is part of why a filtered tree read as
-       bones with some grey text among them. */
-
-    .row-kind.kind-particle {
-        color: var(--vscode-charts-orange);
-    }
+    /* A row's twisty, kind picture and name are dockChromeCss's .tree-row, shared with the Mod
+       Browser; what follows is this tree's own - its list, its selection, its gating, its eye. */
 
     /* Scrolls inside itself rather than growing without limit.
     
@@ -1932,32 +1892,14 @@ const Shell = styled.div`
     }
 
     .bone-row {
-        display: flex;
-        align-items: center;
-        gap: var(--space-4);
-        padding: var(--space-2) var(--space-6);
         cursor: pointer;
-        white-space: nowrap;
-        /* Load-bearing: without it a flex item refuses to shrink below its content, so the row
-           stays as wide as its longest name and the list scrolls sideways anyway. */
-        min-width: 0;
-    }
-
-    .bone-row .bone-name {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .bone-row:hover {
-        background: var(--vscode-list-hoverBackground);
     }
 
     .bone-row.selected {
         background: var(--vscode-list-activeSelectionBackground);
     }
 
-    .bone-row.hidden-bone .bone-name {
+    .bone-row.hidden-bone .tree-name {
         opacity: 0.55;
         font-style: italic;
     }
@@ -1979,28 +1921,6 @@ const Shell = styled.div`
     .bone-row.scaffold.selected,
     .bone-row.scaffold:focus-within {
         opacity: 1;
-    }
-
-    /* A real box, not one the glyph gives it. Sized by its icon alone it is 12px wide and NO
-       pixels tall, so the one control that folds a subtree is a hairline to aim at - and nothing
-       at all if the icon font has not loaded. Same fault as the row's details button had. */
-
-    .bone-row .twisty {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 14px;
-        height: 16px;
-        flex-shrink: 0;
-        opacity: 0.7;
-    }
-
-    .bone-row .twisty:hover {
-        opacity: 1;
-    }
-
-    .bone-row .twisty.leaf {
-        visibility: hidden;
     }
 
     .bone-row .bone-attach {
@@ -10791,9 +10711,19 @@ function ModelPreview(): React.JSX.Element {
                                                     expandable,
                                                     expanded,
                                                 }) => (
-                                                    <li
+                                                    <TreeRow
                                                         key={node.id}
-                                                        data-row={node.id}
+                                                        id={node.id}
+                                                        kind={node.kind}
+                                                        name={node.name}
+                                                        depth={node.depth}
+                                                        expandable={expandable}
+                                                        expanded={expanded}
+                                                        onToggle={() =>
+                                                            toggleCollapsed(
+                                                                node.id,
+                                                            )
+                                                        }
                                                         className={
                                                             "bone-row" +
                                                             (selected.has(
@@ -10809,11 +10739,6 @@ function ModelPreview(): React.JSX.Element {
                                                                 ? " scaffold"
                                                                 : "")
                                                         }
-                                                        style={{
-                                                            paddingLeft:
-                                                                6 +
-                                                                node.depth * 10,
-                                                        }}
                                                         title={
                                                             node.because ===
                                                             undefined
@@ -10864,59 +10789,8 @@ ${becauseText(node.because)}`
                                                             setAnchor(
                                                                 after.anchor,
                                                             );
-
-                                                            if (
-                                                                node.kind ===
-                                                                "bone"
-                                                            ) {
-                                                            }
                                                         }}
                                                     >
-                                                        <span
-                                                            className={`twisty${expandable ? "" : " leaf"}`}
-                                                            onClick={(
-                                                                event,
-                                                            ) => {
-                                                                event.stopPropagation();
-                                                                toggleCollapsed(
-                                                                    node.id,
-                                                                );
-                                                            }}
-                                                        >
-                                                            <Icon
-                                                                name={
-                                                                    expanded
-                                                                        ? "expanded"
-                                                                        : "collapsed"
-                                                                }
-                                                                size={13}
-                                                            />
-                                                        </span>
-                                                        {/* The kind reads as a PICTURE now. A letter needed
-                                                the legend in the filter strip to decode, on every
-                                                row of a hundred-row tree. */}
-                                                        <span
-                                                            className={`row-kind kind-${node.kind}`}
-                                                            title={
-                                                                KIND_LABELS[
-                                                                    node.kind
-                                                                ]
-                                                            }
-                                                        >
-                                                            <Icon
-                                                                name={
-                                                                    KIND_ICONS[
-                                                                        node
-                                                                            .kind
-                                                                    ]
-                                                                }
-                                                                size={13}
-                                                            />
-                                                        </span>
-                                                        <span className="bone-name">
-                                                            {node.name}
-                                                        </span>
-
                                                         {/* Blender's arrangement, and the reader asked for it
                                                 by name: an open eye, a half-shut one for a row
                                                 whose visibility is inherited from above, and a
@@ -11011,7 +10885,7 @@ ${becauseText(node.because)}`
                                                                 );
                                                             }}
                                                         />
-                                                    </li>
+                                                    </TreeRow>
                                                 ),
                                             )}
                                             {/* Inside the list, not after it. Below the box it was one

@@ -23,6 +23,8 @@ import styled from "styled-components";
 
 import { GET_ENCYCLOPEDIA_ENTRY } from "../protocol/encyclopedia";
 import type { GetEncyclopediaEntryResult } from "../protocol/encyclopedia";
+import { GET_MODEL_DETAIL } from "../protocol/modelPreview";
+import type { GetModelDetailResult } from "../protocol/modelPreview";
 import {
     GET_SYMBOL_NODE,
     GET_SYMBOL_OUTLINE,
@@ -111,6 +113,13 @@ function request<T>(method: string, params: unknown): Promise<T | null> {
     return new Promise((resolve) => {
         waiting.set(id, (result) => resolve(result as T | null));
         vscode.postMessage({ type: "request", id, method, params });
+    });
+}
+
+/** A model's detail for its preview's tree: one function, so the tile asks once per model. */
+function loadModelDetail(model: string): Promise<GetModelDetailResult | null> {
+    return request<GetModelDetailResult>(GET_MODEL_DETAIL, {
+        modelReference: model,
     });
 }
 
@@ -1089,6 +1098,7 @@ function TabContent({
                 card: (objectId, width) => (
                     <CardSection objectId={objectId} fitWidth={width} />
                 ),
+                modelDetail: loadModelDetail,
             }}
         />
     );

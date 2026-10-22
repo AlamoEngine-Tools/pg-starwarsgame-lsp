@@ -180,7 +180,9 @@ public sealed class SymbolPreviewsTest
             // named as a .tga the project ships as a .dds, which the game takes for the same texture;
             // the engine effect's one texture.
             ModelBones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-                .Add(ModelBoneKey.From(Model), ["Root", "HP_Weapon_00", "HP_Engine_00"]),
+                // Every name a bone reference resolves to: its three bones, and a mesh named apart
+                // from any bone, at whose origin the engine places one.
+                .Add(ModelBoneKey.From(Model), ["Root", "HP_Weapon_00", "HP_Engine_00", "Hull_Mesh"]),
             ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add(ModelBoneKey.From(Model), ["SD.tga", "sd_missing.dds"])
                 .Add(ModelBoneKey.From(Engine), ["sd.dds"])
@@ -201,7 +203,9 @@ public sealed class SymbolPreviewsTest
                 Script => ScriptFile,
                 _ => null
             });
-        return new SymbolPreviews(index, relations, new Texts(), new Diagnostics(), Disk());
+        // The model file's own skeleton: three bones.
+        return new SymbolPreviews(index, relations, new Texts(), new Diagnostics(), Disk(),
+            id => id == Model ? 3 : null);
     }
 
     private const string ModelFile = @"C:\work\mod\Data\Art\Models\EV_StarDestroyer.alo";
@@ -376,14 +380,19 @@ public sealed class SymbolPreviewsTest
         Assert.Equal((4, 2), (preview.Columns, preview.Rows));
         Assert.Equal(
             [
-                ("identity", 0, 0, 1, 1), ("problems", 1, 0, 1, 1), ("entries", 0, 1, 1, 1), ("entries", 1, 1, 1, 1),
-                ("entries", 2, 1, 1, 1), ("entries", 3, 0, 1, 2)
+                ("identity", 0, 0, 1, 1), ("problems", 1, 0, 1, 1), ("hierarchy", 2, 0, 1, 1),
+                ("entries", 0, 1, 1, 1), ("entries", 1, 1, 1, 1), ("entries", 2, 1, 1, 1), ("entries", 3, 0, 1, 2)
             ],
             Layout(preview));
+        // The tree is read from the model by name, as the model preview reads it.
+        Assert.Equal("ev_stardestroyer.alo", preview.Tiles.Single(t => t.Kind == "hierarchy").ObjectId);
         Assert.Equal(["textures", "particleSystems", "animations", "usedBy"],
             preview.Tiles.Where(t => t.Kind == "entries").Select(t => t.Relation));
     }
 
+    // Its bones are the file's skeleton, not every name a bone reference resolves to: a mesh named
+    // apart from any bone is no bone of the model's (measured on FoC: the Star Destroyer's 71 bones
+    // against 74 names).
     [Fact]
     public void AModelsHeader_CountsItsBones_Textures_ParticleSystems_AndAnimations()
     {
