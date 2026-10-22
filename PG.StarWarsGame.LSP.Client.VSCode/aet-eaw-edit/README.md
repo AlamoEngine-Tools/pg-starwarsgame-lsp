@@ -600,23 +600,44 @@ Flag: `aet-eaw-edit.features.tools.encyclopedia` (on by default). Read-only.
 
 Flag: `aet-eaw-edit.features.tools.modBrowser` (on by default). Read-only.
 
-- **Mod Browser view** - the outlines Game Data, Assets and Schema; one panel per project
-- **Rail** - lists, their loaded entries and each entry's relations; the path to the open one is the breadcrumb
+- **Mod Browser view** - the outlines Game Data, Assets, Scripts and Schema; one panel per project
+- **Rail** - VS Code's tree of lists, their loaded entries and each entry's relations, a picture per kind; the
+  path to the open one is the breadcrumb
+  - Keys: up and down, `Page Up`, `Page Down`, `Home`, `End`; right opens a row, then goes to its first child;
+    left closes it, then goes to its parent; `Enter` opens, `Space` selects, `F12` goes to the definition
+  - Width dragged by its right edge, and kept
 - **Lists** - each entry once, as the definition the game uses, with its origin and what it overrides
-  - Paged on the server, 200 at a time
-  - Search form: name, what it behaves like with its count, origin
+  - Paged on the server, 200 at a time, and sorted there by a header click: name, type, behaves like, origin
+  - Search form: name, what it behaves like with its count, origin; its height dragged by its top edge
+  - A filter in each column header, writing into the same search
+  - Column widths and order dragged in the header, kept per list
 - **Relations** - computed for one entry, when it opens; an empty one counted zero, with the reason
   - Game objects: models, particle systems, particles, SFX and speech events, hardpoints, other references,
     textures, Lua script, references, definitions
   - Objects only the game defines: no relations from their tags (`Not in the mod's files`)
-  - Models: animations, particle systems, textures, references. Animations: model. Textures and audio:
+  - Models: animations, particle systems, textures, references. Particle systems: textures, and as references
+    the models whose proxies carry them and the objects naming them. Animations: model. Textures and audio:
     references. Lua scripts: loaded by, requires. Enums: references
-- **Object page** - defined in, overrides, variant of; the encyclopedia card with its faction switch
+- **Scripts** - Lua scripts by their folder under `Data/Scripts`: GameObject, Library, Story, AI, Evaluators,
+  FreeStore, Interventions, Miscellaneous, and Other for any other
+- **Schema** - the XML types, each with its tags; the enums; the behaviours, with what decides each and the game
+  objects that have it
+- **Previews** - an entry opens into its tiles, each at a fixed place on its type's grid
+  - Game object: header, problems, encyclopedia card with its faction switch, references
+  - Other XML object: header, problems, what its tags name, references
+  - Model: header with its bones and counts, problems, its tree of bones, meshes and effects, textures,
+    particle systems, animations, references
+  - Particle system: header, problems, textures, references
+  - Lua script: header with its size, lines and dates, loaded by, requires
+  - Schema type, tag and behaviour: its documentation - value type, what it references, its enum and values,
+    whether it repeats, description, notes
+  - Textures, audio, animations and enums: none; selecting one shows its relations
 - **Tabs** - a click selects; a double click or `Enter` opens the entry in a tab beside the table's own, which keeps
   its search, scroll and selection. One preview tab, in italics, is reused until it is pinned
 - **Actions** - `F12` goes to the definition. The context menu lists only what can be done; a row's hover icons
-  and the entry's page offer Preview unit, Show encyclopedia card, Show effective object and Preview model, an
-  unavailable one disabled with the reason
+  and the entry's page offer Preview unit, Show encyclopedia card, Show effective object, Preview model,
+  Preview on its model (an animation, with its model's clip selected), Reveal in File Explorer and Copy name,
+  an unavailable one disabled with the reason
 
 ---
 

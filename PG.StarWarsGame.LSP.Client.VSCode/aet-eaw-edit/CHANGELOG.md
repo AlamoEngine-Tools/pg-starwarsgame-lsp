@@ -59,6 +59,10 @@
   - A release of the server is gated on a baseline release of the version it reads, beside the schema gate
   - The baseline builder writes the DTO version into the manifest, which the baseline release checks its tag
     against
+  - A baseline build is reproducible: every set and map is written in ordinal order, and a rebuild that
+    changes nothing keeps the previous file, build time included, so its hash says so
+  - The builder takes the game folders as `-e` and `-f` in both verbs, or from `AET_EAW_PATH` and
+    `AET_FOC_PATH`, and writes to the repository's baseline folder by default
 - **XML structure judged by the game's reader** - a file the game drops is an error, XML the game reads but standard
   tools reject is a warning ([#199](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/199))
   - Comments inside values read as the game reads them: cut out, the text around them joined
@@ -228,11 +232,21 @@
   - A forward-slash sub-path such as `Heroes/Boba_Fett` resolves, as in the game
   - Vanilla and a large total-conversion mod: every reference resolves inside `Data/Scripts/GameObject`
 - **Mod Browser** - everything a project indexes, by what it is: game objects and every other XML type, models,
-  particle systems, animations, textures, audio, Lua scripts and the schema's enums, each once, as the definition
-  the game uses ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
-  - A **Mod Browser** view with the outlines Game Data, Assets and Schema; one panel per project
-  - A rail of lists, their entries and each entry's relations, whose path is the breadcrumb; a table paged on the
-    server, with a search form - name, what it behaves like with its count, origin
+  particle systems, animations, textures, audio, Lua scripts and the schema's types, tags, enums and behaviours,
+  each once, as the definition the game uses ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
+  - A **Mod Browser** view with the outlines Game Data, Assets, Scripts and Schema; one panel per project
+  - A rail drawn as VS Code's tree, with its keys and a picture per kind, of lists, their entries and each entry's
+    relations, whose path is the breadcrumb; the rail and the search form are resized by dragging
+  - A table paged and sorted on the server, with a search form - name, what it behaves like with its count,
+    origin - and a filter in each column header writing into it; column widths and order kept per list
+  - Previews as tiles on a fixed grid per type: a game object's problems, encyclopedia card and references; a
+    model's counts, tree of bones, meshes and effects, textures, particle systems and animations; a script's
+    size, lines, loaders and requires; a schema tag's documentation. A type with nothing to show has none
+  - Lua scripts in a Scripts outline by their folder under `Data/Scripts`
+  - The Schema outline: the types with their tags, a tag's page its documentation; the enums; the behaviours
+    with what decides each and the objects that have it
+  - A particle system's references include the models whose proxies carry it, from a proxy catalog the model
+    scan and the baseline keep
   - An object's relations by what each is - models, particle systems, particles, SFX and speech events,
     hardpoints, textures, its Lua script - with its references and every layer defining it; an empty one
     counted zero, with the reason
@@ -243,13 +257,19 @@
   - A click selects an entry; a double click or `Enter` opens it in a tab beside the table's own, one preview
     tab reused until it is pinned; `F12` goes to its definition
   - The context menu lists only what can be done; a row's hover icons and the entry's page carry the code lens
-    set - preview unit, encyclopedia card, effective object, preview model - an unavailable one disabled with
-    the reason
+    set - preview unit, encyclopedia card, effective object, preview model - with an animation previewed on its
+    model, a file revealed in the file manager and the name copied; an unavailable one disabled with the reason
+  - A planet offers no encyclopedia card anywhere, its popup being a preview of its own
   - The Preview Model picker lists models only, without particle systems
   - Flag `aet-eaw-edit.features.tools.modBrowser`, on by default
 
 ### Fixes
 
+- **Diagnostics for a file opened from the server** - a file first opened at a URI the server handed out, such as
+  a definition from the Mod Browser, reached no project and got no diagnostics
+  ([#291](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/291))
+  - The server keeps each file under its spelling on disk; the layered scan lowercased project paths
+  - A document reaches its project's server whatever the case of its path
 - **Projects without icons** - the encyclopedia's notice names the project first and what it builds on after;
   it listed the lowest dependency first ([#280](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/280))
 - **A library's hook** - a library calling a function a requiring script defines (`Definitions()` in
