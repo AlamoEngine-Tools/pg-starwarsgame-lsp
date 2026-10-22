@@ -521,7 +521,91 @@ public sealed class BaselineSerializerTest
         Assert.Null(result);
     }
 
+    // ── Reproducible output ──────────────────────────────────────────────────
+
+    // Sets and maps enumerate in hash order, which .NET randomises per process: written that way, two
+    // builds of the same game differ in every byte. Written in ordinal order, they are one file.
+    [Fact]
+    public void Serialize_WritesEverySetAndMapInOrdinalOrder()
+    {
+        string[] names = ["zeta", "Alpha", "mike", "bravo", "Yankee", "charlie", "x_ray", "delta", "kilo", "echo"];
+        var map = names.ToImmutableDictionary(n => n, n => ImmutableArray.Create(n), StringComparer.OrdinalIgnoreCase);
+        var baseline = new BaselineIndex(
+            names.Select(n => Symbol(n, new UnknownOrigin("engine"))).ToImmutableDictionary(s => s.Id),
+            TestDate, "hash", map, map, map)
+        {
+            AssetFiles = names.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
+            ModelBones = map,
+            ModelTextures = map,
+            ModelProxies = map,
+            ParticleSystems = names.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
+            GroupMemberships = names.ToImmutableDictionary(n => n, _ => ImmutableArray<GroupMembership>.Empty,
+                StringComparer.OrdinalIgnoreCase),
+            ObjectTags = names.ToImmutableDictionary(n => n, _ => ImmutableArray<BaselineTag>.Empty,
+                StringComparer.OrdinalIgnoreCase)
+        };
+        var sorted = names.Order(StringComparer.Ordinal).ToArray();
+
+        var dto = RawDto(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(sorted, dto.Symbols.Select(s => s.Id));
+        Assert.Equal(sorted, dto.AssetFiles);
+        Assert.Equal(sorted, dto.ParticleSystems);
+        Assert.Equal(sorted, dto.GroupMemberships.Select(g => g.GroupKey));
+        Assert.Equal(sorted, dto.ObjectTags.Select(t => t.Name));
+        foreach (var entries in new[]
+                 {
+                     dto.DynamicEnumValues, dto.HardcodedEnumValues, dto.FileTypeMap, dto.ModelBones,
+                     dto.ModelTextures, dto.ModelProxies
+                 })
+            Assert.Equal(sorted, entries.Select(e => e.Name));
+    }
+
+    // A rebuild that changes nothing changes no byte: the file it would replace is kept, build time
+    // included, so the manifest hash says "unchanged" and the repository shows no diff.
+    [Fact]
+    public void SerializeOver_TheSameContent_KeepsThePreviousFile()
+    {
+        var symbol = Symbol("UNIT_A", new UnknownOrigin("engine"));
+        var previous = BaselineSerializer.Serialize(Baseline(symbol));
+
+        var written = BaselineSerializer.SerializeOver(Baseline(symbol) with { BuiltAt = TestDate.AddDays(1) },
+            previous);
+
+        Assert.Equal(previous, written);
+    }
+
+    [Fact]
+    public void SerializeOver_ChangedContent_IsANewBuild()
+    {
+        var previous = BaselineSerializer.Serialize(Baseline(Symbol("UNIT_A", new UnknownOrigin("engine"))));
+        var later = TestDate.AddDays(1);
+
+        var written = BaselineSerializer.SerializeOver(
+            Baseline(Symbol("UNIT_B", new UnknownOrigin("engine"))) with { BuiltAt = later }, previous);
+
+        Assert.Equal(later, Deserialize(written).BuiltAt);
+        Assert.Contains("UNIT_B", Deserialize(written).Symbols.Keys);
+    }
+
+    [Fact]
+    public void SerializeOver_NoOrUnreadablePreviousFile_IsANewBuild()
+    {
+        var baseline = Baseline(Symbol("UNIT_A", new UnknownOrigin("engine")));
+
+        Assert.Equal(BaselineSerializer.Serialize(baseline), BaselineSerializer.SerializeOver(baseline, null));
+        Assert.Equal(BaselineSerializer.Serialize(baseline), BaselineSerializer.SerializeOver(baseline, [1, 2, 3]));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    private static SerializedBaseline RawDto(byte[] data)
+    {
+        using var gz = new GZipStream(new MemoryStream(data), CompressionMode.Decompress);
+        using var raw = new MemoryStream();
+        gz.CopyTo(raw);
+        return MessagePackSerializer.Deserialize<SerializedBaseline>(raw.ToArray());
+    }
 
     private static BaselineIndex Baseline(params GameSymbol[] symbols)
     {

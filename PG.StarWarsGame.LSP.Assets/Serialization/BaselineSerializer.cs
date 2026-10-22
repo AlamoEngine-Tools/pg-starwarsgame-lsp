@@ -8,23 +8,39 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Serialization;
 
+/// <remarks>
+///     Reproducible: every set and map is written in ordinal order, since a hashed collection
+///     enumerates in an order .NET randomises per process, and <see cref="SerializeOver" /> keeps a
+///     previous file whose content is the same, so a rebuild that changes nothing changes no byte.
+/// </remarks>
 public static class BaselineSerializer
 {
+    /// <summary>
+    ///     The bytes to write over <paramref name="previous" />: those bytes themselves when they hold
+    ///     the same baseline, their build time included; otherwise a new build.
+    /// </summary>
+    public static byte[] SerializeOver(BaselineIndex baseline, byte[]? previous)
+    {
+        if (previous is null || Deserialize(previous) is not { } earlier) return Serialize(baseline);
+        var same = Serialize(baseline with { BuiltAt = earlier.BuiltAt });
+        return same.AsSpan().SequenceEqual(previous) ? previous : Serialize(baseline);
+    }
+
     public static byte[] Serialize(BaselineIndex baseline)
     {
         var dto = new SerializedBaseline
         {
-            Symbols = baseline.Symbols.Values.ToArray(),
+            Symbols = [.. baseline.Symbols.Values.OrderBy(s => s.Id, StringComparer.Ordinal)],
             BuiltAtMs = baseline.BuiltAt.ToUnixTimeMilliseconds(),
             SourceManifestHash = baseline.SourceManifestHash,
             DynamicEnumValues = ToSerializedArray(baseline.DynamicEnumValues),
             HardcodedEnumValues = ToSerializedArray(baseline.HardcodedEnumValues),
             FileTypeMap = ToSerializedArray(baseline.FileTypeMap),
             GroupMemberships = ToSerializedGroupMemberships(baseline.GroupMemberships),
-            AssetFiles = baseline.AssetFiles.ToArray(),
+            AssetFiles = [.. baseline.AssetFiles.Order(StringComparer.Ordinal)],
             ModelBones = ToSerializedArray(baseline.ModelBones),
             ModelTextures = ToSerializedArray(baseline.ModelTextures),
-            ParticleSystems = baseline.ParticleSystems.ToArray(),
+            ParticleSystems = [.. baseline.ParticleSystems.Order(StringComparer.Ordinal)],
             ModelProxies = ToSerializedArray(baseline.ModelProxies),
             ObjectTags = ToSerializedObjectTags(baseline.ObjectTags),
             SchemaVersion = SerializedBaseline.CurrentSchemaVersion
@@ -86,8 +102,11 @@ public static class BaselineSerializer
     private static SerializedObjectTags[] ToSerializedObjectTags(
         ImmutableDictionary<string, ImmutableArray<BaselineTag>> dict)
     {
-        return dict.Select(kv => new SerializedObjectTags { Name = kv.Key, Tags = kv.Value.ToArray() })
-            .ToArray();
+        return
+        [
+            .. dict.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .Select(kv => new SerializedObjectTags { Name = kv.Key, Tags = [.. kv.Value] })
+        ];
     }
 
     private static ImmutableDictionary<string, ImmutableArray<BaselineTag>> FromSerializedObjectTags(
@@ -102,8 +121,11 @@ public static class BaselineSerializer
     private static SerializedEnumValues[] ToSerializedArray(
         ImmutableDictionary<string, ImmutableArray<string>> dict)
     {
-        return dict.Select(kv => new SerializedEnumValues { Name = kv.Key, Values = kv.Value.ToArray() })
-            .ToArray();
+        return
+        [
+            .. dict.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .Select(kv => new SerializedEnumValues { Name = kv.Key, Values = [.. kv.Value] })
+        ];
     }
 
     private static ImmutableDictionary<string, ImmutableArray<string>> FromSerializedArray(
@@ -115,9 +137,11 @@ public static class BaselineSerializer
     private static SerializedGroupMemberships[] ToSerializedGroupMemberships(
         ImmutableDictionary<string, ImmutableArray<GroupMembership>> dict)
     {
-        return dict.Select(kv => new SerializedGroupMemberships
-                { GroupKey = kv.Key, Members = kv.Value.ToArray() })
-            .ToArray();
+        return
+        [
+            .. dict.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .Select(kv => new SerializedGroupMemberships { GroupKey = kv.Key, Members = [.. kv.Value] })
+        ];
     }
 
     private static ImmutableDictionary<string, ImmutableArray<GroupMembership>> FromSerializedGroupMemberships(

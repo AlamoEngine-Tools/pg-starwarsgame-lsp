@@ -550,14 +550,19 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     // ── Serialize ─────────────────────────────────────────────────────────────
 
-    var data = BaselineSerializer.Serialize(baseline);
+    // Over the file it replaces, so a rebuild that changes nothing leaves it - and its manifest hash -
+    // byte for byte as it was.
+    var previous = File.Exists(outputFile) ? await File.ReadAllBytesAsync(outputFile) : null;
+    var data = BaselineSerializer.SerializeOver(baseline, previous);
 
     var outputDir = Path.GetDirectoryName(outputFile);
     if (!string.IsNullOrEmpty(outputDir))
         Directory.CreateDirectory(outputDir);
 
     await File.WriteAllBytesAsync(outputFile, data);
-    Console.WriteLine($"Written: {outputFile} ({data.Length:N0} bytes)");
+    Console.WriteLine(ReferenceEquals(data, previous)
+        ? $"Unchanged: {outputFile} ({data.Length:N0} bytes)"
+        : $"Written: {outputFile} ({data.Length:N0} bytes)");
 
     var manifestFile = Path.ChangeExtension(outputFile, ".manifest.json");
     await File.WriteAllTextAsync(manifestFile,
@@ -611,8 +616,9 @@ static async Task WriteIconSidecarAsync(
             icons = MegaTextureIconExtractor.ExtractAll(directory, textureStream);
         }
 
-        var pack = IconPackSerializer.Serialize(icons, manifestHash, DateTimeOffset.UtcNow);
         var sidecarFile = IconPackSerializer.SidecarPathFor(outputFile);
+        var previous = File.Exists(sidecarFile) ? await File.ReadAllBytesAsync(sidecarFile) : null;
+        var pack = IconPackSerializer.SerializeOver(icons, manifestHash, DateTimeOffset.UtcNow, previous);
         await File.WriteAllBytesAsync(sidecarFile, pack);
         Console.WriteLine($"Icons: {sidecarFile} ({icons.Count} icon(s), {pack.Length:N0} bytes)");
     }
