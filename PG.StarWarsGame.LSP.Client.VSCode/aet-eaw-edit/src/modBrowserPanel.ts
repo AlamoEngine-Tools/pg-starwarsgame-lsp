@@ -20,6 +20,7 @@ const ACTION_COMMANDS: Record<string, { command: string; byName?: true }> = {
     encyclopedia: { command: "aet-eaw-edit.lsp.showEncyclopedia" },
     effectiveObject: { command: "aet-eaw-edit.lsp.showEffectiveObject" },
     previewModel: { command: "aet-eaw-edit.lsp.previewModel", byName: true },
+    previewClip: { command: "aet-eaw-edit.lsp.previewModel", byName: true },
 };
 
 /**

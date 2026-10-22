@@ -84,7 +84,7 @@ public sealed class AssetRelationsTest
             [
                 "data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala", "data/art/models/ev_tie_die.ala",
                 "data/art/models/p_smoke.alo", "data/art/textures/tie.tga", "data/art/textures/smoke.tga",
-                "data/art/textures/i_tie.tga", "data/art/textures/glow.dds"
+                "data/art/textures/i_tie.tga", "data/art/textures/glow.dds", "data/art/models/stray_walk.ala"
             ], ["data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala"]),
             ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_smoke.alo"),
             ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
@@ -136,6 +136,16 @@ public sealed class AssetRelationsTest
         Assert.Equal([("definition", "binary"), ("previewModel", null), ("reveal", "packed")],
             ActionsOf("particleSystems", "p_smoke.alo"));
         Assert.Equal([("definition", "binary"), ("reveal", "packed")], ActionsOf("textures", "tie.tga"));
+    }
+
+    // An animation is worth seeing only on its model: it opens the model preview with itself selected,
+    // where a model pairs with it by name.
+    [Fact]
+    public void AnAnimation_PreviewsOnItsModel_WhereOnePairsWithIt()
+    {
+        Assert.Equal([("definition", "binary"), ("previewClip", null), ("reveal", "packed")],
+            ActionsOf("animations", "ev_tie_die.ala"));
+        Assert.Contains(("previewClip", "unpaired"), ActionsOf("animations", "stray_walk.ala"));
     }
 
     // Every file can be shown in the file manager where there is one on disk; one that only ships

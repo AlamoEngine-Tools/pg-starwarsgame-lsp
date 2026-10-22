@@ -5,6 +5,7 @@ import * as l10n from "@vscode/l10n";
 // The "Preview Model" picker's items and its choice. Kept free of `vscode` so the unit harness can
 // run it; extension.ts owns the QuickPick itself.
 
+import type { PreviewSubject } from "./modelPreviewPanel";
 import { type PreviewModelEntry } from "./protocol/modelPreview";
 
 /** One row of the picker. Structurally a `vscode.QuickPickItem`. */
@@ -40,4 +41,14 @@ export function pickedModelName(
 
     const name = typed.trim();
     return name === "" ? null : name;
+}
+
+/**
+ * What a named model or animation previews as. An animation names no model, so it goes to the
+ * server as one: it pairs the clip with its model and opens the model with the clip selected.
+ */
+export function previewSubjectFor(reference: string): PreviewSubject {
+    return reference.toLowerCase().endsWith(".ala")
+        ? { kind: "animation", animationReference: reference }
+        : { kind: "model", modelReference: reference };
 }

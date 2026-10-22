@@ -71,6 +71,7 @@ export const ACTION_ICONS: Record<string, IconName> = {
     definition: "definition",
     previewUnit: "preview3d",
     previewModel: "preview3d",
+    previewClip: "preview3d",
     encyclopedia: "encyclopediaCard",
     effectiveObject: "effectiveObject",
     copyName: "copy",

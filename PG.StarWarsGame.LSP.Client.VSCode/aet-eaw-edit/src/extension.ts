@@ -37,6 +37,7 @@ import {
     type ModelPickItem,
     modelPickItems,
     pickedModelName,
+    previewSubjectFor,
 } from "./modelPicker";
 import { type ListModelsResult } from "./protocol/modelPreview";
 import { type ServerStatus } from "./protocol/serverStatus";
@@ -3137,7 +3138,7 @@ export async function activate(
                 ModelPreviewPanel.show(
                     context.extensionUri,
                     panelProject(projectKey),
-                    { kind: "model", modelReference: name },
+                    previewSubjectFor(name),
                     name,
                 );
             },

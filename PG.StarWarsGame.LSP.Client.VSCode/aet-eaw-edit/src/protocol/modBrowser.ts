@@ -77,7 +77,10 @@ export interface GetSymbolNodeResult {
 
 /** One thing that can be done with an entry. */
 export interface SymbolAction {
-    /** `definition`, `previewUnit`, `encyclopedia`, `effectiveObject` or `previewModel`. */
+    /**
+     * `definition`, `previewUnit`, `encyclopedia`, `effectiveObject`, `previewModel`, `previewClip`
+     * (an animation, on its model) or `reveal`.
+     */
     action: string;
     /** Why it is unavailable; null when it is available. */
     reason?: string | null;

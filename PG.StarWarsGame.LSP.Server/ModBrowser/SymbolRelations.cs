@@ -124,9 +124,22 @@ public sealed class SymbolRelations(
             _ => "binary"
         });
         if (page == "enums") return [definition];
-        List<SymbolAction> actions = page is "models" or "particleSystems"
-            ? [definition, new SymbolAction("previewModel", _tools.ModelPreview ? null : Off)]
-            : [definition];
+        List<SymbolAction> actions = page switch
+        {
+            "models" or "particleSystems" =>
+                [definition, new SymbolAction("previewModel", _tools.ModelPreview ? null : Off)],
+            // A clip is worth seeing only on its model, which the preview pairs with it by name and
+            // checks against the skeleton; one no model's name prefixes has nothing to play on.
+            "animations" =>
+            [
+                definition, new SymbolAction("previewClip", !_tools.ModelPreview
+                    ? Off
+                    : ModelOf(entry.Name).Any()
+                        ? null
+                        : "unpaired")
+            ],
+            _ => [definition]
+        };
         actions.Add(new SymbolAction("reveal", file is not null
             ? null
             : entry.Origin == "game"

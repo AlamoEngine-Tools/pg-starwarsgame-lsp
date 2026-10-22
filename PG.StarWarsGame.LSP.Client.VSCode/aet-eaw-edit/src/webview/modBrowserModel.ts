@@ -337,6 +337,8 @@ function actionLabel(action: string): string {
             return l10n.t("Show effective object");
         case "previewModel":
             return l10n.t("Preview model");
+        case "previewClip":
+            return l10n.t("Preview on its model");
         case "copyName":
             return l10n.t("Copy name");
         case "reveal":
@@ -357,6 +359,8 @@ function actionReasonLabel(reason: string): string {
             return l10n.t("Defined by the schema");
         case "noModel":
             return l10n.t("Names no model");
+        case "unpaired":
+            return l10n.t("No model by its name");
         case "noEncyclopedia":
             return l10n.t("No encyclopedia text");
         case "planet":
