@@ -56,6 +56,11 @@ export class ModBrowserViewProvider implements ProjectTree<ModBrowserOutlineItem
                           "file-media",
                       ),
                       new ModBrowserOutlineItem(
+                          "scripts",
+                          vscode.l10n.t("Scripts"),
+                          "file-code",
+                      ),
+                      new ModBrowserOutlineItem(
                           "schema",
                           vscode.l10n.t("Schema"),
                           "symbol-enum",

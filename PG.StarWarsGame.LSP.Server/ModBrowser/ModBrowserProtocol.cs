@@ -11,6 +11,7 @@ public static class SymbolOutlines
 {
     public const string GameData = "gameData";
     public const string Assets = "assets";
+    public const string Scripts = "scripts";
     public const string Schema = "schema";
 }
 

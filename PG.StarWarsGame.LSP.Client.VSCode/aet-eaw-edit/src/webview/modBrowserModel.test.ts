@@ -35,6 +35,11 @@ describe("pageIcon", () => {
         assert.equal(pageIcon("luaScripts"), "script");
         assert.equal(pageIcon("enums"), "enumeration");
     });
+
+    // The Scripts outline's lists are the folders under Data/Scripts, each of scripts.
+    it("pictures a folder of scripts as scripts", () => {
+        assert.equal(pageIcon("scripts:GameObject"), "script");
+    });
 });
 
 describe("relationIcon", () => {
@@ -60,6 +65,11 @@ describe("relationIcon", () => {
 
 /** The Mod Browser's words for the server's keys (#270). */
 describe("pageLabel", () => {
+    it("names a folder of scripts by the folder", () => {
+        assert.equal(pageLabel("scripts:GameObject"), "GameObject");
+        assert.equal(pageLabel("scripts:Other"), "Other");
+    });
+
     it("names the game objects' list and keeps every other XML type's own name", () => {
         assert.equal(pageLabel("xml:GameObjectType"), "Game Objects");
         assert.equal(pageLabel("xml:SFXEvent"), "SFXEvent");

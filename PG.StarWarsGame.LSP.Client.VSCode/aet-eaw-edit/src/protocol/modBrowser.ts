@@ -10,7 +10,7 @@ import { GET_ENCYCLOPEDIA_ENTRY } from "./encyclopedia";
 import { GET_MODEL_DETAIL } from "./modelPreview";
 
 /** The outlines the sidebar picks between. */
-export type SymbolOutline = "gameData" | "assets" | "schema";
+export type SymbolOutline = "gameData" | "assets" | "scripts" | "schema";
 
 export const GET_SYMBOL_OUTLINE = "aet/getSymbolOutline";
 export const GET_SYMBOL_PAGE = "aet/getSymbolPage";

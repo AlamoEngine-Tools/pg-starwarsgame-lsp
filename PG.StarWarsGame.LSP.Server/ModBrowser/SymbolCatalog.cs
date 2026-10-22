@@ -71,10 +71,19 @@ public sealed class SymbolCatalog
             .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        string[] assetPages = ["models", "particleSystems", "animations", "textures", "audio", "luaScripts"];
+        string[] assetPages = ["models", "particleSystems", "animations", "textures", "audio"];
         foreach (var page in assetPages) pages[page] = [];
         foreach (var (page, row) in AssetRows(index)) Add(pages, page, row);
-        foreach (var row in ScriptRows(index)) Add(pages, "luaScripts", row);
+        // Every script is on the scripts' page, which its relations find it by and it opens on; the
+        // Scripts outline lists them by the folder they sit in.
+        pages["luaScripts"] = [];
+        var scriptPages = ScriptFolders.Select(f => ScriptsPrefix + f).Append(ScriptsPrefix + OtherScripts).ToList();
+        foreach (var page in scriptPages) pages[page] = [];
+        foreach (var row in ScriptRows(index))
+        {
+            Add(pages, "luaScripts", row);
+            Add(pages, ScriptsPrefix + ScriptFolder(row.Id), row);
+        }
 
         pages["enums"] = enums
             .Select(e => new SymbolRow(e.Name, e.Name, null, [], "game", null, [], "enums"))
@@ -87,6 +96,7 @@ public sealed class SymbolCatalog
         {
             [SymbolOutlines.GameData] = xmlPages,
             [SymbolOutlines.Assets] = assetPages,
+            [SymbolOutlines.Scripts] = scriptPages,
             [SymbolOutlines.Schema] = ["enums"]
         }, kinds.Select(k => k.Kind).Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase).ToList());
@@ -201,10 +211,12 @@ public sealed class SymbolCatalog
         return [.. _kinds.Select(k => new SymbolKindCount(k, counts.GetValueOrDefault(k)))];
     }
 
+    // A row opens on the page it is listed on, unless it names its own: a script listed under its
+    // folder still opens as a script.
     private static void Add(Dictionary<string, List<SymbolRow>> pages, string page, SymbolRow row)
     {
         if (!pages.TryGetValue(page, out var rows)) pages[page] = rows = [];
-        rows.Add(row with { Page = page });
+        rows.Add(row with { Page = row.Page ?? page });
     }
 
     // One row per object name: the highest layer's definition, else the game's.
@@ -279,6 +291,32 @@ public sealed class SymbolCatalog
         return index.Documents.Values
             .Where(d => d.DocumentUri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             .Select(d => new SymbolRow(d.DocumentUri, d.DocumentUri[(d.DocumentUri.LastIndexOf('/') + 1)..], ".lua",
-                [], "layer:" + d.LayerRank, d.LayerName, []));
+                [], "layer:" + d.LayerRank, d.LayerName, [], "luaScripts"));
+    }
+
+    private const string ScriptsPrefix = "scripts:";
+    private const string OtherScripts = "Other";
+
+    /// <summary>
+    ///     The folders both games ship their scripts in under <c>Data/Scripts</c>, in the order the
+    ///     outline lists them. Folder names, not engine rules: only GameObject is a lookup the
+    ///     engine makes (#133).
+    /// </summary>
+    private static readonly string[] ScriptFolders =
+        ["GameObject", "Library", "Story", "AI", "Evaluators", "FreeStore", "Interventions", "Miscellaneous"];
+
+    // The folder right under Data/Scripts a script sits in, as the outline spells it; Other for a
+    // script in none of them, or not under Data/Scripts at all.
+    private static string ScriptFolder(string uri)
+    {
+        const string root = "/data/scripts/";
+        var at = uri.IndexOf(root, StringComparison.OrdinalIgnoreCase);
+        if (at < 0) return OtherScripts;
+        var rest = uri[(at + root.Length)..];
+        var slash = rest.IndexOf('/');
+        if (slash < 0) return OtherScripts;
+        var folder = rest[..slash];
+        return ScriptFolders.FirstOrDefault(f => f.Equals(folder, StringComparison.OrdinalIgnoreCase)) ??
+               OtherScripts;
     }
 }

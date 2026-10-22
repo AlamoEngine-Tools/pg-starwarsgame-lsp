@@ -178,6 +178,38 @@ public sealed class SymbolCatalogTest
         Assert.Equal(["Unit_Fire_SFX"], Page("xml:SFXEvent", origins: ["game"]).Rows.Select(r => r.Name));
     }
 
+    // Lua scripts have an outline of their own, grouped by the folders the games ship under
+    // Data/Scripts; one outside them is Other. Every script still opens as a script.
+    [Fact]
+    public void TheScriptsOutline_GroupsScriptsByTheirFolder_EachOpeningAsAScript()
+    {
+        const string scripts = "file:///c:/work/mod/data/scripts/";
+        var documents = Index().Documents;
+        foreach (var path in new[]
+                 {
+                     "gameobject/TieScript.lua", "Story/Story_Empire.lua", "library/PGBase.lua",
+                     "custom/Thing.lua", "Loose.lua"
+                 })
+            documents = documents.Add(scripts + path,
+                new DocumentIndex(scripts + path, 1, [], [], LayerRank: 1, LayerName: "Mod"));
+        var catalog = SymbolCatalog.Build(Index() with { Documents = documents }, Kinds, []);
+
+        var outline = catalog.Outline(SymbolOutlines.Scripts).ToDictionary(p => p.Page, p => p.Count);
+
+        Assert.Equal(
+        [
+            "scripts:GameObject", "scripts:Library", "scripts:Story", "scripts:AI", "scripts:Evaluators",
+            "scripts:FreeStore", "scripts:Interventions", "scripts:Miscellaneous", "scripts:Other"
+        ], outline.Keys);
+        Assert.Equal((1, 1, 1, 0, 2),
+            (outline["scripts:GameObject"], outline["scripts:Story"], outline["scripts:Library"],
+                outline["scripts:AI"], outline["scripts:Other"]));
+        var script = catalog.Page(new GetSymbolPageParams("scripts:GameObject")).Rows.Single();
+        Assert.Equal(("TieScript.lua", "luaScripts"), (script.Name, script.Page));
+        Assert.NotNull(catalog.Find("luaScripts", "TieScript.lua"));
+        Assert.DoesNotContain("luaScripts", catalog.Outline(SymbolOutlines.Assets).Select(p => p.Page));
+    }
+
     [Fact]
     public void TheAssetsOutline_KeepsModelsAndParticleSystemsApart()
     {

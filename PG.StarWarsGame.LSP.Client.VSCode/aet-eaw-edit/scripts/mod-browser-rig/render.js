@@ -4,7 +4,7 @@
 // Runs the BUILT Mod Browser webview (`out/webview/modBrowser.js`, so `node esbuild.js` first)
 // headless, answering its requests from recorded server answers, and plays a scenario of clicks.
 //
-// Usage: `node render.js <scenario.json> [answers.json] [--outline gameData|assets|schema]`
+// Usage: `node render.js <scenario.json> [answers.json] [--outline gameData|assets|scripts|schema]`
 //
 // A scenario is `[{"click": "<exact text>"}, {"type": "<text>"}, {"wait": <ms>}, ...]`; a click
 // presses the first button, row, cell or tree row whose text is exactly that, a type fills the search
@@ -26,7 +26,7 @@ const flag = (name) => {
 const outline = flag("--outline") ?? "gameData";
 const [scenarioFile, answersArg] = args;
 if (!scenarioFile) {
-    console.error("usage: node render.js <scenario.json> [answers.json] [--outline gameData|assets|schema]");
+    console.error("usage: node render.js <scenario.json> [answers.json] [--outline gameData|assets|scripts|schema]");
     process.exit(2);
 }
 const answersFile = answersArg ?? path.join(OUT, "answers.json");

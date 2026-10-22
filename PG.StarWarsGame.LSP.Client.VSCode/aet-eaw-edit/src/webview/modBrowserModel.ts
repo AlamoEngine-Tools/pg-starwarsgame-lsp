@@ -15,6 +15,8 @@ import type {
 import type { IconName } from "./shared/Icon";
 
 const XML_PREFIX = "xml:";
+/** A Scripts outline list: the scripts in one folder under Data/Scripts. */
+const SCRIPTS_PREFIX = "scripts:";
 
 /** A list's name: the game objects' list by what it holds, every other XML type by its own name. */
 export function pageLabel(page: string): string {
@@ -38,7 +40,9 @@ export function pageLabel(page: string): string {
         default:
             return page.startsWith(XML_PREFIX)
                 ? page.slice(XML_PREFIX.length)
-                : page;
+                : page.startsWith(SCRIPTS_PREFIX)
+                  ? page.slice(SCRIPTS_PREFIX.length)
+                  : page;
     }
 }
 
@@ -60,7 +64,7 @@ export function pageIcon(page: string): IconName {
         case "enums":
             return "enumeration";
         default:
-            return "gameObject";
+            return page.startsWith(SCRIPTS_PREFIX) ? "script" : "gameObject";
     }
 }
 

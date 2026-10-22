@@ -1,5 +1,5 @@
 [
-  {"click": "Lua Scripts", "in": ".rail"},
+  {"click": "GameObject", "in": ".rail"},
   {"wait": 600},
   {"type": "Darthvader"},
   {"click": "Search", "in": ".search-foot"},
