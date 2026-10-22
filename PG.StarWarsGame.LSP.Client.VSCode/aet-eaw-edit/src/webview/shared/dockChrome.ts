@@ -883,6 +883,49 @@ ${tokensCss}
     .data-table th.sortable { cursor: pointer; }
     .data-table th.sortable:hover { color: var(--colour-ink); }
     .data-table th svg { vertical-align: middle; margin-left: var(--space-4); }
+    /* A header's filter button sits after its label, lit while the filter holds rows back. Its
+       right edge is the grip a column is sized by; a header dragged onto another marks where it
+       lands. */
+    .data-table th .th-filter {
+        margin-left: var(--space-4);
+        padding: 0 var(--space-2);
+        border: 0;
+        border-radius: var(--radius-3);
+        background: none;
+        color: var(--colour-faint);
+        cursor: pointer;
+    }
+    .data-table th .th-filter svg { margin-left: 0; }
+    .data-table th .th-filter:hover:not(:disabled) { color: var(--colour-ink); background: var(--colour-hover); }
+    .data-table th .th-filter.active { color: var(--colour-action); }
+    .data-table th .th-filter:disabled { cursor: default; opacity: 0.5; }
+    .data-table th .th-grip {
+        position: absolute;
+        top: 0;
+        right: -3px;
+        width: 6px;
+        height: 100%;
+        cursor: col-resize;
+        z-index: 2;
+    }
+    .data-table th .th-grip:hover { background: var(--vscode-sash-hoverBorder, var(--colour-focus)); }
+    .data-table th.drop-target { box-shadow: inset var(--space-2) 0 0 var(--colour-focus); }
+    /* At the widths the reader dragged to, a cell that does not fit ends in an ellipsis. */
+    .data-table.fixed { table-layout: fixed; min-width: 100%; }
+    .data-table.fixed th, .data-table.fixed td { overflow: hidden; text-overflow: ellipsis; }
+    .column-filter {
+        position: fixed;
+        z-index: 20;
+        display: grid;
+        gap: var(--space-8);
+        min-width: 200px;
+        max-width: 360px;
+        padding: var(--space-8);
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-6);
+        background: var(--colour-panel);
+        box-shadow: 0 var(--space-4) var(--space-12) var(--colour-shadow, rgba(0, 0, 0, 0.36));
+    }
     .data-table td {
         padding: var(--space-2) var(--space-12);
         white-space: nowrap;

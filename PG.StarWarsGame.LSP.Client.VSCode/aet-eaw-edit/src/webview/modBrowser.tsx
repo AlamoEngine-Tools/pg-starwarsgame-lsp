@@ -44,7 +44,7 @@ import {
 import { pickShipName } from "../shipNamePick";
 import { EncyclopediaCard } from "./encyclopediaCard";
 import { factionModes, factionSlotOf } from "./encyclopediaModes";
-import { DataTable } from "./shared/DataTable";
+import { ColumnFilter, DataTable } from "./shared/DataTable";
 import { menuAction, RowMenuFrame } from "./shared/RowMenu";
 import { TabStrip } from "./shared/TabStrip";
 import {
@@ -83,6 +83,14 @@ import { ModeSelector } from "./shared/ModeSelector";
 import { readPanelSize, writePanelSize } from "./shared/panelLayout";
 import { initPanelLayout } from "./shared/panelLayoutBridge";
 import { treeStep } from "./shared/rovingFocus";
+import {
+    moveColumn,
+    readColumnLayout,
+    writeColumnOrder,
+    writeColumnWidth,
+} from "./shared/tableColumns";
+import type { ColumnLayout } from "./shared/tableColumns";
+import type { SortState } from "./shared/tableSort";
 import { useEdgeResize } from "./useEdgeResize";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -197,6 +205,60 @@ function nodeName(node: RailNode): string {
     return node.kind === "entry" ? node.row.name : node.label;
 }
 
+/** A list table's columns, in the table's own order. */
+const COLUMN_KEYS = ["name", "type", "kinds", "origin"];
+
+/**
+ * Where a list's column arrangement is kept: per list - an outline's list by its page, a relation by
+ * its page and relation - so every Models relation shares one arrangement.
+ */
+function columnsOf(list: ListNode): string {
+    return list.parent
+        ? `modBrowser.columns.${list.page}.${list.parent.relation}`
+        : `modBrowser.columns.${list.page}`;
+}
+
+/** A name filter: what to match, applied on Enter or its button, and cleared by its other. */
+function NameFilter({
+    value,
+    onApply,
+}: {
+    value: string;
+    onApply: (query: string) => void;
+}): React.JSX.Element {
+    const [typed, setTyped] = useState(value);
+    return (
+        <form
+            className="name-filter"
+            onSubmit={(event) => {
+                event.preventDefault();
+                onApply(typed.trim());
+            }}
+        >
+            <input
+                autoFocus
+                aria-label={l10n.t("Name")}
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+            />
+            <Button
+                compact
+                disabled={value === ""}
+                disabledReason={l10n.t("No name filter")}
+                onClick={() => {
+                    setTyped("");
+                    onApply("");
+                }}
+            >
+                {l10n.t("Clear")}
+            </Button>
+            <Button compact submit className="primary">
+                {l10n.t("Filter")}
+            </Button>
+        </form>
+    );
+}
+
 /** A node's picture: an entry and an outline list by their type, a relation by what it holds. */
 function nodeIcon(node: RailNode): IconName {
     return node.kind === "list" && node.parent
@@ -278,6 +340,10 @@ function App(): React.JSX.Element {
      * rows the rail draws for it.
      */
     const [filters, setFilters] = useState<Record<string, Filter>>({});
+    /** Each list's sort, by its key, as its header was last clicked; sorted on the server. */
+    const [sorts, setSorts] = useState<Record<string, SortState>>({});
+    /** Bumped when a table's columns are sized or moved: the layout is read from the size store. */
+    const [, setColumnsMoved] = useState(0);
     const [formOpen, setFormOpen] = useState(true);
     const [refreshed, setRefreshed] = useState(0);
     const [menu, setMenu] = useState<Menu | null>(null);
@@ -317,6 +383,7 @@ function App(): React.JSX.Element {
                 setNodes({});
                 setPreviews({});
                 setFilters({});
+                setSorts({});
                 setDraft(NO_FILTER);
             }
             // The index changed: what was loaded may be stale, so it is asked again.
@@ -373,9 +440,15 @@ function App(): React.JSX.Element {
 
     const list = tableList;
     const filter = (list && filters[list.key]) ?? NO_FILTER;
+    const sort = list ? sorts[list.key] : undefined;
 
     const load = useCallback(
-        async (node: ListNode, applied: Filter, offset: number) => {
+        async (
+            node: ListNode,
+            applied: Filter,
+            sorted: SortState | undefined,
+            offset: number,
+        ) => {
             setLoading(true);
             const params: GetSymbolPageParams = {
                 page: node.page,
@@ -383,6 +456,8 @@ function App(): React.JSX.Element {
                 query: applied.query || undefined,
                 kinds: applied.kinds.length ? applied.kinds : undefined,
                 origins: applied.origins.length ? applied.origins : undefined,
+                sort: sorted?.column,
+                descending: sorted?.direction === "desc" || undefined,
                 offset,
                 limit: PAGE_SIZE,
             };
@@ -411,10 +486,10 @@ function App(): React.JSX.Element {
 
     useEffect(() => {
         if (list !== null) {
-            void load(list, filter, 0);
+            void load(list, filter, sort, 0);
         }
         // The list is followed by its key: a new object for the same list must not reload it.
-    }, [list?.key, filter, refreshed, load]);
+    }, [list?.key, filter, sort, refreshed, load]);
 
     const shownOf = (node: ListNode): Loaded =>
         loaded[node.key] ?? { rows: [], total: 0 };
@@ -458,6 +533,8 @@ function App(): React.JSX.Element {
         const result = await request<GetSymbolPageResult>(GET_SYMBOL_PAGE, {
             page: node.page,
             parent: node.parent,
+            sort: sorts[node.key]?.column,
+            descending: sorts[node.key]?.direction === "desc" || undefined,
             limit: PAGE_SIZE,
         });
         setLoaded((known) => ({
@@ -593,6 +670,107 @@ function App(): React.JSX.Element {
     };
 
     const layers = summary?.layers ?? [];
+
+    /**
+     * A column's filter in the table's header. It is the search form's own filter - a change in
+     * either is the other's - and applies at once. The type has none: a list holds one type, or
+     * its entries' types are what the relation is.
+     */
+    const columnFilter = (
+        column: string,
+        applied: Filter,
+        apply: (next: Filter) => void,
+    ): ColumnFilter | undefined => {
+        const toggle = (values: string[], value: string): string[] =>
+            values.includes(value)
+                ? values.filter((v) => v !== value)
+                : [...values, value];
+        switch (column) {
+            case "name":
+                return {
+                    active: applied.query !== "",
+                    content: (
+                        <NameFilter
+                            value={applied.query}
+                            onApply={(query) => apply({ ...applied, query })}
+                        />
+                    ),
+                };
+            case "kinds": {
+                const choices = kindChoices(kinds, applied.kinds);
+                return {
+                    active: applied.kinds.length > 0,
+                    reason:
+                        choices.length === 0
+                            ? l10n.t("Only a game object behaves like a kind")
+                            : undefined,
+                    content: (
+                        <span className="tag-row">
+                            {choices.map((k) => (
+                                <button
+                                    key={k.kind}
+                                    type="button"
+                                    className="tag"
+                                    aria-pressed={applied.kinds.includes(
+                                        k.kind,
+                                    )}
+                                    disabled={k.disabled}
+                                    title={
+                                        k.disabled
+                                            ? l10n.t("None in this list")
+                                            : undefined
+                                    }
+                                    onClick={() =>
+                                        apply({
+                                            ...applied,
+                                            kinds: toggle(
+                                                applied.kinds,
+                                                k.kind,
+                                            ),
+                                        })
+                                    }
+                                >
+                                    {k.label}
+                                </button>
+                            ))}
+                        </span>
+                    ),
+                };
+            }
+            case "origin":
+                return {
+                    active: applied.origins.length > 0,
+                    content: (
+                        <span className="tag-row">
+                            {originChoices(layers).map((o) => (
+                                <button
+                                    key={o}
+                                    type="button"
+                                    className="tag"
+                                    aria-pressed={applied.origins.includes(o)}
+                                    onClick={() =>
+                                        apply({
+                                            ...applied,
+                                            origins: toggle(applied.origins, o),
+                                        })
+                                    }
+                                >
+                                    {originLabel(o, null, layers)}
+                                </button>
+                            ))}
+                        </span>
+                    ),
+                };
+            case "type":
+                return {
+                    active: false,
+                    reason: l10n.t("No filter for the type"),
+                    content: null,
+                };
+            default:
+                return undefined;
+        }
+    };
 
     if (outline === null || summary === null || list === null) {
         return (
@@ -904,7 +1082,47 @@ function App(): React.JSX.Element {
                         onMenu={(x, y, row, index) =>
                             openMenu(x, y, entryOf(list, row), index)
                         }
-                        onMore={() => void load(list, filter, rows.length)}
+                        onMore={() =>
+                            void load(list, filter, sort, rows.length)
+                        }
+                        sort={sort ?? null}
+                        onSort={(next) =>
+                            setSorts((known) => {
+                                const rest = { ...known };
+                                delete rest[list.key];
+                                return next
+                                    ? { ...rest, [list.key]: next }
+                                    : rest;
+                            })
+                        }
+                        layout={readColumnLayout(columnsOf(list), COLUMN_KEYS)}
+                        onResize={(widths) => {
+                            for (const [key, width] of Object.entries(widths)) {
+                                writeColumnWidth(columnsOf(list), key, width);
+                            }
+                            setColumnsMoved((n) => n + 1);
+                        }}
+                        onMove={(from, to) => {
+                            const table = columnsOf(list);
+                            writeColumnOrder(
+                                table,
+                                moveColumn(
+                                    readColumnLayout(table, COLUMN_KEYS).order,
+                                    from,
+                                    to,
+                                ),
+                            );
+                            setColumnsMoved((n) => n + 1);
+                        }}
+                        filter={(column) =>
+                            columnFilter(column, filter, (next) => {
+                                setDraft(next);
+                                setFilters((known) => ({
+                                    ...known,
+                                    [list.key]: next,
+                                }));
+                            })
+                        }
                     />
                 )}
                 {!activeTab && (
@@ -1038,6 +1256,12 @@ function ListPage({
     onAct,
     onMenu,
     onMore,
+    sort,
+    onSort,
+    layout,
+    onResize,
+    onMove,
+    filter,
 }: {
     label: string;
     rows: SymbolRow[];
@@ -1053,6 +1277,14 @@ function ListPage({
     onAct: (action: string, row: SymbolRow) => void;
     onMenu: (x: number, y: number, row: SymbolRow, index: number) => void;
     onMore: () => void;
+    /** The column the server sorts the list by, as its header was last clicked. */
+    sort: SortState | null;
+    onSort: (next: SortState | null) => void;
+    /** The list's columns as the reader arranged them, and the drags that arrange them. */
+    layout: ColumnLayout;
+    onResize: (widths: Record<string, number>) => void;
+    onMove: (from: string, to: string) => void;
+    filter: (column: string) => ColumnFilter | undefined;
 }): React.JSX.Element {
     const hover = useRef<number | undefined>(undefined);
     const rest = (row: SymbolRow) => {
@@ -1108,6 +1340,13 @@ function ListPage({
             rows={rows}
             rowKey={(r) => r.id}
             selected={selectedId}
+            sortable={COLUMN_KEYS}
+            sort={sort}
+            onSort={onSort}
+            layout={layout}
+            onResize={onResize}
+            onMove={onMove}
+            filter={filter}
             inert={(r) =>
                 r.page
                     ? undefined

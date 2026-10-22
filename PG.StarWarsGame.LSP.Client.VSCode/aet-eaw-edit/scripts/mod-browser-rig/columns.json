@@ -1,0 +1,13 @@
+﻿[
+  {"type": "Star_Destroyer"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"click": "Origin", "in": "thead"},
+  {"wait": 300},
+  {"click": "Origin", "in": "thead"},
+  {"wait": 400},
+  {"click": "Filter Behaves like", "in": "thead"},
+  {"wait": 300},
+  {"click": "HeroUnit (2)", "in": ".column-filter"},
+  {"wait": 600}
+]

@@ -51,6 +51,7 @@ import {
     IconEyeClosed,
     IconEyeDotted,
     IconFileCode,
+    IconFilter,
     IconFolderOpen,
     IconFilterOff,
     IconFlag,
@@ -264,6 +265,8 @@ const ICONS = {
     // Taking every filter OFF at once. Not `reset`, which undoes what you did to the SUBJECT, and
     // not `search`, which is the control that put a filter on in the first place.
     clearFilter: IconFilterOff,
+    // A column's own filter, in its header.
+    filter: IconFilter,
 
     // Recomputing the automatic layout. The glyph is the shape the layout produces - a graph laid
     // out in ranks - because "arrange" on its own could mean sorting a list.

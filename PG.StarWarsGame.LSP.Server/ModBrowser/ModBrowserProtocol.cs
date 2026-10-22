@@ -41,6 +41,14 @@ public sealed record GetSymbolPageParams(string Page) : IRequest<GetSymbolPageRe
     /// <summary>Origins an entry must come from (<c>game</c>, <c>project</c>, <c>layer:N</c>); none filters nothing.</summary>
     public IReadOnlyList<string>? Origins { get; init; }
 
+    /// <summary>
+    ///     The column the entries are sorted by - <c>name</c>, <c>type</c>, <c>kinds</c> or <c>origin</c> -
+    ///     before the page is cut; none keeps the list's own order.
+    /// </summary>
+    public string? Sort { get; init; }
+
+    public bool Descending { get; init; }
+
     public int Offset { get; init; }
 
     public int Limit { get; init; } = 200;

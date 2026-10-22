@@ -142,6 +142,34 @@ public sealed class SymbolCatalogTest
         Assert.Equal(["Hero_Ship"], page.Rows.Select(r => r.Name));
     }
 
+    // Sorted on the server, before the page is cut: the table holds a page, and sorting only the rows
+    // it holds would show a wrong order.
+    [Fact]
+    public void APage_IsSortedByAColumn_BeforeItIsPaged()
+    {
+        GetSymbolPageResult Sorted(string column, bool descending, int limit = 200, string? query = null)
+        {
+            return Catalog().Page(new GetSymbolPageParams("xml:GameObjectType")
+                { Sort = column, Descending = descending, Limit = limit, Query = query });
+        }
+
+        Assert.Equal(["Star_Destroyer", "Hero_Ship", "Core_Frigate"],
+            Sorted("name", true).Rows.Select(r => r.Name));
+        var first = Sorted("name", true, 1);
+        Assert.Equal(["Star_Destroyer"], first.Rows.Select(r => r.Name));
+        Assert.Equal(3, first.Total);
+        // By what an entry behaves like, ties by name.
+        Assert.Equal(["Hero_Ship", "Core_Frigate", "Star_Destroyer"],
+            Sorted("kinds", false).Rows.Select(r => r.Name));
+        // From the project's own layer down to the game's, as the panel reads origins.
+        Assert.Equal(["Core_Frigate", "Hero_Ship", "Star_Destroyer"],
+            Sorted("origin", false).Rows.Select(r => r.Name));
+        Assert.Equal(["Star_Destroyer", "Core_Frigate", "Hero_Ship"],
+            Sorted("origin", true).Rows.Select(r => r.Name));
+        // A column asked for wins over the query's own order.
+        Assert.Equal(["Hero_Ship", "Star_Destroyer"], Sorted("name", false, query: "s").Rows.Select(r => r.Name));
+    }
+
     [Fact]
     public void TheKindsAndOriginFilters_Narrow()
     {

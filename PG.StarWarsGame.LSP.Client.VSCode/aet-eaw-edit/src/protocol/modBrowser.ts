@@ -178,6 +178,12 @@ export interface GetSymbolPageParams {
     kinds?: string[];
     /** Origins an entry must come from: `game`, `project`, `layer:N`. */
     origins?: string[];
+    /**
+     * The column sorted by - `name`, `type`, `kinds` or `origin` - before the page is cut; none
+     * keeps the list's own order.
+     */
+    sort?: string;
+    descending?: boolean;
     offset?: number;
     limit?: number;
     /** When set, the page lists this entry's relation. */

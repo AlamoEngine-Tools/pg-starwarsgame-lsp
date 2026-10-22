@@ -64,10 +64,11 @@ window.acquireVsCodeApi = () => ({
 });
 function find(text, scope) {
     const root = scope ? document.querySelector(scope) : document;
-    const hit = [...(root?.querySelectorAll("button, tr, td, b, [role=treeitem] .label") ?? [])]
-        .find((el) => el.textContent.trim() === text);
+    const hit = [...(root?.querySelectorAll("button, tr, th, td, b, [role=treeitem] .label") ?? [])]
+        .find((el) => el.textContent.trim() === text)
+        ?? [...(root?.querySelectorAll("[title]") ?? [])].find((el) => el.title === text);
     if (!hit) { window.__MISSES__.push(["click", text]); return null; }
-    return hit.closest("button, tr, [role=treeitem]") ?? hit;
+    return hit.closest("button, tr, th, [role=treeitem]") ?? hit;
 }
 function press(text, scope) {
     find(text, scope)?.click();

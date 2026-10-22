@@ -153,11 +153,42 @@ public sealed class SymbolCatalog
         var filtered = request.Kinds is { Count: > 0 } kinds
             ? [.. unkinded.Where(r => r.Kinds.Any(k => kinds.Contains(k, StringComparer.OrdinalIgnoreCase)))]
             : unkinded;
+        if (request.Sort is { } column) filtered = Sorted(filtered, column, request.Descending);
         var slice = filtered
             .Skip(Math.Max(0, request.Offset))
             .Take(Math.Clamp(request.Limit, 1, MostPerPage))
             .ToList();
         return new GetSymbolPageResult(slice, filtered.Count) { Kinds = KindCounts(rows, unkinded) };
+    }
+
+    // A column's order, ties by name. Origins run from the project's own layer down to the game's -
+    // the leafiest layer first - and a name nothing defines last; an unknown column keeps the list's.
+    private static List<SymbolRow> Sorted(List<SymbolRow> rows, string column, bool descending)
+    {
+        Func<SymbolRow, IComparable>? key = column switch
+        {
+            "name" => r => r.Name.ToLowerInvariant(),
+            "type" => r => (r.Type ?? string.Empty).ToLowerInvariant(),
+            "kinds" => r => string.Join(",", r.Kinds).ToLowerInvariant(),
+            "origin" => r => OriginRank(r.Origin),
+            _ => null
+        };
+        if (key is null) return rows;
+        var ordered = descending ? rows.OrderByDescending(key) : rows.OrderBy(key);
+        return [.. ordered.ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    private static int OriginRank(string origin)
+    {
+        return origin switch
+        {
+            "project" => int.MinValue,
+            "game" => int.MaxValue - 1,
+            "missing" => int.MaxValue,
+            _ when origin.StartsWith("layer:", StringComparison.Ordinal) &&
+                   int.TryParse(origin.AsSpan("layer:".Length), out var rank) => -rank,
+            _ => int.MaxValue - 2
+        };
     }
 
     private IReadOnlyList<SymbolKindCount> KindCounts(IReadOnlyList<SymbolRow> rows, List<SymbolRow> matching)

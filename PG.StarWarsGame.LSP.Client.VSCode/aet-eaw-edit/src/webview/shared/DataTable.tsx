@@ -5,10 +5,12 @@
 // dockChromeCss; the keys follow rovingFocus, a header click cycles tableSort. What a row IS, and
 // what it can do, is the owner's: the table draws, selects and moves focus.
 
-import { ReactNode, useRef } from "react";
+import * as l10n from "@vscode/l10n";
+import { ReactNode, useEffect, useRef, useState } from "react";
 
 import { Icon } from "./Icon";
 import { rowStep } from "./rovingFocus";
+import type { ColumnLayout } from "./tableColumns";
 import { nextSort, SortState } from "./tableSort";
 
 export interface DataColumn<R> {
@@ -52,7 +54,30 @@ export interface DataTableProps<R> {
     /** Said in place of the rows when there are none. */
     empty: string;
     foot?: ReactNode;
+    /**
+     * The reader's arrangement of the columns. Without it the columns keep the table's order and
+     * size to what they hold; with widths for every column, they keep those.
+     */
+    layout?: ColumnLayout;
+    /** Every column's width, once one is dragged by its header's edge: the rest keep the width drawn. */
+    onResize?: (widths: Record<string, number>) => void;
+    /** A column dragged by its header onto another, which it takes the place of. */
+    onMove?: (from: string, to: string) => void;
+    /** A column's filter, opened from its header; none for a column without one. */
+    filter?: (column: string) => ColumnFilter | undefined;
 }
+
+/** A column's filter in its header: what it shows when opened, and whether it narrows the rows. */
+export interface ColumnFilter {
+    /** It holds rows back. */
+    active: boolean;
+    /** Why the column cannot be filtered, for one that cannot. */
+    reason?: string;
+    content: ReactNode;
+}
+
+/** The narrowest a column is dragged to. */
+const MIN_COLUMN_WIDTH = 48;
 
 export function DataTable<R>({
     label,
@@ -73,8 +98,62 @@ export function DataTable<R>({
     actions,
     empty,
     foot,
+    layout,
+    onResize,
+    onMove,
+    filter,
 }: DataTableProps<R>): React.JSX.Element {
     const body = useRef<HTMLTableSectionElement>(null);
+    const head = useRef<HTMLTableRowElement>(null);
+    const [openFilter, setOpenFilter] = useState<{
+        column: string;
+        x: number;
+        y: number;
+    } | null>(null);
+    const shown = layout
+        ? layout.order.flatMap((key) => columns.filter((c) => c.key === key))
+        : [...columns];
+    const widths = layout?.widths ?? {};
+    const fixed = shown.every((c) => widths[c.key] !== undefined);
+
+    // A drag by a header's edge: every column's width as drawn is taken when it starts, so the
+    // others keep theirs once the table lays out at fixed widths.
+    const resizeFrom = (
+        column: string,
+        e: React.PointerEvent<HTMLSpanElement>,
+    ): void => {
+        if (!onResize) {
+            return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        const cells = [
+            ...(head.current?.querySelectorAll<HTMLElement>(
+                "th[data-column]",
+            ) ?? []),
+        ];
+        const start: Record<string, number> = {};
+        for (const cell of cells) {
+            start[cell.dataset.column ?? ""] = Math.round(cell.offsetWidth);
+        }
+        const x = e.clientX;
+        const grip = e.currentTarget;
+        grip.setPointerCapture(e.pointerId);
+        const move = (ev: PointerEvent): void =>
+            onResize({
+                ...start,
+                [column]: Math.max(
+                    MIN_COLUMN_WIDTH,
+                    start[column] + ev.clientX - x,
+                ),
+            });
+        const stop = (): void => {
+            grip.removeEventListener("pointermove", move);
+            grip.removeEventListener("pointerup", stop);
+        };
+        grip.addEventListener("pointermove", move);
+        grip.addEventListener("pointerup", stop);
+    };
     const selectedAt = rows.findIndex((r) => rowKey(r) === selected);
     const tabStop = selectedAt === -1 ? 0 : selectedAt;
 
@@ -125,10 +204,34 @@ export function DataTable<R>({
     return (
         <div className="data-table-frame">
             <div className="data-table-scroll">
-                <table className="data-table" aria-label={label}>
+                <table
+                    className={fixed ? "data-table fixed" : "data-table"}
+                    aria-label={label}
+                    style={
+                        fixed
+                            ? {
+                                  width: shown.reduce(
+                                      (sum, c) => sum + widths[c.key],
+                                      0,
+                                  ),
+                              }
+                            : undefined
+                    }
+                >
+                    {fixed && (
+                        <colgroup>
+                            {shown.map((c) => (
+                                <col
+                                    key={c.key}
+                                    style={{ width: widths[c.key] }}
+                                />
+                            ))}
+                            {actions && <col style={{ width: 0 }} />}
+                        </colgroup>
+                    )}
                     <thead>
-                        <tr>
-                            {columns.map((c) => (
+                        <tr ref={head}>
+                            {shown.map((c) => (
                                 <HeadCell
                                     key={c.key}
                                     column={c}
@@ -138,6 +241,20 @@ export function DataTable<R>({
                                     }
                                     sort={sort ?? null}
                                     onSort={onSort}
+                                    filter={filter?.(c.key)}
+                                    onFilter={(x, y) =>
+                                        setOpenFilter((open) =>
+                                            open?.column === c.key
+                                                ? null
+                                                : { column: c.key, x, y },
+                                        )
+                                    }
+                                    onResizeStart={
+                                        onResize
+                                            ? (e) => resizeFrom(c.key, e)
+                                            : undefined
+                                    }
+                                    onMove={onMove}
                                 />
                             ))}
                             {actions && <th aria-hidden="true" />}
@@ -185,7 +302,7 @@ export function DataTable<R>({
                                         }
                                     }}
                                 >
-                                    {columns.map((c) => (
+                                    {shown.map((c) => (
                                         <td
                                             key={c.key}
                                             className={
@@ -211,6 +328,19 @@ export function DataTable<R>({
                     <p className="data-table-empty">{empty}</p>
                 )}
             </div>
+            {openFilter && filter?.(openFilter.column) && (
+                <FilterFlyout
+                    x={openFilter.x}
+                    y={openFilter.y}
+                    label={
+                        columns.find((c) => c.key === openFilter.column)
+                            ?.label ?? ""
+                    }
+                    onClose={() => setOpenFilter(null)}
+                >
+                    {filter(openFilter.column)?.content}
+                </FilterFlyout>
+            )}
             {foot !== undefined && (
                 <div className="data-table-foot">{foot}</div>
             )}
@@ -218,54 +348,178 @@ export function DataTable<R>({
     );
 }
 
-/** A column's header: a click, Enter or Space cycles its sort when the table sorts by it. */
+/**
+ * A column's header. A click, Enter or Space cycles its sort when the table sorts by it; its filter
+ * button opens the column's filter; its right edge is dragged to size it, and the header itself onto
+ * another to move it there.
+ */
 function HeadCell<R>({
     column,
     sortable,
     sort,
     onSort,
+    filter,
+    onFilter,
+    onResizeStart,
+    onMove,
 }: {
     column: DataColumn<R>;
     sortable: boolean;
     sort: SortState | null;
     onSort?: (next: SortState | null) => void;
+    filter?: ColumnFilter;
+    onFilter: (x: number, y: number) => void;
+    onResizeStart?: (e: React.PointerEvent<HTMLSpanElement>) => void;
+    onMove?: (from: string, to: string) => void;
 }): React.JSX.Element {
-    if (!sortable || onSort === undefined) {
-        return <th scope="col">{column.label}</th>;
-    }
-    const active = sort?.column === column.key ? sort : null;
-    const cycle = (): void => onSort(nextSort(sort, column.key));
+    const [dropping, setDropping] = useState(false);
+    const sorts = sortable && onSort !== undefined;
+    const active = sorts && sort?.column === column.key ? sort : null;
+    const cycle = (): void => {
+        if (sorts) {
+            onSort(nextSort(sort, column.key));
+        }
+    };
     return (
         <th
-            className="sortable"
-            scope="col"
-            tabIndex={0}
-            aria-sort={
-                active === null
-                    ? "none"
-                    : active.direction === "asc"
-                      ? "ascending"
-                      : "descending"
+            className={
+                [sorts ? "sortable" : null, dropping ? "drop-target" : null]
+                    .filter(Boolean)
+                    .join(" ") || undefined
             }
+            scope="col"
+            data-column={column.key}
+            tabIndex={sorts ? 0 : undefined}
+            aria-sort={
+                !sorts
+                    ? undefined
+                    : active === null
+                      ? "none"
+                      : active.direction === "asc"
+                        ? "ascending"
+                        : "descending"
+            }
+            draggable={onMove !== undefined}
+            onDragStart={(e) => {
+                e.dataTransfer.setData("text/x-column", column.key);
+                e.dataTransfer.effectAllowed = "move";
+            }}
+            onDragOver={(e) => {
+                if (onMove && e.dataTransfer.types.includes("text/x-column")) {
+                    e.preventDefault();
+                    setDropping(true);
+                }
+            }}
+            onDragLeave={() => setDropping(false)}
+            onDrop={(e) => {
+                setDropping(false);
+                const from = e.dataTransfer.getData("text/x-column");
+                if (onMove && from) {
+                    e.preventDefault();
+                    onMove(from, column.key);
+                }
+            }}
             onClick={cycle}
             onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
+                if (sorts && (e.key === "Enter" || e.key === " ")) {
                     e.preventDefault();
                     cycle();
                 }
             }}
         >
-            {column.label}
-            {active && (
-                <Icon
-                    name={
-                        active.direction === "asc"
-                            ? "sortAscending"
-                            : "sortDescending"
-                    }
-                    size={12}
+            <span className="th-label">
+                {column.label}
+                {active && (
+                    <Icon
+                        name={
+                            active.direction === "asc"
+                                ? "sortAscending"
+                                : "sortDescending"
+                        }
+                        size={12}
+                    />
+                )}
+            </span>
+            {filter && (
+                <button
+                    type="button"
+                    className={filter.active ? "th-filter active" : "th-filter"}
+                    disabled={filter.reason !== undefined}
+                    aria-pressed={filter.active}
+                    title={filter.reason ?? l10n.t("Filter {0}", column.label)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        const box = e.currentTarget.getBoundingClientRect();
+                        onFilter(box.left, box.bottom + 2);
+                    }}
+                >
+                    <Icon name="filter" size={12} />
+                </button>
+            )}
+            {onResizeStart && (
+                <span
+                    className="th-grip"
+                    title={l10n.t("Drag to resize")}
+                    draggable={false}
+                    onPointerDown={onResizeStart}
+                    onClick={(e) => e.stopPropagation()}
+                    onDragStart={(e) => e.preventDefault()}
                 />
             )}
         </th>
+    );
+}
+
+/**
+ * A column's filter, opened below its header and over the rows, as a flyout rather than a
+ * collapsible: the table does not move. Escape or a click outside closes it.
+ */
+function FilterFlyout({
+    x,
+    y,
+    label,
+    onClose,
+    children,
+}: {
+    x: number;
+    y: number;
+    label: string;
+    onClose: () => void;
+    children: ReactNode;
+}): React.JSX.Element {
+    const frame = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const away = (e: PointerEvent): void => {
+            // A header's filter button toggles it itself.
+            const target = e.target as Element;
+            if (
+                !frame.current?.contains(target) &&
+                target.closest(".th-filter") === null
+            ) {
+                onClose();
+            }
+        };
+        const escape = (e: KeyboardEvent): void => {
+            if (e.key === "Escape") {
+                onClose();
+            }
+        };
+        window.addEventListener("pointerdown", away);
+        window.addEventListener("keydown", escape);
+        return () => {
+            window.removeEventListener("pointerdown", away);
+            window.removeEventListener("keydown", escape);
+        };
+    }, [onClose]);
+    return (
+        <div
+            ref={frame}
+            className="column-filter"
+            role="dialog"
+            aria-label={l10n.t("Filter {0}", label)}
+            style={{ left: x, top: y }}
+        >
+            {children}
+        </div>
     );
 }
