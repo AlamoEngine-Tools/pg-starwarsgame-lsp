@@ -52,8 +52,11 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
             return Task.FromResult<CodeLensContainer?>(null);
 
         var index = _indexService.Current;
+        // A dynamic enum value's definition is no symbol, and a file defining only values - an enum file
+        // under Data/XML/Enum - may hold none.
+        var enumLenses = EnumValueLenses(uri, index).ToList();
         if (!index.Documents.TryGetValue(uri, out var docIndex))
-            return Task.FromResult<CodeLensContainer?>(new CodeLensContainer());
+            return Task.FromResult<CodeLensContainer?>(new CodeLensContainer(enumLenses));
 
         var lenses = new List<LspCodeLens>();
         foreach (var symbol in docIndex.Symbols)
@@ -74,8 +77,25 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
         // clickable to peek them - making the otherwise-invisible grouping obvious in the editor.
         foreach (var lens in GroupMembershipLenses(uri, docIndex, index))
             lenses.Add(lens);
+        lenses.AddRange(enumLenses);
 
         return Task.FromResult<CodeLensContainer?>(new CodeLensContainer(lenses));
+    }
+
+    // One lens per dynamic enum value this document defines - in an enum file, or a GameConstants list -
+    // counting its uses: references to enum:<Enum>/<Value>, as the parser records them and rename edits them.
+    private IEnumerable<LspCodeLens> EnumValueLenses(string uri, GameIndex index)
+    {
+        var messages = new ConfiguredMessageCatalog(_config);
+        foreach (var (enumName, values) in index.WorkspaceEnumValueDefinitions)
+        foreach (var (value, origin) in values)
+        {
+            if (!origin.IsNavigable || _fileHelper.NormalizeUri(origin.Uri) != uri) continue;
+            var refs = index.WorkspaceReferences.TryGetValue($"enum:{enumName}/{value}", out var found)
+                ? found
+                : [];
+            yield return ReferencesCodeLensProvider.For(uri, origin.Line, origin.Column ?? 0, refs, messages);
+        }
     }
 
     // One lens per group-key tag occurrence in this document: "{n} {MemberType}s in this group",
