@@ -232,7 +232,7 @@
   the game uses ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
   - A **Mod Browser** view with the outlines Game Data, Assets and Schema; one panel per project
   - A rail of lists, their entries and each entry's relations, whose path is the breadcrumb; a table paged on the
-    server, with a search form - name, kind with its count, origin
+    server, with a search form - name, what it behaves like with its count, origin
   - An object's relations by what each is - models, particle systems, particles, SFX and speech events,
     hardpoints, textures, its Lua script - with its references and every layer defining it; an empty one
     counted zero, with the reason
@@ -240,9 +240,11 @@
     loaders and requires, an enum's tags, the objects referencing an asset
   - An object's page: where the definition the game uses is, what it overrides and is a variant of, and its
     encyclopedia card with the faction switch
-  - A click or `Enter` opens an entry, a double click or `F12` goes to its definition; the context menu and a
-    row's hover icons carry the code lens set - preview unit, encyclopedia card, effective object, preview model -
-    an unavailable one disabled with the reason
+  - A click selects an entry; a double click or `Enter` opens it in a tab beside the table's own, one preview
+    tab reused until it is pinned; `F12` goes to its definition
+  - The context menu lists only what can be done; a row's hover icons and the entry's page carry the code lens
+    set - preview unit, encyclopedia card, effective object, preview model - an unavailable one disabled with
+    the reason
   - The Preview Model picker lists models only, without particle systems
   - Flag `aet-eaw-edit.features.tools.modBrowser`, on by default
 

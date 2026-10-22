@@ -7,9 +7,11 @@
 // relation is a list again; the path to the open node is the breadcrumb. A list carries its search
 // form at the bottom; an entry shows its header and, for a game object, its encyclopedia card.
 //
-// A click on a row opens it, a double click goes to its definition; Enter and F12 do the same from
-// the keyboard, and the twisty only expands. What else an entry offers - the code lens set - is on
-// its context menu, on the row's hover icons and on its page.
+// A click selects a row, in the table and the rail alike; a double click or Enter opens the entry
+// in a tab beside the table's own, which keeps the table as it was left. One preview tab is reused
+// until it is pinned, as VS Code's italic preview tab. F12 goes to the definition, and the twisty
+// only expands. What else an entry offers - the code lens set - is on its context menu, which lists
+// only what can be done, on the row's hover icons and on its page.
 //
 // Every request goes through the host, which sends it to this panel's own project's server.
 
@@ -45,12 +47,21 @@ import {
     KindChoice,
     kindChoices,
     locationLabel,
+    menuChoices,
     originChoices,
     originLabel,
     pageLabel,
     reasonLabel,
     relationLabel,
 } from "./modBrowserModel";
+import {
+    closeTab,
+    NO_TABS,
+    openPreview,
+    pinTab,
+    showTable,
+    Tabs,
+} from "./modBrowserTabs";
 import { Button } from "./shared/Button";
 import { IconButton } from "./shared/Button";
 import { dockChromeCss, dockHeaderCss } from "./shared/dockChrome";
@@ -168,6 +179,11 @@ function nodeName(node: RailNode): string {
     return node.kind === "entry" ? node.row.name : node.label;
 }
 
+/** An entry's tab: one per entry, however many paths in the rail lead to it. */
+function tabKey(node: EntryNode): string {
+    return `${node.page}\n${node.row.id}`;
+}
+
 /** An open context menu: where, and on which entry. */
 interface Menu {
     x: number;
@@ -196,7 +212,11 @@ const shipNames = new Map<string, string | null>();
 function App(): React.JSX.Element {
     const [outline, setOutline] = useState<SymbolOutline | null>(null);
     const [summary, setSummary] = useState<GetSymbolOutlineResult | null>(null);
+    /** What is selected - in the rail and, when it is one of its rows, in the table. */
     const [current, setCurrent] = useState<RailNode | null>(null);
+    /** The list the table's tab shows. */
+    const [tableList, setTableList] = useState<ListNode | null>(null);
+    const [tabs, setTabs] = useState<Tabs<EntryNode>>(NO_TABS);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     /**
      * Every list's loaded rows, the table's among them. The rail draws a list's children from here,
@@ -225,6 +245,8 @@ function App(): React.JSX.Element {
             if (msg.type === "outline" && msg.outline) {
                 setOutline(msg.outline);
                 setCurrent(null);
+                setTableList(null);
+                setTabs(NO_TABS);
                 setExpanded(new Set());
                 setLoaded({});
                 setNodes({});
@@ -265,23 +287,22 @@ function App(): React.JSX.Element {
             setSummary(result);
             const first = result?.pages[0];
             if (first) {
-                setCurrent(
-                    (open) =>
-                        open ?? {
-                            kind: "list",
-                            key: first.page,
-                            page: first.page,
-                            label: pageLabel(first.page),
-                            count: first.count,
-                            trail: [],
-                        },
-                );
+                const firstList: ListNode = {
+                    kind: "list",
+                    key: first.page,
+                    page: first.page,
+                    label: pageLabel(first.page),
+                    count: first.count,
+                    trail: [],
+                };
+                setCurrent((open) => open ?? firstList);
+                setTableList((open) => open ?? firstList);
                 setExpanded((open) => new Set(open).add(first.page));
             }
         });
     }, [outline, refreshed]);
 
-    const list = current?.kind === "list" ? current : null;
+    const list = tableList;
 
     const load = useCallback(
         async (node: ListNode, applied: Filter, offset: number) => {
@@ -399,15 +420,30 @@ function App(): React.JSX.Element {
     };
 
     const select = (node: RailNode) => {
-        // Back to the list the table holds keeps its search; another list starts unfiltered.
-        if (node.kind === "list" && node.key !== tableKey) {
-            setDraft(NO_FILTER);
-            setFilter(NO_FILTER);
-        } else if (node.kind === "entry") {
+        if (node.kind === "list") {
+            // Back to the list the table holds keeps its search; another list starts unfiltered.
+            if (node.key !== tableKey) {
+                setDraft(NO_FILTER);
+                setFilter(NO_FILTER);
+            }
+            setTableList(node);
+            setTabs((open) => showTable(open));
+            expand(node, true);
+        } else {
             void fetchNode(node);
         }
+        setCurrent(node);
+    };
+
+    /** Opens an entry in the foreground, in its own tab or the one unpinned preview tab. */
+    const openEntry = (node: EntryNode) => {
+        if (!node.row.page) {
+            return;
+        }
+        void fetchNode(node);
         expand(node, true);
         setCurrent(node);
+        setTabs((known) => openPreview(known, tabKey(node), node));
     };
 
     /** Does one item of an entry's menu. */
@@ -420,7 +456,7 @@ function App(): React.JSX.Element {
             return;
         }
         if (action === "open") {
-            select(node);
+            openEntry(node);
         } else if (action === "definition") {
             const location = (await fetchNode(node))?.location;
             if (location) {
@@ -452,7 +488,7 @@ function App(): React.JSX.Element {
 
     const layers = summary?.layers ?? [];
 
-    if (outline === null || summary === null || current === null) {
+    if (outline === null || summary === null || list === null) {
         return (
             <Shell>
                 <p className="empty">{l10n.t("Loading...")}</p>
@@ -467,7 +503,7 @@ function App(): React.JSX.Element {
         return (
             <div key={node.key}>
                 <div
-                    className={`node${current.key === node.key ? " selected" : ""}`}
+                    className={`node${current?.key === node.key ? " selected" : ""}`}
                     style={{ "--depth": depth } as React.CSSProperties}
                     onContextMenu={(e) => {
                         if (node.kind === "entry") {
@@ -503,11 +539,17 @@ function App(): React.JSX.Element {
                         title={inert ? inertReason(node) : undefined}
                         onClick={() => select(node)}
                         onDoubleClick={() =>
-                            node.kind === "entry" &&
-                            void act("definition", node)
+                            node.kind === "entry" && openEntry(node)
                         }
                         onKeyDown={(e) => {
-                            if (node.kind === "entry" && e.key === "F12") {
+                            if (node.kind !== "entry") {
+                                return;
+                            }
+                            if (e.key === "Enter") {
+                                // Not a click: a click only selects.
+                                e.preventDefault();
+                                openEntry(node);
+                            } else if (e.key === "F12") {
                                 e.preventDefault();
                                 void act("definition", node);
                             }
@@ -547,7 +589,14 @@ function App(): React.JSX.Element {
         );
     };
 
-    const crumbs = [...current.trail, current];
+    const activeTab =
+        tabs.previews.find((t) => t.key === tabs.active)?.item ?? null;
+    const shown: RailNode = activeTab ?? list;
+    const crumbs = [...shown.trail, shown];
+    const selectedRow =
+        current?.kind === "entry" && current.key.startsWith(`${list.key}\n`)
+            ? current.row.id
+            : null;
 
     return (
         <Shell>
@@ -555,6 +604,16 @@ function App(): React.JSX.Element {
                 {tops.map((top) => renderNode(top, 0))}
             </nav>
             <main className="page">
+                <TabStrip
+                    table={list.label}
+                    tabs={tabs}
+                    onTable={() => setTabs((known) => showTable(known))}
+                    onTab={(key) =>
+                        setTabs((known) => ({ ...known, active: key }))
+                    }
+                    onPin={(key) => setTabs((known) => pinTab(known, key))}
+                    onClose={(key) => setTabs((known) => closeTab(known, key))}
+                />
                 <header className="crumbs">
                     {crumbs.map((node, i) => (
                         <span key={node.key} className="crumb-step">
@@ -563,7 +622,11 @@ function App(): React.JSX.Element {
                                 <button
                                     type="button"
                                     className="crumb"
-                                    onClick={() => select(node)}
+                                    onClick={() =>
+                                        node.kind === "list"
+                                            ? select(node)
+                                            : openEntry(node)
+                                    }
                                 >
                                     {nodeName(node)}
                                 </button>
@@ -572,7 +635,7 @@ function App(): React.JSX.Element {
                             )}
                         </span>
                     ))}
-                    {list && (
+                    {!activeTab && (
                         <span className="end">
                             {l10n.t(
                                 "{0} of {1}",
@@ -582,64 +645,64 @@ function App(): React.JSX.Element {
                         </span>
                     )}
                 </header>
-                {current.kind === "entry" ? (
+                {activeTab ? (
                     <EntryPage
-                        node={current}
-                        result={nodes[current.key] ?? null}
+                        node={activeTab}
+                        result={nodes[activeTab.key] ?? null}
                         layers={layers}
                         onOpenBase={(base) =>
-                            select({
+                            openEntry({
                                 kind: "entry",
-                                key: `${current.key}\n${base}`,
-                                page: current.page,
+                                key: `${activeTab.key}\n${base}`,
+                                page: activeTab.page,
                                 row: {
                                     id: base,
                                     name: base,
                                     kinds: [],
                                     origin: "",
                                     overrides: [],
-                                    page: current.page,
+                                    page: activeTab.page,
                                 },
                                 // Reached from the variant, so the way back is the variant.
-                                trail: [...current.trail, current],
+                                trail: [...activeTab.trail, activeTab],
                             })
                         }
-                        onAct={(action) => void act(action, current)}
+                        onAct={(action) => void act(action, activeTab)}
                     />
                 ) : (
                     <ListPage
-                        node={current}
+                        node={list}
                         rows={rows}
                         total={total}
                         loading={loading}
                         layers={layers}
-                        nodeOf={(row) => nodes[entryOf(current, row).key]}
-                        onHover={(row) => void fetchNode(entryOf(current, row))}
+                        selectedId={selectedRow}
+                        nodeOf={(row) => nodes[entryOf(list, row).key]}
+                        onHover={(row) => void fetchNode(entryOf(list, row))}
+                        onSelect={(row) => select(entryOf(list, row))}
                         onAct={(action, row) =>
-                            void act(action, entryOf(current, row))
+                            void act(action, entryOf(list, row))
                         }
                         onMenu={(x, y, row, index) =>
-                            openMenu(x, y, entryOf(current, row), index)
+                            openMenu(x, y, entryOf(list, row), index)
                         }
-                        onMore={() => void load(current, filter, rows.length)}
+                        onMore={() => void load(list, filter, rows.length)}
                     />
                 )}
-                {current.kind === "list" && (
+                {!activeTab && (
                     <SearchForm
                         open={formOpen}
                         onToggle={() => setFormOpen((o) => !o)}
                         title={
-                            current.parent
+                            list.parent
                                 ? l10n.t(
                                       "{0} of {1}",
-                                      current.label,
+                                      list.label,
                                       nodeName(
-                                          current.trail[
-                                              current.trail.length - 1
-                                          ],
+                                          list.trail[list.trail.length - 1],
                                       ),
                                   )
-                                : current.label
+                                : list.label
                         }
                         draft={draft}
                         kinds={kindChoices(kinds, draft.kinds)}
@@ -657,15 +720,89 @@ function App(): React.JSX.Element {
             {menu && (
                 <EntryMenu
                     menu={menu}
-                    choices={actionChoices(
-                        !!menu.node.row.page,
-                        nodes[menu.node.key]?.actions,
+                    choices={menuChoices(
+                        actionChoices(
+                            !!menu.node.row.page,
+                            nodes[menu.node.key]?.actions,
+                        ),
                     )}
                     onAct={(action) => void act(action, menu.node)}
                     onClose={closeMenu}
                 />
             )}
         </Shell>
+    );
+}
+
+/**
+ * The tabs above the page: the table's own, then the previews opened from it. The unpinned one is
+ * in italics and the next entry opened takes it over; pinning it, or a double click on it, keeps it.
+ */
+function TabStrip({
+    table,
+    tabs,
+    onTable,
+    onTab,
+    onPin,
+    onClose,
+}: {
+    table: string;
+    tabs: Tabs<EntryNode>;
+    onTable: () => void;
+    onTab: (key: string) => void;
+    onPin: (key: string) => void;
+    onClose: (key: string) => void;
+}): React.JSX.Element {
+    return (
+        <div
+            className="tabs"
+            role="tablist"
+            aria-label={l10n.t("Open entries")}
+        >
+            <button
+                type="button"
+                role="tab"
+                aria-selected={tabs.active === null}
+                className={`tab table-tab${tabs.active === null ? " on" : ""}`}
+                onClick={onTable}
+            >
+                {table}
+            </button>
+            {tabs.previews.map((tab) => (
+                <div
+                    key={tab.key}
+                    className={`tab${tabs.active === tab.key ? " on" : ""}${tab.pinned ? "" : " preview"}`}
+                >
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={tabs.active === tab.key}
+                        className="tab-name"
+                        title={
+                            tab.pinned
+                                ? undefined
+                                : l10n.t("Preview - double click to keep it")
+                        }
+                        onClick={() => onTab(tab.key)}
+                        onDoubleClick={() => onPin(tab.key)}
+                    >
+                        {tab.item.row.name}
+                    </button>
+                    {!tab.pinned && (
+                        <IconButton
+                            icon="pin"
+                            title={l10n.t("Keep open")}
+                            onClick={() => onPin(tab.key)}
+                        />
+                    )}
+                    <IconButton
+                        icon="close"
+                        title={l10n.t("Close")}
+                        onClick={() => onClose(tab.key)}
+                    />
+                </div>
+            ))}
+        </div>
     );
 }
 
@@ -764,8 +901,10 @@ function ListPage({
     total,
     loading,
     layers,
+    selectedId,
     nodeOf,
     onHover,
+    onSelect,
     onAct,
     onMenu,
     onMore,
@@ -775,9 +914,12 @@ function ListPage({
     total: number;
     loading: boolean;
     layers: GetSymbolOutlineResult["layers"];
+    /** The selected row's id, when the selection is one of this list's rows. */
+    selectedId: string | null;
     /** The row's entry as the server opened it, once it has. */
     nodeOf: (row: SymbolRow) => GetSymbolNodeResult | undefined;
     onHover: (row: SymbolRow) => void;
+    onSelect: (row: SymbolRow) => void;
     onAct: (action: string, row: SymbolRow) => void;
     onMenu: (x: number, y: number, row: SymbolRow, index: number) => void;
     onMore: () => void;
@@ -826,7 +968,7 @@ function ListPage({
                         <tr>
                             <th>{l10n.t("Name")}</th>
                             <th>{l10n.t("Type")}</th>
-                            <th>{l10n.t("Kinds")}</th>
+                            <th>{l10n.t("Behaves like")}</th>
                             <th>{l10n.t("Origin")}</th>
                             <th aria-label={l10n.t("Actions")} />
                         </tr>
@@ -837,7 +979,16 @@ function ListPage({
                                 key={row.id}
                                 data-row-index={index}
                                 tabIndex={0}
-                                className={row.page ? undefined : "inert"}
+                                className={
+                                    [
+                                        row.page ? null : "inert",
+                                        row.id === selectedId
+                                            ? "selected"
+                                            : null,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" ") || undefined
+                                }
                                 title={
                                     row.page
                                         ? undefined
@@ -845,8 +996,8 @@ function ListPage({
                                           ? l10n.t("Nothing defines this name")
                                           : l10n.t("Not an entry of its own")
                                 }
-                                onClick={() => onAct("open", row)}
-                                onDoubleClick={() => onAct("definition", row)}
+                                onClick={() => row.page && onSelect(row)}
+                                onDoubleClick={() => onAct("open", row)}
                                 onKeyDown={(e) => onRowKey(e, row, index)}
                                 onMouseEnter={() => rest(row)}
                                 onFocus={() => rest(row)}
@@ -1168,7 +1319,7 @@ function SearchForm({
                         />
                         {kinds.length > 0 && (
                             <>
-                                <span>{l10n.t("Kind")}</span>
+                                <span>{l10n.t("Behaves like")}</span>
                                 <span className="chips">
                                     {kinds.map((k) => (
                                         <button
@@ -1346,9 +1497,57 @@ const Shell = styled.div`
 
     .page {
         display: grid;
-        grid-template-rows: auto minmax(0, 1fr) auto auto;
+        grid-template-rows: auto auto minmax(0, 1fr) auto auto;
         min-width: 0;
         min-height: 0;
+    }
+    /* The tabs read as the editor's own: the active one on the editor background with an accent
+       line on top, the unpinned preview in italics. */
+    .tabs {
+        display: flex;
+        overflow-x: auto;
+        background: var(
+            --vscode-editorGroupHeader-tabsBackground,
+            var(--vscode-sideBar-background)
+        );
+        border-bottom: 1px solid var(--vscode-panel-border);
+    }
+    .tab {
+        display: inline-flex;
+        align-items: center;
+        flex: none;
+        max-width: 260px;
+        border: 0;
+        border-right: 1px solid var(--vscode-panel-border);
+        background: var(--vscode-tab-inactiveBackground, transparent);
+        color: var(
+            --vscode-tab-inactiveForeground,
+            var(--vscode-descriptionForeground)
+        );
+    }
+    .tab.table-tab {
+        padding: var(--space-6) var(--space-12);
+        cursor: pointer;
+    }
+    .tab.on {
+        background: var(
+            --vscode-tab-activeBackground,
+            var(--vscode-editor-background)
+        );
+        color: var(--vscode-tab-activeForeground, var(--vscode-foreground));
+        box-shadow: inset 0 1px 0 var(--vscode-focusBorder);
+    }
+    .tab .tab-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: var(--space-6) var(--space-4) var(--space-6) var(--space-12);
+        border: 0;
+        background: none;
+        cursor: pointer;
+    }
+    .tab.preview .tab-name {
+        font-style: italic;
     }
     .crumbs {
         display: flex;
@@ -1408,6 +1607,10 @@ const Shell = styled.div`
     }
     tbody tr:hover td {
         background: var(--vscode-list-hoverBackground);
+    }
+    tbody tr.selected td {
+        background: var(--vscode-list-activeSelectionBackground);
+        color: var(--vscode-list-activeSelectionForeground);
     }
     tbody tr.inert {
         cursor: default;
@@ -1479,7 +1682,7 @@ const Shell = styled.div`
     }
     .search-grid {
         display: grid;
-        grid-template-columns: 64px minmax(0, 1fr);
+        grid-template-columns: max-content minmax(0, 1fr);
         gap: var(--space-6) var(--space-8);
         padding: var(--space-8) var(--space-16);
         align-items: center;

@@ -604,7 +604,7 @@ Flag: `aet-eaw-edit.features.tools.modBrowser` (on by default). Read-only.
 - **Rail** - lists, their loaded entries and each entry's relations; the path to the open one is the breadcrumb
 - **Lists** - each entry once, as the definition the game uses, with its origin and what it overrides
   - Paged on the server, 200 at a time
-  - Search form: name, kind with its count, origin
+  - Search form: name, what it behaves like with its count, origin
 - **Relations** - computed for one entry, when it opens; an empty one counted zero, with the reason
   - Game objects: models, particle systems, particles, SFX and speech events, hardpoints, other references,
     textures, Lua script, references, definitions
@@ -612,9 +612,11 @@ Flag: `aet-eaw-edit.features.tools.modBrowser` (on by default). Read-only.
   - Models: animations, particle systems, textures, references. Animations: model. Textures and audio:
     references. Lua scripts: loaded by, requires. Enums: references
 - **Object page** - defined in, overrides, variant of; the encyclopedia card with its faction switch
-- **Actions** - click or `Enter` opens, double click or `F12` goes to the definition; the context menu and a row's
-  hover icons offer Preview unit, Show encyclopedia card, Show effective object and Preview model, an unavailable
-  one disabled with the reason
+- **Tabs** - a click selects; a double click or `Enter` opens the entry in a tab beside the table's own, which keeps
+  its search, scroll and selection. One preview tab, in italics, is reused until it is pinned
+- **Actions** - `F12` goes to the definition. The context menu lists only what can be done; a row's hover icons
+  and the entry's page offer Preview unit, Show encyclopedia card, Show effective object and Preview model, an
+  unavailable one disabled with the reason
 
 ---
 

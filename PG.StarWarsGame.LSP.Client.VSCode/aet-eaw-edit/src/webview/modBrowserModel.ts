@@ -224,6 +224,17 @@ export function actionChoices(
     ];
 }
 
+/**
+ * An entry's context menu: only what can be done. The one place an unavailable action is left out
+ * rather than disabled - a menu is a list of what to do next, not a map of the entry's actions,
+ * which the action column on its page keeps (maintainer, 2026-10-22).
+ */
+export function menuChoices(groups: ActionChoice[][]): ActionChoice[][] {
+    return groups
+        .map((group) => group.filter((c) => !c.disabled))
+        .filter((group) => group.length > 0);
+}
+
 function actionLabel(action: string): string {
     switch (action) {
         case "open":

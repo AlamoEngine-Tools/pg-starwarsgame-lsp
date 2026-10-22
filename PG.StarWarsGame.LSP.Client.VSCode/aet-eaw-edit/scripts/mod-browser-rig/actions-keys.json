@@ -6,11 +6,11 @@
   {"wait": 600},
   {"key": "F12", "on": "Star_Destroyer", "in": ".grid"},
   {"wait": 300},
-  {"dblclick": "Star_Destroyer", "in": ".grid"},
-  {"wait": 300},
   {"menu": "Star_Destroyer", "in": ".grid"},
   {"wait": 300},
   {"click": "Preview unit", "in": ".row-menu"},
+  {"wait": 300},
+  {"click": "Star_Destroyer", "in": ".grid"},
   {"wait": 300},
   {"key": "Enter", "on": "Star_Destroyer", "in": ".grid"},
   {"wait": 600}

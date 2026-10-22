@@ -31,7 +31,8 @@ if (!scenarioFile) {
 }
 const answersFile = answersArg ?? path.join(OUT, "answers.json");
 const answers = fs.existsSync(answersFile) ? JSON.parse(fs.readFileSync(answersFile, "utf8")) : {};
-const scenario = JSON.parse(fs.readFileSync(scenarioFile, "utf8"));
+// An editor may save the scenario with a byte-order mark, which JSON.parse refuses.
+const scenario = JSON.parse(fs.readFileSync(scenarioFile, "utf8").replace(/^﻿/, ""));
 const name = path.basename(scenarioFile, ".json");
 const l10n = fs.readFileSync(path.join(CLIENT, "l10n", "bundle.l10n.json"), "utf8");
 
@@ -105,9 +106,13 @@ function report() {
         lines.push(mark + "  ".repeat(depth) + node.textContent.trim());
     }
     lines.push("--- crumbs: " + [...document.querySelectorAll(".crumbs .crumb-step")].map((c) => c.textContent.trim()).join(" > "));
+    lines.push("--- tabs: " + [...document.querySelectorAll(".tabs .tab")].map((t) => t.textContent.trim()
+        + (t.classList.contains("on") ? " [on]" : "") + (t.classList.contains("preview") ? " [preview]" : "")).join(" | "));
     const page = document.querySelector(".entry") ?? document.querySelector(".grid");
     lines.push("--- page:");
-    for (const el of page?.querySelectorAll("h1, p, tr") ?? []) lines.push("  " + el.textContent.trim().replace(/\\s+/g, " "));
+    for (const el of page?.querySelectorAll("h1, p, tr") ?? []) {
+        lines.push((el.classList.contains("selected") ? "* " : "  ") + el.textContent.trim().replace(/\\s+/g, " "));
+    }
     lines.push("--- card: " + (document.querySelector(".entry .card") ? "drawn" : "none"));
     const actions = [...document.querySelectorAll(".entry .actions button")];
     if (actions.length) {

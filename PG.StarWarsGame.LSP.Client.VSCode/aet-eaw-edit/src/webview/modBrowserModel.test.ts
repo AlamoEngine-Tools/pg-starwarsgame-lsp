@@ -8,6 +8,7 @@ import {
     actionChoices,
     kindChoices,
     locationLabel,
+    menuChoices,
     originChoices,
     originLabel,
     pageLabel,
@@ -199,5 +200,30 @@ describe("actionChoices", () => {
         assert.equal(reasonOf("binary"), "Not a text file");
         assert.equal(reasonOf("schema"), "Defined by the schema");
         assert.equal(reasonOf("off"), "Turned off in the settings");
+    });
+});
+
+describe("menuChoices", () => {
+    it("lists only what can be done, leaving no empty group behind", () => {
+        const menu = menuChoices(
+            actionChoices(true, [
+                { action: "definition", reason: "binary" },
+                { action: "previewModel", reason: null },
+            ]),
+        );
+
+        assert.deepEqual(
+            menu.map((g) => g.map((c) => c.action)),
+            [["open"], ["previewModel"], ["copyName"]],
+        );
+    });
+
+    it("offers only the name of a row that is no entry of its own", () => {
+        assert.deepEqual(
+            menuChoices(actionChoices(false, undefined)).map((g) =>
+                g.map((c) => c.action),
+            ),
+            [["copyName"]],
+        );
     });
 });

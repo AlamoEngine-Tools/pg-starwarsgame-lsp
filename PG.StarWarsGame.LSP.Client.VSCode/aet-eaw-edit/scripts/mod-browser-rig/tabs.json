@@ -1,0 +1,21 @@
+﻿[
+  {"type": "Star_Destroyer"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"click": "Star_Destroyer_Warp", "in": ".grid"},
+  {"wait": 300},
+  {"dblclick": "Star_Destroyer", "in": ".grid"},
+  {"wait": 600},
+  {"click": "Game Objects", "in": ".tabs"},
+  {"wait": 300},
+  {"dblclick": "Star_Destroyer_Warp", "in": ".grid"},
+  {"wait": 600},
+  {"dblclick": "Star_Destroyer_Warp", "in": ".tabs"},
+  {"wait": 300},
+  {"click": "Game Objects", "in": ".tabs"},
+  {"wait": 300},
+  {"dblclick": "Accuser_Star_Destroyer", "in": ".grid"},
+  {"wait": 600},
+  {"click": "Game Objects", "in": ".tabs"},
+  {"wait": 300}
+]

@@ -2,7 +2,7 @@
   {"type": "Star_Destroyer"},
   {"click": "Search", "in": ".search-foot"},
   {"wait": 300},
-  {"click": "Star_Destroyer", "in": ".grid"},
+  {"dblclick": "Star_Destroyer", "in": ".grid"},
   {"wait": 300},
   {"click": "Generic_Star_Destroyer", "in": ".entry"},
   {"wait": 600}

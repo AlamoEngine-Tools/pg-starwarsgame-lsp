@@ -22,7 +22,8 @@ if (!workspaceArg || !project || !requestsFile) {
 const workspace = path.resolve(workspaceArg).replace(/\\/g, "/");
 const rootUri = "file:///" + workspace.replace(/^\/+/, "");
 const answersFile = answersArg ?? path.join(OUT, "answers.json");
-const requests = JSON.parse(fs.readFileSync(requestsFile, "utf8"));
+// An editor may save the requests with a byte-order mark, which JSON.parse refuses.
+const requests = JSON.parse(fs.readFileSync(requestsFile, "utf8").replace(/^﻿/, ""));
 const answers = fs.existsSync(answersFile) ? JSON.parse(fs.readFileSync(answersFile, "utf8")) : {};
 
 const server = spawn(SERVER_EXE, [], {stdio: ["pipe", "pipe", "ignore"]});
