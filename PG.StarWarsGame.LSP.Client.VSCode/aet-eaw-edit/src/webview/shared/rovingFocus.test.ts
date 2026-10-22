@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { menuStep, rowStep } from "./rovingFocus";
+import { menuStep, rowStep, treeStep } from "./rovingFocus";
 
 describe("menuStep", () => {
     // Items 1 and 3 are disabled, as an action the entry does not offer.
@@ -52,5 +52,43 @@ describe("rowStep", () => {
     it("ignores any other key and an empty table", () => {
         assert.equal(rowStep(10, 5, "Enter", 4), undefined);
         assert.equal(rowStep(0, 0, "ArrowDown", 4), undefined);
+    });
+});
+
+describe("treeStep", () => {
+    // Game Objects (open) > Star_Destroyer (open) > Models (closed), Hardpoints (leaf); Models (closed).
+    const rows = [
+        { depth: 0, expandable: true, expanded: true },
+        { depth: 1, expandable: true, expanded: true },
+        { depth: 2, expandable: true, expanded: false },
+        { depth: 2, expandable: false, expanded: false },
+        { depth: 0, expandable: true, expanded: false },
+    ];
+
+    it("walks the visible rows as a table does", () => {
+        assert.deepEqual(treeStep(rows, 1, "ArrowDown", 10), { to: 2 });
+        assert.deepEqual(treeStep(rows, 0, "ArrowUp", 10), { to: 0 });
+        assert.deepEqual(treeStep(rows, 2, "End", 10), { to: 4 });
+        assert.deepEqual(treeStep(rows, 3, "Home", 10), { to: 0 });
+    });
+
+    it("expands a closed row on the right, then goes to its first child", () => {
+        assert.deepEqual(treeStep(rows, 2, "ArrowRight", 10), { expand: true });
+        assert.deepEqual(treeStep(rows, 1, "ArrowRight", 10), { to: 2 });
+        assert.equal(treeStep(rows, 3, "ArrowRight", 10), undefined);
+    });
+
+    it("collapses an open row on the left, otherwise goes to its parent", () => {
+        assert.deepEqual(treeStep(rows, 1, "ArrowLeft", 10), {
+            collapse: true,
+        });
+        assert.deepEqual(treeStep(rows, 3, "ArrowLeft", 10), { to: 1 });
+        assert.deepEqual(treeStep(rows, 2, "ArrowLeft", 10), { to: 1 });
+        assert.equal(treeStep(rows, 4, "ArrowLeft", 10), undefined);
+    });
+
+    it("ignores any other key and an empty tree", () => {
+        assert.equal(treeStep(rows, 0, "Enter", 10), undefined);
+        assert.equal(treeStep([], 0, "ArrowDown", 10), undefined);
     });
 });

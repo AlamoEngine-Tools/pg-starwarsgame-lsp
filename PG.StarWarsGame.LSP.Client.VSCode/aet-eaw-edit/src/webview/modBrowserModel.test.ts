@@ -14,11 +14,49 @@ import {
     menuChoices,
     originChoices,
     originLabel,
+    pageIcon,
     pageLabel,
     previewLayout,
     reasonLabel,
+    relationIcon,
     relationLabel,
 } from "./modBrowserModel";
+
+/** The rail's picture of each list and entry, by what it is (#270). */
+describe("pageIcon", () => {
+    it("pictures an entry by its type", () => {
+        assert.equal(pageIcon("xml:GameObjectType"), "gameObject");
+        assert.equal(pageIcon("xml:SFXEvent"), "gameObject");
+        assert.equal(pageIcon("models"), "model");
+        assert.equal(pageIcon("particleSystems"), "effects");
+        assert.equal(pageIcon("animations"), "animation");
+        assert.equal(pageIcon("textures"), "texture");
+        assert.equal(pageIcon("audio"), "audio");
+        assert.equal(pageIcon("luaScripts"), "script");
+        assert.equal(pageIcon("enums"), "enumeration");
+    });
+});
+
+describe("relationIcon", () => {
+    it("pictures a relation by what it holds", () => {
+        assert.equal(relationIcon("models"), "model");
+        assert.equal(relationIcon("model"), "model");
+        assert.equal(relationIcon("sfxEvents"), "audio");
+        assert.equal(relationIcon("samples"), "audio");
+        assert.equal(relationIcon("speechEvents"), "speech");
+        assert.equal(relationIcon("hardpoints"), "target");
+        assert.equal(relationIcon("luaScript"), "script");
+        assert.equal(relationIcon("requires"), "script");
+        assert.equal(relationIcon("usedBy"), "references");
+        assert.equal(relationIcon("referencedBy"), "references");
+        assert.equal(relationIcon("definitions"), "definition");
+    });
+
+    // An object's own tags name the rest: a relation named after its tag.
+    it("pictures any other relation as the tag naming it", () => {
+        assert.equal(relationIcon("Projectile_Types"), "tag");
+    });
+});
 
 /** The Mod Browser's words for the server's keys (#270). */
 describe("pageLabel", () => {

@@ -55,8 +55,10 @@ import {
     menuChoices,
     originChoices,
     originLabel,
+    pageIcon,
     pageLabel,
     reasonLabel,
+    relationIcon,
     relationLabel,
 } from "./modBrowserModel";
 import { ACTION_ICONS, PreviewPage } from "./modBrowserPreview";
@@ -76,12 +78,21 @@ import {
     problemsPanelCss,
 } from "./shared/dockChrome";
 import { Field } from "./shared/Field";
-import { Icon } from "./shared/Icon";
+import { Icon, IconName } from "./shared/Icon";
 import { ModeSelector } from "./shared/ModeSelector";
+import { readPanelSize, writePanelSize } from "./shared/panelLayout";
+import { initPanelLayout } from "./shared/panelLayoutBridge";
+import { treeStep } from "./shared/rovingFocus";
+import { useEdgeResize } from "./useEdgeResize";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
 const vscode = acquireVsCodeApi();
+initPanelLayout(vscode);
+
+/** The rail's and the search form's remembered sizes, as every panel keeps its own. */
+const RAIL_WIDTH_KEY = "modBrowser.rail";
+const SEARCH_HEIGHT_KEY = "modBrowser.search";
 
 const PAGE_SIZE = 200;
 /** The card at twice the game's size: legible, and still small enough to sit beside the header. */
@@ -186,6 +197,28 @@ function nodeName(node: RailNode): string {
     return node.kind === "entry" ? node.row.name : node.label;
 }
 
+/** A node's picture: an entry and an outline list by their type, a relation by what it holds. */
+function nodeIcon(node: RailNode): IconName {
+    return node.kind === "list" && node.parent
+        ? relationIcon(node.parent.relation)
+        : pageIcon(node.page);
+}
+
+/**
+ * One visible row of the rail, top to bottom - what the tree's keys walk. A list with more rows
+ * than it has loaded ends in a row that opens it in the table.
+ */
+interface RailRow {
+    key: string;
+    node: RailNode;
+    depth: number;
+    open: boolean;
+    /** It has nothing to open: a list of none, or an entry the index cannot open. */
+    inert: boolean;
+    /** The rows of the list not loaded, on its last row. */
+    more?: number;
+}
+
 /** An entry's tab: one per entry, however many paths in the rail lead to it. */
 function tabKey(node: EntryNode): string {
     return `${node.page}\n${node.row.id}`;
@@ -249,6 +282,24 @@ function App(): React.JSX.Element {
     const [refreshed, setRefreshed] = useState(0);
     const [menu, setMenu] = useState<Menu | null>(null);
     const closeMenu = useCallback(() => setMenu(null), []);
+    /** The rail row the keys act on, as VS Code's tree focuses one; the selection follows it. */
+    const [focusKey, setFocusKey] = useState<string | null>(null);
+    const railRef = useRef<HTMLElement>(null);
+    // The rail is dragged by its right edge, the search form by its top; each size is kept.
+    const railWidth = useEdgeResize(
+        readPanelSize(RAIL_WIDTH_KEY, 260),
+        160,
+        640,
+        "e",
+        (width) => writePanelSize(RAIL_WIDTH_KEY, width),
+    );
+    const searchHeight = useEdgeResize(
+        readPanelSize(SEARCH_HEIGHT_KEY, 200),
+        96,
+        600,
+        "n",
+        (height) => writePanelSize(SEARCH_HEIGHT_KEY, height),
+    );
 
     useEffect(() => {
         const handle = (event: MessageEvent) => {
@@ -551,88 +602,196 @@ function App(): React.JSX.Element {
         );
     }
 
-    const renderNode = (node: RailNode, depth: number): React.JSX.Element => {
+    // The rail, as VS Code's tree: its visible rows in order, one of them focused, keys moving the
+    // focus and the selection with it.
+    const railRows: RailRow[] = [];
+    const walk = (node: RailNode, depth: number): void => {
         const open = expanded.has(node.key);
         const inert = node.kind === "entry" ? !node.row.page : node.count === 0;
-        const more = node.kind === "list" && open ? moreOf(node) : 0;
+        railRows.push({ key: node.key, node, depth, open, inert });
+        if (!open || inert) {
+            return;
+        }
+        childrenOf(node).forEach((child) => walk(child, depth + 1));
+        const more = node.kind === "list" ? moreOf(node) : 0;
+        if (more > 0) {
+            railRows.push({
+                key: `${node.key}\nmore`,
+                node,
+                depth: depth + 1,
+                open: false,
+                inert: false,
+                more,
+            });
+        }
+    };
+    tops.forEach((top) => walk(top, 0));
+    const expandable = (row: RailRow): boolean =>
+        row.more === undefined && !row.inert;
+    const focused =
+        railRows.find((row) => row.key === focusKey) ??
+        railRows.find((row) => row.key === current?.key) ??
+        railRows[0];
+
+    /** A row chosen: a list shows in the table - the more row its own list - and an entry is selected. */
+    const chooseRow = (row: RailRow): void => {
+        setFocusKey(row.key);
+        if (!row.inert) {
+            select(row.node);
+        }
+    };
+
+    /**
+     * A row the keys moved to: the selection follows, as in VS Code's tree, but walking past a list
+     * shows it without unfolding it, and the more row waits for Enter.
+     */
+    const focusRow = (row: RailRow): void => {
+        setFocusKey(row.key);
+        if (row.inert || row.more !== undefined) {
+            return;
+        }
+        if (row.node.kind === "list") {
+            showList(row.node);
+            setCurrent(row.node);
+        } else {
+            select(row.node);
+        }
+    };
+
+    const onRailKey = (e: React.KeyboardEvent): void => {
+        const at = railRows.indexOf(focused);
+        if (at < 0) {
+            return;
+        }
+        const node = focused.node;
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (e.key === "Enter" && node.kind === "entry" && !focused.more) {
+                // Enter opens; a click and the space bar only select.
+                void openEntry(node);
+            } else {
+                chooseRow(focused);
+            }
+            return;
+        }
+        if (e.key === "F12" && node.kind === "entry" && !focused.more) {
+            e.preventDefault();
+            void act("definition", node);
+            return;
+        }
+        const page = Math.max(
+            1,
+            Math.floor((railRef.current?.clientHeight ?? 220) / 22) - 1,
+        );
+        const step = treeStep(
+            railRows.map((row) => ({
+                depth: row.depth,
+                expandable: expandable(row),
+                expanded: row.open,
+            })),
+            at,
+            e.key,
+            page,
+        );
+        if (step === undefined) {
+            return;
+        }
+        e.preventDefault();
+        if ("to" in step) {
+            focusRow(railRows[step.to]);
+            railRef.current
+                ?.querySelector<HTMLElement>(`[data-index="${step.to}"]`)
+                ?.focus();
+        } else {
+            toggle(node);
+        }
+    };
+
+    const renderRow = (row: RailRow, index: number): React.JSX.Element => {
+        const { node } = row;
+        const canOpen = expandable(row);
+        const selected = row.more === undefined && current?.key === node.key;
         return (
-            <div key={node.key}>
-                <div
-                    className={`node${current?.key === node.key ? " selected" : ""}`}
-                    style={{ "--depth": depth } as React.CSSProperties}
-                    onContextMenu={(e) => {
-                        if (node.kind === "entry") {
-                            e.preventDefault();
-                            openMenu(e.clientX, e.clientY, node, -1);
+            <div
+                key={row.key}
+                role="treeitem"
+                data-index={index}
+                className={
+                    "node" +
+                    (selected ? " selected" : "") +
+                    (row.more !== undefined ? " more" : "") +
+                    (row.inert ? " inert" : "")
+                }
+                style={{ "--depth": row.depth } as React.CSSProperties}
+                tabIndex={row === focused ? 0 : -1}
+                aria-level={row.depth + 1}
+                aria-expanded={canOpen ? row.open : undefined}
+                aria-selected={selected}
+                aria-disabled={row.inert || undefined}
+                title={row.inert ? inertReason(node) : undefined}
+                onFocus={() => setFocusKey(row.key)}
+                onClick={() => chooseRow(row)}
+                onDoubleClick={() =>
+                    node.kind === "entry" &&
+                    row.more === undefined &&
+                    openEntry(node)
+                }
+                onContextMenu={(e) => {
+                    if (node.kind === "entry" && row.more === undefined) {
+                        e.preventDefault();
+                        openMenu(e.clientX, e.clientY, node, -1);
+                    }
+                }}
+            >
+                {Array.from({ length: row.depth }, (_, level) => (
+                    <span
+                        key={level}
+                        className="guide"
+                        style={{ "--level": level } as React.CSSProperties}
+                    />
+                ))}
+                <span
+                    className="twisty"
+                    title={
+                        canOpen
+                            ? row.open
+                                ? l10n.t("Collapse")
+                                : l10n.t("Expand")
+                            : undefined
+                    }
+                    onClick={(e) => {
+                        // The twisty only folds; the row around it selects.
+                        e.stopPropagation();
+                        if (canOpen) {
+                            toggle(node);
                         }
                     }}
                 >
-                    <button
-                        type="button"
-                        className="twisty"
-                        disabled={inert}
-                        title={
-                            inert
-                                ? undefined
-                                : open
-                                  ? l10n.t("Collapse")
-                                  : l10n.t("Expand")
-                        }
-                        onClick={() => toggle(node)}
-                    >
-                        {!inert && (
-                            <Icon
-                                name={open ? "expanded" : "collapsed"}
-                                size={12}
-                            />
-                        )}
-                    </button>
-                    <button
-                        type="button"
-                        className="label"
-                        disabled={inert}
-                        title={inert ? inertReason(node) : undefined}
-                        onClick={() => select(node)}
-                        onDoubleClick={() =>
-                            node.kind === "entry" && openEntry(node)
-                        }
-                        onKeyDown={(e) => {
-                            if (node.kind !== "entry") {
-                                return;
-                            }
-                            if (e.key === "Enter") {
-                                // Not a click: a click only selects.
-                                e.preventDefault();
-                                void openEntry(node);
-                            } else if (e.key === "F12") {
-                                e.preventDefault();
-                                void act("definition", node);
-                            }
-                        }}
-                    >
-                        {nodeName(node)}
-                    </button>
-                    {node.kind === "list" && (
-                        <span className="count">
-                            {node.count?.toLocaleString() ?? ""}
-                        </span>
+                    {canOpen && (
+                        <Icon
+                            name={row.open ? "expanded" : "collapsed"}
+                            size={16}
+                        />
                     )}
-                </div>
-                {open &&
-                    !inert &&
-                    childrenOf(node).map((c) => renderNode(c, depth + 1))}
-                {more > 0 && node.kind === "list" && (
-                    <button
-                        type="button"
-                        className="node more"
-                        style={{ "--depth": depth + 1 } as React.CSSProperties}
-                        onClick={() => select(node)}
-                    >
-                        <span />
-                        <span className="label">
-                            {l10n.t("{0} more", more.toLocaleString())}
-                        </span>
-                    </button>
+                </span>
+                {row.more === undefined ? (
+                    <span className="node-icon">
+                        <Icon name={nodeIcon(node)} size={16} />
+                    </span>
+                ) : (
+                    <span />
+                )}
+                <span className="label">
+                    {row.more !== undefined
+                        ? l10n.t("{0} more", row.more.toLocaleString())
+                        : nodeName(node)}
+                </span>
+                {node.kind === "list" && row.more === undefined ? (
+                    <span className="count">
+                        {node.count?.toLocaleString() ?? ""}
+                    </span>
+                ) : (
+                    <span />
                 )}
             </div>
         );
@@ -648,10 +807,29 @@ function App(): React.JSX.Element {
             : null;
 
     return (
-        <Shell>
-            <nav className="rail" aria-label={l10n.t("Lists")}>
-                {tops.map((top) => renderNode(top, 0))}
-            </nav>
+        <Shell
+            style={
+                {
+                    "--rail-width": `${railWidth.size}px`,
+                } as React.CSSProperties
+            }
+        >
+            <div className="rail-frame">
+                <nav
+                    ref={railRef}
+                    className="rail"
+                    role="tree"
+                    aria-label={l10n.t("Lists")}
+                    onKeyDown={onRailKey}
+                >
+                    {railRows.map(renderRow)}
+                </nav>
+                <div
+                    className="resize-handle-e"
+                    title={l10n.t("Drag to resize")}
+                    {...railWidth.handleProps}
+                />
+            </div>
             <main className="page">
                 <TabStrip
                     label={l10n.t("Open entries")}
@@ -744,6 +922,8 @@ function App(): React.JSX.Element {
                                   )
                                 : list.label
                         }
+                        height={searchHeight.size}
+                        resize={searchHeight.handleProps}
                         draft={draft}
                         kinds={kindChoices(kinds, draft.kinds)}
                         origins={originChoices(layers)}
@@ -1177,6 +1357,8 @@ function SearchForm({
     open,
     onToggle,
     title,
+    height,
+    resize,
     draft,
     kinds,
     origins,
@@ -1188,6 +1370,9 @@ function SearchForm({
     open: boolean;
     onToggle: () => void;
     title: string;
+    /** Its height while open, dragged by the handle along its top edge; shut, it is its head. */
+    height: number;
+    resize: Record<string, unknown>;
     draft: Filter;
     kinds: KindChoice[];
     origins: string[];
@@ -1203,11 +1388,19 @@ function SearchForm({
     return (
         <form
             className="search"
+            style={open ? { height } : undefined}
             onSubmit={(event) => {
                 event.preventDefault();
                 onSearch();
             }}
         >
+            {open && (
+                <div
+                    className="resize-handle-n"
+                    title={l10n.t("Drag to resize")}
+                    {...resize}
+                />
+            )}
             <button type="button" className="search-head" onClick={onToggle}>
                 <b>{l10n.t("Search")}</b>
                 <span className="dim">{title}</span>
@@ -1304,7 +1497,7 @@ const Shell = styled.div`
     ${problemsPanelCss}
 
     display: grid;
-    grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+    grid-template-columns: var(--rail-width, 260px) minmax(0, 1fr);
     height: 100vh;
     color: var(--colour-ink);
     background: var(--colour-editor-ground);
@@ -1319,28 +1512,50 @@ const Shell = styled.div`
         color: var(--colour-muted);
     }
 
-    /* The rail: the editor's own tree, one row per node, indented by depth. */
-    .rail {
-        overflow: auto;
+    /* The rail: VS Code's tree. 22px rows, 8px per level, 16px chevrons, a picture of what each node
+       is, and an indent guide per level, shown while the pointer is over the tree or it has the
+       focus, as the editor shows its own by default. Dragged wider by its right edge. */
+    .rail-frame {
+        position: relative;
+        display: grid;
+        min-height: 0;
         border-right: var(--space-1) solid var(--colour-line);
-        padding: var(--space-6) 0;
         background: var(--colour-sidebar);
     }
+    .resize-handle-e {
+        position: absolute;
+        top: 0;
+        right: -3px;
+        width: 6px;
+        height: 100%;
+        cursor: ew-resize;
+        z-index: 2;
+    }
+    .resize-handle-e:hover,
+    .resize-handle-e:active {
+        background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+    }
+    .rail {
+        overflow: auto;
+        padding: var(--space-4) 0;
+        outline: none;
+    }
     .node {
+        position: relative;
         display: grid;
-        grid-template-columns: var(--icon-size-16) minmax(0, 1fr) auto;
+        grid-template-columns:
+            var(--icon-size-16) var(--icon-size-16) minmax(0, 1fr)
+            auto;
         align-items: center;
         gap: var(--space-4);
         box-sizing: border-box;
-        width: 100%;
         height: 22px;
         padding: 0 var(--space-8) 0
-            calc(var(--space-8) + var(--depth, 0) * var(--space-16));
-        border: 0;
-        background: none;
-        text-align: left;
+            calc(var(--space-8) + var(--depth, 0) * var(--space-8));
+        cursor: pointer;
+        user-select: none;
         content-visibility: auto;
-        contain-intrinsic-size: 22px;
+        contain-intrinsic-size: auto 22px;
     }
     .node:hover {
         background: var(--colour-hover);
@@ -1349,35 +1564,50 @@ const Shell = styled.div`
         background: var(--colour-selected);
         color: var(--colour-selected-ink);
     }
+    .node:focus {
+        outline: var(--space-1) solid
+            var(--vscode-list-focusOutline, var(--vscode-focusBorder));
+        outline-offset: calc(-1 * var(--space-1));
+    }
+    .node.inert {
+        color: var(--colour-faint);
+        cursor: default;
+    }
     .node.more {
-        cursor: pointer;
         color: var(--colour-link);
     }
-    .node .twisty {
+    /* One line per level, through the middle of that level's chevron. */
+    .node .guide {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: calc(
+            var(--space-8) + var(--level) * var(--space-8) +
+                var(--icon-size-16) / 2
+        );
+        width: var(--space-1);
+        background: var(
+            --vscode-tree-indentGuidesStroke,
+            var(--colour-line-strong)
+        );
+        opacity: 0;
+    }
+    .rail:hover .node .guide,
+    .rail:focus-within .node .guide {
+        opacity: 1;
+    }
+    .node .twisty,
+    .node .node-icon {
         display: grid;
         place-items: center;
-        width: var(--icon-size-16);
-        padding: 0;
-        border: 0;
-        background: none;
-        cursor: pointer;
     }
-    .node .twisty:disabled {
-        cursor: default;
+    .node .node-icon {
+        color: var(--colour-muted);
     }
     .node .label {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        padding: 0;
-        border: 0;
-        background: none;
-        text-align: left;
-        cursor: pointer;
-    }
-    .node .label:disabled {
-        color: var(--colour-faint);
-        cursor: default;
     }
     .node .count {
         color: var(--colour-muted);
@@ -1424,9 +1654,22 @@ const Shell = styled.div`
         margin-left: var(--space-6);
     }
 
+    /* Open, the form keeps the height it was dragged to by its top edge, its fields scrolling and
+       its buttons at its foot. */
     .search {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        min-height: 0;
         border-top: var(--space-1) solid var(--colour-line);
         background: var(--colour-sidebar);
+    }
+    .search .search-grid {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        align-content: start;
     }
     .search-head {
         display: flex;
@@ -1531,9 +1774,12 @@ const Shell = styled.div`
     @media (max-width: 700px) {
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: 40vh minmax(0, 1fr);
-        .rail {
+        .rail-frame {
             border-right: 0;
             border-bottom: var(--space-1) solid var(--colour-line);
+        }
+        .resize-handle-e {
+            display: none;
         }
     }
 `;

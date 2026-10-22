@@ -35,6 +35,54 @@ export function menuStep(
     }
 }
 
+/** One visible row of a tree, as `treeStep` needs it. */
+export interface TreeStepRow {
+    depth: number;
+    /** It has rows below it. */
+    expandable: boolean;
+    expanded: boolean;
+}
+
+/** What a key does in a tree: move to a visible row, or fold the focused one open or shut. */
+export type TreeStep = { to: number } | { expand: true } | { collapse: true };
+
+/**
+ * What the key does in a tree, as VS Code's own: up, down, a page, Home and End walk the visible
+ * rows as a table's; right opens a closed row and then goes to its first child; left shuts an open
+ * row and otherwise goes to its parent. Undefined for any other key, or where the key has nothing to
+ * do.
+ */
+export function treeStep(
+    rows: readonly TreeStepRow[],
+    at: number,
+    key: string,
+    page: number,
+): TreeStep | undefined {
+    const row = rows[at];
+    if (key === "ArrowRight") {
+        if (!row?.expandable) {
+            return undefined;
+        }
+        if (!row.expanded) {
+            return { expand: true };
+        }
+        return rows[at + 1]?.depth > row.depth ? { to: at + 1 } : undefined;
+    }
+    if (key === "ArrowLeft") {
+        if (row?.expandable && row.expanded) {
+            return { collapse: true };
+        }
+        for (let i = at - 1; i >= 0 && row; i--) {
+            if (rows[i].depth < row.depth) {
+                return { to: i };
+            }
+        }
+        return undefined;
+    }
+    const to = rowStep(rows.length, at, key, page);
+    return to === undefined ? undefined : { to };
+}
+
 /**
  * The row the key moves to, by index: one row, a page of `page` rows, or the first or last,
  * clamped to the table. Undefined for any other key, or a table with no rows.

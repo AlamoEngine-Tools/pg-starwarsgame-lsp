@@ -1,0 +1,22 @@
+[
+  {"type": "Star_Destroyer"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"click": "Star_Destroyer", "in": ".rail"},
+  {"wait": 400},
+  {"key": "ArrowRight"},
+  {"wait": 400},
+  {"key": "ArrowRight"},
+  {"wait": 300},
+  {"key": "ArrowDown"},
+  {"key": "ArrowDown"},
+  {"wait": 300},
+  {"key": "ArrowLeft"},
+  {"wait": 300},
+  {"key": "ArrowLeft"},
+  {"wait": 300},
+  {"key": "ArrowDown"},
+  {"wait": 300},
+  {"hover": "Game Objects", "in": ".rail"},
+  {"wait": 300}
+]

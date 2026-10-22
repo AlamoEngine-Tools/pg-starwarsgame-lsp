@@ -12,6 +12,7 @@ import type {
     SymbolLayer,
     SymbolLocation,
 } from "../protocol/modBrowser";
+import type { IconName } from "./shared/Icon";
 
 const XML_PREFIX = "xml:";
 
@@ -38,6 +39,63 @@ export function pageLabel(page: string): string {
             return page.startsWith(XML_PREFIX)
                 ? page.slice(XML_PREFIX.length)
                 : page;
+    }
+}
+
+/** A list's and an entry's picture in the rail, by the type it holds or is. */
+export function pageIcon(page: string): IconName {
+    switch (page) {
+        case "models":
+            return "model";
+        case "particleSystems":
+            return "effects";
+        case "animations":
+            return "animation";
+        case "textures":
+            return "texture";
+        case "audio":
+            return "audio";
+        case "luaScripts":
+            return "script";
+        case "enums":
+            return "enumeration";
+        default:
+            return "gameObject";
+    }
+}
+
+/** A relation's picture, by what it holds; one named after a tag is pictured as the tag. */
+export function relationIcon(relation: string): IconName {
+    switch (relation) {
+        case "models":
+        case "model":
+            return "model";
+        case "particleSystems":
+        case "particles":
+            return "effects";
+        case "sfxEvents":
+        case "samples":
+            return "audio";
+        case "speechEvents":
+            return "speech";
+        case "hardpoints":
+            return "target";
+        case "textures":
+            return "texture";
+        case "animations":
+            return "animation";
+        case "luaScript":
+        case "loadedBy":
+        case "requires":
+            return "script";
+        case "referencedBy":
+        case "usedBy":
+        case "otherReferences":
+            return "references";
+        case "definitions":
+            return "definition";
+        default:
+            return "tag";
     }
 }
 

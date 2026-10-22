@@ -7,10 +7,10 @@
 // Usage: `node render.js <scenario.json> [answers.json] [--outline gameData|assets|schema]`
 //
 // A scenario is `[{"click": "<exact text>"}, {"type": "<text>"}, {"wait": <ms>}, ...]`; a click
-// presses the first button, row or cell whose text is exactly that, a type fills the search form's
-// name, and either takes `"in": "<selector>"` to look only there. `dblclick`, `menu` (a right
+// presses the first button, row, cell or tree row whose text is exactly that, a type fills the search
+// form's name, and either takes `"in": "<selector>"` to look only there. `dblclick`, `menu` (a right
 // click) and `hover` find their target the same way; `{"key": "F12", "on": "<text>"}` presses a key
-// on it. Writes `out/<scenario>.png`, prints what the page shows - the rail, the breadcrumb, the
+// on it, and without `on` on the tree's focused row. Writes `out/<scenario>.png`, prints what the page shows - the rail, the breadcrumb, the
 // open page, an open menu and what the page asked the host to do - and lists every request it had
 // no answer for in `out/misses.json`, a requests file for record.js.
 const fs = require("node:fs");
@@ -64,9 +64,10 @@ window.acquireVsCodeApi = () => ({
 });
 function find(text, scope) {
     const root = scope ? document.querySelector(scope) : document;
-    const hit = [...(root?.querySelectorAll("button, tr, td, b") ?? [])].find((el) => el.textContent.trim() === text);
+    const hit = [...(root?.querySelectorAll("button, tr, td, b, [role=treeitem] .label") ?? [])]
+        .find((el) => el.textContent.trim() === text);
     if (!hit) { window.__MISSES__.push(["click", text]); return null; }
-    return hit.closest("button, tr") ?? hit;
+    return hit.closest("button, tr, [role=treeitem]") ?? hit;
 }
 function press(text, scope) {
     find(text, scope)?.click();
@@ -85,8 +86,9 @@ function point(type, text, scope) {
         el.dispatchEvent(new MouseEvent("contextmenu", {...at, button: 2}));
     }
 }
+// Without a target, the key goes to the tree's focused row, as the keyboard's would.
 function pressKey(name, text, scope) {
-    const el = find(text, scope);
+    const el = text === undefined ? document.querySelector("[role=tree] [tabindex='0']") : find(text, scope);
     if (!el) return;
     el.focus();
     el.dispatchEvent(new KeyboardEvent("keydown", {key: name, bubbles: true, cancelable: true}));
@@ -182,6 +184,7 @@ const palette = `
     --vscode-foreground: #cccccc; --vscode-descriptionForeground: #9d9d9d; --vscode-disabledForeground: #6e6e6e;
     --vscode-editor-background: #1f1f1f; --vscode-sideBar-background: #181818; --vscode-panel-border: #2b2b2b;
     --vscode-list-hoverBackground: #2a2d2e; --vscode-list-activeSelectionBackground: #04395e;
+    --vscode-tree-indentGuidesStroke: #585858; --vscode-list-focusOutline: #0078d4;
     --vscode-list-activeSelectionForeground: #ffffff; --vscode-textLink-foreground: #4daafc;
     --vscode-badge-background: #616161; --vscode-badge-foreground: #f8f8f8;
     --vscode-button-background: #0078d4; --vscode-button-foreground: #ffffff; --vscode-button-hoverBackground: #026ec1;
