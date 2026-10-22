@@ -14,15 +14,17 @@ export type SymbolOutline = "gameData" | "assets" | "schema";
 export const GET_SYMBOL_OUTLINE = "aet/getSymbolOutline";
 export const GET_SYMBOL_PAGE = "aet/getSymbolPage";
 export const GET_SYMBOL_NODE = "aet/getSymbolNode";
+export const GET_SYMBOL_PREVIEW = "aet/getSymbolPreview";
 
 /**
- * The requests the panel's webview may have relayed to its server, and no other: its own three,
- * and the encyclopedia card an object page embeds.
+ * The requests the panel's webview may have relayed to its server, and no other: its own four,
+ * and the encyclopedia card an object's preview embeds.
  */
 export const MOD_BROWSER_METHODS: readonly string[] = [
     GET_SYMBOL_OUTLINE,
     GET_SYMBOL_PAGE,
     GET_SYMBOL_NODE,
+    GET_SYMBOL_PREVIEW,
     GET_ENCYCLOPEDIA_ENTRY,
 ];
 
@@ -72,6 +74,40 @@ export interface SymbolAction {
     action: string;
     /** Why it is unavailable; null when it is available. */
     reason?: string | null;
+}
+
+/** An entry's preview: the tiles its type's adapter lists, in the order the grid places them. */
+export interface GetSymbolPreviewResult {
+    /** `gameObject`, `xmlObject`; null when the entry's type has no adapter. */
+    adapter?: string | null;
+    tiles: PreviewTile[];
+}
+
+/** One tile, sized in grid cells; which members it fills depends on its kind. */
+export interface PreviewTile {
+    /** `identity`, `problems`, `encyclopedia`, `definition` or `entries`. */
+    kind: string;
+    width: number;
+    height: number;
+    relation?: string | null;
+    count?: number | null;
+    entry?: SymbolRow | null;
+    location?: SymbolLocation | null;
+    variantOf?: string | null;
+    entries?: PreviewEntry[];
+    text?: string | null;
+    effective?: string | null;
+    objectId?: string | null;
+}
+
+/** One line of a problems or entries tile. */
+export interface PreviewEntry {
+    name: string;
+    detail?: string | null;
+    /** The entry it opens; absent for a problem. */
+    row?: SymbolRow | null;
+    /** Where a problem is. */
+    location?: SymbolLocation | null;
 }
 
 export interface GetSymbolOutlineParams {

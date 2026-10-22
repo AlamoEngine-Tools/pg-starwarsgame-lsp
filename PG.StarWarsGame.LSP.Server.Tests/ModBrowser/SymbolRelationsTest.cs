@@ -148,6 +148,15 @@ public sealed class SymbolRelationsTest
         Assert.Contains(("effectiveObject", null), actions);
     }
 
+    // Assembling a unit and its encyclopedia card mean nothing to an SFX event, so they are not on
+    // its list at all; what does apply stays, disabled with its reason when unavailable.
+    [Fact]
+    public void AnObjectOfAnotherType_OffersOnlyTheActionsThatApplyToIt()
+    {
+        Assert.Equal([("definition", null), ("effectiveObject", "notAVariant")],
+            Relations().Node("xml:SFXEvent", "Unit_Select_SD").Actions.Select(a => (a.Action, a.Reason)));
+    }
+
     [Fact]
     public void AShippedObject_HasNoDefinitionToGoTo()
     {

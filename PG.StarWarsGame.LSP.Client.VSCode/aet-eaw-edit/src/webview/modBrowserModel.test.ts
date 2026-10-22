@@ -12,6 +12,7 @@ import {
     originChoices,
     originLabel,
     pageLabel,
+    previewLayout,
     reasonLabel,
     relationLabel,
 } from "./modBrowserModel";
@@ -225,5 +226,39 @@ describe("menuChoices", () => {
             ),
             [["copyName"]],
         );
+    });
+});
+
+/**
+ * The preview's grid, after Scout's tile grid: a column is dropped at a time, never below one. Unlike
+ * Scout's, the grid uses the full width - its columns stretch - so a wide panel takes more of them.
+ */
+describe("previewLayout", () => {
+    const at = (width: number) => {
+        const layout = previewLayout(width);
+        return [layout.columns, layout.actionsBeside];
+    };
+
+    it("keeps the actions beside the grid while two columns fit beside them", () => {
+        assert.deepEqual(at(1082), [4, true]);
+        assert.deepEqual(at(1081), [3, true]);
+        assert.deepEqual(at(866), [3, true]);
+        assert.deepEqual(at(865), [2, true]);
+        assert.deepEqual(at(650), [2, true]);
+    });
+
+    it("takes every column that fits the full width, with no upper limit", () => {
+        assert.deepEqual(at(1298), [5, true]);
+        assert.deepEqual(at(1920), [7, true]);
+    });
+
+    it("moves the actions above the grid when they no longer fit beside two columns", () => {
+        assert.deepEqual(at(649), [2, false]);
+        assert.deepEqual(at(452), [2, false]);
+        assert.deepEqual(at(451), [1, false]);
+    });
+
+    it("never drops below one column, however narrow", () => {
+        assert.deepEqual(at(100), [1, false]);
     });
 });

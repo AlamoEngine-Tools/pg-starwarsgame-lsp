@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Assets;
+using PG.StarWarsGame.LSP.Xml;
 
 namespace PG.StarWarsGame.LSP.Server.ModBrowser;
 
@@ -72,6 +73,30 @@ public sealed class GetSymbolNodeHandler(
         return Task.FromResult(new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
                 config.Current.Features.Tools)
             .Node(request.Page, request.Id));
+    }
+}
+
+/// <summary>Serves one entry's preview: the tiles its type's adapter lists (#270).</summary>
+public sealed class GetSymbolPreviewHandler(
+    IGameIndexService index,
+    ISchemaProvider schema,
+    IVariantTagSource tags,
+    IGameAssetResolver assets,
+    IDocumentTextSource texts,
+    IXmlDiagnosticsCollector diagnostics,
+    ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<GetSymbolPreviewParams, GetSymbolPreviewResult>
+{
+    public Task<GetSymbolPreviewResult> Handle(GetSymbolPreviewParams request, CancellationToken cancellationToken)
+    {
+        var features = config.Current.Features.Tools;
+        if (!features.ModBrowser) return Task.FromResult(new GetSymbolPreviewResult(null, []));
+        var current = index.Current;
+        var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
+        var relations = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
+            features);
+        return Task.FromResult(new SymbolPreviews(current, schema, tags, relations, texts, diagnostics, features)
+            .Preview(request.Page, request.Id));
     }
 }
 

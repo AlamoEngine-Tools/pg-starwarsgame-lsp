@@ -235,6 +235,46 @@ export function menuChoices(groups: ActionChoice[][]): ActionChoice[][] {
         .filter((group) => group.length > 0);
 }
 
+/** The preview grid's cell: a column's least width and a row's height, in pixels, and the gap between. */
+export const PREVIEW_CELL = { width: 200, height: 120, gap: 16 };
+/** The action column, flush right beside the grid, and what surrounds the two. */
+export const PREVIEW_ACTIONS = 180;
+const PREVIEW_PADDING = 18;
+
+/** How the preview lays out at a width. */
+export interface PreviewLayout {
+    columns: number;
+    /** A column's width once the columns stretch to fill the grid. */
+    columnWidth: number;
+    actionsBeside: boolean;
+}
+
+/**
+ * The preview's grid at a given width, after Scout's tile grid: as many columns as fit at their least
+ * width, dropped one at a time as the panel narrows, never below one. Unlike Scout's, the columns
+ * then stretch to use the full width, so tiles flow across all of it. The actions keep their own
+ * column, flush right, while two grid columns still fit beside them, and go above the grid when not.
+ */
+export function previewLayout(width: number): PreviewLayout {
+    const fit = (room: number) =>
+        Math.floor(
+            (room + PREVIEW_CELL.gap) / (PREVIEW_CELL.width + PREVIEW_CELL.gap),
+        );
+    const besideRoom =
+        width - 2 * PREVIEW_PADDING - PREVIEW_ACTIONS - PREVIEW_PADDING;
+    const actionsBeside = fit(besideRoom) >= 2;
+    const room = actionsBeside ? besideRoom : width - 2 * PREVIEW_PADDING;
+    const columns = Math.max(1, fit(room));
+    return {
+        columns,
+        columnWidth: Math.max(
+            PREVIEW_CELL.width,
+            (room - (columns - 1) * PREVIEW_CELL.gap) / columns,
+        ),
+        actionsBeside,
+    };
+}
+
 function actionLabel(action: string): string {
     switch (action) {
         case "open":

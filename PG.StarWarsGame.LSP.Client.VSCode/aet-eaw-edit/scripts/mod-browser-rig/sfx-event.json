@@ -1,0 +1,9 @@
+﻿[
+  {"click": "SFXEvent", "in": ".rail"},
+  {"wait": 600},
+  {"type": "Unit_Select_Star_Destroyer"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"dblclick": "Unit_Select_Star_Destroyer", "in": ".grid"},
+  {"wait": 600}
+]

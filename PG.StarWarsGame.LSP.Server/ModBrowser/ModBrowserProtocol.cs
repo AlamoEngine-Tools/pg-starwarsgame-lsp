@@ -83,6 +83,64 @@ public sealed record SymbolLocation(string Uri, int Line);
 /// <param name="Reason">Why it is unavailable; null when it is available.</param>
 public sealed record SymbolAction(string Action, string? Reason);
 
+/// <summary>Asks for an entry's preview: the tiles its type's adapter shows (#270).</summary>
+[Method("aet/getSymbolPreview", Direction.ClientToServer)]
+public sealed record GetSymbolPreviewParams(string Page, string Id) : IRequest<GetSymbolPreviewResult>;
+
+/// <param name="Adapter">
+///     Which adapter answered - <c>gameObject</c>, <c>xmlObject</c>; null when the entry's type has
+///     none, and a click on it only selects.
+/// </param>
+/// <param name="Tiles">The tiles in the order the grid places them.</param>
+public sealed record GetSymbolPreviewResult(string? Adapter, IReadOnlyList<PreviewTile> Tiles);
+
+/// <summary>One tile of a preview, sized in grid cells; which members it fills depends on its kind.</summary>
+/// <param name="Kind">
+///     <c>identity</c>, <c>problems</c>, <c>encyclopedia</c>, <c>definition</c> or <c>entries</c>.
+/// </param>
+/// <param name="Width">Columns it spans; the grid caps it at the columns it has.</param>
+/// <param name="Height">Rows it spans.</param>
+public sealed record PreviewTile(string Kind, int Width, int Height)
+{
+    /// <summary>An entries tile's relation key, which also names the tile.</summary>
+    public string? Relation { get; init; }
+
+    /// <summary>How many entries the relation has; the tile may list fewer.</summary>
+    public int? Count { get; init; }
+
+    /// <summary>The identity tile's entry.</summary>
+    public SymbolRow? Entry { get; init; }
+
+    /// <summary>The identity tile's definition the game uses; null for one no text file of the project holds.</summary>
+    public SymbolLocation? Location { get; init; }
+
+    /// <summary>The identity tile's variant base.</summary>
+    public string? VariantOf { get; init; }
+
+    /// <summary>A problems or entries tile's lines.</summary>
+    public IReadOnlyList<PreviewEntry> Entries { get; init; } = [];
+
+    /// <summary>The definition tile's element as written in its file.</summary>
+    public string? Text { get; init; }
+
+    /// <summary>The definition tile's effective object, for a variant; null otherwise.</summary>
+    public string? Effective { get; init; }
+
+    /// <summary>The encyclopedia tile's object.</summary>
+    public string? ObjectId { get; init; }
+}
+
+/// <param name="Name">What the line says: an entry's name, or a problem's message.</param>
+/// <param name="Detail">A second, quieter line.</param>
+public sealed record PreviewEntry(string Name, string? Detail)
+{
+    /// <summary>The entry the line opens; null for a problem.</summary>
+    public SymbolRow? Row { get; init; }
+
+    /// <summary>Where a problem is.</summary>
+    public SymbolLocation? Location { get; init; }
+}
+
 /// <param name="Relation">The relation's key.</param>
 /// <param name="Count">How many entries it lists; null until counted, for one that needs every object's tags.</param>
 /// <param name="Reason">Why it lists none: <c>none</c>, or <c>notInModFiles</c> when the entry's tags are not known.</param>

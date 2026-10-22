@@ -107,13 +107,27 @@ function report() {
     }
     lines.push("--- crumbs: " + [...document.querySelectorAll(".crumbs .crumb-step")].map((c) => c.textContent.trim()).join(" > "));
     lines.push("--- tabs: " + [...document.querySelectorAll(".tabs .tab")].map((t) => t.textContent.trim()
-        + (t.classList.contains("on") ? " [on]" : "") + (t.classList.contains("preview") ? " [preview]" : "")).join(" | "));
+        + (t.classList.contains("on") ? " [on]" : "") + (t.classList.contains("unpinned") ? " [preview]" : "")).join(" | "));
     const page = document.querySelector(".entry") ?? document.querySelector(".grid");
     lines.push("--- page:");
     for (const el of page?.querySelectorAll("h1, p, tr") ?? []) {
         lines.push((el.classList.contains("selected") ? "* " : "  ") + el.textContent.trim().replace(/\\s+/g, " "));
     }
     lines.push("--- card: " + (document.querySelector(".entry .card") ? "drawn" : "none"));
+    for (const tile of document.querySelectorAll(".preview .tile")) {
+        const kind = [...tile.classList].find((c) => c.startsWith("tile-"))?.slice(5);
+        const area = tile.style.gridColumn + " x " + tile.style.gridRow;
+        const head = tile.querySelector(".tile-head")?.textContent.trim() ?? "";
+        const body = [...tile.querySelectorAll(".identity-name, .tg, dt, dd, .li b, .tile-foot")]
+            .map((e) => e.textContent.trim()).slice(0, 8).join(" | ");
+        lines.push("--- tile " + kind + " (" + area + ") " + head + ": " + body
+            + (tile.querySelector(".card") ? " [card]" : "") + (tile.querySelector(".code") ? " [code]" : ""));
+    }
+    const previewActions = document.querySelector(".preview-actions");
+    if (previewActions) {
+        lines.push("--- preview actions" + (previewActions.classList.contains("inline") ? " (above)" : " (beside)") + ": "
+            + [...previewActions.querySelectorAll(".act")].map((b) => b.textContent.trim() + (b.disabled ? " [off]" : "")).join(" | "));
+    }
     const actions = [...document.querySelectorAll(".entry .actions button")];
     if (actions.length) {
         lines.push("--- page actions: " + actions.map((b) => b.textContent.trim() + (b.disabled ? " [" + b.title + "]" : "")).join(" | "));

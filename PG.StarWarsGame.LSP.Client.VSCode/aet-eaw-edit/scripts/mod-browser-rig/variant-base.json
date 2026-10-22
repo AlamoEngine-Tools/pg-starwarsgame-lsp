@@ -4,6 +4,6 @@
   {"wait": 300},
   {"dblclick": "Star_Destroyer", "in": ".grid"},
   {"wait": 300},
-  {"click": "Generic_Star_Destroyer", "in": ".entry"},
+  {"click": "Generic_Star_Destroyer", "in": ".preview"},
   {"wait": 600}
 ]

@@ -27,10 +27,12 @@ import {
     GET_SYMBOL_NODE,
     GET_SYMBOL_OUTLINE,
     GET_SYMBOL_PAGE,
+    GET_SYMBOL_PREVIEW,
     GetSymbolNodeResult,
     GetSymbolOutlineResult,
     GetSymbolPageParams,
     GetSymbolPageResult,
+    GetSymbolPreviewResult,
     SymbolKindCount,
     SymbolOutline,
     SymbolParent,
@@ -54,6 +56,7 @@ import {
     reasonLabel,
     relationLabel,
 } from "./modBrowserModel";
+import { ACTION_ICONS, PreviewPage } from "./modBrowserPreview";
 import {
     closeTab,
     NO_TABS,
@@ -79,15 +82,6 @@ const GAME_OBJECT_TYPE = "GameObjectType";
 const CARD_ZOOM = 2;
 /** How long the pointer rests on a row before its actions are asked for. */
 const HOVER_DELAY_MS = 250;
-
-/** The icon an action shows on a row. */
-const ACTION_ICONS: Record<string, IconName> = {
-    definition: "definition",
-    previewUnit: "preview3d",
-    previewModel: "preview3d",
-    encyclopedia: "encyclopediaCard",
-    effectiveObject: "effectiveObject",
-};
 
 // ── the request relay ──────────────────────────────────────────────────────
 
@@ -225,6 +219,10 @@ function App(): React.JSX.Element {
      */
     const [loaded, setLoaded] = useState<Record<string, Loaded>>({});
     const [nodes, setNodes] = useState<Record<string, GetSymbolNodeResult>>({});
+    /** Each opened entry's preview, by its tab. */
+    const [previews, setPreviews] = useState<
+        Record<string, GetSymbolPreviewResult>
+    >({});
     /** The list the table last showed, whose search form the panel holds. */
     const [tableKey, setTableKey] = useState<string | null>(null);
     const [kinds, setKinds] = useState<SymbolKindCount[]>([]);
@@ -250,11 +248,13 @@ function App(): React.JSX.Element {
                 setExpanded(new Set());
                 setLoaded({});
                 setNodes({});
+                setPreviews({});
             }
             // The index changed: what was loaded may be stale, so it is asked again.
             if (msg.type === "refresh") {
                 setLoaded({});
                 setNodes({});
+                setPreviews({});
                 setRefreshed((n) => n + 1);
             }
         };
@@ -444,6 +444,23 @@ function App(): React.JSX.Element {
         expand(node, true);
         setCurrent(node);
         setTabs((known) => openPreview(known, tabKey(node), node));
+        void fetchPreview(node);
+    };
+
+    /** The entry's preview, asked for once per entry and index. */
+    const fetchPreview = async (node: EntryNode): Promise<void> => {
+        const key = tabKey(node);
+        if (previews[key]) {
+            return;
+        }
+        const result = await request<GetSymbolPreviewResult>(
+            GET_SYMBOL_PREVIEW,
+            { page: node.page, id: node.row.id },
+        );
+        setPreviews((known) => ({
+            ...known,
+            [key]: result ?? { adapter: null, tiles: [] },
+        }));
     };
 
     /** Does one item of an entry's menu. */
@@ -646,27 +663,12 @@ function App(): React.JSX.Element {
                     )}
                 </header>
                 {activeTab ? (
-                    <EntryPage
+                    <TabContent
                         node={activeTab}
+                        preview={previews[tabKey(activeTab)]}
                         result={nodes[activeTab.key] ?? null}
                         layers={layers}
-                        onOpenBase={(base) =>
-                            openEntry({
-                                kind: "entry",
-                                key: `${activeTab.key}\n${base}`,
-                                page: activeTab.page,
-                                row: {
-                                    id: base,
-                                    name: base,
-                                    kinds: [],
-                                    origin: "",
-                                    overrides: [],
-                                    page: activeTab.page,
-                                },
-                                // Reached from the variant, so the way back is the variant.
-                                trail: [...activeTab.trail, activeTab],
-                            })
-                        }
+                        onOpen={openEntry}
                         onAct={(action) => void act(action, activeTab)}
                     />
                 ) : (
@@ -771,7 +773,7 @@ function TabStrip({
             {tabs.previews.map((tab) => (
                 <div
                     key={tab.key}
-                    className={`tab${tabs.active === tab.key ? " on" : ""}${tab.pinned ? "" : " preview"}`}
+                    className={`tab${tabs.active === tab.key ? " on" : ""}${tab.pinned ? "" : " unpinned"}`}
                 >
                     <button
                         type="button"
@@ -1207,8 +1209,93 @@ function EntryPage({
     );
 }
 
-/** The object's encyclopedia card with its faction switch, asked for when the entry opens. */
-function CardSection({ objectId }: { objectId: string }): React.JSX.Element {
+/**
+ * An open tab's content: the preview the server's adapter lists, or, for an entry whose type has
+ * no adapter yet, its page as before.
+ */
+function TabContent({
+    node,
+    preview,
+    result,
+    layers,
+    onOpen,
+    onAct,
+}: {
+    node: EntryNode;
+    preview: GetSymbolPreviewResult | undefined;
+    result: GetSymbolNodeResult | null;
+    layers: GetSymbolOutlineResult["layers"];
+    onOpen: (node: EntryNode) => void;
+    onAct: (action: string) => void;
+}): React.JSX.Element {
+    // Reached from this entry, so the way back is this entry.
+    const reached = (row: SymbolRow): EntryNode => ({
+        kind: "entry",
+        key: `${node.key}\n${row.id}`,
+        page: row.page ?? node.page,
+        row,
+        trail: [...node.trail, node],
+    });
+    const openBase = (base: string) =>
+        onOpen(
+            reached({
+                id: base,
+                name: base,
+                kinds: [],
+                origin: "",
+                overrides: [],
+                page: node.page,
+            }),
+        );
+
+    if (preview === undefined) {
+        return <p className="empty">{l10n.t("Loading...")}</p>;
+    }
+    if (!preview.adapter) {
+        return (
+            <EntryPage
+                node={node}
+                result={result}
+                layers={layers}
+                onOpenBase={openBase}
+                onAct={onAct}
+            />
+        );
+    }
+    return (
+        <PreviewPage
+            tiles={preview.tiles}
+            actions={result?.actions}
+            layers={layers}
+            handlers={{
+                onOpenRow: (row) => onOpen(reached(row)),
+                onOpenBase: openBase,
+                onOpenLocation: (location) =>
+                    vscode.postMessage({
+                        type: "openLocation",
+                        uri: location.uri,
+                        line: location.line,
+                    }),
+                onAct,
+                card: (objectId, width) => (
+                    <CardSection objectId={objectId} fitWidth={width} />
+                ),
+            }}
+        />
+    );
+}
+
+/**
+ * The object's encyclopedia card with its faction switch, asked for when the entry opens. In a
+ * preview tile it is scaled to the tile's width, never above twice the game's size.
+ */
+function CardSection({
+    objectId,
+    fitWidth,
+}: {
+    objectId: string;
+    fitWidth?: number;
+}): React.JSX.Element {
     const [card, setCard] = useState<GetEncyclopediaEntryResult | null>(null);
     const [factionSlot, setFactionSlot] = useState(0);
 
@@ -1242,6 +1329,9 @@ function CardSection({ objectId }: { objectId: string }): React.JSX.Element {
         shipNames.set(objectId, pickShipName(card.shipNames?.names ?? []));
     }
     const shipName = shipNames.get(objectId) ?? null;
+    const zoom = fitWidth
+        ? Math.min(CARD_ZOOM, fitWidth / card.layout.width)
+        : CARD_ZOOM;
 
     return (
         <div className="card">
@@ -1249,7 +1339,7 @@ function CardSection({ objectId }: { objectId: string }): React.JSX.Element {
                 entry={
                     shipName === null ? card : { ...card, unitClass: shipName }
                 }
-                zoom={CARD_ZOOM}
+                zoom={zoom}
                 factionSlot={factionSlot}
             />
             <Field label={l10n.t("Faction frame")}>
@@ -1546,7 +1636,7 @@ const Shell = styled.div`
         background: none;
         cursor: pointer;
     }
-    .tab.preview .tab-name {
+    .tab.unpinned .tab-name {
         font-style: italic;
     }
     .crumbs {
@@ -1727,6 +1817,220 @@ const Shell = styled.div`
         display: inline-grid;
         gap: var(--space-8);
         margin-top: var(--space-16);
+    }
+
+    /* An entry's preview: the tile grid and the action column beside it - or above it, as one row,
+       when the panel is too narrow. Cell sizes come in as inline styles from PREVIEW_CELL. One form
+       per concept: tags, key/value, entry list, problems, code. */
+    .preview {
+        display: flex;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        gap: var(--space-16);
+        padding: var(--space-16);
+        overflow: auto;
+        min-height: 0;
+    }
+    .preview.beside {
+        flex-wrap: nowrap;
+        align-items: flex-start;
+    }
+    .preview-grid {
+        display: grid;
+        flex: 1;
+        min-width: 0;
+    }
+    /* A tile's heading stays put; what it holds scrolls inside it rather than being cut off. */
+    .tile-body {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+    }
+    .tile {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6);
+        min-width: 0;
+        overflow: hidden;
+        padding: var(--space-12) var(--space-16);
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: var(--radius-6);
+        background: var(--vscode-sideBar-background);
+    }
+    .tile-identity {
+        border-color: transparent;
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+    }
+    .tile-problems {
+        border-color: var(--vscode-errorForeground);
+    }
+    .tile-head {
+        display: flex;
+        align-items: center;
+        gap: var(--space-8);
+        margin: 0;
+        font-size: var(--font-size-11);
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--vscode-descriptionForeground);
+    }
+    .tile-count {
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+    }
+    .tile-foot {
+        margin-top: auto;
+        font-size: var(--font-size-11);
+        color: var(--vscode-descriptionForeground);
+    }
+    .identity-name {
+        margin: 0;
+        font-size: var(--font-size-16);
+        overflow-wrap: anywhere;
+    }
+    .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+    }
+    .tg {
+        padding: var(--space-1) var(--space-8);
+        border-radius: var(--radius-pill);
+        background: var(--vscode-badge-background);
+        color: var(--vscode-badge-foreground);
+        font-size: var(--font-size-11);
+    }
+    .tile-identity .tg {
+        background: transparent;
+        border: 1px solid currentColor;
+        color: inherit;
+    }
+    .tg.origin {
+        font-style: italic;
+    }
+    .kv {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: var(--space-2) var(--space-12);
+        margin: 0;
+        font-size: var(--font-size-12);
+    }
+    .kv dt {
+        font-weight: 600;
+    }
+    .kv dd {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    .tile-identity .link {
+        color: inherit;
+        text-decoration: underline;
+    }
+    .lst {
+        display: grid;
+        gap: var(--space-4);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .li button {
+        display: grid;
+        width: 100%;
+        padding: var(--space-1) var(--space-8);
+        border: 0;
+        border-left: 2px solid var(--vscode-focusBorder);
+        background: none;
+        text-align: left;
+        cursor: pointer;
+    }
+    .li b,
+    .li span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .li b {
+        font-weight: 500;
+        color: var(--vscode-textLink-foreground);
+    }
+    .li span {
+        font-size: var(--font-size-11);
+        color: var(--vscode-descriptionForeground);
+    }
+    .li.off button {
+        border-left-color: var(--vscode-panel-border);
+        cursor: default;
+    }
+    .li.off b {
+        color: var(--vscode-disabledForeground);
+    }
+    .li.err button {
+        border-left-color: var(--vscode-errorForeground);
+    }
+    .li.err b {
+        color: var(--vscode-errorForeground);
+        white-space: normal;
+    }
+    .code {
+        margin: 0;
+        font-family: var(--vscode-editor-font-family);
+        font-size: var(--font-size-11);
+        white-space: pre;
+    }
+    .seg {
+        display: inline-flex;
+        margin-left: auto;
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: var(--radius-3);
+        overflow: hidden;
+        font-weight: 400;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+    .seg button {
+        padding: 0 var(--space-6);
+        border: 0;
+        background: none;
+        color: var(--vscode-descriptionForeground);
+        cursor: pointer;
+    }
+    .seg button.on {
+        background: var(--vscode-list-activeSelectionBackground);
+        color: var(--vscode-list-activeSelectionForeground);
+    }
+    .preview-actions {
+        display: grid;
+        flex: none;
+        align-content: start;
+        gap: var(--space-12);
+    }
+    .preview-actions.inline {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        gap: var(--space-16);
+    }
+    .act {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-8);
+        padding: 0;
+        border: 0;
+        background: none;
+        text-align: left;
+        color: var(--vscode-textLink-foreground);
+        cursor: pointer;
+    }
+    .act:disabled {
+        color: var(--vscode-disabledForeground);
+        cursor: default;
+    }
+    .act small {
+        display: block;
+        font-size: var(--font-size-11);
     }
 
     @media (max-width: 700px) {

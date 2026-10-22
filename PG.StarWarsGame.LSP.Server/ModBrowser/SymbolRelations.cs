@@ -96,7 +96,7 @@ public sealed class SymbolRelations(
         {
             Location = location,
             VariantOf = winner?.VariantBaseId,
-            Actions = ObjectActions(winner, location)
+            Actions = ObjectActions(winner, location, page == GameObjects)
         };
     }
 
@@ -114,10 +114,11 @@ public sealed class SymbolRelations(
             : [definition];
     }
 
-    // The code lens set, on the lenses' own rules.
-    private List<SymbolAction> ObjectActions(GameSymbol? winner, SymbolLocation? location)
+    // The code lens set, on the lenses' own rules. Assembling a unit and drawing its encyclopedia
+    // card are a game object's; another type does not get them at all, rather than disabled.
+    private List<SymbolAction> ObjectActions(GameSymbol? winner, SymbolLocation? location, bool gameObject)
     {
-        return
+        List<SymbolAction> actions =
         [
             new SymbolAction("definition", location is null ? "shipped" : null),
             new SymbolAction("previewUnit", !_tools.ModelPreview
@@ -136,6 +137,9 @@ public sealed class SymbolRelations(
                     ? "notAVariant"
                     : null)
         ];
+        return gameObject
+            ? actions
+            : actions.Where(a => a.Action is not ("previewUnit" or "encyclopedia")).ToList();
     }
 
     // The highest layer's definition - with the game's, the one the catalog lists.
