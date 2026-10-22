@@ -25,7 +25,11 @@ public sealed class SchemaOutlineTest
     private static readonly EnumDefinition s_damage = new()
     {
         Name = "DamageType",
-        Values = [new EnumValueDefinition { Name = "Damage_Laser", Description = En("Lasers") }, new EnumValueDefinition { Name = "Damage_Ion" }]
+        Values =
+        [
+            new EnumValueDefinition { Name = "Damage_Laser", Description = En("Lasers") },
+            new EnumValueDefinition { Name = "Damage_Ion" }
+        ]
     };
 
     private static readonly ObjectKindDefinition s_spaceUnit = new()
@@ -101,7 +105,10 @@ public sealed class SchemaOutlineTest
         var (catalog, _, _) = Build();
 
         Assert.Equal(
-            [new SymbolPageSummary("schemaTypes", 2), new SymbolPageSummary("enums", 1), new SymbolPageSummary("behaviours", 1)],
+            [
+                new SymbolPageSummary("schemaTypes", 2), new SymbolPageSummary("enums", 1),
+                new SymbolPageSummary("behaviours", 1)
+            ],
             catalog.Outline(SymbolOutlines.Schema));
     }
 
@@ -110,9 +117,11 @@ public sealed class SchemaOutlineTest
     {
         var (catalog, relations, _) = Build();
 
-        Assert.Equal(3, relations.Node("schemaTypes", "GameObjectType").Relations.Single(r => r.Relation == "tags").Count);
+        Assert.Equal(3,
+            relations.Node("schemaTypes", "GameObjectType").Relations.Single(r => r.Relation == "tags").Count);
         var tags = relations.Rows("schemaTypes", "GameObjectType", "tags")!;
-        Assert.Equal([("Affiliation", "NameReferenceList"), ("Damage_Type", "DynamicEnumValue"), ("Tactical_Health", "Float")],
+        Assert.Equal(
+            [("Affiliation", "NameReferenceList"), ("Damage_Type", "DynamicEnumValue"), ("Tactical_Health", "Float")],
             tags.Select(t => (t.Name, t.Type)));
         Assert.Equal("schemaTags", tags[0].Page);
         Assert.Empty(relations.Rows("schemaTypes", "SFXEvent", "tags")!);
