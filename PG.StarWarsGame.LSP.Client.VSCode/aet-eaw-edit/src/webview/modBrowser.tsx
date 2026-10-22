@@ -56,14 +56,8 @@ import {
     pageLabel,
     reasonLabel,
     relationLabel,
-    PREVIEW_ACTIONS,
 } from "./modBrowserModel";
-import {
-    ACTION_ICONS,
-    Actions,
-    EntryHead,
-    PreviewPage,
-} from "./modBrowserPreview";
+import { ACTION_ICONS, PreviewPage } from "./modBrowserPreview";
 import {
     closeTab,
     NO_TABS,
@@ -88,7 +82,6 @@ declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
 
 const PAGE_SIZE = 200;
-const GAME_OBJECT_TYPE = "GameObjectType";
 /** The card at twice the game's size: legible, and still small enough to sit beside the header. */
 const CARD_ZOOM = 2;
 /** How long the pointer rests on a row before its actions are asked for. */
@@ -460,12 +453,18 @@ function App(): React.JSX.Element {
         setCurrent(node);
     };
 
-    /** Opens an entry in the foreground, in its own tab or the one unpinned preview tab. */
-    const openEntry = (node: EntryNode) => {
+    /**
+     * Opens an entry in the foreground, in its own tab or the one unpinned preview tab. An entry
+     * whose type has no preview is only selected: a tab with its header alone would show nothing.
+     */
+    const openEntry = async (node: EntryNode): Promise<void> => {
         if (!node.row.page) {
             return;
         }
-        void fetchNode(node);
+        if ((await fetchNode(node))?.open?.reason) {
+            select(node);
+            return;
+        }
         expand(node, true);
         setCurrent(node);
         setTabs((known) => openPreview(known, tabKey(node), node));
@@ -498,7 +497,7 @@ function App(): React.JSX.Element {
             return;
         }
         if (action === "open") {
-            openEntry(node);
+            await openEntry(node);
         } else if (action === "definition") {
             const location = (await fetchNode(node))?.location;
             if (location) {
@@ -590,7 +589,7 @@ function App(): React.JSX.Element {
                             if (e.key === "Enter") {
                                 // Not a click: a click only selects.
                                 e.preventDefault();
-                                openEntry(node);
+                                void openEntry(node);
                             } else if (e.key === "F12") {
                                 e.preventDefault();
                                 void act("definition", node);
@@ -759,6 +758,7 @@ function App(): React.JSX.Element {
                         actionChoices(
                             !!menu.node.row.page,
                             nodes[menu.node.key]?.actions,
+                            nodes[menu.node.key]?.open,
                         ),
                     )}
                     onAct={(action) => void act(action, menu.node)}
@@ -1019,65 +1019,9 @@ function RowActions({
 }
 
 /**
- * An opened entry whose type has no preview adapter yet: the preview's header and actions, and for a
- * game object its encyclopedia card - the same component the encyclopedia panel draws. Its relations
- * are its children in the rail.
- */
-function EntryPage({
-    node,
-    result,
-    layers,
-    onOpenBase,
-    onAct,
-}: {
-    node: EntryNode;
-    result: GetSymbolNodeResult | null;
-    layers: GetSymbolOutlineResult["layers"];
-    onOpenBase: (base: string) => void;
-    onAct: (action: string) => void;
-}): React.JSX.Element {
-    const row = result?.entry ?? node.row;
-    return (
-        <section className="entry">
-            <div className="entry-main">
-                <EntryHead
-                    tile={{
-                        kind: "identity",
-                        x: 0,
-                        y: 0,
-                        width: 1,
-                        height: 1,
-                        entry: row,
-                        location: result?.location,
-                        variantOf: result?.variantOf,
-                    }}
-                    layers={layers}
-                    handlers={{
-                        onOpenBase,
-                        onOpenLocation: (location) =>
-                            vscode.postMessage({
-                                type: "openLocation",
-                                uri: location.uri,
-                                line: location.line,
-                            }),
-                    }}
-                />
-                {row.type === GAME_OBJECT_TYPE && (
-                    <CardSection objectId={row.id} />
-                )}
-            </div>
-            <Actions
-                actions={result?.actions}
-                onAct={onAct}
-                width={PREVIEW_ACTIONS}
-            />
-        </section>
-    );
-}
-
-/**
- * An open tab's content: the preview the server's adapter lists, or, for an entry whose type has
- * no adapter yet, its page as before.
+ * An open tab's content: the preview the server's adapter lists. An entry whose preview would be its
+ * header alone has none, and is only ever selected; a tab can still meet one when the index changes
+ * under it, and then says so.
  */
 function TabContent({
     node,
@@ -1118,15 +1062,7 @@ function TabContent({
         return <p className="empty">{l10n.t("Loading...")}</p>;
     }
     if (!preview.adapter) {
-        return (
-            <EntryPage
-                node={node}
-                result={result}
-                layers={layers}
-                onOpenBase={openBase}
-                onAct={onAct}
-            />
-        );
+        return <p className="empty">{l10n.t("No preview for this type")}</p>;
     }
     return (
         <PreviewPage
@@ -1536,9 +1472,8 @@ const Shell = styled.div`
         min-width: 0;
         min-height: 0;
     }
-    .preview-actions .tile-grid {
-        justify-content: start;
-    }
+    /* The action tiles keep the shared grid's centring in their column, set apart from the
+       content tiles beside them. */
 
     /* The entry's header is the one tile set apart, as the reference's identity tile is: the same
        panel frame as its neighbours, washed with the theme's accent and edged along the top in it,
@@ -1568,27 +1503,6 @@ const Shell = styled.div`
         font-size: var(--font-size-16);
         font-weight: 600;
         overflow-wrap: anywhere;
-    }
-    .code {
-        margin: 0;
-        font-family: var(--vscode-editor-font-family, monospace);
-        font-size: var(--font-size-11);
-        white-space: pre;
-    }
-
-    /* An entry without a preview adapter: its header and card, the action tiles beside them. */
-    .entry {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: start;
-        gap: var(--space-16);
-        padding: var(--space-16);
-        overflow: auto;
-    }
-    .entry-main {
-        display: grid;
-        gap: var(--space-16);
-        min-width: 0;
     }
     .card {
         display: inline-grid;

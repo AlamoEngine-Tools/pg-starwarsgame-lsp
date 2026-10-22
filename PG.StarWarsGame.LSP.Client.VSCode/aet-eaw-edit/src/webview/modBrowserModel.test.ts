@@ -195,6 +195,19 @@ describe("actionChoices", () => {
         ]);
     });
 
+    it("says why an entry whose type has no preview does not open", () => {
+        assert.deepEqual(
+            summary(
+                actionChoices(
+                    true,
+                    [{ action: "definition", reason: "binary" }],
+                    { action: "open", reason: "noPreview" },
+                ),
+            )[0][0],
+            ["open", "Open", "No preview for this type"],
+        );
+    });
+
     it("says why there is no definition to go to", () => {
         const reasonOf = (reason: string) =>
             actionChoices(true, [{ action: "definition", reason }])[0][1]

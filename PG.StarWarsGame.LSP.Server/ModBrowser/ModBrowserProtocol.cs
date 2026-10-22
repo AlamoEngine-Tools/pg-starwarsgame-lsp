@@ -70,6 +70,12 @@ public sealed record GetSymbolNodeResult(SymbolRow? Entry, IReadOnlyList<SymbolR
 
     /// <summary>What can be done with the entry - the code lens set - each with why when it cannot.</summary>
     public IReadOnlyList<SymbolAction> Actions { get; init; } = [];
+
+    /// <summary>
+    ///     Opening the entry into its preview: no reason where its type has a preview, <c>noPreview</c>
+    ///     where its preview would be its header alone.
+    /// </summary>
+    public SymbolAction Open { get; init; } = new("open", null);
 }
 
 /// <param name="Uri">The defining document.</param>
@@ -129,20 +135,11 @@ public sealed record PreviewTile(string Kind, int X, int Y, int Width, int Heigh
     /// <summary>A problems or entries tile's lines.</summary>
     public IReadOnlyList<PreviewEntry> Entries { get; init; } = [];
 
-    /// <summary>The definition tile's element as written in its file.</summary>
-    public string? Text { get; init; }
-
-    /// <summary>The definition tile's effective object, for a variant; null otherwise.</summary>
-    public string? Effective { get; init; }
-
     /// <summary>The encyclopedia tile's object.</summary>
     public string? ObjectId { get; init; }
 
-    /// <summary>A facts tile's counts, in the order shown.</summary>
+    /// <summary>The identity tile's counts, in the order shown - a model's bones, textures and the rest.</summary>
     public IReadOnlyList<PreviewFact>? Facts { get; init; }
-
-    /// <summary>A source tile's first line in its file, from 0: where <see cref="Text" /> starts.</summary>
-    public int? Line { get; init; }
 }
 
 /// <param name="Key">What is counted: <c>bones</c>, <c>textures</c>, <c>particleSystems</c>, <c>animations</c>.</param>

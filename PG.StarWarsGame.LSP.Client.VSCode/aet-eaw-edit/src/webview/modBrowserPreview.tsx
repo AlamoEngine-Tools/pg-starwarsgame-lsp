@@ -32,7 +32,6 @@ import {
 } from "./modBrowserModel";
 import { DockTile, DockTileGrid } from "./shared/DockTile";
 import { Icon, IconName } from "./shared/Icon";
-import { ModeSelector } from "./shared/ModeSelector";
 import { Panel } from "./shared/Panel";
 import { problemLook, problemTag } from "./shared/problemLook";
 
@@ -181,60 +180,21 @@ function Tile({
                         handlers.card(tile.objectId, width - PANEL_INSET)}
                 </Panel>
             );
-        case "definition":
-            return <DefinitionPanel tile={tile} place={place} />;
-        case "entries": {
-            const entries = tile.entries ?? [];
-            const more = (tile.count ?? entries.length) - entries.length;
+        case "entries":
+            // Every entry of the relation: the tile scrolls, so none is held back.
             return (
                 <Panel
                     title={relationLabel(tile.relation ?? "")}
                     count={tile.count?.toLocaleString()}
                     flush
                     style={place}
-                    foot={
-                        more > 0
-                            ? l10n.t("{0} more", more.toLocaleString())
-                            : undefined
-                    }
                 >
                     <EntryList
-                        entries={entries}
+                        entries={tile.entries ?? []}
                         onOpen={(row) => handlers.onOpenRow(row)}
                     />
                 </Panel>
             );
-        }
-        case "facts":
-            return (
-                <Panel title={l10n.t("Model")} style={place}>
-                    <dl className="kv-rows">
-                        {(tile.facts ?? []).map((f) => (
-                            <Fragment key={f.key}>
-                                <dt>{factLabel(f.key)}</dt>
-                                <dd className="number">
-                                    {f.value.toLocaleString()}
-                                </dd>
-                            </Fragment>
-                        ))}
-                    </dl>
-                </Panel>
-            );
-        case "source": {
-            const text = tile.text ?? "";
-            return (
-                <Panel
-                    title={l10n.t("Source")}
-                    style={place}
-                    foot={l10n.t(
-                        "From line {0}",
-                        ((tile.line ?? 0) + 1).toLocaleString(),
-                    )}
-                >
-                    <pre className="code">{text}</pre>
-                </Panel>
-            );
-        }
         default:
             return null;
     }
@@ -244,7 +204,7 @@ function Tile({
  * The entry's header, the one bold thing on the page: its name, tags for what classifies it, and
  * where the definition the game uses comes from.
  */
-export function EntryHead({
+function EntryHead({
     tile,
     layers,
     handlers,
@@ -253,8 +213,8 @@ export function EntryHead({
     tile: PreviewTile;
     layers: GetSymbolOutlineResult["layers"];
     handlers: Pick<PreviewHandlers, "onOpenBase" | "onOpenLocation">;
-    /** Its cells, on the preview grid; absent on an entry page. */
-    place?: React.CSSProperties;
+    /** Its cells, on the preview grid. */
+    place: React.CSSProperties;
 }): React.JSX.Element | null {
     const entry = tile.entry;
     if (!entry) {
@@ -318,51 +278,18 @@ export function EntryHead({
                             </dd>
                         </>
                     )}
+                    {/* A model's counts: what it holds, at a glance beside where it comes from. */}
+                    {(tile.facts ?? []).map((f) => (
+                        <Fragment key={f.key}>
+                            <dt>{factLabel(f.key)}</dt>
+                            <dd className="number">
+                                {f.value.toLocaleString()}
+                            </dd>
+                        </Fragment>
+                    ))}
                 </dl>
             </div>
         </section>
-    );
-}
-
-type DefinitionView = "written" | "effective";
-
-/** The definition as written in its file, with the merged effective object one switch away. */
-function DefinitionPanel({
-    tile,
-    place,
-}: {
-    tile: PreviewTile;
-    place: React.CSSProperties;
-}): React.JSX.Element {
-    const [view, setView] = useState<DefinitionView>("written");
-    const text = (view === "effective" ? tile.effective : tile.text) ?? "";
-    const lines = text.split("\n").length;
-    return (
-        <Panel
-            title={l10n.t("Definition")}
-            style={place}
-            end={
-                <ModeSelector<DefinitionView>
-                    label={l10n.t("Definition")}
-                    value={view}
-                    options={[
-                        { id: "written", label: l10n.t("As written") },
-                        tile.effective
-                            ? { id: "effective", label: l10n.t("Effective") }
-                            : {
-                                  id: "effective",
-                                  label: l10n.t("Effective"),
-                                  disabled: true,
-                                  disabledReason: `${l10n.t("Effective")} - ${l10n.t("Not a variant")}`,
-                              },
-                    ]}
-                    onSelect={setView}
-                />
-            }
-            foot={l10n.t("{0} lines", lines.toLocaleString())}
-        >
-            <pre className="code">{text}</pre>
-        </Panel>
     );
 }
 
@@ -453,7 +380,7 @@ function EntryList({
  * own next, copying the name last. One that does not apply stays, disabled, with why. A column
  * beside the grid when there is room for one, a row above it when there is not.
  */
-export function Actions({
+function Actions({
     actions,
     onAct,
     width,

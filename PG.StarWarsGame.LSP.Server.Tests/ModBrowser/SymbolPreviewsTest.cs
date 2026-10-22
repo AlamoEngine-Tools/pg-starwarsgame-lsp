@@ -26,6 +26,7 @@ public sealed class SymbolPreviewsTest
     private const string Model = "data/art/models/ev_stardestroyer.alo";
     private const string Engine = "data/art/models/p_engine.alo";
     private const string Idle = "data/art/models/ev_stardestroyer_idle_00.ala";
+    private const string Crowded = "data/art/models/ev_crowded.alo";
 
     // A script opens with a comment banner, as the game's own do; its source starts after it.
     private static readonly string s_script = string.Join("\n",
@@ -162,7 +163,7 @@ public sealed class SymbolPreviewsTest
                 .Add(Units, new DocumentIndex(Units, 1, [.. symbols], [], LayerRank: 0, LayerName: "Mod"))
                 .Add(Script, new DocumentIndex(Script, 1, [], [], ["PGStateMachine"], LayerRank: 0, LayerName: "Mod")),
             WorkspaceDefinitions = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s)),
-            AssetFiles = MergedAssetFileIndex.Merge([Model, Engine, Idle, "data/art/textures/sd.dds"], []),
+            AssetFiles = MergedAssetFileIndex.Merge([Model, Engine, Idle, Crowded, "data/art/textures/sd.dds"], []),
             // The model's three bones and two textures, one of which no file holds - the other is
             // named as a .tga the project ships as a .dds, which the game takes for the same texture;
             // the engine effect's one texture.
@@ -170,7 +171,9 @@ public sealed class SymbolPreviewsTest
                 .Add(ModelBoneKey.From(Model), ["Root", "HP_Weapon_00", "HP_Engine_00"]),
             ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add(ModelBoneKey.From(Model), ["SD.tga", "sd_missing.dds"])
-                .Add(ModelBoneKey.From(Engine), ["sd.dds"]),
+                .Add(ModelBoneKey.From(Engine), ["sd.dds"])
+                // More textures than a list was ever cut at.
+                .Add(ModelBoneKey.From(Crowded), [.. Enumerable.Range(0, 25).Select(i => $"crowd_{i:00}.dds")]),
             ParticleSystems = [ModelBoneKey.From(Engine)]
         };
         var schema = new Schema();
@@ -179,7 +182,7 @@ public sealed class SymbolPreviewsTest
         // The model's proxies name the engine effect and one no file holds.
         var relations = new SymbolRelations(index, schema, tags, catalog,
             id => id == Model ? ["P_Engine", "P_Missing"] : [], tools);
-        return new SymbolPreviews(index, schema, tags, relations, new Texts(), new Diagnostics(),
+        return new SymbolPreviews(index, tags, relations, new Texts(), new Diagnostics(),
             tools ?? new ToolsFeatureFlags());
     }
 
@@ -190,7 +193,7 @@ public sealed class SymbolPreviewsTest
     }
 
     [Fact]
-    public void AGameObject_IsPreviewedAsIdentity_Problems_Encyclopedia_Definition_References()
+    public void AGameObject_IsPreviewedAsIdentity_Problems_References_AndItsEncyclopediaDownTheRight()
     {
         var preview = Previews().Preview(Page, "Star_Destroyer");
 
@@ -198,31 +201,42 @@ public sealed class SymbolPreviewsTest
         Assert.Equal((6, 6), (preview.Columns, preview.Rows));
         Assert.Equal(
             [
-                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("encyclopedia", 0, 2, 2, 4),
-                ("definition", 2, 2, 2, 4), ("entries", 4, 0, 2, 6)
+                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("encyclopedia", 4, 0, 2, 6),
+                ("entries", 0, 2, 4, 4)
             ],
             Layout(preview));
         Assert.Equal("referencedBy", preview.Tiles[^1].Relation);
         Assert.Equal("Star_Destroyer", preview.Tiles.Single(t => t.Kind == "encyclopedia").ObjectId);
     }
 
-    // Every tile has its fixed place: one that is not there leaves its cells empty, and no other tile
-    // grows into them (maintainer, 2026-10-22: as Scout, a fixed tile only ever takes its own space).
+    // A tile absent for one entry has its fixed place all the same: its cells stay empty, and no
+    // other tile grows into them (maintainer, 2026-10-22: as Scout, a fixed tile only ever takes its
+    // own space).
     [Fact]
     public void AnAbsentTile_LeavesItsCellsEmpty()
     {
         Assert.Equal(
-            [
-                ("identity", 0, 0, 2, 2), ("encyclopedia", 0, 2, 2, 4), ("definition", 2, 2, 2, 4),
-                ("entries", 4, 0, 2, 6)
-            ],
+            [("identity", 0, 0, 2, 2), ("encyclopedia", 4, 0, 2, 6), ("entries", 0, 2, 4, 4)],
             Layout(Previews().Preview(Page, "Star_Destroyer_Mk2")));
         Assert.Equal(
-            [
-                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("definition", 2, 2, 2, 4),
-                ("entries", 4, 0, 2, 6)
-            ],
+            [("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("entries", 0, 2, 4, 4)],
             Layout(Previews(new ToolsFeatureFlags { Encyclopedia = false }).Preview(Page, "Star_Destroyer")));
+    }
+
+    // The definition is the file's, one click away with its highlighting; no preview repeats it
+    // (maintainer, 2026-10-22).
+    [Fact]
+    public void NoPreview_RepeatsTheDefinitionItsFileShows()
+    {
+        var previews = Previews();
+
+        Assert.All(
+            new[]
+            {
+                previews.Preview(Page, "Star_Destroyer"), previews.Preview(Page, "Star_Destroyer_Mk2"),
+                previews.Preview("xml:SFXEvent", "Unit_Select_SD"), previews.Preview("luaScripts", Script)
+            },
+            p => Assert.DoesNotContain(p.Tiles, t => t.Kind is "definition" or "source"));
     }
 
     [Fact]
@@ -233,20 +247,6 @@ public sealed class SymbolPreviewsTest
         Assert.Equal("Star_Destroyer_Mk2", identity.Entry?.Name);
         Assert.Equal(new SymbolLocation(Units, 6), identity.Location);
         Assert.Equal("Star_Destroyer", identity.VariantOf);
-    }
-
-    [Fact]
-    public void TheDefinition_IsTheElementAsWritten_WithTheEffectiveObjectOnlyForAVariant()
-    {
-        var previews = Previews();
-
-        var plain = previews.Preview(Page, "Star_Destroyer").Tiles.Single(t => t.Kind == "definition");
-        var variant = previews.Preview(Page, "Star_Destroyer_Mk2").Tiles.Single(t => t.Kind == "definition");
-
-        Assert.Equal(string.Join("\n", s_units.Split('\n')[1..6]).Trim(), plain.Text?.Trim());
-        Assert.Null(plain.Effective);
-        Assert.StartsWith("<SpaceUnit Name=\"Star_Destroyer_Mk2\">", variant.Text);
-        Assert.Contains("EV_StarDestroyer.alo", variant.Effective);
     }
 
     [Fact]
@@ -274,15 +274,15 @@ public sealed class SymbolPreviewsTest
     }
 
     [Fact]
-    public void AnotherXmlObject_ShowsItsOwnRelations_AndNoEncyclopedia()
+    public void AnotherXmlObject_ShowsItsOwnRelationsUnderItsHeader_AndItsReferencesDownTheRight()
     {
         var preview = Previews().Preview("xml:SFXEvent", "Unit_Select_SD");
 
         Assert.Equal("xmlObject", preview.Adapter);
         Assert.Equal(
             [
-                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("definition", 0, 2, 4, 4),
-                ("entries", 4, 0, 2, 3), ("entries", 4, 3, 2, 3)
+                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("entries", 0, 2, 4, 4),
+                ("entries", 4, 0, 2, 6)
             ],
             Layout(preview));
         Assert.Equal(["samples", "referencedBy"],
@@ -290,11 +290,11 @@ public sealed class SymbolPreviewsTest
     }
 
     [Fact]
-    public void AnObjectOnlyTheGameDefines_HasNoDefinitionToShow_AndNoProblems()
+    public void AnObjectOnlyTheGameDefines_HasItsHeaderAndReferences_AndNoProblems()
     {
         var preview = Previews().Preview(Page, "Shipped_Only");
 
-        Assert.Equal([("identity", 0, 0, 2, 2), ("entries", 4, 0, 2, 6)], Layout(preview));
+        Assert.Equal([("identity", 0, 0, 2, 2), ("entries", 0, 2, 4, 4)], Layout(preview));
     }
 
     [Fact]
@@ -305,30 +305,52 @@ public sealed class SymbolPreviewsTest
         Assert.DoesNotContain(preview.Tiles, t => t.Kind == "encyclopedia");
     }
 
+    // A preview that would be its header alone is none: a texture, a sound, an animation and an enum
+    // have nothing to show yet (maintainer, 2026-10-22).
     [Fact]
-    public void AnEntryWithoutAnAdapter_OrNoEntryAtAll_HasNoPreview()
+    public void AnEntryWhosePreviewWouldBeItsHeaderAlone_OrNoEntryAtAll_HasNoPreview()
     {
         var previews = Previews();
 
         Assert.Null(previews.Preview("textures", "data/art/textures/sd.dds").Adapter);
+        Assert.Null(previews.Preview("animations", Idle).Adapter);
         Assert.Null(previews.Preview("models", "nothing.alo").Adapter);
         Assert.Null(previews.Preview(Page, "Nothing_By_This_Name").Adapter);
+        Assert.False(SymbolPreviews.HasPreview("animations"));
+        Assert.True(SymbolPreviews.HasPreview("models"));
+        Assert.True(SymbolPreviews.HasPreview("xml:SFXEvent"));
     }
 
     [Fact]
-    public void AModel_IsPreviewedAsIdentity_Problems_Facts_Textures_AndItsListsDownTheRight()
+    public void AModel_IsLaidOutFourTilesAcross_ItsListsInTheSecondRow_ItsReferencesDownTheFourth()
     {
         var preview = Previews().Preview("models", Model);
 
         Assert.Equal("model", preview.Adapter);
+        // One cell per tile: four columns at their least width still fit beside the actions, where
+        // eight cells of two would not.
+        Assert.Equal((4, 2), (preview.Columns, preview.Rows));
         Assert.Equal(
             [
-                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("facts", 0, 2, 2, 4), ("entries", 2, 2, 2, 4),
-                ("entries", 4, 0, 2, 2), ("entries", 4, 2, 2, 2), ("entries", 4, 4, 2, 2)
+                ("identity", 0, 0, 1, 1), ("problems", 1, 0, 1, 1), ("entries", 0, 1, 1, 1), ("entries", 1, 1, 1, 1),
+                ("entries", 2, 1, 1, 1), ("entries", 3, 0, 1, 2)
             ],
             Layout(preview));
         Assert.Equal(["textures", "particleSystems", "animations", "usedBy"],
             preview.Tiles.Where(t => t.Kind == "entries").Select(t => t.Relation));
+    }
+
+    [Fact]
+    public void AModelsHeader_CountsItsBones_Textures_ParticleSystems_AndAnimations()
+    {
+        var identity = Previews().Preview("models", Model).Tiles.Single(t => t.Kind == "identity");
+
+        Assert.Equal(
+            [
+                new PreviewFact("bones", 3), new PreviewFact("textures", 2), new PreviewFact("particleSystems", 2),
+                new PreviewFact("animations", 1)
+            ],
+            identity.Facts);
     }
 
     [Fact]
@@ -339,7 +361,7 @@ public sealed class SymbolPreviewsTest
         Assert.Equal(2, problems.Count);
         Assert.Equal(
             [("sd_missing.dds", "missingTexture", "warning"), ("p_missing.alo", "missingParticleSystem", "warning")],
-            problems.Entries!.Select(e => (e.Name, e.Reason, e.Severity)));
+            problems.Entries.Select(e => (e.Name, e.Reason, e.Severity)));
     }
 
     [Fact]
@@ -358,17 +380,14 @@ public sealed class SymbolPreviewsTest
         Assert.All(textures.Entries, e => Assert.Null(e.Detail));
     }
 
+    // The tile scrolls, so a list is never cut short with a count of what it left out.
     [Fact]
-    public void AModelsFacts_CountItsBones_Textures_ParticleSystems_AndAnimations()
+    public void AList_HoldsEveryEntry()
     {
-        var facts = Previews().Preview("models", Model).Tiles.Single(t => t.Kind == "facts");
+        var textures = Previews().Preview("models", Crowded).Tiles.Single(t => t.Relation == "textures");
 
-        Assert.Equal(
-            [
-                new PreviewFact("bones", 3), new PreviewFact("textures", 2), new PreviewFact("particleSystems", 2),
-                new PreviewFact("animations", 1)
-            ],
-            facts.Facts);
+        Assert.Equal(25, textures.Count);
+        Assert.Equal(25, textures.Entries.Count);
     }
 
     [Fact]
@@ -382,33 +401,13 @@ public sealed class SymbolPreviewsTest
     }
 
     [Fact]
-    public void AnAnimation_IsPreviewedAsIdentity_AndItsModel()
-    {
-        var preview = Previews().Preview("animations", Idle);
-
-        Assert.Equal("animation", preview.Adapter);
-        Assert.Equal([("identity", 0, 0, 2, 2), ("entries", 2, 0, 2, 2)], Layout(preview));
-        Assert.Equal(Model, preview.Tiles[1].Entries!.Single().Row?.Id);
-    }
-
-    [Fact]
-    public void ALuaScript_IsPreviewedAsIdentity_ItsSource_LoadedBy_AndRequires()
+    public void ALuaScript_IsItsHeader_LoadedBy_AndRequires_InOneRow()
     {
         var preview = Previews().Preview("luaScripts", Script);
 
         Assert.Equal("luaScript", preview.Adapter);
-        Assert.Equal(
-            [("identity", 0, 0, 2, 2), ("source", 0, 2, 4, 4), ("entries", 4, 0, 2, 3), ("entries", 4, 3, 2, 3)],
-            Layout(preview));
+        Assert.Equal((6, 2), (preview.Columns, preview.Rows));
+        Assert.Equal([("identity", 0, 0, 2, 2), ("entries", 2, 0, 2, 2), ("entries", 4, 0, 2, 2)], Layout(preview));
         Assert.Equal(["loadedBy", "requires"], preview.Tiles.Where(t => t.Kind == "entries").Select(t => t.Relation));
-    }
-
-    [Fact]
-    public void AScriptsSource_StartsAtItsFirstLineOfCode_PastTheCommentBanner()
-    {
-        var source = Previews().Preview("luaScripts", Script).Tiles.Single(t => t.Kind == "source");
-
-        Assert.StartsWith("require(\"PGStateMachine\")", source.Text);
-        Assert.Equal(4, source.Line);
     }
 }

@@ -95,7 +95,7 @@ public sealed class GetSymbolPreviewHandler(
         var catalog = SymbolCatalog.For(current, schema.AllKinds, schema.AllEnums);
         var relations = new SymbolRelations(current, schema, tags, catalog, ModelProxies.For(current, assets),
             features);
-        return Task.FromResult(new SymbolPreviews(current, schema, tags, relations, texts, diagnostics, features)
+        return Task.FromResult(new SymbolPreviews(current, tags, relations, texts, diagnostics, features)
             .Preview(request.Page, request.Id));
     }
 }

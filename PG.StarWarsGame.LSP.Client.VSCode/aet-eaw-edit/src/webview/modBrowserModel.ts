@@ -178,6 +178,8 @@ export interface ActionChoice {
 export function actionChoices(
     canOpen: boolean,
     actions: readonly SymbolAction[] | undefined,
+    /** Opening the entry into its preview, as the server answered; absent until it has. */
+    open?: SymbolAction | null,
 ): ActionChoice[][] {
     const choice = (
         action: string,
@@ -209,7 +211,7 @@ export function actionChoices(
     const offered = (actions ?? []).filter((a) => a.action !== "definition");
     return [
         [
-            choice("open", null, "Enter"),
+            choice("open", open?.reason, "Enter"),
             definition
                 ? choice("definition", definition.reason, "F12")
                 : disabled(
@@ -344,6 +346,8 @@ function actionReasonLabel(reason: string): string {
             return l10n.t("No encyclopedia text");
         case "notAVariant":
             return l10n.t("Not a variant");
+        case "noPreview":
+            return l10n.t("No preview for this type");
         case "off":
             return l10n.t("Turned off in the settings");
         default:

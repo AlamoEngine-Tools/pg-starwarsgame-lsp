@@ -122,6 +122,21 @@ public sealed class AssetRelationsTest
         Assert.Equal([("definition", "binary")], ActionsOf("textures", "tie.tga"));
     }
 
+    // An entry opens into its preview; one whose preview would be its header alone has none, and
+    // says so rather than opening an empty tab.
+    [Fact]
+    public void AnEntry_OpensOnlyWhereItsTypeHasAPreview()
+    {
+        var relations = Relations();
+
+        Assert.Equal(new SymbolAction("open", null), relations.Node("models", "ev_tie.alo").Open);
+        Assert.Equal(new SymbolAction("open", null), relations.Node("luaScripts", "tiescript.lua").Open);
+        Assert.Equal(new SymbolAction("open", "noPreview"), relations.Node("textures", "tie.tga").Open);
+        Assert.Equal(new SymbolAction("open", "noPreview"), relations.Node("animations", "ev_tie_die.ala").Open);
+        Assert.Equal(new SymbolAction("open", "noPreview"), relations.Node("enums", "AnimationType").Open);
+        Assert.Equal(new SymbolAction("open", null), relations.Node("xml:GameObjectType", "Tie_Fighter").Open);
+    }
+
     [Fact]
     public void ALuaScript_GoesToItsFile()
     {

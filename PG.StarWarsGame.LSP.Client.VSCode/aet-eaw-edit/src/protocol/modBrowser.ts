@@ -66,6 +66,8 @@ export interface GetSymbolNodeResult {
     variantOf?: string | null;
     /** What can be done with the entry - the code lens set - each with why when it cannot. */
     actions?: SymbolAction[];
+    /** Opening the entry into its preview; its reason is `noPreview` where its type has none. */
+    open?: SymbolAction | null;
 }
 
 /** One thing that can be done with an entry. */
@@ -78,7 +80,7 @@ export interface SymbolAction {
 
 /** An entry's preview: its adapter's fixed grid, and every tile placed on it. */
 export interface GetSymbolPreviewResult {
-    /** `gameObject`, `xmlObject`; null when the entry's type has no adapter. */
+    /** `gameObject`, `xmlObject`, `model`, `particleSystem` or `luaScript`; null when the entry has no preview. */
     adapter?: string | null;
     tiles: PreviewTile[];
     /** The grid's columns and rows; the webview stretches them over the tab. */
@@ -88,7 +90,7 @@ export interface GetSymbolPreviewResult {
 
 /** One tile, placed and sized in grid cells; which members it fills depends on its kind. */
 export interface PreviewTile {
-    /** `identity`, `problems`, `encyclopedia`, `definition`, `entries`, `facts` or `source`. */
+    /** `identity`, `problems`, `encyclopedia` or `entries`. */
     kind: string;
     /** Its first column and row, from 0. */
     x: number;
@@ -101,16 +103,12 @@ export interface PreviewTile {
     location?: SymbolLocation | null;
     variantOf?: string | null;
     entries?: PreviewEntry[];
-    text?: string | null;
-    effective?: string | null;
     objectId?: string | null;
-    /** A facts tile's counts, in the order shown. */
+    /** The identity tile's counts, in the order shown - a model's bones, textures and the rest. */
     facts?: PreviewFact[] | null;
-    /** A source tile's first line in its file, from 0. */
-    line?: number | null;
 }
 
-/** One count of a facts tile: `bones`, `textures`, `particleSystems` or `animations`. */
+/** One count in an identity tile: `bones`, `textures`, `particleSystems` or `animations`. */
 export interface PreviewFact {
     key: string;
     value: number;

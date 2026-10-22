@@ -76,7 +76,8 @@ public sealed class SymbolRelations(
                 .ToList())
             {
                 Location = page == "luaScripts" ? new SymbolLocation(entry.Id, 0) : null,
-                Actions = AssetActions(page)
+                Actions = AssetActions(page),
+                Open = new SymbolAction("open", SymbolPreviews.HasPreview(page) ? null : "noPreview")
             };
 
         var (named, known) = TagRelations(entry);
