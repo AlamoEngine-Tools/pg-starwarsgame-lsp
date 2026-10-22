@@ -20,7 +20,7 @@ internal class NullSchemaProvider : ISchemaProvider
     public virtual IReadOnlyList<XmlTagDefinition> AllTags => [];
     public virtual IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public virtual IReadOnlyList<ObjectKindDefinition> AllKinds => [];
-    public IReadOnlyList<EnumDefinition> AllEnums => [];
+    public virtual IReadOnlyList<EnumDefinition> AllEnums => [];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 

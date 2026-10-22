@@ -60,7 +60,8 @@ public sealed class SymbolRelations(
         ["textures"] = [UsedBy],
         ["audio"] = [UsedBy],
         ["luaScripts"] = ["loadedBy", "requires"],
-        ["enums"] = [UsedBy],
+        ["enums"] = ["values", UsedBy],
+        ["enumValues"] = [],
         ["schemaTypes"] = ["tags"],
         ["schemaTags"] = [],
         ["behaviours"] = ["objects"]
@@ -69,7 +70,7 @@ public sealed class SymbolRelations(
     /// <summary>Whether a page lists the schema's own elements: no file of their own, nothing to reveal.</summary>
     private static bool IsSchema(string page)
     {
-        return page is "enums" or "schemaTypes" or "schemaTags" or "behaviours";
+        return page is "enums" or "enumValues" or "schemaTypes" or "schemaTags" or "behaviours";
     }
 
     /// <summary>The relations a game object always shows, empty ones disabled with their reason.</summary>
@@ -239,15 +240,15 @@ public sealed class SymbolRelations(
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(t => Texture(t) ?? Missing(t, null)),
             ("animations", "model") => ModelOf(entry.Name),
-            ("enums", UsedBy) => schema.AllTags
-                .Where(t => string.Equals(t.Enum?.Name, entry.Name, StringComparison.OrdinalIgnoreCase))
-                .Select(t => new SymbolRow(t.Tag, t.Tag, "tag", [], "schema", null, [])),
+            ("enums", UsedBy) => TagsTypedWith(entry.Name),
             ("luaScripts", "loadedBy") => ObjectsReferencing(WorkspaceFileKey.Create(WorkspaceFileKey.LuaScriptType,
                 entry.Name)),
             ("luaScripts", "requires") => (index.Documents.GetValueOrDefault(entry.Id)?.RequireArgs ?? [])
                 .Select(a => catalog.Find("luaScripts", WithExtension(a, ".lua")) ?? Missing(a, ".lua")),
             ("textures", UsedBy) => ModelsNaming(entry.Name).Concat(Users(entry.Name)),
             ("schemaTypes", "tags") => catalog.Rows("schemaTags")
+                .Where(r => r.Id.StartsWith(entry.Id + "/", StringComparison.Ordinal)),
+            ("enums", "values") => catalog.Rows("enumValues")
                 .Where(r => r.Id.StartsWith(entry.Id + "/", StringComparison.Ordinal)),
             ("behaviours", "objects") => catalog.Rows(GameObjects)
                 .Where(r => r.Kinds.Contains(entry.Name, StringComparer.OrdinalIgnoreCase)),
@@ -256,6 +257,25 @@ public sealed class SymbolRelations(
             _ => []
         };
         return rows.DistinctBy(r => r.Id).ToList();
+    }
+
+    // The tags typed with an enum, as the tag pages they are on each type that has them; a schema
+    // that lists no types names them as tags alone.
+    private IEnumerable<SymbolRow> TagsTypedWith(string enumName)
+    {
+        bool Takes(XmlTagDefinition tag)
+        {
+            return string.Equals(tag.Enum?.Name, enumName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var pages = schema.AllObjectTypes
+            .SelectMany(t => schema.GetTagsForType(t.TypeName).Where(Takes)
+                .Select(tag => catalog.Find("schemaTags", t.TypeName + "/" + tag.Tag)))
+            .OfType<SymbolRow>()
+            .ToList();
+        return pages.Count > 0
+            ? pages
+            : schema.AllTags.Where(Takes).Select(t => new SymbolRow(t.Tag, t.Tag, "tag", [], "schema", null, []));
     }
 
     // The model an animation belongs to: the longest model name its own name starts with.

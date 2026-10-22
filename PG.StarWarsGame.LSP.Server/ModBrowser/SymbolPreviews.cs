@@ -48,7 +48,7 @@ public sealed class SymbolPreviews(
     /// <summary>The pages whose entries have a preview.</summary>
     private static readonly HashSet<string> s_assetPages = new(StringComparer.Ordinal)
     {
-        "models", "particleSystems", "luaScripts", "schemaTypes", "schemaTags", "behaviours"
+        "models", "particleSystems", "luaScripts", "schemaTypes", "schemaTags", "behaviours", "enums"
     };
 
     private static readonly GetSymbolPreviewResult s_none = new(null, []);
@@ -75,6 +75,7 @@ public sealed class SymbolPreviews(
             "schemaTypes" => SchemaType(layout, page, entry, node),
             "schemaTags" => SchemaTag(layout, entry, node),
             "behaviours" => Behaviour(layout, page, entry, node),
+            "enums" => Enum(layout, page, entry, node),
             _ => XmlObject(layout, page, entry, node)
         };
         return layout.Tiles.Count < 2
@@ -118,27 +119,27 @@ public sealed class SymbolPreviews(
     }
 
     /// <summary>
-    ///     A model, on a grid of four tiles across: its header with its counts, its problems and its tree
-    ///     of bones, meshes and effects on top, its textures, particle systems and animations below, its
-    ///     references down the fourth column.
+    ///     A model, on a grid of four columns: its header with its counts and its problems, its textures
+    ///     and particle systems, its animations and references, two to a band down the left half; its
+    ///     tree of bones, meshes and effects down the right.
     /// </summary>
     /// <remarks>
-    ///     One column per tile: four columns at their least width fit beside the action column, where
-    ///     eight would make the tab scroll sideways. Two rows per tile: a row keeps its height rather
-    ///     than stretching, and one is too short for a list.
+    ///     Four columns at their least width fit beside the action column. The lists go two to a band,
+    ///     each two rows tall, as a row keeps its height rather than stretching; the tree - the page's
+    ///     main content, and as deep as the model's skeleton - takes the right half, every row tall.
     /// </remarks>
     private string Model(Layout layout, string page, SymbolRow entry, GetSymbolNodeResult node)
     {
-        layout.Grid(4, 4);
+        layout.Grid(4, 6);
         layout.Put(Header(entry, node) with { Facts = ModelFacts(entry, node) }, 0, 0, 1, 2);
         layout.Put(AssetProblems(page, entry.Id), 1, 0, 1, 2);
         // Its bones, meshes and effects as the model preview's tree, which the webview reads from
         // the model itself by name.
-        layout.Put(Tile("hierarchy") with { ObjectId = entry.Name }, 2, 0, 1, 2);
+        layout.Put(Tile("hierarchy") with { ObjectId = entry.Name }, 2, 0, 2, 6);
         layout.Put(Entries(page, entry.Id, "textures"), 0, 2, 1, 2);
         layout.Put(Entries(page, entry.Id, "particleSystems"), 1, 2, 1, 2);
-        layout.Put(Entries(page, entry.Id, "animations"), 2, 2, 1, 2);
-        layout.Put(Entries(page, entry.Id, UsedBy), 3, 0, 1, 4);
+        layout.Put(Entries(page, entry.Id, "animations"), 0, 4, 1, 2);
+        layout.Put(Entries(page, entry.Id, UsedBy), 1, 4, 1, 2);
         return "model";
     }
 
@@ -188,7 +189,7 @@ public sealed class SymbolPreviews(
             if (tag.MultipleAllowed) properties.Add(new PreviewProperty("repeats", ""));
         }
 
-        var values = tag?.Enum?.Values ?? [];
+        var values = tag?.Enum is { } enumeration ? EnumValueList.Of(index, enumeration) : [];
         layout.Grid(6, 2);
         layout.Put(Header(entry, node), 0, 0, 2, 2);
         layout.Put(Documentation(properties, tag?.Description, tag?.Notes), 2, 0, values.Count > 0 ? 2 : 4, 2);
@@ -199,6 +200,33 @@ public sealed class SymbolPreviews(
                 Entries = [.. values.Select(v => new PreviewEntry(v.Name, Describe(v.Description)))]
             }, 4, 0, 2, 2);
         return "schemaTag";
+    }
+
+    /// <summary>
+    ///     An enum: whether it is built in or read from the game's files, its documentation, every value
+    ///     down the right, and the tags typed with it under them.
+    /// </summary>
+    private string Enum(Layout layout, string page, SymbolRow entry, GetSymbolNodeResult node)
+    {
+        var definition = schema?.AllEnums.FirstOrDefault(e => e.Name == entry.Id);
+        List<PreviewProperty> properties = [];
+        if (definition is not null)
+        {
+            properties.Add(new PreviewProperty("kind", EnumValueList.KindKey(definition.Kind)));
+            if (definition.IsBitfield) properties.Add(new PreviewProperty("bitfield", ""));
+        }
+
+        var values = definition is null ? [] : EnumValueList.Of(index, definition);
+        layout.Grid(6, 4);
+        layout.Put(Header(entry, node), 0, 0, 2, 2);
+        layout.Put(Documentation(properties, definition?.Description, definition?.Notes), 2, 0, 2, 2);
+        layout.Put(Tile("values") with
+        {
+            Count = values.Count,
+            Entries = [.. values.Select(v => new PreviewEntry(v.Name, Describe(v.Description)))]
+        }, 4, 0, 2, 4);
+        layout.Put(Entries(page, entry.Id, UsedBy), 0, 2, 4, 2);
+        return "enum";
     }
 
     /// <summary>A behaviour: what decides it, and the game objects that have it.</summary>
@@ -358,7 +386,12 @@ public sealed class SymbolPreviews(
             // An asset's type is its extension, which its name already ends with.
             Entries = rows
                 .Select(r => new PreviewEntry(r.Name,
-                    r.Type is { } type && r.Name.EndsWith(type, StringComparison.OrdinalIgnoreCase) ? null : r.Type)
+                    // A tag is said with its type: one tag name is a tag on several.
+                    r.Page == "schemaTags"
+                        ? r.Id[..r.Id.IndexOf('/')]
+                        : r.Type is { } type && r.Name.EndsWith(type, StringComparison.OrdinalIgnoreCase)
+                            ? null
+                            : r.Type)
                 {
                     Row = r
                 })

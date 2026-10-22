@@ -370,18 +370,18 @@ public sealed class SymbolPreviewsTest
     }
 
     [Fact]
-    public void AModel_IsLaidOutFourTilesAcross_ItsListsInTheSecondBand_ItsReferencesDownTheFourth()
+    public void AModel_PairsItsListsOnTheLeft_ItsTreeTheRightHalfFullHeight()
     {
         var preview = Previews().Preview("models", Model);
 
         Assert.Equal("model", preview.Adapter);
-        // One column per tile: four columns at their least width still fit beside the actions, where
-        // eight would not. Two rows per tile: a row keeps its height, and one row is too short for a list.
-        Assert.Equal((4, 4), (preview.Columns, preview.Rows));
+        // Four columns at their least width still fit beside the actions. The lists two to a band, two
+        // rows tall; the tree - the page's main content, and a deep one - two columns by every row.
+        Assert.Equal((4, 6), (preview.Columns, preview.Rows));
         Assert.Equal(
             [
-                ("identity", 0, 0, 1, 2), ("problems", 1, 0, 1, 2), ("hierarchy", 2, 0, 1, 2),
-                ("entries", 0, 2, 1, 2), ("entries", 1, 2, 1, 2), ("entries", 2, 2, 1, 2), ("entries", 3, 0, 1, 4)
+                ("identity", 0, 0, 1, 2), ("problems", 1, 0, 1, 2), ("hierarchy", 2, 0, 2, 6),
+                ("entries", 0, 2, 1, 2), ("entries", 1, 2, 1, 2), ("entries", 0, 4, 1, 2), ("entries", 1, 4, 1, 2)
             ],
             Layout(preview));
         // The tree is read from the model by name, as the model preview reads it.

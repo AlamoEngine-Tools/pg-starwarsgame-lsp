@@ -85,8 +85,14 @@ public sealed class SymbolCatalog
             Add(pages, ScriptsPrefix + ScriptFolder(row.Id), row);
         }
 
+        // An enum by whether it is built in or read from the game's files; its values each a row of
+        // their own, the enum's children.
         pages["enums"] = enums
-            .Select(e => new SymbolRow(e.Name, e.Name, null, [], "game", null, [], "enums"))
+            .Select(e => new SymbolRow(e.Name, e.Name, EnumValueList.KindKey(e.Kind), [], "game", null, [], "enums"))
+            .ToList();
+        pages["enumValues"] = enums
+            .SelectMany(e => EnumValueList.Of(index, e).Select(v =>
+                new SymbolRow(e.Name + "/" + v.Name, v.Name, e.Name, [], v.Origin, null, [], "enumValues")))
             .ToList();
         // The schema's types, each tag of each type - a tag by its type and name, as a tag name means
         // something else on another type - and the behaviours.

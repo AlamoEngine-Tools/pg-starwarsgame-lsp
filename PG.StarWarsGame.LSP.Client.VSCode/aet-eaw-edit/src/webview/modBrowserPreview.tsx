@@ -41,6 +41,8 @@ import {
     fileSize,
     noteLabel,
     propertyLabel,
+    propertyValue,
+    rowTypeLabel,
 } from "./modBrowserModel";
 import { treeItemsFromDetail } from "./preview/modelTreeItems";
 import {
@@ -280,7 +282,7 @@ function Documentation({ tile }: { tile: PreviewTile }): React.JSX.Element {
                     {properties.map((p) => (
                         <Fragment key={p.key}>
                             <dt>{propertyLabel(p.key)}</dt>
-                            <dd>{p.value || l10n.t("Yes")}</dd>
+                            <dd>{propertyValue(p)}</dd>
                         </Fragment>
                     ))}
                 </dl>
@@ -329,7 +331,9 @@ function EntryHead({
             <div className="panel-body">
                 <h2 className="entry-title">{entry.name}</h2>
                 <div className="tag-row">
-                    {entry.type && <span className="tag">{entry.type}</span>}
+                    {entry.type && (
+                        <span className="tag">{rowTypeLabel(entry)}</span>
+                    )}
                     {entry.kinds.map((k) => (
                         <span key={k} className="tag">
                             {k}

@@ -86,6 +86,7 @@ import {
     IconPlayerStop,
     IconPlayerTrackNext,
     IconPlayerTrackPrev,
+    IconPoint,
     IconPlus,
     IconPolygon,
     type IconProps,
@@ -324,6 +325,8 @@ const ICONS = {
     // The Schema outline's types and behaviours.
     schemaType: IconSchema,
     behaviour: IconActivity,
+    // One value of an enum.
+    enumValue: IconPoint,
 } satisfies Record<string, ComponentType<IconProps>>;
 
 export type IconName = keyof typeof ICONS;

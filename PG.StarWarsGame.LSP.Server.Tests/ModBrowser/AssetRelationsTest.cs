@@ -174,7 +174,7 @@ public sealed class AssetRelationsTest
         Assert.Equal(new SymbolAction("open", null), relations.Node("luaScripts", "tiescript.lua").Open);
         Assert.Equal(new SymbolAction("open", "noPreview"), relations.Node("textures", "tie.tga").Open);
         Assert.Equal(new SymbolAction("open", "noPreview"), relations.Node("animations", "ev_tie_die.ala").Open);
-        Assert.Equal(new SymbolAction("open", "noPreview"), relations.Node("enums", "AnimationType").Open);
+        Assert.Equal(new SymbolAction("open", null), relations.Node("enums", "AnimationType").Open);
         Assert.Equal(new SymbolAction("open", null), relations.Node("xml:GameObjectType", "Tie_Fighter").Open);
     }
 

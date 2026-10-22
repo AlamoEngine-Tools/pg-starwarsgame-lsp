@@ -60,6 +60,7 @@ import {
     reasonLabel,
     relationIcon,
     relationLabel,
+    rowTypeLabel,
 } from "./modBrowserModel";
 import { ACTION_ICONS, PreviewPage } from "./modBrowserPreview";
 import {
@@ -1306,7 +1307,7 @@ function ListPage({
                 {
                     key: "type",
                     label: l10n.t("Type"),
-                    cell: (r) => r.type ?? "",
+                    cell: (r) => rowTypeLabel(r),
                     dim: true,
                 },
                 {
@@ -2029,7 +2030,12 @@ const Shell = styled.div`
         list-style: none;
     }
     .entry-row.plain {
+        /* A list item, not a button: sized as a button is, so its padding does not overflow. */
+        box-sizing: border-box;
         cursor: default;
+    }
+    .entry-row.plain:hover {
+        background: none;
     }
     .entry-row.plain .entry-name {
         color: var(--colour-ink);

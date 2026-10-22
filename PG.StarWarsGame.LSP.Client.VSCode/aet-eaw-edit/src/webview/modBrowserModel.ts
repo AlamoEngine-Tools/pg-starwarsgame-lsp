@@ -7,10 +7,12 @@
 import * as l10n from "@vscode/l10n";
 
 import type {
+    PreviewProperty,
     SymbolAction,
     SymbolKindCount,
     SymbolLayer,
     SymbolLocation,
+    SymbolRow,
 } from "../protocol/modBrowser";
 import type { IconName } from "./shared/Icon";
 
@@ -43,6 +45,8 @@ export function pageLabel(page: string): string {
             return l10n.t("Tags");
         case "behaviours":
             return l10n.t("Behaviours");
+        case "enumValues":
+            return l10n.t("Values");
         default:
             return page.startsWith(XML_PREFIX)
                 ? page.slice(XML_PREFIX.length)
@@ -75,6 +79,8 @@ export function pageIcon(page: string): IconName {
             return "tag";
         case "behaviours":
             return "behaviour";
+        case "enumValues":
+            return "enumValue";
         default:
             return page.startsWith(SCRIPTS_PREFIX) ? "script" : "gameObject";
     }
@@ -114,6 +120,8 @@ export function relationIcon(relation: string): IconName {
             return "tag";
         case "objects":
             return "gameObject";
+        case "values":
+            return "enumValue";
         default:
             return "tag";
     }
@@ -371,8 +379,44 @@ export function propertyLabel(key: string): string {
             return l10n.t("Flags");
         case "memberOf":
             return l10n.t("Member of");
+        case "kind":
+            return l10n.t("Kind");
+        case "bitfield":
+            return l10n.t("Bitfield");
         default:
             return key;
+    }
+}
+
+/**
+ * A property's value as the documentation tile shows it: an enum's kind by its name, one that is
+ * only there or not as a yes, any other as the schema names it.
+ */
+export function propertyValue(property: PreviewProperty): string {
+    if (property.key === "kind") {
+        return enumKindLabel(property.value);
+    }
+    return property.value || l10n.t("Yes");
+}
+
+/** A row's type as the table and the entry's header show it: an enum by whether it is built in. */
+export function rowTypeLabel(row: SymbolRow): string {
+    return row.page === "enums" && row.type
+        ? enumKindLabel(row.type)
+        : (row.type ?? "");
+}
+
+/** Whether an enum is built into the engine or read from the game's files. */
+function enumKindLabel(kind: string): string {
+    switch (kind) {
+        case "fixed":
+            return l10n.t("Built in");
+        case "dynamic":
+            return l10n.t("Dynamic");
+        case "gameConstants":
+            return l10n.t("Game constants");
+        default:
+            return kind;
     }
 }
 

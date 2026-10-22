@@ -22,13 +22,28 @@ public sealed class SchemaOutlineTest
         return new Dictionary<string, string> { ["en"] = text };
     }
 
+    // Dynamic: its values are the game's and the project's, from their enum files; the schema only
+    // describes some.
     private static readonly EnumDefinition s_damage = new()
     {
         Name = "DamageType",
+        Kind = EnumKind.DynamicXml,
         Values =
         [
             new EnumValueDefinition { Name = "Damage_Laser", Description = En("Lasers") },
             new EnumValueDefinition { Name = "Damage_Ion" }
+        ]
+    };
+
+    // Built into the engine: the schema's values are all there are.
+    private static readonly EnumDefinition s_weather = new()
+    {
+        Name = "WeatherType",
+        Kind = EnumKind.SchemaFixed,
+        Values =
+        [
+            new EnumValueDefinition { Name = "Rain", Description = En("Rain falls") },
+            new EnumValueDefinition { Name = "Snow" }
         ]
     };
 
@@ -40,6 +55,8 @@ public sealed class SchemaOutlineTest
     private sealed class Schema : NullSchemaProvider
     {
         public override IReadOnlyList<ObjectKindDefinition> AllKinds => [s_spaceUnit];
+
+        public override IReadOnlyList<EnumDefinition> AllEnums => [s_damage, s_weather];
 
         public override IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes =>
         [
@@ -80,13 +97,21 @@ public sealed class SchemaOutlineTest
             new FileOrigin(Units, 1, 2), null, Behaviors: ["SPACE_UNIT"], Flags: ["Is_Space"]);
         var index = GameIndex.Empty with
         {
+            // The game ships two damage types; the project adds one and repeats one.
+            Baseline = BaselineIndex.Empty with
+            {
+                DynamicEnumValues = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                    .Add("DamageType", ["Damage_Laser", "Damage_Ion"])
+            },
+            WorkspaceDynamicEnumValues = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("DamageType", ["Damage_Ion", "Damage_Mod"]),
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(Units, new DocumentIndex(Units, 1, [destroyer], [], LayerRank: 0, LayerName: "Mod")),
             WorkspaceDefinitions =
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(destroyer.Id, [destroyer])
         };
         var schema = new Schema();
-        var catalog = SymbolCatalog.Build(index, [s_spaceUnit], [s_damage], schema);
+        var catalog = SymbolCatalog.Build(index, [s_spaceUnit], [s_damage, s_weather], schema);
         var relations = new SymbolRelations(index, schema, new NoTags(), catalog);
         return (catalog, relations, new SymbolPreviews(index, relations, null!, null!, null!, schema: schema));
     }
@@ -106,7 +131,7 @@ public sealed class SchemaOutlineTest
 
         Assert.Equal(
             [
-                new SymbolPageSummary("schemaTypes", 2), new SymbolPageSummary("enums", 1),
+                new SymbolPageSummary("schemaTypes", 2), new SymbolPageSummary("enums", 2),
                 new SymbolPageSummary("behaviours", 1)
             ],
             catalog.Outline(SymbolOutlines.Schema));
@@ -164,8 +189,63 @@ public sealed class SchemaOutlineTest
         Assert.Contains(new PreviewProperty("enum", "DamageType"), damage.Tiles[1].Properties!);
         // What it references is the enum, said once.
         Assert.DoesNotContain(damage.Tiles[1].Properties!, p => p.Key == "references");
-        Assert.Equal([("Damage_Laser", "Lasers"), ("Damage_Ion", null)],
+        Assert.Equal([("Damage_Laser", "Lasers"), ("Damage_Ion", null), ("Damage_Mod", null)],
             damage.Tiles[2].Entries!.Select(e => (e.Name, e.Detail)));
+    }
+
+    // An enum says whether it is built into the engine or read from the game's files, and lists its
+    // values: a built-in one the schema's, a dynamic one the game's and the project's together.
+    [Fact]
+    public void AnEnum_SaysWhetherItIsBuiltIn_AndListsItsValues()
+    {
+        var (catalog, relations, previews) = Build();
+
+        Assert.Equal([("DamageType", "dynamic"), ("WeatherType", "fixed")],
+            catalog.Page(new GetSymbolPageParams("enums")).Rows.Select(r => (r.Name, r.Type)));
+        Assert.Equal(new SymbolAction("open", null), relations.Node("enums", "DamageType").Open);
+
+        var damage = previews.Preview("enums", "DamageType");
+        Assert.Equal("enum", damage.Adapter);
+        Assert.Equal(
+        [
+            ("identity", 0, 0, 2, 2), ("documentation", 2, 0, 2, 2), ("values", 4, 0, 2, 4),
+            ("entries", 0, 2, 4, 2)
+        ], damage.Tiles.Select(t => (t.Kind, t.X, t.Y, t.Width, t.Height)));
+        Assert.Equal([new PreviewProperty("kind", "dynamic")], damage.Tiles[1].Properties);
+        Assert.Equal(["Damage_Laser", "Damage_Ion", "Damage_Mod"], damage.Tiles[2].Entries.Select(e => e.Name));
+        Assert.Equal("usedBy", damage.Tiles[3].Relation);
+        // The tags typed with it are the tag pages they are, each on its type.
+        Assert.Equal([("Damage_Type", "schemaTags", "GameObjectType/Damage_Type")],
+            relations.Rows("enums", "DamageType", "usedBy")!.Select(r => (r.Name, r.Page, r.Id)));
+        // One tag name is a tag on several types: its line says which.
+        Assert.Equal([("Damage_Type", "GameObjectType")], damage.Tiles[3].Entries.Select(e => (e.Name, e.Detail)));
+
+        var weather = previews.Preview("enums", "WeatherType");
+        Assert.Equal([new PreviewProperty("kind", "fixed")], weather.Tiles[1].Properties);
+        Assert.Equal([("Rain", "Rain falls"), ("Snow", null)],
+            weather.Tiles[2].Entries.Select(e => (e.Name, e.Detail)));
+    }
+
+    // An enum's values are its children in the rail and a list of their own in the table: each value
+    // once, from the game or from the project.
+    [Fact]
+    public void AnEnum_OpensIntoItsValues()
+    {
+        var (_, relations, _) = Build();
+
+        var node = relations.Node("enums", "DamageType");
+        Assert.Equal(["values", "usedBy"], node.Relations.Select(r => r.Relation));
+        Assert.Equal(3, node.Relations[0].Count);
+        Assert.Equal(
+        [
+            ("Damage_Ion", "DamageType", "game"), ("Damage_Laser", "DamageType", "game"),
+            ("Damage_Mod", "DamageType", "project")
+        ], relations.Rows("enums", "DamageType", "values")!.Select(r => (r.Name, r.Type, r.Origin)));
+        Assert.Equal(["Rain", "Snow"], relations.Rows("enums", "WeatherType", "values")!.Select(r => r.Name));
+        // A value is the schema's, with nothing of its own to preview.
+        var value = relations.Node("enumValues", "DamageType/Damage_Mod");
+        Assert.Equal(new SymbolAction("open", "noPreview"), value.Open);
+        Assert.Empty(value.Relations);
     }
 
     [Fact]

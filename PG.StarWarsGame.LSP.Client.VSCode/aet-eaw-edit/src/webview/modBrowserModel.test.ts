@@ -19,9 +19,11 @@ import {
     previewLayout,
     noteLabel,
     propertyLabel,
+    propertyValue,
     reasonLabel,
     relationIcon,
     relationLabel,
+    rowTypeLabel,
 } from "./modBrowserModel";
 
 /** The Schema outline's words and pictures (#270). */
@@ -47,6 +49,45 @@ describe("the Schema outline", () => {
         assert.equal(propertyLabel("repeats"), "Repeats");
         assert.equal(noteLabel("BuggedInEngine"), "Bugged in the engine");
         assert.equal(noteLabel("Since"), "Since");
+    });
+
+    // Whether an enum is built in or read from the game's files, said wherever its type is.
+    it("says what kind of enum an enum is", () => {
+        const enumRow = (type: string) => ({
+            id: "DamageType",
+            name: "DamageType",
+            type,
+            kinds: [],
+            origin: "game",
+            overrides: [],
+            page: "enums",
+        });
+        assert.equal(rowTypeLabel(enumRow("fixed")), "Built in");
+        assert.equal(rowTypeLabel(enumRow("dynamic")), "Dynamic");
+        assert.equal(rowTypeLabel(enumRow("gameConstants")), "Game constants");
+        assert.equal(
+            rowTypeLabel({
+                ...enumRow("GameObjectType"),
+                page: "xml:GameObjectType",
+            }),
+            "GameObjectType",
+        );
+        assert.equal(propertyLabel("kind"), "Kind");
+        assert.equal(
+            propertyValue({ key: "kind", value: "dynamic" }),
+            "Dynamic",
+        );
+        assert.equal(propertyValue({ key: "repeats", value: "" }), "Yes");
+        assert.equal(
+            propertyValue({ key: "valueType", value: "Float" }),
+            "Float",
+        );
+    });
+
+    it("names and pictures an enum's values", () => {
+        assert.equal(relationLabel("values"), "Values");
+        assert.equal(relationIcon("values"), "enumValue");
+        assert.equal(pageIcon("enumValues"), "enumValue");
     });
 });
 
