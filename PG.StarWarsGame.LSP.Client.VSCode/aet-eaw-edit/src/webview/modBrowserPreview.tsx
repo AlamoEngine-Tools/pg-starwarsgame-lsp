@@ -9,7 +9,7 @@
 // only draws them.
 
 import * as l10n from "@vscode/l10n";
-import { ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import type {
     GetSymbolOutlineResult,
@@ -26,7 +26,9 @@ import {
     PREVIEW_ACTIONS,
     PREVIEW_CELL,
     previewLayout,
+    problemMessage,
     relationLabel,
+    factLabel,
 } from "./modBrowserModel";
 import { DockTile, DockTileGrid } from "./shared/DockTile";
 import { Icon, IconName } from "./shared/Icon";
@@ -203,6 +205,36 @@ function Tile({
                 </Panel>
             );
         }
+        case "facts":
+            return (
+                <Panel title={l10n.t("Model")} style={place}>
+                    <dl className="kv-rows">
+                        {(tile.facts ?? []).map((f) => (
+                            <Fragment key={f.key}>
+                                <dt>{factLabel(f.key)}</dt>
+                                <dd className="number">
+                                    {f.value.toLocaleString()}
+                                </dd>
+                            </Fragment>
+                        ))}
+                    </dl>
+                </Panel>
+            );
+        case "source": {
+            const text = tile.text ?? "";
+            return (
+                <Panel
+                    title={l10n.t("Source")}
+                    style={place}
+                    foot={l10n.t(
+                        "From line {0}",
+                        ((tile.line ?? 0) + 1).toLocaleString(),
+                    )}
+                >
+                    <pre className="code">{text}</pre>
+                </Panel>
+            );
+        }
         default:
             return null;
     }
@@ -349,7 +381,8 @@ function Problems({
         <div className="problem-list">
             {entries.map((e, i) => {
                 const look = problemLook(e.severity ?? "warning");
-                const tag = problemTag(e.detail);
+                // A problem the server found in an asset has no diagnostic id to show.
+                const tag = e.reason ? null : problemTag(e.detail);
                 return (
                     <button
                         key={`${e.name}-${i}`}
@@ -362,10 +395,12 @@ function Problems({
                             className={`codicon codicon-${look.icon} sev-${look.tone}`}
                             aria-hidden="true"
                         />
-                        <span className="problem-msg">{e.name}</span>
-                        <span className="problem-id" title={tag.title}>
-                            {tag.text}
-                        </span>
+                        <span className="problem-msg">{problemMessage(e)}</span>
+                        {tag && (
+                            <span className="problem-id" title={tag.title}>
+                                {tag.text}
+                            </span>
+                        )}
                     </button>
                 );
             })}
@@ -384,6 +419,9 @@ function EntryList({
     entries: PreviewEntry[];
     onOpen: (row: SymbolRow) => void;
 }): React.JSX.Element {
+    if (entries.length === 0) {
+        return <p className="empty">{l10n.t("None")}</p>;
+    }
     return (
         <ul className="entry-list">
             {entries.map((e, i) => (

@@ -137,7 +137,17 @@ public sealed record PreviewTile(string Kind, int X, int Y, int Width, int Heigh
 
     /// <summary>The encyclopedia tile's object.</summary>
     public string? ObjectId { get; init; }
+
+    /// <summary>A facts tile's counts, in the order shown.</summary>
+    public IReadOnlyList<PreviewFact>? Facts { get; init; }
+
+    /// <summary>A source tile's first line in its file, from 0: where <see cref="Text" /> starts.</summary>
+    public int? Line { get; init; }
 }
+
+/// <param name="Key">What is counted: <c>bones</c>, <c>textures</c>, <c>particleSystems</c>, <c>animations</c>.</param>
+/// <param name="Value">How many.</param>
+public sealed record PreviewFact(string Key, int Value);
 
 /// <param name="Name">What the line says: an entry's name, or a problem's message.</param>
 /// <param name="Detail">A second, quieter line.</param>
@@ -151,6 +161,13 @@ public sealed record PreviewEntry(string Name, string? Detail)
 
     /// <summary>A problem's severity, <c>error</c> or <c>warning</c>, as the preview's problems carry it.</summary>
     public string? Severity { get; init; }
+
+    /// <summary>
+    ///     A problem the server found rather than a diagnostic: <c>missingTexture</c> or
+    ///     <c>missingParticleSystem</c>, with <see cref="PreviewEntry.Name" /> the name no file holds.
+    ///     The client words it.
+    /// </summary>
+    public string? Reason { get; init; }
 }
 
 /// <param name="Relation">The relation's key.</param>

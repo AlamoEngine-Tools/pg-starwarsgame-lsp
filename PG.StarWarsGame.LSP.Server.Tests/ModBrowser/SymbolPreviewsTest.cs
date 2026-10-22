@@ -22,6 +22,21 @@ public sealed class SymbolPreviewsTest
 {
     private const string Units = "file:///c:/work/mod/data/xml/units.xml";
     private const string Page = "xml:GameObjectType";
+    private const string Script = "file:///c:/work/mod/data/scripts/gameobject/myhero.lua";
+    private const string Model = "data/art/models/ev_stardestroyer.alo";
+    private const string Engine = "data/art/models/p_engine.alo";
+    private const string Idle = "data/art/models/ev_stardestroyer_idle_00.ala";
+
+    // A script opens with a comment banner, as the game's own do; its source starts after it.
+    private static readonly string s_script = string.Join("\n",
+        "-- A banner the source skips",
+        "--[[ and a block",
+        "     comment ]]",
+        "",
+        "require(\"PGStateMachine\")",
+        "",
+        "function Definitions()",
+        "end");
 
     private static readonly string s_units = string.Join("\n",
         "<GameObjectFiles>",
@@ -83,7 +98,12 @@ public sealed class SymbolPreviewsTest
     {
         public DocumentText? GetText(string canonicalUri)
         {
-            return canonicalUri == Units ? new DocumentText(s_units, 1, false) : null;
+            return canonicalUri switch
+            {
+                Units => new DocumentText(s_units, 1, false),
+                Script => new DocumentText(s_script, 1, false),
+                _ => null
+            };
         }
     }
 
@@ -138,15 +158,27 @@ public sealed class SymbolPreviewsTest
             {
                 Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add(shipped.Id, shipped)
             },
-            Documents = ImmutableDictionary<string, DocumentIndex>.Empty.Add(Units,
-                new DocumentIndex(Units, 1, [.. symbols], [], LayerRank: 0, LayerName: "Mod")),
+            Documents = ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(Units, new DocumentIndex(Units, 1, [.. symbols], [], LayerRank: 0, LayerName: "Mod"))
+                .Add(Script, new DocumentIndex(Script, 1, [], [], ["PGStateMachine"], LayerRank: 0, LayerName: "Mod")),
             WorkspaceDefinitions = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s)),
-            AssetFiles = MergedAssetFileIndex.Merge(["data/art/models/ev_stardestroyer.alo"], [])
+            AssetFiles = MergedAssetFileIndex.Merge([Model, Engine, Idle, "data/art/textures/sd.dds"], []),
+            // The model's three bones and two textures, one of which no file holds - the other is
+            // named as a .tga the project ships as a .dds, which the game takes for the same texture;
+            // the engine effect's one texture.
+            ModelBones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add(ModelBoneKey.From(Model), ["Root", "HP_Weapon_00", "HP_Engine_00"]),
+            ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add(ModelBoneKey.From(Model), ["SD.tga", "sd_missing.dds"])
+                .Add(ModelBoneKey.From(Engine), ["sd.dds"]),
+            ParticleSystems = [ModelBoneKey.From(Engine)]
         };
         var schema = new Schema();
         var tags = new Tags();
         var catalog = SymbolCatalog.Build(index, [], []);
-        var relations = new SymbolRelations(index, schema, tags, catalog, tools: tools);
+        // The model's proxies name the engine effect and one no file holds.
+        var relations = new SymbolRelations(index, schema, tags, catalog,
+            id => id == Model ? ["P_Engine", "P_Missing"] : [], tools);
         return new SymbolPreviews(index, schema, tags, relations, new Texts(), new Diagnostics(),
             tools ?? new ToolsFeatureFlags());
     }
@@ -278,7 +310,105 @@ public sealed class SymbolPreviewsTest
     {
         var previews = Previews();
 
-        Assert.Null(previews.Preview("models", "ev_stardestroyer.alo").Adapter);
+        Assert.Null(previews.Preview("textures", "data/art/textures/sd.dds").Adapter);
+        Assert.Null(previews.Preview("models", "nothing.alo").Adapter);
         Assert.Null(previews.Preview(Page, "Nothing_By_This_Name").Adapter);
+    }
+
+    [Fact]
+    public void AModel_IsPreviewedAsIdentity_Problems_Facts_Textures_AndItsListsDownTheRight()
+    {
+        var preview = Previews().Preview("models", Model);
+
+        Assert.Equal("model", preview.Adapter);
+        Assert.Equal(
+            [
+                ("identity", 0, 0, 2, 2), ("problems", 2, 0, 2, 2), ("facts", 0, 2, 2, 4), ("entries", 2, 2, 2, 4),
+                ("entries", 4, 0, 2, 2), ("entries", 4, 2, 2, 2), ("entries", 4, 4, 2, 2)
+            ],
+            Layout(preview));
+        Assert.Equal(["textures", "particleSystems", "animations", "usedBy"],
+            preview.Tiles.Where(t => t.Kind == "entries").Select(t => t.Relation));
+    }
+
+    [Fact]
+    public void AModelsProblems_AreTheTexturesAndParticleSystemsItNamesThatNoFileHolds()
+    {
+        var problems = Previews().Preview("models", Model).Tiles.Single(t => t.Kind == "problems");
+
+        Assert.Equal(2, problems.Count);
+        Assert.Equal(
+            [("sd_missing.dds", "missingTexture", "warning"), ("p_missing.alo", "missingParticleSystem", "warning")],
+            problems.Entries!.Select(e => (e.Name, e.Reason, e.Severity)));
+    }
+
+    [Fact]
+    public void ATextureNamedAsATga_IsTheDdsTheProjectShips_AsTheGameTakesIt()
+    {
+        var textures = Previews().Preview("models", Model).Tiles.Single(t => t.Relation == "textures");
+
+        Assert.Equal("data/art/textures/sd.dds", textures.Entries[0].Row?.Id);
+    }
+
+    [Fact]
+    public void AnAssetsLine_HasNoDetail_ItsExtensionBeingAlreadyInItsName()
+    {
+        var textures = Previews().Preview("models", Model).Tiles.Single(t => t.Relation == "textures");
+
+        Assert.All(textures.Entries, e => Assert.Null(e.Detail));
+    }
+
+    [Fact]
+    public void AModelsFacts_CountItsBones_Textures_ParticleSystems_AndAnimations()
+    {
+        var facts = Previews().Preview("models", Model).Tiles.Single(t => t.Kind == "facts");
+
+        Assert.Equal(
+            [
+                new PreviewFact("bones", 3), new PreviewFact("textures", 2), new PreviewFact("particleSystems", 2),
+                new PreviewFact("animations", 1)
+            ],
+            facts.Facts);
+    }
+
+    [Fact]
+    public void AParticleSystem_IsPreviewedAsIdentity_Textures_AndReferences()
+    {
+        var preview = Previews().Preview("particleSystems", Engine);
+
+        Assert.Equal("particleSystem", preview.Adapter);
+        Assert.Equal([("identity", 0, 0, 2, 2), ("entries", 0, 2, 4, 4), ("entries", 4, 0, 2, 6)], Layout(preview));
+        Assert.Equal(["textures", "usedBy"], preview.Tiles.Where(t => t.Kind == "entries").Select(t => t.Relation));
+    }
+
+    [Fact]
+    public void AnAnimation_IsPreviewedAsIdentity_AndItsModel()
+    {
+        var preview = Previews().Preview("animations", Idle);
+
+        Assert.Equal("animation", preview.Adapter);
+        Assert.Equal([("identity", 0, 0, 2, 2), ("entries", 2, 0, 2, 2)], Layout(preview));
+        Assert.Equal(Model, preview.Tiles[1].Entries!.Single().Row?.Id);
+    }
+
+    [Fact]
+    public void ALuaScript_IsPreviewedAsIdentity_ItsSource_LoadedBy_AndRequires()
+    {
+        var preview = Previews().Preview("luaScripts", Script);
+
+        Assert.Equal("luaScript", preview.Adapter);
+        Assert.Equal(
+            [("identity", 0, 0, 2, 2), ("source", 0, 2, 4, 4), ("entries", 4, 0, 2, 3), ("entries", 4, 3, 2, 3)],
+            Layout(preview));
+        Assert.Equal(["loadedBy", "requires"], preview.Tiles.Where(t => t.Kind == "entries").Select(t => t.Relation));
+    }
+
+    [Fact]
+    public void AScriptsSource_StartsAtItsFirstLineOfCode_PastTheCommentBanner()
+    {
+        var source = Previews().Preview("luaScripts", Script).Tiles.Single(t => t.Kind == "source");
+
+        Assert.StartsWith("require(\"PGStateMachine\")", source.Text);
+        Assert.Equal(4, source.Line);
     }
 }

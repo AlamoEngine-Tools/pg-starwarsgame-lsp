@@ -6,7 +6,9 @@ import { describe, it } from "node:test";
 
 import {
     actionChoices,
+    factLabel,
     kindChoices,
+    problemMessage,
     locationLabel,
     menuChoices,
     originChoices,
@@ -249,5 +251,40 @@ describe("previewLayout", () => {
 
     it("never shrinks a cell below its least width; the grid scrolls instead", () => {
         assert.equal(previewLayout(300, 6).cellWidth, 120);
+    });
+});
+
+describe("factLabel", () => {
+    it("names what a model's facts count", () => {
+        assert.equal(factLabel("bones"), "Bones");
+        assert.equal(factLabel("textures"), "Textures");
+        assert.equal(factLabel("particleSystems"), "Particle Systems");
+        assert.equal(factLabel("animations"), "Animations");
+    });
+});
+
+describe("problemMessage", () => {
+    it("words a problem the server found by its reason, naming what no file holds", () => {
+        assert.equal(
+            problemMessage({
+                name: "sd_missing.dds",
+                reason: "missingTexture",
+            }),
+            "No file holds the texture - sd_missing.dds",
+        );
+        assert.equal(
+            problemMessage({
+                name: "p_missing.alo",
+                reason: "missingParticleSystem",
+            }),
+            "No file holds the particle system - p_missing.alo",
+        );
+    });
+
+    it("leaves a diagnostic's message as it is", () => {
+        assert.equal(
+            problemMessage({ name: "Max_Speed is out of range" }),
+            "Max_Speed is out of range",
+        );
     });
 });

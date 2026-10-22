@@ -38,6 +38,7 @@ public sealed class SymbolRelations(
     private const string UsedBy = "usedBy";
     private const string Off = "off";
     private static readonly char[] s_separators = [',', ' ', '\t', '\n', '\r'];
+    private static readonly string[] s_textureInterchange = [".tga", ".dds"];
 
     private readonly ToolsFeatureFlags _tools = tools ?? new ToolsFeatureFlags();
 
@@ -192,7 +193,7 @@ public sealed class SymbolRelations(
                 .Select(p => catalog.Find("particleSystems", p) ?? Missing(p.ToLowerInvariant(), ".alo")),
             (_, "textures") => index.ModelTextures.GetValueOrDefault(ModelBoneKey.From(entry.Name), [])
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(t => catalog.Find("textures", t) ?? Missing(t, null)),
+                .Select(t => Texture(t) ?? Missing(t, null)),
             ("animations", "model") => ModelOf(entry.Name),
             ("enums", UsedBy) => schema.AllTags
                 .Where(t => string.Equals(t.Enum?.Name, entry.Name, StringComparison.OrdinalIgnoreCase))
@@ -221,8 +222,9 @@ public sealed class SymbolRelations(
 
     private IEnumerable<SymbolRow> ModelsNaming(string texture)
     {
+        var key = TextureKey(texture);
         return index.ModelTextures
-            .Where(m => m.Value.Contains(texture, StringComparer.OrdinalIgnoreCase))
+            .Where(m => m.Value.Any(named => TextureKey(named) == key))
             .Select(m => catalog.Find("models", m.Key) ?? catalog.Find("particleSystems", m.Key))
             .OfType<SymbolRow>()
             .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase);
@@ -327,12 +329,36 @@ public sealed class SymbolRelations(
         {
             "models" => catalog.Find("models", WithExtension(name, ".alo")),
             "particleSystems" => catalog.Find("particleSystems", WithExtension(name, ".alo")),
-            "textures" => catalog.Find("textures", name),
+            "textures" => Texture(name),
             "samples" => catalog.Find("audio", name),
             "luaScript" => catalog.Find("luaScripts", WithExtension(name, ".lua")),
             _ => catalog.FindObject(name)
         };
         return found ?? Missing(name, type);
+    }
+
+    /// <summary>
+    ///     The texture a name means: the name as written, else the same name as a <c>.tga</c> or a
+    ///     <c>.dds</c>, which the game takes for one texture - a model routinely names a <c>.tga</c>
+    ///     that only ever ships as a <c>.dds</c>. The asset resolver's rule, so the browser and the
+    ///     model preview agree on what is missing.
+    /// </summary>
+    private SymbolRow? Texture(string name)
+    {
+        if (catalog.Find("textures", name) is { } written) return written;
+        var extension = Path.GetExtension(name);
+        if (!s_textureInterchange.Contains(extension, StringComparer.OrdinalIgnoreCase)) return null;
+        return s_textureInterchange
+            .Where(e => !e.Equals(extension, StringComparison.OrdinalIgnoreCase))
+            .Select(e => catalog.Find("textures", Path.ChangeExtension(name, e)))
+            .FirstOrDefault(r => r is not null);
+    }
+
+    // A texture name as one key for its .tga and its .dds, in any case.
+    private static string TextureKey(string name)
+    {
+        var lower = name.ToLowerInvariant();
+        return s_textureInterchange.Contains(Path.GetExtension(lower)) ? Path.ChangeExtension(lower, ".tga") : lower;
     }
 
     private static SymbolRow Missing(string name, string? type)

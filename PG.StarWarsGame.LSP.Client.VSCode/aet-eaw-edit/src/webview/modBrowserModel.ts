@@ -235,6 +235,43 @@ export function menuChoices(groups: ActionChoice[][]): ActionChoice[][] {
         .filter((group) => group.length > 0);
 }
 
+/** What a model's facts tile counts. */
+export function factLabel(key: string): string {
+    switch (key) {
+        case "bones":
+            return l10n.t("Bones");
+        case "textures":
+            return l10n.t("Textures");
+        case "particleSystems":
+            return l10n.t("Particle Systems");
+        case "animations":
+            return l10n.t("Animations");
+        default:
+            return key;
+    }
+}
+
+/**
+ * A preview problem's message: a diagnostic's is its own, one the server found in an asset is
+ * worded here from its reason, naming what no file holds.
+ */
+export function problemMessage(entry: {
+    name: string;
+    reason?: string | null;
+}): string {
+    switch (entry.reason) {
+        case "missingTexture":
+            return l10n.t("No file holds the texture - {0}", entry.name);
+        case "missingParticleSystem":
+            return l10n.t(
+                "No file holds the particle system - {0}",
+                entry.name,
+            );
+        default:
+            return entry.name;
+    }
+}
+
 /** The preview grid's cell: its least width and height, in pixels, and the gap between cells. */
 export const PREVIEW_CELL = { width: 120, height: 80, gap: 16 };
 /** The action column, flush right beside the grid, and what surrounds the two. */

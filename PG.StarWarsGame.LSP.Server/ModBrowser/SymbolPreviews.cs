@@ -31,6 +31,7 @@ public sealed class SymbolPreviews(
 {
     private const string GameObjects = "xml:GameObjectType";
     private const string ReferencedBy = "referencedBy";
+    private const string UsedBy = "usedBy";
 
     /// <summary>The grid every XML preview is laid out on; the webview stretches it over the tab.</summary>
     private const int Columns = 6;
@@ -47,8 +48,7 @@ public sealed class SymbolPreviews(
 
     public GetSymbolPreviewResult Preview(string page, string id)
     {
-        // Assets, scripts and the schema get their adapters later; a click on them only selects.
-        if (!page.StartsWith("xml:", StringComparison.Ordinal)) return s_none;
+        if (!page.StartsWith("xml:", StringComparison.Ordinal)) return AssetPreview(page, id);
         var node = relations.Node(page, id);
         if (node.Entry is not { } entry) return s_none;
 
@@ -103,6 +103,140 @@ public sealed class SymbolPreviews(
             Height = Share(Rows, stacked.Count, i + 1) - Share(Rows, stacked.Count, i)
         }));
         return tiles;
+    }
+
+    /// <summary>
+    ///     A model, a particle system, an animation or a Lua script, on the same grid as an XML object:
+    ///     its identity and problems across the top left, its body below them, its lists down the right.
+    ///     A texture, a sound and an enum have no adapter yet; a click on them only selects.
+    /// </summary>
+    /// <remarks>
+    ///     An asset's lists are fixed, unlike an XML object's: a model's textures tile is there with
+    ///     none in it, so the same relation is always in the same cells.
+    /// </remarks>
+    private GetSymbolPreviewResult AssetPreview(string page, string id)
+    {
+        if (page is not ("models" or "particleSystems" or "animations" or "luaScripts")) return s_none;
+        var node = relations.Node(page, id);
+        if (node.Entry is not { } entry) return s_none;
+
+        var tiles = new List<PreviewTile>();
+
+        // A tile in its own cells; one there is nothing to show in leaves them empty.
+        void Put(PreviewTile? tile, int x, int y, int width, int height)
+        {
+            if (tile is not null) tiles.Add(tile with { X = x, Y = y, Width = width, Height = height });
+        }
+
+        Put(Tile("identity") with { Entry = entry, Location = node.Location }, 0, 0, 2, 2);
+        switch (page)
+        {
+            case "models":
+                Put(AssetProblems(page, entry.Id), 2, 0, 2, 2);
+                Put(Facts(entry, node), 0, 2, 2, 4);
+                Put(Entries(page, entry.Id, "textures"), 2, 2, 2, 4);
+                tiles.AddRange(Stacked(page, entry.Id, ["particleSystems", "animations", UsedBy]));
+                break;
+            case "particleSystems":
+                Put(AssetProblems(page, entry.Id), 2, 0, 2, 2);
+                Put(Entries(page, entry.Id, "textures"), 0, 2, 4, 4);
+                tiles.AddRange(Stacked(page, entry.Id, [UsedBy]));
+                break;
+            case "animations":
+                Put(Entries(page, entry.Id, "model"), 2, 0, 2, 2);
+                break;
+            default:
+                Put(Source(entry.Id), 0, 2, 4, 4);
+                tiles.AddRange(Stacked(page, entry.Id, ["loadedBy", "requires"]));
+                break;
+        }
+
+        var adapter = page switch
+        {
+            "models" => "model",
+            "particleSystems" => "particleSystem",
+            "animations" => "animation",
+            _ => "luaScript"
+        };
+        return new GetSymbolPreviewResult(adapter, tiles) { Columns = Columns, Rows = Rows };
+    }
+
+    // The relations down the list column, sharing its rows.
+    private IEnumerable<PreviewTile> Stacked(string page, string id, string[] relationKeys)
+    {
+        return relationKeys.Select((r, i) => Entries(page, id, r) with
+        {
+            X = ListColumn, Y = Share(Rows, relationKeys.Length, i), Width = Columns - ListColumn,
+            Height = Share(Rows, relationKeys.Length, i + 1) - Share(Rows, relationKeys.Length, i)
+        });
+    }
+
+    // What an asset names that no file holds: a texture, or a particle system a proxy names.
+    private PreviewTile? AssetProblems(string page, string id)
+    {
+        IEnumerable<PreviewEntry> Missing(string relation, string reason)
+        {
+            // A relation the page does not have - a particle system's particle systems - is no rows.
+            return (relations.Rows(page, id, relation) ?? [])
+                .Where(r => r.Origin == "missing")
+                .Select(r => new PreviewEntry(r.Name, null) { Severity = "warning", Reason = reason });
+        }
+
+        var found = Missing("textures", "missingTexture").Concat(Missing("particleSystems", "missingParticleSystem"))
+            .ToList();
+        return found.Count == 0 ? null : Tile("problems") with { Count = found.Count, Entries = found };
+    }
+
+    // A model's counts: its bones from the model catalog, and how many of each relation it has.
+    private PreviewTile Facts(SymbolRow entry, GetSymbolNodeResult node)
+    {
+        int Counted(string relation)
+        {
+            return node.Relations.FirstOrDefault(r => r.Relation == relation)?.Count ?? 0;
+        }
+
+        var bones = index.ModelBones.GetValueOrDefault(ModelBoneKey.From(entry.Name), []).Length;
+        return Tile("facts") with
+        {
+            Facts =
+            [
+                new PreviewFact("bones", bones), new PreviewFact("textures", Counted("textures")),
+                new PreviewFact("particleSystems", Counted("particleSystems")),
+                new PreviewFact("animations", Counted("animations"))
+            ]
+        };
+    }
+
+    /// <summary>
+    ///     A script's source from its first line of code: the comment banner the game's own scripts
+    ///     open with is skipped, line comments and block comments alike. Null for a script whose
+    ///     text is not to hand.
+    /// </summary>
+    private PreviewTile? Source(string uri)
+    {
+        if (texts.GetText(uri) is not { } document) return null;
+        var lines = document.Text.Replace("\r\n", "\n").Split('\n');
+        var first = 0;
+        var inBlock = false;
+        for (; first < lines.Length; first++)
+        {
+            var line = lines[first].Trim();
+            if (inBlock)
+            {
+                inBlock = !line.Contains("]]", StringComparison.Ordinal);
+                continue;
+            }
+
+            if (line.StartsWith("--[[", StringComparison.Ordinal) || line.StartsWith("--[=", StringComparison.Ordinal))
+            {
+                inBlock = !line[4..].Contains("]]", StringComparison.Ordinal);
+                continue;
+            }
+
+            if (line.Length > 0 && !line.StartsWith("--", StringComparison.Ordinal)) break;
+        }
+
+        return Tile("source") with { Text = string.Join("\n", lines[first..]), Line = first };
     }
 
     // Where the i-th of n equal parts of a run of cells starts; part i ends where part i + 1 starts.
@@ -171,7 +305,14 @@ public sealed class SymbolPreviews(
         {
             Relation = relation,
             Count = rows.Count,
-            Entries = rows.Take(ListedEntries).Select(r => new PreviewEntry(r.Name, r.Type) { Row = r }).ToList()
+            // An asset's type is its extension, which its name already ends with.
+            Entries = rows.Take(ListedEntries)
+                .Select(r => new PreviewEntry(r.Name,
+                    r.Type is { } type && r.Name.EndsWith(type, StringComparison.OrdinalIgnoreCase) ? null : r.Type)
+                {
+                    Row = r
+                })
+                .ToList()
         };
     }
 

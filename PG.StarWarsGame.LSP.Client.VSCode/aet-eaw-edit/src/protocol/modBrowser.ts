@@ -88,7 +88,7 @@ export interface GetSymbolPreviewResult {
 
 /** One tile, placed and sized in grid cells; which members it fills depends on its kind. */
 export interface PreviewTile {
-    /** `identity`, `problems`, `encyclopedia`, `definition` or `entries`. */
+    /** `identity`, `problems`, `encyclopedia`, `definition`, `entries`, `facts` or `source`. */
     kind: string;
     /** Its first column and row, from 0. */
     x: number;
@@ -104,6 +104,16 @@ export interface PreviewTile {
     text?: string | null;
     effective?: string | null;
     objectId?: string | null;
+    /** A facts tile's counts, in the order shown. */
+    facts?: PreviewFact[] | null;
+    /** A source tile's first line in its file, from 0. */
+    line?: number | null;
+}
+
+/** One count of a facts tile: `bones`, `textures`, `particleSystems` or `animations`. */
+export interface PreviewFact {
+    key: string;
+    value: number;
 }
 
 /** One line of a problems or entries tile. */
@@ -116,6 +126,8 @@ export interface PreviewEntry {
     location?: SymbolLocation | null;
     /** A problem's severity, "error" or "warning". */
     severity?: string | null;
+    /** A problem the server found in an asset: "missingTexture" or "missingParticleSystem". */
+    reason?: string | null;
 }
 
 export interface GetSymbolOutlineParams {

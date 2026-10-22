@@ -84,12 +84,13 @@ public sealed class AssetRelationsTest
             [
                 "data/art/models/ev_tie.alo", "data/art/models/ev_tie_idle.ala", "data/art/models/ev_tie_die.ala",
                 "data/art/models/p_smoke.alo", "data/art/textures/tie.tga", "data/art/textures/smoke.tga",
-                "data/art/textures/i_tie.tga"
+                "data/art/textures/i_tie.tga", "data/art/textures/glow.dds"
             ], []),
             ParticleSystems = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "p_smoke.alo"),
             ModelTextures = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .WithComparers(StringComparer.OrdinalIgnoreCase)
-                .Add("ev_tie.alo", ["Tie.tga"]).Add("p_smoke.alo", ["Smoke.tga"])
+                // The effect names its glow as a .tga that only ships as a .dds.
+                .Add("ev_tie.alo", ["Tie.tga"]).Add("p_smoke.alo", ["Smoke.tga", "Glow.tga"])
         };
         // The model carries two effects; one names a particle system no layer ships.
         return new SymbolRelations(index, new Schema(), _tags, SymbolCatalog.Build(index, [], [s_animationType]),
@@ -166,9 +167,9 @@ public sealed class AssetRelationsTest
     }
 
     [Fact]
-    public void AParticleSystem_OpensIntoItsTextures()
+    public void AParticleSystem_OpensIntoItsTextures_ATgaNameMeaningTheDdsShipped()
     {
-        Assert.Equal(["smoke.tga"], Names(Relations().Rows("particleSystems", "p_smoke.alo", "textures")));
+        Assert.Equal(["smoke.tga", "glow.dds"], Names(Relations().Rows("particleSystems", "p_smoke.alo", "textures")));
     }
 
     [Fact]
@@ -184,6 +185,8 @@ public sealed class AssetRelationsTest
 
         Assert.Equal(["ev_tie.alo"], Names(relations.Rows("textures", "tie.tga", "usedBy")));
         Assert.Equal(["Tie_Fighter"], Names(relations.Rows("textures", "i_tie.tga", "usedBy")));
+        // Named as a .tga by the effect, shipped as a .dds: the game takes them for one texture.
+        Assert.Equal(["p_smoke.alo"], Names(relations.Rows("textures", "glow.dds", "usedBy")));
     }
 
     [Fact]
