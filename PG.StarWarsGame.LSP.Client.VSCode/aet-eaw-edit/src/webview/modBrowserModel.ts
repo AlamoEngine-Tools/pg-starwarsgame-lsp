@@ -399,6 +399,17 @@ export function propertyValue(property: PreviewProperty): string {
     return property.value || l10n.t("Yes");
 }
 
+/**
+ * A list table's columns, in the table's own order: an enum's values list its key and value as two
+ * fields - the name XML writes and what the engine uses - where every other list says what an entry
+ * behaves like.
+ */
+export function listColumns(relation: string | undefined): string[] {
+    return relation === "values"
+        ? ["name", "value", "type", "origin"]
+        : ["name", "type", "kinds", "origin"];
+}
+
 /** A row's type as the table and the entry's header show it: an enum by whether it is built in. */
 export function rowTypeLabel(row: SymbolRow): string {
     return row.page === "enums" && row.type

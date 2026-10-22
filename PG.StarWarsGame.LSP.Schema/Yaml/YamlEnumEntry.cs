@@ -6,6 +6,7 @@ namespace PG.StarWarsGame.LSP.Schema.Yaml;
 internal sealed class YamlEnumValueEntry
 {
     public string Name { get; set; } = string.Empty;
+    public string? Value { get; set; }
     public Dictionary<string, string> Description { get; set; } = [];
     public List<YamlNote> Notes { get; set; } = [];
     public List<string> Groups { get; set; } = [];

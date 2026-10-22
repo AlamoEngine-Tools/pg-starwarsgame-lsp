@@ -1,0 +1,13 @@
+﻿[
+  {"click": "Enums", "in": ".rail"},
+  {"wait": 600},
+  {"type": "AnimationType"},
+  {"click": "Search", "in": ".search-foot"},
+  {"wait": 300},
+  {"click": "AnimationType", "in": ".rail"},
+  {"wait": 600},
+  {"key": "ArrowRight"},
+  {"wait": 400},
+  {"click": "Values", "in": ".rail"},
+  {"wait": 800}
+]

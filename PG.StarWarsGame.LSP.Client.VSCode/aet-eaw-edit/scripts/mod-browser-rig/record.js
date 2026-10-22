@@ -77,11 +77,12 @@ function request(method, params, timeoutMs = 120000) {
         rootUri,
         capabilities: {},
         // AET_BASELINE reads a baseline built here rather than the newest release, for a change
-        // that needs one rebuilt.
+        // that needs one rebuilt; AET_SCHEMA likewise a schema checkout (its eaw/ folder).
         initializationOptions: {
             workspaceRoot: workspace,
             projectPath: `${workspace}/${project}`,
             baselineLocalPath: process.env.AET_BASELINE,
+            schemaLocalPath: process.env.AET_SCHEMA,
         },
         workspaceFolders: [{uri: rootUri, name: "rig"}],
     });

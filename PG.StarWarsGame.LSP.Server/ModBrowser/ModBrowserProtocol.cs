@@ -196,6 +196,9 @@ public sealed record PreviewFact(string Key, int Value);
 /// <param name="Detail">A second, quieter line.</param>
 public sealed record PreviewEntry(string Name, string? Detail)
 {
+    /// <summary>An enum value's value where it is not its name: what the engine uses for it.</summary>
+    public string? Value { get; init; }
+
     /// <summary>The entry the line opens; null for a problem.</summary>
     public SymbolRow? Row { get; init; }
 
@@ -251,4 +254,8 @@ public sealed record SymbolRow(
     string Origin,
     string? OriginName,
     IReadOnlyList<string> Overrides,
-    string? Page = null);
+    string? Page = null)
+{
+    /// <summary>An enum value's value - what the engine uses for it - beside its name, the key XML writes.</summary>
+    public string? Value { get; init; }
+}

@@ -197,7 +197,7 @@ public sealed class SymbolPreviews(
             layout.Put(Tile("values") with
             {
                 Count = values.Count,
-                Entries = [.. values.Select(v => new PreviewEntry(v.Name, Describe(v.Description)))]
+                Entries = [.. values.Select(ValueEntry)]
             }, 4, 0, 2, 2);
         return "schemaTag";
     }
@@ -223,10 +223,19 @@ public sealed class SymbolPreviews(
         layout.Put(Tile("values") with
         {
             Count = values.Count,
-            Entries = [.. values.Select(v => new PreviewEntry(v.Name, Describe(v.Description)))]
+            Entries = [.. values.Select(ValueEntry)]
         }, 4, 0, 2, 4);
         layout.Put(Entries(page, entry.Id, UsedBy), 0, 2, 4, 2);
         return "enum";
+    }
+
+    // An enum value's line: its key, its value beside it where that is not the key, its description.
+    private PreviewEntry ValueEntry(EnumValueList.Value value)
+    {
+        return new PreviewEntry(value.Name, Describe(value.Description))
+        {
+            Value = value.EngineValue.Equals(value.Name, StringComparison.Ordinal) ? null : value.EngineValue
+        };
     }
 
     /// <summary>A behaviour: what decides it, and the game objects that have it.</summary>

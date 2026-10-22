@@ -277,6 +277,7 @@ internal static class YamlSchemaParser
             values.Add(new RawEnumValueDefinition
             {
                 Name = v.Name,
+                Value = string.IsNullOrWhiteSpace(v.Value) ? null : v.Value,
                 Description = v.Description,
                 Notes = ReadNotes(v.Notes),
                 Groups = v.Groups,

@@ -44,7 +44,7 @@ import {
 import { pickShipName } from "../shipNamePick";
 import { EncyclopediaCard } from "./encyclopediaCard";
 import { factionModes, factionSlotOf } from "./encyclopediaModes";
-import { ColumnFilter, DataTable } from "./shared/DataTable";
+import { ColumnFilter, DataColumn, DataTable } from "./shared/DataTable";
 import { menuAction, RowMenuFrame } from "./shared/RowMenu";
 import { TabStrip } from "./shared/TabStrip";
 import {
@@ -52,6 +52,7 @@ import {
     actionChoices,
     KindChoice,
     kindChoices,
+    listColumns,
     menuChoices,
     originChoices,
     originLabel,
@@ -205,9 +206,6 @@ function relationOf(entry: EntryNode, relation: SymbolRelation): ListNode {
 function nodeName(node: RailNode): string {
     return node.kind === "entry" ? node.row.name : node.label;
 }
-
-/** A list table's columns, in the table's own order. */
-const COLUMN_KEYS = ["name", "type", "kinds", "origin"];
 
 /**
  * Where a list's column arrangement is kept: per list - an outline's list by its page, a relation by
@@ -768,6 +766,12 @@ function App(): React.JSX.Element {
                     reason: l10n.t("No filter for the type"),
                     content: null,
                 };
+            case "value":
+                return {
+                    active: false,
+                    reason: l10n.t("No filter for the value"),
+                    content: null,
+                };
             default:
                 return undefined;
         }
@@ -1096,7 +1100,11 @@ function App(): React.JSX.Element {
                                     : rest;
                             })
                         }
-                        layout={readColumnLayout(columnsOf(list), COLUMN_KEYS)}
+                        columnKeys={listColumns(list.parent?.relation)}
+                        layout={readColumnLayout(
+                            columnsOf(list),
+                            listColumns(list.parent?.relation),
+                        )}
                         onResize={(widths) => {
                             for (const [key, width] of Object.entries(widths)) {
                                 writeColumnWidth(columnsOf(list), key, width);
@@ -1108,7 +1116,10 @@ function App(): React.JSX.Element {
                             writeColumnOrder(
                                 table,
                                 moveColumn(
-                                    readColumnLayout(table, COLUMN_KEYS).order,
+                                    readColumnLayout(
+                                        table,
+                                        listColumns(list.parent?.relation),
+                                    ).order,
                                     from,
                                     to,
                                 ),
@@ -1263,6 +1274,7 @@ function ListPage({
     onResize,
     onMove,
     filter,
+    columnKeys,
 }: {
     label: string;
     rows: SymbolRow[];
@@ -1286,6 +1298,8 @@ function ListPage({
     onResize: (widths: Record<string, number>) => void;
     onMove: (from: string, to: string) => void;
     filter: (column: string) => ColumnFilter | undefined;
+    /** The columns this list shows, in its own order. */
+    columnKeys: string[];
 }): React.JSX.Element {
     const hover = useRef<number | undefined>(undefined);
     const rest = (row: SymbolRow) => {
@@ -1302,8 +1316,14 @@ function ListPage({
     return (
         <DataTable<SymbolRow>
             label={label}
-            columns={[
+            columns={(
+                [
                 { key: "name", label: l10n.t("Name"), cell: (r) => r.name },
+                {
+                    key: "value",
+                    label: l10n.t("Value"),
+                    cell: (r) => r.value ?? "",
+                },
                 {
                     key: "type",
                     label: l10n.t("Type"),
@@ -1337,11 +1357,17 @@ function ListPage({
                         </>
                     ),
                 },
-            ]}
+                ] satisfies DataColumn<SymbolRow>[]
+            )
+                .filter((c) => columnKeys.includes(c.key))
+                .sort(
+                    (a, b) =>
+                        columnKeys.indexOf(a.key) - columnKeys.indexOf(b.key),
+                )}
             rows={rows}
             rowKey={(r) => r.id}
             selected={selectedId}
-            sortable={COLUMN_KEYS}
+            sortable={columnKeys}
             sort={sort}
             onSort={onSort}
             layout={layout}
@@ -2039,6 +2065,12 @@ const Shell = styled.div`
     }
     .entry-row.plain .entry-name {
         color: var(--colour-ink);
+    }
+    /* An enum value's value beside its name, where the engine uses another. */
+    .entry-row.plain .entry-value {
+        margin-left: var(--space-8);
+        color: var(--colour-muted);
+        font-family: var(--vscode-editor-font-family, monospace);
     }
 
     @media (max-width: 700px) {

@@ -9,6 +9,7 @@ import {
     factLabel,
     fileSize,
     kindChoices,
+    listColumns,
     problemMessage,
     locationLabel,
     menuChoices,
@@ -88,6 +89,28 @@ describe("the Schema outline", () => {
         assert.equal(relationLabel("values"), "Values");
         assert.equal(relationIcon("values"), "enumValue");
         assert.equal(pageIcon("enumValues"), "enumValue");
+    });
+
+    // An enum's values list keys and values as fields of their own; no value behaves like anything.
+    it("gives an enum's values list a Value column", () => {
+        assert.deepEqual(listColumns(undefined), [
+            "name",
+            "type",
+            "kinds",
+            "origin",
+        ]);
+        assert.deepEqual(listColumns("models"), [
+            "name",
+            "type",
+            "kinds",
+            "origin",
+        ]);
+        assert.deepEqual(listColumns("values"), [
+            "name",
+            "value",
+            "type",
+            "origin",
+        ]);
     });
 });
 

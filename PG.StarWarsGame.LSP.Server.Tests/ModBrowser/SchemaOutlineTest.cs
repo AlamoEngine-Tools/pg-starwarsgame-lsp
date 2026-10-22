@@ -42,7 +42,7 @@ public sealed class SchemaOutlineTest
         Kind = EnumKind.SchemaFixed,
         Values =
         [
-            new EnumValueDefinition { Name = "Rain", Description = En("Rain falls") },
+            new EnumValueDefinition { Name = "Rain", Value = "WEATHER_RAIN", Description = En("Rain falls") },
             new EnumValueDefinition { Name = "Snow" }
         ]
     };
@@ -105,6 +105,10 @@ public sealed class SchemaOutlineTest
             },
             WorkspaceDynamicEnumValues = ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add("DamageType", ["Damage_Ion", "Damage_Mod"]),
+            // The Star Destroyer's definition uses the project's damage type, as the parser records it.
+            WorkspaceReferences = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                .Add("enum:DamageType/Damage_Mod",
+                    [new GameReference("enum:DamageType/Damage_Mod", null, null, Units, 3, 14, 10)]),
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(Units, new DocumentIndex(Units, 1, [destroyer], [], LayerRank: 0, LayerName: "Mod")),
             WorkspaceDefinitions =
@@ -224,6 +228,8 @@ public sealed class SchemaOutlineTest
         Assert.Equal([new PreviewProperty("kind", "fixed")], weather.Tiles[1].Properties);
         Assert.Equal([("Rain", "Rain falls"), ("Snow", null)],
             weather.Tiles[2].Entries.Select(e => (e.Name, e.Detail)));
+        // A value apart from its name is said beside it; one that is its name is not said twice.
+        Assert.Equal(["WEATHER_RAIN", null], weather.Tiles[2].Entries.Select(e => e.Value));
     }
 
     // An enum's values are its children in the rail and a list of their own in the table: each value
@@ -241,11 +247,17 @@ public sealed class SchemaOutlineTest
             ("Damage_Ion", "DamageType", "game"), ("Damage_Laser", "DamageType", "game"),
             ("Damage_Mod", "DamageType", "project")
         ], relations.Rows("enums", "DamageType", "values")!.Select(r => (r.Name, r.Type, r.Origin)));
-        Assert.Equal(["Rain", "Snow"], relations.Rows("enums", "WeatherType", "values")!.Select(r => r.Name));
-        // A value is the schema's, with nothing of its own to preview.
+        // Key and value, each a field of its own: the name XML writes and what the engine uses for it.
+        Assert.Equal([("Rain", "WEATHER_RAIN"), ("Snow", "Snow")],
+            relations.Rows("enums", "WeatherType", "values")!.Select(r => (r.Name, r.Value)));
+        // A value is the schema's, with nothing of its own to preview; it opens into the objects using it.
         var value = relations.Node("enumValues", "DamageType/Damage_Mod");
         Assert.Equal(new SymbolAction("open", "noPreview"), value.Open);
-        Assert.Empty(value.Relations);
+        Assert.Equal([new SymbolRelation("usedBy", 1, null)], value.Relations);
+        Assert.Equal(["Star_Destroyer"],
+            relations.Rows("enumValues", "DamageType/Damage_Mod", "usedBy")!.Select(r => r.Name));
+        Assert.Equal([new SymbolRelation("usedBy", 0, "none")],
+            relations.Node("enumValues", "DamageType/Damage_Laser").Relations);
     }
 
     [Fact]

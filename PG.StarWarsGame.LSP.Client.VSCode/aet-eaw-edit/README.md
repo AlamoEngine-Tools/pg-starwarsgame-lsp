@@ -137,7 +137,8 @@ Indexes the full EaW/FoC object graph across the workspace.
 - **Find all references** - `Shift+F12`
 - **Rename** - `F2`, workspace-wide
 - **Code actions** - quick fixes, including creating a missing localisation key
-- **Code lens** - reference counts above every named object
+- **Code lens** - reference counts above every named object, and above every value an enum file or
+  `GameConstants.xml` defines for a dynamic enum
 - **Auto-close tags** - on `>` (needs `editor.formatOnType`)
 - **Linked editing** - opening and closing tag renamed together (needs `editor.linkedEditing`)
 - **Variant inheritance** - **Show Effective Object** opens the merged XML of a `Variant_Of_Existing_Type` object
@@ -621,8 +622,11 @@ Flag: `aet-eaw-edit.features.tools.modBrowser` (on by default). Read-only.
 - **Scripts** - Lua scripts by their folder under `Data/Scripts`: GameObject, Library, Story, AI, Evaluators,
   FreeStore, Interventions, Miscellaneous, and Other for any other
 - **Schema** - the XML types, each with its tags; the enums, each built in or dynamic and opening into its values -
-  a dynamic one's from the game's files and the project's; the behaviours, with what decides each and the game
-  objects that have it
+  a dynamic one's from the game's files and the project's, each value listing the objects using it; the
+  behaviours, with what decides each and the game objects that have it
+  - A value is a key and a value: the name XML writes and what the engine uses for it, two columns of the list.
+    An animation type's value is the name its files are filed under - `Transition To Move` is
+    `<model>_MOVESTART_<NN>.ala`
 - **Previews** - an entry opens into its tiles, each at a fixed place on its type's grid
   - Game object: header, problems, encyclopedia card with its faction switch, references
   - Other XML object: header, problems, what its tags name, references

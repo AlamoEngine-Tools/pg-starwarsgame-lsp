@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.RegularExpressions;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Core.Assets;
@@ -79,6 +80,19 @@ public static partial class ModelAnimationClips
             var clipType = name[(stem.Length + 1)..take.Index];
             return clipType.Equals(type, StringComparison.OrdinalIgnoreCase);
         });
+    }
+
+    /// <summary>
+    ///     The name an animation type's clips are filed under, for the name XML writes: the member's value where
+    ///     the schema gives one - <c>Choke_Die</c> is filed as <c>CHOKEDEATH</c> - else the name itself.
+    /// </summary>
+    /// <param name="animationTypes">The enum the tag is typed with; null when the schema does not say.</param>
+    /// <param name="xmlName">The value as the XML writes it, matched ignoring case and the ends' spaces.</param>
+    public static string FileNameOf(EnumDefinition? animationTypes, string xmlName)
+    {
+        var name = xmlName.Trim();
+        return animationTypes?.Values
+            .FirstOrDefault(v => v.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.EngineValue ?? name;
     }
 
     /// <summary>The model's file name without its extension, from a bare name or a path with either slash.</summary>

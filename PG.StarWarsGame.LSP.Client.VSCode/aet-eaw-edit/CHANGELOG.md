@@ -244,8 +244,12 @@
     size, lines, loaders and requires; a schema tag's documentation. A type with nothing to show has none
   - Lua scripts in a Scripts outline by their folder under `Data/Scripts`
   - The Schema outline: the types with their tags, a tag's page its documentation; the enums, each built in or
-    dynamic, with their values as children - a dynamic enum's from the game's files and the project's; the
-    behaviours with what decides each and the objects that have it
+    dynamic, with their values as children - a dynamic enum's from the game's files and the project's, each with
+    the objects using it; the behaviours with what decides each and the objects that have it
+  - An enum value is a key and a value, each a column: the name XML writes, and what the engine uses for it - for
+    an animation type, the name its files are filed under
+- **References lens on dynamic enum values** - every value an enum file or `GameConstants.xml` defines counts its
+  uses, as an object's definition does ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
   - A particle system's references include the models whose proxies carry it, from a proxy catalog the model
     scan and the baseline keep
   - An object's relations by what each is - models, particle systems, particles, SFX and speech events,
@@ -266,6 +270,9 @@
 
 ### Fixes
 
+- **Death animations looked up by their file name** - a death animation type's clips are found under the name the
+  engine files them under, not the name XML writes; `Choke_Die` is `<model>_CHOKEDEATH_<NN>.ala`, and a model with
+  only `_CHOKE_DIE_` files has no death animation ([#270](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/270))
 - **Diagnostics for a file opened from the server** - a file first opened at a URI the server handed out, such as
   a definition from the Mod Browser, reached no project and got no diagnostics
   ([#291](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/291))

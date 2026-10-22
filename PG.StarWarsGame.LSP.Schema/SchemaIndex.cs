@@ -181,6 +181,7 @@ public sealed class SchemaIndex
         var values = raw.Values.Select(rawVal => new EnumValueDefinition
         {
             Name = rawVal.Name,
+            Value = rawVal.Value,
             Description = rawVal.Description,
             Notes = rawVal.Notes,
             Groups = rawVal.Groups,

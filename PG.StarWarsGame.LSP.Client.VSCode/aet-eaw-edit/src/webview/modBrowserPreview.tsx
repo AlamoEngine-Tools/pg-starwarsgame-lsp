@@ -249,7 +249,14 @@ function Tile({
                     <ul className="entry-list">
                         {(tile.entries ?? []).map((e) => (
                             <li key={e.name} className="entry-row plain">
-                                <span className="entry-name">{e.name}</span>
+                                <span className="entry-name">
+                                    {e.name}
+                                    {e.value && (
+                                        <span className="entry-value">
+                                            {e.value}
+                                        </span>
+                                    )}
+                                </span>
                                 {e.detail && (
                                     <span className="entry-detail">
                                         {e.detail}

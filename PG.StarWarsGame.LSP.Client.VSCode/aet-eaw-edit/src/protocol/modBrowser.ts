@@ -159,6 +159,8 @@ export interface PreviewFact {
 export interface PreviewEntry {
     name: string;
     detail?: string | null;
+    /** An enum value's value where it is not its name. */
+    value?: string | null;
     /** The entry it opens; absent for a problem. */
     row?: SymbolRow | null;
     /** Where a problem is. */
@@ -221,6 +223,8 @@ export interface SymbolRow {
     overrides: string[];
     /** The page the entry opens on; none for a missing name, a tag or a definition's place. */
     page?: string | null;
+    /** An enum value's value - what the engine uses for it - beside its name, the key XML writes. */
+    value?: string | null;
 }
 
 /** A kind with how many entries of the list are of it. */

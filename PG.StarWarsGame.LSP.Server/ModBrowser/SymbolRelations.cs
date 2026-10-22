@@ -61,7 +61,7 @@ public sealed class SymbolRelations(
         ["audio"] = [UsedBy],
         ["luaScripts"] = ["loadedBy", "requires"],
         ["enums"] = ["values", UsedBy],
-        ["enumValues"] = [],
+        ["enumValues"] = [UsedBy],
         ["schemaTypes"] = ["tags"],
         ["schemaTags"] = [],
         ["behaviours"] = ["objects"]
@@ -250,6 +250,8 @@ public sealed class SymbolRelations(
                 .Where(r => r.Id.StartsWith(entry.Id + "/", StringComparison.Ordinal)),
             ("enums", "values") => catalog.Rows("enumValues")
                 .Where(r => r.Id.StartsWith(entry.Id + "/", StringComparison.Ordinal)),
+            // A value's users, as the parser records each tag holding it - rename's own references.
+            ("enumValues", UsedBy) => ObjectsReferencing("enum:" + entry.Id),
             ("behaviours", "objects") => catalog.Rows(GameObjects)
                 .Where(r => r.Kinds.Contains(entry.Name, StringComparer.OrdinalIgnoreCase)),
             ("particleSystems", UsedBy) => ModelsCarrying(entry.Name).Concat(Users(entry.Name)),

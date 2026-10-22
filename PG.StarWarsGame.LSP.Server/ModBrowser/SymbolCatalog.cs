@@ -92,7 +92,8 @@ public sealed class SymbolCatalog
             .ToList();
         pages["enumValues"] = enums
             .SelectMany(e => EnumValueList.Of(index, e).Select(v =>
-                new SymbolRow(e.Name + "/" + v.Name, v.Name, e.Name, [], v.Origin, null, [], "enumValues")))
+                new SymbolRow(e.Name + "/" + v.Name, v.Name, e.Name, [], v.Origin, null, [], "enumValues")
+                    { Value = v.EngineValue }))
             .ToList();
         // The schema's types, each tag of each type - a tag by its type and name, as a tag name means
         // something else on another type - and the behaviours.
@@ -200,6 +201,7 @@ public sealed class SymbolCatalog
             "name" => r => r.Name.ToLowerInvariant(),
             "type" => r => (r.Type ?? string.Empty).ToLowerInvariant(),
             "kinds" => r => string.Join(",", r.Kinds).ToLowerInvariant(),
+            "value" => r => (r.Value ?? string.Empty).ToLowerInvariant(),
             "origin" => r => OriginRank(r.Origin),
             _ => null
         };
