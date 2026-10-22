@@ -1318,45 +1318,45 @@ function ListPage({
             label={label}
             columns={(
                 [
-                { key: "name", label: l10n.t("Name"), cell: (r) => r.name },
-                {
-                    key: "value",
-                    label: l10n.t("Value"),
-                    cell: (r) => r.value ?? "",
-                },
-                {
-                    key: "type",
-                    label: l10n.t("Type"),
-                    cell: (r) => rowTypeLabel(r),
-                    dim: true,
-                },
-                {
-                    key: "kinds",
-                    label: l10n.t("Behaves like"),
-                    cell: (r) => r.kinds.join(", "),
-                    dim: true,
-                },
-                {
-                    key: "origin",
-                    label: l10n.t("Origin"),
-                    cell: (r) => (
-                        <>
-                            {originLabel(r.origin, r.originName, layers)}
-                            {r.overrides.length > 0 && (
-                                <span className="tag outline">
-                                    {l10n.t(
-                                        "Overrides - {0}",
-                                        originLabel(
-                                            r.overrides[0],
-                                            null,
-                                            layers,
-                                        ),
-                                    )}
-                                </span>
-                            )}
-                        </>
-                    ),
-                },
+                    { key: "name", label: l10n.t("Name"), cell: (r) => r.name },
+                    {
+                        key: "value",
+                        label: l10n.t("Value"),
+                        cell: (r) => r.value ?? "",
+                    },
+                    {
+                        key: "type",
+                        label: l10n.t("Type"),
+                        cell: (r) => rowTypeLabel(r),
+                        dim: true,
+                    },
+                    {
+                        key: "kinds",
+                        label: l10n.t("Behaves like"),
+                        cell: (r) => r.kinds.join(", "),
+                        dim: true,
+                    },
+                    {
+                        key: "origin",
+                        label: l10n.t("Origin"),
+                        cell: (r) => (
+                            <>
+                                {originLabel(r.origin, r.originName, layers)}
+                                {r.overrides.length > 0 && (
+                                    <span className="tag outline">
+                                        {l10n.t(
+                                            "Overrides - {0}",
+                                            originLabel(
+                                                r.overrides[0],
+                                                null,
+                                                layers,
+                                            ),
+                                        )}
+                                    </span>
+                                )}
+                            </>
+                        ),
+                    },
                 ] satisfies DataColumn<SymbolRow>[]
             )
                 .filter((c) => columnKeys.includes(c.key))
