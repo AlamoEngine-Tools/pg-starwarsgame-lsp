@@ -126,7 +126,10 @@ export function PreviewPage({
                 style={{
                     // The adapter's fixed grid, stretched over the tab from each cell's least size.
                     gridTemplateColumns: `repeat(${columns}, minmax(${PREVIEW_CELL.width}px, 1fr))`,
-                    gridTemplateRows: `repeat(${rows}, minmax(${PREVIEW_CELL.height}px, 1fr))`,
+                    // Rows keep their designated height: the grid ends where its last row does
+                    // rather than stretching that row to the bottom of the tab (maintainer,
+                    // 2026-10-22). What a tile holds scrolls inside it.
+                    gridTemplateRows: `repeat(${rows}, ${PREVIEW_CELL.height}px)`,
                     gap: `${PREVIEW_CELL.gap}px`,
                 }}
             >

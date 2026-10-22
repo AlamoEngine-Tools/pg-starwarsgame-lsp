@@ -115,21 +115,22 @@ public sealed class SymbolPreviews(
     ///     references down the fourth column.
     /// </summary>
     /// <remarks>
-    ///     One cell per tile: four columns at their least width fit beside the action column, where
-    ///     eight cells of two would make the tab scroll sideways.
+    ///     One column per tile: four columns at their least width fit beside the action column, where
+    ///     eight would make the tab scroll sideways. Two rows per tile: a row keeps its height rather
+    ///     than stretching, and one is too short for a list.
     /// </remarks>
     private string Model(Layout layout, string page, SymbolRow entry, GetSymbolNodeResult node)
     {
-        layout.Grid(4, 2);
-        layout.Put(Header(entry, node) with { Facts = ModelFacts(entry, node) }, 0, 0, 1, 1);
-        layout.Put(AssetProblems(page, entry.Id), 1, 0, 1, 1);
+        layout.Grid(4, 4);
+        layout.Put(Header(entry, node) with { Facts = ModelFacts(entry, node) }, 0, 0, 1, 2);
+        layout.Put(AssetProblems(page, entry.Id), 1, 0, 1, 2);
         // Its bones, meshes and effects as the model preview's tree, which the webview reads from
         // the model itself by name.
-        layout.Put(Tile("hierarchy") with { ObjectId = entry.Name }, 2, 0, 1, 1);
-        layout.Put(Entries(page, entry.Id, "textures"), 0, 1, 1, 1);
-        layout.Put(Entries(page, entry.Id, "particleSystems"), 1, 1, 1, 1);
-        layout.Put(Entries(page, entry.Id, "animations"), 2, 1, 1, 1);
-        layout.Put(Entries(page, entry.Id, UsedBy), 3, 0, 1, 2);
+        layout.Put(Tile("hierarchy") with { ObjectId = entry.Name }, 2, 0, 1, 2);
+        layout.Put(Entries(page, entry.Id, "textures"), 0, 2, 1, 2);
+        layout.Put(Entries(page, entry.Id, "particleSystems"), 1, 2, 1, 2);
+        layout.Put(Entries(page, entry.Id, "animations"), 2, 2, 1, 2);
+        layout.Put(Entries(page, entry.Id, UsedBy), 3, 0, 1, 4);
         return "model";
     }
 

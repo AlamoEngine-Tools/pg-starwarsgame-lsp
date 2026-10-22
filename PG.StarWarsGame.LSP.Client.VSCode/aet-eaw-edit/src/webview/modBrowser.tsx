@@ -1467,9 +1467,12 @@ const Shell = styled.div`
 
     /* An entry's preview: the tile grid and the action tiles beside it - or above it, as one row,
        when the panel is too narrow. Cell sizes come in as inline styles from PREVIEW_CELL. */
+    /* The grid and the actions take the height they need and no more; the tab scrolls when they
+       need more than it has. */
     .preview {
         display: grid;
-        grid-template-rows: auto minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        align-content: start;
         gap: var(--space-16);
         padding: var(--space-16);
         overflow: auto;
@@ -1480,7 +1483,8 @@ const Shell = styled.div`
     }
     .preview.beside {
         grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-rows: minmax(0, 1fr);
+        grid-template-rows: auto;
+        align-items: start;
     }
     .preview-grid {
         display: grid;
