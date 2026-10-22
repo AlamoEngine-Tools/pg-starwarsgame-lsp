@@ -1528,17 +1528,28 @@ const Shell = styled.div`
         justify-content: start;
     }
 
-    /* The entry's header is the one bold thing on the page, set on the editor's ground rather than
-       in a box of its own: the name, then what classifies it, then where it comes from. */
+    /* The entry's header is the one tile set apart, as the reference's identity tile is: the same
+       panel frame as its neighbours, washed with the theme's accent and edged along the top in it,
+       as the editor marks its active tab. A tint rather than a fill, so the tags and the links in
+       it keep their own colours and their contrast in every theme. */
     .entry-head {
-        border-color: transparent;
-        background: none;
+        border-color: color-mix(
+            in srgb,
+            var(--colour-action) 45%,
+            var(--colour-line-strong)
+        );
+        border-top: var(--space-2) solid var(--colour-action);
+        background: color-mix(
+            in srgb,
+            var(--colour-action) 14%,
+            var(--colour-panel)
+        );
     }
     .entry-head .panel-body {
         display: grid;
         align-content: start;
         gap: var(--space-8);
-        padding: 0;
+        padding: var(--space-12);
     }
     .entry-title {
         margin: 0;
