@@ -243,8 +243,9 @@
     model's counts, tree of bones, meshes and effects, textures, particle systems and animations; a script's
     size, lines, loaders and requires; a schema tag's documentation. A type with nothing to show has none
   - Lua scripts in a Scripts outline by their folder under `Data/Scripts`
-  - The Schema outline: the types with their tags, a tag's page its documentation; the enums; the behaviours
-    with what decides each and the objects that have it
+  - The Schema outline: the types with their tags, a tag's page its documentation; the enums, each built in or
+    dynamic, with their values as children - a dynamic enum's from the game's files and the project's; the
+    behaviours with what decides each and the objects that have it
   - A particle system's references include the models whose proxies carry it, from a proxy catalog the model
     scan and the baseline keep
   - An object's relations by what each is - models, particle systems, particles, SFX and speech events,

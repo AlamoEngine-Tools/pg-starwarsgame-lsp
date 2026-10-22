@@ -620,18 +620,20 @@ Flag: `aet-eaw-edit.features.tools.modBrowser` (on by default). Read-only.
     references. Lua scripts: loaded by, requires. Enums: references
 - **Scripts** - Lua scripts by their folder under `Data/Scripts`: GameObject, Library, Story, AI, Evaluators,
   FreeStore, Interventions, Miscellaneous, and Other for any other
-- **Schema** - the XML types, each with its tags; the enums; the behaviours, with what decides each and the game
+- **Schema** - the XML types, each with its tags; the enums, each built in or dynamic and opening into its values -
+  a dynamic one's from the game's files and the project's; the behaviours, with what decides each and the game
   objects that have it
 - **Previews** - an entry opens into its tiles, each at a fixed place on its type's grid
   - Game object: header, problems, encyclopedia card with its faction switch, references
   - Other XML object: header, problems, what its tags name, references
-  - Model: header with its bones and counts, problems, its tree of bones, meshes and effects, textures,
-    particle systems, animations, references
+  - Model: header with its bones and counts, problems, textures, particle systems, animations, references, and
+    its tree of bones, meshes and effects down the right half
   - Particle system: header, problems, textures, references
   - Lua script: header with its size, lines and dates, loaded by, requires
   - Schema type, tag and behaviour: its documentation - value type, what it references, its enum and values,
     whether it repeats, description, notes
-  - Textures, audio, animations and enums: none; selecting one shows its relations
+  - Enum: whether it is built in or dynamic, its documentation, every value, the tags typed with it
+  - Textures, audio and animations: none; selecting one shows its relations
 - **Tabs** - a click selects; a double click or `Enter` opens the entry in a tab beside the table's own, which keeps
   its search, scroll and selection. One preview tab, in italics, is reused until it is pinned
 - **Actions** - `F12` goes to the definition. The context menu lists only what can be done; a row's hover icons
